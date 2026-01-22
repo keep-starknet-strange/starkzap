@@ -1,54 +1,323 @@
-import { describe, it, expect } from "vitest";
-import { RpcProvider } from "starknet";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { RpcProvider, TransactionFinalityStatus } from "starknet";
 import { Tx } from "../src/tx/index.js";
 import { getTestConfig } from "./config.js";
 
 describe("Tx", () => {
   const { config } = getTestConfig();
 
-  it("should build voyager explorer URL for testnet", () => {
-    const provider = new RpcProvider({
-      nodeUrl: "https://starknet-sepolia.example.com",
+  describe("explorer URL", () => {
+    it("should build voyager explorer URL for testnet", () => {
+      const provider = new RpcProvider({
+        nodeUrl: "https://starknet-sepolia.example.com",
+      });
+      const hash = "0x123abc";
+
+      const tx = new Tx(hash, provider, { provider: "voyager" });
+
+      expect(tx.explorerUrl).toContain("voyager.online");
+      expect(tx.explorerUrl).toContain(hash);
     });
-    const hash = "0x123abc";
 
-    const tx = new Tx(hash, provider, { provider: "voyager" });
+    it("should build starkscan explorer URL", () => {
+      const provider = new RpcProvider({
+        nodeUrl: "https://starknet-sepolia.example.com",
+      });
+      const hash = "0x123abc";
 
-    expect(tx.explorerUrl).toContain("voyager.online");
-    expect(tx.explorerUrl).toContain(hash);
+      const tx = new Tx(hash, provider, { provider: "starkscan" });
+
+      expect(tx.explorerUrl).toContain("starkscan.co");
+      expect(tx.explorerUrl).toContain(hash);
+    });
+
+    it("should use custom base URL", () => {
+      const provider = new RpcProvider({
+        nodeUrl: "https://starknet-sepolia.example.com",
+      });
+      const hash = "0x123abc";
+
+      const tx = new Tx(hash, provider, {
+        baseUrl: "https://my-explorer.com",
+      });
+
+      expect(tx.explorerUrl).toBe("https://my-explorer.com/tx/0x123abc");
+    });
+
+    it("should default to voyager when no config", () => {
+      const provider = new RpcProvider({
+        nodeUrl: "https://starknet-sepolia.example.com",
+      });
+      const hash = "0x123abc";
+
+      const tx = new Tx(hash, provider);
+
+      expect(tx.explorerUrl).toContain("voyager.online");
+    });
+
+    it("should use mainnet URL when nodeUrl contains mainnet", () => {
+      const provider = new RpcProvider({
+        nodeUrl: "https://starknet-mainnet.example.com",
+      });
+      const hash = "0x123abc";
+
+      const tx = new Tx(hash, provider, { provider: "voyager" });
+
+      // Mainnet URL should not have subdomain
+      expect(tx.explorerUrl).toBe("https://voyager.online/tx/0x123abc");
+    });
+
+    it("should use mainnet URL for starkscan", () => {
+      const provider = new RpcProvider({
+        nodeUrl: "https://starknet-mainnet.example.com",
+      });
+      const hash = "0x123abc";
+
+      const tx = new Tx(hash, provider, { provider: "starkscan" });
+
+      expect(tx.explorerUrl).toBe("https://starkscan.co/tx/0x123abc");
+    });
+
+    it("should store hash correctly", () => {
+      const provider = new RpcProvider({ nodeUrl: config.rpcUrl });
+      const hash = "0xdeadbeef";
+
+      const tx = new Tx(hash, provider);
+
+      expect(tx.hash).toBe(hash);
+    });
   });
 
-  it("should build starkscan explorer URL", () => {
-    const provider = new RpcProvider({
-      nodeUrl: "https://starknet-sepolia.example.com",
+  describe("wait", () => {
+    const createMockProvider = (overrides = {}) =>
+      ({
+        channel: { nodeUrl: "https://starknet-sepolia.example.com" },
+        ...overrides,
+      }) as unknown as RpcProvider;
+
+    it("should call provider.waitForTransaction", async () => {
+      const mockProvider = createMockProvider({
+        waitForTransaction: vi.fn().mockResolvedValue({}),
+      });
+
+      const tx = new Tx("0x123", mockProvider);
+
+      await tx.wait({
+        successStates: [TransactionFinalityStatus.ACCEPTED_ON_L2],
+      });
+
+      expect(mockProvider.waitForTransaction).toHaveBeenCalledWith(
+        "0x123",
+        expect.objectContaining({
+          successStates: expect.arrayContaining([
+            TransactionFinalityStatus.ACCEPTED_ON_L2,
+          ]),
+        })
+      );
     });
-    const hash = "0x123abc";
 
-    const tx = new Tx(hash, provider, { provider: "starkscan" });
+    it("should use default options when none provided", async () => {
+      const mockProvider = createMockProvider({
+        waitForTransaction: vi.fn().mockResolvedValue({}),
+      });
 
-    expect(tx.explorerUrl).toContain("starkscan.co");
-    expect(tx.explorerUrl).toContain(hash);
+      const tx = new Tx("0x123", mockProvider);
+
+      await tx.wait();
+
+      expect(mockProvider.waitForTransaction).toHaveBeenCalledWith(
+        "0x123",
+        expect.objectContaining({
+          successStates: expect.arrayContaining([
+            TransactionFinalityStatus.ACCEPTED_ON_L2,
+            TransactionFinalityStatus.ACCEPTED_ON_L1,
+          ]),
+        })
+      );
+    });
   });
 
-  it("should use custom base URL", () => {
-    const provider = new RpcProvider({
-      nodeUrl: "https://starknet-sepolia.example.com",
-    });
-    const hash = "0x123abc";
+  describe("receipt", () => {
+    it("should fetch transaction receipt", async () => {
+      const mockReceipt = {
+        execution_status: "SUCCEEDED",
+        finality_status: "ACCEPTED_ON_L2",
+        transaction_hash: "0x123",
+      };
+      const mockProvider = {
+        channel: { nodeUrl: "https://starknet-sepolia.example.com" },
+        getTransactionReceipt: vi.fn().mockResolvedValue(mockReceipt),
+      } as unknown as RpcProvider;
 
-    const tx = new Tx(hash, provider, {
-      baseUrl: "https://my-explorer.com",
+      const tx = new Tx("0x123", mockProvider);
+      const receipt = await tx.receipt();
+
+      expect(receipt).toEqual(mockReceipt);
+      expect(mockProvider.getTransactionReceipt).toHaveBeenCalledWith("0x123");
     });
 
-    expect(tx.explorerUrl).toBe("https://my-explorer.com/tx/0x123abc");
+    it("should cache the receipt", async () => {
+      const mockReceipt = { transaction_hash: "0x123" };
+      const mockProvider = {
+        channel: { nodeUrl: "https://starknet-sepolia.example.com" },
+        getTransactionReceipt: vi.fn().mockResolvedValue(mockReceipt),
+      } as unknown as RpcProvider;
+
+      const tx = new Tx("0x123", mockProvider);
+
+      await tx.receipt();
+      await tx.receipt();
+      await tx.receipt();
+
+      // Should only be called once due to caching
+      expect(mockProvider.getTransactionReceipt).toHaveBeenCalledTimes(1);
+    });
   });
 
-  it("should store hash correctly", () => {
-    const provider = new RpcProvider({ nodeUrl: config.rpcUrl });
-    const hash = "0xdeadbeef";
+  describe("watch", () => {
+    beforeEach(() => {
+      vi.useFakeTimers();
+    });
 
-    const tx = new Tx(hash, provider);
+    afterEach(() => {
+      vi.useRealTimers();
+    });
 
-    expect(tx.hash).toBe(hash);
+    it("should call callback with status updates", async () => {
+      const mockProvider = {
+        channel: { nodeUrl: "https://starknet-sepolia.example.com" },
+        getTransactionStatus: vi.fn().mockResolvedValue({
+          finality_status: "RECEIVED",
+          execution_status: undefined,
+        }),
+      } as unknown as RpcProvider;
+
+      const tx = new Tx("0x123", mockProvider);
+      const callback = vi.fn();
+
+      const unsubscribe = tx.watch(callback);
+
+      // Let the first poll happen
+      await vi.advanceTimersByTimeAsync(0);
+
+      expect(callback).toHaveBeenCalledWith({
+        finality: "RECEIVED",
+        execution: undefined,
+      });
+
+      unsubscribe();
+    });
+
+    it("should stop polling when unsubscribe is called", async () => {
+      const mockProvider = {
+        channel: { nodeUrl: "https://starknet-sepolia.example.com" },
+        getTransactionStatus: vi.fn().mockResolvedValue({
+          finality_status: "RECEIVED",
+        }),
+      } as unknown as RpcProvider;
+
+      const tx = new Tx("0x123", mockProvider);
+      const callback = vi.fn();
+
+      const unsubscribe = tx.watch(callback);
+
+      await vi.advanceTimersByTimeAsync(0);
+      expect(callback).toHaveBeenCalledTimes(1);
+
+      unsubscribe();
+
+      // Advance time past several poll intervals
+      await vi.advanceTimersByTimeAsync(20000);
+
+      // Should still only be 1 call since we unsubscribed
+      expect(callback).toHaveBeenCalledTimes(1);
+    });
+
+    it("should stop polling when transaction reaches final status", async () => {
+      const mockProvider = {
+        channel: { nodeUrl: "https://starknet-sepolia.example.com" },
+        getTransactionStatus: vi.fn().mockResolvedValue({
+          finality_status: "ACCEPTED_ON_L2",
+          execution_status: "SUCCEEDED",
+        }),
+      } as unknown as RpcProvider;
+
+      const tx = new Tx("0x123", mockProvider);
+      const callback = vi.fn();
+
+      tx.watch(callback);
+
+      await vi.advanceTimersByTimeAsync(0);
+
+      // Callback should be called once with final status
+      expect(callback).toHaveBeenCalledWith({
+        finality: "ACCEPTED_ON_L2",
+        execution: "SUCCEEDED",
+      });
+
+      // Advance time and verify no more calls
+      await vi.advanceTimersByTimeAsync(20000);
+      expect(callback).toHaveBeenCalledTimes(1);
+    });
+
+    it("should continue polling on errors", async () => {
+      let callCount = 0;
+      const mockProvider = {
+        channel: { nodeUrl: "https://starknet-sepolia.example.com" },
+        getTransactionStatus: vi.fn().mockImplementation(() => {
+          callCount++;
+          if (callCount === 1) {
+            return Promise.reject(new Error("Network error"));
+          }
+          return Promise.resolve({
+            finality_status: "ACCEPTED_ON_L2",
+            execution_status: "SUCCEEDED",
+          });
+        }),
+      } as unknown as RpcProvider;
+
+      const tx = new Tx("0x123", mockProvider);
+      const callback = vi.fn();
+
+      const unsubscribe = tx.watch(callback);
+
+      // First poll - error, no callback
+      await vi.advanceTimersByTimeAsync(0);
+      expect(callback).not.toHaveBeenCalled();
+
+      // Wait for retry interval
+      await vi.advanceTimersByTimeAsync(5000);
+      expect(callback).toHaveBeenCalledWith({
+        finality: "ACCEPTED_ON_L2",
+        execution: "SUCCEEDED",
+      });
+
+      unsubscribe();
+    });
+
+    it("should stop on REVERTED status", async () => {
+      const mockProvider = {
+        channel: { nodeUrl: "https://starknet-sepolia.example.com" },
+        getTransactionStatus: vi.fn().mockResolvedValue({
+          finality_status: "RECEIVED",
+          execution_status: "REVERTED",
+        }),
+      } as unknown as RpcProvider;
+
+      const tx = new Tx("0x123", mockProvider);
+      const callback = vi.fn();
+
+      tx.watch(callback);
+
+      await vi.advanceTimersByTimeAsync(0);
+      expect(callback).toHaveBeenCalledWith({
+        finality: "RECEIVED",
+        execution: "REVERTED",
+      });
+
+      // Advance time and verify no more calls (stopped due to REVERTED)
+      await vi.advanceTimersByTimeAsync(20000);
+      expect(callback).toHaveBeenCalledTimes(1);
+    });
   });
 });

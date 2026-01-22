@@ -94,8 +94,8 @@ describe("Sponsorship (AVNU Paymaster)", () => {
         },
         feeMode: "sponsored",
         timeBounds: {
-          executeAfter: BigInt(Math.floor(Date.now() / 1000)),
-          executeBefore: BigInt(Math.floor(Date.now() / 1000) + 3600),
+          executeAfter: Math.floor(Date.now() / 1000),
+          executeBefore: Math.floor(Date.now() / 1000) + 3600,
         },
       });
 

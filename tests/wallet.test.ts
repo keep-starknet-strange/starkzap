@@ -1,7 +1,11 @@
 import { describe, it, expect, beforeAll } from "vitest";
 import { StarkSDK } from "../src/sdk.js";
 import { StarkSigner } from "../src/signer/stark.js";
-import { OpenZeppelinPreset, ArgentPreset } from "../src/account/presets.js";
+import {
+  OpenZeppelinPreset,
+  ArgentPreset,
+  BraavosPreset,
+} from "../src/account/presets.js";
 import { getTestConfig, testPrivateKeys } from "./config.js";
 
 describe("Wallet", () => {
@@ -48,12 +52,28 @@ describe("Wallet", () => {
       expect(wallet.address).toBeDefined();
     });
 
+    it("should connect with Braavos preset", async () => {
+      const signer = new StarkSigner(privateKey);
+      const wallet = await sdk.connectWallet({
+        account: {
+          signer,
+          accountClass: BraavosPreset,
+        },
+      });
+
+      expect(wallet.address).toBeDefined();
+    });
+
     it("should compute different addresses for different signers", async () => {
       const signer1 = new StarkSigner(testPrivateKeys.key1);
       const signer2 = new StarkSigner(testPrivateKeys.key2);
 
-      const wallet1 = await sdk.connectWallet({ account: { signer: signer1 } });
-      const wallet2 = await sdk.connectWallet({ account: { signer: signer2 } });
+      const wallet1 = await sdk.connectWallet({
+        account: { signer: signer1 },
+      });
+      const wallet2 = await sdk.connectWallet({
+        account: { signer: signer2 },
+      });
 
       expect(wallet1.address).not.toBe(wallet2.address);
     });
@@ -89,11 +109,23 @@ describe("Wallet", () => {
 
       expect(wallet.address).toBeDefined();
     });
+
+    it("should pass feeMode and timeBounds to wallet", async () => {
+      const signer = new StarkSigner(privateKey);
+      const wallet = await sdk.connectWallet({
+        account: { signer },
+        feeMode: "sponsored",
+        timeBounds: {
+          executeBefore: Math.floor(Date.now() / 1000) + 3600,
+        },
+      });
+
+      expect(wallet.address).toBeDefined();
+    });
   });
 
   describe("isDeployed", () => {
     it("should return false for new account", async () => {
-      // Use a random key that's unlikely to be deployed
       const signer = new StarkSigner(testPrivateKeys.random());
 
       const wallet = await sdk.connectWallet({
@@ -130,14 +162,54 @@ describe("Wallet", () => {
         account: { signer },
       });
 
-      // With AVNU paymaster built into starknet.js, sponsored is always available
       const result = await wallet.preflight({
         kind: "execute",
         feeMode: "sponsored",
       });
 
-      // Should succeed since AVNU paymaster is built-in (no sponsor config needed)
       expect(result.ok).toBe(true);
+    });
+
+    it("should return ok for execute preflight with undeployed account", async () => {
+      const signer = new StarkSigner(testPrivateKeys.random());
+      const wallet = await sdk.connectWallet({
+        account: { signer },
+      });
+
+      // 'execute' kind allows undeployed accounts
+      const result = await wallet.preflight({
+        kind: "execute",
+      });
+
+      expect(result.ok).toBe(true);
+    });
+  });
+
+  describe("getAccount", () => {
+    it("should return the underlying starknet.js account", async () => {
+      const signer = new StarkSigner(privateKey);
+      const wallet = await sdk.connectWallet({
+        account: { signer },
+      });
+
+      const account = wallet.getAccount();
+
+      expect(account).toBeDefined();
+      expect(account.address).toBe(wallet.address);
+    });
+  });
+});
+
+describe("StarkSDK", () => {
+  const { config } = getTestConfig();
+
+  describe("getProvider", () => {
+    it("should return the RPC provider", () => {
+      const sdk = new StarkSDK(config);
+      const provider = sdk.getProvider();
+
+      expect(provider).toBeDefined();
+      expect(provider.channel).toBeDefined();
     });
   });
 });

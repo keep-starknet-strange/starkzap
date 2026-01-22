@@ -33,6 +33,7 @@
     "format:check": "prettier --check .",
     "test": "vitest run --exclude tests/integration/**",
     "test:watch": "vitest --exclude tests/integration/**",
+    "test:coverage": "vitest run --exclude tests/integration/** --coverage",
     "test:devnet": "TEST_NETWORK=devnet vitest run --exclude tests/integration/**",
     "test:testnet": "TEST_NETWORK=testnet vitest run --exclude tests/integration/**",
     "test:integration": "./scripts/test-integration.sh",
@@ -41,6 +42,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.39.2",
+    "@vitest/coverage-v8": "^4.0.17",
     "eslint": "^9.39.2",
     "eslint-config-prettier": "^10.1.8",
     "husky": "^9.1.7",
