@@ -18,14 +18,30 @@ import type {
   PrepareOptions,
 } from "../types/wallet.js";
 import type { SDKConfig } from "../types/config.js";
+import type { WalletInterface } from "./interface.js";
+
+export { type WalletInterface } from "./interface.js";
 
 /**
- * Represents a connected Starknet wallet.
- * Provides methods for deployment, transaction execution, and preflight checks.
+ * Wallet implementation using a custom signer and account preset.
  *
- * Sponsored transactions use AVNU's paymaster (built into starknet.js).
+ * This is the default wallet implementation that uses:
+ * - A `SignerInterface` for signing (e.g., `StarkSigner` with a private key)
+ * - An `AccountClassConfig` preset (e.g., `OpenZeppelinPreset`, `ArgentPreset`)
+ *
+ * For Cartridge Controller integration, use `CartridgeWallet` instead.
+ *
+ * @example
+ * ```ts
+ * const wallet = await sdk.connectWallet({
+ *   account: {
+ *     signer: new StarkSigner(privateKey),
+ *     accountClass: OpenZeppelinPreset,
+ *   }
+ * });
+ * ```
  */
-export class Wallet {
+export class Wallet implements WalletInterface {
   /** The wallet's Starknet address */
   readonly address: string;
 

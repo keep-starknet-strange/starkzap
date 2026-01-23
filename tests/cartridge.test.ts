@@ -2,135 +2,122 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 
 // Mock the @cartridge/controller module
 vi.mock("@cartridge/controller", () => {
-  const mockAccount = {
+  const mockWalletAccount = {
     address: "0x1234567890abcdef",
     signer: {
       signTransaction: vi.fn().mockResolvedValue(["0xsig1", "0xsig2"]),
       signMessage: vi.fn().mockResolvedValue(["0xmsg1", "0xmsg2"]),
     },
     signMessage: vi.fn().mockResolvedValue(["0xmsg1", "0xmsg2"]),
+    execute: vi.fn().mockResolvedValue({ transaction_hash: "0xtxhash" }),
+    executePaymasterTransaction: vi
+      .fn()
+      .mockResolvedValue({ transaction_hash: "0xsponsored" }),
+    buildPaymasterTransaction: vi.fn().mockResolvedValue({
+      type: "invoke",
+      typed_data: {},
+      fee: { gas_price: "0x1" },
+    }),
+    preparePaymasterTransaction: vi.fn().mockResolvedValue({
+      type: "invoke",
+      invoke: { signature: ["0xsig"] },
+    }),
+    simulateTransaction: vi.fn().mockResolvedValue([
+      {
+        transaction_trace: {
+          execute_invocation: {},
+        },
+      },
+    ]),
   };
 
   class MockController {
     probe = vi.fn().mockResolvedValue(null);
-    connect = vi.fn().mockResolvedValue(mockAccount);
+    connect = vi.fn().mockResolvedValue(mockWalletAccount);
     disconnect = vi.fn().mockResolvedValue(undefined);
     openProfile = vi.fn();
     openSettings = vi.fn();
     username = vi.fn().mockResolvedValue("testuser");
+    rpcUrl = vi.fn().mockReturnValue("https://api.cartridge.gg/x/test");
+    keychain = {
+      deploy: vi.fn().mockResolvedValue({
+        code: "SUCCESS",
+        transaction_hash: "0xdeploy",
+      }),
+    };
   }
 
   return { default: MockController };
 });
 
-import { CartridgeSigner } from "../src/signer/cartridge.js";
+// Mock starknet RpcProvider
+vi.mock("starknet", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("starknet")>();
 
-describe("CartridgeSigner", () => {
+  class MockRpcProvider {
+    channel = { nodeUrl: "https://test.rpc" };
+    getClassHashAt = vi.fn().mockResolvedValue("0xclasshash");
+  }
+
+  return {
+    ...actual,
+    RpcProvider: MockRpcProvider,
+  };
+});
+
+import { CartridgeWallet } from "../src/wallet/cartridge.js";
+
+describe("CartridgeWallet", () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
   describe("create", () => {
-    it("should create and connect a CartridgeSigner", async () => {
-      const signer = await CartridgeSigner.create({
+    it("should create and connect a CartridgeWallet", async () => {
+      const wallet = await CartridgeWallet.create({
         rpcUrl: "https://api.cartridge.gg/x/starknet/sepolia",
       });
 
-      expect(signer).toBeInstanceOf(CartridgeSigner);
-      expect(signer.isConnected()).toBe(true);
+      expect(wallet).toBeInstanceOf(CartridgeWallet);
+      expect(wallet.address).toBe("0x1234567890abcdef");
     });
 
     it("should accept policies option", async () => {
-      const signer = await CartridgeSigner.create({
+      const wallet = await CartridgeWallet.create({
         policies: [{ target: "0xCONTRACT", method: "transfer" }],
       });
 
-      expect(signer.isConnected()).toBe(true);
+      expect(wallet.address).toBeDefined();
     });
 
     it("should work with no options", async () => {
-      const signer = await CartridgeSigner.create();
+      const wallet = await CartridgeWallet.create();
 
-      expect(signer.isConnected()).toBe(true);
+      expect(wallet.address).toBeDefined();
+    });
+
+    it("should accept feeMode and timeBounds options", async () => {
+      const wallet = await CartridgeWallet.create({
+        feeMode: "sponsored",
+        timeBounds: { executeBefore: 12345 },
+      });
+
+      expect(wallet.address).toBeDefined();
     });
   });
 
-  describe("connect", () => {
-    it("should use existing session if available", async () => {
-      // First create a signer
-      const signer = await CartridgeSigner.create();
-      const controller = signer.getController();
+  describe("isDeployed", () => {
+    it("should return true when deployed", async () => {
+      const wallet = await CartridgeWallet.create();
+      const deployed = await wallet.isDeployed();
 
-      // Mock probe to return an existing account
-      const mockExistingAccount = {
-        address: "0xexisting",
-        signer: { signTransaction: vi.fn(), signMessage: vi.fn() },
-        signMessage: vi.fn(),
-      };
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (controller.probe as any).mockResolvedValueOnce(mockExistingAccount);
-
-      // Reconnect should use probe
-      const account = await signer.connect();
-      expect(account.address).toBe("0xexisting");
-    });
-
-    it("should throw if connection fails", async () => {
-      const signer = await CartridgeSigner.create();
-      const controller = signer.getController();
-
-      // Mock probe and connect to return null (cancelled)
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (controller.probe as any).mockResolvedValueOnce(null);
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (controller.connect as any).mockResolvedValueOnce(null);
-
-      await expect(signer.connect()).rejects.toThrow(
-        "Cartridge connection cancelled or failed"
-      );
+      expect(deployed).toBe(true);
     });
   });
 
-  describe("getPubKey", () => {
-    it("should return the account address", async () => {
-      const signer = await CartridgeSigner.create();
-      const pubKey = await signer.getPubKey();
-
-      expect(pubKey).toBe("0x1234567890abcdef");
-    });
-  });
-
-  describe("getAccount", () => {
-    it("should return the connected wallet account", async () => {
-      const signer = await CartridgeSigner.create();
-      const account = signer.getAccount();
-
-      expect(account.address).toBe("0x1234567890abcdef");
-    });
-  });
-
-  describe("signMessage", () => {
-    it("should delegate to wallet account", async () => {
-      const signer = await CartridgeSigner.create();
-      const typedData = {
-        types: {
-          StarknetDomain: [{ name: "name", type: "felt" }],
-          Message: [{ name: "content", type: "felt" }],
-        },
-        primaryType: "Message" as const,
-        domain: { name: "Test" },
-        message: { content: "0x1234" },
-      };
-
-      const signature = await signer.signMessage(typedData, "0xaccount");
-
-      expect(signature).toEqual(["0xmsg1", "0xmsg2"]);
-    });
-  });
-
-  describe("signTransaction", () => {
-    it("should delegate to wallet account signer", async () => {
-      const signer = await CartridgeSigner.create();
+  describe("execute", () => {
+    it("should execute calls and return Tx", async () => {
+      const wallet = await CartridgeWallet.create();
       const calls = [
         {
           contractAddress: "0x123",
@@ -139,53 +126,126 @@ describe("CartridgeSigner", () => {
         },
       ];
 
-      const signature = await signer.signTransaction(calls, {
-        walletAddress: "0xaccount",
-        chainId: "0x534e5f5345504f4c4941" as const,
-        nonce: 0n,
-        version: "0x3" as const,
-        maxFee: 0n,
-        cairoVersion: "1" as const,
-      });
+      const tx = await wallet.execute(calls);
 
-      expect(signature).toEqual(["0xsig1", "0xsig2"]);
+      expect(tx.hash).toBe("0xtxhash");
+    });
+
+    it("should use paymaster for sponsored mode", async () => {
+      const wallet = await CartridgeWallet.create({
+        feeMode: "sponsored",
+      });
+      const calls = [
+        {
+          contractAddress: "0x123",
+          entrypoint: "transfer",
+          calldata: ["0x456", "100"],
+        },
+      ];
+
+      const tx = await wallet.execute(calls);
+
+      expect(tx.hash).toBe("0xsponsored");
     });
   });
 
-  describe("_getStarknetSigner", () => {
-    it("should return the underlying signer", async () => {
-      const signer = await CartridgeSigner.create();
-      const starknetSigner = signer._getStarknetSigner();
+  describe("buildSponsored", () => {
+    it("should build a sponsored transaction", async () => {
+      const wallet = await CartridgeWallet.create();
+      const calls = [
+        {
+          contractAddress: "0x123",
+          entrypoint: "transfer",
+          calldata: [],
+        },
+      ];
 
-      expect(starknetSigner).toBeDefined();
-      expect(typeof starknetSigner.signTransaction).toBe("function");
+      const prepared = await wallet.buildSponsored(calls);
+
+      expect(prepared).toBeDefined();
+      expect(prepared.type).toBe("invoke");
+    });
+  });
+
+  describe("signSponsored", () => {
+    it("should sign a prepared transaction", async () => {
+      const wallet = await CartridgeWallet.create();
+      const prepared = {
+        type: "invoke" as const,
+        typed_data: {},
+        fee: { gas_price: "0x1" },
+      };
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const executable = await wallet.signSponsored(prepared as any);
+
+      expect(executable).toBeDefined();
+    });
+  });
+
+  describe("prepareSponsored", () => {
+    it("should build and sign in one step", async () => {
+      const wallet = await CartridgeWallet.create();
+      const calls = [
+        {
+          contractAddress: "0x123",
+          entrypoint: "transfer",
+          calldata: [],
+        },
+      ];
+
+      const executable = await wallet.prepareSponsored(calls);
+
+      expect(executable).toBeDefined();
+    });
+  });
+
+  describe("preflight", () => {
+    it("should return ok for deployed account", async () => {
+      const wallet = await CartridgeWallet.create();
+
+      const result = await wallet.preflight({ kind: "transfer" });
+
+      expect(result.ok).toBe(true);
+    });
+  });
+
+  describe("getAccount", () => {
+    it("should return the wallet account", async () => {
+      const wallet = await CartridgeWallet.create();
+      const account = wallet.getAccount();
+
+      expect(account.address).toBe("0x1234567890abcdef");
     });
   });
 
   describe("getController", () => {
-    it("should return the Cartridge Controller instance", async () => {
-      const signer = await CartridgeSigner.create();
-      const controller = signer.getController();
+    it("should return the Cartridge Controller", async () => {
+      const wallet = await CartridgeWallet.create();
+      const controller = wallet.getController();
 
       expect(controller).toBeDefined();
       expect(typeof controller.openProfile).toBe("function");
     });
   });
 
-  describe("disconnect", () => {
-    it("should disconnect and clear account", async () => {
-      const signer = await CartridgeSigner.create();
-      expect(signer.isConnected()).toBe(true);
+  describe("username", () => {
+    it("should return the username", async () => {
+      const wallet = await CartridgeWallet.create();
+      const username = await wallet.username();
 
-      await signer.disconnect();
-      expect(signer.isConnected()).toBe(false);
+      expect(username).toBe("testuser");
     });
+  });
 
-    it("should throw when accessing account after disconnect", async () => {
-      const signer = await CartridgeSigner.create();
-      await signer.disconnect();
+  describe("disconnect", () => {
+    it("should disconnect from controller", async () => {
+      const wallet = await CartridgeWallet.create();
+      const controller = wallet.getController();
 
-      expect(() => signer.getAccount()).toThrow("Cartridge not connected");
+      await wallet.disconnect();
+
+      expect(controller.disconnect).toHaveBeenCalled();
     });
   });
 });

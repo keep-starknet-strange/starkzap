@@ -2,6 +2,10 @@ import { RpcProvider } from "starknet";
 import type { SDKConfig } from "./types/config.js";
 import type { ConnectWalletOptions } from "./types/wallet.js";
 import { Wallet } from "./wallet/index.js";
+import {
+  CartridgeWallet,
+  type CartridgeWalletOptions,
+} from "./wallet/cartridge.js";
 import { AccountProvider } from "./wallet/accounts/provider.js";
 
 /**
@@ -98,6 +102,39 @@ export class StarkSDK {
       feeMode,
       timeBounds
     );
+  }
+
+  /**
+   * Connect using Cartridge Controller.
+   *
+   * Opens the Cartridge authentication popup for social login or passkeys.
+   * Returns a CartridgeWallet that implements WalletInterface.
+   *
+   * @example
+   * ```ts
+   * const wallet = await sdk.connectCartridge({
+   *   policies: [
+   *     { target: "0xCONTRACT", method: "transfer" }
+   *   ]
+   * });
+   *
+   * // Use just like any other wallet
+   * await wallet.execute([...]);
+   *
+   * // Access Cartridge-specific features
+   * const controller = wallet.getController();
+   * controller.openProfile();
+   * ```
+   */
+  async connectCartridge(
+    options: Omit<CartridgeWalletOptions, "rpcUrl"> = {}
+  ): Promise<CartridgeWallet> {
+    const explorer = options.explorer ?? this.config.explorer;
+    return CartridgeWallet.create({
+      ...options,
+      rpcUrl: this.config.rpcUrl,
+      ...(explorer && { explorer }),
+    });
   }
 
   /**
