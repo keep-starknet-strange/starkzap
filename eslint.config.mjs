@@ -11,5 +11,17 @@ export default defineConfig(
   eslintConfigPrettier,
   {
     ignores: ["dist/", "node_modules/"],
+  },
+  {
+    rules: {
+      // Allow unused variables with underscore prefix
+      "@typescript-eslint/no-unused-vars": [
+        "error",
+        {
+          argsIgnorePattern: "^_",
+          varsIgnorePattern: "^_",
+        },
+      ],
+    },
   }
 );
