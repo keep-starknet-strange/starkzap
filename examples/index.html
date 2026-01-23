@@ -257,7 +257,7 @@
         </div>
 
         <div class="input-group">
-          <label>RPC URL</label>
+          <label>RPC URL (Sepolia Testnet)</label>
           <input
             type="text"
             id="rpcUrl"
@@ -266,12 +266,27 @@
           />
         </div>
 
+        <div class="grid">
+          <div class="input-group">
+            <label>Private Key (for manual connection)</label>
+            <input type="password" id="privateKey" placeholder="0x..." />
+          </div>
+          <div class="input-group">
+            <label>Account Type</label>
+            <select id="accountPreset">
+              <option value="oz">OpenZeppelin</option>
+              <option value="argent">Argent</option>
+              <option value="braavos">Braavos</option>
+            </select>
+          </div>
+        </div>
+
         <div class="btn-group">
           <button class="btn-primary" id="connectCartridge">
             Connect Cartridge
           </button>
-          <button class="btn-secondary" id="connectDevnet">
-            Connect Devnet
+          <button class="btn-secondary" id="connectPrivateKey">
+            Connect with Key
           </button>
           <button class="btn-secondary" id="disconnect" disabled>
             Disconnect
@@ -284,8 +299,13 @@
         <h2>Wallet Actions</h2>
         <div class="grid">
           <div class="input-group">
-            <label>Contract Address</label>
-            <input type="text" id="contractAddress" placeholder="0x..." />
+            <label>Contract Address (ETH on Sepolia)</label>
+            <input
+              type="text"
+              id="contractAddress"
+              value="0x049d36570d4e46f48e99674bd3fcc84644ddd6b96f7c741b1562b82f9e004dc7"
+              placeholder="0x..."
+            />
           </div>
           <div class="input-group">
             <label>Entrypoint</label>
@@ -354,7 +374,7 @@
 
       // Buttons
       const connectCartridgeBtn = document.getElementById("connectCartridge");
-      const connectDevnetBtn = document.getElementById("connectDevnet");
+      const connectPrivateKeyBtn = document.getElementById("connectPrivateKey");
       const disconnectBtn = document.getElementById("disconnect");
       const executeBtn = document.getElementById("execute");
       const checkDeployedBtn = document.getElementById("checkDeployed");
@@ -366,6 +386,8 @@
       const contractAddressInput = document.getElementById("contractAddress");
       const entrypointInput = document.getElementById("entrypoint");
       const calldataInput = document.getElementById("calldata");
+      const privateKeyInput = document.getElementById("privateKey");
+      const accountPresetSelect = document.getElementById("accountPreset");
 
       // Logging
       function log(message, type = "") {
@@ -392,7 +414,7 @@
         executeSponsoredBtn.disabled = !connected;
         prepareSponsoredBtn.disabled = !connected;
         connectCartridgeBtn.disabled = connected;
-        connectDevnetBtn.disabled = connected;
+        connectPrivateKeyBtn.disabled = connected;
       }
 
       // Initialize SDK
@@ -432,24 +454,41 @@
         }
       });
 
-      // Connect with Devnet (private key)
-      connectDevnetBtn.addEventListener("click", async () => {
+      // Connect with Private Key (testnet)
+      connectPrivateKeyBtn.addEventListener("click", async () => {
         try {
-          log("Connecting to devnet...", "info");
+          const privateKey = privateKeyInput.value.trim();
+          if (!privateKey) {
+            throw new Error("Please enter a private key");
+          }
+
+          log("Connecting with private key...", "info");
           const module = await initSDK();
 
-          // Devnet prefunded account
-          const privateKey = "0x71d7bb07b9a64f6f78ac4c816aff4da9";
           const signer = new module.StarkSigner(privateKey);
+
+          // Get the selected account preset
+          const presetName = accountPresetSelect.value;
+          let accountClass;
+          switch (presetName) {
+            case "argent":
+              accountClass = module.ArgentPreset;
+              break;
+            case "braavos":
+              accountClass = module.BraavosPreset;
+              break;
+            default:
+              accountClass = module.OpenZeppelinPreset;
+          }
 
           wallet = await sdk.connectWallet({
             account: {
               signer,
-              accountClass: module.DevnetPreset,
+              accountClass,
             },
           });
 
-          log(`Connected: ${wallet.address}`, "success");
+          log(`Connected (${presetName}): ${wallet.address}`, "success");
           updateUI();
         } catch (err) {
           log(`Connection failed: ${err.message}`, "error");
