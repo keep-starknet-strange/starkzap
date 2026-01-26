@@ -4,6 +4,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:server": "tsx server.ts",
+    "dev:all": "concurrently \"npm run dev\" \"npm run dev:server\"",
     "build": "vite build",
     "preview": "vite preview"
   },
@@ -11,6 +13,13 @@
     "x": "file:.."
   },
   "devDependencies": {
+    "@privy-io/node": "^0.8.0",
+    "@types/cors": "^2.8.17",
+    "@types/express": "^5.0.0",
+    "concurrently": "^9.1.2",
+    "cors": "^2.8.5",
+    "express": "^4.21.2",
+    "tsx": "^4.19.2",
     "typescript": "^5.9.3",
     "vite": "^7.3.1"
   }

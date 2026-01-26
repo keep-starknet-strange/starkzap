@@ -6,12 +6,31 @@ export { Wallet, type WalletInterface } from "./wallet/index.js";
 export { CartridgeWallet } from "./wallet/cartridge.js";
 export type { CartridgeWalletOptions } from "./wallet/cartridge.js";
 
-// Transaction
+// Submitted Transaction (tracking)
 export { Tx } from "./tx/index.js";
+
+// Signable Transactions (for signing before submission)
+export type {
+  SignableTransaction,
+  SignedTransaction,
+  TransactionDetails,
+  InvokeTransactionDetails,
+  DeployAccountTransactionDetails,
+  DeclareTransactionDetails,
+  ResourceBounds,
+} from "./transaction/index.js";
+export {
+  InvokeTransaction,
+  DeployAccountTransaction,
+  DeclareTransaction,
+} from "./transaction/index.js";
 
 // Signer
 export type { SignerInterface } from "./signer/interface.js";
+export { BaseSigner } from "./signer/base.js";
+export { SignerAdapter } from "./signer/adapter.js";
 export { StarkSigner } from "./signer/stark.js";
+export { PrivySigner, type PrivySignerConfig } from "./signer/privy.js";
 
 // Account Presets
 export {
@@ -19,6 +38,7 @@ export {
   OpenZeppelinPreset,
   ArgentPreset,
   BraavosPreset,
+  ArgentXV050Preset,
 } from "./account/presets.js";
 
 // Token Presets (auto-generated from Voyager API)

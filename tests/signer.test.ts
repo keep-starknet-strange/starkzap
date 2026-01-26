@@ -1,7 +1,7 @@
-import { describe, it, expect, vi } from "vitest";
-import { EDataAvailabilityMode } from "starknet";
-import { StarkSigner } from "../src/index.js";
-import { testPrivateKeys, devnetAccount } from "./config.js";
+import { describe, it, expect } from "vitest";
+import { StarkSigner } from "../src/signer/stark.js";
+import { SignerAdapter } from "../src/signer/adapter.js";
+import { testPrivateKeys } from "./config.js";
 
 describe("StarkSigner", () => {
   describe("getPubKey", () => {
@@ -47,124 +47,64 @@ describe("StarkSigner", () => {
     });
   });
 
-  describe("_getStarknetSigner", () => {
-    it("should have internal starknet signer set in constructor", () => {
+  describe("signRaw", () => {
+    it("should sign a message hash", async () => {
       const signer = new StarkSigner(testPrivateKeys.key1);
+      const hash =
+        "0x7ac3d3a1c64937d2459740b1e76319efd3b305829d59987ca2961ff65ace734";
 
-      // Check that private signer property is set during construction
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      expect((signer as any).signer).toBeDefined();
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      expect(typeof (signer as any).signer.signTransaction).toBe("function");
+      const signature = await signer.signRaw(hash);
+
+      expect(signature).toHaveLength(2);
+      expect(signature[0]).toMatch(/^0x[a-fA-F0-9]+$/);
+      expect(signature[1]).toMatch(/^0x[a-fA-F0-9]+$/);
     });
 
-    it("should return the cached signer instance", () => {
+    it("should produce consistent signatures for same hash", async () => {
       const signer = new StarkSigner(testPrivateKeys.key1);
+      const hash =
+        "0x7ac3d3a1c64937d2459740b1e76319efd3b305829d59987ca2961ff65ace734";
 
-      // Verify _getStarknetSigner returns the cached private signer
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const cachedSigner = (signer as any).signer;
-      const starknetSigner1 = signer._getStarknetSigner();
-      const starknetSigner2 = signer._getStarknetSigner();
+      const sig1 = await signer.signRaw(hash);
+      const sig2 = await signer.signRaw(hash);
 
-      expect(starknetSigner1).toBe(cachedSigner);
-      expect(starknetSigner2).toBe(cachedSigner);
+      expect(sig1).toEqual(sig2);
+    });
+
+    it("should produce different signatures for different hashes", async () => {
+      const signer = new StarkSigner(testPrivateKeys.key1);
+      const hash1 =
+        "0x7ac3d3a1c64937d2459740b1e76319efd3b305829d59987ca2961ff65ace734";
+      // Use a valid Stark field element (< 2^251)
+      const hash2 =
+        "0x01c707ea7771c277429b7e8c8e976c15022e962da430f863f1331a2c8cae8829";
+
+      const sig1 = await signer.signRaw(hash1);
+      const sig2 = await signer.signRaw(hash2);
+
+      expect(sig1).not.toEqual(sig2);
     });
   });
+});
 
-  describe("signMessage", () => {
-    it("should call underlying signer signMessage", async () => {
-      const signer = new StarkSigner(devnetAccount.privateKey);
-      const starknetSigner = signer._getStarknetSigner();
+describe("SignerAdapter", () => {
+  it("should wrap a SignerInterface and provide starknet.js compatibility", async () => {
+    const signer = new StarkSigner(testPrivateKeys.key1);
+    const adapter = new SignerAdapter(signer);
 
-      // Mock the underlying signer
-      const mockSignature = ["0x123", "0x456"];
-      const signMessageSpy = vi
-        .spyOn(starknetSigner, "signMessage")
-        .mockResolvedValue(mockSignature);
-
-      const typedData = {
-        types: {
-          StarknetDomain: [
-            { name: "name", type: "shortstring" },
-            { name: "version", type: "shortstring" },
-            { name: "chainId", type: "shortstring" },
-          ],
-          Message: [{ name: "content", type: "felt" }],
-        },
-        primaryType: "Message" as const,
-        domain: {
-          name: "TestApp",
-          version: "1",
-          chainId: "SN_SEPOLIA",
-        },
-        message: {
-          content: "0x1234",
-        },
-      };
-
-      const signature = await signer.signMessage(
-        typedData,
-        devnetAccount.address
-      );
-
-      expect(signMessageSpy).toHaveBeenCalledWith(
-        typedData,
-        devnetAccount.address
-      );
-      expect(signature).toEqual(mockSignature);
-
-      signMessageSpy.mockRestore();
-    });
+    // Adapter should delegate getPubKey
+    const pubKey = await adapter.getPubKey();
+    expect(pubKey).toBe(await signer.getPubKey());
   });
 
-  describe("signTransaction", () => {
-    it("should call underlying signer signTransaction", async () => {
-      const signer = new StarkSigner(devnetAccount.privateKey);
-      const starknetSigner = signer._getStarknetSigner();
+  it("should have all required starknet.js SignerInterface methods", () => {
+    const signer = new StarkSigner(testPrivateKeys.key1);
+    const adapter = new SignerAdapter(signer);
 
-      // Mock the underlying signer
-      const mockSignature = ["0xabc", "0xdef"];
-      const signTransactionSpy = vi
-        .spyOn(starknetSigner, "signTransaction")
-        .mockResolvedValue(mockSignature);
-
-      const calls = [
-        {
-          contractAddress: "0x123",
-          entrypoint: "transfer",
-          calldata: ["0x456", "100", "0"],
-        },
-      ];
-
-      const transactionDetails = {
-        walletAddress: devnetAccount.address,
-        chainId: "0x534e5f5345504f4c4941" as const,
-        nonce: 0n,
-        version: "0x3" as const,
-        maxFee: 0n,
-        cairoVersion: "1" as const,
-        resourceBounds: {
-          l1_gas: { max_amount: 1000n, max_price_per_unit: 1000000n },
-          l2_gas: { max_amount: 0n, max_price_per_unit: 0n },
-          l1_data_gas: { max_amount: 0n, max_price_per_unit: 0n },
-        },
-        tip: 0n,
-        paymasterData: [],
-        accountDeploymentData: [],
-        nonceDataAvailabilityMode: EDataAvailabilityMode.L1,
-        feeDataAvailabilityMode: EDataAvailabilityMode.L1,
-      };
-
-      const signature = await signer.signTransaction(calls, transactionDetails);
-
-      expect(signTransactionSpy).toHaveBeenCalledWith(
-        calls,
-        transactionDetails
-      );
-      expect(signature).toEqual(mockSignature);
-
-      signTransactionSpy.mockRestore();
-    });
+    expect(typeof adapter.getPubKey).toBe("function");
+    expect(typeof adapter.signMessage).toBe("function");
+    expect(typeof adapter.signTransaction).toBe("function");
+    expect(typeof adapter.signDeployAccountTransaction).toBe("function");
+    expect(typeof adapter.signDeclareTransaction).toBe("function");
   });
 });

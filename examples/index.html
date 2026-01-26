@@ -404,7 +404,7 @@
       <div id="connect-section" class="card">
         <div class="card-title">Connect Wallet</div>
 
-        <div class="connect-grid">
+        <div class="connect-grid" style="grid-template-columns: 1fr 1fr 1fr">
           <button id="btn-cartridge" class="btn btn-cartridge">
             <svg
               width="20"
@@ -419,6 +419,26 @@
               <path d="M2 12l10 5 10-5" />
             </svg>
             Cartridge
+          </button>
+          <button
+            id="btn-privy"
+            class="btn btn-privy"
+            style="
+              background: linear-gradient(135deg, #8b5cf6 0%, #6366f1 100%);
+            "
+          >
+            <svg
+              width="20"
+              height="20"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+            >
+              <circle cx="12" cy="12" r="10" />
+              <path d="M12 6v6l4 2" />
+            </svg>
+            Privy
           </button>
           <button id="btn-toggle-pk" class="btn btn-secondary">
             <svg
@@ -463,6 +483,41 @@
               style="width: 100%"
             >
               Connect
+            </button>
+          </div>
+        </div>
+
+        <div id="privy-form" class="hidden">
+          <div class="divider">Privy Connection</div>
+          <div class="form-group">
+            <label for="privy-email">Email</label>
+            <input
+              type="email"
+              id="privy-email"
+              placeholder="user@example.com"
+              autocomplete="email"
+            />
+          </div>
+          <p
+            style="
+              font-size: 0.8rem;
+              color: var(--text-muted);
+              margin-bottom: 1rem;
+            "
+          >
+            Enter your email to register or login.<br />
+            A Starknet wallet will be created for you.
+          </p>
+          <div class="form-group">
+            <button
+              id="btn-connect-privy"
+              class="btn btn-primary"
+              style="
+                width: 100%;
+                background: linear-gradient(135deg, #8b5cf6 0%, #6366f1 100%);
+              "
+            >
+              Register / Login
             </button>
           </div>
         </div>

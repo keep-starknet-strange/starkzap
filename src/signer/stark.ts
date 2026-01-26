@@ -1,14 +1,5 @@
-import {
-  Signer,
-  ec,
-  type Call,
-  type InvocationsSignerDetails,
-  type Signature,
-  type SignerInterface as StarknetSignerInterface,
-  type TypedData,
-} from "starknet";
-import type { SignerInterface } from "./interface.js";
-import type { Address } from "../types/index.js";
+import { ec, type Signature } from "starknet";
+import { BaseSigner } from "./base.js";
 
 /**
  * Standard Stark curve signer using a private key.
@@ -18,35 +9,22 @@ import type { Address } from "../types/index.js";
  * const signer = new StarkSigner("0xPRIVATE_KEY");
  * ```
  */
-export class StarkSigner implements SignerInterface {
+export class StarkSigner extends BaseSigner {
   private readonly publicKey: string;
-  private readonly signer: Signer;
+  private readonly privateKey: string;
 
   constructor(privateKey: string) {
+    super();
+    this.privateKey = privateKey;
     this.publicKey = ec.starkCurve.getStarkKey(privateKey);
-    this.signer = new Signer(privateKey);
   }
 
   async getPubKey(): Promise<string> {
     return this.publicKey;
   }
 
-  async signMessage(
-    typedData: TypedData,
-    accountAddress: Address
-  ): Promise<Signature> {
-    return this.signer.signMessage(typedData, accountAddress);
-  }
-
-  async signTransaction(
-    transactions: Call[],
-    transactionsDetail: InvocationsSignerDetails
-  ): Promise<Signature> {
-    return this.signer.signTransaction(transactions, transactionsDetail);
-  }
-
-  /** @internal */
-  _getStarknetSigner(): StarknetSignerInterface {
-    return this.signer;
+  async signRaw(hash: string): Promise<Signature> {
+    const signature = ec.starkCurve.sign(hash, this.privateKey);
+    return ["0x" + signature.r.toString(16), "0x" + signature.s.toString(16)];
   }
 }

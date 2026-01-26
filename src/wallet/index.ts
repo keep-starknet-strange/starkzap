@@ -6,9 +6,11 @@ import {
   type PaymasterTimeBounds,
   type PreparedTransaction,
   TransactionFinalityStatus,
+  type ResourceBounds,
 } from "starknet";
 import { Tx } from "../tx/index.js";
 import { AccountProvider } from "./accounts/provider.js";
+import { SignerAdapter } from "../signer/adapter.js";
 import type {
   EnsureReadyOptions,
   ExecuteOptions,
@@ -22,6 +24,25 @@ import type { WalletInterface } from "./interface.js";
 import { Address } from "../types/address.js";
 
 export { type WalletInterface } from "./interface.js";
+/**
+ * Convert resource bounds to BigInt format expected by v3hash functions.
+ */
+function toResourceBoundsBigInt(resourceBounds: ResourceBounds) {
+  return {
+    l1_gas: {
+      max_amount: BigInt(resourceBounds.l1_gas.max_amount),
+      max_price_per_unit: BigInt(resourceBounds.l1_gas.max_price_per_unit),
+    },
+    l2_gas: {
+      max_amount: BigInt(resourceBounds.l2_gas.max_amount),
+      max_price_per_unit: BigInt(resourceBounds.l2_gas.max_price_per_unit),
+    },
+    l1_data_gas: {
+      max_amount: BigInt(resourceBounds.l1_data_gas.max_amount),
+      max_price_per_unit: BigInt(resourceBounds.l1_data_gas.max_price_per_unit),
+    },
+  };
+}
 
 /**
  * Wallet implementation using a custom signer and account preset.
@@ -80,11 +101,14 @@ export class Wallet implements WalletInterface {
     const address = await accountProvider.getAddress();
     const signer = accountProvider.getSigner();
 
+    // Wrap the SDK signer in an adapter for starknet.js compatibility
+    const signerAdapter = new SignerAdapter(signer);
+
     // Create account with optional custom paymaster
     const accountOptions = {
       provider,
       address,
-      signer: signer._getStarknetSigner(),
+      signer: signerAdapter,
       ...(config.paymaster && { paymaster: config.paymaster }),
     };
     const account = new Account(accountOptions);
@@ -157,13 +181,49 @@ export class Wallet implements WalletInterface {
     const constructorCalldata =
       this.accountProvider.getConstructorCalldata(publicKey);
 
-    // Note: AVNU paymaster doesn't support account deployment yet
-    // Always use regular deployment
-    const { transaction_hash } = await this.account.deployAccount({
+    // Estimate fees first
+    const estimateFee = await this.account.estimateAccountDeployFee({
       classHash,
       constructorCalldata,
       addressSalt: publicKey,
     });
+
+    // Helper to safely convert to BigInt and multiply
+    const multiply2x = (value: unknown): string => {
+      const bigVal = BigInt(String(value ?? 0));
+      return "0x" + (bigVal * 2n).toString(16);
+    };
+
+    // Apply 2x multiplier to resource bounds for safety margin
+    const l1Gas = estimateFee.resourceBounds.l1_gas;
+    const l2Gas = estimateFee.resourceBounds.l2_gas;
+    const l1DataGas = estimateFee.resourceBounds.l1_data_gas;
+
+    const resourceBounds = {
+      l1_gas: {
+        max_amount: multiply2x(l1Gas.max_amount),
+        max_price_per_unit: multiply2x(l1Gas.max_price_per_unit),
+      },
+      l2_gas: {
+        max_amount: multiply2x(l2Gas.max_amount),
+        max_price_per_unit: multiply2x(l2Gas.max_price_per_unit),
+      },
+      l1_data_gas: {
+        max_amount: multiply2x(l1DataGas?.max_amount),
+        max_price_per_unit: multiply2x(l1DataGas?.max_price_per_unit),
+      },
+    };
+
+    // Note: AVNU paymaster doesn't support account deployment yet
+    // Always use regular deployment
+    const { transaction_hash } = await this.account.deployAccount(
+      {
+        classHash,
+        constructorCalldata,
+        addressSalt: publicKey,
+      },
+      { resourceBounds: toResourceBoundsBigInt(resourceBounds) }
+    );
 
     return new Tx(transaction_hash, this.provider, this.config.explorer);
   }
