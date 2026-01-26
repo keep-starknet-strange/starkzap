@@ -1,11 +1,11 @@
 import { describe, it, expect, beforeAll } from "vitest";
 import { StarkSDK } from "../src/sdk.js";
-import { StarkSigner } from "../src/signer/stark.js";
+import { StarkSigner } from "../src/index.js";
 import {
   OpenZeppelinPreset,
   ArgentPreset,
   BraavosPreset,
-} from "../src/account/presets.js";
+} from "../src/index.js";
 import { getTestConfig, testPrivateKeys } from "./config.js";
 
 describe("Wallet", () => {

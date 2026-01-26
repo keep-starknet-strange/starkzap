@@ -1,11 +1,11 @@
 import { describe, it, expect } from "vitest";
 import { AccountProvider } from "../src/wallet/accounts/provider.js";
-import { StarkSigner } from "../src/signer/stark.js";
+import { StarkSigner } from "../src/index.js";
 import {
   OpenZeppelinPreset,
   ArgentPreset,
   BraavosPreset,
-} from "../src/account/presets.js";
+} from "../src/index.js";
 import { testPrivateKeys } from "./config.js";
 
 describe("AccountProvider", () => {

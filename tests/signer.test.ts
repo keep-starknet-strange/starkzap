@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
 import { EDataAvailabilityMode } from "starknet";
-import { StarkSigner } from "../src/signer/stark.js";
+import { StarkSigner } from "../src/index.js";
 import { testPrivateKeys, devnetAccount } from "./config.js";
 
 describe("StarkSigner", () => {

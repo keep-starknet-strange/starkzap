@@ -1,8 +1,8 @@
 import { describe, it, expect, beforeAll } from "vitest";
 import { RpcProvider } from "starknet";
 import { StarkSDK } from "../../src/sdk.js";
-import { StarkSigner } from "../../src/signer/stark.js";
-import { DevnetPreset } from "../../src/account/presets.js";
+import { StarkSigner } from "../../src/index.js";
+import { DevnetPreset } from "../../src/index.js";
 import { getTestConfig, testPrivateKeys } from "../config.js";
 
 /**

@@ -66,7 +66,7 @@ vi.mock("starknet", async (importOriginal) => {
   };
 });
 
-import { CartridgeWallet } from "../src/wallet/cartridge.js";
+import { CartridgeWallet } from "../src/index.js";
 
 describe("CartridgeWallet", () => {
   beforeEach(() => {

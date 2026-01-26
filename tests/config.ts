@@ -1,4 +1,4 @@
-import type { SDKConfig } from "../src/types/config.js";
+import type { SDKConfig } from "../src/index.js";
 
 /**
  * Test configuration for Starknet Sepolia testnet.
