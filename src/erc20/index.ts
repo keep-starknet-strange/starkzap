@@ -45,7 +45,7 @@ export class Erc20 {
    * import { Erc20, Amount, USDC } from "x";
    *
    * const erc20 = new Erc20(USDC);
-   * const amount = Amount.fromTokenUnit("100", USDC);
+   * const amount = Amount.parse("100", USDC);
    *
    * await erc20.transfer({
    *   from: wallet,
@@ -106,6 +106,6 @@ export class Erc20 {
       high: result[1] as string,
     });
 
-    return Amount.fromTokenBase(balance, this.token);
+    return Amount.fromRaw(balance, this.token);
   }
 }

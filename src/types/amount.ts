@@ -17,25 +17,34 @@ import type { Token } from "./token.js";
 export type AmountInput = string | number | bigint;
 
 /**
+ * Arguments for the Amount constructor.
+ * Either a Token object, or the number of decimal places and optional symbol.
+ */
+export type AmountArgs = [token: Token] | [decimals: number, symbol?: string];
+
+/**
  * Represents a token amount with precision handling for blockchain operations.
  *
  * The Amount class provides a safe way to handle token amounts by distinguishing between:
  * - **Unit values**: Human-readable values (e.g., 1.5 ETH, 100 USDC)
- * - **Base values**: Raw blockchain values with full precision (e.g., 1500000000000000000 wei)
+ * - **Raw values**: Raw blockchain values with full precision (e.g., 1500000000000000000 wei)
  *
  * This separation prevents common precision errors when working with blockchain token amounts.
  *
  * @example
  * ```ts
- * // Creating from human-readable unit values
- * const ethAmount = Amount.fromUnit("1.5", 18, "ETH");
- * const usdcAmount = Amount.fromUnit(100, 6, "USDC");
+ * // Creating from human-readable values with a Token
+ * const strkAmount = Amount.parse("10", STRK);
+ * const usdcAmount = Amount.parse(100, USDC);
  *
- * // Creating from raw blockchain values
- * const rawAmount = Amount.fromBase(1500000000000000000n, 18, "ETH");
+ * // Creating from human-readable values with decimals
+ * const ethAmount = Amount.parse("1.5", 18, "ETH");
  *
- * // Using with Token presets
- * const strkAmount = Amount.fromTokenUnit("10", STRK);
+ * // Creating from raw blockchain values with a Token
+ * const balance = Amount.fromRaw(1500000000000000000n, ETH);
+ *
+ * // Creating from raw blockchain values with decimals
+ * const rawAmount = Amount.fromRaw(1500000000000000000n, 18, "ETH");
  *
  * // Converting for display or contract calls
  * console.log(ethAmount.toUnit());      // "1.5"
@@ -67,62 +76,47 @@ export class Amount {
   }
 
   /**
-   * Creates an Amount from a human-readable unit value using a Token definition.
-   *
-   * This is the recommended method when working with known tokens as it automatically
-   * uses the correct decimals and symbol from the token configuration.
-   *
-   * @param amount - The unit amount as string, number, or bigint (e.g., "1.5", 100, 10n)
-   * @param token - Token definition containing decimals and symbol
-   * @returns A new Amount instance
-   * @throws Error if the amount format is invalid or exceeds token precision
-   *
-   * @example
-   * ```ts
-   * import { STRK, USDC } from "x";
-   *
-   * const strkAmount = Amount.fromTokenUnit("1.5", STRK);
-   * const usdcAmount = Amount.fromTokenUnit(100, USDC);
-   * ```
-   */
-  static fromTokenUnit(amount: AmountInput, token: Token): Amount {
-    return this.fromUnit(amount, token.decimals, token.symbol);
-  }
-
-  /**
    * Creates an Amount from a human-readable unit value (e.g., "1.5" ETH).
    *
    * Use this method when you have a value that a user would recognize,
    * like "1.5" for 1.5 ETH or "100" for 100 USDC.
    *
    * @param amount - The unit amount as string, number, or bigint
-   * @param decimals - Number of decimal places for the token (e.g., 18 for ETH, 6 for USDC)
-   * @param symbol - Optional token symbol for display formatting
+   * @param args - Either a `Token` object, or `decimals` and optional `symbol`:
+   *   - `(token: Token)` - Uses the token's decimals and symbol
+   *   - `(decimals: number, symbol?: string)` - Uses explicit decimals and optional symbol
    * @returns A new Amount instance
    * @throws Error if the amount format is invalid (negative, non-numeric)
    * @throws Error if the amount exceeds the specified decimal precision
    *
    * @example
    * ```ts
-   * // From string (most precise)
-   * Amount.fromUnit("1.5", 18, "ETH")     // 1.5 ETH = 1500000000000000000 wei
+   * // With a Token (recommended for known tokens)
+   * Amount.parse("1.5", STRK)          // Uses STRK's decimals and symbol
+   * Amount.parse(100, USDC)            // Uses USDC's decimals and symbol
    *
-   * // From number (be careful with floating point)
-   * Amount.fromUnit(1.5, 18, "ETH")       // Same as above
-   *
-   * // From bigint (treated as whole units)
-   * Amount.fromUnit(10n, 18, "ETH")       // 10 ETH = 10000000000000000000 wei
-   *
-   * // With different decimals
-   * Amount.fromUnit("100", 6, "USDC")     // 100 USDC = 100000000 base units
-   * Amount.fromUnit("0.5", 8, "BTC")      // 0.5 BTC = 50000000 satoshis
+   * // With decimals and optional symbol
+   * Amount.parse("1.5", 18, "ETH")     // 1.5 ETH = 1500000000000000000 wei
+   * Amount.parse(1.5, 18, "ETH")       // Same as above (number input)
+   * Amount.parse(10n, 18, "ETH")       // 10 ETH (bigint treated as whole units)
+   * Amount.parse("100", 6, "USDC")     // 100 USDC = 100000000 base units
+   * Amount.parse("0.5", 8)             // 0.5 with 8 decimals, no symbol
    * ```
    */
-  static fromUnit(
-    amount: AmountInput,
-    decimals: number,
-    symbol?: string
-  ): Amount {
+  static parse(amount: AmountInput, ...args: AmountArgs): Amount {
+    let decimals: number;
+    let symbol: string | undefined;
+
+    if (typeof args[0] === "number") {
+      // TypeScript knows this is Shape B
+      decimals = args[0];
+      symbol = args[1]; // It knows this is a string | undefined
+    } else {
+      // TypeScript knows this is Shape A (Token)
+      decimals = args[0].decimals;
+      symbol = args[0].symbol;
+    }
+
     // If someone passes a raw bigint here, it's ambiguous.
     // We treat it as whole units (e.g., 10n -> 10 STRK).
     const amountStr = amount.toString();
@@ -149,59 +143,46 @@ export class Amount {
   }
 
   /**
-   * Creates an Amount from a raw base value using a Token definition.
-   *
-   * This is the recommended method when receiving values from blockchain
-   * contracts or APIs, as it automatically uses the correct decimals
-   * and symbol from the token configuration.
-   *
-   * @param amount - The base amount as string, number, or bigint (e.g., raw contract value)
-   * @param token - Token definition containing decimals and symbol
-   * @returns A new Amount instance
-   *
-   * @example
-   * ```ts
-   * import { STRK } from "x";
-   *
-   * // From a contract call that returns raw FRI value
-   * const balance = await contract.balanceOf(address);
-   * const amount = Amount.fromTokenBase(balance, STRK);
-   * console.log(amount.toUnit()); // Human-readable balance
-   * ```
-   */
-  static fromTokenBase(amount: AmountInput, token: Token): Amount {
-    return this.fromBase(amount, token.decimals, token.symbol);
-  }
-
-  /**
-   * Creates an Amount directly from a raw base value (e.g., wei, FRI, satoshis).
+   * Creates an Amount directly from a raw value (e.g., wei, FRI, satoshis).
    *
    * Use this method when you have a value directly from the blockchain,
    * such as a balance query or transaction amount.
    *
-   * @param amount - The raw base amount as string, number, or bigint
-   * @param decimals - Number of decimal places for the token
-   * @param symbol - Optional token symbol for display formatting
+   * @param amount - The raw amount as string, number, or bigint
+   * @param args - Either a `Token` object, or `decimals` and optional `symbol`:
+   *   - `(token: Token)` - Uses the token's decimals and symbol
+   *   - `(decimals: number, symbol?: string)` - Uses explicit decimals and optional symbol
    * @returns A new Amount instance
    *
    * @example
    * ```ts
-   * // From bigint (typical blockchain response)
-   * Amount.fromBase(1500000000000000000n, 18, "ETH")  // 1.5 ETH
+   * // With a Token (recommended for known tokens)
+   * const balance = await contract.balanceOf(address);
+   * Amount.fromRaw(balance, STRK)                    // Uses STRK's decimals and symbol
    *
-   * // From string (e.g., from JSON response)
-   * Amount.fromBase("1500000000000000000", 18, "ETH") // 1.5 ETH
-   *
-   * // From number (be careful with large values)
-   * Amount.fromBase(1000000, 6, "USDC")               // 1 USDC
+   * // With decimals and optional symbol
+   * Amount.fromRaw(1500000000000000000n, 18, "ETH")  // 1.5 ETH
+   * Amount.fromRaw("1500000000000000000", 18, "ETH") // From string (e.g., JSON response)
+   * Amount.fromRaw(1000000, 6, "USDC")               // 1 USDC
+   * Amount.fromRaw(1000000n, 6)                      // 1 unit, no symbol
    * ```
    */
-  static fromBase(
-    amount: AmountInput,
-    decimals: number,
-    symbol?: string
-  ): Amount {
+  static fromRaw(amount: AmountInput, ...args: AmountArgs): Amount {
     const baseValue = BigInt(amount);
+
+    let decimals: number;
+    let symbol: string | undefined;
+
+    if (typeof args[0] === "number") {
+      // TypeScript knows this is Shape B
+      decimals = args[0];
+      symbol = args[1]; // It knows this is a string | undefined
+    } else {
+      // TypeScript knows this is Shape A (Token)
+      decimals = args[0].decimals;
+      symbol = args[0].symbol;
+    }
+
     return new Amount(baseValue, decimals, symbol);
   }
 
@@ -215,7 +196,7 @@ export class Amount {
    *
    * @example
    * ```ts
-   * const amount = Amount.fromUnit("1.5", 18, "ETH");
+   * const amount = Amount.parse("1.5", 18, "ETH");
    * const rawValue = amount.toBase(); // 1500000000000000000n
    *
    * // Use in contract call
@@ -236,10 +217,10 @@ export class Amount {
    *
    * @example
    * ```ts
-   * Amount.fromBase(1500000000000000000n, 18).toUnit()  // "1.5"
-   * Amount.fromBase(1000000000000000000n, 18).toUnit()  // "1"
-   * Amount.fromBase(500n, 18).toUnit()                   // "0.0000000000000005"
-   * Amount.fromBase(100000000n, 6).toUnit()              // "100"
+   * Amount.fromRaw(1500000000000000000n, 18).toUnit()  // "1.5"
+   * Amount.fromRaw(1000000000000000000n, 18).toUnit()  // "1"
+   * Amount.fromRaw(500n, 18).toUnit()                   // "0.0000000000000005"
+   * Amount.fromRaw(100000000n, 6).toUnit()              // "100"
    * ```
    */
   public toUnit(): string {
@@ -274,13 +255,13 @@ export class Amount {
    *
    * @example
    * ```ts
-   * const amount = Amount.fromUnit("1500.123456", 18, "ETH");
+   * const amount = Amount.parse("1500.123456", 18, "ETH");
    *
    * amount.toFormatted()       // "1,500.123456 ETH" (full precision)
    * amount.toFormatted(true)   // "1,500.1235 ETH" (compressed to 4 decimals)
    *
    * // Without symbol
-   * const noSymbol = Amount.fromUnit("100", 6);
+   * const noSymbol = Amount.parse("100", 6);
    * noSymbol.toFormatted()     // "100" (no symbol appended)
    * ```
    */
@@ -302,10 +283,10 @@ export class Amount {
    *
    * @example
    * ```ts
-   * const ethAmount = Amount.fromUnit("1.5", 18, "ETH");
+   * const ethAmount = Amount.parse("1.5", 18, "ETH");
    * console.log(ethAmount.getDecimals()); // 18
    *
-   * const usdcAmount = Amount.fromTokenUnit("100", USDC);
+   * const usdcAmount = Amount.parse("100", USDC);
    * console.log(usdcAmount.getDecimals()); // 6
    * ```
    */
@@ -322,10 +303,10 @@ export class Amount {
    *
    * @example
    * ```ts
-   * const ethAmount = Amount.fromUnit("1.5", 18, "ETH");
+   * const ethAmount = Amount.parse("1.5", 18, "ETH");
    * console.log(ethAmount.getSymbol()); // "ETH"
    *
-   * const noSymbol = Amount.fromUnit("1.5", 18);
+   * const noSymbol = Amount.parse("1.5", 18);
    * console.log(noSymbol.getSymbol()); // undefined
    * ```
    */
@@ -346,15 +327,11 @@ export class Amount {
     }
 
     // Only check symbols if both are set
-    if (
+    return !(
       this.symbol !== undefined &&
       other.symbol !== undefined &&
       this.symbol !== other.symbol
-    ) {
-      return false;
-    }
-
-    return true;
+    );
   }
 
   /**
@@ -396,8 +373,8 @@ export class Amount {
    *
    * @example
    * ```ts
-   * const a = Amount.fromUnit("1.5", 18, "ETH");
-   * const b = Amount.fromUnit("2.5", 18, "ETH");
+   * const a = Amount.parse("1.5", 18, "ETH");
+   * const b = Amount.parse("2.5", 18, "ETH");
    * const sum = a.add(b);
    * console.log(sum.toUnit()); // "4"
    * ```
@@ -424,8 +401,8 @@ export class Amount {
    *
    * @example
    * ```ts
-   * const a = Amount.fromUnit("5", 18, "ETH");
-   * const b = Amount.fromUnit("2", 18, "ETH");
+   * const a = Amount.parse("5", 18, "ETH");
+   * const b = Amount.parse("2", 18, "ETH");
    * const diff = a.subtract(b);
    * console.log(diff.toUnit()); // "3"
    * ```
@@ -451,7 +428,7 @@ export class Amount {
    *
    * @example
    * ```ts
-   * const amount = Amount.fromUnit("10", 18, "ETH");
+   * const amount = Amount.parse("10", 18, "ETH");
    *
    * amount.multiply(2).toUnit();     // "20"
    * amount.multiply("0.5").toUnit(); // "5"
@@ -497,7 +474,7 @@ export class Amount {
    *
    * @example
    * ```ts
-   * const amount = Amount.fromUnit("10", 18, "ETH");
+   * const amount = Amount.parse("10", 18, "ETH");
    *
    * amount.divide(2).toUnit();     // "5"
    * amount.divide("0.5").toUnit(); // "20"
@@ -543,10 +520,10 @@ export class Amount {
    *
    * @example
    * ```ts
-   * const a = Amount.fromUnit("1.5", 18, "ETH");
-   * const b = Amount.fromUnit("1.5", 18, "ETH");
-   * const c = Amount.fromUnit("2", 18, "ETH");
-   * const usdc = Amount.fromUnit("1.5", 6, "USDC");
+   * const a = Amount.parse("1.5", 18, "ETH");
+   * const b = Amount.parse("1.5", 18, "ETH");
+   * const c = Amount.parse("2", 18, "ETH");
+   * const usdc = Amount.parse("1.5", 6, "USDC");
    *
    * a.eq(b);    // true
    * a.eq(c);    // false
@@ -570,9 +547,9 @@ export class Amount {
    *
    * @example
    * ```ts
-   * const a = Amount.fromUnit("2", 18, "ETH");
-   * const b = Amount.fromUnit("1", 18, "ETH");
-   * const usdc = Amount.fromUnit("1", 6, "USDC");
+   * const a = Amount.parse("2", 18, "ETH");
+   * const b = Amount.parse("1", 18, "ETH");
+   * const usdc = Amount.parse("1", 6, "USDC");
    *
    * a.gt(b);    // true
    * b.gt(a);    // false
@@ -596,9 +573,9 @@ export class Amount {
    *
    * @example
    * ```ts
-   * const a = Amount.fromUnit("2", 18, "ETH");
-   * const b = Amount.fromUnit("2", 18, "ETH");
-   * const usdc = Amount.fromUnit("2", 6, "USDC");
+   * const a = Amount.parse("2", 18, "ETH");
+   * const b = Amount.parse("2", 18, "ETH");
+   * const usdc = Amount.parse("2", 6, "USDC");
    *
    * a.gte(b);    // true
    * a.gte(usdc); // false (incompatible)
@@ -621,9 +598,9 @@ export class Amount {
    *
    * @example
    * ```ts
-   * const a = Amount.fromUnit("1", 18, "ETH");
-   * const b = Amount.fromUnit("2", 18, "ETH");
-   * const usdc = Amount.fromUnit("2", 6, "USDC");
+   * const a = Amount.parse("1", 18, "ETH");
+   * const b = Amount.parse("2", 18, "ETH");
+   * const usdc = Amount.parse("2", 6, "USDC");
    *
    * a.lt(b);    // true
    * b.lt(a);    // false
@@ -647,9 +624,9 @@ export class Amount {
    *
    * @example
    * ```ts
-   * const a = Amount.fromUnit("2", 18, "ETH");
-   * const b = Amount.fromUnit("2", 18, "ETH");
-   * const usdc = Amount.fromUnit("2", 6, "USDC");
+   * const a = Amount.parse("2", 18, "ETH");
+   * const b = Amount.parse("2", 18, "ETH");
+   * const usdc = Amount.parse("2", 6, "USDC");
    *
    * a.lte(b);    // true
    * a.lte(usdc); // false (incompatible)
@@ -669,8 +646,8 @@ export class Amount {
    *
    * @example
    * ```ts
-   * Amount.fromUnit("0", 18, "ETH").isZero();   // true
-   * Amount.fromUnit("0.1", 18, "ETH").isZero(); // false
+   * Amount.parse("0", 18, "ETH").isZero();   // true
+   * Amount.parse("0.1", 18, "ETH").isZero(); // false
    * ```
    */
   public isZero(): boolean {
@@ -684,8 +661,8 @@ export class Amount {
    *
    * @example
    * ```ts
-   * Amount.fromUnit("1", 18, "ETH").isPositive(); // true
-   * Amount.fromUnit("0", 18, "ETH").isPositive(); // false
+   * Amount.parse("1", 18, "ETH").isPositive(); // true
+   * Amount.parse("0", 18, "ETH").isPositive(); // false
    * ```
    */
   public isPositive(): boolean {

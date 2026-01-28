@@ -120,7 +120,7 @@ describe("ERC20 (Integration)", () => {
     );
 
     // Transfer amount: 0.1 ETH using Amount
-    const transferAmount = Amount.fromTokenUnit("0.1", ETH);
+    const transferAmount = Amount.parse("0.1", ETH);
 
     // Transfer tokens
     const tx = await erc20.transfer({
@@ -209,8 +209,8 @@ describe("ERC20 (Integration)", () => {
     });
 
     // Transfer amounts using Amount
-    const amount1 = Amount.fromTokenUnit("0.1", ETH); // 0.1 ETH
-    const amount2 = Amount.fromTokenUnit("0.2", ETH); // 0.2 ETH
+    const amount1 = Amount.parse("0.1", ETH); // 0.1 ETH
+    const amount2 = Amount.parse("0.2", ETH); // 0.2 ETH
 
     // Do multi-transfer
     const tx = await erc20.transfer({
@@ -294,7 +294,7 @@ describe("ERC20 (Integration)", () => {
     });
 
     // Use Amount for transfer - using the custom token config
-    const transferAmount = Amount.fromTokenUnit("0.05", customEthToken); // 0.05 ETH
+    const transferAmount = Amount.parse("0.05", customEthToken); // 0.05 ETH
 
     const tx = await erc20.transfer({
       from: senderWallet,
