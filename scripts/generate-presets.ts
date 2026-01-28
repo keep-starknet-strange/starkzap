@@ -1,3 +1,5 @@
+// noinspection ES6PreferShortImport
+
 /**
  * Fetches ERC20 tokens from Voyager API and generates TypeScript presets.
  *

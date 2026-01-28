@@ -1,6 +1,6 @@
 import { hash, type Calldata } from "starknet";
 import { OpenZeppelinPreset } from "../../account/presets.js";
-import type { SignerInterface } from "../../signer/interface.js";
+import type { SignerInterface } from "../../signer/index.js";
 import { Address } from "../../types/address.js";
 import type { AccountClassConfig } from "../../types/wallet.js";
 
