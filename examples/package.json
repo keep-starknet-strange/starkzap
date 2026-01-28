@@ -16,6 +16,7 @@
     "@privy-io/node": "^0.8.0",
     "@types/cors": "^2.8.17",
     "@types/express": "^5.0.0",
+    "@vitejs/plugin-basic-ssl": "^2.1.4",
     "concurrently": "^9.1.2",
     "cors": "^2.8.5",
     "express": "^4.21.2",

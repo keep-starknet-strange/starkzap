@@ -8,6 +8,8 @@ import {
   type ExecutableUserTransaction,
   type PaymasterTimeBounds,
   type PreparedTransaction,
+  type TypedData,
+  type Signature,
   type WalletAccount,
 } from "starknet";
 import { Tx } from "../tx/index.js";
@@ -280,6 +282,14 @@ export class CartridgeWallet implements WalletInterface {
   }
 
   /**
+   * Sign a typed data message (EIP-712 style).
+   * Returns the signature.
+   */
+  async signMessage(typedData: TypedData): Promise<Signature> {
+    return this.walletAccount.signMessage(typedData);
+  }
+
+  /**
    * Build a sponsored transaction for the paymaster.
    */
   async buildSponsored(
@@ -320,40 +330,34 @@ export class CartridgeWallet implements WalletInterface {
   }
 
   /**
-   * Check if an operation can succeed before attempting it.
+   * Simulate a transaction to check if it would succeed.
    */
   async preflight(options: PreflightOptions): Promise<PreflightResult> {
-    const { kind, calls = [] } = options;
+    const { calls } = options;
 
     try {
       const deployed = await this.isDeployed();
-      if (!deployed && kind !== "execute") {
+      if (!deployed) {
         return { ok: false, reason: "Account not deployed" };
       }
 
-      if (calls.length > 0) {
-        const simulation = await this.walletAccount.simulateTransaction([
-          { type: "INVOKE", payload: calls },
-        ]);
+      const simulation = await this.walletAccount.simulateTransaction([
+        { type: "INVOKE", payload: calls },
+      ]);
 
-        const result = simulation[0];
+      const result = simulation[0];
+      if (result && "transaction_trace" in result && result.transaction_trace) {
+        const trace = result.transaction_trace;
         if (
-          result &&
-          "transaction_trace" in result &&
-          result.transaction_trace
+          "execute_invocation" in trace &&
+          trace.execute_invocation &&
+          "revert_reason" in trace.execute_invocation
         ) {
-          const trace = result.transaction_trace;
-          if (
-            "execute_invocation" in trace &&
-            trace.execute_invocation &&
-            "revert_reason" in trace.execute_invocation
-          ) {
-            return {
-              ok: false,
-              reason:
-                trace.execute_invocation.revert_reason ?? "Simulation failed",
-            };
-          }
+          return {
+            ok: false,
+            reason:
+              trace.execute_invocation.revert_reason ?? "Simulation failed",
+          };
         }
       }
 

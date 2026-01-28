@@ -2,11 +2,13 @@ import {
   StarkSDK,
   StarkSigner,
   PrivySigner,
+  WebAuthnSigner,
   OpenZeppelinPreset,
   ArgentPreset,
   ArgentXV050Preset,
   BraavosPreset,
   DevnetPreset,
+  WebAuthnPreset,
   type WalletInterface,
   type AccountClassConfig,
 } from "x";
@@ -27,7 +29,7 @@ const sdk = new StarkSDK({
 
 // Current wallet
 let wallet: WalletInterface | null = null;
-let walletType: "cartridge" | "privatekey" | "privy" | null = null;
+let walletType: "cartridge" | "privatekey" | "privy" | "webauthn" | null = null;
 
 // Privy wallet info (stored for signing)
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -41,6 +43,9 @@ const logContainer = document.getElementById("log")!;
 
 const btnCartridge = document.getElementById(
   "btn-cartridge"
+) as HTMLButtonElement;
+const btnWebAuthn = document.getElementById(
+  "btn-webauthn"
 ) as HTMLButtonElement;
 const btnTogglePk = document.getElementById(
   "btn-toggle-pk"
@@ -56,6 +61,9 @@ const btnCheckDeployed = document.getElementById(
   "btn-check-deployed"
 ) as HTMLButtonElement;
 const btnDeploy = document.getElementById("btn-deploy") as HTMLButtonElement;
+const btnTestSign = document.getElementById(
+  "btn-test-sign"
+) as HTMLButtonElement;
 const btnDisconnect = document.getElementById(
   "btn-disconnect"
 ) as HTMLButtonElement;
@@ -102,9 +110,17 @@ function showConnected() {
     cartridge: "Cartridge Wallet",
     privatekey: "Private Key Wallet",
     privy: "Privy Wallet",
+    webauthn: "Face ID Wallet",
   };
   walletTypeLabelEl.textContent =
     labels[walletType || ""] || "Connected Wallet";
+
+  // Show test sign button for WebAuthn
+  if (walletType === "webauthn") {
+    btnTestSign.style.display = "flex";
+  } else {
+    btnTestSign.style.display = "none";
+  }
 }
 
 function showDisconnected() {
@@ -334,6 +350,59 @@ async function connectPrivy() {
   }
 }
 
+// Connect with WebAuthn (Face ID / Touch ID)
+async function connectWebAuthn() {
+  setButtonLoading(btnWebAuthn, true);
+  log("Starting Face ID / Touch ID...", "info");
+
+  try {
+    if (!WebAuthnSigner.isSupported()) {
+      throw new Error("WebAuthn not supported");
+    }
+
+    const saved = localStorage.getItem("webauthn_credential");
+    let signer: InstanceType<typeof WebAuthnSigner>;
+
+    if (saved) {
+      log("Found existing passkey...", "info");
+      signer = WebAuthnSigner.get(JSON.parse(saved));
+    } else {
+      log("Creating new passkey...", "info");
+      const result = await WebAuthnSigner.create();
+      signer = result.signer;
+      localStorage.setItem(
+        "webauthn_credential",
+        JSON.stringify({
+          credentialId: result.credentialId,
+          publicKey: result.publicKey,
+        })
+      );
+      log("Passkey saved!", "success");
+    }
+
+    // Show public key info
+    const { x, y, salt } = signer.getParsedPublicKey();
+    log(`X: ${x.low.slice(0, 12)}...`, "info");
+    log(`Y: ${y.low.slice(0, 12)}...`, "info");
+    log(`Salt: ${salt.slice(0, 12)}...`, "info");
+
+    wallet = await sdk.connectWallet({
+      account: { signer, accountClass: WebAuthnPreset },
+    });
+    walletType = "webauthn";
+
+    walletAddressEl.textContent = truncateAddress(wallet.address);
+    walletAddressEl.title = wallet.address;
+    log(`Connected: ${truncateAddress(wallet.address)}`, "success");
+    showConnected();
+    await checkDeploymentStatus();
+  } catch (err) {
+    log(`WebAuthn failed: ${err}`, "error");
+  } finally {
+    setButtonLoading(btnWebAuthn, false, "Face ID");
+  }
+}
+
 // Deploy account
 async function deployAccount() {
   if (!wallet) return;
@@ -357,6 +426,40 @@ async function deployAccount() {
   }
 }
 
+// Test WebAuthn signing
+async function testSign() {
+  if (!wallet || walletType !== "webauthn") return;
+
+  setButtonLoading(btnTestSign, true);
+  log("Testing Face ID signature...", "info");
+
+  try {
+    const testHash = "0x" + crypto.randomUUID().replace(/-/g, "").slice(0, 64);
+    log(`Hash: ${testHash.slice(0, 20)}...`, "info");
+
+    const signer = wallet.getAccount().signer as InstanceType<
+      typeof WebAuthnSigner
+    >;
+    const sig = await signer.sign(testHash);
+
+    log("Signed!", "success");
+    log(
+      `r: ${sig.r.low.slice(0, 12)}... ${sig.r.high.slice(0, 12)}...`,
+      "info"
+    );
+    log(
+      `s: ${sig.s.low.slice(0, 12)}... ${sig.s.high.slice(0, 12)}...`,
+      "info"
+    );
+    log(`authData: ${sig.authenticatorData.length} chars`, "info");
+    log(`clientData: ${sig.clientDataJSON.length} chars`, "info");
+  } catch (err) {
+    log(`Signing failed: ${err}`, "error");
+  } finally {
+    setButtonLoading(btnTestSign, false, "Test Sign");
+  }
+}
+
 // Disconnect
 function disconnect() {
   if (wallet && walletType === "cartridge" && "disconnect" in wallet) {
@@ -369,6 +472,7 @@ function disconnect() {
 
 // Event Listeners
 btnCartridge.addEventListener("click", connectCartridge);
+btnWebAuthn.addEventListener("click", connectWebAuthn);
 
 btnTogglePk.addEventListener("click", () => {
   pkForm.classList.toggle("hidden");
@@ -390,6 +494,7 @@ btnCheckDeployed.addEventListener("click", async () => {
 });
 
 btnDeploy.addEventListener("click", deployAccount);
+btnTestSign.addEventListener("click", testSign);
 
 btnDisconnect.addEventListener("click", disconnect);
 

@@ -1,5 +1,5 @@
 import type { Signature } from "starknet";
-import { BaseSigner } from "./base.js";
+import type { SignerInterface } from "./interface.js";
 
 /**
  * Configuration for the Privy signer.
@@ -72,7 +72,7 @@ function parsePrivySignature(signature: string): Signature {
  * });
  * ```
  */
-export class PrivySigner extends BaseSigner {
+export class PrivySigner implements SignerInterface {
   private readonly walletId: string;
   private readonly publicKey: string;
   private readonly rawSignFn: (
@@ -81,7 +81,6 @@ export class PrivySigner extends BaseSigner {
   ) => Promise<string>;
 
   constructor(config: PrivySignerConfig) {
-    super();
     this.walletId = config.walletId;
     this.publicKey = config.publicKey;
     this.rawSignFn = config.rawSign;

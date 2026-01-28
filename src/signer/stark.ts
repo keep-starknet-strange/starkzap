@@ -1,5 +1,5 @@
 import { ec, type Signature } from "starknet";
-import { BaseSigner } from "./base.js";
+import type { SignerInterface } from "./interface.js";
 
 /**
  * Standard Stark curve signer using a private key.
@@ -9,12 +9,11 @@ import { BaseSigner } from "./base.js";
  * const signer = new StarkSigner("0xPRIVATE_KEY");
  * ```
  */
-export class StarkSigner extends BaseSigner {
+export class StarkSigner implements SignerInterface {
   private readonly publicKey: string;
   private readonly privateKey: string;
 
   constructor(privateKey: string) {
-    super();
     this.privateKey = privateKey;
     this.publicKey = ec.starkCurve.getStarkKey(privateKey);
   }

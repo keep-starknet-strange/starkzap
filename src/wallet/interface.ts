@@ -1,4 +1,11 @@
-import type { Account, Call } from "starknet";
+import type {
+  Account,
+  Call,
+  TypedData,
+  Signature,
+  PreparedTransaction,
+  ExecutableUserTransaction,
+} from "starknet";
 import type { Tx } from "../tx/index.js";
 import type {
   EnsureReadyOptions,
@@ -7,8 +14,6 @@ import type {
   PreflightResult,
   PrepareOptions,
 } from "../types/wallet.js";
-import type { PreparedTransaction, ExecutableUserTransaction } from "starknet";
-import type { Address } from "../types/address.js";
 
 /**
  * Interface for a connected Starknet wallet.
@@ -61,6 +66,12 @@ export interface WalletInterface {
   execute(calls: Call[], options?: ExecuteOptions): Promise<Tx>;
 
   /**
+   * Sign a typed data message (EIP-712 style).
+   * Returns the signature.
+   */
+  signMessage(typedData: TypedData): Promise<Signature>;
+
+  /**
    * Build a sponsored transaction for the paymaster.
    * Returns the prepared transaction with typed data and fee estimate.
    */
@@ -87,12 +98,18 @@ export interface WalletInterface {
   ): Promise<ExecutableUserTransaction>;
 
   /**
-   * Check if an operation can succeed before attempting it.
+   * Simulate a transaction to check if it would succeed.
    */
   preflight(options: PreflightOptions): Promise<PreflightResult>;
 
   /**
    * Get the underlying starknet.js Account instance.
+   * Use this for advanced operations not covered by the SDK.
    */
   getAccount(): Account;
+
+  /**
+   * Disconnect the wallet and clean up resources.
+   */
+  disconnect(): Promise<void>;
 }

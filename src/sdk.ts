@@ -83,7 +83,6 @@ export class StarkSDK {
    * const wallet = await sdk.connectWallet({
    *   account: { signer: new StarkSigner(privateKey) },
    *   feeMode: "sponsored",
-   *   sponsorPolicyHint: { action: "onboarding" },
    * });
    * ```
    */

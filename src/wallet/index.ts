@@ -5,8 +5,9 @@ import {
   type ExecutableUserTransaction,
   type PaymasterTimeBounds,
   type PreparedTransaction,
+  type TypedData,
+  type Signature,
   TransactionFinalityStatus,
-  type ResourceBounds,
 } from "starknet";
 import { Tx } from "../tx/index.js";
 import { AccountProvider } from "./accounts/provider.js";
@@ -24,25 +25,6 @@ import type { WalletInterface } from "./interface.js";
 import { Address } from "../types/address.js";
 
 export { type WalletInterface } from "./interface.js";
-/**
- * Convert resource bounds to BigInt format expected by v3hash functions.
- */
-function toResourceBoundsBigInt(resourceBounds: ResourceBounds) {
-  return {
-    l1_gas: {
-      max_amount: BigInt(resourceBounds.l1_gas.max_amount),
-      max_price_per_unit: BigInt(resourceBounds.l1_gas.max_price_per_unit),
-    },
-    l2_gas: {
-      max_amount: BigInt(resourceBounds.l2_gas.max_amount),
-      max_price_per_unit: BigInt(resourceBounds.l2_gas.max_price_per_unit),
-    },
-    l1_data_gas: {
-      max_amount: BigInt(resourceBounds.l1_data_gas.max_amount),
-      max_price_per_unit: BigInt(resourceBounds.l1_data_gas.max_price_per_unit),
-    },
-  };
-}
 
 /**
  * Wallet implementation using a custom signer and account preset.
@@ -172,8 +154,8 @@ export class Wallet implements WalletInterface {
    * Deploy the account contract.
    * Returns a Tx object to track the deployment.
    *
-   * Note: Sponsored deployment is not yet supported by AVNU paymaster.
-   * Deployment always uses user_pays fee mode.
+   * Note: Sponsored deployment is not supported by most paymasters.
+   * Deployment uses user_pays fee mode with a 2x safety margin on estimated fees.
    */
   async deploy(): Promise<Tx> {
     const classHash = this.accountProvider.getClassHash();
@@ -188,41 +170,34 @@ export class Wallet implements WalletInterface {
       addressSalt: publicKey,
     });
 
-    // Helper to safely convert to BigInt and multiply
-    const multiply2x = (value: unknown): string => {
-      const bigVal = BigInt(String(value ?? 0));
-      return "0x" + (bigVal * 2n).toString(16);
-    };
-
     // Apply 2x multiplier to resource bounds for safety margin
-    const l1Gas = estimateFee.resourceBounds.l1_gas;
-    const l2Gas = estimateFee.resourceBounds.l2_gas;
-    const l1DataGas = estimateFee.resourceBounds.l1_data_gas;
+    const multiply2x = (value: unknown): bigint =>
+      BigInt(String(value ?? 0)) * 2n;
+
+    const { l1_gas, l2_gas, l1_data_gas } = estimateFee.resourceBounds;
 
     const resourceBounds = {
       l1_gas: {
-        max_amount: multiply2x(l1Gas.max_amount),
-        max_price_per_unit: multiply2x(l1Gas.max_price_per_unit),
+        max_amount: multiply2x(l1_gas.max_amount),
+        max_price_per_unit: multiply2x(l1_gas.max_price_per_unit),
       },
       l2_gas: {
-        max_amount: multiply2x(l2Gas.max_amount),
-        max_price_per_unit: multiply2x(l2Gas.max_price_per_unit),
+        max_amount: multiply2x(l2_gas.max_amount),
+        max_price_per_unit: multiply2x(l2_gas.max_price_per_unit),
       },
       l1_data_gas: {
-        max_amount: multiply2x(l1DataGas?.max_amount),
-        max_price_per_unit: multiply2x(l1DataGas?.max_price_per_unit),
+        max_amount: multiply2x(l1_data_gas?.max_amount),
+        max_price_per_unit: multiply2x(l1_data_gas?.max_price_per_unit),
       },
     };
 
-    // Note: AVNU paymaster doesn't support account deployment yet
-    // Always use regular deployment
     const { transaction_hash } = await this.account.deployAccount(
       {
         classHash,
         constructorCalldata,
         addressSalt: publicKey,
       },
-      { resourceBounds: toResourceBoundsBigInt(resourceBounds) }
+      { resourceBounds }
     );
 
     return new Tx(transaction_hash, this.provider, this.config.explorer);
@@ -255,6 +230,14 @@ export class Wallet implements WalletInterface {
     const { transaction_hash } = await this.account.execute(calls);
 
     return new Tx(transaction_hash, this.provider, this.config.explorer);
+  }
+
+  /**
+   * Sign a typed data message (EIP-712 style).
+   * Returns the signature.
+   */
+  async signMessage(typedData: TypedData): Promise<Signature> {
+    return this.account.signMessage(typedData);
   }
 
   /**
@@ -334,42 +317,37 @@ export class Wallet implements WalletInterface {
   }
 
   /**
-   * Check if an operation can succeed before attempting it.
+   * Check if a transaction can succeed before attempting it.
+   * Simulates the calls and returns any revert reason.
    */
   async preflight(options: PreflightOptions): Promise<PreflightResult> {
-    const { kind, calls = [] } = options;
+    const { calls } = options;
 
     try {
       // Check deployment status
       const deployed = await this.isDeployed();
-      if (!deployed && kind !== "execute") {
+      if (!deployed) {
         return { ok: false, reason: "Account not deployed" };
       }
 
-      // Simulate transaction if calls provided
-      if (calls.length > 0) {
-        const simulation = await this.account.simulateTransaction([
-          { type: "INVOKE", payload: calls },
-        ]);
+      // Simulate transaction
+      const simulation = await this.account.simulateTransaction([
+        { type: "INVOKE", payload: calls },
+      ]);
 
-        const result = simulation[0];
+      const result = simulation[0];
+      if (result && "transaction_trace" in result && result.transaction_trace) {
+        const trace = result.transaction_trace;
         if (
-          result &&
-          "transaction_trace" in result &&
-          result.transaction_trace
+          "execute_invocation" in trace &&
+          trace.execute_invocation &&
+          "revert_reason" in trace.execute_invocation
         ) {
-          const trace = result.transaction_trace;
-          if (
-            "execute_invocation" in trace &&
-            trace.execute_invocation &&
-            "revert_reason" in trace.execute_invocation
-          ) {
-            return {
-              ok: false,
-              reason:
-                trace.execute_invocation.revert_reason ?? "Simulation failed",
-            };
-          }
+          return {
+            ok: false,
+            reason:
+              trace.execute_invocation.revert_reason ?? "Simulation failed",
+          };
         }
       }
 
@@ -384,19 +362,17 @@ export class Wallet implements WalletInterface {
 
   /**
    * Get the underlying starknet.js Account instance.
+   * Use this for advanced operations not covered by the SDK.
    */
   getAccount(): Account {
     return this.account;
   }
 
   /**
-   * Get the underlying RPC provider.
+   * Disconnect the wallet and clean up resources.
+   * For signer-based wallets, this is a no-op since there's no persistent connection.
    */
-  getProvider(): RpcProvider {
-    return this.provider;
-  }
-
-  get address(): Address {
-    return Address.from(this.account.address);
+  async disconnect(): Promise<void> {
+    // No-op for signer-based wallets
   }
 }

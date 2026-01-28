@@ -1,8 +1,4 @@
 import type { Signature } from "starknet";
-import type {
-  SignableTransaction,
-  SignedTransaction,
-} from "../transaction/interface.js";
 
 /**
  * Signer interface for the SDK.
@@ -12,7 +8,7 @@ import type {
  * - `getPubKey()` - returns the public key
  * - `signRaw(hash)` - signs a message hash and returns the signature
  *
- * The `sign(transaction)` method is provided as a convenience that calls `signRaw`.
+ * The SDK uses `SignerAdapter` to bridge this interface with starknet.js internally.
  */
 export interface SignerInterface {
   /**
@@ -28,13 +24,4 @@ export interface SignerInterface {
    * @returns The signature as [r, s] tuple
    */
   signRaw(hash: string): Promise<Signature>;
-
-  /**
-   * Sign a transaction.
-   * Gets the hash from the transaction and signs it.
-   *
-   * @param transaction - The transaction to sign
-   * @returns The signed transaction
-   */
-  sign(transaction: SignableTransaction): Promise<SignedTransaction>;
 }

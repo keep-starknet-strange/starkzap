@@ -404,7 +404,7 @@
       <div id="connect-section" class="card">
         <div class="card-title">Connect Wallet</div>
 
-        <div class="connect-grid" style="grid-template-columns: 1fr 1fr 1fr">
+        <div class="connect-grid" style="grid-template-columns: 1fr 1fr">
           <button id="btn-cartridge" class="btn btn-cartridge">
             <svg
               width="20"
@@ -419,6 +419,30 @@
               <path d="M2 12l10 5 10-5" />
             </svg>
             Cartridge
+          </button>
+          <button
+            id="btn-webauthn"
+            class="btn"
+            style="
+              background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+              color: white;
+            "
+          >
+            <svg
+              width="20"
+              height="20"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+            >
+              <path
+                d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2z"
+              />
+              <path d="M12 6v6l4 2" />
+              <circle cx="12" cy="12" r="3" />
+            </svg>
+            Face ID
           </button>
           <button
             id="btn-privy"
@@ -547,6 +571,13 @@
           </button>
           <button id="btn-deploy" class="btn btn-primary">
             Deploy Account
+          </button>
+          <button
+            id="btn-test-sign"
+            class="btn btn-secondary"
+            style="display: none"
+          >
+            Test Sign
           </button>
           <button id="btn-disconnect" class="btn btn-disconnect">
             Disconnect
