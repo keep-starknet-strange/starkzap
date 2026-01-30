@@ -1,9 +1,8 @@
+import { Contract, type RpcProvider } from "starknet";
+import { getTokensFromAddresses } from "../erc20/index.js";
 import { Address, type ChainId, type Token } from "../types/index.js";
-import { CairoFelt252, Contract, type RpcProvider } from "starknet";
-import { ABI as STAKING_ABI } from "./abi/staking.js";
 import { ABI as POOL_ABI } from "./abi/pool.js";
-import { ABI as ERC20_ABI } from "./abi/erc20.js";
-import { getPresets } from "../token/index.js";
+import { ABI as STAKING_ABI } from "./abi/staking.js";
 
 export class Staking {
   private readonly pool: Contract;
@@ -36,7 +35,7 @@ export class Staking {
 
     const staker_address = Address.from(poolParameters.staker_address);
     const staking_contract = Address.from(poolParameters.staking_contract);
-    console.log("staker ", staker_address);
+
     if (staking_contract !== stakingContractAddress) {
       throw new Error("Staking contract address is wrong in the config.");
     }
@@ -116,103 +115,6 @@ export class Staking {
         });
       });
 
-    const presetTokens = Object.values(getPresets(chainId));
-
-    const tokens: Token[] = [];
-    const unknownTokenAddresses: Address[] = [];
-
-    for (const tokenAddress of tokenAddresses) {
-      const token = presetTokens.find((preset) => {
-        return preset.address === tokenAddress;
-      });
-
-      if (token) {
-        tokens.push(token);
-      } else {
-        unknownTokenAddresses.push(tokenAddress);
-      }
-    }
-
-    if (unknownTokenAddresses.length > 0) {
-      const erc20Contracts = unknownTokenAddresses.map((address) => {
-        return new Contract({
-          abi: ERC20_ABI,
-          address: address,
-          providerOrAccount: provider,
-        }).typedv2(ERC20_ABI);
-      });
-
-      const results = await Promise.all(
-        erc20Contracts
-          .map((contract) => {
-            return [
-              contract.name().then((name) => {
-                return {
-                  token: contract.address as Address,
-                  type: "name",
-                  value: new CairoFelt252(name).decodeUtf8(),
-                };
-              }),
-              contract.symbol().then((symbol) => {
-                return {
-                  token: contract.address as Address,
-                  type: "symbol",
-                  value: new CairoFelt252(symbol).decodeUtf8(),
-                };
-              }),
-              contract.decimals().then((decimals) => {
-                return {
-                  token: contract.address as Address,
-                  type: "decimals",
-                  value: decimals as number,
-                };
-              }),
-            ];
-          })
-          .flat()
-      );
-
-      const tokenDetails = Map.groupBy(results, (r) => r.token);
-
-      for (const unknownTokenAddress of unknownTokenAddresses) {
-        const details = tokenDetails.get(unknownTokenAddress);
-        if (details) {
-          let name: string | null = null;
-          let symbol: string | null = null;
-          let decimals: number | null = null;
-
-          for (const detail of details) {
-            if (detail.type == "name" && typeof detail.value == "string") {
-              name = detail.value;
-            } else if (
-              detail.type == "symbol" &&
-              typeof detail.value == "string"
-            ) {
-              symbol = detail.value;
-            } else if (
-              detail.type == "decimals" &&
-              typeof detail.value == "number"
-            ) {
-              decimals = detail.value;
-            }
-          }
-
-          if (name && symbol && decimals) {
-            tokens.push({
-              name: name,
-              address: unknownTokenAddress,
-              decimals: decimals,
-              symbol: symbol,
-            });
-          } else {
-            console.warn("Could not determine token", unknownTokenAddress);
-          }
-        } else {
-          console.warn("Could not determine token", unknownTokenAddress);
-        }
-      }
-    }
-
-    return tokens;
+    return await getTokensFromAddresses(chainId, tokenAddresses, provider);
   }
 }

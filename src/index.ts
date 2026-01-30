@@ -39,7 +39,7 @@ export {
 } from "@/network";
 
 // ERC20
-export { Erc20 } from "@/erc20";
+export * from "@/erc20";
 
 // Token Presets (auto-generated from AVNU API)
 export * from "@/token/presets";

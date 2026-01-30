@@ -32,8 +32,8 @@ const AVNU_API_URLS = {
 type Network = keyof typeof AVNU_API_URLS;
 
 const DEFAULT_OUTPUT_PATHS: Record<Network, string> = {
-  mainnet: resolve(__dirname, "../src/token/presets.ts"),
-  sepolia: resolve(__dirname, "../src/token/presets.sepolia.ts"),
+  mainnet: resolve(__dirname, "../src/erc20/token/presets.ts"),
+  sepolia: resolve(__dirname, "../src/erc20/token/presets.sepolia.ts"),
 };
 
 const { values, positionals } = parseArgs({
