@@ -2,7 +2,8 @@
 export { StarkSDK } from "./sdk.js";
 
 // Wallet
-export type { WalletInterface } from "./wallet/index.js";
+export { Wallet, AccountProvider } from "./wallet/index.js";
+export type { WalletInterface, WalletOptions } from "./wallet/index.js";
 export { CartridgeWallet } from "./wallet/cartridge.js";
 export type { CartridgeWalletOptions } from "./wallet/cartridge.js";
 

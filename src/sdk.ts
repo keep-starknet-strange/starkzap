@@ -6,7 +6,6 @@ import {
   CartridgeWallet,
   type CartridgeWalletOptions,
 } from "./wallet/cartridge.js";
-import { AccountProvider } from "./wallet/accounts/provider.js";
 
 /**
  * Main SDK class for Starknet wallet integration.
@@ -89,18 +88,13 @@ export class StarkSDK {
   async connectWallet(options: ConnectWalletOptions): Promise<Wallet> {
     const { account, feeMode, timeBounds } = options;
 
-    const accountProvider = new AccountProvider(
-      account.signer,
-      account.accountClass
-    );
-
-    return Wallet.create(
-      accountProvider,
-      this.provider,
-      this.config,
-      feeMode,
-      timeBounds
-    );
+    return Wallet.create({
+      account,
+      provider: this.provider,
+      config: this.config,
+      ...(feeMode && { feeMode }),
+      ...(timeBounds && { timeBounds }),
+    });
   }
 
   /**

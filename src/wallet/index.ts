@@ -11,7 +11,9 @@ import {
 import { Tx } from "../tx/index.js";
 import { AccountProvider } from "./accounts/provider.js";
 import { SignerAdapter } from "../signer/adapter.js";
+import type { SignerInterface } from "../signer/interface.js";
 import type {
+  AccountClassConfig,
   EnsureReadyOptions,
   ExecuteOptions,
   FeeMode,
@@ -30,6 +32,25 @@ import {
 } from "./utils.js";
 
 export { type WalletInterface } from "./interface.js";
+export { AccountProvider } from "./accounts/provider.js";
+
+/**
+ * Options for creating a Wallet.
+ */
+export interface WalletOptions {
+  /** Account: either AccountProvider or { signer, accountClass? } */
+  account:
+    | AccountProvider
+    | { signer: SignerInterface; accountClass?: AccountClassConfig };
+  /** RPC provider */
+  provider: RpcProvider;
+  /** SDK configuration */
+  config: SDKConfig;
+  /** Default fee mode (default: "user_pays") */
+  feeMode?: FeeMode;
+  /** Default time bounds for paymaster transactions */
+  timeBounds?: PaymasterTimeBounds;
+}
 
 /**
  * Wallet implementation using a custom signer and account preset.
@@ -42,11 +63,11 @@ export { type WalletInterface } from "./interface.js";
  *
  * @example
  * ```ts
- * const wallet = await sdk.connectWallet({
- *   account: {
- *     signer: new StarkSigner(privateKey),
- *     accountClass: OpenZeppelinPreset,
- *   }
+ * const wallet = await Wallet.create({
+ *   signer: new StarkSigner(privateKey),
+ *   accountClass: ArgentPreset,
+ *   provider,
+ *   config,
  * });
  * ```
  */
@@ -64,47 +85,72 @@ export class Wallet implements WalletInterface {
     accountProvider: AccountProvider,
     account: Account,
     provider: RpcProvider,
-    config: SDKConfig,
-    defaultFeeMode: FeeMode = "user_pays",
-    defaultTimeBounds?: PaymasterTimeBounds
+    explorerConfig: ExplorerConfig | undefined,
+    defaultFeeMode: FeeMode,
+    defaultTimeBounds: PaymasterTimeBounds | undefined
   ) {
     this.accountProvider = accountProvider;
     this.account = account;
     this.provider = provider;
-    this.explorerConfig = config.explorer;
+    this.explorerConfig = explorerConfig;
     this.defaultFeeMode = defaultFeeMode;
     this.defaultTimeBounds = defaultTimeBounds;
   }
 
   /**
    * Create a new Wallet instance.
+   *
+   * @example
+   * ```ts
+   * // With signer
+   * const wallet = await Wallet.create({
+   *   account: { signer: new StarkSigner(privateKey), accountClass: ArgentPreset },
+   *   provider,
+   *   config,
+   * });
+   *
+   * // With AccountProvider
+   * const wallet = await Wallet.create({
+   *   account: new AccountProvider(signer, accountClass),
+   *   provider,
+   *   config,
+   * });
+   * ```
    */
-  static async create(
-    accountProvider: AccountProvider,
-    provider: RpcProvider,
-    config: SDKConfig,
-    defaultFeeMode: FeeMode = "user_pays",
-    defaultTimeBounds?: PaymasterTimeBounds
-  ): Promise<Wallet> {
+  static async create(options: WalletOptions): Promise<Wallet> {
+    const {
+      account: accountInput,
+      provider,
+      config,
+      feeMode = "user_pays",
+      timeBounds,
+    } = options;
+
+    // Build or use provided AccountProvider
+    const accountProvider =
+      accountInput instanceof AccountProvider
+        ? accountInput
+        : new AccountProvider(accountInput.signer, accountInput.accountClass);
+
     const address = await accountProvider.getAddress();
     const signer = accountProvider.getSigner();
-    const signerAdapter = new SignerAdapter(signer);
 
-    const accountOptions = {
+    // Create starknet.js Account with our signer adapter
+    const signerAdapter = new SignerAdapter(signer);
+    const account = new Account({
       provider,
       address,
       signer: signerAdapter,
       ...(config.paymaster && { paymaster: config.paymaster }),
-    };
-    const account = new Account(accountOptions);
+    });
 
     return new Wallet(
       accountProvider,
       account,
       provider,
-      config,
-      defaultFeeMode,
-      defaultTimeBounds
+      config.explorer,
+      feeMode,
+      timeBounds
     );
   }
 
