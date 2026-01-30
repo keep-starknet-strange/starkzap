@@ -1,8 +1,8 @@
 import { Contract, type RpcProvider } from "starknet";
 import { getTokensFromAddresses } from "../erc20/index.js";
 import { Address, type ChainId, type Token } from "../types/index.js";
-import { ABI as POOL_ABI } from "./abi/pool.js";
-import { ABI as STAKING_ABI } from "./abi/staking.js";
+import { ABI as POOL_ABI } from "../abi/pool.js";
+import { ABI as STAKING_ABI } from "../abi/staking.js";
 
 export class Staking {
   private readonly pool: Contract;
