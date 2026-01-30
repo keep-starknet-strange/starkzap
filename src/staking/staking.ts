@@ -177,9 +177,9 @@ export class Staking {
       for (const unknownTokenAddress of unknownTokenAddresses) {
         const details = tokenDetails.get(unknownTokenAddress);
         if (details) {
-          let name: string = "";
-          let symbol: string = "";
-          let decimals: number = 0;
+          let name: string | null = null;
+          let symbol: string | null = null;
+          let decimals: number | null = null;
 
           for (const detail of details) {
             if (detail.type == "name" && typeof detail.value == "string") {
@@ -197,12 +197,16 @@ export class Staking {
             }
           }
 
-          tokens.push({
-            name: name,
-            address: unknownTokenAddress,
-            decimals: decimals,
-            symbol: symbol,
-          });
+          if (name && symbol && decimals) {
+            tokens.push({
+              name: name,
+              address: unknownTokenAddress,
+              decimals: decimals,
+              symbol: symbol,
+            });
+          } else {
+            console.warn("Could not determine token", unknownTokenAddress);
+          }
         } else {
           console.warn("Could not determine token", unknownTokenAddress);
         }
