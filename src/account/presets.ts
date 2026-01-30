@@ -32,16 +32,19 @@ export const OpenZeppelinPreset: AccountClassConfig = {
 };
 
 /**
- * Argent account preset.
+ * Argent account preset (v0.4.0).
+ * Uses CairoCustomEnum for the owner signer.
  */
 export const ArgentPreset: AccountClassConfig = {
   classHash:
     "0x036078334509b514626504edc9fb252328d1a240e4e948bef8d0c08dff45927f",
   buildConstructorCalldata(publicKey: string): Calldata {
-    // Argent constructor: (owner, guardian)
+    // ArgentX v0.4.0 uses CairoCustomEnum for the owner signer
+    const axSigner = new CairoCustomEnum({ Starknet: { pubkey: publicKey } });
+    const axGuardian = new CairoOption<unknown>(CairoOptionVariant.None);
     return CallData.compile({
-      owner: publicKey,
-      guardian: "0x0", // No guardian
+      owner: axSigner,
+      guardian: axGuardian,
     });
   },
 };
