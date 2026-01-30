@@ -12,12 +12,13 @@ import {
   type WalletInterface,
   type AccountClassConfig,
 } from "x";
+import { ec } from "starknet";
 
 // Configuration
 const RPC_URL = "https://api.cartridge.gg/x/starknet/sepolia/rpc/v0_9";
 const PRIVY_SERVER_URL = "http://localhost:3001";
 const DUMMY_POLICY = {
-  target: "0x049d36570d4e46f48e99674bd3fcc84644ddd6b96f7c741b1562b82f9e004dc7",
+  target: "0x04718f5a0fc34cc1af16a1cdee98ffb20c31f5cd61d6ab07201858f4287c938d", // STRK
   method: "transfer",
 };
 
@@ -67,10 +68,18 @@ const btnTestSign = document.getElementById(
 const btnDisconnect = document.getElementById(
   "btn-disconnect"
 ) as HTMLButtonElement;
-
+const btnTransfer = document.getElementById(
+  "btn-transfer"
+) as HTMLButtonElement;
+const btnTransferSponsored = document.getElementById(
+  "btn-transfer-sponsored"
+) as HTMLButtonElement;
 const privateKeyInput = document.getElementById(
   "private-key"
 ) as HTMLInputElement;
+const btnGenerateKey = document.getElementById(
+  "btn-generate-key"
+) as HTMLButtonElement;
 const privyEmailInput = document.getElementById(
   "privy-email"
 ) as HTMLInputElement;
@@ -79,6 +88,9 @@ const accountPresetSelect = document.getElementById(
 ) as HTMLSelectElement;
 const privyForm = document.getElementById("privy-form")!;
 const walletAddressEl = document.getElementById("wallet-address")!;
+const btnCopyAddress = document.getElementById(
+  "btn-copy-address"
+) as HTMLButtonElement;
 const walletStatusEl = document.getElementById("wallet-status")!;
 const walletTypeLabelEl = document.getElementById("wallet-type-label")!;
 
@@ -232,6 +244,13 @@ async function connectPrivateKey() {
     walletAddressEl.title = wallet.address;
 
     log(`Connected: ${truncateAddress(wallet.address)}`, "success");
+    log(`Full address: ${wallet.address}`, "info");
+
+    // Show public key for debugging
+    const pubKey = await signer.getPubKey();
+    log(`Public key: ${truncateAddress(pubKey)}`, "info");
+
+    log("Click 📋 to copy address, then fund it with STRK", "info");
     showConnected();
     await checkDeploymentStatus();
   } catch (err) {
@@ -320,6 +339,8 @@ async function connectPrivy() {
 
     // Compare addresses
     log(`SDK computed address: ${wallet.address}`, "info");
+    console.log("361 [Privy] Wallet data address:", walletData.address);
+    console.log("362 [Privy] Wallet address:", wallet.address);
     if (walletData.address.toLowerCase() !== wallet.address.toLowerCase()) {
       log(
         `WARNING: Address mismatch! Privy and SDK computed different addresses.`,
@@ -400,6 +421,97 @@ async function connectWebAuthn() {
     log(`WebAuthn failed: ${err}`, "error");
   } finally {
     setButtonLoading(btnWebAuthn, false, "Face ID");
+  }
+}
+
+// Test transfer (send 0 STRK to self)
+async function testTransfer() {
+  if (!wallet) return;
+
+  setButtonLoading(btnTransfer, true);
+  log("Executing test transfer (0 STRK to self)...", "info");
+
+  try {
+    // First check if deployed
+    const deployed = await wallet.isDeployed();
+    if (!deployed) {
+      log("Account not deployed - deploy first!", "error");
+      return;
+    }
+
+    // STRK contract on Sepolia
+    const STRK_CONTRACT =
+      "0x04718f5a0fc34cc1af16a1cdee98ffb20c31f5cd61d6ab07201858f4287c938d";
+
+    // Transfer 0 STRK to self (safe test)
+    const tx = await wallet.execute([
+      {
+        contractAddress: STRK_CONTRACT,
+        entrypoint: "transfer",
+        calldata: [wallet.address, "0", "0"], // recipient, amount_low, amount_high
+      },
+    ]);
+
+    log(`Tx submitted: ${truncateAddress(tx.hash)}`, "success");
+    log("Waiting for confirmation...", "info");
+
+    await tx.wait();
+    log("Transfer confirmed!", "success");
+
+    if (tx.explorerUrl) {
+      log(`Explorer: ${tx.explorerUrl}`, "info");
+    }
+  } catch (err) {
+    log(`Transfer failed: ${err}`, "error");
+  } finally {
+    setButtonLoading(btnTransfer, false, "Test Transfer");
+  }
+}
+
+// Sponsored transfer (gasless)
+async function testSponsoredTransfer() {
+  if (!wallet) return;
+
+  setButtonLoading(btnTransferSponsored, true);
+  log("Executing sponsored transfer (gasless)...", "info");
+
+  try {
+    const deployed = await wallet.isDeployed();
+    if (!deployed) {
+      log("Account not deployed - deploy first!", "error");
+      return;
+    }
+
+    const STRK_CONTRACT =
+      "0x04718f5a0fc34cc1af16a1cdee98ffb20c31f5cd61d6ab07201858f4287c938d";
+
+    // Execute with sponsored fee mode
+    const tx = await wallet.execute(
+      [
+        {
+          contractAddress: STRK_CONTRACT,
+          entrypoint: "transfer",
+          calldata: [wallet.address, "0", "0"],
+        },
+      ],
+      { feeMode: "sponsored" }
+    );
+
+    log(`Sponsored tx submitted: ${truncateAddress(tx.hash)}`, "success");
+    log("Gas paid by paymaster!", "info");
+    log("Waiting for confirmation...", "info");
+
+    await tx.wait();
+    log("Sponsored transfer confirmed!", "success");
+
+    if (tx.explorerUrl) {
+      log(`Explorer: ${tx.explorerUrl}`, "info");
+    }
+  } catch (err) {
+    log(`Sponsored tx failed: ${err}`, "error");
+    log("Paymaster may not support this account/network", "info");
+  } finally {
+    setButtonLoading(btnTransferSponsored, false, "Sponsored Tx");
   }
 }
 
@@ -494,8 +606,22 @@ btnCheckDeployed.addEventListener("click", async () => {
 });
 
 btnDeploy.addEventListener("click", deployAccount);
+btnTransfer.addEventListener("click", testTransfer);
+btnCopyAddress.addEventListener("click", async () => {
+  if (!wallet) return;
+  try {
+    await navigator.clipboard.writeText(wallet.address);
+    btnCopyAddress.textContent = "✓";
+    log(`Copied: ${wallet.address}`, "success");
+    setTimeout(() => {
+      btnCopyAddress.textContent = "📋";
+    }, 2000);
+  } catch {
+    log(`Address: ${wallet.address}`, "info");
+  }
+});
+btnTransferSponsored.addEventListener("click", testSponsoredTransfer);
 btnTestSign.addEventListener("click", testSign);
-
 btnDisconnect.addEventListener("click", disconnect);
 
 // Allow Enter key to submit private key form
@@ -503,6 +629,20 @@ privateKeyInput.addEventListener("keypress", (e) => {
   if (e.key === "Enter") {
     connectPrivateKey();
   }
+});
+
+// Generate random private key
+btnGenerateKey.addEventListener("click", () => {
+  const randomBytes = ec.starkCurve.utils.randomPrivateKey();
+  const privateKey =
+    "0x" +
+    Array.from(randomBytes)
+      .map((b) => b.toString(16).padStart(2, "0"))
+      .join("");
+  privateKeyInput.value = privateKey;
+  privateKeyInput.type = "text"; // Show it so user can see/copy it
+  log("Generated random private key (shown above)", "success");
+  log("This is a NEW account - fund it before deploying", "info");
 });
 
 // Initial log

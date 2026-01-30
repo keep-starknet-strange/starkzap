@@ -236,6 +236,22 @@
         color: var(--text-primary);
       }
 
+      .btn-copy {
+        background: transparent;
+        border: 1px solid var(--border-color);
+        border-radius: 6px;
+        padding: 0.25rem 0.5rem;
+        cursor: pointer;
+        font-size: 0.8rem;
+        transition: all 0.2s;
+        margin-left: 0.5rem;
+      }
+
+      .btn-copy:hover {
+        background: var(--bg-tertiary);
+        border-color: var(--accent-primary);
+      }
+
       .address {
         max-width: 200px;
         overflow: hidden;
@@ -484,12 +500,23 @@
           <div class="divider">Enter credentials</div>
           <div class="form-group">
             <label for="private-key">Private Key</label>
-            <input
-              type="password"
-              id="private-key"
-              placeholder="0x..."
-              autocomplete="off"
-            />
+            <div style="display: flex; gap: 0.5rem">
+              <input
+                type="password"
+                id="private-key"
+                placeholder="0x..."
+                autocomplete="off"
+                style="flex: 1"
+              />
+              <button
+                id="btn-generate-key"
+                class="btn btn-secondary"
+                type="button"
+                style="white-space: nowrap; padding: 0.5rem 0.75rem"
+              >
+                🎲
+              </button>
+            </div>
           </div>
           <div class="form-group">
             <label for="account-preset">Account Type</label>
@@ -556,6 +583,13 @@
         <div class="info-row">
           <span class="info-label">Address</span>
           <span id="wallet-address" class="info-value address">—</span>
+          <button
+            id="btn-copy-address"
+            class="btn-copy"
+            title="Copy full address"
+          >
+            📋
+          </button>
         </div>
 
         <div class="info-row">
@@ -571,6 +605,19 @@
           </button>
           <button id="btn-deploy" class="btn btn-primary">
             Deploy Account
+          </button>
+          <button id="btn-transfer" class="btn btn-primary">
+            Test Transfer
+          </button>
+          <button
+            id="btn-transfer-sponsored"
+            class="btn"
+            style="
+              background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+              color: white;
+            "
+          >
+            Sponsored Tx
           </button>
           <button
             id="btn-test-sign"
