@@ -1,5 +1,5 @@
 import { Address, type ChainId, type Token } from "../types/index.js";
-import { cairo, Contract, type RpcProvider, shortString } from "starknet";
+import { CairoFelt252, Contract, type RpcProvider } from "starknet";
 import { ABI as STAKING_ABI } from "./abi/staking.js";
 import { ABI as POOL_ABI } from "./abi/pool.js";
 import { ABI as ERC20_ABI } from "./abi/erc20.js";
@@ -150,14 +150,14 @@ export class Staking {
                 return {
                   token: contract.address as Address,
                   type: "name",
-                  value: shortString.decodeShortString(cairo.felt(name)), // USE CairoFelt252
+                  value: new CairoFelt252(name).decodeUtf8(),
                 };
               }),
               contract.symbol().then((symbol) => {
                 return {
                   token: contract.address as Address,
                   type: "symbol",
-                  value: shortString.decodeShortString(cairo.felt(symbol)),
+                  value: new CairoFelt252(symbol).decodeUtf8(),
                 };
               }),
               contract.decimals().then((decimals) => {
