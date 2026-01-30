@@ -24,6 +24,7 @@
     "isolatedModules": true,
     "moduleDetection": "force",
     "esModuleInterop": true,
+    "resolveJsonModule": true,
     // Performance
     "skipLibCheck": true
   },

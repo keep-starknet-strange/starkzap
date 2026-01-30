@@ -1,5 +1,6 @@
 import type { SDKConfig } from "@/types";
 import { Address } from "@/types";
+import "dotenv/config";
 
 /**
  * Test configuration for Starknet Sepolia testnet.
@@ -9,6 +10,8 @@ export const testnetConfig: SDKConfig = {
     process.env.TESTNET_RPC_URL ??
     "https://starknet-sepolia.public.blastapi.io",
   chainId: "SN_SEPOLIA",
+  stakingContract:
+    "0x03745ab04a431fc02871a139be6b93d9260b0ff3e779ad9c8b377183b23109f1" as Address,
 };
 
 /**

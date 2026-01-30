@@ -16,6 +16,9 @@ export { SignerAdapter } from "@/signer/adapter";
 export { StarkSigner } from "@/signer/stark";
 export { PrivySigner, type PrivySignerConfig } from "@/signer/privy";
 
+// Staking
+export { Staking } from "./staking/index.js";
+
 // Account Presets
 export {
   DevnetPreset,

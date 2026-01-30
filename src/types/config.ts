@@ -1,5 +1,6 @@
 import type { PaymasterOptions } from "starknet";
 import type { NetworkPreset, NetworkName } from "@/network";
+import type { Address } from "@/types";
 
 /** Supported Starknet chain identifiers */
 export type ChainId = "SN_MAIN" | "SN_SEPOLIA";
@@ -65,4 +66,8 @@ export interface SDKConfig {
   paymaster?: PaymasterOptions;
   /** Optional: configures how explorer URLs are built */
   explorer?: ExplorerConfig;
+  /** Optional: configures Staking contract's address.
+   * Staking package can only work if this address is available
+   */
+  stakingContract?: Address;
 }

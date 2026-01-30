@@ -1,1 +1,1 @@
-export {};
+export { Staking } from "./staking.js";

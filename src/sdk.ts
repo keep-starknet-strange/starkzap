@@ -7,6 +7,9 @@ import {
   CartridgeWallet,
   type CartridgeWalletOptions,
 } from "@/wallet/cartridge";
+import { AccountProvider } from "@/wallet/accounts/provider";
+import type { Address, Token } from "./types/index.js";
+import { Staking } from "./staking/index.js";
 
 /** Resolved SDK configuration with required rpcUrl and chainId */
 interface ResolvedConfig extends Omit<SDKConfig, "rpcUrl" | "chainId"> {
@@ -174,6 +177,47 @@ export class StarkSDK {
       chainId: this.config.chainId,
       ...(explorer && { explorer }),
     });
+  }
+
+  async stakingInPool(pool: Address, stakeToken: Token): Promise<Staking> {
+    if (!this.config.stakingContract) {
+      throw new Error("`stakingContract` is not defined in the sdk config.");
+    }
+
+    return Staking.fromPool(
+      pool,
+      stakeToken,
+      this.provider,
+      this.config.stakingContract
+    );
+  }
+
+  async stakingInValidator(
+    staker: Address,
+    stakeToken: Token
+  ): Promise<Staking> {
+    if (!this.config.stakingContract) {
+      throw new Error("`stakingContract` is not defined in the sdk config.");
+    }
+
+    return Staking.fromStaker(
+      staker,
+      stakeToken,
+      this.provider,
+      this.config.stakingContract
+    );
+  }
+
+  async stakingTokens(): Promise<Token[]> {
+    if (!this.config.stakingContract) {
+      throw new Error("`stakingContract` is not defined in the sdk config.");
+    }
+
+    return Staking.activeTokens(
+      this.provider,
+      this.config.chainId,
+      this.config.stakingContract
+    );
   }
 
   /**
