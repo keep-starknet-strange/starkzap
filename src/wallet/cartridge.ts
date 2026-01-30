@@ -1,7 +1,6 @@
 import Controller from "@cartridge/controller";
 import {
   RpcProvider,
-  TransactionFinalityStatus,
   constants,
   type Account,
   type Call,
@@ -23,9 +22,14 @@ import type {
 } from "../types/wallet.js";
 import type { ExplorerConfig, ChainId } from "../types/config.js";
 import type { WalletInterface } from "./interface.js";
-import { Address } from "../types/index.js";
+import {
+  checkDeployed,
+  ensureWalletReady,
+  executeWithFeeMode,
+  preflightTransaction,
+  buildSponsoredTransaction,
+} from "./utils.js";
 
-// Map SDK chainId to Starknet constants
 const CHAIN_ID_MAP: Record<ChainId, string> = {
   SN_MAIN: constants.StarknetChainId.SN_MAIN,
   SN_SEPOLIA: constants.StarknetChainId.SN_SEPOLIA,
@@ -33,33 +37,15 @@ const CHAIN_ID_MAP: Record<ChainId, string> = {
 
 /**
  * Options for connecting with Cartridge Controller.
- *
- * @example
- * ```ts
- * const wallet = await sdk.connectCartridge({
- *   rpcUrl: "https://api.cartridge.gg/x/starknet/mainnet",
- *   policies: [
- *     { target: "0xCONTRACT", method: "transfer" }
- *   ]
- * });
- * ```
  */
 export interface CartridgeWalletOptions {
-  /** RPC URL for the Starknet network */
   rpcUrl?: string;
-  /** Chain ID for the Starknet network */
   chainId?: ChainId;
-  /** Session policies for pre-approved transactions */
   policies?: Array<{ target: string; method: string }>;
-  /** Preset name for controller configuration */
   preset?: string;
-  /** Custom keychain URL */
   url?: string;
-  /** Default fee mode for transactions */
   feeMode?: FeeMode;
-  /** Default time bounds for sponsored transactions */
   timeBounds?: PaymasterTimeBounds;
-  /** Explorer configuration for transaction URLs */
   explorer?: ExplorerConfig;
 }
 
@@ -69,21 +55,16 @@ export interface CartridgeWalletOptions {
  * Cartridge Controller provides a seamless onboarding experience with:
  * - Social login (Google, Discord)
  * - WebAuthn (passkeys)
- * - Session keys for gasless transactions
+ * - Session policies for gasless transactions
  *
  * @example
  * ```ts
  * const wallet = await CartridgeWallet.create({
  *   rpcUrl: "https://api.cartridge.gg/x/starknet/mainnet",
- *   policies: [
- *     { target: "0xCONTRACT", method: "transfer" }
- *   ]
+ *   policies: [{ target: "0xCONTRACT", method: "transfer" }]
  * });
  *
- * // Use just like any other wallet
- * await wallet.execute([
- *   { contractAddress: "0x...", entrypoint: "transfer", calldata: [...] }
- * ]);
+ * await wallet.execute([...]);
  *
  * // Access Cartridge-specific features
  * const controller = wallet.getController();
@@ -94,9 +75,9 @@ export class CartridgeWallet implements WalletInterface {
   private readonly controller: Controller;
   private readonly walletAccount: WalletAccount;
   private readonly provider: RpcProvider;
+  private readonly explorerConfig: ExplorerConfig | undefined;
   private readonly defaultFeeMode: FeeMode;
   private readonly defaultTimeBounds: PaymasterTimeBounds | undefined;
-  private readonly explorerConfig: ExplorerConfig | undefined;
 
   private constructor(
     controller: Controller,
@@ -107,36 +88,27 @@ export class CartridgeWallet implements WalletInterface {
     this.controller = controller;
     this.walletAccount = walletAccount;
     this.provider = provider;
+    this.explorerConfig = options.explorer;
     this.defaultFeeMode = options.feeMode ?? "user_pays";
     this.defaultTimeBounds = options.timeBounds;
-    this.explorerConfig = options.explorer;
   }
 
   /**
    * Create and connect a CartridgeWallet.
-   * Opens the Cartridge authentication popup if not already connected.
-   *
-   * @param options - Configuration options
-   * @returns A connected CartridgeWallet instance
-   * @throws Error if connection fails or is cancelled
    */
   static async create(
     options: CartridgeWalletOptions = {}
   ): Promise<CartridgeWallet> {
-    // Build controller options
     const controllerOptions: Record<string, unknown> = {};
 
-    // Set default chain ID
     if (options.chainId) {
       controllerOptions.defaultChainId = CHAIN_ID_MAP[options.chainId];
     }
 
-    // Add custom chains if using non-Cartridge RPC
     if (options.rpcUrl && !options.rpcUrl.includes("api.cartridge.gg")) {
       controllerOptions.chains = [{ rpcUrl: options.rpcUrl }];
     }
 
-    // Add policies if provided
     if (options.policies && options.policies.length > 0) {
       controllerOptions.policies = {
         contracts: Object.fromEntries(
@@ -148,20 +120,17 @@ export class CartridgeWallet implements WalletInterface {
       };
     }
 
-    // Add preset if provided
     if (options.preset) {
       controllerOptions.preset = options.preset;
     }
 
-    // Add custom keychain URL if provided
     if (options.url) {
       controllerOptions.url = options.url;
     }
 
     const controller = new Controller(controllerOptions);
 
-    // Wait for the keychain iframe to be ready
-    const maxWaitMs = 10000; // 10 seconds max
+    const maxWaitMs = 10000;
     const pollIntervalMs = 100;
     let waited = 0;
 
@@ -191,136 +160,59 @@ export class CartridgeWallet implements WalletInterface {
     return new CartridgeWallet(controller, walletAccount, provider, options);
   }
 
-  /**
-   * Check if the account contract is deployed on-chain.
-   * Cartridge accounts are typically already deployed.
-   */
   async isDeployed(): Promise<boolean> {
-    try {
-      const classHash = await this.provider.getClassHashAt(this.address);
-      return !!classHash;
-    } catch {
-      return false;
-    }
+    return checkDeployed(this.provider, this.address);
   }
 
-  /**
-   * Ensure the wallet is ready for transactions.
-   * For Cartridge, this checks deployment and deploys if needed.
-   */
   async ensureReady(options: EnsureReadyOptions = {}): Promise<void> {
-    const { deploy = "if_needed", onProgress } = options;
-
-    onProgress?.({ step: "CONNECTED" });
-
-    onProgress?.({ step: "CHECK_DEPLOYED" });
-    const deployed = await this.isDeployed();
-
-    if (deployed && deploy !== "always") {
-      onProgress?.({ step: "READY" });
-      return;
-    }
-
-    if (!deployed && deploy === "never") {
-      throw new Error("Account not deployed and deploy mode is 'never'");
-    }
-
-    onProgress?.({ step: "DEPLOYING" });
-    const tx = await this.deploy();
-    await tx.wait({
-      successStates: [
-        TransactionFinalityStatus.ACCEPTED_ON_L2,
-        TransactionFinalityStatus.ACCEPTED_ON_L1,
-      ],
-    });
-
-    onProgress?.({ step: "READY" });
+    return ensureWalletReady(this, options);
   }
 
-  /**
-   * Deploy the account contract via Cartridge Controller.
-   */
   async deploy(): Promise<Tx> {
-    // Cartridge handles deployment through its keychain
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const result = await (this.controller as any).keychain?.deploy();
     if (!result || result.code !== "SUCCESS") {
       throw new Error(result?.message ?? "Cartridge deployment failed");
     }
-
     return new Tx(result.transaction_hash, this.provider, this.explorerConfig);
   }
 
-  /**
-   * Execute one or more contract calls.
-   * Cartridge uses session keys for pre-approved transactions.
-   */
   async execute(calls: Call[], options: ExecuteOptions = {}): Promise<Tx> {
     const feeMode = options.feeMode ?? this.defaultFeeMode;
     const timeBounds = options.timeBounds ?? this.defaultTimeBounds;
 
-    if (feeMode === "sponsored") {
-      // Use paymaster for sponsored transactions
-      const paymasterDetails = {
-        feeMode: { mode: "sponsored" as const },
-        ...(timeBounds && { timeBounds }),
-      };
-
-      const { transaction_hash } =
-        await this.walletAccount.executePaymasterTransaction(
-          calls,
-          paymasterDetails
-        );
-
-      return new Tx(transaction_hash, this.provider, this.explorerConfig);
-    }
-
-    // Standard execution through Cartridge
-    const { transaction_hash } = await this.walletAccount.execute(calls);
-
-    return new Tx(transaction_hash, this.provider, this.explorerConfig);
+    return executeWithFeeMode(
+      this.walletAccount,
+      calls,
+      feeMode,
+      timeBounds,
+      this.provider,
+      this.explorerConfig
+    );
   }
 
-  /**
-   * Sign a typed data message (EIP-712 style).
-   * Returns the signature.
-   */
   async signMessage(typedData: TypedData): Promise<Signature> {
     return this.walletAccount.signMessage(typedData);
   }
 
-  /**
-   * Build a sponsored transaction for the paymaster.
-   */
   async buildSponsored(
     calls: Call[],
     options: PrepareOptions = {}
   ): Promise<PreparedTransaction> {
     const timeBounds = options.timeBounds ?? this.defaultTimeBounds;
-
-    const paymasterDetails = {
-      feeMode: { mode: "sponsored" as const },
-      ...(timeBounds && { timeBounds }),
-    };
-
-    return this.walletAccount.buildPaymasterTransaction(
+    return buildSponsoredTransaction(
+      this.walletAccount,
       calls,
-      paymasterDetails
-    );
+      timeBounds
+    ) as Promise<PreparedTransaction>;
   }
 
-  /**
-   * Sign a prepared sponsored transaction.
-   */
   async signSponsored(
     prepared: PreparedTransaction
   ): Promise<ExecutableUserTransaction> {
     return this.walletAccount.preparePaymasterTransaction(prepared);
   }
 
-  /**
-   * Build and sign a sponsored transaction in one step.
-   */
   async prepareSponsored(
     calls: Call[],
     options: PrepareOptions = {}
@@ -329,73 +221,21 @@ export class CartridgeWallet implements WalletInterface {
     return this.signSponsored(prepared);
   }
 
-  /**
-   * Simulate a transaction to check if it would succeed.
-   */
   async preflight(options: PreflightOptions): Promise<PreflightResult> {
-    const { calls } = options;
-
-    try {
-      const deployed = await this.isDeployed();
-      if (!deployed) {
-        return { ok: false, reason: "Account not deployed" };
-      }
-
-      const simulation = await this.walletAccount.simulateTransaction([
-        { type: "INVOKE", payload: calls },
-      ]);
-
-      const result = simulation[0];
-      if (result && "transaction_trace" in result && result.transaction_trace) {
-        const trace = result.transaction_trace;
-        if (
-          "execute_invocation" in trace &&
-          trace.execute_invocation &&
-          "revert_reason" in trace.execute_invocation
-        ) {
-          return {
-            ok: false,
-            reason:
-              trace.execute_invocation.revert_reason ?? "Simulation failed",
-          };
-        }
-      }
-
-      return { ok: true };
-    } catch (error) {
-      return {
-        ok: false,
-        reason: error instanceof Error ? error.message : "Unknown error",
-      };
-    }
+    return preflightTransaction(this, this.walletAccount, options);
   }
 
-  /**
-   * Get the underlying starknet.js Account instance.
-   */
   getAccount(): Account {
     return this.walletAccount as unknown as Account;
   }
 
   /**
-   * Get the Cartridge Controller instance.
-   * Useful for accessing controller-specific features.
-   *
-   * @example
-   * ```ts
-   * const controller = wallet.getController();
-   * controller.openProfile();
-   * controller.openSettings();
-   * const username = await controller.username();
-   * ```
+   * Get the Cartridge Controller instance for Cartridge-specific features.
    */
   getController(): Controller {
     return this.controller;
   }
 
-  /**
-   * Disconnect from Cartridge Controller.
-   */
   async disconnect(): Promise<void> {
     await this.controller.disconnect();
   }
