@@ -11,16 +11,18 @@ import {
   type V3DeclareSignerDetails,
   typedData as typedDataUtils,
   CallData,
-  v3hash,
+  hash,
+  transaction,
   EDAMode,
 } from "starknet";
 import type { SignerInterface } from "./interface.js";
 
 /**
- * Convert data availability mode string to EDAMode.
+ * Convert data availability mode to integer (0 = L1, 1 = L2).
  */
-function toDAMode(mode: string): EDAMode {
-  return mode === "L2" ? EDAMode.L2 : EDAMode.L1;
+function intDAM(mode: string | EDAMode): 0 | 1 {
+  if (mode === EDAMode.L2 || mode === "L2") return 1;
+  return 0;
 }
 
 /**
@@ -49,23 +51,27 @@ export class SignerAdapter implements StarknetSignerInterface {
     details: InvocationsSignerDetails
   ): Promise<Signature> {
     const det = details as V3InvocationsSignerDetails;
-    const compiledCalldata = CallData.toCalldata(transactions);
-
-    const msgHash = v3hash.calculateInvokeTransactionHash(
-      det.walletAddress,
-      det.version,
-      compiledCalldata,
-      det.chainId,
-      det.nonce,
-      det.accountDeploymentData || [],
-      toDAMode(det.nonceDataAvailabilityMode as string),
-      toDAMode(det.feeDataAvailabilityMode as string),
-      det.resourceBounds,
-      det.tip,
-      det.paymasterData || []
+    // Use getExecuteCalldata to properly format multicall for the account's cairo version
+    const compiledCalldata = transaction.getExecuteCalldata(
+      transactions,
+      det.cairoVersion
     );
 
-    return this.signer.signRaw(msgHash);
+    const msgHash = hash.calculateInvokeTransactionHash({
+      senderAddress: det.walletAddress,
+      version: det.version,
+      compiledCalldata,
+      chainId: det.chainId,
+      nonce: det.nonce,
+      accountDeploymentData: det.accountDeploymentData || [],
+      nonceDataAvailabilityMode: intDAM(det.nonceDataAvailabilityMode),
+      feeDataAvailabilityMode: intDAM(det.feeDataAvailabilityMode),
+      resourceBounds: det.resourceBounds,
+      tip: det.tip ?? 0,
+      paymasterData: det.paymasterData || [],
+    });
+
+    return this.signer.signRaw(msgHash as string);
   }
 
   async signDeployAccountTransaction(
@@ -76,22 +82,22 @@ export class SignerAdapter implements StarknetSignerInterface {
       det.constructorCalldata
     );
 
-    const msgHash = v3hash.calculateDeployAccountTransactionHash(
-      det.contractAddress,
-      det.classHash,
+    const msgHash = hash.calculateDeployAccountTransactionHash({
+      contractAddress: det.contractAddress,
+      classHash: det.classHash,
       compiledConstructorCalldata,
-      det.addressSalt,
-      det.version,
-      det.chainId,
-      det.nonce,
-      toDAMode(det.nonceDataAvailabilityMode as string),
-      toDAMode(det.feeDataAvailabilityMode as string),
-      det.resourceBounds,
-      BigInt(String(det.tip ?? 0)),
-      det.paymasterData || []
-    );
+      salt: det.addressSalt,
+      version: det.version,
+      chainId: det.chainId,
+      nonce: det.nonce,
+      nonceDataAvailabilityMode: intDAM(det.nonceDataAvailabilityMode),
+      feeDataAvailabilityMode: intDAM(det.feeDataAvailabilityMode),
+      resourceBounds: det.resourceBounds,
+      tip: det.tip ?? 0,
+      paymasterData: det.paymasterData || [],
+    });
 
-    return this.signer.signRaw(msgHash);
+    return this.signer.signRaw(msgHash as string);
   }
 
   async signDeclareTransaction(
@@ -99,21 +105,21 @@ export class SignerAdapter implements StarknetSignerInterface {
   ): Promise<Signature> {
     const det = details as V3DeclareSignerDetails;
 
-    const msgHash = v3hash.calculateDeclareTransactionHash(
-      det.classHash,
-      det.compiledClassHash,
-      det.senderAddress,
-      det.version,
-      det.chainId,
-      det.nonce,
-      det.accountDeploymentData || [],
-      toDAMode(det.nonceDataAvailabilityMode as string),
-      toDAMode(det.feeDataAvailabilityMode as string),
-      det.resourceBounds,
-      det.tip,
-      det.paymasterData || []
-    );
+    const msgHash = hash.calculateDeclareTransactionHash({
+      classHash: det.classHash,
+      compiledClassHash: det.compiledClassHash,
+      senderAddress: det.senderAddress,
+      version: det.version,
+      chainId: det.chainId,
+      nonce: det.nonce,
+      accountDeploymentData: det.accountDeploymentData || [],
+      nonceDataAvailabilityMode: intDAM(det.nonceDataAvailabilityMode),
+      feeDataAvailabilityMode: intDAM(det.feeDataAvailabilityMode),
+      resourceBounds: det.resourceBounds,
+      tip: det.tip ?? 0,
+      paymasterData: det.paymasterData || [],
+    });
 
-    return this.signer.signRaw(msgHash);
+    return this.signer.signRaw(msgHash as string);
   }
 }
