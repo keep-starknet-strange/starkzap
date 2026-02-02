@@ -14,6 +14,7 @@ export { Tx } from "./tx/index.js";
 export type { SignerInterface } from "./signer/interface.js";
 export { SignerAdapter } from "./signer/adapter.js";
 export { StarkSigner } from "./signer/stark.js";
+export { PrivySigner, type PrivySignerConfig } from "./signer/privy.js";
 
 // Account Presets
 export {

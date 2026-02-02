@@ -48,7 +48,7 @@ export interface WalletOptions {
   /** SDK configuration */
   config: SDKConfig;
   /** Known address (skips address computation if provided) */
-  address?: string;
+  accountAddress?: Address;
   /** Default fee mode (default: "user_pays") */
   feeMode?: FeeMode;
   /** Default time bounds for paymaster transactions */
@@ -128,7 +128,7 @@ export class Wallet implements WalletInterface {
       account: accountInput,
       provider,
       config,
-      address: providedAddress,
+      accountAddress: providedAddress,
       feeMode = "user_pays",
       timeBounds,
     } = options;
