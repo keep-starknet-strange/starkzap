@@ -27,6 +27,13 @@ export interface AccountClassConfig {
   classHash: string;
   /** Build constructor calldata from public key */
   buildConstructorCalldata: (publicKey: string) => Calldata;
+  /**
+   * Compute the salt for address computation.
+   * Default: uses public key directly (for Stark curve accounts).
+   * Override for non-Stark curves (e.g., P-256/WebAuthn) where the public key
+   * is too large for Pedersen hash.
+   */
+  getSalt?: (publicKey: string) => string;
 }
 
 // ─── Account Configuration ──────────────────────────────────────────────────
@@ -122,7 +129,6 @@ export interface ProgressEvent {
  * ```ts
  * await wallet.ensureReady({
  *   deploy: "if_needed",
- *   feeMode: "sponsored",
  *   onProgress: (e) => console.log(e.step)
  * });
  * ```
@@ -130,22 +136,8 @@ export interface ProgressEvent {
 export interface EnsureReadyOptions {
   /** When to deploy (default: "if_needed") */
   deploy?: DeployMode;
-  /** How fees are paid for deployment */
-  feeMode?: FeeMode;
-  /** Optional time bounds for paymaster transactions */
-  timeBounds?: PaymasterTimeBounds;
   /** Callback for progress updates */
   onProgress?: (event: ProgressEvent) => void;
-}
-
-// ─── Deploy ──────────────────────────────────────────────────────────────────
-
-/** Options for `wallet.deploy()` */
-export interface DeployOptions {
-  /** How fees are paid */
-  feeMode?: FeeMode;
-  /** Optional time bounds for paymaster transactions */
-  timeBounds?: PaymasterTimeBounds;
 }
 
 // ─── Execute ─────────────────────────────────────────────────────────────────
@@ -166,20 +158,13 @@ export interface PrepareOptions {
 
 // ─── Preflight ───────────────────────────────────────────────────────────────
 
-/** The kind of operation to preflight check */
-export type PreflightKind = "transfer" | "stake" | "unstake" | "execute";
-
 /**
  * Options for `wallet.preflight()`.
  * Checks if an operation can succeed before attempting it.
  */
 export interface PreflightOptions {
-  /** What kind of operation */
-  kind: PreflightKind;
-  /** How fees would be paid */
-  feeMode?: FeeMode;
-  /** Optional: the actual calls to simulate */
-  calls?: Call[];
+  /** The calls to simulate */
+  calls: Call[];
 }
 
 /** Preflight succeeded — operation can proceed */

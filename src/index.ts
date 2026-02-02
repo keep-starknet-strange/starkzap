@@ -2,7 +2,8 @@
 export { StarkSDK } from "./sdk.js";
 
 // Wallet
-export { Wallet, type WalletInterface } from "./wallet/index.js";
+export { Wallet, AccountProvider } from "./wallet/index.js";
+export type { WalletInterface, WalletOptions } from "./wallet/index.js";
 export { CartridgeWallet } from "./wallet/cartridge.js";
 export type { CartridgeWalletOptions } from "./wallet/cartridge.js";
 
@@ -11,7 +12,9 @@ export { Tx } from "./tx/index.js";
 
 // Signer
 export type { SignerInterface } from "./signer/interface.js";
+export { SignerAdapter } from "./signer/adapter.js";
 export { StarkSigner } from "./signer/stark.js";
+export { PrivySigner, type PrivySignerConfig } from "./signer/privy.js";
 
 // Account Presets
 export {
@@ -19,6 +22,7 @@ export {
   OpenZeppelinPreset,
   ArgentPreset,
   BraavosPreset,
+  ArgentXV050Preset,
 } from "./account/presets.js";
 
 // Token Presets (auto-generated from Voyager API)
@@ -51,10 +55,8 @@ export type {
   ProgressStep,
   ProgressEvent,
   EnsureReadyOptions,
-  DeployOptions,
   ExecuteOptions,
   PrepareOptions,
-  PreflightKind,
   PreflightOptions,
   PreflightResult,
 } from "./types/wallet.js";

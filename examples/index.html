@@ -236,6 +236,22 @@
         color: var(--text-primary);
       }
 
+      .btn-copy {
+        background: transparent;
+        border: 1px solid var(--border-color);
+        border-radius: 6px;
+        padding: 0.25rem 0.5rem;
+        cursor: pointer;
+        font-size: 0.8rem;
+        transition: all 0.2s;
+        margin-left: 0.5rem;
+      }
+
+      .btn-copy:hover {
+        background: var(--bg-tertiary);
+        border-color: var(--accent-primary);
+      }
+
       .address {
         max-width: 200px;
         overflow: hidden;
@@ -404,7 +420,7 @@
       <div id="connect-section" class="card">
         <div class="card-title">Connect Wallet</div>
 
-        <div class="connect-grid">
+        <div class="connect-grid" style="grid-template-columns: 1fr 1fr">
           <button id="btn-cartridge" class="btn btn-cartridge">
             <svg
               width="20"
@@ -419,6 +435,50 @@
               <path d="M2 12l10 5 10-5" />
             </svg>
             Cartridge
+          </button>
+          <button
+            id="btn-webauthn"
+            class="btn"
+            style="
+              background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+              color: white;
+            "
+          >
+            <svg
+              width="20"
+              height="20"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+            >
+              <path
+                d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2z"
+              />
+              <path d="M12 6v6l4 2" />
+              <circle cx="12" cy="12" r="3" />
+            </svg>
+            Face ID
+          </button>
+          <button
+            id="btn-privy"
+            class="btn btn-privy"
+            style="
+              background: linear-gradient(135deg, #8b5cf6 0%, #6366f1 100%);
+            "
+          >
+            <svg
+              width="20"
+              height="20"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+            >
+              <circle cx="12" cy="12" r="10" />
+              <path d="M12 6v6l4 2" />
+            </svg>
+            Privy
           </button>
           <button id="btn-toggle-pk" class="btn btn-secondary">
             <svg
@@ -440,18 +500,30 @@
           <div class="divider">Enter credentials</div>
           <div class="form-group">
             <label for="private-key">Private Key</label>
-            <input
-              type="password"
-              id="private-key"
-              placeholder="0x..."
-              autocomplete="off"
-            />
+            <div style="display: flex; gap: 0.5rem">
+              <input
+                type="password"
+                id="private-key"
+                placeholder="0x..."
+                autocomplete="off"
+                style="flex: 1"
+              />
+              <button
+                id="btn-generate-key"
+                class="btn btn-secondary"
+                type="button"
+                style="white-space: nowrap; padding: 0.5rem 0.75rem"
+              >
+                🎲
+              </button>
+            </div>
           </div>
           <div class="form-group">
             <label for="account-preset">Account Type</label>
             <select id="account-preset">
               <option value="openzeppelin">OpenZeppelin</option>
               <option value="argent">Argent</option>
+              <option value="argentx050">ArgentX v0.5.0 (Privy)</option>
               <option value="braavos">Braavos</option>
               <option value="devnet">Devnet</option>
             </select>
@@ -466,6 +538,51 @@
             </button>
           </div>
         </div>
+
+        <div id="privy-form" class="hidden">
+          <div class="divider">Privy Connection</div>
+          <div class="form-group">
+            <label for="privy-email">Email</label>
+            <input
+              type="email"
+              id="privy-email"
+              placeholder="user@example.com"
+              autocomplete="email"
+            />
+          </div>
+          <div class="form-group">
+            <label for="privy-account-preset">Account Type</label>
+            <select id="privy-account-preset">
+              <option value="openzeppelin">OpenZeppelin</option>
+              <option value="argent">Argent</option>
+              <option value="argentx050">ArgentX v0.5.0</option>
+              <option value="braavos">Braavos</option>
+              <option value="devnet">Devnet</option>
+            </select>
+          </div>
+          <p
+            style="
+              font-size: 0.8rem;
+              color: var(--text-muted);
+              margin-bottom: 1rem;
+            "
+          >
+            Enter your email to register or login.<br />
+            Privy provides the signer, you choose the account contract.
+          </p>
+          <div class="form-group">
+            <button
+              id="btn-connect-privy"
+              class="btn btn-primary"
+              style="
+                width: 100%;
+                background: linear-gradient(135deg, #8b5cf6 0%, #6366f1 100%);
+              "
+            >
+              Register / Login
+            </button>
+          </div>
+        </div>
       </div>
 
       <!-- Wallet Info (shown when connected) -->
@@ -477,6 +594,13 @@
         <div class="info-row">
           <span class="info-label">Address</span>
           <span id="wallet-address" class="info-value address">—</span>
+          <button
+            id="btn-copy-address"
+            class="btn-copy"
+            title="Copy full address"
+          >
+            📋
+          </button>
         </div>
 
         <div class="info-row">
@@ -492,6 +616,26 @@
           </button>
           <button id="btn-deploy" class="btn btn-primary">
             Deploy Account
+          </button>
+          <button id="btn-transfer" class="btn btn-primary">
+            Test Transfer
+          </button>
+          <button
+            id="btn-transfer-sponsored"
+            class="btn"
+            style="
+              background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+              color: white;
+            "
+          >
+            Sponsored Tx
+          </button>
+          <button
+            id="btn-test-sign"
+            class="btn btn-secondary"
+            style="display: none"
+          >
+            Test Sign
           </button>
           <button id="btn-disconnect" class="btn btn-disconnect">
             Disconnect
