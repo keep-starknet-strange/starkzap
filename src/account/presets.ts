@@ -6,6 +6,7 @@ import {
   type Calldata,
 } from "starknet";
 import type { AccountClassConfig } from "../types/wallet.js";
+import { parseP256PublicKey } from "../signer/webauthn.js";
 
 /**
  * Devnet account preset.
@@ -76,5 +77,56 @@ export const ArgentXV050Preset: AccountClassConfig = {
       owner: axSigner,
       guardian: axGuardian,
     });
+  },
+};
+
+/**
+ * WebAuthn/P-256 account preset.
+ * Use this with WebAuthnSigner for Face ID / Touch ID authentication.
+ *
+ * The public key is in uncompressed format: 04 || x (32 bytes) || y (32 bytes)
+ * The constructor expects (x, y) as two u256 values, each split into (low, high) u128s.
+ *
+ * @example
+ * ```typescript
+ * const { signer, credential } = await WebAuthnSigner.create({
+ *   rpId: "myapp.com",
+ *   rpName: "My App",
+ *   userId: "user123",
+ *   userName: "user@example.com",
+ * });
+ *
+ * const wallet = await sdk.connectWallet({
+ *   account: {
+ *     signer,
+ *     accountClass: WebAuthnPreset,
+ *   },
+ * });
+ * ```
+ */
+export const WebAuthnPreset: AccountClassConfig = {
+  // TODO: Replace with your deployed P-256 account class hash
+  classHash:
+    "0x0000000000000000000000000000000000000000000000000000000000000000",
+
+  buildConstructorCalldata(publicKey: string): Calldata {
+    const { x, y } = parseP256PublicKey(publicKey);
+
+    // Constructor: (public_key: (x: u256, y: u256))
+    // u256 = { low: u128, high: u128 }
+    return CallData.compile({
+      public_key: {
+        x: { low: x.low, high: x.high },
+        y: { low: y.low, high: y.high },
+      },
+    });
+  },
+
+  getSalt(publicKey: string): string {
+    // P-256 public key is too large for Pedersen hash.
+    // Use x.low (lower 128 bits of x coordinate) as salt.
+    // This is unique enough for address derivation.
+    const { salt } = parseP256PublicKey(publicKey);
+    return salt;
   },
 };

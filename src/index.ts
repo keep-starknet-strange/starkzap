@@ -15,6 +15,12 @@ export type { SignerInterface } from "./signer/interface.js";
 export { SignerAdapter } from "./signer/adapter.js";
 export { StarkSigner } from "./signer/stark.js";
 export { PrivySigner, type PrivySignerConfig } from "./signer/privy.js";
+export {
+  WebAuthnSigner,
+  parseP256PublicKey,
+  type WebAuthnSignatureData,
+  type P256Coordinates,
+} from "./signer/webauthn.js";
 
 // Account Presets
 export {
@@ -23,6 +29,7 @@ export {
   ArgentPreset,
   BraavosPreset,
   ArgentXV050Preset,
+  WebAuthnPreset,
 } from "./account/presets.js";
 
 // Token Presets (auto-generated from Voyager API)
