@@ -26,15 +26,19 @@ export class AccountProvider {
     const publicKey = await this.getPublicKey();
     const calldata = this.getConstructorCalldata(publicKey);
 
+    // Use custom salt computation if provided, otherwise use public key directly
+    const salt = this.accountClass.getSalt
+      ? this.accountClass.getSalt(publicKey)
+      : publicKey;
+
     const addressStr = hash.calculateContractAddressFromHash(
-      publicKey, // salt
+      salt,
       this.accountClass.classHash,
       calldata,
       0 // deployer address (0 for counterfactual)
     );
 
     this.cachedAddress = Address.from(addressStr);
-
     return this.cachedAddress;
   }
 

@@ -146,42 +146,19 @@ describe("Wallet", () => {
       });
 
       const result = await wallet.preflight({
-        kind: "transfer",
-        feeMode: "user_pays",
+        calls: [
+          {
+            contractAddress: "0x123",
+            entrypoint: "transfer",
+            calldata: [],
+          },
+        ],
       });
 
       expect(result.ok).toBe(false);
       if (!result.ok) {
         expect(result.reason).toContain("not deployed");
       }
-    });
-
-    it("should allow sponsored preflight (AVNU paymaster is built-in)", async () => {
-      const signer = new StarkSigner(privateKey);
-      const wallet = await sdk.connectWallet({
-        account: { signer },
-      });
-
-      const result = await wallet.preflight({
-        kind: "execute",
-        feeMode: "sponsored",
-      });
-
-      expect(result.ok).toBe(true);
-    });
-
-    it("should return ok for execute preflight with undeployed account", async () => {
-      const signer = new StarkSigner(testPrivateKeys.random());
-      const wallet = await sdk.connectWallet({
-        account: { signer },
-      });
-
-      // 'execute' kind allows undeployed accounts
-      const result = await wallet.preflight({
-        kind: "execute",
-      });
-
-      expect(result.ok).toBe(true);
     });
   });
 

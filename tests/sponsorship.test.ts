@@ -102,29 +102,4 @@ describe("Sponsorship (AVNU Paymaster)", () => {
       expect(wallet).toBeDefined();
     });
   });
-
-  describe("Preflight", () => {
-    it("should not check sponsor config for preflight (AVNU is built-in)", async () => {
-      const sdk = new StarkSDK({
-        rpcUrl: devnetConfig.rpcUrl,
-        chainId: devnetConfig.chainId,
-      });
-
-      const wallet = await sdk.connectWallet({
-        account: {
-          signer: new StarkSigner(privateKey),
-          accountClass: OpenZeppelinPreset,
-        },
-      });
-
-      // Preflight with sponsored should work (AVNU is built-in)
-      const result = await wallet.preflight({
-        kind: "execute",
-        feeMode: "sponsored",
-      });
-
-      // Should fail because account isn't deployed, not because of sponsor
-      expect(result.ok).toBe(true);
-    });
-  });
 });
