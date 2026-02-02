@@ -31,7 +31,7 @@ export class AccountProvider {
       ? this.accountClass.getSalt(publicKey)
       : publicKey;
 
-    this.cachedAddress = hash.calculateContractAddressFromHash(
+    const addressStr = hash.calculateContractAddressFromHash(
       salt,
       this.accountClass.classHash,
       calldata,
@@ -39,7 +39,6 @@ export class AccountProvider {
     );
 
     this.cachedAddress = Address.from(addressStr);
-
     return this.cachedAddress;
   }
 

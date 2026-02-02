@@ -22,6 +22,7 @@ import type {
   PrepareOptions,
 } from "../types/wallet.js";
 import type { SDKConfig, ExplorerConfig } from "../types/config.js";
+import { Address } from "../types/address.js";
 import type { WalletInterface } from "./interface.js";
 import {
   checkDeployed,
@@ -72,7 +73,7 @@ export interface WalletOptions {
  * ```
  */
 export class Wallet implements WalletInterface {
-  readonly address: string;
+  readonly address: Address;
 
   private readonly provider: RpcProvider;
   private readonly account: Account;
@@ -82,6 +83,7 @@ export class Wallet implements WalletInterface {
   private readonly defaultTimeBounds: PaymasterTimeBounds | undefined;
 
   private constructor(
+    address: Address,
     accountProvider: AccountProvider,
     account: Account,
     provider: RpcProvider,
@@ -89,6 +91,7 @@ export class Wallet implements WalletInterface {
     defaultFeeMode: FeeMode,
     defaultTimeBounds: PaymasterTimeBounds | undefined
   ) {
+    this.address = address;
     this.accountProvider = accountProvider;
     this.account = account;
     this.provider = provider;
@@ -145,6 +148,7 @@ export class Wallet implements WalletInterface {
     });
 
     return new Wallet(
+      address,
       accountProvider,
       account,
       provider,
@@ -252,6 +256,10 @@ export class Wallet implements WalletInterface {
 
   getAccount(): Account {
     return this.account;
+  }
+
+  getProvider(): RpcProvider {
+    return this.provider;
   }
 
   async disconnect(): Promise<void> {

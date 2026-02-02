@@ -21,6 +21,7 @@ import type {
   PrepareOptions,
 } from "../types/wallet.js";
 import type { ExplorerConfig, ChainId } from "../types/config.js";
+import { Address } from "../types/address.js";
 import type { WalletInterface } from "./interface.js";
 import {
   checkDeployed,
@@ -72,6 +73,7 @@ export interface CartridgeWalletOptions {
  * ```
  */
 export class CartridgeWallet implements WalletInterface {
+  readonly address: Address;
   private readonly controller: Controller;
   private readonly walletAccount: WalletAccount;
   private readonly provider: RpcProvider;
@@ -85,6 +87,7 @@ export class CartridgeWallet implements WalletInterface {
     provider: RpcProvider,
     options: CartridgeWalletOptions = {}
   ) {
+    this.address = Address.from(walletAccount.address);
     this.controller = controller;
     this.walletAccount = walletAccount;
     this.provider = provider;
@@ -229,6 +232,10 @@ export class CartridgeWallet implements WalletInterface {
     return this.walletAccount as unknown as Account;
   }
 
+  getProvider(): RpcProvider {
+    return this.provider;
+  }
+
   /**
    * Get the Cartridge Controller instance for Cartridge-specific features.
    */
@@ -245,9 +252,5 @@ export class CartridgeWallet implements WalletInterface {
    */
   async username(): Promise<string | undefined> {
     return this.controller.username();
-  }
-
-  get address(): Address {
-    return Address.from(this.walletAccount.address);
   }
 }

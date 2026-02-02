@@ -1,12 +1,14 @@
 import type {
   Account,
   Call,
+  RpcProvider,
   TypedData,
   Signature,
   PreparedTransaction,
   ExecutableUserTransaction,
 } from "starknet";
 import type { Tx } from "../tx/index.js";
+import type { Address } from "../types/address.js";
 import type {
   EnsureReadyOptions,
   ExecuteOptions,
@@ -40,7 +42,7 @@ import type {
  */
 export interface WalletInterface {
   /** The wallet's Starknet address */
-  get address(): Address;
+  readonly address: Address;
 
   /**
    * Check if the account contract is deployed on-chain.
@@ -107,6 +109,12 @@ export interface WalletInterface {
    * Use this for advanced operations not covered by the SDK.
    */
   getAccount(): Account;
+
+  /**
+   * Get the RPC provider instance.
+   * Use this for read-only operations like balance queries.
+   */
+  getProvider(): RpcProvider;
 
   /**
    * Disconnect the wallet and clean up resources.
