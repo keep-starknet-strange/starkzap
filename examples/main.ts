@@ -86,6 +86,9 @@ const privyEmailInput = document.getElementById(
 const accountPresetSelect = document.getElementById(
   "account-preset"
 ) as HTMLSelectElement;
+const privyAccountPresetSelect = document.getElementById(
+  "privy-account-preset"
+) as HTMLSelectElement;
 const privyForm = document.getElementById("privy-form")!;
 const walletAddressEl = document.getElementById("wallet-address")!;
 const btnCopyAddress = document.getElementById(
@@ -98,6 +101,7 @@ const walletTypeLabelEl = document.getElementById("wallet-type-label")!;
 const presets: Record<string, AccountClassConfig> = {
   openzeppelin: OpenZeppelinPreset,
   argent: ArgentPreset,
+  argentx050: ArgentXV050Preset,
   braavos: BraavosPreset,
   devnet: DevnetPreset,
 };
@@ -328,29 +332,20 @@ async function connectPrivy() {
       },
     });
 
-    // Connect wallet with ArgentX v0.5.0 preset (used by Privy)
+    // Use selected account preset from Privy dropdown
+    const presetKey = privyAccountPresetSelect.value;
+    const preset = presets[presetKey];
+    log(`Using account preset: ${presetKey}`, "info");
+
     wallet = await sdk.connectWallet({
       account: {
         signer,
-        accountClass: ArgentXV050Preset,
+        accountClass: preset,
       },
     });
     walletType = "privy";
 
-    // Compare addresses
-    log(`SDK computed address: ${wallet.address}`, "info");
-    console.log("361 [Privy] Wallet data address:", walletData.address);
-    console.log("362 [Privy] Wallet address:", wallet.address);
-    if (walletData.address.toLowerCase() !== wallet.address.toLowerCase()) {
-      log(
-        `WARNING: Address mismatch! Privy and SDK computed different addresses.`,
-        "error"
-      );
-      log(
-        `This means the account class or constructor format doesn't match Privy's.`,
-        "error"
-      );
-    }
+    log(`Wallet address: ${wallet.address}`, "info");
 
     walletAddressEl.textContent = truncateAddress(wallet.address);
     walletAddressEl.title = wallet.address;

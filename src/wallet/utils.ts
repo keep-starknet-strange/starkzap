@@ -124,71 +124,11 @@ export async function preflightTransaction(
 }
 
 /**
- * Ensure minimum resource bounds to prevent out-of-gas errors.
- * Some RPCs return 0 for l1_gas which causes transactions to fail.
- */
-function ensureMinResourceBounds(resourceBounds: {
-  l1_gas: { max_amount: bigint | number; max_price_per_unit: bigint | number };
-  l2_gas: { max_amount: bigint | number; max_price_per_unit: bigint | number };
-  l1_data_gas?: {
-    max_amount: bigint | number;
-    max_price_per_unit: bigint | number;
-  };
-}): {
-  l1_gas: { max_amount: bigint; max_price_per_unit: bigint };
-  l2_gas: { max_amount: bigint; max_price_per_unit: bigint };
-  l1_data_gas: { max_amount: bigint; max_price_per_unit: bigint };
-} {
-  const MIN_L1_GAS = 1000n;
-  const MIN_L2_GAS = 100000n;
-  const MIN_L1_DATA_GAS = 100n;
-
-  const ensureMin = (
-    value: bigint | number | undefined,
-    min: bigint
-  ): bigint => {
-    const v = BigInt(value ?? 0);
-    return v < min ? min : v;
-  };
-
-  return {
-    l1_gas: {
-      max_amount: ensureMin(resourceBounds.l1_gas.max_amount, MIN_L1_GAS),
-      max_price_per_unit: BigInt(resourceBounds.l1_gas.max_price_per_unit),
-    },
-    l2_gas: {
-      max_amount: ensureMin(resourceBounds.l2_gas.max_amount, MIN_L2_GAS),
-      max_price_per_unit: BigInt(resourceBounds.l2_gas.max_price_per_unit),
-    },
-    l1_data_gas: {
-      max_amount: ensureMin(
-        resourceBounds.l1_data_gas?.max_amount,
-        MIN_L1_DATA_GAS
-      ),
-      max_price_per_unit: BigInt(
-        resourceBounds.l1_data_gas?.max_price_per_unit ?? 0
-      ),
-    },
-  };
-}
-
-/**
  * Execute calls with optional sponsorship.
  */
 export async function executeWithFeeMode(
   account: {
-    execute: (
-      calls: Call[],
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      details?: any
-    ) => Promise<{ transaction_hash: string }>;
-    estimateInvokeFee: (calls: Call[]) => Promise<{
-      resourceBounds: {
-        l1_gas: { max_amount: bigint; max_price_per_unit: bigint };
-        l2_gas: { max_amount: bigint; max_price_per_unit: bigint };
-        l1_data_gas?: { max_amount: bigint; max_price_per_unit: bigint };
-      };
-    }>;
+    execute: (calls: Call[]) => Promise<{ transaction_hash: string }>;
     executePaymasterTransaction: (
       calls: Call[],
       details: {
@@ -222,13 +162,7 @@ export async function executeWithFeeMode(
     return new Tx(transaction_hash, provider, explorerConfig);
   }
 
-  // Manually estimate fees and ensure minimum resource bounds
-  const estimate = await account.estimateInvokeFee(calls);
-  const resourceBounds = ensureMinResourceBounds(estimate.resourceBounds);
-
-  const { transaction_hash } = await account.execute(calls, {
-    resourceBounds,
-  });
+  const { transaction_hash } = await account.execute(calls);
   return new Tx(transaction_hash, provider, explorerConfig);
 }
 

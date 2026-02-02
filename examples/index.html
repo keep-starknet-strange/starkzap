@@ -523,6 +523,7 @@
             <select id="account-preset">
               <option value="openzeppelin">OpenZeppelin</option>
               <option value="argent">Argent</option>
+              <option value="argentx050">ArgentX v0.5.0 (Privy)</option>
               <option value="braavos">Braavos</option>
               <option value="devnet">Devnet</option>
             </select>
@@ -549,6 +550,16 @@
               autocomplete="email"
             />
           </div>
+          <div class="form-group">
+            <label for="privy-account-preset">Account Type</label>
+            <select id="privy-account-preset">
+              <option value="openzeppelin">OpenZeppelin</option>
+              <option value="argent">Argent</option>
+              <option value="argentx050">ArgentX v0.5.0</option>
+              <option value="braavos">Braavos</option>
+              <option value="devnet">Devnet</option>
+            </select>
+          </div>
           <p
             style="
               font-size: 0.8rem;
@@ -557,7 +568,7 @@
             "
           >
             Enter your email to register or login.<br />
-            A Starknet wallet will be created for you.
+            Privy provides the signer, you choose the account contract.
           </p>
           <div class="form-group">
             <button
