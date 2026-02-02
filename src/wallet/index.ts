@@ -149,9 +149,7 @@ export class Wallet implements WalletInterface {
         : new AccountProvider(accountInput.signer, accountInput.accountClass);
 
     // Use provided address or compute from account provider
-    const address = providedAddress
-      ? Address.from(providedAddress)
-      : await accountProvider.getAddress();
+    const address = providedAddress ?? (await accountProvider.getAddress());
 
     const signer = accountProvider.getSigner();
 

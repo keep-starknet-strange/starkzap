@@ -7,7 +7,6 @@ import {
   CartridgeWallet,
   type CartridgeWalletOptions,
 } from "@/wallet/cartridge";
-import { AccountProvider } from "@/wallet/accounts/provider";
 import type { Address, Token } from "@/types";
 import { Staking } from "@/staking";
 

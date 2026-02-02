@@ -247,5 +247,4 @@ export class CartridgeWallet implements WalletInterface {
   async username(): Promise<string | undefined> {
     return this.controller.username();
   }
-
 }
