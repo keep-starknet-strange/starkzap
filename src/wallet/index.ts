@@ -47,6 +47,8 @@ export interface WalletOptions {
   provider: RpcProvider;
   /** SDK configuration */
   config: SDKConfig;
+  /** Known address (skips address computation if provided) */
+  address?: string;
   /** Default fee mode (default: "user_pays") */
   feeMode?: FeeMode;
   /** Default time bounds for paymaster transactions */
@@ -105,16 +107,17 @@ export class Wallet implements WalletInterface {
    *
    * @example
    * ```ts
-   * // With signer
+   * // With signer (address computed from public key)
    * const wallet = await Wallet.create({
    *   account: { signer: new StarkSigner(privateKey), accountClass: ArgentPreset },
    *   provider,
    *   config,
    * });
    *
-   * // With AccountProvider
+   * // With known address (skips address computation)
    * const wallet = await Wallet.create({
-   *   account: new AccountProvider(signer, accountClass),
+   *   account: { signer: new StarkSigner(privateKey) },
+   *   address: "0x123...",
    *   provider,
    *   config,
    * });
@@ -125,6 +128,7 @@ export class Wallet implements WalletInterface {
       account: accountInput,
       provider,
       config,
+      address: providedAddress,
       feeMode = "user_pays",
       timeBounds,
     } = options;
@@ -135,7 +139,11 @@ export class Wallet implements WalletInterface {
         ? accountInput
         : new AccountProvider(accountInput.signer, accountInput.accountClass);
 
-    const address = await accountProvider.getAddress();
+    // Use provided address or compute from account provider
+    const address = providedAddress
+      ? Address.from(providedAddress)
+      : await accountProvider.getAddress();
+
     const signer = accountProvider.getSigner();
 
     // Create starknet.js Account with our signer adapter
