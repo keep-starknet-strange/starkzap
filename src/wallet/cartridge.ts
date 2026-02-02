@@ -19,9 +19,9 @@ import type {
   PreflightResult,
   ExplorerConfig,
   ChainId,
+  fromAddress
 } from "@/types";
 import type { WalletInterface } from "@/wallet/interface";
-import { Address } from "@/types";
 import {
   checkDeployed,
   ensureWalletReady,
@@ -86,7 +86,7 @@ export class CartridgeWallet implements WalletInterface {
     provider: RpcProvider,
     options: CartridgeWalletOptions = {}
   ) {
-    this.address = Address.from(walletAccount.address);
+    this.address = fromAddress(walletAccount.address);
     this.controller = controller;
     this.walletAccount = walletAccount;
     this.provider = provider;
@@ -247,4 +247,5 @@ export class CartridgeWallet implements WalletInterface {
   async username(): Promise<string | undefined> {
     return this.controller.username();
   }
+
 }

@@ -20,7 +20,7 @@ import { writeFileSync } from "node:fs";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
-import { Address } from "@/types";
+import { type Address, fromAddress } from "@/types";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -106,7 +106,7 @@ async function fetchPage(page: number, apiUrl: string): Promise<AvnuResponse> {
 function transformToken(avnuToken: AvnuToken): Token {
   return {
     name: avnuToken.name,
-    address: Address.from(avnuToken.address),
+    address: fromAddress(avnuToken.address),
     decimals: avnuToken.decimals,
     symbol: avnuToken.symbol,
     logoUrl: avnuToken.logoUri,

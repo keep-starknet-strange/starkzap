@@ -1,15 +1,15 @@
 import { beforeAll, describe, it } from "vitest";
-import { sepoliaTokens, StarkSDK } from "../../src/index.js";
+import { sepoliaTokens, StarkSDK } from "@/index";
 import { testnetConfig } from "../config.js";
-import { Address } from "../../src/types/address.js";
+import { fromAddress } from "@/types";
 
 describe("Staking", () => {
   let sdk: StarkSDK;
 
-  const sepoliaPoolAddress = Address.from(
+  const sepoliaPoolAddress = fromAddress(
     "0x056e375b0554d472f125d5de8f7d20994167d69ec4c5ebf16c5de17cac2818c8"
   );
-  const sepoliaStaker = Address.from(
+  const sepoliaStaker = fromAddress(
     "0x00eec9c60f18316a9eba3862e923f1cbebc621acaffefc1699c508671974cf7f"
   );
   const STRK = sepoliaTokens.STRK!;

@@ -1,11 +1,11 @@
 import { CairoFelt252, Contract, RpcProvider } from "starknet";
-import type { Address, ChainId, Token } from "../../types/index.js";
-import { mainnetTokens } from "./presets.js";
-import { sepoliaTokens } from "./presets.sepolia.js";
+import type { Address, ChainId, Token } from "@/types";
+import { mainnetTokens } from "@/erc20/token/presets";
+import { sepoliaTokens } from "@/erc20/token/presets.sepolia";
 import { ABI as ERC20_ABI } from "../../abi/erc20.js";
 
-export * from "./presets.js";
-export * from "./presets.sepolia.js";
+export * from "@/erc20/token/presets";
+export * from "@/erc20/token/presets.sepolia";
 
 export function getPresets(chainId: ChainId): Record<string, Token> {
   switch (chainId) {
@@ -79,7 +79,15 @@ export async function getTokensFromAddresses(
         .flat()
     );
 
-    const tokenDetails = Map.groupBy(results, (r) => r.token);
+    const tokenDetails = results.reduce((map, r) => {
+      const group = map.get(r.token);
+      if (group) {
+        group.push(r);
+      } else {
+        map.set(r.token, [r]);
+      }
+      return map;
+    }, new Map<Address, typeof results>());
 
     for (const unknownTokenAddress of unknownTokenAddresses) {
       const details = tokenDetails.get(unknownTokenAddress);

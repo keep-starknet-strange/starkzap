@@ -8,14 +8,12 @@ import { validateAndParseAddress, type BigNumberish } from "starknet";
  */
 export type Address = string & { readonly __type: "StarknetAddress" };
 
-export const Address = {
-  /**
-   * Parse a Starknet address from a BigNumberish value.
-   * @param address - The address to parse
-   * @returns The validated address
-   * @throws Argument must be a valid address inside the address range bound
-   */
-  from: (address: BigNumberish): Address => {
-    return validateAndParseAddress(address) as Address;
-  },
-};
+/**
+ * Parse a Starknet address from a BigNumberish value.
+ * @param value - The address to parse
+ * @returns The validated address
+ * @throws Argument must be a valid address inside the address range bound
+ */
+export function fromAddress(value: BigNumberish): Address {
+  return validateAndParseAddress(value) as Address;
+}

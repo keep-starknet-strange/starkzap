@@ -1,6 +1,6 @@
 import { Contract, type RpcProvider } from "starknet";
-import { getTokensFromAddresses } from "../erc20/index.js";
-import { Address, type ChainId, type Token } from "../types/index.js";
+import { getTokensFromAddresses } from "@/erc20";
+import { type Address, type ChainId, fromAddress, type Token } from "@/types";
 import { ABI as POOL_ABI } from "../abi/pool.js";
 import { ABI as STAKING_ABI } from "../abi/staking.js";
 
@@ -33,8 +33,8 @@ export class Staking {
     }).typedv2(POOL_ABI);
     const poolParameters = await poolContract.contract_parameters_v1();
 
-    const staker_address = Address.from(poolParameters.staker_address);
-    const staking_contract = Address.from(poolParameters.staking_contract);
+    const staker_address = fromAddress(poolParameters.staker_address);
+    const staking_contract = fromAddress(poolParameters.staking_contract);
 
     if (staking_contract !== stakingContractAddress) {
       throw new Error("Staking contract address is wrong in the config.");
@@ -48,14 +48,14 @@ export class Staking {
 
     const staker = await stakingContract.staker_pool_info(staker_address);
     const pool = staker.pools.find((pool) => {
-      return Address.from(pool.pool_contract) === poolAddress;
+      return fromAddress(pool.pool_contract) === poolAddress;
     });
 
     if (!pool) {
       throw new Error(`Could not verify pool address ${poolAddress}`);
     }
 
-    if (Address.from(pool.token_address) !== token.address) {
+    if (fromAddress(pool.token_address) !== token.address) {
       throw new Error(
         `Pool ${poolAddress} does not hold ${token.symbol} tokens`
       );
@@ -78,7 +78,7 @@ export class Staking {
 
     const info = await stakingContract.staker_pool_info(stakerAddress);
     const pool = info.pools.find((pool) => {
-      return Address.from(pool.token_address) === token.address;
+      return fromAddress(pool.token_address) === token.address;
     });
 
     if (!pool) {
@@ -89,7 +89,7 @@ export class Staking {
 
     const poolContract = new Contract({
       abi: POOL_ABI,
-      address: Address.from(pool.pool_contract),
+      address: fromAddress(pool.pool_contract),
       providerOrAccount: provider,
     }).typedv2(POOL_ABI);
 
@@ -111,7 +111,7 @@ export class Staking {
       .get_active_tokens()
       .then((addresses) => {
         return addresses.map((address) => {
-          return Address.from(address);
+          return fromAddress(address);
         });
       });
 

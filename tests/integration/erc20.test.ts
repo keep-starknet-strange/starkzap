@@ -1,8 +1,7 @@
 import { describe, it, expect, beforeAll } from "vitest";
 import { RpcProvider } from "starknet";
 import { StarkSDK } from "@/sdk";
-import { Erc20 } from "@/erc20";
-import { sepoliaTokens } from "@/token";
+import { Erc20, sepoliaTokens } from "@/erc20";
 import { StarkSigner } from "@/signer";
 import { DevnetPreset } from "@/account";
 import { Amount } from "@/types";

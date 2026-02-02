@@ -2,7 +2,7 @@ import { hash, num, type Calldata } from "starknet";
 import type { PAYMASTER_API } from "@starknet-io/starknet-types-010";
 import { OpenZeppelinPreset } from "@/account";
 import type { SignerInterface } from "@/signer";
-import { Address } from "@/types";
+import { type Address, fromAddress } from "@/types";
 import type { AccountClassConfig } from "@/types";
 
 /** Ensure value is a 0x-prefixed hex string */
@@ -47,7 +47,8 @@ export class AccountProvider {
       0 // deployer address (0 for counterfactual)
     );
 
-    this.cachedAddress = Address.from(addressStr);
+    this.cachedAddress = fromAddress(addressStr);
+
     return this.cachedAddress;
   }
 

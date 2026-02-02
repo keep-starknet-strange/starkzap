@@ -1,2 +1,2 @@
-export * from "./erc20.js";
-export * from "./token/index.js";
+export * from "@/erc20/erc20";
+export * from "@/erc20/token";

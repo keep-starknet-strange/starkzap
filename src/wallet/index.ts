@@ -12,6 +12,7 @@ import { AccountProvider } from "@/wallet/accounts/provider";
 import { SignerAdapter } from "@/signer";
 import type { SignerInterface } from "@/signer";
 import type {
+  Address,
   AccountClassConfig,
   DeployOptions,
   EnsureReadyOptions,
@@ -19,9 +20,10 @@ import type {
   FeeMode,
   PreflightOptions,
   PreflightResult,
+  SDKConfig,
+  ExplorerConfig,
+  ChainId
 } from "@/types";
-import type { SDKConfig, ExplorerConfig, ChainId } from "@/types";
-import { Address } from "@/types";
 import type { WalletInterface } from "@/wallet/interface";
 import {
   checkDeployed,

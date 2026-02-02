@@ -17,7 +17,7 @@ export { StarkSigner } from "@/signer/stark";
 export { PrivySigner, type PrivySignerConfig } from "@/signer/privy";
 
 // Staking
-export { Staking } from "./staking/index.js";
+export { Staking } from "@/staking";
 
 // Account Presets
 export {
@@ -80,6 +80,7 @@ export type {
 
 // Types - Token
 export type { Token } from "@/types/token";
+export type { Address } from "@/types/address";
 
 // Amount
 export { Amount, tokenAmountToFormatted } from "@/types/amount";

@@ -8,8 +8,8 @@ import {
   type CartridgeWalletOptions,
 } from "@/wallet/cartridge";
 import { AccountProvider } from "@/wallet/accounts/provider";
-import type { Address, Token } from "./types/index.js";
-import { Staking } from "./staking/index.js";
+import type { Address, Token } from "@/types";
+import { Staking } from "@/staking";
 
 /** Resolved SDK configuration with required rpcUrl and chainId */
 interface ResolvedConfig extends Omit<SDKConfig, "rpcUrl" | "chainId"> {

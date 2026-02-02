@@ -1,5 +1,4 @@
-import type { SDKConfig } from "@/types";
-import { Address } from "@/types";
+import { type Address, fromAddress, type SDKConfig } from "@/types";
 import "dotenv/config";
 
 /**
@@ -31,7 +30,7 @@ export const devnetConfig: SDKConfig = {
  * Note: This is a valid Stark private key within curve order
  */
 export const devnetAccount = {
-  address: Address.from(
+  address: fromAddress(
     "0x64b48806902a367c8598f4f95c305e8c1a1acba5f082d294a43793113115691"
   ),
   privateKey: "0x71d7bb07b9a64f6f78ac4c816aff4da9",
