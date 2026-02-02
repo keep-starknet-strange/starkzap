@@ -1,5 +1,14 @@
-import type { Account, Call } from "starknet";
+import type {
+  Account,
+  Call,
+  RpcProvider,
+  TypedData,
+  Signature,
+  PreparedTransaction,
+  ExecutableUserTransaction,
+} from "starknet";
 import type { Tx } from "../tx/index.js";
+import type { Address } from "../types/address.js";
 import type {
   EnsureReadyOptions,
   ExecuteOptions,
@@ -7,8 +16,6 @@ import type {
   PreflightResult,
   PrepareOptions,
 } from "../types/wallet.js";
-import type { PreparedTransaction, ExecutableUserTransaction } from "starknet";
-import type { Address } from "../types/address.js";
 
 /**
  * Interface for a connected Starknet wallet.
@@ -35,7 +42,7 @@ import type { Address } from "../types/address.js";
  */
 export interface WalletInterface {
   /** The wallet's Starknet address */
-  get address(): Address;
+  readonly address: Address;
 
   /**
    * Check if the account contract is deployed on-chain.
@@ -59,6 +66,12 @@ export interface WalletInterface {
    * Returns a Tx object to track the transaction.
    */
   execute(calls: Call[], options?: ExecuteOptions): Promise<Tx>;
+
+  /**
+   * Sign a typed data message (EIP-712 style).
+   * Returns the signature.
+   */
+  signMessage(typedData: TypedData): Promise<Signature>;
 
   /**
    * Build a sponsored transaction for the paymaster.
@@ -87,12 +100,24 @@ export interface WalletInterface {
   ): Promise<ExecutableUserTransaction>;
 
   /**
-   * Check if an operation can succeed before attempting it.
+   * Simulate a transaction to check if it would succeed.
    */
   preflight(options: PreflightOptions): Promise<PreflightResult>;
 
   /**
    * Get the underlying starknet.js Account instance.
+   * Use this for advanced operations not covered by the SDK.
    */
   getAccount(): Account;
+
+  /**
+   * Get the RPC provider instance.
+   * Use this for read-only operations like balance queries.
+   */
+  getProvider(): RpcProvider;
+
+  /**
+   * Disconnect the wallet and clean up resources.
+   */
+  disconnect(): Promise<void>;
 }

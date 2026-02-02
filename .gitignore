@@ -1,6 +1,11 @@
 # Dependencies
 node_modules/
 
+# Environment variables (may contain secrets)
+.env
+.env.*
+!.env.example
+
 # Build output
 dist/
 
@@ -24,3 +29,4 @@ coverage/
 
 # Env variables
 .env
+*.pem
