@@ -1,3 +1,4 @@
+import { useState } from "react";
 import {
   StyleSheet,
   TextInput,
@@ -5,6 +6,7 @@ import {
   ActivityIndicator,
   ScrollView,
 } from "react-native";
+import * as Clipboard from "expo-clipboard";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { ThemedText } from "@/components/themed-text";
@@ -34,6 +36,7 @@ export default function HomeScreen() {
     privateKey,
     selectedPreset,
     wallet,
+    walletType,
     isConnecting,
     isDeployed,
     isCheckingStatus,
@@ -44,7 +47,26 @@ export default function HomeScreen() {
     disconnect,
     checkDeploymentStatus,
     deploy,
+    testTransfer,
+    isTransferring,
+    // Privy
+    privyEmail,
+    privySelectedPreset,
+    setPrivyEmail,
+    setPrivySelectedPreset,
+    connectPrivy,
   } = useWalletStore();
+
+  const [showPrivyForm, setShowPrivyForm] = useState(false);
+  const [showPrivateKeyForm, setShowPrivateKeyForm] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  const copyAddress = async () => {
+    if (!wallet) return;
+    await Clipboard.setStringAsync(wallet.address);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
 
   return (
     <SafeAreaView style={styles.container} edges={["top"]}>
@@ -171,60 +193,167 @@ export default function HomeScreen() {
               </ThemedView>
             </ThemedView>
 
-            <ThemedView style={styles.inputContainer}>
-              <ThemedText style={styles.label}>Private Key</ThemedText>
-              <TextInput
-                style={styles.input}
-                placeholder="Enter your private key"
-                placeholderTextColor="#888"
-                value={privateKey}
-                onChangeText={setPrivateKey}
-                secureTextEntry
-                autoCapitalize="none"
-                autoCorrect={false}
-              />
-            </ThemedView>
-
-            <ThemedView style={styles.inputContainer}>
-              <ThemedText style={styles.label}>Account Type</ThemedText>
-              <ThemedView style={styles.presetContainer}>
-                {Object.keys(PRESETS).map((preset) => (
-                  <TouchableOpacity
-                    key={preset}
-                    style={[
-                      styles.presetButton,
-                      selectedPreset === preset && styles.presetButtonActive,
-                    ]}
-                    onPress={() => setSelectedPreset(preset)}
-                  >
-                    <ThemedText
-                      style={[
-                        styles.presetButtonText,
-                        selectedPreset === preset &&
-                          styles.presetButtonTextActive,
-                      ]}
-                    >
-                      {preset}
-                    </ThemedText>
-                  </TouchableOpacity>
-                ))}
-              </ThemedView>
-            </ThemedView>
-
+            {/* Privy Login - Primary Option */}
             <TouchableOpacity
-              style={[styles.button, styles.buttonPrimary]}
-              onPress={connect}
+              style={[styles.button, styles.buttonPrivy]}
+              onPress={() => {
+                setShowPrivyForm(!showPrivyForm);
+                setShowPrivateKeyForm(false);
+              }}
               disabled={isConnecting}
             >
-              {isConnecting ? (
-                <ActivityIndicator color="#fff" />
-              ) : (
-                <ThemedText style={styles.buttonText}>Connect</ThemedText>
-              )}
+              <ThemedText style={styles.buttonText}>
+                {showPrivyForm ? "Hide Privy Login" : "Login with Privy"}
+              </ThemedText>
             </TouchableOpacity>
 
+            {showPrivyForm && (
+              <>
+                <ThemedView style={styles.inputContainer}>
+                  <ThemedText style={styles.label}>Email</ThemedText>
+                  <TextInput
+                    style={styles.input}
+                    placeholder="user@example.com"
+                    placeholderTextColor="#888"
+                    value={privyEmail}
+                    onChangeText={setPrivyEmail}
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                    keyboardType="email-address"
+                  />
+                </ThemedView>
+
+                <ThemedView style={styles.inputContainer}>
+                  <ThemedText style={styles.label}>Account Type</ThemedText>
+                  <ThemedView style={styles.presetContainer}>
+                    {Object.keys(PRESETS).map((preset) => (
+                      <TouchableOpacity
+                        key={preset}
+                        style={[
+                          styles.presetButton,
+                          privySelectedPreset === preset &&
+                            styles.presetButtonActive,
+                        ]}
+                        onPress={() => setPrivySelectedPreset(preset)}
+                      >
+                        <ThemedText
+                          style={[
+                            styles.presetButtonText,
+                            privySelectedPreset === preset &&
+                              styles.presetButtonTextActive,
+                          ]}
+                        >
+                          {preset}
+                        </ThemedText>
+                      </TouchableOpacity>
+                    ))}
+                  </ThemedView>
+                </ThemedView>
+
+                <TouchableOpacity
+                  style={[styles.button, styles.buttonPrimary]}
+                  onPress={connectPrivy}
+                  disabled={isConnecting}
+                >
+                  {isConnecting ? (
+                    <ActivityIndicator color="#fff" />
+                  ) : (
+                    <ThemedText style={styles.buttonText}>
+                      Connect with Privy
+                    </ThemedText>
+                  )}
+                </TouchableOpacity>
+              </>
+            )}
+
+            {/* Divider */}
+            <ThemedView style={styles.divider}>
+              <ThemedView style={styles.dividerLine} />
+              <ThemedText style={styles.dividerText}>or</ThemedText>
+              <ThemedView style={styles.dividerLine} />
+            </ThemedView>
+
+            {/* Private Key Option */}
+            {!showPrivateKeyForm ? (
+              <TouchableOpacity
+                style={[styles.button, styles.buttonSecondary]}
+                onPress={() => {
+                  setShowPrivateKeyForm(true);
+                  setShowPrivyForm(false);
+                }}
+              >
+                <ThemedText style={styles.buttonTextSecondary}>
+                  Use Private Key
+                </ThemedText>
+              </TouchableOpacity>
+            ) : (
+              <>
+                <ThemedView style={styles.inputContainer}>
+                  <ThemedText style={styles.label}>Private Key</ThemedText>
+                  <TextInput
+                    style={styles.input}
+                    placeholder="Enter your private key"
+                    placeholderTextColor="#888"
+                    value={privateKey}
+                    onChangeText={setPrivateKey}
+                    secureTextEntry
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                  />
+                </ThemedView>
+
+                <ThemedView style={styles.inputContainer}>
+                  <ThemedText style={styles.label}>Account Type</ThemedText>
+                  <ThemedView style={styles.presetContainer}>
+                    {Object.keys(PRESETS).map((preset) => (
+                      <TouchableOpacity
+                        key={preset}
+                        style={[
+                          styles.presetButton,
+                          selectedPreset === preset &&
+                            styles.presetButtonActive,
+                        ]}
+                        onPress={() => setSelectedPreset(preset)}
+                      >
+                        <ThemedText
+                          style={[
+                            styles.presetButtonText,
+                            selectedPreset === preset &&
+                              styles.presetButtonTextActive,
+                          ]}
+                        >
+                          {preset}
+                        </ThemedText>
+                      </TouchableOpacity>
+                    ))}
+                  </ThemedView>
+                </ThemedView>
+
+                <TouchableOpacity
+                  style={[styles.button, styles.buttonPrimary]}
+                  onPress={connect}
+                  disabled={isConnecting}
+                >
+                  {isConnecting ? (
+                    <ActivityIndicator color="#fff" />
+                  ) : (
+                    <ThemedText style={styles.buttonText}>Connect</ThemedText>
+                  )}
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[styles.button, styles.buttonSecondary]}
+                  onPress={() => setShowPrivateKeyForm(false)}
+                >
+                  <ThemedText style={styles.buttonTextSecondary}>
+                    Cancel
+                  </ThemedText>
+                </TouchableOpacity>
+              </>
+            )}
+
             <TouchableOpacity
-              style={[styles.button, styles.buttonSecondary]}
+              style={[styles.button, styles.buttonSecondary, { marginTop: 20 }]}
               onPress={resetNetworkConfig}
             >
               <ThemedText style={styles.buttonTextSecondary}>
@@ -236,7 +365,9 @@ export default function HomeScreen() {
           // Connected Wallet View
           <ThemedView style={styles.card}>
             <ThemedView style={styles.cardHeader}>
-              <ThemedText type="subtitle">Connected Wallet</ThemedText>
+              <ThemedText type="subtitle">
+                {walletType === "privy" ? "Privy Wallet" : "Connected Wallet"}
+              </ThemedText>
               <ThemedView style={styles.networkBadge}>
                 <ThemedText style={styles.networkBadgeText}>
                   {NETWORKS.find((n) => n.chainId === chainId)?.name ||
@@ -246,7 +377,30 @@ export default function HomeScreen() {
             </ThemedView>
 
             <ThemedView style={styles.walletInfo}>
-              <ThemedText style={styles.label}>Address</ThemedText>
+              {walletType === "privy" && privyEmail && (
+                <>
+                  <ThemedText style={styles.label}>Email</ThemedText>
+                  <ThemedText style={styles.emailText}>{privyEmail}</ThemedText>
+                </>
+              )}
+              <ThemedView style={styles.addressRow}>
+                <ThemedText
+                  style={[
+                    styles.label,
+                    walletType === "privy" && { marginTop: 12 },
+                  ]}
+                >
+                  Address
+                </ThemedText>
+                <TouchableOpacity
+                  onPress={copyAddress}
+                  style={styles.copyButton}
+                >
+                  <ThemedText style={styles.copyButtonText}>
+                    {copied ? "Copied!" : "Copy"}
+                  </ThemedText>
+                </TouchableOpacity>
+              </ThemedView>
               <ThemedText style={styles.address}>{wallet.address}</ThemedText>
 
               <ThemedView style={styles.statusRow}>
@@ -303,6 +457,22 @@ export default function HomeScreen() {
                 </TouchableOpacity>
               )}
             </ThemedView>
+
+            {isDeployed && (
+              <TouchableOpacity
+                style={[styles.button, styles.buttonSuccess]}
+                onPress={testTransfer}
+                disabled={isTransferring}
+              >
+                {isTransferring ? (
+                  <ActivityIndicator color="#fff" />
+                ) : (
+                  <ThemedText style={styles.buttonText}>
+                    Test Transfer (0 STRK to self)
+                  </ThemedText>
+                )}
+              </TouchableOpacity>
+            )}
 
             <TouchableOpacity
               style={[styles.button, styles.buttonDanger]}
@@ -428,6 +598,32 @@ const styles = StyleSheet.create({
   buttonDanger: {
     backgroundColor: "#dc3545",
   },
+  buttonSuccess: {
+    backgroundColor: "#28a745",
+  },
+  buttonPrivy: {
+    backgroundColor: "#8b5cf6",
+  },
+  divider: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginVertical: 20,
+  },
+  dividerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: "rgba(128, 128, 128, 0.3)",
+  },
+  dividerText: {
+    marginHorizontal: 12,
+    opacity: 0.5,
+    fontSize: 14,
+  },
+  emailText: {
+    fontSize: 16,
+    fontWeight: "500",
+    marginBottom: 4,
+  },
   buttonText: {
     color: "#fff",
     fontSize: 16,
@@ -447,6 +643,22 @@ const styles = StyleSheet.create({
   },
   walletInfo: {
     marginTop: 16,
+  },
+  addressRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  copyButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: 6,
+    backgroundColor: "rgba(10, 126, 164, 0.2)",
+  },
+  copyButtonText: {
+    fontSize: 12,
+    color: "#0a7ea4",
+    fontWeight: "600",
   },
   address: {
     fontFamily: "monospace",

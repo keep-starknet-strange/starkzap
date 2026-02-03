@@ -3,8 +3,10 @@ import { Alert } from "react-native";
 import {
   StarkSDK,
   StarkSigner,
+  PrivySigner,
   OpenZeppelinPreset,
   ArgentPreset,
+  ArgentXV050Preset,
   BraavosPreset,
   DevnetPreset,
   type WalletInterface,
@@ -18,6 +20,9 @@ export interface NetworkConfig {
   chainId: ChainId;
   rpcUrl: string;
 }
+
+// Privy server URL - change this to your server URL
+const PRIVY_SERVER_URL = "http://localhost:3001";
 
 // Available network presets
 export const NETWORKS: NetworkConfig[] = [
@@ -40,9 +45,13 @@ export const DEFAULT_NETWORK_INDEX = 0;
 export const PRESETS: Record<string, AccountClassConfig> = {
   OpenZeppelin: OpenZeppelinPreset,
   Argent: ArgentPreset,
+  "ArgentX v0.5": ArgentXV050Preset,
   Braavos: BraavosPreset,
   Devnet: DevnetPreset,
 };
+
+// Wallet connection type
+type WalletType = "privatekey" | "privy";
 
 interface WalletState {
   // SDK configuration
@@ -60,13 +69,20 @@ interface WalletState {
   privateKey: string;
   selectedPreset: string;
 
+  // Privy form state
+  privyEmail: string;
+  privySelectedPreset: string;
+  privyWalletId: string | null;
+
   // Wallet state
   wallet: WalletInterface | null;
+  walletType: WalletType | null;
   isDeployed: boolean | null;
 
   // Loading states
   isConnecting: boolean;
   isCheckingStatus: boolean;
+  isTransferring: boolean;
 
   // Logs
   logs: string[];
@@ -82,11 +98,15 @@ interface WalletState {
   // Actions
   setPrivateKey: (key: string) => void;
   setSelectedPreset: (preset: string) => void;
+  setPrivyEmail: (email: string) => void;
+  setPrivySelectedPreset: (preset: string) => void;
   addLog: (message: string) => void;
   connect: () => Promise<void>;
+  connectPrivy: () => Promise<void>;
   disconnect: () => void;
   checkDeploymentStatus: () => Promise<void>;
   deploy: () => Promise<void>;
+  testTransfer: () => Promise<void>;
 }
 
 const truncateAddress = (address: string) => {
@@ -110,10 +130,19 @@ export const useWalletStore = create<WalletState>((set, get) => ({
   // Initial state
   privateKey: "",
   selectedPreset: "OpenZeppelin",
+
+  // Privy state
+  privyEmail: "",
+  privySelectedPreset: "ArgentX v0.5",
+  privyWalletId: null,
+
+  // Wallet state
   wallet: null,
+  walletType: null,
   isDeployed: null,
   isConnecting: false,
   isCheckingStatus: false,
+  isTransferring: false,
   logs: [],
 
   // Network configuration actions
@@ -176,8 +205,11 @@ export const useWalletStore = create<WalletState>((set, get) => ({
       sdk: null,
       isConfigured: false,
       wallet: null,
+      walletType: null,
       isDeployed: null,
       privateKey: "",
+      privyEmail: "",
+      privyWalletId: null,
       selectedNetworkIndex: DEFAULT_NETWORK_INDEX,
       rpcUrl: defaultNetwork.rpcUrl,
       chainId: defaultNetwork.chainId,
@@ -189,6 +221,10 @@ export const useWalletStore = create<WalletState>((set, get) => ({
   setPrivateKey: (key) => set({ privateKey: key }),
 
   setSelectedPreset: (preset) => set({ selectedPreset: preset }),
+
+  setPrivyEmail: (email) => set({ privyEmail: email }),
+
+  setPrivySelectedPreset: (preset) => set({ privySelectedPreset: preset }),
 
   addLog: (message) =>
     set((state) => ({
@@ -223,7 +259,7 @@ export const useWalletStore = create<WalletState>((set, get) => ({
         },
       });
 
-      set({ wallet: connectedWallet });
+      set({ wallet: connectedWallet, walletType: "privatekey" });
       addLog(`Connected: ${truncateAddress(connectedWallet.address)}`);
 
       // Check deployment status after connecting
@@ -236,12 +272,104 @@ export const useWalletStore = create<WalletState>((set, get) => ({
     }
   },
 
+  connectPrivy: async () => {
+    const { privyEmail, privySelectedPreset, sdk, addLog } = get();
+
+    if (!sdk) {
+      Alert.alert(
+        "Error",
+        "SDK not configured. Please configure network first."
+      );
+      return;
+    }
+
+    if (!privyEmail.trim() || !privyEmail.includes("@")) {
+      Alert.alert("Error", "Please enter a valid email address");
+      return;
+    }
+
+    set({ isConnecting: true });
+    addLog(`Connecting with Privy (${privyEmail})...`);
+
+    try {
+      // Check if server is running
+      const healthRes = await fetch(`${PRIVY_SERVER_URL}/api/health`);
+      if (!healthRes.ok) {
+        throw new Error(
+          "Privy server not running. Start it with: npm run dev:server"
+        );
+      }
+
+      // Register user or get existing wallet
+      addLog("Registering/fetching user...");
+      const registerRes = await fetch(`${PRIVY_SERVER_URL}/api/user/register`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: privyEmail }),
+      });
+
+      if (!registerRes.ok) {
+        const err = await registerRes.json();
+        throw new Error(err.details || err.error || "Failed to register user");
+      }
+
+      const { isNew, wallet: walletData } = await registerRes.json();
+      addLog(`${isNew ? "Created new" : "Found existing"} Privy wallet`);
+      addLog(`Address: ${truncateAddress(walletData.address)}`);
+
+      // Store wallet ID for signing
+      set({ privyWalletId: walletData.id });
+
+      // Create signer with rawSign callback
+      const signer = new PrivySigner({
+        walletId: walletData.id,
+        publicKey: walletData.publicKey,
+        rawSign: async (walletId: string, hash: string) => {
+          const signRes = await fetch(`${PRIVY_SERVER_URL}/api/wallet/sign`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ walletId, hash }),
+          });
+
+          if (!signRes.ok) {
+            const err = await signRes.json();
+            throw new Error(err.details || err.error || "Signing failed");
+          }
+
+          const { signature } = await signRes.json();
+          return signature;
+        },
+      });
+
+      const connectedWallet = await sdk.connectWallet({
+        account: {
+          signer,
+          accountClass: PRESETS[privySelectedPreset],
+        },
+      });
+
+      set({ wallet: connectedWallet, walletType: "privy" });
+      addLog(`Connected: ${truncateAddress(connectedWallet.address)}`);
+
+      // Check deployment status after connecting
+      await get().checkDeploymentStatus();
+    } catch (err) {
+      addLog(`Privy connection failed: ${err}`);
+      Alert.alert("Connection Failed", String(err));
+    } finally {
+      set({ isConnecting: false });
+    }
+  },
+
   disconnect: () => {
     const { addLog } = get();
     set({
       wallet: null,
+      walletType: null,
       isDeployed: null,
       privateKey: "",
+      privyEmail: "",
+      privyWalletId: null,
     });
     addLog("Disconnected");
   },
@@ -283,6 +411,45 @@ export const useWalletStore = create<WalletState>((set, get) => ({
       Alert.alert("Deployment Failed", String(err));
     } finally {
       set({ isConnecting: false });
+    }
+  },
+
+  testTransfer: async () => {
+    const { wallet, isDeployed, addLog } = get();
+    if (!wallet) return;
+
+    if (!isDeployed) {
+      Alert.alert("Error", "Account not deployed. Deploy first!");
+      return;
+    }
+
+    set({ isTransferring: true });
+    addLog("Executing test transfer (0 STRK to self)...");
+
+    try {
+      // STRK contract on Sepolia/Mainnet
+      const STRK_CONTRACT =
+        "0x04718f5a0fc34cc1af16a1cdee98ffb20c31f5cd61d6ab07201858f4287c938d";
+
+      // Transfer 0 STRK to self (safe test)
+      const tx = await wallet.execute([
+        {
+          contractAddress: STRK_CONTRACT,
+          entrypoint: "transfer",
+          calldata: [wallet.address, "0", "0"], // recipient, amount_low, amount_high
+        },
+      ]);
+
+      addLog(`Tx submitted: ${truncateAddress(tx.hash)}`);
+      addLog("Waiting for confirmation...");
+
+      await tx.wait();
+      addLog("Transfer confirmed!");
+    } catch (err) {
+      addLog(`Transfer failed: ${err}`);
+      Alert.alert("Transfer Failed", String(err));
+    } finally {
+      set({ isTransferring: false });
     }
   },
 }));
