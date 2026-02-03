@@ -85,4 +85,4 @@ export const sepoliaTokens: Record<string, Token> = {
       logoUrl: new URL("https://i.postimg.cc/sgpzCv0Z/logo.png"),
     },
   },
-};
+} as const;

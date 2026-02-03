@@ -2,7 +2,7 @@ import { CairoFelt252, Contract, RpcProvider } from "starknet";
 import type { Address, ChainId, Token } from "@/types";
 import { mainnetTokens } from "@/erc20/token/presets";
 import { sepoliaTokens } from "@/erc20/token/presets.sepolia";
-import { ABI as ERC20_ABI } from "../../abi/erc20.js";
+import { ABI as ERC20_ABI } from "@resources/abi/erc20.js";
 
 export * from "@/erc20/token/presets";
 export * from "@/erc20/token/presets.sepolia";

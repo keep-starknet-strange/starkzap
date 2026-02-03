@@ -1,62 +1,32 @@
-import { describe, it, expect, beforeAll } from "vitest";
-import { RpcProvider } from "starknet";
+import { beforeAll, describe, expect, inject, it } from "vitest";
 import { StarkSDK } from "@/sdk";
 import { StarkSigner } from "@/signer";
 import { DevnetPreset } from "@/account";
-import { getTestConfig, testPrivateKeys } from "../config";
+import { DevnetProvider } from "starknet-devnet";
+import { fund } from "./shared";
+import { testPrivateKeys } from "../config";
 
-/**
- * Integration tests that require a running devnet.
- *
- * Start devnet with:
- *   npm run devnet:start
- *
- * Run these tests with:
- *   npm run test:integration
- */
 describe("Account Deployment (Integration)", () => {
-  const { config, network } = getTestConfig();
+  const config = inject("sdkConfig");
   let sdk: StarkSDK;
-  let provider: RpcProvider;
-  let devnetRunning = false;
+  let devnetRunning: boolean;
 
   beforeAll(async () => {
     sdk = new StarkSDK(config);
-    provider = sdk.getProvider();
 
-    try {
-      await provider.getChainId();
-      devnetRunning = true;
-      console.log(`Connected to ${network}`);
-    } catch {
+    const devnetProvider = new DevnetProvider({
+      url: config.rpcUrl,
+    });
+    devnetRunning = await devnetProvider.isAlive();
+
+    if (!devnetRunning) {
       console.warn("Devnet not running, skipping integration tests");
     }
   });
 
-  /**
-   * Fund an account using devnet's mint endpoint.
-   */
-  async function fundAccount(address: string, amount = "1000000000000000000") {
-    const response = await fetch("http://127.0.0.1:5050", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        jsonrpc: "2.0",
-        method: "devnet_mint",
-        params: { address, amount: Number(amount) },
-        id: 1,
-      }),
-    });
-    const result = await response.json();
-    if (result.error) {
-      throw new Error(result.error.message);
-    }
-    return result;
-  }
-
   it("should deploy a new account", async () => {
     if (!devnetRunning) {
-      console.log("Skipping: devnet not running");
+      console.error("Skipping: devnet not running");
       return;
     }
 
@@ -74,7 +44,7 @@ describe("Account Deployment (Integration)", () => {
     console.log("Account address:", wallet.address);
 
     // Fund the account
-    await fundAccount(wallet.address);
+    await fund(wallet);
     console.log("Account funded");
 
     // Check not deployed yet
@@ -112,7 +82,7 @@ describe("Account Deployment (Integration)", () => {
     });
 
     // Fund account
-    await fundAccount(wallet.address);
+    await fund(wallet);
 
     const progressSteps: string[] = [];
 
@@ -152,7 +122,7 @@ describe("Account Deployment (Integration)", () => {
     });
 
     // Fund and deploy
-    await fundAccount(wallet.address);
+    await fund(wallet);
     await wallet.ensureReady({ deploy: "if_needed" });
 
     // Now call ensureReady again - should skip deployment

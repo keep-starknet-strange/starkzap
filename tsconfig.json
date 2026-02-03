@@ -1,11 +1,12 @@
 {
   "compilerOptions": {
     // File Layout
-    "rootDir": "src",
+    "rootDir": ".",
     "outDir": "dist",
     "baseUrl": ".",
     "paths": {
-      "@/*": ["src/*"]
+      "@/*": ["src/*"],
+      "@resources/*": ["resources/*"]
     },
     // Module Settings
     "module": "esnext",
@@ -28,6 +29,6 @@
     // Performance
     "skipLibCheck": true
   },
-  "include": ["src/**/*"],
+  "include": ["src/**/*", "resources/**/*"],
   "exclude": ["node_modules", "dist"]
 }

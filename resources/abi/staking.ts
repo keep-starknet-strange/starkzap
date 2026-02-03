@@ -30,6 +30,28 @@ export const ABI = [
         ],
         state_mutability: "view",
       },
+      {
+        type: "function",
+        name: "get_total_stake",
+        inputs: [],
+        outputs: [
+          {
+            type: "core::integer::u128",
+          },
+        ],
+        state_mutability: "view",
+      },
+      {
+        type: "function",
+        name: "contract_parameters_v1",
+        inputs: [],
+        outputs: [
+          {
+            type: "staking::staking::interface::StakingContractInfoV1",
+          },
+        ],
+        state_mutability: "view",
+      },
     ],
   },
   {
@@ -100,6 +122,46 @@ export const ABI = [
       {
         name: "snapshot",
         type: "@core::array::Array::<core::starknet::contract_address::ContractAddress>",
+      },
+    ],
+  },
+  {
+    type: "struct",
+    name: "staking::staking::interface::StakingContractInfoV1",
+    members: [
+      {
+        name: "min_stake",
+        type: "core::integer::u128",
+      },
+      {
+        name: "token_address",
+        type: "core::starknet::contract_address::ContractAddress",
+      },
+      {
+        name: "attestation_contract",
+        type: "core::starknet::contract_address::ContractAddress",
+      },
+      {
+        name: "pool_contract_class_hash",
+        type: "core::starknet::class_hash::ClassHash",
+      },
+      {
+        name: "reward_supplier",
+        type: "core::starknet::contract_address::ContractAddress",
+      },
+      {
+        name: "exit_wait_window",
+        type: "starkware_utils::types::time::time::TimeDelta",
+      },
+    ],
+  },
+  {
+    type: "struct",
+    name: "starkware_utils::types::time::time::TimeDelta",
+    members: [
+      {
+        name: "seconds",
+        type: "core::integer::u64",
       },
     ],
   },

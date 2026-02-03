@@ -1,68 +1,33 @@
-import { describe, it, expect, beforeAll } from "vitest";
-import { RpcProvider } from "starknet";
+import { beforeAll, describe, expect, inject, it } from "vitest";
 import { StarkSDK } from "@/sdk";
 import { Erc20, sepoliaTokens } from "@/erc20";
 import { StarkSigner } from "@/signer";
 import { DevnetPreset } from "@/account";
 import { Amount } from "@/types";
-import { getTestConfig, testPrivateKeys } from "../config";
+import { testPrivateKeys } from "../config";
+import { fund } from "./shared";
+import { DevnetProvider } from "starknet-devnet";
 
-/**
- * ERC20 integration tests that require a running devnet.
- *
- * Start devnet with:
- *   npm run devnet:start
- *
- * Run these tests with:
- *   npm run test:integration
- */
 describe("ERC20 (Integration)", () => {
-  const { config, network } = getTestConfig();
+  const config = inject("sdkConfig");
   let sdk: StarkSDK;
-  let provider: RpcProvider;
   let devnetRunning = false;
 
-  // Use ETH token for testing (available on devnet)
   const ETH = sepoliaTokens.ETH!;
+  const STRK = sepoliaTokens.STRK!;
 
   beforeAll(async () => {
     sdk = new StarkSDK(config);
-    provider = sdk.getProvider();
 
-    try {
-      await provider.getChainId();
-      devnetRunning = true;
-      console.log(`Connected to ${network}`);
-    } catch {
+    const devnetProvider = new DevnetProvider({
+      url: config.rpcUrl,
+    });
+    devnetRunning = await devnetProvider.isAlive();
+
+    if (!devnetRunning) {
       console.warn("Devnet not running, skipping integration tests");
     }
   });
-
-  /**
-   * Fund an account using devnet's mint endpoint.
-   * @param unit - "WEI" for ETH, "FRI" for STRK
-   */
-  async function fundAccount(
-    address: string,
-    amount = "1000000000000000000",
-    unit: "WEI" | "FRI" = "WEI"
-  ) {
-    const response = await fetch("http://127.0.0.1:5050", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        jsonrpc: "2.0",
-        method: "devnet_mint",
-        params: { address, amount: Number(amount), unit },
-        id: 1,
-      }),
-    });
-    const result = await response.json();
-    if (result.error) {
-      throw new Error(result.error.message);
-    }
-    return result;
-  }
 
   it("should transfer ETH tokens between accounts", async () => {
     if (!devnetRunning) {
@@ -96,10 +61,9 @@ describe("ERC20 (Integration)", () => {
     // Fund both accounts
     // - STRK (FRI) for gas fees
     // - ETH (WEI) for the actual ERC20 transfer test
-    const fundAmount = "2000000000000000000"; // 2 ETH
-    await fundAccount(senderWallet.address, fundAmount, "FRI"); // STRK for gas
-    await fundAccount(senderWallet.address, fundAmount, "WEI"); // ETH for transfer
-    await fundAccount(receiverWallet.address, "100000000000000000", "FRI"); // STRK for deployment
+    await fund(senderWallet, Amount.parse(2, STRK));
+    await fund(senderWallet, Amount.parse(2, ETH));
+    await fund(receiverWallet, Amount.parse(0.1, STRK)); // STRK for deployment
     console.log("Accounts funded");
 
     // Deploy sender account
@@ -190,8 +154,8 @@ describe("ERC20 (Integration)", () => {
     console.log("Receiver 2:", receiver2Wallet.address);
 
     // Fund sender with STRK for gas and ETH for transfers
-    await fundAccount(senderWallet.address, "3000000000000000000", "FRI"); // STRK for gas
-    await fundAccount(senderWallet.address, "3000000000000000000", "WEI"); // ETH for transfers
+    await fund(senderWallet, Amount.parse(3, STRK)); // STRK for gas
+    await fund(senderWallet, Amount.parse(3, ETH)); // ETH for transfers
     console.log("Sender funded");
 
     // Deploy sender
@@ -274,8 +238,8 @@ describe("ERC20 (Integration)", () => {
     });
 
     // Fund and deploy sender
-    await fundAccount(senderWallet.address, "2000000000000000000", "FRI"); // STRK for gas
-    await fundAccount(senderWallet.address, "2000000000000000000", "WEI"); // ETH for transfers
+    await fund(senderWallet, Amount.parse(2, STRK)); // STRK for gas
+    await fund(senderWallet, Amount.parse(2, ETH)); // ETH for transfers
     await senderWallet.ensureReady({ deploy: "if_needed" });
 
     // Use custom token config (still ETH, but defined manually)
