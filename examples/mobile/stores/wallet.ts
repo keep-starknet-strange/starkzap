@@ -22,7 +22,8 @@ export interface NetworkConfig {
 }
 
 // Privy server URL - change this to your server URL
-const PRIVY_SERVER_URL = "http://localhost:3001";
+// For Expo Go: use your machine's local IP (not localhost)
+export const PRIVY_SERVER_URL = "http://192.168.1.222:3001";
 
 // Available network presets
 export const NETWORKS: NetworkConfig[] = [
@@ -98,11 +99,14 @@ interface WalletState {
   // Actions
   setPrivateKey: (key: string) => void;
   setSelectedPreset: (preset: string) => void;
-  setPrivyEmail: (email: string) => void;
   setPrivySelectedPreset: (preset: string) => void;
   addLog: (message: string) => void;
   connect: () => Promise<void>;
-  connectPrivy: () => Promise<void>;
+  connectWithPrivy: (
+    walletId: string,
+    publicKey: string,
+    email: string
+  ) => Promise<void>;
   disconnect: () => void;
   checkDeploymentStatus: () => Promise<void>;
   deploy: () => Promise<void>;
@@ -133,7 +137,7 @@ export const useWalletStore = create<WalletState>((set, get) => ({
 
   // Privy state
   privyEmail: "",
-  privySelectedPreset: "ArgentX v0.5",
+  privySelectedPreset: "OpenZeppelin",
   privyWalletId: null,
 
   // Wallet state
@@ -222,8 +226,6 @@ export const useWalletStore = create<WalletState>((set, get) => ({
 
   setSelectedPreset: (preset) => set({ selectedPreset: preset }),
 
-  setPrivyEmail: (email) => set({ privyEmail: email }),
-
   setPrivySelectedPreset: (preset) => set({ privySelectedPreset: preset }),
 
   addLog: (message) =>
@@ -272,8 +274,12 @@ export const useWalletStore = create<WalletState>((set, get) => ({
     }
   },
 
-  connectPrivy: async () => {
-    const { privyEmail, privySelectedPreset, sdk, addLog } = get();
+  connectWithPrivy: async (
+    walletId: string,
+    publicKey: string,
+    email: string
+  ) => {
+    const { privySelectedPreset, sdk, addLog } = get();
 
     if (!sdk) {
       Alert.alert(
@@ -283,52 +289,22 @@ export const useWalletStore = create<WalletState>((set, get) => ({
       return;
     }
 
-    if (!privyEmail.trim() || !privyEmail.includes("@")) {
-      Alert.alert("Error", "Please enter a valid email address");
-      return;
-    }
-
-    set({ isConnecting: true });
-    addLog(`Connecting with Privy (${privyEmail})...`);
+    set({ isConnecting: true, privyEmail: email });
+    addLog(`Connecting with Privy (${email})...`);
 
     try {
-      // Check if server is running
-      const healthRes = await fetch(`${PRIVY_SERVER_URL}/api/health`);
-      if (!healthRes.ok) {
-        throw new Error(
-          "Privy server not running. Start it with: npm run dev:server"
-        );
-      }
-
-      // Register user or get existing wallet
-      addLog("Registering/fetching user...");
-      const registerRes = await fetch(`${PRIVY_SERVER_URL}/api/user/register`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: privyEmail }),
-      });
-
-      if (!registerRes.ok) {
-        const err = await registerRes.json();
-        throw new Error(err.details || err.error || "Failed to register user");
-      }
-
-      const { isNew, wallet: walletData } = await registerRes.json();
-      addLog(`${isNew ? "Created new" : "Found existing"} Privy wallet`);
-      addLog(`Address: ${truncateAddress(walletData.address)}`);
-
       // Store wallet ID for signing
-      set({ privyWalletId: walletData.id });
+      set({ privyWalletId: walletId });
 
       // Create signer with rawSign callback
       const signer = new PrivySigner({
-        walletId: walletData.id,
-        publicKey: walletData.publicKey,
-        rawSign: async (walletId: string, hash: string) => {
+        walletId,
+        publicKey,
+        rawSign: async (wId: string, hash: string) => {
           const signRes = await fetch(`${PRIVY_SERVER_URL}/api/wallet/sign`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ walletId, hash }),
+            body: JSON.stringify({ walletId: wId, hash }),
           });
 
           if (!signRes.ok) {

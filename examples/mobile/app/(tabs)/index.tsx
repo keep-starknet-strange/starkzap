@@ -1,17 +1,24 @@
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import {
   StyleSheet,
   TextInput,
   TouchableOpacity,
   ActivityIndicator,
   ScrollView,
+  Alert,
 } from "react-native";
 import * as Clipboard from "expo-clipboard";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { usePrivy, useLoginWithEmail } from "@privy-io/expo";
 
 import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
-import { useWalletStore, PRESETS, NETWORKS } from "@/stores/wallet";
+import {
+  useWalletStore,
+  PRESETS,
+  NETWORKS,
+  PRIVY_SERVER_URL,
+} from "@/stores/wallet";
 
 const CHAIN_OPTIONS = [
   { label: "Sepolia", value: "SN_SEPOLIA" as const },
@@ -52,20 +59,76 @@ export default function HomeScreen() {
     // Privy
     privyEmail,
     privySelectedPreset,
-    setPrivyEmail,
     setPrivySelectedPreset,
-    connectPrivy,
+    connectWithPrivy,
   } = useWalletStore();
+
+  // Privy hooks
+  const { isReady, user, logout, getAccessToken } = usePrivy();
+  const { sendCode, loginWithCode, state: loginState } = useLoginWithEmail();
 
   const [showPrivyForm, setShowPrivyForm] = useState(false);
   const [showPrivateKeyForm, setShowPrivateKeyForm] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [email, setEmail] = useState("");
+  const [otp, setOtp] = useState("");
+  const [isLoadingWallet, setIsLoadingWallet] = useState(false);
+
+  // After Privy authentication, fetch/create Starknet wallet from our backend
+  // Note: This is called manually via button, not automatically, to avoid infinite loops on error
+  const fetchStarknetWallet = useCallback(async () => {
+    if (!user || wallet || !isConfigured) return;
+    if (isLoadingWallet) return; // Prevent double-calls
+
+    setIsLoadingWallet(true);
+    const emailAccount = user.linked_accounts?.find(
+      (a: { type: string }) => a.type === "email"
+    ) as { address?: string } | undefined;
+    const userEmail = emailAccount?.address || "";
+
+    try {
+      // Get Privy access token (auto-refreshes if expired)
+      const accessToken = await getAccessToken();
+      if (!accessToken) {
+        throw new Error("Failed to get Privy access token");
+      }
+
+      // Fetch or create Starknet wallet via our backend
+      const res = await fetch(`${PRIVY_SERVER_URL}/api/wallet/starknet`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${accessToken}`,
+        },
+      });
+
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.details || err.error || "Failed to get wallet");
+      }
+
+      const { wallet: walletData } = await res.json();
+      await connectWithPrivy(walletData.id, walletData.publicKey, userEmail);
+    } catch (err) {
+      Alert.alert("Error", String(err));
+    } finally {
+      setIsLoadingWallet(false);
+    }
+  }, [user, wallet, isConfigured, getAccessToken, connectWithPrivy]);
+  // Note: isLoadingWallet intentionally NOT in deps to prevent infinite loop on error
 
   const copyAddress = async () => {
     if (!wallet) return;
     await Clipboard.setStringAsync(wallet.address);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
+  };
+
+  const handlePrivyLogout = async () => {
+    await logout();
+    disconnect();
+    setEmail("");
+    setOtp("");
   };
 
   return (
@@ -193,76 +256,218 @@ export default function HomeScreen() {
               </ThemedView>
             </ThemedView>
 
-            {/* Privy Login - Primary Option */}
-            <TouchableOpacity
-              style={[styles.button, styles.buttonPrivy]}
-              onPress={() => {
-                setShowPrivyForm(!showPrivyForm);
-                setShowPrivateKeyForm(false);
-              }}
-              disabled={isConnecting}
-            >
-              <ThemedText style={styles.buttonText}>
-                {showPrivyForm ? "Hide Privy Login" : "Login with Privy"}
+            {/* Privy status */}
+            {!isReady && (
+              <ThemedText
+                style={{ fontSize: 12, color: "#888", marginBottom: 8 }}
+              >
+                Initializing...
               </ThemedText>
-            </TouchableOpacity>
+            )}
 
-            {showPrivyForm && (
-              <>
-                <ThemedView style={styles.inputContainer}>
-                  <ThemedText style={styles.label}>Email</ThemedText>
-                  <TextInput
-                    style={styles.input}
-                    placeholder="user@example.com"
-                    placeholderTextColor="#888"
-                    value={privyEmail}
-                    onChangeText={setPrivyEmail}
-                    autoCapitalize="none"
-                    autoCorrect={false}
-                    keyboardType="email-address"
-                  />
-                </ThemedView>
+            {/* Privy Login - Show button if not logged in */}
+            {isReady && !user && (
+              <TouchableOpacity
+                style={[styles.button, styles.buttonPrivy]}
+                onPress={() => {
+                  setShowPrivyForm(!showPrivyForm);
+                  setShowPrivateKeyForm(false);
+                }}
+                disabled={isConnecting || isLoadingWallet}
+              >
+                <ThemedText style={styles.buttonText}>
+                  {showPrivyForm ? "Hide Privy Login" : "Login with Privy"}
+                </ThemedText>
+              </TouchableOpacity>
+            )}
 
-                <ThemedView style={styles.inputContainer}>
-                  <ThemedText style={styles.label}>Account Type</ThemedText>
-                  <ThemedView style={styles.presetContainer}>
-                    {Object.keys(PRESETS).map((preset) => (
-                      <TouchableOpacity
-                        key={preset}
-                        style={[
-                          styles.presetButton,
-                          privySelectedPreset === preset &&
-                            styles.presetButtonActive,
-                        ]}
-                        onPress={() => setPrivySelectedPreset(preset)}
-                      >
-                        <ThemedText
-                          style={[
-                            styles.presetButtonText,
-                            privySelectedPreset === preset &&
-                              styles.presetButtonTextActive,
-                          ]}
-                        >
-                          {preset}
-                        </ThemedText>
-                      </TouchableOpacity>
-                    ))}
-                  </ThemedView>
-                </ThemedView>
-
-                <TouchableOpacity
-                  style={[styles.button, styles.buttonPrimary]}
-                  onPress={connectPrivy}
-                  disabled={isConnecting}
-                >
-                  {isConnecting ? (
-                    <ActivityIndicator color="#fff" />
-                  ) : (
+            {/* Show logged in state - user exists */}
+            {isReady && user && (
+              <ThemedView style={styles.otpInfo}>
+                <ThemedText style={styles.label}>
+                  {!isConfigured
+                    ? "Logged in! Configure network above to continue."
+                    : isLoadingWallet
+                      ? "Connecting wallet..."
+                      : "Logged in! Tap below to connect wallet."}
+                </ThemedText>
+                {isLoadingWallet && (
+                  <ActivityIndicator color="#8b5cf6" style={{ marginTop: 8 }} />
+                )}
+                {isConfigured && !isLoadingWallet && !wallet && (
+                  <TouchableOpacity
+                    style={[
+                      styles.button,
+                      styles.buttonPrimary,
+                      { marginTop: 12 },
+                    ]}
+                    onPress={fetchStarknetWallet}
+                  >
                     <ThemedText style={styles.buttonText}>
-                      Connect with Privy
+                      Connect Starknet Wallet
                     </ThemedText>
-                  )}
+                  </TouchableOpacity>
+                )}
+                <TouchableOpacity
+                  style={[
+                    styles.button,
+                    styles.buttonSecondary,
+                    { marginTop: 8 },
+                  ]}
+                  onPress={handlePrivyLogout}
+                >
+                  <ThemedText style={styles.buttonTextSecondary}>
+                    Logout
+                  </ThemedText>
                 </TouchableOpacity>
+              </ThemedView>
+            )}
+
+            {/* Login form - only show if not logged in */}
+            {showPrivyForm && !user && (
+              <>
+                {/* Step 1: Enter email */}
+                {(loginState.status === "initial" ||
+                  loginState.status === "error" ||
+                  loginState.status === "sending-code") && (
+                  <>
+                    <ThemedView style={styles.inputContainer}>
+                      <ThemedText style={styles.label}>Email</ThemedText>
+                      <TextInput
+                        style={styles.input}
+                        placeholder="user@example.com"
+                        placeholderTextColor="#888"
+                        value={email}
+                        onChangeText={setEmail}
+                        autoCapitalize="none"
+                        autoCorrect={false}
+                        keyboardType="email-address"
+                      />
+                    </ThemedView>
+
+                    <ThemedView style={styles.inputContainer}>
+                      <ThemedText style={styles.label}>Account Type</ThemedText>
+                      <ThemedView style={styles.presetContainer}>
+                        {Object.keys(PRESETS).map((preset) => (
+                          <TouchableOpacity
+                            key={preset}
+                            style={[
+                              styles.presetButton,
+                              privySelectedPreset === preset &&
+                                styles.presetButtonActive,
+                            ]}
+                            onPress={() => setPrivySelectedPreset(preset)}
+                          >
+                            <ThemedText
+                              style={[
+                                styles.presetButtonText,
+                                privySelectedPreset === preset &&
+                                  styles.presetButtonTextActive,
+                              ]}
+                            >
+                              {preset}
+                            </ThemedText>
+                          </TouchableOpacity>
+                        ))}
+                      </ThemedView>
+                    </ThemedView>
+
+                    {loginState.status === "error" && (
+                      <ThemedText style={styles.errorText}>
+                        Login failed
+                      </ThemedText>
+                    )}
+
+                    <TouchableOpacity
+                      style={[styles.button, styles.buttonPrimary]}
+                      onPress={() => email.includes("@") && sendCode({ email })}
+                      disabled={
+                        !email.includes("@") ||
+                        loginState.status === "sending-code"
+                      }
+                    >
+                      {loginState.status === "sending-code" ? (
+                        <ActivityIndicator color="#fff" />
+                      ) : (
+                        <ThemedText style={styles.buttonText}>
+                          Send Verification Code
+                        </ThemedText>
+                      )}
+                    </TouchableOpacity>
+                  </>
+                )}
+
+                {/* Step 2: Enter OTP */}
+                {(loginState.status === "awaiting-code-input" ||
+                  loginState.status === "submitting-code") && (
+                  <>
+                    <ThemedView style={styles.otpInfo}>
+                      <ThemedText style={styles.label}>
+                        Verification code sent to:
+                      </ThemedText>
+                      <ThemedText style={styles.emailText}>{email}</ThemedText>
+                    </ThemedView>
+
+                    <ThemedView style={styles.inputContainer}>
+                      <ThemedText style={styles.label}>Enter Code</ThemedText>
+                      <TextInput
+                        style={styles.input}
+                        placeholder="Enter 6-digit code"
+                        placeholderTextColor="#888"
+                        value={otp}
+                        onChangeText={setOtp}
+                        autoCapitalize="none"
+                        autoCorrect={false}
+                        keyboardType="number-pad"
+                        maxLength={6}
+                      />
+                    </ThemedView>
+
+                    <TouchableOpacity
+                      style={[styles.button, styles.buttonPrimary]}
+                      onPress={() =>
+                        otp.length === 6 && loginWithCode({ code: otp })
+                      }
+                      disabled={
+                        otp.length !== 6 ||
+                        loginState.status === "submitting-code"
+                      }
+                    >
+                      {loginState.status === "submitting-code" ? (
+                        <ActivityIndicator color="#fff" />
+                      ) : (
+                        <ThemedText style={styles.buttonText}>
+                          Verify & Connect
+                        </ThemedText>
+                      )}
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      style={[styles.button, styles.buttonSecondary]}
+                      onPress={() => {
+                        setOtp("");
+                        setEmail("");
+                      }}
+                    >
+                      <ThemedText style={styles.buttonTextSecondary}>
+                        Use Different Email
+                      </ThemedText>
+                    </TouchableOpacity>
+                  </>
+                )}
+
+                {/* Login success - waiting for user object */}
+                {loginState.status === "done" && (
+                  <ThemedView style={styles.otpInfo}>
+                    <ThemedText style={styles.label}>
+                      Login successful!
+                    </ThemedText>
+                    <ActivityIndicator
+                      color="#8b5cf6"
+                      style={{ marginTop: 8 }}
+                    />
+                  </ThemedView>
+                )}
               </>
             )}
 
@@ -476,7 +681,7 @@ export default function HomeScreen() {
 
             <TouchableOpacity
               style={[styles.button, styles.buttonDanger]}
-              onPress={disconnect}
+              onPress={walletType === "privy" ? handlePrivyLogout : disconnect}
             >
               <ThemedText style={styles.buttonText}>Disconnect</ThemedText>
             </TouchableOpacity>
@@ -627,6 +832,20 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "500",
     marginBottom: 4,
+  },
+  otpInfo: {
+    marginTop: 16,
+    padding: 12,
+    backgroundColor: "rgba(139, 92, 246, 0.1)",
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "rgba(139, 92, 246, 0.3)",
+  },
+  errorText: {
+    color: "#dc3545",
+    fontSize: 14,
+    marginTop: 8,
+    textAlign: "center",
   },
   buttonText: {
     color: "#fff",
