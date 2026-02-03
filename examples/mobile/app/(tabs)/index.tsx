@@ -487,13 +487,17 @@ export default function HomeScreen() {
         {logs.length > 0 && (
           <ThemedView style={styles.card}>
             <ThemedText type="subtitle">Logs</ThemedText>
-            <ThemedView style={styles.logContainer}>
+            <ScrollView
+              style={styles.logContainer}
+              nestedScrollEnabled
+              showsVerticalScrollIndicator
+            >
               {logs.map((log, index) => (
                 <ThemedText key={index} style={styles.logEntry}>
                   {log}
                 </ThemedText>
               ))}
-            </ThemedView>
+            </ScrollView>
           </ThemedView>
         )}
       </ScrollView>
@@ -693,6 +697,9 @@ const styles = StyleSheet.create({
   logContainer: {
     marginTop: 12,
     maxHeight: 200,
+    backgroundColor: "rgba(0, 0, 0, 0.2)",
+    borderRadius: 8,
+    padding: 8,
   },
   logEntry: {
     fontSize: 12,
