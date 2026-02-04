@@ -252,7 +252,7 @@ function generatePresets(
     "",
     'import type { Address, Validator } from "@/types";',
     "",
-    `export const ${networkName}Validators: Record<string, Validator> = {`,
+    `export const ${networkName}Validators = {`,
   ];
 
   // Track used key names to handle duplicates
@@ -281,7 +281,7 @@ function generatePresets(
     lines.push("  },");
   }
 
-  lines.push("} as const;");
+  lines.push("} as const satisfies Record<string, Validator>;");
   lines.push("");
 
   return lines.join("\n");

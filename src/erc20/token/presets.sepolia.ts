@@ -8,7 +8,7 @@
 
 import type { Token, Address } from "@/types";
 
-export const sepoliaTokens: Record<string, Token> = {
+export const sepoliaTokens = {
   ETH: {
     name: "Ether",
     address:
@@ -79,4 +79,4 @@ export const sepoliaTokens: Record<string, Token> = {
       logoUrl: new URL("https://i.postimg.cc/sgpzCv0Z/logo.png"),
     },
   },
-} as const;
+} as const satisfies Record<string, Token>;

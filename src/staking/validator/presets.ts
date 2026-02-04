@@ -8,7 +8,7 @@
 
 import type { Address, Validator } from "@/types";
 
-export const mainnetValidators: Record<string, Validator> = {
+export const mainnetValidators = {
   KARNOT: {
     name: "Karnot",
     stakerAddress:
@@ -505,6 +505,12 @@ export const mainnetValidators: Record<string, Validator> = {
       "0x04c9bd490305796b88852d6f57862f9eda26c8af30c240cc68e9cfb785e79525" as Address,
     logoUrl: new URL("https://assets.underware.gg/underware-blackBG.png"),
   },
+  ATTENDANTES: {
+    name: "Attendantes",
+    stakerAddress:
+      "0x012ae285a6692f2ac00811aa75e8a3c8d94367cba22e22e581e2b51e3bde5103" as Address,
+    logoUrl: null,
+  },
   HIGHTOWER: {
     name: "HighTower",
     stakerAddress:
@@ -516,12 +522,6 @@ export const mainnetValidators: Record<string, Validator> = {
     stakerAddress:
       "0x0586a61016dfb1967e3eb227b048a1331e640851a9998b251d2da2385fbb066e" as Address,
     logoUrl: new URL("https://x.com/staking4all/photo"),
-  },
-  ATTENDANTES: {
-    name: "Attendantes",
-    stakerAddress:
-      "0x012ae285a6692f2ac00811aa75e8a3c8d94367cba22e22e581e2b51e3bde5103" as Address,
-    logoUrl: null,
   },
   RUNELABS: {
     name: "Runelabs",
@@ -551,6 +551,12 @@ export const mainnetValidators: Record<string, Validator> = {
       "0x07bcc23ef59476c2dc09218afae71405e295ed58442ece796ce22a0b04adb571" as Address,
     logoUrl: null,
   },
+  DAS_RHEINGOLD: {
+    name: "Das.Rheingold",
+    stakerAddress:
+      "0x04c2e99661a85fec90cc66fec5b1eb911a0633888f468f3eac6b9654191f7102" as Address,
+    logoUrl: null,
+  },
   CUMULO: {
     name: "Cumulo",
     stakerAddress:
@@ -564,12 +570,6 @@ export const mainnetValidators: Record<string, Validator> = {
     logoUrl: new URL(
       "https://www.meria.com/images/branding/logo-line-color.svg"
     ),
-  },
-  DAS_RHEINGOLD: {
-    name: "Das.Rheingold",
-    stakerAddress:
-      "0x04c2e99661a85fec90cc66fec5b1eb911a0633888f468f3eac6b9654191f7102" as Address,
-    logoUrl: null,
   },
   DAPRIDDLE: {
     name: "dapriddle",
@@ -627,6 +627,12 @@ export const mainnetValidators: Record<string, Validator> = {
       "0x01012c7ce5ed1a11964e5609d58a4db9154f373f41adee673416b1e07fcf6d90" as Address,
     logoUrl: new URL("https://trustyourtechnolust.xyz/icon.svg"),
   },
+  ALPHATEAM: {
+    name: "alphateam",
+    stakerAddress:
+      "0x0786e60c09a183406dce74b279a3010ad2e20fb3d3b831ecd5a2d94a0f7abd0d" as Address,
+    logoUrl: null,
+  },
   ASGARD: {
     name: "Asgard",
     stakerAddress:
@@ -664,12 +670,6 @@ export const mainnetValidators: Record<string, Validator> = {
     logoUrl: new URL(
       "https://avatars.githubusercontent.com/u/139079136?s=400&u=4ff64afa0f64e7420c5c12e9a1d41daf23de865c"
     ),
-  },
-  ALPHATEAM: {
-    name: "alphateam",
-    stakerAddress:
-      "0x0786e60c09a183406dce74b279a3010ad2e20fb3d3b831ecd5a2d94a0f7abd0d" as Address,
-    logoUrl: null,
   },
   COINHUNTERS: {
     name: "CoinHunters",
@@ -733,20 +733,20 @@ export const mainnetValidators: Record<string, Validator> = {
       "https://raw.githubusercontent.com/wombatqq/wombatqq_logo/main/wombat%20logo.png"
     ),
   },
-  OWLSTAKE: {
-    name: "OwlStake",
-    stakerAddress:
-      "0x00af5b577ec756cef1c21dc3e7bd13e02b2f3677926b8d6ee2ff2a4256b7f1ca" as Address,
-    logoUrl: new URL(
-      "https://raw.githubusercontent.com/owlstake/owlstake/refs/heads/main/owlstake-logo.png"
-    ),
-  },
   NODIUMS: {
     name: "Nodiums",
     stakerAddress:
       "0x0443b3a19a8ef82abab80b1741bef9a99cc533a4e822a4e139fa96017b2007b5" as Address,
     logoUrl: new URL(
       "https://nodiums.com/wp-content/uploads/2024/01/logo-20.png"
+    ),
+  },
+  OWLSTAKE: {
+    name: "OwlStake",
+    stakerAddress:
+      "0x00af5b577ec756cef1c21dc3e7bd13e02b2f3677926b8d6ee2ff2a4256b7f1ca" as Address,
+    logoUrl: new URL(
+      "https://raw.githubusercontent.com/owlstake/owlstake/refs/heads/main/owlstake-logo.png"
     ),
   },
   ONNODE: {
@@ -991,4 +991,4 @@ export const mainnetValidators: Record<string, Validator> = {
       "https://citadel-tx-icons.s3.eu-west-3.amazonaws.com/c1logo.png"
     ),
   },
-} as const;
+} as const satisfies Record<string, Validator>;

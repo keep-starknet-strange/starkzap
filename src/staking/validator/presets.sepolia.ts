@@ -8,7 +8,7 @@
 
 import type { Address, Validator } from "@/types";
 
-export const sepoliaValidators: Record<string, Validator> = {
+export const sepoliaValidators = {
   MOONLI_ME: {
     name: "moonli.me",
     stakerAddress:
@@ -143,4 +143,4 @@ export const sepoliaValidators: Record<string, Validator> = {
       "0x07636ead6307de79a40d609ba8e581d65a959f74882e6ed08345653819eb8e05" as Address,
     logoUrl: new URL("https://chorus.one/logo-360x360.jpg"),
   },
-} as const;
+} as const satisfies Record<string, Validator>;

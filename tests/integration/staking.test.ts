@@ -32,7 +32,7 @@ describe("Staking Lifecycle (Integration)", () => {
   let devnetRunning = false;
   let stakingAvailable = false;
 
-  const STRK = sepoliaTokens.STRK!;
+  const STRK = sepoliaTokens.STRK;
 
   beforeAll(async () => {
     sdk = new StarkSDK(config);
@@ -287,7 +287,7 @@ describe("Staking Lifecycle (Integration)", () => {
         return;
       }
 
-      const validator = sepoliaValidators.NETHERMIND!;
+      const validator = sepoliaValidators.NETHERMIND;
       console.log("Testing getStakerPools for validator:", validator.name);
 
       const pools = await sdk.getStakerPools(validator.stakerAddress);
@@ -322,9 +322,9 @@ describe("Staking Lifecycle (Integration)", () => {
       }
 
       const validators = [
-        sepoliaValidators.NETHERMIND!,
-        sepoliaValidators.CHORUS_ONE!,
-        sepoliaValidators.KEPLR!,
+        sepoliaValidators.NETHERMIND,
+        sepoliaValidators.CHORUS_ONE,
+        sepoliaValidators.KEPLR,
       ];
 
       for (const validator of validators) {
@@ -384,9 +384,9 @@ describe("Staking Lifecycle (Integration)", () => {
   //
   //     // Get APY and commission from multiple validators
   //     const validators = [
-  //       sepoliaValidators.MOONLI_ME!,
-  //       sepoliaValidators.TEKU!,
-  //       sepoliaValidators.ONCHAINAUSTRIA!,
+  //       sepoliaValidators.MOONLI_ME,
+  //       sepoliaValidators.TEKU,
+  //       sepoliaValidators.ONCHAINAUSTRIA,
   //     ];
   //
   //     const results: { name: string; commission: number; maxApy: number }[] = [];

@@ -8,7 +8,7 @@
 
 import type { Token, Address } from "@/types";
 
-export const mainnetTokens: Record<string, Token> = {
+export const mainnetTokens = {
   USDC: {
     name: "USDC",
     address:
@@ -849,4 +849,4 @@ export const mainnetTokens: Record<string, Token> = {
       ),
     },
   },
-} as const;
+} as const satisfies Record<string, Token>;

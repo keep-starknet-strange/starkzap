@@ -7,7 +7,7 @@ import { sepoliaTokens } from "@/erc20";
  */
 export async function fund(
   wallet: Wallet,
-  amount: Amount = Amount.parse(100, sepoliaTokens.STRK!)
+  amount: Amount = Amount.parse(100, sepoliaTokens.STRK)
 ) {
   let unit: string;
 

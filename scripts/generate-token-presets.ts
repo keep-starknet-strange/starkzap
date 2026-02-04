@@ -189,7 +189,7 @@ function generatePresets(tokens: Token[], networkName: Network): string {
     "",
     'import type { Token, Address } from "@/types";',
     "",
-    `export const ${networkName}Tokens: Record<string, Token> = {`,
+    `export const ${networkName}Tokens = {`,
   ];
 
   // Track used key names to handle duplicates
@@ -218,7 +218,7 @@ function generatePresets(tokens: Token[], networkName: Network): string {
     lines.push("  },");
   }
 
-  lines.push("} as const;");
+  lines.push("} as const satisfies Record<string, Token>;");
   lines.push("");
 
   return lines.join("\n");

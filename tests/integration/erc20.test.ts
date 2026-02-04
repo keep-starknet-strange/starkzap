@@ -13,8 +13,8 @@ describe("ERC20 (Integration)", () => {
   let sdk: StarkSDK;
   let devnetRunning = false;
 
-  const ETH = sepoliaTokens.ETH!;
-  const STRK = sepoliaTokens.STRK!;
+  const ETH = sepoliaTokens.ETH;
+  const STRK = sepoliaTokens.STRK;
 
   beforeAll(async () => {
     sdk = new StarkSDK(config);
