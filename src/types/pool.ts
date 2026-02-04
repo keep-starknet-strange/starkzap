@@ -1,5 +1,20 @@
 import { Amount } from "@/types/amount";
 import type { Address } from "@/types/address";
+import type { Token } from "@/types/token";
+
+/**
+ * Represents a staking pool for a validator.
+ *
+ * Each validator can have multiple pools, one per supported token (e.g., STRK, BTC).
+ */
+export interface Pool {
+  /** The pool contract address */
+  poolContract: Address;
+  /** The token that can be staked in this pool */
+  token: Token;
+  /** The total amount staked in this pool by the validator */
+  amount: Amount;
+}
 
 /**
  * Pool member position information

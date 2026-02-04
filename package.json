@@ -52,8 +52,10 @@
     "test:integration": "vitest run --project integration",
     "test:integration:watch": "vitest --project integration",
     "test:all": "vitest run",
-    "generate:presets": "npx tsx scripts/generate-presets.ts --network mainnet",
-    "generate:presets:sepolia": "npx tsx scripts/generate-presets.ts --network sepolia",
+    "generate:tokens": "npx tsx scripts/generate-token-presets.ts --network mainnet",
+    "generate:tokens:sepolia": "npx tsx scripts/generate-token-presets.ts --network sepolia",
+    "generate:validators": "npx tsx scripts/generate-validator-presets.ts --network mainnet",
+    "generate:validators:sepolia": "npx tsx scripts/generate-validator-presets.ts --network sepolia",
     "prepare": "husky"
   },
   "devDependencies": {

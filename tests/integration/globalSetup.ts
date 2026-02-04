@@ -2,7 +2,6 @@ import type { TestProject } from "vitest/node";
 import { Devnet } from "starknet-devnet";
 import "dotenv/config";
 import { type SDKConfig } from "../../src/types/config.js";
-import { fromAddress } from "../../src/types/address.js";
 import { forkRPC } from "./shared";
 
 let devnet: Devnet | null = null;
@@ -10,25 +9,6 @@ let devnet: Devnet | null = null;
 // Compatibility constants
 const DEVNET_VERSION = "v0.7.2";
 const RPC_VERSION = "v0_10";
-
-/**
- * Creates an SDK config for the devnet instance.
- */
-function createDevnetConfig(
-  devnetUrl: string,
-  stakingContractAddress?: string
-): SDKConfig {
-  const config: SDKConfig = {
-    rpcUrl: devnetUrl,
-    chainId: "SN_SEPOLIA", // Devnet uses Sepolia chain ID
-  };
-
-  if (stakingContractAddress) {
-    config.stakingContract = fromAddress(stakingContractAddress);
-  }
-
-  return config;
-}
 
 /**
  * Global setup for integration tests.
@@ -44,10 +24,8 @@ function createDevnetConfig(
  */
 export default async function setup(project: TestProject) {
   const forkNetwork = forkRPC(RPC_VERSION);
-  const stakingContractAddress = process.env.FORK_STAKING_CONTRACT;
 
   const args = ["--seed", "0"];
-  console.log("Forking", forkNetwork);
   if (forkNetwork) {
     args.push("--fork-network", forkNetwork);
     console.log(
@@ -62,10 +40,14 @@ export default async function setup(project: TestProject) {
     args,
     stdout: "ignore",
     stderr: "ignore",
+    maxStartupMillis: 15000,
   });
 
   const devnetUrl = devnet.provider.url;
-  const sdkConfig = createDevnetConfig(devnetUrl, stakingContractAddress);
+  const sdkConfig: SDKConfig = {
+    rpcUrl: devnetUrl,
+    chainId: "SN_SEPOLIA", // Devnet uses Sepolia chain ID
+  };
 
   console.log(`✅ Devnet running at ${devnetUrl}\n`);
   project.provide("sdkConfig", sdkConfig);

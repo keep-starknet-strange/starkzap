@@ -7,7 +7,7 @@ import {
   CartridgeWallet,
   type CartridgeWalletOptions,
 } from "@/wallet/cartridge";
-import type { Address, Token } from "@/types";
+import type { Address, Token, Pool } from "@/types";
 import { Staking } from "@/staking";
 
 /** Resolved SDK configuration with required rpcUrl and chainId */
@@ -178,44 +178,128 @@ export class StarkSDK {
     });
   }
 
+  /**
+   * Get a Staking instance for a specific delegation pool contract.
+   *
+   * Use this when you know the exact pool contract address you want to interact with.
+   * For most use cases, prefer `stakingInValidator()` which finds the pool automatically.
+   *
+   * @param pool - The pool contract address
+   * @param stakeToken - The token to stake (must match the pool's token)
+   * @returns A Staking instance for interacting with the pool
+   * @throws Error if staking is not configured in the SDK config
+   *
+   * @example
+   * ```ts
+   * const staking = await sdk.stakingInPool(poolAddress, strkToken);
+   * const tx = await staking.enter(wallet, Amount.parse(100, strkToken));
+   * ```
+   */
   async stakingInPool(pool: Address, stakeToken: Token): Promise<Staking> {
-    if (!this.config.stakingContract) {
-      throw new Error("`stakingContract` is not defined in the sdk config.");
+    if (!this.config.staking?.contract) {
+      throw new Error("`staking.contract` is not defined in the sdk config.");
     }
 
     return Staking.fromPool(
       pool,
       stakeToken,
       this.provider,
-      this.config.stakingContract
+      this.config.staking
     );
   }
 
+  /**
+   * Get a Staking instance for a validator's delegation pool.
+   *
+   * This is the recommended way to interact with staking. It finds the pool
+   * for the specified token managed by the given validator.
+   *
+   * @param staker - The validator's staker address
+   * @param stakeToken - The token to stake (e.g., STRK)
+   * @returns A Staking instance for interacting with the validator's pool
+   * @throws Error if staking is not configured or the validator has no pool for this token
+   *
+   * @example
+   * ```ts
+   * const staking = await sdk.stakingInValidator(validatorAddress, strkToken);
+   *
+   * // Check the APY
+   * const maxApy = await staking.getMaxAPY();
+   * console.log(`Max APY: ${maxApy.toFixed(2)}%`);
+   *
+   * // Enter the pool
+   * const tx = await staking.enter(wallet, Amount.parse(100, strkToken));
+   * await tx.wait();
+   * ```
+   */
   async stakingInValidator(
     staker: Address,
     stakeToken: Token
   ): Promise<Staking> {
-    if (!this.config.stakingContract) {
-      throw new Error("`stakingContract` is not defined in the sdk config.");
+    if (!this.config.staking?.contract) {
+      throw new Error("`staking.contract` is not defined in the sdk config.");
     }
 
     return Staking.fromStaker(
       staker,
       stakeToken,
       this.provider,
-      this.config.stakingContract
+      this.config.staking
     );
   }
 
+  /**
+   * Get all tokens that are currently enabled for staking.
+   *
+   * Returns the list of tokens that can be staked in the protocol.
+   * Typically includes STRK and may include other tokens.
+   *
+   * @returns Array of tokens that can be staked
+   * @throws Error if staking is not configured in the SDK config
+   *
+   * @example
+   * ```ts
+   * const tokens = await sdk.stakingTokens();
+   * console.log(`Stakeable tokens: ${tokens.map(t => t.symbol).join(', ')}`);
+   * // Output: "Stakeable tokens: STRK, BTC"
+   * ```
+   */
   async stakingTokens(): Promise<Token[]> {
-    if (!this.config.stakingContract) {
-      throw new Error("`stakingContract` is not defined in the sdk config.");
+    if (!this.config.staking?.contract) {
+      throw new Error("`staking.contract` is not defined in the sdk config.");
     }
 
-    return Staking.activeTokens(
+    return Staking.activeTokens(this.provider, this.config.staking);
+  }
+
+  /**
+   * Get all delegation pools managed by a specific validator.
+   *
+   * Validators can have multiple pools, one for each supported token.
+   * Use this to discover what pools a validator offers and their current
+   * delegation amounts.
+   *
+   * @param staker - The validator's staker address
+   * @returns Array of pools with their contract addresses, tokens, and amounts
+   * @throws Error if staking is not configured in the SDK config
+   *
+   * @example
+   * ```ts
+   * const pools = await sdk.getStakerPools(validatorAddress);
+   * for (const pool of pools) {
+   *   console.log(`${pool.token.symbol}: ${pool.amount.toFormatted()} delegated`);
+   * }
+   * ```
+   */
+  async getStakerPools(staker: Address): Promise<Pool[]> {
+    if (!this.config.staking?.contract) {
+      throw new Error("`staking.contract` is not defined in the sdk config.");
+    }
+
+    return await Staking.getStakerPools(
       this.provider,
-      this.config.chainId,
-      this.config.stakingContract
+      staker,
+      this.config.staking
     );
   }
 

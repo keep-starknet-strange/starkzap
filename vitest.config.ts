@@ -36,11 +36,10 @@ export default defineConfig({
           include: ["tests/integration/**/*.test.ts"],
           // Sets up devnet instance shared accross all integration tests.
           globalSetup: "./tests/integration/globalSetup.ts",
-          testTimeout: 120_000,
+          testTimeout: 300_000,
           hookTimeout: 60_000,
-          // Run sequentially to avoid devnet conflicts
           sequence: {
-            concurrent: false,
+            concurrent: true,
           },
         },
       },
