@@ -4,8 +4,6 @@ import type {
   RpcProvider,
   TypedData,
   Signature,
-  PreparedTransaction,
-  ExecutableUserTransaction,
 } from "starknet";
 import type { Tx } from "@/tx";
 import type {
@@ -14,7 +12,6 @@ import type {
   ExecuteOptions,
   PreflightOptions,
   PreflightResult,
-  PrepareOptions,
 } from "@/types";
 
 /**
@@ -72,32 +69,6 @@ export interface WalletInterface {
    * Returns the signature.
    */
   signMessage(typedData: TypedData): Promise<Signature>;
-
-  /**
-   * Build a sponsored transaction for the paymaster.
-   * Returns the prepared transaction with typed data and fee estimate.
-   */
-  buildSponsored(
-    calls: Call[],
-    options?: PrepareOptions
-  ): Promise<PreparedTransaction>;
-
-  /**
-   * Sign a prepared sponsored transaction.
-   * Returns the executable transaction ready to be relayed.
-   */
-  signSponsored(
-    prepared: PreparedTransaction
-  ): Promise<ExecutableUserTransaction>;
-
-  /**
-   * Build and sign a sponsored transaction in one step.
-   * Returns the executable transaction ready to be relayed.
-   */
-  prepareSponsored(
-    calls: Call[],
-    options?: PrepareOptions
-  ): Promise<ExecutableUserTransaction>;
 
   /**
    * Simulate a transaction to check if it would succeed.

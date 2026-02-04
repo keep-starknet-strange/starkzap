@@ -9,9 +9,14 @@ import {
   ArgentXV050Preset,
   BraavosPreset,
   DevnetPreset,
+  Erc20,
+  Amount,
+  sepoliaTokens,
+  mainnetTokens,
   type WalletInterface,
   type AccountClassConfig,
   type ChainId,
+  type ExecuteOptions,
 } from "x";
 
 // Network configuration type
@@ -75,6 +80,10 @@ interface WalletState {
   privySelectedPreset: string;
   privyWalletId: string | null;
 
+  // Paymaster state
+  useSponsored: boolean;
+  setUseSponsored: (value: boolean) => void;
+
   // Wallet state
   wallet: WalletInterface | null;
   walletType: WalletType | null;
@@ -137,8 +146,11 @@ export const useWalletStore = create<WalletState>((set, get) => ({
 
   // Privy state
   privyEmail: "",
-  privySelectedPreset: "OpenZeppelin",
+  privySelectedPreset: "Argent",
   privyWalletId: null,
+
+  // Paymaster state
+  useSponsored: false,
 
   // Wallet state
   wallet: null,
@@ -169,6 +181,8 @@ export const useWalletStore = create<WalletState>((set, get) => ({
 
   setCustomChainId: (chainId) => set({ customChainId: chainId }),
 
+  setUseSponsored: (value) => set({ useSponsored: value }),
+
   confirmNetworkConfig: () => {
     const { selectedNetworkIndex, customRpcUrl, customChainId, addLog } = get();
 
@@ -189,7 +203,12 @@ export const useWalletStore = create<WalletState>((set, get) => ({
       chainId = customChainId;
     }
 
-    const newSdk = new StarkSDK({ rpcUrl, chainId });
+    const newSdk = new StarkSDK({
+      rpcUrl,
+      chainId,
+      // Custom paymaster proxy (keeps AVNU API key on server)
+      paymaster: { nodeUrl: `${PRIVY_SERVER_URL}/api/paymaster` },
+    });
     set({
       sdk: newSdk,
       rpcUrl,
@@ -391,30 +410,33 @@ export const useWalletStore = create<WalletState>((set, get) => ({
   },
 
   testTransfer: async () => {
-    const { wallet, isDeployed, addLog } = get();
+    const { wallet, chainId, useSponsored, addLog } = get();
     if (!wallet) return;
 
-    if (!isDeployed) {
-      Alert.alert("Error", "Account not deployed. Deploy first!");
-      return;
-    }
-
     set({ isTransferring: true });
-    addLog("Executing test transfer (0 STRK to self)...");
+    addLog(
+      `Executing test transfer (0 STRK to self)${useSponsored ? " with paymaster..." : "..."}`
+    );
 
     try {
-      // STRK contract on Sepolia/Mainnet
-      const STRK_CONTRACT =
-        "0x04718f5a0fc34cc1af16a1cdee98ffb20c31f5cd61d6ab07201858f4287c938d";
+      // Get STRK token for the current network
+      const tokens = chainId === "SN_MAIN" ? mainnetTokens : sepoliaTokens;
+      const strk = new Erc20(tokens.STRK);
+      const amount = Amount.parse("0", tokens.STRK);
 
-      // Transfer 0 STRK to self (safe test)
-      const tx = await wallet.execute([
-        {
-          contractAddress: STRK_CONTRACT,
-          entrypoint: "transfer",
-          calldata: [wallet.address, "0", "0"], // recipient, amount_low, amount_high
-        },
-      ]);
+      // Build execute options with optional paymaster
+      const options: ExecuteOptions = {};
+      if (useSponsored) {
+        options.feeMode = "sponsored";
+        addLog("Using AVNU paymaster (sponsored)");
+      }
+
+      // Transfer 0 STRK to self using ERC20 class
+      const tx = await strk.transfer({
+        from: wallet,
+        transfers: [{ to: wallet.address, amount }],
+        options,
+      });
 
       addLog(`Tx submitted: ${truncateAddress(tx.hash)}`);
       addLog("Waiting for confirmation...");

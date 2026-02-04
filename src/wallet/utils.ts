@@ -4,6 +4,7 @@ import {
   type Call,
   type PaymasterTimeBounds,
 } from "starknet";
+import type { PAYMASTER_API } from "@starknet-io/starknet-types-010";
 import { Tx } from "@/tx";
 import type { Address } from "@/types";
 import type {
@@ -11,7 +12,6 @@ import type {
   PreflightOptions,
   PreflightResult,
 } from "@/types";
-import type { ExplorerConfig } from "@/types";
 
 /**
  * Shared wallet utilities.
@@ -124,74 +124,14 @@ export async function preflightTransaction(
   }
 }
 
-/**
- * Execute calls with optional sponsorship.
- */
-export async function executeWithFeeMode(
-  account: {
-    execute: (calls: Call[]) => Promise<{ transaction_hash: string }>;
-    executePaymasterTransaction: (
-      calls: Call[],
-      details: {
-        feeMode: { mode: "sponsored" };
-        timeBounds?: PaymasterTimeBounds;
-      }
-    ) => Promise<{ transaction_hash: string }>;
-  },
-  calls: Call[],
-  feeMode: "user_pays" | "sponsored",
-  timeBounds: PaymasterTimeBounds | undefined,
-  provider: RpcProvider,
-  explorerConfig: ExplorerConfig | undefined
-): Promise<Tx> {
-  if (feeMode === "sponsored") {
-    const paymasterDetails: {
-      feeMode: { mode: "sponsored" };
-      timeBounds?: PaymasterTimeBounds;
-    } = {
-      feeMode: { mode: "sponsored" },
-    };
-    if (timeBounds) {
-      paymasterDetails.timeBounds = timeBounds;
-    }
-
-    const { transaction_hash } = await account.executePaymasterTransaction(
-      calls,
-      paymasterDetails
-    );
-
-    return new Tx(transaction_hash, provider, explorerConfig);
-  }
-
-  const { transaction_hash } = await account.execute(calls);
-  return new Tx(transaction_hash, provider, explorerConfig);
-}
-
-/**
- * Build a sponsored transaction.
- */
-export async function buildSponsoredTransaction(
-  account: {
-    buildPaymasterTransaction: (
-      calls: Call[],
-      details: {
-        feeMode: { mode: "sponsored" };
-        timeBounds?: PaymasterTimeBounds;
-      }
-    ) => Promise<unknown>;
-  },
-  calls: Call[],
-  timeBounds: PaymasterTimeBounds | undefined
-): Promise<unknown> {
-  const paymasterDetails: {
-    feeMode: { mode: "sponsored" };
-    timeBounds?: PaymasterTimeBounds;
-  } = {
-    feeMode: { mode: "sponsored" },
+/** Paymaster details for sponsored transactions */
+export function sponsoredDetails(
+  timeBounds?: PaymasterTimeBounds,
+  deploymentData?: PAYMASTER_API.ACCOUNT_DEPLOYMENT_DATA
+) {
+  return {
+    feeMode: { mode: "sponsored" as const },
+    ...(timeBounds && { timeBounds }),
+    ...(deploymentData && { deploymentData }),
   };
-  if (timeBounds) {
-    paymasterDetails.timeBounds = timeBounds;
-  }
-
-  return account.buildPaymasterTransaction(calls, paymasterDetails);
 }

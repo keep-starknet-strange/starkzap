@@ -4,9 +4,7 @@ import {
   constants,
   type Account,
   type Call,
-  type ExecutableUserTransaction,
   type PaymasterTimeBounds,
-  type PreparedTransaction,
   type TypedData,
   type Signature,
   type WalletAccount,
@@ -18,7 +16,6 @@ import type {
   FeeMode,
   PreflightOptions,
   PreflightResult,
-  PrepareOptions,
   ExplorerConfig,
   ChainId,
 } from "@/types";
@@ -27,9 +24,8 @@ import { Address } from "@/types";
 import {
   checkDeployed,
   ensureWalletReady,
-  executeWithFeeMode,
   preflightTransaction,
-  buildSponsoredTransaction,
+  sponsoredDetails,
 } from "@/wallet/utils";
 
 const CHAIN_ID_MAP: Record<ChainId, string> = {
@@ -186,44 +182,19 @@ export class CartridgeWallet implements WalletInterface {
     const feeMode = options.feeMode ?? this.defaultFeeMode;
     const timeBounds = options.timeBounds ?? this.defaultTimeBounds;
 
-    return executeWithFeeMode(
-      this.walletAccount,
-      calls,
-      feeMode,
-      timeBounds,
-      this.provider,
-      this.explorerConfig
-    );
+    const { transaction_hash } =
+      feeMode === "sponsored"
+        ? await this.walletAccount.executePaymasterTransaction(
+            calls,
+            sponsoredDetails(timeBounds)
+          )
+        : await this.walletAccount.execute(calls);
+
+    return new Tx(transaction_hash, this.provider, this.explorerConfig);
   }
 
   async signMessage(typedData: TypedData): Promise<Signature> {
     return this.walletAccount.signMessage(typedData);
-  }
-
-  async buildSponsored(
-    calls: Call[],
-    options: PrepareOptions = {}
-  ): Promise<PreparedTransaction> {
-    const timeBounds = options.timeBounds ?? this.defaultTimeBounds;
-    return buildSponsoredTransaction(
-      this.walletAccount,
-      calls,
-      timeBounds
-    ) as Promise<PreparedTransaction>;
-  }
-
-  async signSponsored(
-    prepared: PreparedTransaction
-  ): Promise<ExecutableUserTransaction> {
-    return this.walletAccount.preparePaymasterTransaction(prepared);
-  }
-
-  async prepareSponsored(
-    calls: Call[],
-    options: PrepareOptions = {}
-  ): Promise<ExecutableUserTransaction> {
-    const prepared = await this.buildSponsored(calls, options);
-    return this.signSponsored(prepared);
   }
 
   async preflight(options: PreflightOptions): Promise<PreflightResult> {

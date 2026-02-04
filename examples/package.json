@@ -2,6 +2,7 @@
   "dependencies": {
     "@privy-io/node": "^0.8.0",
     "cors": "^2.8.6",
+    "dotenv": "^17.2.3",
     "express": "^5.2.1"
   },
   "devDependencies": {

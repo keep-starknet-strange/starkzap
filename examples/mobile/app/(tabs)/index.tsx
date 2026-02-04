@@ -6,6 +6,7 @@ import {
   ActivityIndicator,
   ScrollView,
   Alert,
+  Switch,
 } from "react-native";
 import * as Clipboard from "expo-clipboard";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -61,6 +62,9 @@ export default function HomeScreen() {
     privySelectedPreset,
     setPrivySelectedPreset,
     connectWithPrivy,
+    // Paymaster
+    useSponsored,
+    setUseSponsored,
   } = useWalletStore();
 
   // Privy hooks
@@ -663,21 +667,30 @@ export default function HomeScreen() {
               )}
             </ThemedView>
 
-            {isDeployed && (
-              <TouchableOpacity
-                style={[styles.button, styles.buttonSuccess]}
-                onPress={testTransfer}
-                disabled={isTransferring}
-              >
-                {isTransferring ? (
-                  <ActivityIndicator color="#fff" />
-                ) : (
-                  <ThemedText style={styles.buttonText}>
-                    Test Transfer (0 STRK to self)
-                  </ThemedText>
-                )}
-              </TouchableOpacity>
-            )}
+            <ThemedView style={styles.switchRow}>
+              <ThemedText style={styles.label}>
+                Use Paymaster (Sponsored)
+              </ThemedText>
+              <Switch
+                value={useSponsored}
+                onValueChange={setUseSponsored}
+                trackColor={{ false: "#444", true: "#8b5cf6" }}
+                thumbColor={useSponsored ? "#fff" : "#888"}
+              />
+            </ThemedView>
+            <TouchableOpacity
+              style={[styles.button, styles.buttonSuccess]}
+              onPress={testTransfer}
+              disabled={isTransferring}
+            >
+              {isTransferring ? (
+                <ActivityIndicator color="#fff" />
+              ) : (
+                <ThemedText style={styles.buttonText}>
+                  Test Transfer (0 STRK to self)
+                </ThemedText>
+              )}
+            </TouchableOpacity>
 
             <TouchableOpacity
               style={[styles.button, styles.buttonDanger]}
@@ -753,6 +766,13 @@ const styles = StyleSheet.create({
   },
   inputContainer: {
     marginTop: 16,
+  },
+  switchRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginTop: 16,
+    marginBottom: 8,
   },
   label: {
     fontSize: 14,

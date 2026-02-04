@@ -1,10 +1,9 @@
 import {
   Account,
   RpcProvider,
+  PaymasterRpc,
   type Call,
-  type ExecutableUserTransaction,
   type PaymasterTimeBounds,
-  type PreparedTransaction,
   type TypedData,
   type Signature,
 } from "starknet";
@@ -19,7 +18,6 @@ import type {
   FeeMode,
   PreflightOptions,
   PreflightResult,
-  PrepareOptions,
 } from "@/types";
 import type { SDKConfig, ExplorerConfig } from "@/types";
 import { Address } from "@/types";
@@ -27,9 +25,8 @@ import type { WalletInterface } from "@/wallet/interface";
 import {
   checkDeployed,
   ensureWalletReady,
-  executeWithFeeMode,
   preflightTransaction,
-  buildSponsoredTransaction,
+  sponsoredDetails,
 } from "@/wallet/utils";
 
 export { type WalletInterface } from "@/wallet/interface";
@@ -148,11 +145,17 @@ export class Wallet implements WalletInterface {
 
     // Create starknet.js Account with our signer adapter
     const signerAdapter = new SignerAdapter(signer);
+
+    // Create PaymasterRpc instance if paymaster config is provided
+    const paymaster = config.paymaster
+      ? new PaymasterRpc(config.paymaster)
+      : undefined;
+
     const account = new Account({
       provider,
       address,
       signer: signerAdapter,
-      ...(config.paymaster && { paymaster: config.paymaster }),
+      ...(paymaster && { paymaster }),
     });
 
     return new Wallet(
@@ -218,44 +221,31 @@ export class Wallet implements WalletInterface {
     const feeMode = options.feeMode ?? this.defaultFeeMode;
     const timeBounds = options.timeBounds ?? this.defaultTimeBounds;
 
-    return executeWithFeeMode(
-      this.account,
-      calls,
-      feeMode,
-      timeBounds,
-      this.provider,
-      this.explorerConfig
-    );
+    let transactionHash: string;
+
+    if (feeMode === "sponsored") {
+      // Check if account needs deployment (paymaster can deploy + invoke in one tx)
+      const deployed = await this.isDeployed();
+      const deploymentData = deployed
+        ? undefined
+        : await this.accountProvider.getDeploymentData();
+
+      const { transaction_hash } =
+        await this.account.executePaymasterTransaction(
+          calls,
+          sponsoredDetails(timeBounds, deploymentData)
+        );
+      transactionHash = transaction_hash;
+    } else {
+      const { transaction_hash } = await this.account.execute(calls);
+      transactionHash = transaction_hash;
+    }
+
+    return new Tx(transactionHash, this.provider, this.explorerConfig);
   }
 
   async signMessage(typedData: TypedData): Promise<Signature> {
     return this.account.signMessage(typedData);
-  }
-
-  async buildSponsored(
-    calls: Call[],
-    options: PrepareOptions = {}
-  ): Promise<PreparedTransaction> {
-    const timeBounds = options.timeBounds ?? this.defaultTimeBounds;
-    return buildSponsoredTransaction(
-      this.account,
-      calls,
-      timeBounds
-    ) as Promise<PreparedTransaction>;
-  }
-
-  async signSponsored(
-    prepared: PreparedTransaction
-  ): Promise<ExecutableUserTransaction> {
-    return this.account.preparePaymasterTransaction(prepared);
-  }
-
-  async prepareSponsored(
-    calls: Call[],
-    options: PrepareOptions = {}
-  ): Promise<ExecutableUserTransaction> {
-    const prepared = await this.buildSponsored(calls, options);
-    return this.signSponsored(prepared);
   }
 
   async preflight(options: PreflightOptions): Promise<PreflightResult> {
