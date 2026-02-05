@@ -25,11 +25,6 @@
       "import": "./dist/polyfills.js"
     }
   },
-  "peerDependencies": {
-    "react-native-get-random-values": ">=1.8.0",
-    "fast-text-encoding": ">=1.0.0",
-    "@ethersproject/shims": ">=5.7.0"
-  },
   "peerDependenciesMeta": {
     "react-native-get-random-values": {
       "optional": true
