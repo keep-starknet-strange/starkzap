@@ -16,6 +16,7 @@
  * API Documentation: https://docs.avnu.fi/api/tokens/get-tokens
  */
 
+import { execSync } from "node:child_process";
 import { writeFileSync } from "node:fs";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -82,11 +83,17 @@ interface Token {
   logoUrl: string | null;
 }
 
-async function fetchPage(page: number, apiUrl: string): Promise<AvnuResponse> {
+async function fetchPage(
+  page: number,
+  apiUrl: string,
+  onlyVerified: boolean
+): Promise<AvnuResponse> {
   const url = new URL(apiUrl);
   url.searchParams.set("page", page.toString());
   url.searchParams.set("size", "100");
-  url.searchParams.set("tag", "Verified");
+  if (onlyVerified) {
+    url.searchParams.set("tag", "Verified");
+  }
 
   const response = await fetch(url.toString(), {
     headers: {
@@ -113,7 +120,10 @@ function transformToken(avnuToken: AvnuToken): Token {
   };
 }
 
-async function fetchAllTokens(apiUrl: string): Promise<Token[]> {
+async function fetchAllTokens(
+  apiUrl: string,
+  onlyVerified: boolean
+): Promise<Token[]> {
   const tokens: Token[] = [];
   let page = 0; // AVNU API uses zero-based page index
   let totalPages = 1;
@@ -126,7 +136,7 @@ async function fetchAllTokens(apiUrl: string): Promise<Token[]> {
     const pageInfo =
       totalPages > 1 ? page + 1 + "/" + totalPages : page + 1 + "/...";
     console.log("  Fetching page " + pageInfo);
-    const response = await fetchPage(page, apiUrl);
+    const response = await fetchPage(page, apiUrl, onlyVerified);
     totalPages = response.totalPages;
 
     for (const item of response.content) {
@@ -142,12 +152,17 @@ async function fetchAllTokens(apiUrl: string): Promise<Token[]> {
 /**
  * Convert a token symbol to a valid TypeScript key name.
  */
-function toKeyName(symbol: string): string {
+function toKeyName(symbol: string): string | null {
   let name = symbol
     .replace(/[^a-zA-Z0-9_]/g, "_")
     .replace(/_+/g, "_")
     .replace(/^_|_$/g, "")
     .toUpperCase();
+
+  // Skip tokens with purely numeric names
+  if (/^[0-9]+$/.test(name)) {
+    return null;
+  }
 
   // Prefix with underscore if starts with a number
   if (/^[0-9]/.test(name)) {
@@ -156,7 +171,7 @@ function toKeyName(symbol: string): string {
 
   // Fallback for empty names
   if (!name) {
-    name = "UNKNOWN";
+    return null;
   }
 
   return name;
@@ -196,16 +211,21 @@ function generatePresets(tokens: Token[], networkName: Network): string {
   const usedNames = new Map<string, number>();
 
   for (const token of tokens) {
-    let keyName = toKeyName(token.symbol);
+    const keyName = toKeyName(token.symbol);
+    if (!keyName) {
+      // Omit tokens with no name
+      continue;
+    }
 
     // Handle duplicate key names
     const count = usedNames.get(keyName) ?? 0;
+    let constantName = keyName;
     if (count > 0) {
-      keyName = keyName + "_" + count;
+      constantName = keyName + "_" + count;
     }
-    usedNames.set(toKeyName(token.symbol), count + 1);
+    usedNames.set(keyName, count + 1);
 
-    lines.push(`  ${keyName}: {`);
+    lines.push(`  ${constantName}: {`);
     lines.push(`    name: "${escapeString(token.name)}",`);
     lines.push(`    address: "${token.address}" as Address,`);
     lines.push(`    decimals: ${token.decimals},`);
@@ -236,7 +256,7 @@ async function main() {
   const apiUrl = AVNU_API_URLS[network];
 
   try {
-    const tokens = await fetchAllTokens(apiUrl);
+    const tokens = await fetchAllTokens(apiUrl, network === "mainnet");
 
     console.log(
       "\nFetched " + tokens.length + " verified ERC20 tokens for " + network
@@ -247,6 +267,10 @@ async function main() {
     writeFileSync(outputPath, presetsContent);
 
     console.log(`Written presets to ${outputPath}`);
+
+    // Format with prettier
+    console.log("Formatting with prettier...");
+    execSync(`npx prettier --write "${outputPath}"`, { stdio: "inherit" });
   } catch (error) {
     console.error("Failed to generate presets:", error);
     process.exit(1);

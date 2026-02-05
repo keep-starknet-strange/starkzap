@@ -21,6 +21,9 @@ const MAPPING = {
   "paperplane.fill": "send",
   "chevron.left.forwardslash.chevron.right": "code",
   "chevron.right": "chevron-right",
+  "wallet.bifold.fill": "account-balance-wallet",
+  "chart.line.uptrend.xyaxis": "trending-up",
+  "arrow.left.arrow.right": "swap-horiz",
 } as IconMapping;
 
 /**

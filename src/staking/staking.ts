@@ -17,7 +17,7 @@ import { ABI as POOL_ABI } from "@resources/abi/pool";
 import { ABI as STAKING_ABI } from "@resources/abi/staking";
 import { ABI as MINTING_CURVE_ABI } from "@resources/abi/minting-curve";
 import { ABI as ERC20_ABI } from "@resources/abi/erc20";
-import type { Wallet } from "@/wallet";
+import type { WalletInterface } from "@/wallet";
 import type { Tx } from "@/tx";
 import type { Pool, PoolMember } from "@/types/pool";
 import { groupBy } from "@/utils";
@@ -82,7 +82,7 @@ export class Staking {
    * ```
    */
   async enter(
-    wallet: Wallet,
+    wallet: WalletInterface,
     amount: Amount,
     options?: ExecuteOptions
   ): Promise<Tx> {
@@ -112,7 +112,7 @@ export class Staking {
    * @param wallet - The wallet to check
    * @returns True if the wallet is a pool member, false otherwise
    */
-  async isMember(wallet: Wallet): Promise<boolean> {
+  async isMember(wallet: WalletInterface): Promise<boolean> {
     const member = await this.pool.get_pool_member_info_v1(wallet.address);
     return member.isSome();
   }
@@ -138,7 +138,7 @@ export class Staking {
    * }
    * ```
    */
-  async getPosition(wallet: Wallet): Promise<PoolMember | null> {
+  async getPosition(wallet: WalletInterface): Promise<PoolMember | null> {
     const memberInfo = await this.pool.get_pool_member_info_v1(wallet.address);
 
     if (memberInfo.isNone()) {
@@ -304,7 +304,7 @@ export class Staking {
    * ```
    */
   async add(
-    wallet: Wallet,
+    wallet: WalletInterface,
     amount: Amount,
     options?: ExecuteOptions
   ): Promise<Tx> {
@@ -344,7 +344,10 @@ export class Staking {
    * }
    * ```
    */
-  async claimRewards(wallet: Wallet, options?: ExecuteOptions): Promise<Tx> {
+  async claimRewards(
+    wallet: WalletInterface,
+    options?: ExecuteOptions
+  ): Promise<Tx> {
     const member = await this.assertIsMember(wallet);
 
     if (member.rewardAddress !== wallet.address) {
@@ -393,7 +396,7 @@ export class Staking {
    * ```
    */
   async exitIntent(
-    wallet: Wallet,
+    wallet: WalletInterface,
     amount: Amount,
     options?: ExecuteOptions
   ): Promise<Tx> {
@@ -436,7 +439,7 @@ export class Staking {
    * }
    * ```
    */
-  async exit(wallet: Wallet, options?: ExecuteOptions): Promise<Tx> {
+  async exit(wallet: WalletInterface, options?: ExecuteOptions): Promise<Tx> {
     const member = await this.assertIsMember(wallet);
 
     const unpoolTime = member.unpoolTime;
@@ -466,7 +469,7 @@ export class Staking {
     }).typedv2(ERC20_ABI);
   }
 
-  private async assertIsMember(wallet: Wallet): Promise<PoolMember> {
+  private async assertIsMember(wallet: WalletInterface): Promise<PoolMember> {
     const maybeMember = await this.getPosition(wallet);
     if (!maybeMember) {
       throw new Error(

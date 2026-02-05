@@ -1,5 +1,5 @@
 import { type Address, Amount, type ExecuteOptions, type Token } from "@/types";
-import type { Wallet } from "@/wallet";
+import type { WalletInterface } from "@/wallet";
 import { type Call, CallData, uint256 } from "starknet";
 import type { Tx } from "@/tx";
 
@@ -55,7 +55,7 @@ export class Erc20 {
    * @throws Error if any amount's decimals or symbol don't match the token
    */
   public async transfer(args: {
-    from: Wallet;
+    from: WalletInterface;
     transfers: { to: Address; amount: Amount }[];
     options?: ExecuteOptions;
   }): Promise<Tx> {
@@ -92,7 +92,7 @@ export class Erc20 {
    * console.log(balance.toFormatted()); // "100.5 USDC"
    * ```
    */
-  public async balanceOf(args: { wallet: Wallet }): Promise<Amount> {
+  public async balanceOf(args: { wallet: WalletInterface }): Promise<Amount> {
     const provider = args.wallet.getProvider();
     const address = args.wallet.address;
     const result = await provider.callContract({

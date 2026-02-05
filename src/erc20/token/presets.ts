@@ -81,42 +81,6 @@ export const mainnetTokens = {
       ),
     },
   },
-  USN: {
-    name: "USN",
-    address:
-      "0x01e6545cab7ba4ac866768ba5e1bd540893762286ed3fea7f9c02bfa147e135b" as Address,
-    decimals: 18,
-    symbol: "USN",
-    metadata: {
-      logoUrl: new URL(
-        "https://storage.googleapis.com/prod-pendle-bucket-a/images/uploads/31cf1a6e-1b01-4db8-abf6-e52651b1fd05.svg"
-      ),
-    },
-  },
-  WSTETH: {
-    name: "Wrapped Staked Ether",
-    address:
-      "0x0057912720381af14b0e5c87aa4718ed5e527eab60b3801ebf702ab09139e38b" as Address,
-    decimals: 18,
-    symbol: "wstETH",
-    metadata: {
-      logoUrl: new URL(
-        "https://static.starkscan.co/tokens/0x042b8f0484674ca266ac5d08e4ac6a3fe65bd3129795def2dca5c34ecc5f96d2/icons/QmaxTVxd6ZWrotuG64LiuL8PCEgwjiHiQF9isCu8QKgneP"
-      ),
-    },
-  },
-  SUSN: {
-    name: "Staked USN",
-    address:
-      "0x02411565ef1a14decfbe83d2e987cced918cd752508a3d9c55deb67148d14d17" as Address,
-    decimals: 18,
-    symbol: "sUSN",
-    metadata: {
-      logoUrl: new URL(
-        "https://storage.googleapis.com/prod-pendle-bucket-a/images/uploads/dc424e27-4538-4126-8df6-eb7b432853bf.svg"
-      ),
-    },
-  },
   TBTC: {
     name: "Starknet tBTC",
     address:
@@ -153,6 +117,18 @@ export const mainnetTokens = {
       ),
     },
   },
+  USN: {
+    name: "USN",
+    address:
+      "0x01e6545cab7ba4ac866768ba5e1bd540893762286ed3fea7f9c02bfa147e135b" as Address,
+    decimals: 18,
+    symbol: "USN",
+    metadata: {
+      logoUrl: new URL(
+        "https://storage.googleapis.com/prod-pendle-bucket-a/images/uploads/31cf1a6e-1b01-4db8-abf6-e52651b1fd05.svg"
+      ),
+    },
+  },
   LBTC: {
     name: "Lombard Staked Bitcoin",
     address:
@@ -165,15 +141,27 @@ export const mainnetTokens = {
       ),
     },
   },
-  SOLVBTC: {
-    name: "Solv BTC",
+  WSTETH: {
+    name: "Wrapped Staked Ether",
     address:
-      "0x0593e034dda23eea82d2ba9a30960ed42cf4a01502cc2351dc9b9881f9931a68" as Address,
+      "0x0057912720381af14b0e5c87aa4718ed5e527eab60b3801ebf702ab09139e38b" as Address,
     decimals: 18,
-    symbol: "SolvBTC",
+    symbol: "wstETH",
     metadata: {
       logoUrl: new URL(
-        "https://assets.coingecko.com/coins/images/36800/standard/solvBTC.png"
+        "https://static.starkscan.co/tokens/0x042b8f0484674ca266ac5d08e4ac6a3fe65bd3129795def2dca5c34ecc5f96d2/icons/QmaxTVxd6ZWrotuG64LiuL8PCEgwjiHiQF9isCu8QKgneP"
+      ),
+    },
+  },
+  SUSN: {
+    name: "Staked USN",
+    address:
+      "0x02411565ef1a14decfbe83d2e987cced918cd752508a3d9c55deb67148d14d17" as Address,
+    decimals: 18,
+    symbol: "sUSN",
+    metadata: {
+      logoUrl: new URL(
+        "https://storage.googleapis.com/prod-pendle-bucket-a/images/uploads/dc424e27-4538-4126-8df6-eb7b432853bf.svg"
       ),
     },
   },
@@ -187,6 +175,18 @@ export const mainnetTokens = {
       logoUrl: new URL("https://dashboard.endur.fi/endur-fi.svg"),
     },
   },
+  XWBTC: {
+    name: "Endur xWBTC",
+    address:
+      "0x06a567e68c805323525fe1649adb80b03cddf92c23d2629a6779f54192dffc13" as Address,
+    decimals: 8,
+    symbol: "xWBTC",
+    metadata: {
+      logoUrl: new URL(
+        "https://raw.githubusercontent.com/avnu-labs/tokens/refs/heads/main/images/xWBTC.svg"
+      ),
+    },
+  },
   DAIV0: {
     name: "Dai Stablecoin V0",
     address:
@@ -196,30 +196,6 @@ export const mainnetTokens = {
     metadata: {
       logoUrl: new URL(
         "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/0x6B175474E89094C44Da98b954EedeAC495271d0F/logo.png"
-      ),
-    },
-  },
-  XLBTC: {
-    name: "Endur xLBTC",
-    address:
-      "0x07dd3c80de9fcc5545f0cb83678826819c79619ed7992cc06ff81fc67cd2efe0" as Address,
-    decimals: 8,
-    symbol: "xLBTC",
-    metadata: {
-      logoUrl: new URL(
-        "https://raw.githubusercontent.com/avnu-labs/tokens/refs/heads/main/images/xLBTC.svg"
-      ),
-    },
-  },
-  MRE7BTC: {
-    name: "Midas Re7 BTC",
-    address:
-      "0x04e4fb1a9ca7e84bae609b9dc0078ad7719e49187ae7e425bb47d131710eddac" as Address,
-    decimals: 18,
-    symbol: "mRe7BTC",
-    metadata: {
-      logoUrl: new URL(
-        "https://imagedelivery.net/0xPAQaDtnQhBs8IzYRIlNg/3a62ecee-1e58-45d3-9862-3ce90dff1900/logo"
       ),
     },
   },
@@ -235,39 +211,15 @@ export const mainnetTokens = {
       ),
     },
   },
-  XWBTC: {
-    name: "Endur xWBTC",
+  WSTETH_LEGACY: {
+    name: "Legacy Starknet Wrapped Staked Ether",
     address:
-      "0x06a567e68c805323525fe1649adb80b03cddf92c23d2629a6779f54192dffc13" as Address,
-    decimals: 8,
-    symbol: "xWBTC",
-    metadata: {
-      logoUrl: new URL(
-        "https://raw.githubusercontent.com/avnu-labs/tokens/refs/heads/main/images/xWBTC.svg"
-      ),
-    },
-  },
-  NSTR: {
-    name: "Nostra",
-    address:
-      "0x00c530f2c0aa4c16a0806365b0898499fba372e5df7a7172dc6fe9ba777e8007" as Address,
+      "0x042b8f0484674ca266ac5d08e4ac6a3fe65bd3129795def2dca5c34ecc5f96d2" as Address,
     decimals: 18,
-    symbol: "NSTR",
+    symbol: "wstETH(legacy)",
     metadata: {
       logoUrl: new URL(
-        "https://assets.coingecko.com/coins/images/28282/small/Nostra_200x200.png"
-      ),
-    },
-  },
-  DREAMS: {
-    name: "Daydreams",
-    address:
-      "0x04fcaf2a7b4a072fe57c59beee807322d34ed65000d78611c909a46fead07fb1" as Address,
-    decimals: 6,
-    symbol: "dreams",
-    metadata: {
-      logoUrl: new URL(
-        "https://assets.coingecko.com/coins/images/53838/standard/ddpfp.png"
+        "https://wstethmigration.starknet.io/wsteth-legacy-icon.svg"
       ),
     },
   },
@@ -283,6 +235,40 @@ export const mainnetTokens = {
       ),
     },
   },
+  NSTR: {
+    name: "Nostra",
+    address:
+      "0x00c530f2c0aa4c16a0806365b0898499fba372e5df7a7172dc6fe9ba777e8007" as Address,
+    decimals: 18,
+    symbol: "NSTR",
+    metadata: {
+      logoUrl: new URL(
+        "https://assets.coingecko.com/coins/images/28282/small/Nostra_200x200.png"
+      ),
+    },
+  },
+  SOLVBTC: {
+    name: "Solv BTC",
+    address:
+      "0x0593e034dda23eea82d2ba9a30960ed42cf4a01502cc2351dc9b9881f9931a68" as Address,
+    decimals: 18,
+    symbol: "SolvBTC",
+    metadata: {
+      logoUrl: new URL(
+        "https://assets.coingecko.com/coins/images/36800/standard/solvBTC.png"
+      ),
+    },
+  },
+  SURVIVOR: {
+    name: "Survivor",
+    address:
+      "0x042dd777885ad2c116be96d4d634abc90a26a790ffb5871e037dd5ae7d2ec86b" as Address,
+    decimals: 18,
+    symbol: "SURVIVOR",
+    metadata: {
+      logoUrl: new URL("https://lootsurvivor.io/images/survivor_token.png"),
+    },
+  },
   USDU: {
     name: "Uncap USD",
     address:
@@ -293,15 +279,15 @@ export const mainnetTokens = {
       logoUrl: new URL("https://uncap.finance/usdu.png"),
     },
   },
-  WSTETH_LEGACY: {
-    name: "Legacy Starknet Wrapped Staked Ether",
+  DREAMS: {
+    name: "Daydreams",
     address:
-      "0x042b8f0484674ca266ac5d08e4ac6a3fe65bd3129795def2dca5c34ecc5f96d2" as Address,
-    decimals: 18,
-    symbol: "wstETH(legacy)",
+      "0x04fcaf2a7b4a072fe57c59beee807322d34ed65000d78611c909a46fead07fb1" as Address,
+    decimals: 6,
+    symbol: "dreams",
     metadata: {
       logoUrl: new URL(
-        "https://wstethmigration.starknet.io/wsteth-legacy-icon.svg"
+        "https://assets.coingecko.com/coins/images/53838/standard/ddpfp.png"
       ),
     },
   },
@@ -317,6 +303,18 @@ export const mainnetTokens = {
       ),
     },
   },
+  MRE7BTC: {
+    name: "Midas Re7 BTC",
+    address:
+      "0x04e4fb1a9ca7e84bae609b9dc0078ad7719e49187ae7e425bb47d131710eddac" as Address,
+    decimals: 18,
+    symbol: "mRe7BTC",
+    metadata: {
+      logoUrl: new URL(
+        "https://imagedelivery.net/0xPAQaDtnQhBs8IzYRIlNg/3a62ecee-1e58-45d3-9862-3ce90dff1900/logo"
+      ),
+    },
+  },
   BROTHER: {
     name: "STARKNET BROTHER",
     address:
@@ -325,16 +323,6 @@ export const mainnetTokens = {
     symbol: "BROTHER",
     metadata: {
       logoUrl: new URL("https://i.imgur.com/mSywi47.png"),
-    },
-  },
-  SLAY: {
-    name: "Brother Eli",
-    address:
-      "0x02ab526354a39e7f5d272f327fa94e757df3688188d4a92c6dc3623ab79894e2" as Address,
-    decimals: 18,
-    symbol: "SLAY",
-    metadata: {
-      logoUrl: new URL("https://www.brothereli.com/logo.svg"),
     },
   },
   LUSD: {
@@ -359,25 +347,15 @@ export const mainnetTokens = {
       logoUrl: new URL("https://i.postimg.cc/25WRJg4t/Schizo-Face28.png"),
     },
   },
-  SURVIVOR: {
-    name: "Survivor",
+  BURR: {
+    name: "Burrow",
     address:
-      "0x042dd777885ad2c116be96d4d634abc90a26a790ffb5871e037dd5ae7d2ec86b" as Address,
+      "0x01bc7c8ce3b8fe74e4870adc2965df850d429048e83fad93f3140f52ecb74add" as Address,
     decimals: 18,
-    symbol: "SURVIVOR",
-    metadata: {
-      logoUrl: new URL("https://lootsurvivor.io/images/survivor_token.png"),
-    },
-  },
-  DOSIS: {
-    name: "dosis.fun",
-    address:
-      "0x04cd1aebaeebed861072e715bc8963d6cd39b73aba0d563b03d7e8f008e09bdb" as Address,
-    decimals: 18,
-    symbol: "DOSIS",
+    symbol: "BURR",
     metadata: {
       logoUrl: new URL(
-        "https://www.dosis.fun/favicon.ico?favicon.136bf90e.ico"
+        "https://bafybeibxu7laz6irmvjmb73hzue5yrgh4jytefxkskiifj7es7chasherq.ipfs.w3s.link/BURR%20logo.png"
       ),
     },
   },
@@ -393,51 +371,37 @@ export const mainnetTokens = {
       ),
     },
   },
-  SSTRK: {
-    name: "Staked Starknet Token",
+  SLAY: {
+    name: "Brother Eli",
     address:
-      "0x0356f304b154d29d2a8fe22f1cb9107a9b564a733cf6b4cc47fd121ac1af90c9" as Address,
+      "0x02ab526354a39e7f5d272f327fa94e757df3688188d4a92c6dc3623ab79894e2" as Address,
     decimals: 18,
-    symbol: "sSTRK",
+    symbol: "SLAY",
+    metadata: {
+      logoUrl: new URL("https://www.brothereli.com/logo.svg"),
+    },
+  },
+  XTBTC: {
+    name: "Endur xtBTC",
+    address:
+      "0x043a35c1425a0125ef8c171f1a75c6f31ef8648edcc8324b55ce1917db3f9b91" as Address,
+    decimals: 18,
+    symbol: "xtBTC",
     metadata: {
       logoUrl: new URL(
-        "https://nimbora-assets.s3.eu-central-1.amazonaws.com/yieldTokens/Group+41.svg"
+        "https://raw.githubusercontent.com/avnu-labs/tokens/refs/heads/main/images/xtBTC.svg"
       ),
     },
   },
-  SSTR: {
-    name: "SISTER",
+  XLBTC: {
+    name: "Endur xLBTC",
     address:
-      "0x0102d5e124c51b936ee87302e0f938165aec96fb6c2027ae7f3a5ed46c77573b" as Address,
-    decimals: 18,
-    symbol: "SSTR",
+      "0x07dd3c80de9fcc5545f0cb83678826819c79619ed7992cc06ff81fc67cd2efe0" as Address,
+    decimals: 8,
+    symbol: "xLBTC",
     metadata: {
       logoUrl: new URL(
-        "https://res.cloudinary.com/dikavhrql/image/upload/v1732475722/pp-twitter-sstr_t2hd5h.png"
-      ),
-    },
-  },
-  RETH: {
-    name: "Rocket Pool ETH",
-    address:
-      "0x0319111a5037cbec2b3e638cc34a3474e2d2608299f3e62866e9cc683208c610" as Address,
-    decimals: 18,
-    symbol: "rETH",
-    metadata: {
-      logoUrl: new URL(
-        "https://assets.coingecko.com/coins/images/20764/large/reth.png"
-      ),
-    },
-  },
-  SWAY: {
-    name: "Standard Weighted Adalian Yield",
-    address:
-      "0x004878d1148318a31829523ee9c6a5ee563af6cd87f90a30809e5b0d27db8a9b" as Address,
-    decimals: 6,
-    symbol: "SWAY",
-    metadata: {
-      logoUrl: new URL(
-        "https://etherscan.io/token/images/influencesway_32.png"
+        "https://raw.githubusercontent.com/avnu-labs/tokens/refs/heads/main/images/xLBTC.svg"
       ),
     },
   },
@@ -453,27 +417,75 @@ export const mainnetTokens = {
       ),
     },
   },
-  XTBTC: {
-    name: "Endur xtBTC",
+  UNI: {
+    name: "Uniswap",
     address:
-      "0x043a35c1425a0125ef8c171f1a75c6f31ef8648edcc8324b55ce1917db3f9b91" as Address,
+      "0x049210ffc442172463f3177147c1aeaa36c51d152c1b0630f2364c300d4f48ee" as Address,
     decimals: 18,
-    symbol: "xtBTC",
+    symbol: "UNI",
     metadata: {
       logoUrl: new URL(
-        "https://raw.githubusercontent.com/avnu-labs/tokens/refs/heads/main/images/xtBTC.svg"
+        "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/0x1f9840a85d5aF5bf1D1762F925BDADdC4201F984/logo.png"
       ),
     },
   },
-  _1CHAIN: {
-    name: "1CHAIN",
+  SWAY: {
+    name: "Standard Weighted Adalian Yield",
     address:
-      "0x013833e26d675e3254186688ce764c99c43089f65e37afeefee6aed3953ed550" as Address,
-    decimals: 18,
-    symbol: "1CHAIN",
+      "0x004878d1148318a31829523ee9c6a5ee563af6cd87f90a30809e5b0d27db8a9b" as Address,
+    decimals: 6,
+    symbol: "SWAY",
     metadata: {
       logoUrl: new URL(
-        "https://ik.imagekit.io/ikof/photo_2025-05-27_20-34-05.jpg"
+        "https://etherscan.io/token/images/influencesway_32.png"
+      ),
+    },
+  },
+  RETH: {
+    name: "Rocket Pool ETH",
+    address:
+      "0x0319111a5037cbec2b3e638cc34a3474e2d2608299f3e62866e9cc683208c610" as Address,
+    decimals: 18,
+    symbol: "rETH",
+    metadata: {
+      logoUrl: new URL(
+        "https://assets.coingecko.com/coins/images/20764/large/reth.png"
+      ),
+    },
+  },
+  SSTR: {
+    name: "SISTER",
+    address:
+      "0x0102d5e124c51b936ee87302e0f938165aec96fb6c2027ae7f3a5ed46c77573b" as Address,
+    decimals: 18,
+    symbol: "SSTR",
+    metadata: {
+      logoUrl: new URL(
+        "https://res.cloudinary.com/dikavhrql/image/upload/v1732475722/pp-twitter-sstr_t2hd5h.png"
+      ),
+    },
+  },
+  SSTRK: {
+    name: "Staked Starknet Token",
+    address:
+      "0x0356f304b154d29d2a8fe22f1cb9107a9b564a733cf6b4cc47fd121ac1af90c9" as Address,
+    decimals: 18,
+    symbol: "sSTRK",
+    metadata: {
+      logoUrl: new URL(
+        "https://nimbora-assets.s3.eu-central-1.amazonaws.com/yieldTokens/Group+41.svg"
+      ),
+    },
+  },
+  PAL: {
+    name: "Pain au lait",
+    address:
+      "0x049201f03a0f0a9e70e28dcd74cbf44931174dbe3cc4b2ff488898339959e559" as Address,
+    decimals: 18,
+    symbol: "PAL",
+    metadata: {
+      logoUrl: new URL(
+        "https://pbs.twimg.com/profile_images/1761144682808025088/Ki19VFca_400x400.jpg"
       ),
     },
   },
@@ -498,6 +510,18 @@ export const mainnetTokens = {
     metadata: {
       logoUrl: new URL(
         "https://assets.coingecko.com/coins/images/16547/standard/arb.jpg"
+      ),
+    },
+  },
+  AUSD0: {
+    name: "AUSD0",
+    address:
+      "0x04887629c229b4ee8e82f3db4cddeb1b2c0f084d46f229672623bd1282df5931" as Address,
+    decimals: 6,
+    symbol: "AUSD0",
+    metadata: {
+      logoUrl: new URL(
+        "https://gist.githubusercontent.com/vanderspuy/1d6a1d852ec40bedc61c65c0a6caef9d/raw/736946a5434d2a625b00f988bcf44b171152fd9a/ausd0.svg"
       ),
     },
   },
@@ -651,15 +675,15 @@ export const mainnetTokens = {
       ),
     },
   },
-  UNI: {
-    name: "Uniswap",
+  _1CHAIN: {
+    name: "1CHAIN",
     address:
-      "0x049210ffc442172463f3177147c1aeaa36c51d152c1b0630f2364c300d4f48ee" as Address,
+      "0x013833e26d675e3254186688ce764c99c43089f65e37afeefee6aed3953ed550" as Address,
     decimals: 18,
-    symbol: "UNI",
+    symbol: "1CHAIN",
     metadata: {
       logoUrl: new URL(
-        "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/0x1f9840a85d5aF5bf1D1762F925BDADdC4201F984/logo.png"
+        "https://ik.imagekit.io/ikof/photo_2025-05-27_20-34-05.jpg"
       ),
     },
   },
@@ -684,6 +708,18 @@ export const mainnetTokens = {
     metadata: {
       logoUrl: new URL(
         "https://pbs.twimg.com/profile_images/1853796021572104193/HVtV-qa6_400x400.jpg"
+      ),
+    },
+  },
+  DOSIS: {
+    name: "dosis.fun",
+    address:
+      "0x04cd1aebaeebed861072e715bc8963d6cd39b73aba0d563b03d7e8f008e09bdb" as Address,
+    decimals: 18,
+    symbol: "DOSIS",
+    metadata: {
+      logoUrl: new URL(
+        "https://www.dosis.fun/favicon.ico?favicon.136bf90e.ico"
       ),
     },
   },
@@ -720,28 +756,6 @@ export const mainnetTokens = {
     metadata: {
       logoUrl: new URL(
         "https://raw.githubusercontent.com/avnu-labs/tokens/refs/heads/main/images/GwMhELJWsAArhsB.jpeg"
-      ),
-    },
-  },
-  _8: {
-    name: "ONLY EIGHT USERS",
-    address:
-      "0x00e33356072418951fdf3312e3e2eef99abf6d7e12df6ff956082d3e178dde2a" as Address,
-    decimals: 18,
-    symbol: "8",
-    metadata: {
-      logoUrl: new URL("https://i.ibb.co/L6pwNzw/IMG-2587.jpg"),
-    },
-  },
-  PAL: {
-    name: "Pain au lait",
-    address:
-      "0x049201f03a0f0a9e70e28dcd74cbf44931174dbe3cc4b2ff488898339959e559" as Address,
-    decimals: 18,
-    symbol: "PAL",
-    metadata: {
-      logoUrl: new URL(
-        "https://pbs.twimg.com/profile_images/1761144682808025088/Ki19VFca_400x400.jpg"
       ),
     },
   },
@@ -787,18 +801,6 @@ export const mainnetTokens = {
     symbol: "AKU",
     metadata: {
       logoUrl: new URL("https://www.akamarutoken.com/logo.png"),
-    },
-  },
-  BURR: {
-    name: "Burrow",
-    address:
-      "0x01bc7c8ce3b8fe74e4870adc2965df850d429048e83fad93f3140f52ecb74add" as Address,
-    decimals: 18,
-    symbol: "BURR",
-    metadata: {
-      logoUrl: new URL(
-        "https://bafybeibxu7laz6irmvjmb73hzue5yrgh4jytefxkskiifj7es7chasherq.ipfs.w3s.link/BURR%20logo.png"
-      ),
     },
   },
   FYETH: {
