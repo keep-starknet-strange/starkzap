@@ -9,39 +9,24 @@ import {
   ArgentXV050Preset,
   BraavosPreset,
   DevnetPreset,
-  Erc20,
   Amount,
-  sepoliaTokens,
-  mainnetTokens,
+  getErc20,
+  networks,
+  type NetworkPreset,
   type WalletInterface,
   type AccountClassConfig,
   type ChainId,
   type ExecuteOptions,
 } from "x";
 
-// Network configuration type
-export interface NetworkConfig {
-  name: string;
-  chainId: ChainId;
-  rpcUrl: string;
-}
-
 // Privy server URL - change this to your server URL
 // For Expo Go: use your machine's local IP (not localhost)
 export const PRIVY_SERVER_URL = "http://192.168.1.222:3001";
 
-// Available network presets
-export const NETWORKS: NetworkConfig[] = [
-  {
-    name: "Sepolia",
-    chainId: "SN_SEPOLIA",
-    rpcUrl: "https://api.cartridge.gg/x/starknet/sepolia/rpc/v0_9",
-  },
-  {
-    name: "Mainnet",
-    chainId: "SN_MAIN",
-    rpcUrl: "https://api.cartridge.gg/x/starknet/mainnet/rpc/v0_9",
-  },
+// Available networks (using SDK presets)
+export const NETWORKS: { name: string; preset: NetworkPreset }[] = [
+  { name: "Sepolia", preset: networks.sepolia },
+  { name: "Mainnet", preset: networks.mainnet },
 ];
 
 // Default network (index into NETWORKS array, or null for custom)
@@ -130,8 +115,8 @@ const defaultNetwork = NETWORKS[DEFAULT_NETWORK_INDEX];
 
 export const useWalletStore = create<WalletState>((set, get) => ({
   // SDK configuration - starts unconfigured
-  rpcUrl: defaultNetwork.rpcUrl,
-  chainId: defaultNetwork.chainId,
+  rpcUrl: defaultNetwork.preset.rpcUrl,
+  chainId: defaultNetwork.preset.chainId,
   sdk: null,
   isConfigured: false,
   selectedNetworkIndex: DEFAULT_NETWORK_INDEX,
@@ -167,8 +152,8 @@ export const useWalletStore = create<WalletState>((set, get) => ({
     if (network) {
       set({
         selectedNetworkIndex: index,
-        rpcUrl: network.rpcUrl,
-        chainId: network.chainId,
+        rpcUrl: network.preset.rpcUrl,
+        chainId: network.preset.chainId,
       });
     }
   },
@@ -186,13 +171,19 @@ export const useWalletStore = create<WalletState>((set, get) => ({
   confirmNetworkConfig: () => {
     const { selectedNetworkIndex, customRpcUrl, customChainId, addLog } = get();
 
+    let newSdk: StarkSDK;
     let rpcUrl: string;
     let chainId: ChainId;
 
     if (selectedNetworkIndex !== null) {
+      // Use SDK network preset
       const network = NETWORKS[selectedNetworkIndex];
-      rpcUrl = network.rpcUrl;
-      chainId = network.chainId;
+      rpcUrl = network.preset.rpcUrl;
+      chainId = network.preset.chainId;
+      newSdk = new StarkSDK({
+        network: network.preset,
+        paymaster: { nodeUrl: `${PRIVY_SERVER_URL}/api/paymaster` },
+      });
     } else {
       // Custom network
       if (!customRpcUrl.trim()) {
@@ -201,14 +192,13 @@ export const useWalletStore = create<WalletState>((set, get) => ({
       }
       rpcUrl = customRpcUrl.trim();
       chainId = customChainId;
+      newSdk = new StarkSDK({
+        rpcUrl,
+        chainId,
+        paymaster: { nodeUrl: `${PRIVY_SERVER_URL}/api/paymaster` },
+      });
     }
 
-    const newSdk = new StarkSDK({
-      rpcUrl,
-      chainId,
-      // Custom paymaster proxy (keeps AVNU API key on server)
-      paymaster: { nodeUrl: `${PRIVY_SERVER_URL}/api/paymaster` },
-    });
     set({
       sdk: newSdk,
       rpcUrl,
@@ -234,8 +224,8 @@ export const useWalletStore = create<WalletState>((set, get) => ({
       privyEmail: "",
       privyWalletId: null,
       selectedNetworkIndex: DEFAULT_NETWORK_INDEX,
-      rpcUrl: defaultNetwork.rpcUrl,
-      chainId: defaultNetwork.chainId,
+      rpcUrl: defaultNetwork.preset.rpcUrl,
+      chainId: defaultNetwork.preset.chainId,
     });
     addLog("Network configuration reset");
   },
@@ -315,25 +305,11 @@ export const useWalletStore = create<WalletState>((set, get) => ({
       // Store wallet ID for signing
       set({ privyWalletId: walletId });
 
-      // Create signer with rawSign callback
+      // Create signer with server URL
       const signer = new PrivySigner({
         walletId,
         publicKey,
-        rawSign: async (wId: string, hash: string) => {
-          const signRes = await fetch(`${PRIVY_SERVER_URL}/api/wallet/sign`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ walletId: wId, hash }),
-          });
-
-          if (!signRes.ok) {
-            const err = await signRes.json();
-            throw new Error(err.details || err.error || "Signing failed");
-          }
-
-          const { signature } = await signRes.json();
-          return signature;
-        },
+        serverUrl: `${PRIVY_SERVER_URL}/api/wallet/sign`,
       });
 
       const connectedWallet = await sdk.connectWallet({
@@ -419,10 +395,9 @@ export const useWalletStore = create<WalletState>((set, get) => ({
     );
 
     try {
-      // Get STRK token for the current network
-      const tokens = chainId === "SN_MAIN" ? mainnetTokens : sepoliaTokens;
-      const strk = new Erc20(tokens.STRK);
-      const amount = Amount.parse("0", tokens.STRK);
+      // Get STRK contract for the current network
+      const strk = getErc20("STRK", chainId);
+      const amount = Amount.parse("0", strk.token);
 
       // Build execute options with optional paymaster
       const options: ExecuteOptions = {};

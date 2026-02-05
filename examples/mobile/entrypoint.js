@@ -1,7 +1,5 @@
-// Import required polyfills first
-import "fast-text-encoding";
-import "react-native-get-random-values";
-import "@ethersproject/shims";
+// Import SDK polyfills for React Native
+import "x/polyfills";
 
 // Then import the expo router
 import "expo-router/entry";

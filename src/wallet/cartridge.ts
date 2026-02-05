@@ -11,6 +11,7 @@ import {
 } from "starknet";
 import { Tx } from "@/tx";
 import type {
+  DeployOptions,
   EnsureReadyOptions,
   ExecuteOptions,
   FeeMode,
@@ -74,6 +75,7 @@ export class CartridgeWallet implements WalletInterface {
   private readonly controller: Controller;
   private readonly walletAccount: WalletAccount;
   private readonly provider: RpcProvider;
+  private readonly chainId: ChainId;
   private readonly explorerConfig: ExplorerConfig | undefined;
   private readonly defaultFeeMode: FeeMode;
   private readonly defaultTimeBounds: PaymasterTimeBounds | undefined;
@@ -88,6 +90,7 @@ export class CartridgeWallet implements WalletInterface {
     this.controller = controller;
     this.walletAccount = walletAccount;
     this.provider = provider;
+    this.chainId = options.chainId ?? "SN_MAIN";
     this.explorerConfig = options.explorer;
     this.defaultFeeMode = options.feeMode ?? "user_pays";
     this.defaultTimeBounds = options.timeBounds;
@@ -169,7 +172,8 @@ export class CartridgeWallet implements WalletInterface {
     return ensureWalletReady(this, options);
   }
 
-  async deploy(): Promise<Tx> {
+  async deploy(_options: DeployOptions = {}): Promise<Tx> {
+    // Cartridge Controller handles deployment internally
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const result = await (this.controller as any).keychain?.deploy();
     if (!result || result.code !== "SUCCESS") {
@@ -207,6 +211,23 @@ export class CartridgeWallet implements WalletInterface {
 
   getProvider(): RpcProvider {
     return this.provider;
+  }
+
+  getChainId(): ChainId {
+    return this.chainId;
+  }
+
+  getFeeMode(): FeeMode {
+    return this.defaultFeeMode;
+  }
+
+  getClassHash(): string {
+    // Cartridge Controller manages its own account class
+    return "cartridge-controller";
+  }
+
+  async estimateFee(calls: Call[]) {
+    return this.walletAccount.estimateInvokeFee(calls);
   }
 
   /**

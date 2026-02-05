@@ -1,11 +1,18 @@
 import { RpcProvider } from "starknet";
-import type { SDKConfig } from "@/types/config";
+import type { SDKConfig, ChainId } from "@/types/config";
 import type { ConnectWalletOptions } from "@/types/wallet";
+import { networks, type NetworkPreset } from "@/network";
 import { Wallet } from "@/wallet";
 import {
   CartridgeWallet,
   type CartridgeWalletOptions,
 } from "@/wallet/cartridge";
+
+/** Resolved SDK configuration with required rpcUrl and chainId */
+interface ResolvedConfig extends Omit<SDKConfig, "rpcUrl" | "chainId"> {
+  rpcUrl: string;
+  chainId: ChainId;
+}
 
 /**
  * Main SDK class for Starknet wallet integration.
@@ -14,22 +21,19 @@ import {
  * ```ts
  * import { StarkSDK, StarkSigner, ArgentPreset } from "x";
  *
+ * // Using network presets (recommended)
+ * const sdk = new StarkSDK({ network: "mainnet" });
+ * const sdk = new StarkSDK({ network: "sepolia" });
+ *
+ * // Or with custom RPC
  * const sdk = new StarkSDK({
- *   rpcUrl: "https://starknet-mainnet.infura.io/v3/...",
+ *   rpcUrl: "https://my-rpc.example.com",
  *   chainId: "SN_MAIN",
  * });
  *
  * // Connect with default account (OpenZeppelin)
  * const wallet = await sdk.connectWallet({
  *   account: { signer: new StarkSigner(privateKey) },
- * });
- *
- * // Or with a different account preset
- * const wallet = await sdk.connectWallet({
- *   account: {
- *     signer: new StarkSigner(privateKey),
- *     accountClass: ArgentPreset,
- *   },
  * });
  *
  * // Use the wallet
@@ -39,12 +43,53 @@ import {
  * ```
  */
 export class StarkSDK {
-  private readonly config: SDKConfig;
+  private readonly config: ResolvedConfig;
   private readonly provider: RpcProvider;
 
   constructor(config: SDKConfig) {
-    this.config = config;
-    this.provider = new RpcProvider({ nodeUrl: config.rpcUrl });
+    this.config = this.resolveConfig(config);
+    this.provider = new RpcProvider({ nodeUrl: this.config.rpcUrl });
+  }
+
+  private resolveConfig(config: SDKConfig): ResolvedConfig {
+    // Get network preset if specified
+    let networkPreset: NetworkPreset | undefined;
+    if (config.network) {
+      networkPreset =
+        typeof config.network === "string"
+          ? networks[config.network]
+          : config.network;
+    }
+
+    // Resolve rpcUrl (explicit > network preset)
+    const rpcUrl = config.rpcUrl ?? networkPreset?.rpcUrl;
+    if (!rpcUrl) {
+      throw new Error(
+        "StarkSDK requires either 'network' or 'rpcUrl' to be specified"
+      );
+    }
+
+    // Resolve chainId (explicit > network preset)
+    const chainId = config.chainId ?? networkPreset?.chainId;
+    if (!chainId) {
+      throw new Error(
+        "StarkSDK requires either 'network' or 'chainId' to be specified"
+      );
+    }
+
+    // Resolve explorer (explicit > network preset)
+    const explorer =
+      config.explorer ??
+      (networkPreset?.explorerUrl
+        ? { baseUrl: networkPreset.explorerUrl }
+        : undefined);
+
+    return {
+      ...config,
+      rpcUrl,
+      chainId,
+      ...(explorer && { explorer }),
+    };
   }
 
   /**

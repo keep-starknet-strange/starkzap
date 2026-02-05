@@ -8,6 +8,7 @@ import type { PAYMASTER_API } from "@starknet-io/starknet-types-010";
 import { Tx } from "@/tx";
 import type { Address } from "@/types";
 import type {
+  DeployOptions,
   EnsureReadyOptions,
   PreflightOptions,
   PreflightResult,
@@ -39,11 +40,11 @@ export async function checkDeployed(
 export async function ensureWalletReady(
   wallet: {
     isDeployed: () => Promise<boolean>;
-    deploy: () => Promise<Tx>;
+    deploy: (options?: DeployOptions) => Promise<Tx>;
   },
   options: EnsureReadyOptions = {}
 ): Promise<void> {
-  const { deploy = "if_needed", onProgress } = options;
+  const { deploy = "if_needed", feeMode, onProgress } = options;
 
   onProgress?.({ step: "CONNECTED" });
 
@@ -60,7 +61,7 @@ export async function ensureWalletReady(
   }
 
   onProgress?.({ step: "DEPLOYING" });
-  const tx = await wallet.deploy();
+  const tx = await wallet.deploy(feeMode ? { feeMode } : undefined);
   await tx.wait({
     successStates: [
       TransactionFinalityStatus.ACCEPTED_ON_L2,

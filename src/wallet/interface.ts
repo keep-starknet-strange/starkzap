@@ -1,6 +1,7 @@
 import type {
   Account,
   Call,
+  EstimateFeeResponseOverhead,
   RpcProvider,
   TypedData,
   Signature,
@@ -8,8 +9,11 @@ import type {
 import type { Tx } from "@/tx";
 import type {
   Address,
+  ChainId,
+  DeployOptions,
   EnsureReadyOptions,
   ExecuteOptions,
+  FeeMode,
   PreflightOptions,
   PreflightResult,
 } from "@/types";
@@ -55,8 +59,10 @@ export interface WalletInterface {
   /**
    * Deploy the account contract.
    * Returns a Tx object to track the deployment.
+   *
+   * @param options.feeMode - How to pay for deployment ("user_pays" or "sponsored")
    */
-  deploy(): Promise<Tx>;
+  deploy(options?: DeployOptions): Promise<Tx>;
 
   /**
    * Execute one or more contract calls.
@@ -86,6 +92,26 @@ export interface WalletInterface {
    * Use this for read-only operations like balance queries.
    */
   getProvider(): RpcProvider;
+
+  /**
+   * Get the chain ID this wallet is connected to.
+   */
+  getChainId(): ChainId;
+
+  /**
+   * Get the default fee mode for this wallet.
+   */
+  getFeeMode(): FeeMode;
+
+  /**
+   * Get the account class hash.
+   */
+  getClassHash(): string;
+
+  /**
+   * Estimate the fee for executing calls.
+   */
+  estimateFee(calls: Call[]): Promise<EstimateFeeResponseOverhead>;
 
   /**
    * Disconnect the wallet and clean up resources.

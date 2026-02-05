@@ -5,7 +5,8 @@ import { type Call, CallData, uint256 } from "starknet";
 import type { Tx } from "@/tx";
 
 export class Erc20 {
-  private readonly token: Token;
+  /** The token configuration (address, decimals, symbol, etc.) */
+  readonly token: Token;
 
   constructor(token: Token) {
     this.token = token;
