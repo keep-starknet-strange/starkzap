@@ -160,33 +160,18 @@ app.post("/api/wallet/sign", async (req, res) => {
 
 app.post("/api/paymaster", async (req, res) => {
   try {
-    const headers: Record<string, string> = {
-      "Content-Type": "application/json",
-    };
-    if (AVNU_API_KEY) {
-      headers["x-paymaster-api-key"] = AVNU_API_KEY;
-    }
-
-    console.log(
-      `[Paymaster] ${req.body?.method || "unknown"} -> ${AVNU_PAYMASTER_URL}`
-    );
-    console.log(
-      `[Paymaster] API key: ${AVNU_API_KEY ? `${AVNU_API_KEY.slice(0, 8)}...${AVNU_API_KEY.slice(-8)}` : "NOT SET"}`
-    );
+    console.log(`[Paymaster] ${req.body?.method || "unknown"}`);
 
     const response = await fetch(AVNU_PAYMASTER_URL, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "x-paymaster-api-key": process.env.AVNU_API_KEY!,
+        ...(AVNU_API_KEY && { "x-paymaster-api-key": AVNU_API_KEY }),
       },
       body: JSON.stringify(req.body),
     });
-    console.log(`[Paymaster] Response:`, response);
 
     const data = await response.json();
-    console.log(`[Paymaster] Data:`, data);
-
     if (!response.ok) {
       console.log(
         `[Paymaster] Error ${response.status}:`,
@@ -195,11 +180,10 @@ app.post("/api/paymaster", async (req, res) => {
     }
 
     res.status(response.status).json(data);
-
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  } catch (error: any) {
-    console.log(`[Paymaster] Exception:`, error.message);
-    res.status(500).json({ error: error.message });
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.log(`[Paymaster] Exception:`, message);
+    res.status(500).json({ error: message });
   }
 });
 

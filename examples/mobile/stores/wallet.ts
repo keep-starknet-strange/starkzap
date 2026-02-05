@@ -99,7 +99,8 @@ interface WalletState {
   connectWithPrivy: (
     walletId: string,
     publicKey: string,
-    email: string
+    email: string,
+    accessToken: string
   ) => Promise<void>;
   disconnect: () => void;
   checkDeploymentStatus: () => Promise<void>;
@@ -107,11 +108,30 @@ interface WalletState {
   testTransfer: () => Promise<void>;
 }
 
-const truncateAddress = (address: string) => {
-  return `${address.slice(0, 6)}...${address.slice(-4)}`;
-};
+const truncateAddress = (address: string) =>
+  `${address.slice(0, 6)}...${address.slice(-4)}`;
 
 const defaultNetwork = NETWORKS[DEFAULT_NETWORK_INDEX];
+
+/** Register account address with backend for persistence */
+async function registerAccount(
+  preset: string,
+  address: string,
+  token: string
+): Promise<void> {
+  try {
+    await fetch(`${PRIVY_SERVER_URL}/api/wallet/register-account`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ preset, address, deployed: false }),
+    });
+  } catch (err) {
+    console.warn("Failed to register account:", err);
+  }
+}
 
 export const useWalletStore = create<WalletState>((set, get) => ({
   // SDK configuration - starts unconfigured
@@ -286,7 +306,8 @@ export const useWalletStore = create<WalletState>((set, get) => ({
   connectWithPrivy: async (
     walletId: string,
     publicKey: string,
-    email: string
+    email: string,
+    accessToken: string
   ) => {
     const { privySelectedPreset, sdk, addLog } = get();
 
@@ -302,10 +323,8 @@ export const useWalletStore = create<WalletState>((set, get) => ({
     addLog(`Connecting with Privy (${email})...`);
 
     try {
-      // Store wallet ID for signing
       set({ privyWalletId: walletId });
 
-      // Create signer with server URL
       const signer = new PrivySigner({
         walletId,
         publicKey,
@@ -322,7 +341,14 @@ export const useWalletStore = create<WalletState>((set, get) => ({
       set({ wallet: connectedWallet, walletType: "privy" });
       addLog(`Connected: ${truncateAddress(connectedWallet.address)}`);
 
-      // Check deployment status after connecting
+      // Register account with backend for persistence
+      await registerAccount(
+        privySelectedPreset,
+        connectedWallet.address,
+        accessToken
+      );
+
+      // Check deployment status
       await get().checkDeploymentStatus();
     } catch (err) {
       addLog(`Privy connection failed: ${err}`);
@@ -333,7 +359,6 @@ export const useWalletStore = create<WalletState>((set, get) => ({
   },
 
   disconnect: () => {
-    const { addLog } = get();
     set({
       wallet: null,
       walletType: null,
@@ -342,7 +367,7 @@ export const useWalletStore = create<WalletState>((set, get) => ({
       privyEmail: "",
       privyWalletId: null,
     });
-    addLog("Disconnected");
+    get().addLog("Disconnected");
   },
 
   checkDeploymentStatus: async () => {
@@ -362,22 +387,19 @@ export const useWalletStore = create<WalletState>((set, get) => ({
   },
 
   deploy: async () => {
-    const { wallet, addLog, checkDeploymentStatus } = get();
+    const { wallet, useSponsored, addLog, checkDeploymentStatus } = get();
     if (!wallet) return;
-    const { useSponsored } = get();
-    const feeMode = useSponsored ? "sponsored" : "user_pays";
 
     set({ isConnecting: true });
-    addLog("Deploying account...");
+    addLog(`Deploying account${useSponsored ? " (sponsored)..." : "..."}`);
 
     try {
-      const tx = await wallet.deploy({ feeMode: feeMode });
-      addLog(`Deploy tx submitted: ${truncateAddress(tx.hash)}`);
-
-      addLog("Waiting for confirmation...");
+      const tx = await wallet.deploy({
+        feeMode: useSponsored ? "sponsored" : "user_pays",
+      });
+      addLog(`Deploy tx: ${truncateAddress(tx.hash)}`);
       await tx.wait();
-
-      addLog("Account deployed successfully!");
+      addLog("Account deployed!");
       await checkDeploymentStatus();
     } catch (err) {
       addLog(`Deployment failed: ${err}`);
@@ -392,32 +414,23 @@ export const useWalletStore = create<WalletState>((set, get) => ({
     if (!wallet) return;
 
     set({ isTransferring: true });
-    addLog(
-      `Executing test transfer (0 STRK to self)${useSponsored ? " with paymaster..." : "..."}`
-    );
+    addLog(`Test transfer (0 STRK)${useSponsored ? " sponsored..." : "..."}`);
 
     try {
-      // Get STRK contract for the current network
       const strk = getErc20("STRK", chainId);
-      const amount = Amount.parse("0", strk.token);
+      const options: ExecuteOptions = useSponsored
+        ? { feeMode: "sponsored" }
+        : {};
 
-      // Build execute options with optional paymaster
-      const options: ExecuteOptions = {};
-      if (useSponsored) {
-        options.feeMode = "sponsored";
-        addLog("Using AVNU paymaster (sponsored)");
-      }
-
-      // Transfer 0 STRK to self using ERC20 class
       const tx = await strk.transfer({
         from: wallet,
-        transfers: [{ to: wallet.address, amount }],
+        transfers: [
+          { to: wallet.address, amount: Amount.parse("0", strk.token) },
+        ],
         options,
       });
 
-      addLog(`Tx submitted: ${truncateAddress(tx.hash)}`);
-      addLog("Waiting for confirmation...");
-
+      addLog(`Tx: ${truncateAddress(tx.hash)}`);
       await tx.wait();
       addLog("Transfer confirmed!");
     } catch (err) {

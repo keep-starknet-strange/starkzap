@@ -112,7 +112,12 @@ export default function HomeScreen() {
       }
 
       const { wallet: walletData } = await res.json();
-      await connectWithPrivy(walletData.id, walletData.publicKey, userEmail);
+      await connectWithPrivy(
+        walletData.id,
+        walletData.publicKey,
+        userEmail,
+        accessToken
+      );
     } catch (err) {
       Alert.alert("Error", String(err));
     } finally {
