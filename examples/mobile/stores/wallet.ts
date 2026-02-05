@@ -364,12 +364,14 @@ export const useWalletStore = create<WalletState>((set, get) => ({
   deploy: async () => {
     const { wallet, addLog, checkDeploymentStatus } = get();
     if (!wallet) return;
+    const { useSponsored } = get();
+    const feeMode = useSponsored ? "sponsored" : "user_pays";
 
     set({ isConnecting: true });
     addLog("Deploying account...");
 
     try {
-      const tx = await wallet.deploy();
+      const tx = await wallet.deploy({ feeMode: feeMode });
       addLog(`Deploy tx submitted: ${truncateAddress(tx.hash)}`);
 
       addLog("Waiting for confirmation...");
