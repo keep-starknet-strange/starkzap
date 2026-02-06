@@ -1,13 +1,29 @@
 import { type Address, Amount, type ExecuteOptions, type Token } from "@/types";
 import type { WalletInterface } from "@/wallet";
-import { type Call, CallData, uint256 } from "starknet";
+import {
+  type Call,
+  Contract,
+  num,
+  RpcError,
+  type RpcProvider,
+  type TypedContractV2,
+  type Uint256,
+  uint256,
+} from "starknet";
 import type { Tx } from "@/tx";
+import { ABI as ERC20_ABI } from "@/abi/erc20";
 
 export class Erc20 {
   private readonly token: Token;
+  private readonly contract: TypedContractV2<typeof ERC20_ABI>;
 
-  constructor(token: Token) {
+  constructor(token: Token, provider: RpcProvider) {
     this.token = token;
+    this.contract = new Contract({
+      abi: ERC20_ABI,
+      address: this.token.address,
+      providerOrAccount: provider,
+    }).typedv2(ERC20_ABI);
   }
 
   /**
@@ -63,14 +79,10 @@ export class Erc20 {
       // Validate that the amount matches this token
       this.validateAmount(transfer.amount);
 
-      return {
-        contractAddress: this.token.address,
-        entrypoint: "transfer",
-        calldata: CallData.compile([
-          transfer.to,
-          uint256.bnToUint256(transfer.amount.toBase()),
-        ]),
-      };
+      return this.contract.populateTransaction.transfer(
+        transfer.to,
+        uint256.bnToUint256(transfer.amount.toBase())
+      );
     });
 
     return await from.execute(calls, options);
@@ -93,18 +105,21 @@ export class Erc20 {
    * ```
    */
   public async balanceOf(wallet: WalletInterface): Promise<Amount> {
-    const provider = wallet.getProvider();
-    const address = wallet.address;
-    const result = await provider.callContract({
-      contractAddress: this.token.address,
-      entrypoint: "balanceOf",
-      calldata: CallData.compile([address]),
-    });
-    const balance = uint256.uint256ToBN({
-      low: result[0] as string,
-      high: result[1] as string,
-    });
+    let result: number | bigint | Uint256;
+    try {
+      result = await this.contract.balance_of(wallet.address);
+    } catch (error) {
+      if (error instanceof RpcError && error.isType("ENTRYPOINT_NOT_FOUND")) {
+        result = await this.contract.balanceOf(wallet.address);
+      } else {
+        throw error;
+      }
+    }
 
-    return Amount.fromRaw(balance, this.token);
+    if (num.isBigNumberish(result)) {
+      return Amount.fromRaw(num.toBigInt(result), this.token);
+    } else {
+      return Amount.fromRaw(uint256.uint256ToBN(result), this.token);
+    }
   }
 }

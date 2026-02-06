@@ -91,6 +91,53 @@ export const ABI = [
         ],
         state_mutability: "external",
       },
+      {
+        type: "function",
+        name: "transfer",
+        inputs: [
+          {
+            name: "recipient",
+            type: "core::starknet::contract_address::ContractAddress",
+          },
+          {
+            name: "amount",
+            type: "core::integer::u256",
+          },
+        ],
+        outputs: [
+          {
+            type: "core::bool",
+          },
+        ],
+        state_mutability: "external",
+      },
+    ],
+  },
+  {
+    type: "impl",
+    name: "ERC20CamelOnlyImpl",
+    interface_name: "openzeppelin::token::erc20::interface::IERC20CamelOnly",
+  },
+  {
+    type: "interface",
+    name: "openzeppelin::token::erc20::interface::IERC20CamelOnly",
+    items: [
+      {
+        type: "function",
+        name: "balanceOf",
+        inputs: [
+          {
+            name: "account",
+            type: "core::starknet::contract_address::ContractAddress",
+          },
+        ],
+        outputs: [
+          {
+            type: "core::integer::u256",
+          },
+        ],
+        state_mutability: "view",
+      },
     ],
   },
 ] as const;

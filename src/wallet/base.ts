@@ -164,7 +164,7 @@ export abstract class BaseWallet implements WalletInterface {
   erc20(token: Token): Erc20 {
     let erc20 = this.erc20s.get(token.address);
     if (!erc20) {
-      erc20 = new Erc20(token);
+      erc20 = new Erc20(token, this.getProvider());
       this.erc20s.set(token.address, erc20);
     }
 
