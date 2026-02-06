@@ -14,12 +14,14 @@ export { Tx } from "@/tx";
 export type { SignerInterface } from "@/signer/interface";
 export { SignerAdapter } from "@/signer/adapter";
 export { StarkSigner } from "@/signer/stark";
+export { EthSigner } from "@/signer/ethereum";
 export { PrivySigner, type PrivySignerConfig } from "@/signer/privy";
 
 // Account Presets
 export {
   DevnetPreset,
   OpenZeppelinPreset,
+  OpenZeppelinEthPreset,
   ArgentPreset,
   BraavosPreset,
   ArgentXV050Preset,
