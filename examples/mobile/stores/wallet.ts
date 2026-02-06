@@ -3,8 +3,10 @@ import { Alert } from "react-native";
 import {
   StarkSDK,
   StarkSigner,
+  EthSigner,
   PrivySigner,
   OpenZeppelinPreset,
+  OpenZeppelinEthPreset,
   ArgentPreset,
   ArgentXV050Preset,
   BraavosPreset,
@@ -35,11 +37,15 @@ export const DEFAULT_NETWORK_INDEX = 0;
 // Account presets
 export const PRESETS: Record<string, AccountClassConfig> = {
   OpenZeppelin: OpenZeppelinPreset,
+  "OZ Ethereum": OpenZeppelinEthPreset,
   Argent: ArgentPreset,
   "ArgentX v0.5": ArgentXV050Preset,
   Braavos: BraavosPreset,
   Devnet: DevnetPreset,
 };
+
+// Presets that use Ethereum (secp256k1) signatures
+export const ETH_PRESETS = new Set(["OZ Ethereum"]);
 
 // Wallet connection type
 type WalletType = "privatekey" | "privy";
@@ -257,10 +263,12 @@ export const useWalletStore = create<WalletState>((set, get) => ({
 
   setPrivySelectedPreset: (preset) => set({ privySelectedPreset: preset }),
 
-  addLog: (message) =>
+  addLog: (message) => {
+    console.log("addLog", message);
     set((state) => ({
       logs: [...state.logs, `[${new Date().toLocaleTimeString()}] ${message}`],
-    })),
+    }));
+  },
 
   connect: async () => {
     const { privateKey, selectedPreset, sdk, addLog } = get();
@@ -279,10 +287,16 @@ export const useWalletStore = create<WalletState>((set, get) => ({
     }
 
     set({ isConnecting: true });
-    addLog(`Connecting with ${selectedPreset} account...`);
+    const isEthPreset = ETH_PRESETS.has(selectedPreset);
+    addLog(
+      `Connecting with ${selectedPreset} (${isEthPreset ? "secp256k1" : "stark"})...`
+    );
 
     try {
-      const signer = new StarkSigner(privateKey.trim());
+      // Use EthSigner for Ethereum presets, StarkSigner otherwise
+      const signer = isEthPreset
+        ? new EthSigner(privateKey.trim())
+        : new StarkSigner(privateKey.trim());
       const connectedWallet = await sdk.connectWallet({
         account: {
           signer,
