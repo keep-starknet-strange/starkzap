@@ -49,15 +49,41 @@ export const ArgentPreset: AccountClassConfig = {
 };
 
 /**
- * Braavos account preset.
+ * Braavos account preset (v1.2.0) with Stark key.
+ *
+ * Uses BraavosBaseAccount for deployment which then upgrades to BraavosAccount.
+ *
+ * Deployment signature format (15 elements):
+ * - [0-1]: Transaction signature (r, s)
+ * - [2]: Implementation class hash (BraavosAccount)
+ * - [3-11]: Auxiliary data (zeros for basic Stark-only account)
+ * - [12]: Chain ID as felt
+ * - [13-14]: Auxiliary data signature (r, s)
+ *
+ * @see https://github.com/myBraavos/braavos-account-cairo
  */
 export const BraavosPreset: AccountClassConfig = {
+  // BraavosBaseAccount class hash - used for deployment
   classHash:
-    "0x00816dd0297efc55dc1e7559020a3a825e81ef734b558f03c83325d4da7e6253",
+    "0x03d16c7a9a60b0593bd202f660a28c5d76e0403601d9ccc7e4fa253b6a70c201",
+
   buildConstructorCalldata(publicKey: string): Calldata {
-    return CallData.compile({ public_key: publicKey });
+    // Constructor takes just the Stark public key
+    return [publicKey];
+  },
+
+  getSalt(publicKey: string): string {
+    // Salt is the public key (same as constructor calldata)
+    return publicKey;
   },
 };
+
+/**
+ * Braavos implementation class hash (for reference).
+ * This is the class the account upgrades to after deployment.
+ */
+export const BRAAVOS_IMPL_CLASS_HASH =
+  "0x03957f9f5a1cbfe918cedc2015c85200ca51a5f7506ecb6de98a5207b759bf8a";
 
 /**
  * ArgentX v0.5.0 account preset.

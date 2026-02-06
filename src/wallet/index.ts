@@ -2,6 +2,7 @@ import {
   Account,
   RpcProvider,
   PaymasterRpc,
+  hash,
   type Call,
   type PaymasterTimeBounds,
   type TypedData,
@@ -32,6 +33,21 @@ import {
   sponsoredDetails,
 } from "@/wallet/utils";
 import { BaseWallet } from "@/wallet/base";
+import {
+  BraavosPreset,
+  BRAAVOS_IMPL_CLASS_HASH,
+  OpenZeppelinPreset,
+} from "@/account/presets";
+
+// Braavos factory address (same on Sepolia and Mainnet)
+const BRAAVOS_FACTORY_ADDRESS =
+  "0x3d94f65ebc7552eb517ddb374250a9525b605f25f4e41ded6e7d7381ff1c2e8";
+
+// Chain IDs as felt252
+const CHAIN_ID_FELTS: Record<string, string> = {
+  SN_MAIN: "0x534e5f4d41494e",
+  SN_SEPOLIA: "0x534e5f5345504f4c4941",
+};
 
 export { type WalletInterface } from "@/wallet/interface";
 export { BaseWallet } from "@/wallet/base";
@@ -204,14 +220,9 @@ export class Wallet extends BaseWallet {
     const timeBounds = options.timeBounds ?? this.defaultTimeBounds;
 
     if (feeMode === "sponsored") {
-      const deploymentData = await this.accountProvider.getDeploymentData();
-      const { transaction_hash } =
-        await this.account.executePaymasterTransaction(
-          [],
-          sponsoredDetails(timeBounds, deploymentData)
-        );
+      const tx = await this.deployPaymasterWith([], timeBounds);
       this.deployedCache = true;
-      return new Tx(transaction_hash, this.provider, this.explorerConfig);
+      return tx;
     }
 
     const classHash = this.accountProvider.getClassHash();
@@ -252,6 +263,138 @@ export class Wallet extends BaseWallet {
     return new Tx(transaction_hash, this.provider, this.explorerConfig);
   }
 
+  private async deployPaymasterWith(
+    calls: Call[],
+    timeBounds?: PaymasterTimeBounds
+  ): Promise<Tx> {
+    const classHash = this.accountProvider.getClassHash();
+
+    // Special handling for Braavos - deploy via factory
+    if (classHash === BraavosPreset.classHash) {
+      return this.deployBraavosViaFactory(calls, timeBounds);
+    }
+
+    // Standard deployment flow
+    const deploymentData = await this.accountProvider.getDeploymentData();
+    const { transaction_hash } = await this.account.executePaymasterTransaction(
+      calls,
+      sponsoredDetails(timeBounds ?? this.defaultTimeBounds, deploymentData)
+    );
+    this.deployedCache = true;
+    return new Tx(transaction_hash, this.provider, this.explorerConfig);
+  }
+
+  /**
+   * Deploy a Braavos account via the Braavos factory.
+   *
+   * This works by:
+   * 1. Deploying a temporary OZ account (same public key) via paymaster
+   * 2. Using that OZ account to call the Braavos factory
+   * 3. The factory deploys the Braavos account
+   */
+  private async deployBraavosViaFactory(
+    calls: Call[],
+    timeBounds?: PaymasterTimeBounds
+  ): Promise<Tx> {
+    const publicKey = await this.accountProvider.getPublicKey();
+    const signer = this.accountProvider.getSigner();
+
+    // Create a temporary OZ account provider for deployment
+    const ozProvider = new AccountProvider(signer, OpenZeppelinPreset);
+    const ozAddress = await ozProvider.getAddress();
+
+    // Check if OZ bootstrap account is already deployed
+    const ozDeployed = await checkDeployed(this.provider, ozAddress);
+
+    // Build Braavos deployment params
+    // Format: [impl_class_hash, ...9 zeros, chain_id, aux_sig_r, aux_sig_s]
+    const chainIdFelt =
+      CHAIN_ID_FELTS[this.chainId] || "0x534e5f5345504f4c4941"; // Default to SN_SEPOLIA
+
+    // Build the aux data to sign: [impl_class_hash, 9 zeros, chain_id]
+    const auxData: string[] = [
+      BRAAVOS_IMPL_CLASS_HASH, // Implementation class hash
+      "0x0",
+      "0x0",
+      "0x0",
+      "0x0",
+      "0x0",
+      "0x0",
+      "0x0",
+      "0x0",
+      "0x0", // 9 zeros for basic account
+      chainIdFelt, // Chain ID
+    ];
+
+    // Hash the aux data with poseidon
+    const auxHash = hash.computePoseidonHashOnElements(auxData);
+
+    // Sign the aux hash
+    const auxSignature = await signer.signRaw(auxHash);
+
+    // Extract r and s from signature (handle both array and ArraySignatureType)
+    const sigArray = Array.isArray(auxSignature)
+      ? auxSignature
+      : [auxSignature.r, auxSignature.s];
+
+    if (!sigArray[0] || !sigArray[1]) {
+      throw new Error("Invalid signature format from signer");
+    }
+
+    // Build the full additional_deployment_params
+    const additionalParams: string[] = [
+      ...auxData,
+      String(sigArray[0]),
+      String(sigArray[1]),
+    ];
+
+    // Build the factory call
+    const factoryCall: Call = {
+      contractAddress: BRAAVOS_FACTORY_ADDRESS,
+      entrypoint: "deploy_braavos_account",
+      calldata: [
+        publicKey,
+        String(additionalParams.length),
+        ...additionalParams,
+      ],
+    };
+
+    // Create starknet.js Account for the OZ bootstrap account
+    const signerAdapter = new SignerAdapter(signer);
+    const paymaster = this.account.paymaster;
+
+    const ozAccount = new Account({
+      provider: this.provider,
+      address: ozAddress,
+      signer: signerAdapter,
+      ...(paymaster && { paymaster }),
+    });
+
+    let transactionHash: string;
+
+    if (ozDeployed) {
+      // OZ is deployed, just call the factory
+      const allCalls = [factoryCall, ...calls];
+      const result = await ozAccount.executePaymasterTransaction(
+        allCalls,
+        sponsoredDetails(timeBounds ?? this.defaultTimeBounds)
+      );
+      transactionHash = result.transaction_hash;
+    } else {
+      // Deploy OZ and call factory in one transaction
+      const ozDeploymentData = await ozProvider.getDeploymentData();
+      const allCalls = [factoryCall, ...calls];
+      const result = await ozAccount.executePaymasterTransaction(
+        allCalls,
+        sponsoredDetails(timeBounds ?? this.defaultTimeBounds, ozDeploymentData)
+      );
+      transactionHash = result.transaction_hash;
+    }
+
+    this.deployedCache = true;
+    return new Tx(transactionHash, this.provider, this.explorerConfig);
+  }
+
   async execute(calls: Call[], options: ExecuteOptions = {}): Promise<Tx> {
     const feeMode = options.feeMode ?? this.defaultFeeMode;
     const timeBounds = options.timeBounds ?? this.defaultTimeBounds;
@@ -261,19 +404,16 @@ export class Wallet extends BaseWallet {
     if (feeMode === "sponsored") {
       // Check if account needs deployment (paymaster can deploy + invoke in one tx)
       const deployed = await this.isDeployed();
-      const deploymentData = deployed
-        ? undefined
-        : await this.accountProvider.getDeploymentData();
-
-      const { transaction_hash } =
-        await this.account.executePaymasterTransaction(
-          calls,
-          sponsoredDetails(timeBounds, deploymentData)
-        );
-      transactionHash = transaction_hash;
+      transactionHash = deployed
+        ? (
+            await this.account.executePaymasterTransaction(
+              calls,
+              sponsoredDetails(timeBounds)
+            )
+          ).transaction_hash
+        : (await this.deployPaymasterWith(calls, timeBounds)).hash;
     } else {
-      const { transaction_hash } = await this.account.execute(calls);
-      transactionHash = transaction_hash;
+      transactionHash = (await this.account.execute(calls)).transaction_hash;
     }
 
     return new Tx(transactionHash, this.provider, this.explorerConfig);
