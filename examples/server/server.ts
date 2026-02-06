@@ -189,9 +189,23 @@ app.post("/api/paymaster", async (req, res) => {
 
 app.get("/api/health", (_, res) => res.json({ status: "ok" }));
 
-app.listen(3001, () => {
+// Keep reference to server to prevent garbage collection
+const server = app.listen(3001, () => {
   console.log("Server running on http://localhost:3001");
   console.log(
     `AVNU Paymaster: ${AVNU_PAYMASTER_URL} (${AVNU_API_KEY ? "sponsored mode" : "gasless mode"})`
   );
+});
+
+// Handle errors
+server.on("error", (err) => {
+  console.error("Server error:", err);
+});
+
+process.on("uncaughtException", (err) => {
+  console.error("Uncaught exception:", err);
+});
+
+process.on("unhandledRejection", (reason) => {
+  console.error("Unhandled rejection:", reason);
 });
