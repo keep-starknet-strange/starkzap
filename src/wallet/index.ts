@@ -216,11 +216,12 @@ export class Wallet implements WalletInterface {
     const publicKey = await this.accountProvider.getPublicKey();
     const constructorCalldata =
       this.accountProvider.getConstructorCalldata(publicKey);
+    const addressSalt = this.accountProvider.getSalt(publicKey);
 
     const estimateFee = await this.account.estimateAccountDeployFee({
       classHash,
       constructorCalldata,
-      addressSalt: publicKey,
+      addressSalt,
     });
 
     const multiply2x = (value: {
@@ -242,7 +243,7 @@ export class Wallet implements WalletInterface {
     };
 
     const { transaction_hash } = await this.account.deployAccount(
-      { classHash, constructorCalldata, addressSalt: publicKey },
+      { classHash, constructorCalldata, addressSalt },
       { resourceBounds }
     );
 
