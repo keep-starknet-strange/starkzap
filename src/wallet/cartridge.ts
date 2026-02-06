@@ -10,16 +10,17 @@ import {
   type WalletAccount,
 } from "starknet";
 import { Tx } from "@/tx";
-import type {
-  DeployOptions,
-  EnsureReadyOptions,
-  ExecuteOptions,
-  FeeMode,
-  PreflightOptions,
-  PreflightResult,
-  ExplorerConfig,
-  ChainId,
+import {
+  type DeployOptions,
+  type EnsureReadyOptions,
+  type ExecuteOptions,
+  type FeeMode,
+  type PreflightOptions,
+  type PreflightResult,
+  type ExplorerConfig,
+  type ChainId,
   fromAddress,
+  type StakingConfig,
 } from "@/types";
 import {
   checkDeployed,
@@ -161,9 +162,9 @@ export class CartridgeWallet extends BaseWallet {
       nodeUrl: options.rpcUrl ?? controller.rpcUrl(),
     });
 
-    // @ts-expect-error This is a preexisting issue with the starknet.js version mismatch and cartridge's starknet.js version.
     return new CartridgeWallet(
       controller,
+      // @ts-expect-error This is a preexisting issue with the starknet.js version mismatch and cartridge's starknet.js version.
       walletAccount,
       provider,
       stakingConfig,

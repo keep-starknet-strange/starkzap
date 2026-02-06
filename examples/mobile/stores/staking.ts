@@ -11,7 +11,6 @@ import {
   type ChainId,
   type WalletInterface,
   type StarkSDK,
-  type Staking,
 } from "x";
 import {
   showTransactionToast,
@@ -42,7 +41,6 @@ export interface StakingPosition {
   validator: Validator;
   token: Token;
   pool: Pool;
-  staking: Staking;
   chainId: ChainId;
   position: PoolMember | null;
   isMember: boolean;
@@ -78,7 +76,6 @@ interface StakingState {
     validatorKey: string,
     validator: Validator,
     pool: Pool,
-    sdk: StarkSDK,
     wallet: WalletInterface,
     chainId: ChainId
   ) => Promise<void>;
@@ -160,7 +157,7 @@ export const useStakingStore = create<StakingState>((set, get) => ({
     set({ validatorPools: null });
   },
 
-  addPosition: async (validatorKey, validator, pool, sdk, wallet, chainId) => {
+  addPosition: async (validatorKey, validator, pool, wallet, chainId) => {
     const key = makePositionKey(validatorKey, pool.token);
 
     // Check if already added
@@ -173,12 +170,6 @@ export const useStakingStore = create<StakingState>((set, get) => ({
     }
 
     try {
-      // Create staking instance for this pool
-      const stakingInstance = await sdk.stakingInPool(
-        pool.poolContract,
-        pool.token
-      );
-
       // Add to positions with loading state
       set((state) => ({
         positions: {
@@ -189,7 +180,6 @@ export const useStakingStore = create<StakingState>((set, get) => ({
             validator,
             token: pool.token,
             pool,
-            staking: stakingInstance,
             chainId,
             position: null,
             isMember: false,
@@ -198,7 +188,7 @@ export const useStakingStore = create<StakingState>((set, get) => ({
         },
       }));
 
-      // Load the position
+      // Load the position using wallet's staking methods
       await get().loadPosition(key, wallet);
     } catch (error) {
       console.error("Failed to add position:", error);
@@ -229,9 +219,10 @@ export const useStakingStore = create<StakingState>((set, get) => ({
     }));
 
     try {
+      const poolAddress = positionData.pool.poolContract;
       const [position, isMember] = await Promise.all([
-        positionData.staking.getPosition(wallet),
-        positionData.staking.isMember(wallet),
+        wallet.getPoolPosition(poolAddress),
+        wallet.isPoolMember(poolAddress),
       ]);
 
       set((state) => ({
@@ -283,8 +274,9 @@ export const useStakingStore = create<StakingState>((set, get) => ({
 
     try {
       const amount = Amount.parse(amountStr, positionData.token);
+      const poolAddress = positionData.pool.poolContract;
 
-      const tx = await positionData.staking.enter(wallet, amount);
+      const tx = await wallet.enterPool(poolAddress, amount);
       addLog(`Stake tx submitted: ${tx.hash.slice(0, 10)}...`);
 
       // Show pending toast
@@ -330,8 +322,9 @@ export const useStakingStore = create<StakingState>((set, get) => ({
 
     try {
       const amount = Amount.parse(amountStr, positionData.token);
+      const poolAddress = positionData.pool.poolContract;
 
-      const tx = await positionData.staking.add(wallet, amount);
+      const tx = await wallet.addToPool(poolAddress, amount);
       addLog(`Add stake tx submitted: ${tx.hash.slice(0, 10)}...`);
 
       // Show pending toast
@@ -376,7 +369,9 @@ export const useStakingStore = create<StakingState>((set, get) => ({
     );
 
     try {
-      const tx = await positionData.staking.claimRewards(wallet);
+      const poolAddress = positionData.pool.poolContract;
+
+      const tx = await wallet.claimPoolRewards(poolAddress);
       addLog(`Claim tx submitted: ${tx.hash.slice(0, 10)}...`);
 
       // Show pending toast
@@ -422,8 +417,9 @@ export const useStakingStore = create<StakingState>((set, get) => ({
 
     try {
       const amount = Amount.parse(amountStr, positionData.token);
+      const poolAddress = positionData.pool.poolContract;
 
-      const tx = await positionData.staking.exitIntent(wallet, amount);
+      const tx = await wallet.exitPoolIntent(poolAddress, amount);
       addLog(`Exit intent tx submitted: ${tx.hash.slice(0, 10)}...`);
 
       // Show pending toast
@@ -468,7 +464,9 @@ export const useStakingStore = create<StakingState>((set, get) => ({
     );
 
     try {
-      const tx = await positionData.staking.exit(wallet);
+      const poolAddress = positionData.pool.poolContract;
+
+      const tx = await wallet.exitPool(poolAddress);
       addLog(`Exit tx submitted: ${tx.hash.slice(0, 10)}...`);
 
       // Show pending toast

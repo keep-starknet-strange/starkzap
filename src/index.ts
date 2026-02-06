@@ -2,7 +2,7 @@
 export { StarkSDK } from "@/sdk";
 
 // Wallet
-export { Wallet, AccountProvider } from "@/wallet";
+export { Wallet, AccountProvider, BaseWallet } from "@/wallet";
 export type { WalletInterface, WalletOptions } from "@/wallet";
 export {
   CartridgeWallet,

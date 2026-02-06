@@ -1,6 +1,5 @@
 import { create } from "zustand";
 import {
-  Erc20,
   sepoliaTokens,
   mainnetTokens,
   type Token,
@@ -41,11 +40,10 @@ export const useBalancesStore = create<BalancesState>((set, get) => ({
     const newBalances = new Map<string, Amount>();
 
     try {
-      // Fetch all balances in parallel
+      // Fetch all balances in parallel using wallet's balanceOf method
       const balancePromises = tokens.map(async (token) => {
         try {
-          const erc20 = new Erc20(token);
-          const balance = await erc20.balanceOf({ wallet });
+          const balance = await wallet.balanceOf(token);
           return { address: token.address, balance };
         } catch (error) {
           console.error(`Failed to fetch balance for ${token.symbol}:`, error);

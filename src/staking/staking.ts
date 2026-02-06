@@ -13,10 +13,10 @@ import {
   type StakingConfig,
   type Token,
 } from "@/types";
-import { ABI as POOL_ABI } from "@resources/abi/pool";
-import { ABI as STAKING_ABI } from "@resources/abi/staking";
-import { ABI as MINTING_CURVE_ABI } from "@resources/abi/minting-curve";
-import { ABI as ERC20_ABI } from "@resources/abi/erc20";
+import { ABI as POOL_ABI } from "@/abi/pool";
+import { ABI as STAKING_ABI } from "@/abi/staking";
+import { ABI as MINTING_CURVE_ABI } from "@/abi/minting-curve";
+import { ABI as ERC20_ABI } from "@/abi/erc20";
 import type { WalletInterface } from "@/wallet";
 import type { Tx } from "@/tx";
 import type { Pool, PoolMember } from "@/types/pool";

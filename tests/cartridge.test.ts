@@ -151,57 +151,6 @@ describe("CartridgeWallet", () => {
     });
   });
 
-  describe("buildSponsored", () => {
-    it("should build a sponsored transaction", async () => {
-      const wallet = await CartridgeWallet.create();
-      const calls = [
-        {
-          contractAddress: "0x123",
-          entrypoint: "transfer",
-          calldata: [],
-        },
-      ];
-
-      const prepared = await wallet.buildSponsored(calls);
-
-      expect(prepared).toBeDefined();
-      expect(prepared.type).toBe("invoke");
-    });
-  });
-
-  describe("signSponsored", () => {
-    it("should sign a prepared transaction", async () => {
-      const wallet = await CartridgeWallet.create();
-      const prepared = {
-        type: "invoke" as const,
-        typed_data: {},
-        fee: { gas_price: "0x1" },
-      };
-
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const executable = await wallet.signSponsored(prepared as any);
-
-      expect(executable).toBeDefined();
-    });
-  });
-
-  describe("prepareSponsored", () => {
-    it("should build and sign in one step", async () => {
-      const wallet = await CartridgeWallet.create();
-      const calls = [
-        {
-          contractAddress: "0x123",
-          entrypoint: "transfer",
-          calldata: [],
-        },
-      ];
-
-      const executable = await wallet.prepareSponsored(calls);
-
-      expect(executable).toBeDefined();
-    });
-  });
-
   describe("preflight", () => {
     it("should return ok for deployed account", async () => {
       const wallet = await CartridgeWallet.create();

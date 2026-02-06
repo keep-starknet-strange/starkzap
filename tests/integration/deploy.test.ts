@@ -15,7 +15,7 @@ describe("Account Deployment (Integration)", () => {
     sdk = new StarkSDK(config);
 
     const devnetProvider = new DevnetProvider({
-      url: config.rpcUrl,
+      url: config.rpcUrl!,
     });
     devnetRunning = await devnetProvider.isAlive();
 

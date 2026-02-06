@@ -2,12 +2,13 @@ import type { WalletInterface } from "@/wallet/interface";
 import {
   type Address,
   Amount,
+  type ChainId,
   type EnsureReadyOptions,
   type ExecuteOptions,
+  type FeeMode,
   type PoolMember,
   type PreflightOptions,
   type PreflightResult,
-  type PrepareOptions,
   type StakingConfig,
   type Token,
 } from "@/types";
@@ -15,8 +16,7 @@ import type { Tx } from "@/tx";
 import type {
   Account,
   Call,
-  ExecutableUserTransaction,
-  PreparedTransaction,
+  EstimateFeeResponseOverhead,
   RpcProvider,
   Signature,
   TypedData,
@@ -125,23 +125,6 @@ export abstract class BaseWallet implements WalletInterface {
   abstract signMessage(typedData: TypedData): Promise<Signature>;
 
   /** @inheritdoc */
-  abstract buildSponsored(
-    calls: Call[],
-    options?: PrepareOptions
-  ): Promise<PreparedTransaction>;
-
-  /** @inheritdoc */
-  abstract signSponsored(
-    prepared: PreparedTransaction
-  ): Promise<ExecutableUserTransaction>;
-
-  /** @inheritdoc */
-  abstract prepareSponsored(
-    calls: Call[],
-    options?: PrepareOptions
-  ): Promise<ExecutableUserTransaction>;
-
-  /** @inheritdoc */
   abstract preflight(options: PreflightOptions): Promise<PreflightResult>;
 
   /** @inheritdoc */
@@ -149,6 +132,18 @@ export abstract class BaseWallet implements WalletInterface {
 
   /** @inheritdoc */
   abstract getProvider(): RpcProvider;
+
+  /** @inheritdoc */
+  abstract getChainId(): ChainId;
+
+  /** @inheritdoc */
+  abstract getFeeMode(): FeeMode;
+
+  /** @inheritdoc */
+  abstract getClassHash(): string;
+
+  /** @inheritdoc */
+  abstract estimateFee(calls: Call[]): Promise<EstimateFeeResponseOverhead>;
 
   /** @inheritdoc */
   abstract disconnect(): Promise<void>;

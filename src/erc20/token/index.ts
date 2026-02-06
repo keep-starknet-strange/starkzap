@@ -3,7 +3,7 @@ import { type Address, type ChainId, getChainId, type Token } from "@/types";
 import { groupBy } from "@/utils";
 import { mainnetTokens } from "@/erc20/token/presets";
 import { sepoliaTokens } from "@/erc20/token/presets.sepolia";
-import { ABI as ERC20_ABI } from "@resources/abi/erc20.js";
+import { ABI as ERC20_ABI } from "@/abi/erc20";
 
 export * from "@/erc20/token/presets";
 export * from "@/erc20/token/presets.sepolia";

@@ -21,7 +21,7 @@ import {
   showTransactionToast,
   updateTransactionToast,
 } from "@/components/Toast";
-import { Erc20, Amount, fromAddress, type Token, type ChainId } from "x";
+import { Amount, fromAddress, type Token, type ChainId } from "x";
 
 /** Get explorer URL for a transaction hash */
 function getExplorerUrl(txHash: string, chainId: ChainId): string {
@@ -173,10 +173,9 @@ export default function TransfersScreen() {
         transfersByToken.set(key, existing);
       }
 
-      // Execute transfers for each token
+      // Execute transfers for each token using wallet's transfer method
       for (const [_, tokenTransfers] of transfersByToken) {
         const token = tokenTransfers[0]!.token!;
-        const erc20 = new Erc20(token);
 
         const transfersData = tokenTransfers.map((t) => ({
           to: fromAddress(t.toAddress),
@@ -187,10 +186,7 @@ export default function TransfersScreen() {
           `Transferring ${token.symbol} to ${transfersData.length} recipient(s)...`
         );
 
-        const tx = await erc20.transfer({
-          from: wallet,
-          transfers: transfersData,
-        });
+        const tx = await wallet.transfer(token, transfersData);
 
         addLog(`Transfer tx submitted: ${tx.hash.slice(0, 10)}...`);
 

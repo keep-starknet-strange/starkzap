@@ -5,8 +5,7 @@
     "outDir": "dist",
     "baseUrl": ".",
     "paths": {
-      "@/*": ["src/*"],
-      "@resources/*": ["resources/*"]
+      "@/*": ["src/*"]
     },
     // Module Settings
     "module": "esnext",
@@ -29,6 +28,6 @@
     // Performance
     "skipLibCheck": true
   },
-  "include": ["src/**/*", "resources/**/*"],
+  "include": ["src/**/*"],
   "exclude": ["node_modules", "dist"]
 }

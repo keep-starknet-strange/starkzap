@@ -23,7 +23,7 @@ import type {
   SDKConfig,
   ExplorerConfig,
   ChainId,
-  StakingConfig
+  StakingConfig,
 } from "@/types";
 import {
   checkDeployed,
@@ -34,6 +34,7 @@ import {
 import { BaseWallet } from "@/wallet/base";
 
 export { type WalletInterface } from "@/wallet/interface";
+export { BaseWallet } from "@/wallet/base";
 export { AccountProvider } from "@/wallet/accounts/provider";
 
 /**
@@ -85,7 +86,7 @@ interface WalletInternals {
   explorerConfig?: ExplorerConfig;
   defaultFeeMode: FeeMode;
   defaultTimeBounds?: PaymasterTimeBounds;
-  stakingConfig?: StakingConfig
+  stakingConfig: StakingConfig | undefined;
 }
 
 export class Wallet extends BaseWallet {
@@ -101,7 +102,7 @@ export class Wallet extends BaseWallet {
   private deployedCache: boolean | null = null;
 
   private constructor(options: WalletInternals) {
-    super(address, options.stakingConfig);
+    super(options.address, options.stakingConfig);
     this.accountProvider = options.accountProvider;
     this.account = options.account;
     this.provider = options.provider;
@@ -177,7 +178,7 @@ export class Wallet extends BaseWallet {
       ...(config.explorer && { explorerConfig: config.explorer }),
       defaultFeeMode: feeMode,
       ...(timeBounds && { defaultTimeBounds: timeBounds }),
-      stakingConfig: options.config.staking
+      stakingConfig: options.config.staking,
     });
   }
 

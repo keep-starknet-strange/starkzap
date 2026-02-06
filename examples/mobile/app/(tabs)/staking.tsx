@@ -113,15 +113,13 @@ export default function StakingScreen() {
 
   const handleSelectPool = useCallback(
     async (pool: Pool) => {
-      if (!sdk || !wallet || !selectedValidatorKey || !selectedValidator)
-        return;
+      if (!wallet || !selectedValidatorKey || !selectedValidator) return;
 
       setShowPoolPicker(false);
       await addPosition(
         selectedValidatorKey,
         selectedValidator,
         pool,
-        sdk,
         wallet,
         chainId
       );
@@ -130,7 +128,6 @@ export default function StakingScreen() {
       setSelectedValidator(null);
     },
     [
-      sdk,
       wallet,
       selectedValidatorKey,
       selectedValidator,
