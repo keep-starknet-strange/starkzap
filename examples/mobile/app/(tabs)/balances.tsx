@@ -10,6 +10,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { router } from "expo-router";
 import * as Clipboard from "expo-clipboard";
+import { usePrivy } from "@privy-io/expo";
 
 import { ThemedText } from "@/components/themed-text";
 import { TokenBalance } from "@/components/TokenBalance";
@@ -21,7 +22,9 @@ import type { Token } from "x";
 const BATCH_SIZE = 20;
 
 export default function BalancesScreen() {
-  const { wallet, chainId, disconnect, resetNetworkConfig } = useWalletStore();
+  const { wallet, chainId, walletType, disconnect, resetNetworkConfig } =
+    useWalletStore();
+  const { logout } = usePrivy();
   const { balances, isLoading, fetchBalances, getBalance, clearBalances } =
     useBalancesStore();
 
@@ -51,12 +54,15 @@ export default function BalancesScreen() {
     }
   }, [wallet, chainId, fetchBalances]);
 
-  const handleDisconnect = useCallback(() => {
+  const handleDisconnect = useCallback(async () => {
     clearBalances();
+    if (walletType === "privy") {
+      await logout();
+    }
     disconnect();
     resetNetworkConfig();
     router.replace("/");
-  }, [clearBalances, disconnect, resetNetworkConfig]);
+  }, [clearBalances, disconnect, resetNetworkConfig, walletType, logout]);
 
   const handleCopyAddress = useCallback(async () => {
     if (wallet) {
