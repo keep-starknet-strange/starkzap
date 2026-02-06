@@ -191,7 +191,9 @@ app.get("/api/health", (_, res) => res.json({ status: "ok" }));
 
 // Keep reference to server to prevent garbage collection
 const server = app.listen(3001, () => {
-  console.log("Server running on http://localhost:3001");
+  console.log(
+    "Server running on http://localhost:3001 . Update your client's .env accordingly."
+  );
   console.log(
     `AVNU Paymaster: ${AVNU_PAYMASTER_URL} (${AVNU_API_KEY ? "sponsored mode" : "gasless mode"})`
   );

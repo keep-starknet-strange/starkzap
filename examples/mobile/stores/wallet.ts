@@ -20,8 +20,7 @@ import {
 } from "@/components/Toast";
 
 // Privy server URL - change this to your server URL
-// For Expo Go: use your machine's local IP (not localhost)
-export const PRIVY_SERVER_URL = "http://127.0.0.1:3001/";
+export const PRIVY_SERVER_URL = process.env.EXPO_PUBLIC_PRIVY_SERVER_URL ?? "";
 
 /** Get explorer URL for a transaction hash */
 function getExplorerUrl(txHash: string, chainId: ChainId): string {
