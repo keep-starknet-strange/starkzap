@@ -1,10 +1,9 @@
 import {
   Account,
   RpcProvider,
+  PaymasterRpc,
   type Call,
-  type ExecutableUserTransaction,
   type PaymasterTimeBounds,
-  type PreparedTransaction,
   type TypedData,
   type Signature,
 } from "starknet";
@@ -14,22 +13,21 @@ import { SignerAdapter } from "@/signer";
 import type { SignerInterface } from "@/signer";
 import type {
   AccountClassConfig,
+  DeployOptions,
   EnsureReadyOptions,
   ExecuteOptions,
   FeeMode,
   PreflightOptions,
   PreflightResult,
-  PrepareOptions,
 } from "@/types";
-import type { SDKConfig, ExplorerConfig } from "@/types";
+import type { SDKConfig, ExplorerConfig, ChainId } from "@/types";
 import { Address } from "@/types";
 import type { WalletInterface } from "@/wallet/interface";
 import {
   checkDeployed,
   ensureWalletReady,
-  executeWithFeeMode,
   preflightTransaction,
-  buildSponsoredTransaction,
+  sponsoredDetails,
 } from "@/wallet/utils";
 
 export { type WalletInterface } from "@/wallet/interface";
@@ -74,32 +72,41 @@ export interface WalletOptions {
  * });
  * ```
  */
+/** Internal options for Wallet constructor */
+interface WalletInternals {
+  address: Address;
+  accountProvider: AccountProvider;
+  account: Account;
+  provider: RpcProvider;
+  chainId: ChainId;
+  explorerConfig?: ExplorerConfig;
+  defaultFeeMode: FeeMode;
+  defaultTimeBounds?: PaymasterTimeBounds;
+}
+
 export class Wallet implements WalletInterface {
   readonly address: Address;
 
   private readonly provider: RpcProvider;
   private readonly account: Account;
   private readonly accountProvider: AccountProvider;
+  private readonly chainId: ChainId;
   private readonly explorerConfig: ExplorerConfig | undefined;
   private readonly defaultFeeMode: FeeMode;
   private readonly defaultTimeBounds: PaymasterTimeBounds | undefined;
 
-  private constructor(
-    address: Address,
-    accountProvider: AccountProvider,
-    account: Account,
-    provider: RpcProvider,
-    explorerConfig: ExplorerConfig | undefined,
-    defaultFeeMode: FeeMode,
-    defaultTimeBounds: PaymasterTimeBounds | undefined
-  ) {
-    this.address = address;
-    this.accountProvider = accountProvider;
-    this.account = account;
-    this.provider = provider;
-    this.explorerConfig = explorerConfig;
-    this.defaultFeeMode = defaultFeeMode;
-    this.defaultTimeBounds = defaultTimeBounds;
+  /** Cached deployment status (null = not checked yet) */
+  private deployedCache: boolean | null = null;
+
+  private constructor(options: WalletInternals) {
+    this.address = options.address;
+    this.accountProvider = options.accountProvider;
+    this.account = options.account;
+    this.provider = options.provider;
+    this.chainId = options.chainId;
+    this.explorerConfig = options.explorerConfig;
+    this.defaultFeeMode = options.defaultFeeMode;
+    this.defaultTimeBounds = options.defaultTimeBounds;
   }
 
   /**
@@ -148,33 +155,63 @@ export class Wallet implements WalletInterface {
 
     // Create starknet.js Account with our signer adapter
     const signerAdapter = new SignerAdapter(signer);
+
+    // Create PaymasterRpc instance if paymaster config is provided
+    const paymaster = config.paymaster
+      ? new PaymasterRpc(config.paymaster)
+      : undefined;
+
     const account = new Account({
       provider,
       address,
       signer: signerAdapter,
-      ...(config.paymaster && { paymaster: config.paymaster }),
+      ...(paymaster && { paymaster }),
     });
 
-    return new Wallet(
+    return new Wallet({
       address,
       accountProvider,
       account,
       provider,
-      config.explorer,
-      feeMode,
-      timeBounds
-    );
+      chainId: config.chainId!,
+      ...(config.explorer && { explorerConfig: config.explorer }),
+      defaultFeeMode: feeMode,
+      ...(timeBounds && { defaultTimeBounds: timeBounds }),
+    });
   }
 
   async isDeployed(): Promise<boolean> {
-    return checkDeployed(this.provider, this.address);
+    // Return cached result if we know it's deployed
+    if (this.deployedCache === true) {
+      return true;
+    }
+
+    const deployed = await checkDeployed(this.provider, this.address);
+    if (deployed) {
+      this.deployedCache = true;
+    }
+    return deployed;
   }
 
   async ensureReady(options: EnsureReadyOptions = {}): Promise<void> {
     return ensureWalletReady(this, options);
   }
 
-  async deploy(): Promise<Tx> {
+  async deploy(options: DeployOptions = {}): Promise<Tx> {
+    const feeMode = options.feeMode ?? this.defaultFeeMode;
+    const timeBounds = options.timeBounds ?? this.defaultTimeBounds;
+
+    if (feeMode === "sponsored") {
+      const deploymentData = await this.accountProvider.getDeploymentData();
+      const { transaction_hash } =
+        await this.account.executePaymasterTransaction(
+          [],
+          sponsoredDetails(timeBounds, deploymentData)
+        );
+      this.deployedCache = true;
+      return new Tx(transaction_hash, this.provider, this.explorerConfig);
+    }
+
     const classHash = this.accountProvider.getClassHash();
     const publicKey = await this.accountProvider.getPublicKey();
     const constructorCalldata =
@@ -186,24 +223,22 @@ export class Wallet implements WalletInterface {
       addressSalt: publicKey,
     });
 
-    const multiply2x = (value: unknown): bigint =>
-      BigInt(String(value ?? 0)) * 2n;
+    const multiply2x = (value: {
+      max_amount: bigint;
+      max_price_per_unit: bigint;
+    }): { max_amount: bigint; max_price_per_unit: bigint } => {
+      return {
+        max_amount: value.max_amount * 2n,
+        max_price_per_unit: value.max_price_per_unit * 2n,
+      };
+    };
 
     const { l1_gas, l2_gas, l1_data_gas } = estimateFee.resourceBounds;
 
     const resourceBounds = {
-      l1_gas: {
-        max_amount: multiply2x(l1_gas.max_amount),
-        max_price_per_unit: multiply2x(l1_gas.max_price_per_unit),
-      },
-      l2_gas: {
-        max_amount: multiply2x(l2_gas.max_amount),
-        max_price_per_unit: multiply2x(l2_gas.max_price_per_unit),
-      },
-      l1_data_gas: {
-        max_amount: multiply2x(l1_data_gas?.max_amount),
-        max_price_per_unit: multiply2x(l1_data_gas?.max_price_per_unit),
-      },
+      l1_gas: multiply2x(l1_gas),
+      l2_gas: multiply2x(l2_gas),
+      l1_data_gas: multiply2x(l1_data_gas),
     };
 
     const { transaction_hash } = await this.account.deployAccount(
@@ -211,6 +246,7 @@ export class Wallet implements WalletInterface {
       { resourceBounds }
     );
 
+    this.deployedCache = true;
     return new Tx(transaction_hash, this.provider, this.explorerConfig);
   }
 
@@ -218,44 +254,31 @@ export class Wallet implements WalletInterface {
     const feeMode = options.feeMode ?? this.defaultFeeMode;
     const timeBounds = options.timeBounds ?? this.defaultTimeBounds;
 
-    return executeWithFeeMode(
-      this.account,
-      calls,
-      feeMode,
-      timeBounds,
-      this.provider,
-      this.explorerConfig
-    );
+    let transactionHash: string;
+
+    if (feeMode === "sponsored") {
+      // Check if account needs deployment (paymaster can deploy + invoke in one tx)
+      const deployed = await this.isDeployed();
+      const deploymentData = deployed
+        ? undefined
+        : await this.accountProvider.getDeploymentData();
+
+      const { transaction_hash } =
+        await this.account.executePaymasterTransaction(
+          calls,
+          sponsoredDetails(timeBounds, deploymentData)
+        );
+      transactionHash = transaction_hash;
+    } else {
+      const { transaction_hash } = await this.account.execute(calls);
+      transactionHash = transaction_hash;
+    }
+
+    return new Tx(transactionHash, this.provider, this.explorerConfig);
   }
 
   async signMessage(typedData: TypedData): Promise<Signature> {
     return this.account.signMessage(typedData);
-  }
-
-  async buildSponsored(
-    calls: Call[],
-    options: PrepareOptions = {}
-  ): Promise<PreparedTransaction> {
-    const timeBounds = options.timeBounds ?? this.defaultTimeBounds;
-    return buildSponsoredTransaction(
-      this.account,
-      calls,
-      timeBounds
-    ) as Promise<PreparedTransaction>;
-  }
-
-  async signSponsored(
-    prepared: PreparedTransaction
-  ): Promise<ExecutableUserTransaction> {
-    return this.account.preparePaymasterTransaction(prepared);
-  }
-
-  async prepareSponsored(
-    calls: Call[],
-    options: PrepareOptions = {}
-  ): Promise<ExecutableUserTransaction> {
-    const prepared = await this.buildSponsored(calls, options);
-    return this.signSponsored(prepared);
   }
 
   async preflight(options: PreflightOptions): Promise<PreflightResult> {
@@ -268,6 +291,42 @@ export class Wallet implements WalletInterface {
 
   getProvider(): RpcProvider {
     return this.provider;
+  }
+
+  /**
+   * Get the chain ID this wallet is connected to.
+   */
+  getChainId(): ChainId {
+    return this.chainId;
+  }
+
+  /**
+   * Get the default fee mode for this wallet.
+   */
+  getFeeMode(): FeeMode {
+    return this.defaultFeeMode;
+  }
+
+  /**
+   * Get the account class hash.
+   */
+  getClassHash(): string {
+    return this.accountProvider.getClassHash();
+  }
+
+  /**
+   * Estimate the fee for executing calls.
+   *
+   * @example
+   * ```ts
+   * const fee = await wallet.estimateFee([
+   *   { contractAddress: "0x...", entrypoint: "transfer", calldata: [...] }
+   * ]);
+   * console.log(`Estimated fee: ${fee.overall_fee}`);
+   * ```
+   */
+  async estimateFee(calls: Call[]) {
+    return this.account.estimateInvokeFee(calls);
   }
 
   async disconnect(): Promise<void> {

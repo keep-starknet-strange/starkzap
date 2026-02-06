@@ -1,4 +1,5 @@
 import type { PaymasterOptions } from "starknet";
+import type { NetworkPreset, NetworkName } from "@/network";
 
 /** Supported Starknet chain identifiers */
 export type ChainId = "SN_MAIN" | "SN_SEPOLIA";
@@ -28,30 +29,38 @@ export interface ExplorerConfig {
 /**
  * Main configuration for the StarkSDK.
  *
- * Sponsored transactions use AVNU's paymaster (built into starknet.js).
- * You can optionally configure a custom paymaster endpoint.
+ * You can configure using a network preset or custom rpcUrl/chainId.
  *
  * @example
  * ```ts
- * // Basic config (uses default AVNU paymaster for sponsored txs)
+ * // Using a network preset (recommended)
+ * const sdk = new StarkSDK({ network: "mainnet" });
+ * const sdk = new StarkSDK({ network: "sepolia" });
+ *
+ * // Using a preset object directly
+ * import { networks } from "x";
+ * const sdk = new StarkSDK({ network: networks.mainnet });
+ *
+ * // Custom configuration
  * const sdk = new StarkSDK({
- *   rpcUrl: "https://starknet-mainnet.infura.io/v3/YOUR_KEY",
+ *   rpcUrl: "https://my-rpc.example.com",
  *   chainId: "SN_MAIN",
  * });
  *
  * // With custom paymaster endpoint
  * const sdk = new StarkSDK({
- *   rpcUrl: "https://starknet-mainnet.infura.io/v3/YOUR_KEY",
- *   chainId: "SN_MAIN",
+ *   network: "sepolia",
  *   paymaster: { nodeUrl: "https://custom-paymaster.example.com" },
  * });
  * ```
  */
 export interface SDKConfig {
-  /** Starknet JSON-RPC endpoint URL */
-  rpcUrl: string;
-  /** Target chain (mainnet or testnet) */
-  chainId: ChainId;
+  /** Use a network preset (e.g., "mainnet", "sepolia", or a NetworkPreset object) */
+  network?: NetworkName | NetworkPreset;
+  /** Starknet JSON-RPC endpoint URL (overrides network preset) */
+  rpcUrl?: string;
+  /** Target chain (overrides network preset) */
+  chainId?: ChainId;
   /** Optional: custom paymaster config (default: AVNU paymaster) */
   paymaster?: PaymasterOptions;
   /** Optional: configures how explorer URLs are built */

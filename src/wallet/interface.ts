@@ -1,20 +1,21 @@
 import type {
   Account,
   Call,
+  EstimateFeeResponseOverhead,
   RpcProvider,
   TypedData,
   Signature,
-  PreparedTransaction,
-  ExecutableUserTransaction,
 } from "starknet";
 import type { Tx } from "@/tx";
 import type {
   Address,
+  ChainId,
+  DeployOptions,
   EnsureReadyOptions,
   ExecuteOptions,
+  FeeMode,
   PreflightOptions,
   PreflightResult,
-  PrepareOptions,
 } from "@/types";
 
 /**
@@ -58,8 +59,10 @@ export interface WalletInterface {
   /**
    * Deploy the account contract.
    * Returns a Tx object to track the deployment.
+   *
+   * @param options.feeMode - How to pay for deployment ("user_pays" or "sponsored")
    */
-  deploy(): Promise<Tx>;
+  deploy(options?: DeployOptions): Promise<Tx>;
 
   /**
    * Execute one or more contract calls.
@@ -72,32 +75,6 @@ export interface WalletInterface {
    * Returns the signature.
    */
   signMessage(typedData: TypedData): Promise<Signature>;
-
-  /**
-   * Build a sponsored transaction for the paymaster.
-   * Returns the prepared transaction with typed data and fee estimate.
-   */
-  buildSponsored(
-    calls: Call[],
-    options?: PrepareOptions
-  ): Promise<PreparedTransaction>;
-
-  /**
-   * Sign a prepared sponsored transaction.
-   * Returns the executable transaction ready to be relayed.
-   */
-  signSponsored(
-    prepared: PreparedTransaction
-  ): Promise<ExecutableUserTransaction>;
-
-  /**
-   * Build and sign a sponsored transaction in one step.
-   * Returns the executable transaction ready to be relayed.
-   */
-  prepareSponsored(
-    calls: Call[],
-    options?: PrepareOptions
-  ): Promise<ExecutableUserTransaction>;
 
   /**
    * Simulate a transaction to check if it would succeed.
@@ -115,6 +92,26 @@ export interface WalletInterface {
    * Use this for read-only operations like balance queries.
    */
   getProvider(): RpcProvider;
+
+  /**
+   * Get the chain ID this wallet is connected to.
+   */
+  getChainId(): ChainId;
+
+  /**
+   * Get the default fee mode for this wallet.
+   */
+  getFeeMode(): FeeMode;
+
+  /**
+   * Get the account class hash.
+   */
+  getClassHash(): string;
+
+  /**
+   * Estimate the fee for executing calls.
+   */
+  estimateFee(calls: Call[]): Promise<EstimateFeeResponseOverhead>;
 
   /**
    * Disconnect the wallet and clean up resources.

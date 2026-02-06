@@ -3,14 +3,27 @@ import type { SignerInterface } from "@/signer/interface";
 
 /**
  * Configuration for the Privy signer.
+ *
+ * You can either provide:
+ * - `serverUrl`: URL to your backend's sign endpoint (simpler)
+ * - `rawSign`: Custom signing function (flexible)
  */
 export interface PrivySignerConfig {
   /** Privy wallet ID */
   walletId: string;
   /** Public key returned by Privy when creating the wallet */
   publicKey: string;
-  /** Function to call Privy's rawSign endpoint */
-  rawSign: (walletId: string, messageHash: string) => Promise<string>;
+  /**
+   * URL to your backend's sign endpoint.
+   * The signer will POST { walletId, hash } and expect { signature } back.
+   * @example "https://my-server.com/api/wallet/sign"
+   */
+  serverUrl?: string;
+  /**
+   * Custom function to call Privy's rawSign.
+   * Use this for server-side signing with PrivyClient directly.
+   */
+  rawSign?: (walletId: string, messageHash: string) => Promise<string>;
 }
 
 /**
@@ -38,19 +51,14 @@ function parsePrivySignature(signature: string): Signature {
  *
  * @example
  * ```ts
- * import { PrivyClient } from '@privy-io/node';
- *
- * const privyClient = new PrivyClient({
- *   appId: process.env.PRIVY_APP_ID,
- *   appSecret: process.env.PRIVY_APP_SECRET
+ * // Option 1: Simple - provide your backend URL (recommended for mobile/web)
+ * const signer = new PrivySigner({
+ *   walletId: wallet.id,
+ *   publicKey: wallet.public_key,
+ *   serverUrl: "https://my-server.com/api/wallet/sign",
  * });
  *
- * // Create a Starknet wallet for a user
- * const wallet = await privyClient.wallets().create({
- *   chain_type: 'starknet'
- * });
- *
- * // Create the signer
+ * // Option 2: Custom signing function (for server-side with PrivyClient)
  * const signer = new PrivySigner({
  *   walletId: wallet.id,
  *   publicKey: wallet.public_key,
@@ -65,10 +73,7 @@ function parsePrivySignature(signature: string): Signature {
  * // Use with the SDK
  * const sdk = new StarkSDK({ rpcUrl: '...', chainId: 'SN_SEPOLIA' });
  * const wallet = await sdk.connectWallet({
- *   account: {
- *     signer,
- *     accountClass: ArgentXV050Preset,
- *   }
+ *   account: { signer, accountClass: ArgentPreset }
  * });
  * ```
  */
@@ -81,9 +86,33 @@ export class PrivySigner implements SignerInterface {
   ) => Promise<string>;
 
   constructor(config: PrivySignerConfig) {
+    if (!config.serverUrl && !config.rawSign) {
+      throw new Error("PrivySigner requires either serverUrl or rawSign");
+    }
+
     this.walletId = config.walletId;
     this.publicKey = config.publicKey;
-    this.rawSignFn = config.rawSign;
+
+    // Use provided rawSign or create one from serverUrl
+    this.rawSignFn = config.rawSign ?? this.defaultRawSignFn(config.serverUrl!);
+  }
+
+  private defaultRawSignFn(serverUrl: string) {
+    return async (walletId: string, hash: string): Promise<string> => {
+      const response = await fetch(serverUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ walletId, hash }),
+      });
+
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({}));
+        throw new Error(err.details || err.error || "Privy signing failed");
+      }
+
+      const { signature } = await response.json();
+      return signature;
+    };
   }
 
   async getPubKey(): Promise<string> {

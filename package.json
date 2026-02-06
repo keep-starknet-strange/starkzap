@@ -19,6 +19,21 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
+    },
+    "./polyfills": {
+      "types": "./dist/polyfills.d.ts",
+      "import": "./dist/polyfills.js"
+    }
+  },
+  "peerDependenciesMeta": {
+    "react-native-get-random-values": {
+      "optional": true
+    },
+    "fast-text-encoding": {
+      "optional": true
+    },
+    "@ethersproject/shims": {
+      "optional": true
     }
   },
   "files": [

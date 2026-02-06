@@ -30,3 +30,4 @@ coverage/
 # Env variables
 .env
 *.pem
+wallets.json

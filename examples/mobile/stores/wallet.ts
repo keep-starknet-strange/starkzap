@@ -3,34 +3,30 @@ import { Alert } from "react-native";
 import {
   StarkSDK,
   StarkSigner,
+  PrivySigner,
   OpenZeppelinPreset,
   ArgentPreset,
+  ArgentXV050Preset,
   BraavosPreset,
   DevnetPreset,
+  Amount,
+  getErc20,
+  networks,
+  type NetworkPreset,
   type WalletInterface,
   type AccountClassConfig,
   type ChainId,
+  type ExecuteOptions,
 } from "x";
 
-// Network configuration type
-export interface NetworkConfig {
-  name: string;
-  chainId: ChainId;
-  rpcUrl: string;
-}
+// Privy server URL - change this to your server URL
+// For Expo Go: use your machine's local IP (not localhost)
+export const PRIVY_SERVER_URL = "http://192.168.1.222:3001";
 
-// Available network presets
-export const NETWORKS: NetworkConfig[] = [
-  {
-    name: "Sepolia",
-    chainId: "SN_SEPOLIA",
-    rpcUrl: "https://api.cartridge.gg/x/starknet/sepolia/rpc/v0_9",
-  },
-  {
-    name: "Mainnet",
-    chainId: "SN_MAIN",
-    rpcUrl: "https://api.cartridge.gg/x/starknet/mainnet/rpc/v0_9",
-  },
+// Available networks (using SDK presets)
+export const NETWORKS: { name: string; preset: NetworkPreset }[] = [
+  { name: "Sepolia", preset: networks.sepolia },
+  { name: "Mainnet", preset: networks.mainnet },
 ];
 
 // Default network (index into NETWORKS array, or null for custom)
@@ -40,9 +36,13 @@ export const DEFAULT_NETWORK_INDEX = 0;
 export const PRESETS: Record<string, AccountClassConfig> = {
   OpenZeppelin: OpenZeppelinPreset,
   Argent: ArgentPreset,
+  "ArgentX v0.5": ArgentXV050Preset,
   Braavos: BraavosPreset,
   Devnet: DevnetPreset,
 };
+
+// Wallet connection type
+type WalletType = "privatekey" | "privy";
 
 interface WalletState {
   // SDK configuration
@@ -60,13 +60,24 @@ interface WalletState {
   privateKey: string;
   selectedPreset: string;
 
+  // Privy form state
+  privyEmail: string;
+  privySelectedPreset: string;
+  privyWalletId: string | null;
+
+  // Paymaster state
+  useSponsored: boolean;
+  setUseSponsored: (value: boolean) => void;
+
   // Wallet state
   wallet: WalletInterface | null;
+  walletType: WalletType | null;
   isDeployed: boolean | null;
 
   // Loading states
   isConnecting: boolean;
   isCheckingStatus: boolean;
+  isTransferring: boolean;
 
   // Logs
   logs: string[];
@@ -82,23 +93,50 @@ interface WalletState {
   // Actions
   setPrivateKey: (key: string) => void;
   setSelectedPreset: (preset: string) => void;
+  setPrivySelectedPreset: (preset: string) => void;
   addLog: (message: string) => void;
   connect: () => Promise<void>;
+  connectWithPrivy: (
+    walletId: string,
+    publicKey: string,
+    email: string,
+    accessToken: string
+  ) => Promise<void>;
   disconnect: () => void;
   checkDeploymentStatus: () => Promise<void>;
   deploy: () => Promise<void>;
+  testTransfer: () => Promise<void>;
 }
 
-const truncateAddress = (address: string) => {
-  return `${address.slice(0, 6)}...${address.slice(-4)}`;
-};
+const truncateAddress = (address: string) =>
+  `${address.slice(0, 6)}...${address.slice(-4)}`;
 
 const defaultNetwork = NETWORKS[DEFAULT_NETWORK_INDEX];
 
+/** Register account address with backend for persistence */
+async function registerAccount(
+  preset: string,
+  address: string,
+  token: string
+): Promise<void> {
+  try {
+    await fetch(`${PRIVY_SERVER_URL}/api/wallet/register-account`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ preset, address, deployed: false }),
+    });
+  } catch (err) {
+    console.warn("Failed to register account:", err);
+  }
+}
+
 export const useWalletStore = create<WalletState>((set, get) => ({
   // SDK configuration - starts unconfigured
-  rpcUrl: defaultNetwork.rpcUrl,
-  chainId: defaultNetwork.chainId,
+  rpcUrl: defaultNetwork.preset.rpcUrl,
+  chainId: defaultNetwork.preset.chainId,
   sdk: null,
   isConfigured: false,
   selectedNetworkIndex: DEFAULT_NETWORK_INDEX,
@@ -110,10 +148,22 @@ export const useWalletStore = create<WalletState>((set, get) => ({
   // Initial state
   privateKey: "",
   selectedPreset: "OpenZeppelin",
+
+  // Privy state
+  privyEmail: "",
+  privySelectedPreset: "Argent",
+  privyWalletId: null,
+
+  // Paymaster state
+  useSponsored: false,
+
+  // Wallet state
   wallet: null,
+  walletType: null,
   isDeployed: null,
   isConnecting: false,
   isCheckingStatus: false,
+  isTransferring: false,
   logs: [],
 
   // Network configuration actions
@@ -122,8 +172,8 @@ export const useWalletStore = create<WalletState>((set, get) => ({
     if (network) {
       set({
         selectedNetworkIndex: index,
-        rpcUrl: network.rpcUrl,
-        chainId: network.chainId,
+        rpcUrl: network.preset.rpcUrl,
+        chainId: network.preset.chainId,
       });
     }
   },
@@ -136,16 +186,24 @@ export const useWalletStore = create<WalletState>((set, get) => ({
 
   setCustomChainId: (chainId) => set({ customChainId: chainId }),
 
+  setUseSponsored: (value) => set({ useSponsored: value }),
+
   confirmNetworkConfig: () => {
     const { selectedNetworkIndex, customRpcUrl, customChainId, addLog } = get();
 
+    let newSdk: StarkSDK;
     let rpcUrl: string;
     let chainId: ChainId;
 
     if (selectedNetworkIndex !== null) {
+      // Use SDK network preset
       const network = NETWORKS[selectedNetworkIndex];
-      rpcUrl = network.rpcUrl;
-      chainId = network.chainId;
+      rpcUrl = network.preset.rpcUrl;
+      chainId = network.preset.chainId;
+      newSdk = new StarkSDK({
+        network: network.preset,
+        paymaster: { nodeUrl: `${PRIVY_SERVER_URL}/api/paymaster` },
+      });
     } else {
       // Custom network
       if (!customRpcUrl.trim()) {
@@ -154,9 +212,13 @@ export const useWalletStore = create<WalletState>((set, get) => ({
       }
       rpcUrl = customRpcUrl.trim();
       chainId = customChainId;
+      newSdk = new StarkSDK({
+        rpcUrl,
+        chainId,
+        paymaster: { nodeUrl: `${PRIVY_SERVER_URL}/api/paymaster` },
+      });
     }
 
-    const newSdk = new StarkSDK({ rpcUrl, chainId });
     set({
       sdk: newSdk,
       rpcUrl,
@@ -176,11 +238,14 @@ export const useWalletStore = create<WalletState>((set, get) => ({
       sdk: null,
       isConfigured: false,
       wallet: null,
+      walletType: null,
       isDeployed: null,
       privateKey: "",
+      privyEmail: "",
+      privyWalletId: null,
       selectedNetworkIndex: DEFAULT_NETWORK_INDEX,
-      rpcUrl: defaultNetwork.rpcUrl,
-      chainId: defaultNetwork.chainId,
+      rpcUrl: defaultNetwork.preset.rpcUrl,
+      chainId: defaultNetwork.preset.chainId,
     });
     addLog("Network configuration reset");
   },
@@ -189,6 +254,8 @@ export const useWalletStore = create<WalletState>((set, get) => ({
   setPrivateKey: (key) => set({ privateKey: key }),
 
   setSelectedPreset: (preset) => set({ selectedPreset: preset }),
+
+  setPrivySelectedPreset: (preset) => set({ privySelectedPreset: preset }),
 
   addLog: (message) =>
     set((state) => ({
@@ -223,7 +290,7 @@ export const useWalletStore = create<WalletState>((set, get) => ({
         },
       });
 
-      set({ wallet: connectedWallet });
+      set({ wallet: connectedWallet, walletType: "privatekey" });
       addLog(`Connected: ${truncateAddress(connectedWallet.address)}`);
 
       // Check deployment status after connecting
@@ -236,14 +303,71 @@ export const useWalletStore = create<WalletState>((set, get) => ({
     }
   },
 
+  connectWithPrivy: async (
+    walletId: string,
+    publicKey: string,
+    email: string,
+    accessToken: string
+  ) => {
+    const { privySelectedPreset, sdk, addLog } = get();
+
+    if (!sdk) {
+      Alert.alert(
+        "Error",
+        "SDK not configured. Please configure network first."
+      );
+      return;
+    }
+
+    set({ isConnecting: true, privyEmail: email });
+    addLog(`Connecting with Privy (${email})...`);
+
+    try {
+      set({ privyWalletId: walletId });
+
+      const signer = new PrivySigner({
+        walletId,
+        publicKey,
+        serverUrl: `${PRIVY_SERVER_URL}/api/wallet/sign`,
+      });
+
+      const connectedWallet = await sdk.connectWallet({
+        account: {
+          signer,
+          accountClass: PRESETS[privySelectedPreset],
+        },
+      });
+
+      set({ wallet: connectedWallet, walletType: "privy" });
+      addLog(`Connected: ${truncateAddress(connectedWallet.address)}`);
+
+      // Register account with backend for persistence
+      await registerAccount(
+        privySelectedPreset,
+        connectedWallet.address,
+        accessToken
+      );
+
+      // Check deployment status
+      await get().checkDeploymentStatus();
+    } catch (err) {
+      addLog(`Privy connection failed: ${err}`);
+      Alert.alert("Connection Failed", String(err));
+    } finally {
+      set({ isConnecting: false });
+    }
+  },
+
   disconnect: () => {
-    const { addLog } = get();
     set({
       wallet: null,
+      walletType: null,
       isDeployed: null,
       privateKey: "",
+      privyEmail: "",
+      privyWalletId: null,
     });
-    addLog("Disconnected");
+    get().addLog("Disconnected");
   },
 
   checkDeploymentStatus: async () => {
@@ -263,26 +387,57 @@ export const useWalletStore = create<WalletState>((set, get) => ({
   },
 
   deploy: async () => {
-    const { wallet, addLog, checkDeploymentStatus } = get();
+    const { wallet, useSponsored, addLog, checkDeploymentStatus } = get();
     if (!wallet) return;
 
     set({ isConnecting: true });
-    addLog("Deploying account...");
+    addLog(`Deploying account${useSponsored ? " (sponsored)..." : "..."}`);
 
     try {
-      const tx = await wallet.deploy();
-      addLog(`Deploy tx submitted: ${truncateAddress(tx.hash)}`);
-
-      addLog("Waiting for confirmation...");
+      const tx = await wallet.deploy({
+        feeMode: useSponsored ? "sponsored" : "user_pays",
+      });
+      addLog(`Deploy tx: ${truncateAddress(tx.hash)}`);
       await tx.wait();
-
-      addLog("Account deployed successfully!");
+      addLog("Account deployed!");
       await checkDeploymentStatus();
     } catch (err) {
       addLog(`Deployment failed: ${err}`);
       Alert.alert("Deployment Failed", String(err));
     } finally {
       set({ isConnecting: false });
+    }
+  },
+
+  testTransfer: async () => {
+    const { wallet, chainId, useSponsored, addLog } = get();
+    if (!wallet) return;
+
+    set({ isTransferring: true });
+    addLog(`Test transfer (0 STRK)${useSponsored ? " sponsored..." : "..."}`);
+
+    try {
+      const strk = getErc20("STRK", chainId);
+      const options: ExecuteOptions = useSponsored
+        ? { feeMode: "sponsored" }
+        : {};
+
+      const tx = await strk.transfer({
+        from: wallet,
+        transfers: [
+          { to: wallet.address, amount: Amount.parse("0", strk.token) },
+        ],
+        options,
+      });
+
+      addLog(`Tx: ${truncateAddress(tx.hash)}`);
+      await tx.wait();
+      addLog("Transfer confirmed!");
+    } catch (err) {
+      addLog(`Transfer failed: ${err}`);
+      Alert.alert("Transfer Failed", String(err));
+    } finally {
+      set({ isTransferring: false });
     }
   },
 }));

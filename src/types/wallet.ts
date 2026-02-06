@@ -129,6 +129,7 @@ export interface ProgressEvent {
  * ```ts
  * await wallet.ensureReady({
  *   deploy: "if_needed",
+ *   feeMode: "sponsored",
  *   onProgress: (e) => console.log(e.step)
  * });
  * ```
@@ -136,8 +137,20 @@ export interface ProgressEvent {
 export interface EnsureReadyOptions {
   /** When to deploy (default: "if_needed") */
   deploy?: DeployMode;
+  /** How to pay for deployment if needed (default: wallet's default) */
+  feeMode?: FeeMode;
   /** Callback for progress updates */
   onProgress?: (event: ProgressEvent) => void;
+}
+
+// ─── Deploy ──────────────────────────────────────────────────────────────────
+
+/** Options for `wallet.deploy()` */
+export interface DeployOptions {
+  /** How fees are paid (default: "user_pays") */
+  feeMode?: FeeMode;
+  /** Optional time bounds for paymaster-sponsored deployment */
+  timeBounds?: PaymasterTimeBounds;
 }
 
 // ─── Execute ─────────────────────────────────────────────────────────────────
@@ -146,12 +159,6 @@ export interface EnsureReadyOptions {
 export interface ExecuteOptions {
   /** How fees are paid */
   feeMode?: FeeMode;
-  /** Optional time bounds for paymaster transactions */
-  timeBounds?: PaymasterTimeBounds;
-}
-
-/** Options for `wallet.prepareSponsored()` */
-export interface PrepareOptions {
   /** Optional time bounds for paymaster transactions */
   timeBounds?: PaymasterTimeBounds;
 }

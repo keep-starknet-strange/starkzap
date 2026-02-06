@@ -4,21 +4,19 @@ import {
   constants,
   type Account,
   type Call,
-  type ExecutableUserTransaction,
   type PaymasterTimeBounds,
-  type PreparedTransaction,
   type TypedData,
   type Signature,
   type WalletAccount,
 } from "starknet";
 import { Tx } from "@/tx";
 import type {
+  DeployOptions,
   EnsureReadyOptions,
   ExecuteOptions,
   FeeMode,
   PreflightOptions,
   PreflightResult,
-  PrepareOptions,
   ExplorerConfig,
   ChainId,
 } from "@/types";
@@ -27,9 +25,8 @@ import { Address } from "@/types";
 import {
   checkDeployed,
   ensureWalletReady,
-  executeWithFeeMode,
   preflightTransaction,
-  buildSponsoredTransaction,
+  sponsoredDetails,
 } from "@/wallet/utils";
 
 const CHAIN_ID_MAP: Record<ChainId, string> = {
@@ -78,6 +75,7 @@ export class CartridgeWallet implements WalletInterface {
   private readonly controller: Controller;
   private readonly walletAccount: WalletAccount;
   private readonly provider: RpcProvider;
+  private readonly chainId: ChainId;
   private readonly explorerConfig: ExplorerConfig | undefined;
   private readonly defaultFeeMode: FeeMode;
   private readonly defaultTimeBounds: PaymasterTimeBounds | undefined;
@@ -92,6 +90,7 @@ export class CartridgeWallet implements WalletInterface {
     this.controller = controller;
     this.walletAccount = walletAccount;
     this.provider = provider;
+    this.chainId = options.chainId ?? "SN_MAIN";
     this.explorerConfig = options.explorer;
     this.defaultFeeMode = options.feeMode ?? "user_pays";
     this.defaultTimeBounds = options.timeBounds;
@@ -173,7 +172,8 @@ export class CartridgeWallet implements WalletInterface {
     return ensureWalletReady(this, options);
   }
 
-  async deploy(): Promise<Tx> {
+  async deploy(_options: DeployOptions = {}): Promise<Tx> {
+    // Cartridge Controller handles deployment internally
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const result = await (this.controller as any).keychain?.deploy();
     if (!result || result.code !== "SUCCESS") {
@@ -186,44 +186,19 @@ export class CartridgeWallet implements WalletInterface {
     const feeMode = options.feeMode ?? this.defaultFeeMode;
     const timeBounds = options.timeBounds ?? this.defaultTimeBounds;
 
-    return executeWithFeeMode(
-      this.walletAccount,
-      calls,
-      feeMode,
-      timeBounds,
-      this.provider,
-      this.explorerConfig
-    );
+    const { transaction_hash } =
+      feeMode === "sponsored"
+        ? await this.walletAccount.executePaymasterTransaction(
+            calls,
+            sponsoredDetails(timeBounds)
+          )
+        : await this.walletAccount.execute(calls);
+
+    return new Tx(transaction_hash, this.provider, this.explorerConfig);
   }
 
   async signMessage(typedData: TypedData): Promise<Signature> {
     return this.walletAccount.signMessage(typedData);
-  }
-
-  async buildSponsored(
-    calls: Call[],
-    options: PrepareOptions = {}
-  ): Promise<PreparedTransaction> {
-    const timeBounds = options.timeBounds ?? this.defaultTimeBounds;
-    return buildSponsoredTransaction(
-      this.walletAccount,
-      calls,
-      timeBounds
-    ) as Promise<PreparedTransaction>;
-  }
-
-  async signSponsored(
-    prepared: PreparedTransaction
-  ): Promise<ExecutableUserTransaction> {
-    return this.walletAccount.preparePaymasterTransaction(prepared);
-  }
-
-  async prepareSponsored(
-    calls: Call[],
-    options: PrepareOptions = {}
-  ): Promise<ExecutableUserTransaction> {
-    const prepared = await this.buildSponsored(calls, options);
-    return this.signSponsored(prepared);
   }
 
   async preflight(options: PreflightOptions): Promise<PreflightResult> {
@@ -236,6 +211,23 @@ export class CartridgeWallet implements WalletInterface {
 
   getProvider(): RpcProvider {
     return this.provider;
+  }
+
+  getChainId(): ChainId {
+    return this.chainId;
+  }
+
+  getFeeMode(): FeeMode {
+    return this.defaultFeeMode;
+  }
+
+  getClassHash(): string {
+    // Cartridge Controller manages its own account class
+    return "cartridge-controller";
+  }
+
+  async estimateFee(calls: Call[]) {
+    return this.walletAccount.estimateInvokeFee(calls);
   }
 
   /**
