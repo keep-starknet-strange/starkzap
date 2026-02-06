@@ -35,9 +35,9 @@ export class Erc20 {
 
   /**
    * Transfer tokens to one or more addresses.
-   * @param args.from - Wallet to transfer tokens from
-   * @param args.transfers - Array of transfer objects, each containing a to address and an Amount
-   * @param args.options - Optional execution options
+   * @param from - Wallet to transfer tokens from
+   * @param transfers - Array of transfer objects, each containing a to address and an Amount
+   * @param options - Optional execution options
    *
    * @example
    * ```ts
@@ -54,12 +54,12 @@ export class Erc20 {
    *
    * @throws Error if any amount's decimals or symbol don't match the token
    */
-  public async transfer(args: {
-    from: WalletInterface;
-    transfers: { to: Address; amount: Amount }[];
-    options?: ExecuteOptions;
-  }): Promise<Tx> {
-    const calls: Call[] = args.transfers.map((transfer) => {
+  public async transfer(
+    from: WalletInterface,
+    transfers: { to: Address; amount: Amount }[],
+    options?: ExecuteOptions
+  ): Promise<Tx> {
+    const calls: Call[] = transfers.map((transfer) => {
       // Validate that the amount matches this token
       this.validateAmount(transfer.amount);
 
@@ -73,12 +73,12 @@ export class Erc20 {
       };
     });
 
-    return await args.from.execute(calls, args.options);
+    return await from.execute(calls, options);
   }
 
   /**
    * Get the balance in a wallet.
-   * @param args.wallet - Wallet to check the balance of
+   * @param wallet - Wallet to check the balance of
    * @returns Amount representing the token balance
    *
    * @example
@@ -92,9 +92,9 @@ export class Erc20 {
    * console.log(balance.toFormatted()); // "100.5 USDC"
    * ```
    */
-  public async balanceOf(args: { wallet: WalletInterface }): Promise<Amount> {
-    const provider = args.wallet.getProvider();
-    const address = args.wallet.address;
+  public async balanceOf(wallet: WalletInterface): Promise<Amount> {
+    const provider = wallet.getProvider();
+    const address = wallet.address;
     const result = await provider.callContract({
       contractAddress: this.token.address,
       entrypoint: "balanceOf",

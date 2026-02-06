@@ -63,19 +63,6 @@ describe("Staking Lifecycle (Integration)", () => {
     // ==================== SETUP ====================
     console.log("\n=== SETUP ===");
 
-    // Get staking instance
-    const staking = await sdk.stakingInValidator(
-      SEPOLIA_STAKING.VALIDATOR,
-      STRK
-    );
-    console.log("Validator address:", SEPOLIA_STAKING.VALIDATOR);
-
-    // Get pool commission
-    const commission = await staking.getCommission();
-    console.log("Pool commission:", commission, "%");
-    expect(commission).toBeGreaterThanOrEqual(0);
-    expect(commission).toBeLessThanOrEqual(100);
-
     // Create wallet
     const privateKey = testPrivateKeys.random();
     const signer = new StarkSigner(privateKey);
@@ -87,6 +74,19 @@ describe("Staking Lifecycle (Integration)", () => {
     });
     console.log("Wallet address:", wallet.address);
 
+    // Get staking instance
+    const staking = await wallet.stakingInStaker(
+      SEPOLIA_STAKING.VALIDATOR,
+      STRK
+    );
+    console.log("Validator address:", SEPOLIA_STAKING.VALIDATOR);
+
+    // Get pool commission
+    const commission = await wallet.getPoolCommission(staking.poolAddress);
+    console.log("Pool commission:", commission, "%");
+    expect(commission).toBeGreaterThanOrEqual(0);
+    expect(commission).toBeLessThanOrEqual(100);
+
     // Fund wallet generously for all operations
     const totalFunding = Amount.parse(1000, STRK);
     await fund(wallet, totalFunding);
@@ -97,12 +97,12 @@ describe("Staking Lifecycle (Integration)", () => {
     console.log("Account deployed");
 
     // Verify not a member yet
-    const isMemberInitial = await staking.isMember(wallet);
+    const isMemberInitial = await wallet.isPoolMember(staking.poolAddress);
     expect(isMemberInitial).toBe(false);
     console.log("Is member (before enter):", isMemberInitial);
 
     // Position should be null for non-member
-    const positionInitial = await staking.getPosition(wallet);
+    const positionInitial = await wallet.getPoolPosition(staking.poolAddress);
     expect(positionInitial).toBeNull();
 
     // ==================== STEP 1: ENTER POOL ====================
@@ -229,11 +229,6 @@ describe("Staking Lifecycle (Integration)", () => {
       return;
     }
 
-    const staking = await sdk.stakingInValidator(
-      SEPOLIA_STAKING.VALIDATOR,
-      STRK
-    );
-
     // Create wallet that won't enter the pool
     const privateKey = testPrivateKeys.random();
     const signer = new StarkSigner(privateKey);
@@ -244,38 +239,46 @@ describe("Staking Lifecycle (Integration)", () => {
       },
     });
 
+    const staking = await wallet.stakingInStaker(
+      SEPOLIA_STAKING.VALIDATOR,
+      STRK
+    );
+
     await fund(wallet, Amount.parse(500, STRK));
     await wallet.ensureReady({ deploy: "if_needed" });
 
     // Test: Cannot add to stake without being a member
     console.log("Testing: add without membership...");
     expect(async () => {
-      await staking.add(wallet, Amount.parse(50, STRK));
+      await wallet.addToPool(staking.poolAddress, Amount.parse(50, STRK));
     }).rejects.toThrow(/not a member/i);
     console.log("  ✓ Correctly rejected");
 
     // Test: Cannot exit without being a member
     console.log("Testing: exit without membership...");
     expect(async () => {
-      await staking.exitIntent(wallet, Amount.parse(50, STRK));
+      await wallet.exitPoolIntent(staking.poolAddress, Amount.parse(50, STRK));
     }).rejects.toThrow(/not a member/i);
     console.log("  ✓ Correctly rejected");
 
     // Enter to test other constraints
-    const enterTx = await staking.enter(wallet, Amount.parse(100, STRK));
+    const enterTx = await wallet.enterPool(
+      staking.poolAddress,
+      Amount.parse(100, STRK)
+    );
     await enterTx.wait();
 
     // Test: Cannot enter twice
     console.log("Testing: double enter...");
     expect(async () => {
-      await staking.enter(wallet, Amount.parse(50, STRK));
+      await wallet.enterPool(staking.poolAddress, Amount.parse(50, STRK));
     }).rejects.toThrow(/already a member/i);
     console.log("  ✓ Correctly rejected");
 
     // Test: Cannot exit more than staked
     console.log("Testing: exit more than staked...");
     expect(async () => {
-      await staking.exitIntent(wallet, Amount.parse(200, STRK));
+      await wallet.exitPoolIntent(staking.poolAddress, Amount.parse(200, STRK));
     }).rejects.toThrow(/lower than exiting/i);
     console.log("  ✓ Correctly rejected");
   });

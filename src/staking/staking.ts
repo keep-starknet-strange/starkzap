@@ -64,6 +64,15 @@ export class Staking {
   }
 
   /**
+   * The pool contract address for this staking instance.
+   *
+   * @returns The Starknet address of the delegation pool contract
+   */
+  get poolAddress(): Address {
+    return fromAddress(this.pool.address);
+  }
+
+  /**
    * Enter the delegation pool as a new member.
    *
    * This will approve the token transfer and stake the specified amount in the pool.
@@ -459,6 +468,12 @@ export class Staking {
     return await wallet.execute([exitCall], options);
   }
 
+  /**
+   * Creates a typed ERC20 contract instance for the staking token.
+   *
+   * @param providerOrAccount - The provider or account to use for contract calls
+   * @returns A typed ERC20 contract instance
+   */
   private tokenContract(
     providerOrAccount: ProviderOrAccount
   ): TypedContractV2<typeof ERC20_ABI> {
@@ -469,6 +484,13 @@ export class Staking {
     }).typedv2(ERC20_ABI);
   }
 
+  /**
+   * Asserts that a wallet is a member of this pool and returns its position.
+   *
+   * @param wallet - The wallet to check
+   * @returns The pool member position
+   * @throws Error if the wallet is not a member of the pool
+   */
   private async assertIsMember(wallet: WalletInterface): Promise<PoolMember> {
     const maybeMember = await this.getPosition(wallet);
     if (!maybeMember) {
@@ -486,17 +508,15 @@ export class Staking {
    * Use this when you know the specific pool contract address you want to interact with.
    *
    * @param poolAddress - The pool contract address
-   * @param token - The token that the pool accepts for staking
    * @param provider - The RPC provider
    * @param config - The staking configuration
    * @returns A Staking instance for the specified pool
-   * @throws Error if the pool doesn't exist or doesn't match the token
+   * @throws Error if the pool doesn't exist or token cannot be resolved
    *
    * @example
    * ```ts
    * const staking = await Staking.fromPool(
    *   poolAddress,
-   *   strkToken,
    *   provider,
    *   config.staking
    * );
@@ -504,7 +524,6 @@ export class Staking {
    */
   static async fromPool(
     poolAddress: Address,
-    token: Token,
     provider: RpcProvider,
     config: StakingConfig
   ): Promise<Staking> {
@@ -539,9 +558,16 @@ export class Staking {
       throw new Error(`Could not verify pool address ${poolAddress}`);
     }
 
-    if (fromAddress(pool.token_address) !== token.address) {
+    const token = await getTokensFromAddresses(
+      [fromAddress(pool.token_address)],
+      provider
+    ).then((tokens) => {
+      return tokens[0];
+    });
+
+    if (!token) {
       throw new Error(
-        `Pool ${poolAddress} does not hold ${token.symbol} tokens`
+        `Could not resolve token ${pool.token_address} in Pool ${poolAddress}`
       );
     }
 

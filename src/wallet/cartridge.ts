@@ -19,15 +19,15 @@ import type {
   PreflightResult,
   ExplorerConfig,
   ChainId,
-  fromAddress
+  fromAddress,
 } from "@/types";
-import type { WalletInterface } from "@/wallet/interface";
 import {
   checkDeployed,
   ensureWalletReady,
   preflightTransaction,
   sponsoredDetails,
 } from "@/wallet/utils";
+import { BaseWallet } from "@/wallet/base";
 
 const CHAIN_ID_MAP: Record<ChainId, string> = {
   SN_MAIN: constants.StarknetChainId.SN_MAIN,
@@ -70,8 +70,7 @@ export interface CartridgeWalletOptions {
  * controller.openProfile();
  * ```
  */
-export class CartridgeWallet implements WalletInterface {
-  readonly address: Address;
+export class CartridgeWallet extends BaseWallet {
   private readonly controller: Controller;
   private readonly walletAccount: WalletAccount;
   private readonly provider: RpcProvider;
@@ -84,9 +83,10 @@ export class CartridgeWallet implements WalletInterface {
     controller: Controller,
     walletAccount: WalletAccount,
     provider: RpcProvider,
+    stakingConfig: StakingConfig | undefined,
     options: CartridgeWalletOptions = {}
   ) {
-    this.address = fromAddress(walletAccount.address);
+    super(fromAddress(walletAccount.address), stakingConfig);
     this.controller = controller;
     this.walletAccount = walletAccount;
     this.provider = provider;
@@ -100,7 +100,8 @@ export class CartridgeWallet implements WalletInterface {
    * Create and connect a CartridgeWallet.
    */
   static async create(
-    options: CartridgeWalletOptions = {}
+    options: CartridgeWalletOptions = {},
+    stakingConfig?: StakingConfig | undefined
   ): Promise<CartridgeWallet> {
     const controllerOptions: Record<string, unknown> = {};
 
@@ -161,7 +162,13 @@ export class CartridgeWallet implements WalletInterface {
     });
 
     // @ts-expect-error This is a preexisting issue with the starknet.js version mismatch and cartridge's starknet.js version.
-    return new CartridgeWallet(controller, walletAccount, provider, options);
+    return new CartridgeWallet(
+      controller,
+      walletAccount,
+      provider,
+      stakingConfig,
+      options
+    );
   }
 
   async isDeployed(): Promise<boolean> {

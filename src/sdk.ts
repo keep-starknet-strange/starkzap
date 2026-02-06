@@ -170,80 +170,13 @@ export class StarkSDK {
     options: Omit<CartridgeWalletOptions, "rpcUrl" | "chainId"> = {}
   ): Promise<CartridgeWallet> {
     const explorer = options.explorer ?? this.config.explorer;
-    return CartridgeWallet.create({
-      ...options,
-      rpcUrl: this.config.rpcUrl,
-      chainId: this.config.chainId,
-      ...(explorer && { explorer }),
-    });
-  }
-
-  /**
-   * Get a Staking instance for a specific delegation pool contract.
-   *
-   * Use this when you know the exact pool contract address you want to interact with.
-   * For most use cases, prefer `stakingInValidator()` which finds the pool automatically.
-   *
-   * @param pool - The pool contract address
-   * @param stakeToken - The token to stake (must match the pool's token)
-   * @returns A Staking instance for interacting with the pool
-   * @throws Error if staking is not configured in the SDK config
-   *
-   * @example
-   * ```ts
-   * const staking = await sdk.stakingInPool(poolAddress, strkToken);
-   * const tx = await staking.enter(wallet, Amount.parse(100, strkToken));
-   * ```
-   */
-  async stakingInPool(pool: Address, stakeToken: Token): Promise<Staking> {
-    if (!this.config.staking?.contract) {
-      throw new Error("`staking.contract` is not defined in the sdk config.");
-    }
-
-    return Staking.fromPool(
-      pool,
-      stakeToken,
-      this.provider,
-      this.config.staking
-    );
-  }
-
-  /**
-   * Get a Staking instance for a validator's delegation pool.
-   *
-   * This is the recommended way to interact with staking. It finds the pool
-   * for the specified token managed by the given validator.
-   *
-   * @param staker - The validator's staker address
-   * @param stakeToken - The token to stake (e.g., STRK)
-   * @returns A Staking instance for interacting with the validator's pool
-   * @throws Error if staking is not configured or the validator has no pool for this token
-   *
-   * @example
-   * ```ts
-   * const staking = await sdk.stakingInValidator(validatorAddress, strkToken);
-   *
-   * // Check the APY
-   * const maxApy = await staking.getMaxAPY();
-   * console.log(`Max APY: ${maxApy.toFixed(2)}%`);
-   *
-   * // Enter the pool
-   * const tx = await staking.enter(wallet, Amount.parse(100, strkToken));
-   * await tx.wait();
-   * ```
-   */
-  async stakingInValidator(
-    staker: Address,
-    stakeToken: Token
-  ): Promise<Staking> {
-    if (!this.config.staking?.contract) {
-      throw new Error("`staking.contract` is not defined in the sdk config.");
-    }
-
-    return Staking.fromStaker(
-      staker,
-      stakeToken,
-      this.provider,
+    return CartridgeWallet.create(
+      {
+        ...options,
+        rpcUrl: this.config.rpcUrl,
+        chainId: this.config.chainId,
+        ...(explorer && { explorer }),
+      },
       this.config.staking
     );
   }

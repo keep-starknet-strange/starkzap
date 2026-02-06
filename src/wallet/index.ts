@@ -22,15 +22,16 @@ import type {
   PreflightResult,
   SDKConfig,
   ExplorerConfig,
-  ChainId
+  ChainId,
+  StakingConfig
 } from "@/types";
-import type { WalletInterface } from "@/wallet/interface";
 import {
   checkDeployed,
   ensureWalletReady,
   preflightTransaction,
   sponsoredDetails,
 } from "@/wallet/utils";
+import { BaseWallet } from "@/wallet/base";
 
 export { type WalletInterface } from "@/wallet/interface";
 export { AccountProvider } from "@/wallet/accounts/provider";
@@ -84,11 +85,10 @@ interface WalletInternals {
   explorerConfig?: ExplorerConfig;
   defaultFeeMode: FeeMode;
   defaultTimeBounds?: PaymasterTimeBounds;
+  stakingConfig?: StakingConfig
 }
 
-export class Wallet implements WalletInterface {
-  readonly address: Address;
-
+export class Wallet extends BaseWallet {
   private readonly provider: RpcProvider;
   private readonly account: Account;
   private readonly accountProvider: AccountProvider;
@@ -101,7 +101,7 @@ export class Wallet implements WalletInterface {
   private deployedCache: boolean | null = null;
 
   private constructor(options: WalletInternals) {
-    this.address = options.address;
+    super(address, options.stakingConfig);
     this.accountProvider = options.accountProvider;
     this.account = options.account;
     this.provider = options.provider;
@@ -177,6 +177,7 @@ export class Wallet implements WalletInterface {
       ...(config.explorer && { explorerConfig: config.explorer }),
       defaultFeeMode: feeMode,
       ...(timeBounds && { defaultTimeBounds: timeBounds }),
+      stakingConfig: options.config.staking
     });
   }
 
