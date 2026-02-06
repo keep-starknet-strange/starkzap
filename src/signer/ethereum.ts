@@ -1,25 +1,8 @@
 // @ts-expect-error - moduleResolution bundler doesn't resolve subpath exports
 import { secp256k1 } from "@noble/curves/secp256k1";
+import { hexToBytes } from "@noble/curves/utils.js";
 import { uint256, num, type Signature } from "starknet";
 import type { SignerInterface } from "@/signer/interface";
-
-/**
- * Convert hex string to Uint8Array, padding to specified length.
- */
-function hexToBytes(hex: string, padToBytes?: number): Uint8Array {
-  let h = hex.startsWith("0x") ? hex.slice(2) : hex;
-
-  // Pad with leading zeros if needed
-  if (padToBytes && h.length < padToBytes * 2) {
-    h = h.padStart(padToBytes * 2, "0");
-  }
-
-  const bytes = new Uint8Array(h.length / 2);
-  for (let i = 0; i < bytes.length; i++) {
-    bytes[i] = parseInt(h.slice(i * 2, i * 2 + 2), 16);
-  }
-  return bytes;
-}
 
 /**
  * Convert Uint8Array to bigint (big-endian).
@@ -65,7 +48,7 @@ export class EthSigner implements SignerInterface {
     }
 
     // Pad to 32 bytes (64 hex chars) if needed
-    this.privateKey = hexToBytes("0x" + key, 32);
+    this.privateKey = hexToBytes(key);
     this.publicKey = secp256k1
       .getPublicKey(this.privateKey, false)
       .toString("hex");
@@ -86,7 +69,7 @@ export class EthSigner implements SignerInterface {
    */
   async signRaw(hash: string): Promise<Signature> {
     // Convert hash to bytes (32 bytes)
-    const hashBytes = hexToBytes(hash, 32);
+    const hashBytes = hexToBytes(hash.startsWith("0x") ? hash.slice(2) : hash);
 
     // Sign with recovery format to get recovery byte
     const sigBytes = secp256k1.sign(hashBytes, this.privateKey, {
@@ -98,15 +81,13 @@ export class EthSigner implements SignerInterface {
     // Parse the recovered signature (65 bytes)
     // Format: recovery (1 byte) + r (32 bytes) + s (32 bytes)
     const recoveryRaw = sigBytes[0];
-    const rBytes = sigBytes.slice(1, 33);
-    const sBytes = sigBytes.slice(33, 65);
 
     // Normalize recovery to 0 or 1 (handle both raw and Ethereum v=27/28 conventions)
     const recovery = recoveryRaw >= 27 ? recoveryRaw - 27 : recoveryRaw;
 
     // Convert r and s bytes to bigint
-    const rBigInt = bytesToBigInt(rBytes);
-    const sBigInt = bytesToBigInt(sBytes);
+    const rBigInt = bytesToBigInt(sigBytes.slice(1, 33));
+    const sBigInt = bytesToBigInt(sigBytes.slice(33, 65));
 
     // Split r and s into u256 format - bnToUint256 returns hex strings at runtime
     const r = uint256.bnToUint256(rBigInt);
