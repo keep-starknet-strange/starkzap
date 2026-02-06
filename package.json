@@ -73,6 +73,7 @@
     "vitest": "^4.0.17"
   },
   "dependencies": {
+    "@noble/curves": "^1.9.7",
     "@cartridge/controller": "^0.11.3",
     "starknet": "^9.2.1"
   }

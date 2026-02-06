@@ -1,18 +1,36 @@
-// @ts-expect-error - moduleResolution bundler doesn't resolve subpath exports
 import { secp256k1 } from "@noble/curves/secp256k1";
-import { hexToBytes } from "@noble/curves/utils.js";
+import { bytesToHex, hexToBytes } from "@noble/curves/utils.js";
 import { uint256, num, type Signature } from "starknet";
 import type { SignerInterface } from "@/signer/interface";
 
 /**
- * Convert Uint8Array to bigint (big-endian).
+ * Normalize a Starknet message hash into a 32-byte hex string for secp256k1 signing.
  */
-function bytesToBigInt(bytes: Uint8Array): bigint {
-  let result = 0n;
-  for (const byte of bytes) {
-    result = (result << 8n) | BigInt(byte);
+function normalizeHashHex(hash: string): string {
+  let normalized = hash.trim();
+  if (normalized.startsWith("0x") || normalized.startsWith("0X")) {
+    normalized = normalized.slice(2);
   }
-  return result;
+
+  if (!normalized) {
+    throw new Error("Invalid hash: empty value");
+  }
+
+  if (!/^[0-9a-fA-F]+$/.test(normalized)) {
+    throw new Error("Invalid hash: must be hexadecimal");
+  }
+
+  // noble requires even-length hex.
+  if (normalized.length % 2 !== 0) {
+    normalized = `0${normalized}`;
+  }
+
+  // Starknet hashes fit in 251 bits, so 32-byte padding is expected.
+  if (normalized.length > 64) {
+    throw new Error("Invalid hash: expected at most 32 bytes");
+  }
+
+  return normalized.padStart(64, "0").toLowerCase();
 }
 
 /**
@@ -47,11 +65,18 @@ export class EthSigner implements SignerInterface {
       );
     }
 
-    // Pad to 32 bytes (64 hex chars) if needed
+    // Require exactly 32 bytes (64 hex chars)
+    if (key.length !== 64) {
+      throw new Error(
+        "Invalid private key length: expected 32 bytes (64 hex chars)"
+      );
+    }
+
     this.privateKey = hexToBytes(key);
-    this.publicKey = secp256k1
-      .getPublicKey(this.privateKey, false)
-      .toString("hex");
+    const uncompressed = secp256k1.getPublicKey(this.privateKey, false);
+    const x = "0x" + bytesToHex(uncompressed.slice(1, 33));
+    const y = "0x" + bytesToHex(uncompressed.slice(33, 65));
+    this.publicKey = JSON.stringify({ x, y });
   }
 
   /**
@@ -69,36 +94,26 @@ export class EthSigner implements SignerInterface {
    */
   async signRaw(hash: string): Promise<Signature> {
     // Convert hash to bytes (32 bytes)
-    const hashBytes = hexToBytes(hash.startsWith("0x") ? hash.slice(2) : hash);
+    const hashBytes = hexToBytes(normalizeHashHex(hash));
 
-    // Sign with recovery format to get recovery byte
-    const sigBytes = secp256k1.sign(hashBytes, this.privateKey, {
+    // Sign with recovery data for OZ Ethereum account signature format.
+    const signature = secp256k1.sign(hashBytes, this.privateKey, {
       lowS: true,
       prehash: false,
       format: "recovered",
     });
 
-    // Parse the recovered signature (65 bytes)
-    // Format: recovery (1 byte) + r (32 bytes) + s (32 bytes)
-    const recoveryRaw = sigBytes[0];
+    // Split r and s into u256 format.
+    const r = uint256.bnToUint256(signature.r);
+    const s = uint256.bnToUint256(signature.s);
+    const recovery = signature.recovery;
 
-    // Normalize recovery to 0 or 1 (handle both raw and Ethereum v=27/28 conventions)
-    const recovery = recoveryRaw >= 27 ? recoveryRaw - 27 : recoveryRaw;
-
-    // Convert r and s bytes to bigint
-    const rBigInt = bytesToBigInt(sigBytes.slice(1, 33));
-    const sBigInt = bytesToBigInt(sigBytes.slice(33, 65));
-
-    // Split r and s into u256 format - bnToUint256 returns hex strings at runtime
-    const r = uint256.bnToUint256(rBigInt);
-    const s = uint256.bnToUint256(sBigInt);
-
-    // Return as hex strings (cast needed because TS types say BigNumberish)
+    // Return as hex strings
     return [
-      r.low as string,
-      r.high as string,
-      s.low as string,
-      s.high as string,
+      num.toHex(r.low),
+      num.toHex(r.high),
+      num.toHex(s.low),
+      num.toHex(s.high),
       num.toHex(recovery),
     ];
   }

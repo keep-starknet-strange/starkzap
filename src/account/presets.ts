@@ -4,6 +4,7 @@ import {
   CairoOption,
   CairoOptionVariant,
   type Calldata,
+  num,
   uint256,
 } from "starknet";
 import type { AccountClassConfig } from "@/types";
@@ -35,13 +36,21 @@ export const OpenZeppelinPreset: AccountClassConfig = {
  * Parse secp256k1 public key JSON.
  */
 function parseEthPubKey(publicKey: string): { x: bigint; y: bigint } {
-  const x = "0x" + publicKey.slice(1, 33);
-  const y = "0x" + publicKey.slice(33, 65);
-
-  if (!x || !y) {
-    throw new Error(`OpenZeppelinEthPreset: missing x or y in public key JSON`);
+  let parsed: { x?: string; y?: string };
+  try {
+    parsed = JSON.parse(publicKey) as { x?: string; y?: string };
+  } catch {
+    throw new Error(
+      "OpenZeppelinEthPreset: public key must be JSON: {\"x\":\"0x...\",\"y\":\"0x...\"}"
+    );
   }
 
+  if (!parsed.x || !parsed.y) {
+    throw new Error("OpenZeppelinEthPreset: missing x or y in public key JSON");
+  }
+
+  const x = parsed.x;
+  const y = parsed.y;
   return { x: BigInt(x), y: BigInt(y) };
 }
 
@@ -57,21 +66,15 @@ export const OpenZeppelinEthPreset: AccountClassConfig = {
     "0x000b5bcc16b8b0d86c24996e22206f6071bb8d7307837a02720f0ce2fa1b3d7c",
 
   buildConstructorCalldata(publicKey: string): Calldata {
-    // publicKey is JSON: {"x":"0x...","y":"0x..."}
-    // EthPublicKey = Secp256k1Point = (u256, u256) = 4 felt252
     const { x, y } = parseEthPubKey(publicKey);
-
-    // Use u256 helper to split x and y
-    // (Assume uint256.bnToUint256 returns {low: string, high: string})
     const xU256 = uint256.bnToUint256(x);
     const yU256 = uint256.bnToUint256(y);
 
-    // Return as hex strings: [x_low, x_high, y_low, y_high]
     return [
-      xU256.low.toString(16),
-      xU256.high.toString(16),
-      yU256.low.toString(16),
-      yU256.high.toString(16),
+      num.toHex(xU256.low),
+      num.toHex(xU256.high),
+      num.toHex(yU256.low),
+      num.toHex(yU256.high),
     ];
   },
 
