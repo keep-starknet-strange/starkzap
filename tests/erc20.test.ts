@@ -1,9 +1,8 @@
-import { describe, it, expect, vi } from "vitest";
-import { Erc20 } from "@/erc20";
+import { describe, expect, it, vi } from "vitest";
+import { type Address, fromAddress, type Token } from "@/types";
 import { Amount } from "@/types";
-import type { Token } from "@/types";
-import type { Address } from "@/types";
 import type { Wallet } from "@/wallet";
+import { Erc20 } from "@/erc20";
 
 // Mock tokens for testing
 const mockUSDC: Token = {
@@ -33,8 +32,9 @@ const mockDAI: Token = {
 // Mock wallet for testing
 const createMockWallet = () => {
   return {
-    address:
-      "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef" as Address,
+    address: fromAddress(
+      "0x0234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"
+    ),
     execute: vi.fn().mockResolvedValue({ hash: "0xmockhash" }),
     getProvider: vi.fn().mockReturnValue({
       callContract: vi.fn().mockResolvedValue(["0x0", "0x0"]), // Mock balance of 0
@@ -45,111 +45,93 @@ const createMockWallet = () => {
 describe("Erc20", () => {
   describe("transfer validation", () => {
     it("should accept amount with matching decimals and symbol", async () => {
-      const erc20 = new Erc20(mockUSDC);
       const wallet = createMockWallet();
+      const erc20 = new Erc20(mockUSDC, wallet.getProvider());
       const amount = Amount.parse("100", mockUSDC);
 
       // Should not throw
-      await erc20.transfer({
-        from: wallet,
-        transfers: [
-          {
-            to: "0xrecipient" as Address,
-            amount,
-          },
-        ],
-      });
+      await erc20.transfer(wallet, [
+        {
+          to: "0xrecipient" as Address,
+          amount,
+        },
+      ]);
 
       expect(wallet.execute).toHaveBeenCalled();
     });
 
     it("should accept amount without symbol (decimals only validation)", async () => {
-      const erc20 = new Erc20(mockUSDC);
       const wallet = createMockWallet();
+      const erc20 = new Erc20(mockUSDC, wallet.getProvider());
       // Amount created without symbol but with matching decimals
       const amount = Amount.parse("100", 6);
 
       // Should not throw - symbol validation is skipped when amount has no symbol
-      await erc20.transfer({
-        from: wallet,
-        transfers: [
-          {
-            to: "0xrecipient" as Address,
-            amount,
-          },
-        ],
-      });
+      await erc20.transfer(wallet, [
+        {
+          to: "0xrecipient" as Address,
+          amount,
+        },
+      ]);
 
       expect(wallet.execute).toHaveBeenCalled();
     });
 
     it("should throw on decimals mismatch", async () => {
-      const erc20 = new Erc20(mockUSDC); // 6 decimals
       const wallet = createMockWallet();
+      const erc20 = new Erc20(mockUSDC, wallet.getProvider()); // 6 decimals
       const amount = Amount.parse("100", mockETH); // 18 decimals
 
       await expect(
-        erc20.transfer({
-          from: wallet,
-          transfers: [
-            {
-              to: "0xrecipient" as Address,
-              amount,
-            },
-          ],
-        })
-      ).rejects.toThrow("Amount decimals mismatch: expected 6 (USDC), got 18");
-    });
-
-    it("should throw on symbol mismatch", async () => {
-      const erc20 = new Erc20(mockETH); // ETH, 18 decimals
-      const wallet = createMockWallet();
-      const amount = Amount.parse("100", mockDAI); // DAI, 18 decimals (same decimals, different symbol)
-
-      await expect(
-        erc20.transfer({
-          from: wallet,
-          transfers: [
-            {
-              to: "0xrecipient" as Address,
-              amount,
-            },
-          ],
-        })
-      ).rejects.toThrow('Amount symbol mismatch: expected "ETH", got "DAI"');
-    });
-
-    it("should validate all amounts in multi-transfer", async () => {
-      const erc20 = new Erc20(mockUSDC);
-      const wallet = createMockWallet();
-      const validAmount = Amount.parse("100", mockUSDC);
-      const invalidAmount = Amount.parse("50", mockETH);
-
-      await expect(
-        erc20.transfer({
-          from: wallet,
-          transfers: [
-            { to: "0xrecipient1" as Address, amount: validAmount },
-            { to: "0xrecipient2" as Address, amount: invalidAmount },
-          ],
-        })
-      ).rejects.toThrow("Amount decimals mismatch");
-    });
-
-    it("should use toBase() value for contract call", async () => {
-      const erc20 = new Erc20(mockUSDC);
-      const wallet = createMockWallet();
-      const amount = Amount.parse("100", mockUSDC);
-
-      await erc20.transfer({
-        from: wallet,
-        transfers: [
+        erc20.transfer(wallet, [
           {
             to: "0xrecipient" as Address,
             amount,
           },
-        ],
-      });
+        ])
+      ).rejects.toThrow("Amount decimals mismatch: expected 6 (USDC), got 18");
+    });
+
+    it("should throw on symbol mismatch", async () => {
+      const wallet = createMockWallet();
+      const erc20 = new Erc20(mockETH, wallet.getProvider()); // ETH, 18 decimals
+      const amount = Amount.parse("100", mockDAI); // DAI, 18 decimals (same decimals, different symbol)
+
+      await expect(
+        erc20.transfer(wallet, [
+          {
+            to: "0xrecipient" as Address,
+            amount,
+          },
+        ])
+      ).rejects.toThrow('Amount symbol mismatch: expected "ETH", got "DAI"');
+    });
+
+    it("should validate all amounts in multi-transfer", async () => {
+      const wallet = createMockWallet();
+      const erc20 = new Erc20(mockUSDC, wallet.getProvider());
+      const validAmount = Amount.parse("100", mockUSDC);
+      const invalidAmount = Amount.parse("50", mockETH);
+
+      await expect(
+        erc20.transfer(wallet, [
+          { to: "0xrecipient1" as Address, amount: validAmount },
+          { to: "0xrecipient2" as Address, amount: invalidAmount },
+        ])
+      ).rejects.toThrow("Amount decimals mismatch");
+    });
+
+    it("should use toBase() value for contract call", async () => {
+      const wallet = createMockWallet();
+      const erc20 = new Erc20(mockUSDC, wallet.getProvider());
+      const amount = Amount.parse("100", mockUSDC);
+
+      await erc20.transfer(wallet, [
+        {
+          to: "0xrecipient" as Address,
+          amount,
+        },
+      ]);
 
       // Verify execute was called with the correct base value in the calldata
       expect(wallet.execute).toHaveBeenCalled();
@@ -163,8 +145,8 @@ describe("Erc20", () => {
 
   describe("balanceOf", () => {
     it("should return Amount with correct token info", async () => {
-      const erc20 = new Erc20(mockUSDC);
       const wallet = createMockWallet();
+      const erc20 = new Erc20(mockUSDC, wallet.getProvider());
 
       // Mock a balance of 100 USDC (100 * 10^6)
       const mockBalance = 100000000n;
@@ -175,7 +157,7 @@ describe("Erc20", () => {
         "0x0", // high
       ]);
 
-      const balance = await erc20.balanceOf({ wallet });
+      const balance = await erc20.balanceOf(wallet);
 
       expect(balance.toBase()).toBe(mockBalance);
       expect(balance.getDecimals()).toBe(mockUSDC.decimals);
@@ -184,10 +166,10 @@ describe("Erc20", () => {
     });
 
     it("should handle zero balance", async () => {
-      const erc20 = new Erc20(mockUSDC);
       const wallet = createMockWallet();
+      const erc20 = new Erc20(mockUSDC, wallet.getProvider());
 
-      const balance = await erc20.balanceOf({ wallet });
+      const balance = await erc20.balanceOf(wallet);
 
       expect(balance.toBase()).toBe(0n);
       expect(balance.toUnit()).toBe("0");
@@ -196,8 +178,8 @@ describe("Erc20", () => {
     });
 
     it("should handle large balance with 18 decimals", async () => {
-      const erc20 = new Erc20(mockETH);
       const wallet = createMockWallet();
+      const erc20 = new Erc20(mockETH, wallet.getProvider());
 
       // Mock a balance of 1.5 ETH
       const mockBalance = 1500000000000000000n;
@@ -208,7 +190,7 @@ describe("Erc20", () => {
         "0x0", // high
       ]);
 
-      const balance = await erc20.balanceOf({ wallet });
+      const balance = await erc20.balanceOf(wallet);
 
       expect(balance.toBase()).toBe(mockBalance);
       expect(balance.toUnit()).toBe("1.5");

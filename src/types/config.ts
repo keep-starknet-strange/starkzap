@@ -1,8 +1,14 @@
-import type { PaymasterOptions } from "starknet";
+import { type PaymasterOptions, RpcProvider, CairoFelt252 } from "starknet";
 import type { NetworkPreset, NetworkName } from "@/network";
+import type { Address } from "@/types";
 
 /** Supported Starknet chain identifiers */
 export type ChainId = "SN_MAIN" | "SN_SEPOLIA";
+
+export async function getChainId(provider: RpcProvider): Promise<ChainId> {
+  const chainIdHex = await provider.getChainId();
+  return new CairoFelt252(chainIdHex).decodeUtf8() as ChainId;
+}
 
 /** Supported block explorer providers */
 export type ExplorerProvider = "voyager" | "starkscan";
@@ -24,6 +30,28 @@ export interface ExplorerConfig {
   provider?: ExplorerProvider;
   /** Or provide a custom base URL (takes precedence over provider) */
   baseUrl?: string;
+}
+
+/**
+ * Configuration for the Staking module.
+ *
+ * Required for using staking functionality such as entering/exiting pools,
+ * querying validator pools, and retrieving active staking tokens.
+ *
+ * @example
+ * ```ts
+ * const sdk = new StarkSDK({
+ *   rpcUrl: "https://starknet-mainnet.infura.io/v3/YOUR_KEY",
+ *   chainId: "SN_MAIN",
+ *   staking: {
+ *     contract: "0x03745ab04a431fc02871a139be6b93d9260b0ff3e779ad9c8b377183b23109f1",
+ *   },
+ * });
+ * ```
+ */
+export interface StakingConfig {
+  /** Address of the core staking contract */
+  contract: Address;
 }
 
 /**
@@ -65,4 +93,16 @@ export interface SDKConfig {
   paymaster?: PaymasterOptions;
   /** Optional: configures how explorer URLs are built */
   explorer?: ExplorerConfig;
+
+  /**
+   * Optional: configuration for the Staking module.
+   *
+   * Required for staking functionality including:
+   * - Entering and exiting delegation pools
+   * - Adding to existing stakes and claiming rewards
+   * - Querying validator pools and active staking tokens
+   *
+   * @see {@link StakingConfig}
+   */
+  staking?: StakingConfig;
 }

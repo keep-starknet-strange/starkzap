@@ -7,15 +7,20 @@ import type {
   Signature,
 } from "starknet";
 import type { Tx } from "@/tx";
+import type { Erc20 } from "@/erc20";
+import type { Staking } from "@/staking";
 import type {
   Address,
+  Amount,
   ChainId,
   DeployOptions,
   EnsureReadyOptions,
   ExecuteOptions,
   FeeMode,
+  PoolMember,
   PreflightOptions,
   PreflightResult,
+  Token,
 } from "@/types";
 
 /**
@@ -117,4 +122,103 @@ export interface WalletInterface {
    * Disconnect the wallet and clean up resources.
    */
   disconnect(): Promise<void>;
+
+  // ============================================================
+  // ERC20 methods
+  // ============================================================
+
+  /**
+   * Get all ERC20 instances that have been accessed by this wallet.
+   */
+  readonly activeErc20: Erc20[];
+
+  /**
+   * Gets or creates an Erc20 instance for the given token.
+   */
+  erc20(token: Token): Erc20;
+
+  /**
+   * Transfer ERC20 tokens to one or more recipients.
+   */
+  transfer(
+    token: Token,
+    transfers: { to: Address; amount: Amount }[],
+    options?: ExecuteOptions
+  ): Promise<Tx>;
+
+  /**
+   * Get the wallet's balance of an ERC20 token.
+   */
+  balanceOf(token: Token): Promise<Amount>;
+
+  // ============================================================
+  // Staking methods
+  // ============================================================
+
+  /**
+   * Get all Staking instances that have been accessed by this wallet.
+   */
+  readonly activeStaking: Staking[];
+
+  /**
+   * Get or create a Staking instance for a specific pool.
+   */
+  staking(poolAddress: Address): Promise<Staking>;
+
+  /**
+   * Get or create a Staking instance for a validator's pool.
+   */
+  stakingInStaker(stakerAddress: Address, token: Token): Promise<Staking>;
+
+  /**
+   * Enter a delegation pool as a new member.
+   */
+  enterPool(
+    poolAddress: Address,
+    amount: Amount,
+    options?: ExecuteOptions
+  ): Promise<Tx>;
+
+  /**
+   * Add more tokens to an existing stake in a pool.
+   */
+  addToPool(
+    poolAddress: Address,
+    amount: Amount,
+    options?: ExecuteOptions
+  ): Promise<Tx>;
+
+  /**
+   * Claim accumulated staking rewards from a pool.
+   */
+  claimPoolRewards(poolAddress: Address, options?: ExecuteOptions): Promise<Tx>;
+
+  /**
+   * Initiate an exit from a delegation pool.
+   */
+  exitPoolIntent(
+    poolAddress: Address,
+    amount: Amount,
+    options?: ExecuteOptions
+  ): Promise<Tx>;
+
+  /**
+   * Complete the exit from a delegation pool.
+   */
+  exitPool(poolAddress: Address, options?: ExecuteOptions): Promise<Tx>;
+
+  /**
+   * Check if the wallet is a member of a delegation pool.
+   */
+  isPoolMember(poolAddress: Address): Promise<boolean>;
+
+  /**
+   * Get the wallet's staking position in a pool.
+   */
+  getPoolPosition(poolAddress: Address): Promise<PoolMember | null>;
+
+  /**
+   * Get the validator's commission rate for a pool.
+   */
+  getPoolCommission(poolAddress: Address): Promise<number>;
 }

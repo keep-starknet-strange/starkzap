@@ -12,6 +12,7 @@ import { AccountProvider } from "@/wallet/accounts/provider";
 import { SignerAdapter } from "@/signer";
 import type { SignerInterface } from "@/signer";
 import type {
+  Address,
   AccountClassConfig,
   DeployOptions,
   EnsureReadyOptions,
@@ -19,18 +20,21 @@ import type {
   FeeMode,
   PreflightOptions,
   PreflightResult,
+  SDKConfig,
+  ExplorerConfig,
+  ChainId,
+  StakingConfig,
 } from "@/types";
-import type { SDKConfig, ExplorerConfig, ChainId } from "@/types";
-import { Address } from "@/types";
-import type { WalletInterface } from "@/wallet/interface";
 import {
   checkDeployed,
   ensureWalletReady,
   preflightTransaction,
   sponsoredDetails,
 } from "@/wallet/utils";
+import { BaseWallet } from "@/wallet/base";
 
 export { type WalletInterface } from "@/wallet/interface";
+export { BaseWallet } from "@/wallet/base";
 export { AccountProvider } from "@/wallet/accounts/provider";
 
 /**
@@ -82,11 +86,10 @@ interface WalletInternals {
   explorerConfig?: ExplorerConfig;
   defaultFeeMode: FeeMode;
   defaultTimeBounds?: PaymasterTimeBounds;
+  stakingConfig: StakingConfig | undefined;
 }
 
-export class Wallet implements WalletInterface {
-  readonly address: Address;
-
+export class Wallet extends BaseWallet {
   private readonly provider: RpcProvider;
   private readonly account: Account;
   private readonly accountProvider: AccountProvider;
@@ -99,7 +102,7 @@ export class Wallet implements WalletInterface {
   private deployedCache: boolean | null = null;
 
   private constructor(options: WalletInternals) {
-    this.address = options.address;
+    super(options.address, options.stakingConfig);
     this.accountProvider = options.accountProvider;
     this.account = options.account;
     this.provider = options.provider;
@@ -147,9 +150,7 @@ export class Wallet implements WalletInterface {
         : new AccountProvider(accountInput.signer, accountInput.accountClass);
 
     // Use provided address or compute from account provider
-    const address = providedAddress
-      ? Address.from(providedAddress)
-      : await accountProvider.getAddress();
+    const address = providedAddress ?? (await accountProvider.getAddress());
 
     const signer = accountProvider.getSigner();
 
@@ -177,6 +178,7 @@ export class Wallet implements WalletInterface {
       ...(config.explorer && { explorerConfig: config.explorer }),
       defaultFeeMode: feeMode,
       ...(timeBounds && { defaultTimeBounds: timeBounds }),
+      stakingConfig: options.config.staking,
     });
   }
 

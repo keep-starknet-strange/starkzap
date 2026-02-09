@@ -10,24 +10,25 @@ import {
   type WalletAccount,
 } from "starknet";
 import { Tx } from "@/tx";
-import type {
-  DeployOptions,
-  EnsureReadyOptions,
-  ExecuteOptions,
-  FeeMode,
-  PreflightOptions,
-  PreflightResult,
-  ExplorerConfig,
-  ChainId,
+import {
+  type DeployOptions,
+  type EnsureReadyOptions,
+  type ExecuteOptions,
+  type FeeMode,
+  type PreflightOptions,
+  type PreflightResult,
+  type ExplorerConfig,
+  type ChainId,
+  fromAddress,
+  type StakingConfig,
 } from "@/types";
-import type { WalletInterface } from "@/wallet/interface";
-import { Address } from "@/types";
 import {
   checkDeployed,
   ensureWalletReady,
   preflightTransaction,
   sponsoredDetails,
 } from "@/wallet/utils";
+import { BaseWallet } from "@/wallet/base";
 
 const CHAIN_ID_MAP: Record<ChainId, string> = {
   SN_MAIN: constants.StarknetChainId.SN_MAIN,
@@ -70,8 +71,7 @@ export interface CartridgeWalletOptions {
  * controller.openProfile();
  * ```
  */
-export class CartridgeWallet implements WalletInterface {
-  readonly address: Address;
+export class CartridgeWallet extends BaseWallet {
   private readonly controller: Controller;
   private readonly walletAccount: WalletAccount;
   private readonly provider: RpcProvider;
@@ -84,9 +84,10 @@ export class CartridgeWallet implements WalletInterface {
     controller: Controller,
     walletAccount: WalletAccount,
     provider: RpcProvider,
+    stakingConfig: StakingConfig | undefined,
     options: CartridgeWalletOptions = {}
   ) {
-    this.address = Address.from(walletAccount.address);
+    super(fromAddress(walletAccount.address), stakingConfig);
     this.controller = controller;
     this.walletAccount = walletAccount;
     this.provider = provider;
@@ -100,7 +101,8 @@ export class CartridgeWallet implements WalletInterface {
    * Create and connect a CartridgeWallet.
    */
   static async create(
-    options: CartridgeWalletOptions = {}
+    options: CartridgeWalletOptions = {},
+    stakingConfig?: StakingConfig | undefined
   ): Promise<CartridgeWallet> {
     const controllerOptions: Record<string, unknown> = {};
 
@@ -160,8 +162,14 @@ export class CartridgeWallet implements WalletInterface {
       nodeUrl: options.rpcUrl ?? controller.rpcUrl(),
     });
 
-    // @ts-expect-error This is a preexisting issue with the starknet.js version mismatch and cartridge's starknet.js version.
-    return new CartridgeWallet(controller, walletAccount, provider, options);
+    return new CartridgeWallet(
+      controller,
+      // @ts-expect-error This is a preexisting issue with the starknet.js version mismatch and cartridge's starknet.js version.
+      walletAccount,
+      provider,
+      stakingConfig,
+      options
+    );
   }
 
   async isDeployed(): Promise<boolean> {

@@ -13,12 +13,12 @@
   "license": "MIT",
   "author": "0xLucqs",
   "type": "module",
-  "main": "./dist/index.js",
-  "types": "./dist/index.d.ts",
+  "main": "./dist/src/index.js",
+  "types": "./dist/src/index.d.ts",
   "exports": {
     ".": {
-      "types": "./dist/index.d.ts",
-      "import": "./dist/index.js"
+      "types": "./dist/src/index.d.ts",
+      "import": "./dist/src/index.js"
     },
     "./polyfills": {
       "types": "./dist/polyfills.d.ts",
@@ -46,15 +46,16 @@
     "fix": "eslint . --fix",
     "prettier": "prettier --write .",
     "prettier:check": "prettier --check .",
-    "test": "vitest run --exclude tests/integration/**",
-    "test:watch": "vitest --exclude tests/integration/**",
-    "test:coverage": "vitest run --exclude tests/integration/** --coverage",
-    "test:devnet": "TEST_NETWORK=devnet vitest run --exclude tests/integration/**",
-    "test:testnet": "TEST_NETWORK=testnet vitest run --exclude tests/integration/**",
-    "test:integration": "./scripts/test-integration.sh",
-    "generate:presets": "npx tsx scripts/generate-presets.ts --network mainnet",
-    "generate:presets:sepolia": "npx tsx scripts/generate-presets.ts --network sepolia",
-    "devnet:start": "starknet-devnet --seed 0 --account-class cairo1",
+    "test": "vitest run --project unit",
+    "test:watch": "vitest --project unit",
+    "test:coverage": "vitest run --project unit --coverage",
+    "test:integration": "vitest run --project integration",
+    "test:integration:watch": "vitest --project integration",
+    "test:all": "vitest run",
+    "generate:tokens": "npx tsx scripts/generate-token-presets.ts --network mainnet",
+    "generate:tokens:sepolia": "npx tsx scripts/generate-token-presets.ts --network sepolia",
+    "generate:validators": "npx tsx scripts/generate-validator-presets.ts --network mainnet",
+    "generate:validators:sepolia": "npx tsx scripts/generate-validator-presets.ts --network sepolia",
     "prepare": "husky"
   },
   "devDependencies": {
@@ -65,6 +66,7 @@
     "eslint-config-prettier": "^10.1.8",
     "husky": "^9.1.7",
     "prettier": "3.8.1",
+    "starknet-devnet": "^0.7.2",
     "tsc-alias": "^1.8.16",
     "tsx": "^4.21.0",
     "typescript": "^5.9.3",

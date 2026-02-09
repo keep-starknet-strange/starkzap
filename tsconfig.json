@@ -1,7 +1,7 @@
 {
   "compilerOptions": {
     // File Layout
-    "rootDir": "src",
+    "rootDir": ".",
     "outDir": "dist",
     "baseUrl": ".",
     "paths": {
@@ -24,6 +24,7 @@
     "isolatedModules": true,
     "moduleDetection": "force",
     "esModuleInterop": true,
+    "resolveJsonModule": true,
     // Performance
     "skipLibCheck": true
   },
