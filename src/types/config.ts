@@ -1,9 +1,26 @@
-import { type PaymasterOptions, RpcProvider, CairoFelt252 } from "starknet";
+import { type PaymasterOptions, RpcProvider, CairoFelt252, constants } from "starknet";
 import type { NetworkPreset, NetworkName } from "@/network";
 import type { Address } from "@/types";
 
 /** Supported Starknet chain identifiers */
-export type ChainId = "SN_MAIN" | "SN_SEPOLIA";
+export type ChainIdLiteral = "SN_MAIN" | "SN_SEPOLIA";
+
+export class ChainId {
+  constructor(readonly value: ChainIdLiteral) {}
+
+  toFelt252(): string {
+    return this.value === "SN_MAIN"
+      ? constants.StarknetChainId.SN_MAIN
+      : constants.StarknetChainId.SN_SEPOLIA;
+  }
+  toLiteral(): ChainIdLiteral {
+    return this.value;
+  }
+
+  static from(literal: ChainIdLiteral): ChainId {
+    return new ChainId(literal);
+  }
+}
 
 export async function getChainId(provider: RpcProvider): Promise<ChainId> {
   const chainIdHex = await provider.getChainId();

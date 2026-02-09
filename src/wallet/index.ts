@@ -7,6 +7,7 @@ import {
   type PaymasterTimeBounds,
   type TypedData,
   type Signature,
+  CairoFelt252,
 } from "starknet";
 import { Tx } from "@/tx";
 import { AccountProvider } from "@/wallet/accounts/provider";
@@ -42,12 +43,6 @@ import {
 // Braavos factory address (same on Sepolia and Mainnet)
 const BRAAVOS_FACTORY_ADDRESS =
   "0x3d94f65ebc7552eb517ddb374250a9525b605f25f4e41ded6e7d7381ff1c2e8";
-
-// Chain IDs as felt252
-const CHAIN_ID_FELTS: Record<string, string> = {
-  SN_MAIN: "0x534e5f4d41494e",
-  SN_SEPOLIA: "0x534e5f5345504f4c4941",
-};
 
 export { type WalletInterface } from "@/wallet/interface";
 export { BaseWallet } from "@/wallet/base";
@@ -308,8 +303,7 @@ export class Wallet extends BaseWallet {
 
     // Build Braavos deployment params
     // Format: [impl_class_hash, ...9 zeros, chain_id, aux_sig_r, aux_sig_s]
-    const chainIdFelt =
-      CHAIN_ID_FELTS[this.chainId] || "0x534e5f5345504f4c4941"; // Default to SN_SEPOLIA
+    const chainIdFelt = new CairoFelt252(this.chainId).decodeUtf8(); // Default to SN_SEPOLIA
 
     // Build the aux data to sign: [impl_class_hash, 9 zeros, chain_id]
     const auxData: string[] = [

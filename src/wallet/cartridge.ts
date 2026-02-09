@@ -1,7 +1,6 @@
 import Controller from "@cartridge/controller";
 import {
   RpcProvider,
-  constants,
   type Account,
   type Call,
   type PaymasterTimeBounds,
@@ -11,6 +10,7 @@ import {
 } from "starknet";
 import { Tx } from "@/tx";
 import {
+  ChainId,
   type DeployOptions,
   type EnsureReadyOptions,
   type ExecuteOptions,
@@ -18,7 +18,6 @@ import {
   type PreflightOptions,
   type PreflightResult,
   type ExplorerConfig,
-  type ChainId,
   fromAddress,
   type StakingConfig,
 } from "@/types";
@@ -29,11 +28,6 @@ import {
   sponsoredDetails,
 } from "@/wallet/utils";
 import { BaseWallet } from "@/wallet/base";
-
-const CHAIN_ID_MAP: Record<ChainId, string> = {
-  SN_MAIN: constants.StarknetChainId.SN_MAIN,
-  SN_SEPOLIA: constants.StarknetChainId.SN_SEPOLIA,
-};
 
 /**
  * Options for connecting with Cartridge Controller.
@@ -91,7 +85,7 @@ export class CartridgeWallet extends BaseWallet {
     this.controller = controller;
     this.walletAccount = walletAccount;
     this.provider = provider;
-    this.chainId = options.chainId ?? "SN_MAIN";
+    this.chainId = options.chainId ?? ChainId.from("SN_MAIN");
     this.explorerConfig = options.explorer;
     this.defaultFeeMode = options.feeMode ?? "user_pays";
     this.defaultTimeBounds = options.timeBounds;
@@ -107,7 +101,7 @@ export class CartridgeWallet extends BaseWallet {
     const controllerOptions: Record<string, unknown> = {};
 
     if (options.chainId) {
-      controllerOptions.defaultChainId = CHAIN_ID_MAP[options.chainId];
+      controllerOptions.defaultChainId = options.chainId.toFelt252();
     }
 
     if (options.rpcUrl && !options.rpcUrl.includes("api.cartridge.gg")) {
