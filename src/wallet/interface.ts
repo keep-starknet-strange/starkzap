@@ -7,6 +7,7 @@ import type {
   Signature,
 } from "starknet";
 import type { Tx } from "@/tx";
+import type { TxBuilder } from "@/tx/builder";
 import type { Erc20 } from "@/erc20";
 import type { Staking } from "@/staking";
 import type {
@@ -74,6 +75,21 @@ export interface WalletInterface {
    * Returns a Tx object to track the transaction.
    */
   execute(calls: Call[], options?: ExecuteOptions): Promise<Tx>;
+
+  /**
+   * Create a transaction builder for batching multiple operations into a single transaction.
+   *
+   * Chain operations fluently and call `.send()` to execute them atomically.
+   *
+   * @example
+   * ```ts
+   * const tx = await wallet.tx()
+   *   .transfer(USDC, { to: alice, amount: Amount.parse("50", USDC) })
+   *   .enterPool(poolAddress, Amount.parse("100", STRK))
+   *   .send();
+   * ```
+   */
+  tx(): TxBuilder;
 
   /**
    * Sign a typed data message (EIP-712 style).

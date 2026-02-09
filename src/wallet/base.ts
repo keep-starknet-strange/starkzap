@@ -13,6 +13,7 @@ import {
   type Token,
 } from "@/types";
 import type { Tx } from "@/tx";
+import { TxBuilder } from "@/tx/builder";
 import type {
   Account,
   Call,
@@ -147,6 +148,28 @@ export abstract class BaseWallet implements WalletInterface {
 
   /** @inheritdoc */
   abstract disconnect(): Promise<void>;
+
+  // ============================================================
+  // Transaction builder
+  // ============================================================
+
+  /**
+   * Create a transaction builder for batching multiple operations into a single transaction.
+   *
+   * @returns A new TxBuilder instance bound to this wallet
+   *
+   * @example
+   * ```ts
+   * const tx = await wallet.tx()
+   *   .transfer(USDC, { to: alice, amount: Amount.parse("50", USDC) })
+   *   .enterPool(poolAddress, Amount.parse("100", STRK))
+   *   .send();
+   * await tx.wait();
+   * ```
+   */
+  tx(): TxBuilder {
+    return new TxBuilder(this);
+  }
 
   // ============================================================
   // ERC20 delegated methods

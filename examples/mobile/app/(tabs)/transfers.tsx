@@ -26,7 +26,7 @@ import { Amount, fromAddress, type Token, type ChainId } from "x";
 /** Get explorer URL for a transaction hash */
 function getExplorerUrl(txHash: string, chainId: ChainId): string {
   const baseUrl =
-    chainId === "SN_SEPOLIA"
+    chainId.toLiteral() === "SN_SEPOLIA"
       ? "https://sepolia.voyager.online/tx"
       : "https://voyager.online/tx";
   return `${baseUrl}/${txHash}`;

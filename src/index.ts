@@ -10,7 +10,7 @@ export {
 } from "@/wallet/cartridge";
 
 // Transaction
-export { Tx } from "@/tx";
+export { Tx, TxBuilder } from "@/tx";
 
 // Signer
 export * from "@/signer";

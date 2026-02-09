@@ -1,4 +1,5 @@
 import {
+  type Call,
   Contract,
   type ProviderOrAccount,
   type RpcProvider,
@@ -47,10 +48,16 @@ import { groupBy } from "@/utils";
 export class Staking {
   private readonly pool: TypedContractV2<typeof POOL_ABI>;
   private readonly token: Token;
+  private readonly provider: RpcProvider;
 
-  private constructor(pool: TypedContractV2<typeof POOL_ABI>, token: Token) {
+  private constructor(
+    pool: TypedContractV2<typeof POOL_ABI>,
+    token: Token,
+    provider: RpcProvider
+  ) {
     this.pool = pool;
     this.token = token;
+    this.provider = provider;
   }
 
   /**
@@ -60,6 +67,34 @@ export class Staking {
    */
   get poolAddress(): Address {
     return fromAddress(this.pool.address);
+  }
+
+  /**
+   * Build approve + enter pool Calls without executing.
+   *
+   * Useful for constructing multi-step transactions via {@link TxBuilder}.
+   * Does not perform membership validation — that happens on-chain.
+   *
+   * @param walletAddress - The wallet address entering the pool
+   * @param amount - The amount of tokens to stake
+   * @returns Array of Calls (approve + enter_delegation_pool)
+   *
+   * @example
+   * ```ts
+   * const calls = staking.populateEnter(wallet.address, Amount.parse(100, strkToken));
+   * ```
+   */
+  populateEnter(walletAddress: Address, amount: Amount): Call[] {
+    const tokenContract = this.tokenContract(this.provider);
+    const approveCall = tokenContract.populateTransaction.approve(
+      this.pool.address,
+      amount.toBase()
+    );
+    const enterPoolCall = this.pool.populateTransaction.enter_delegation_pool(
+      walletAddress,
+      amount.toBase()
+    );
+    return [approveCall, enterPoolCall];
   }
 
   /**
@@ -91,18 +126,8 @@ export class Staking {
       );
     }
 
-    const tokenContract = this.tokenContract(wallet.getAccount());
-    const approveCall = tokenContract.populateTransaction.approve(
-      this.pool.address,
-      amount.toBase()
-    );
-
-    const enterPoolCall = this.pool.populateTransaction.enter_delegation_pool(
-      wallet.address,
-      amount.toBase()
-    );
-
-    return await wallet.execute([approveCall, enterPoolCall], options);
+    const calls = this.populateEnter(wallet.address, amount);
+    return await wallet.execute(calls, options);
   }
 
   /**
@@ -191,6 +216,34 @@ export class Staking {
   }
 
   /**
+   * Build approve + add-to-pool Calls without executing.
+   *
+   * Useful for constructing multi-step transactions via {@link TxBuilder}.
+   * Does not perform membership validation — that happens on-chain.
+   *
+   * @param walletAddress - The wallet address adding to the pool
+   * @param amount - The amount of tokens to add
+   * @returns Array of Calls (approve + add_to_delegation_pool)
+   *
+   * @example
+   * ```ts
+   * const calls = staking.populateAdd(wallet.address, Amount.parse(50, strkToken));
+   * ```
+   */
+  populateAdd(walletAddress: Address, amount: Amount): Call[] {
+    const tokenContract = this.tokenContract(this.provider);
+    const approveCall = tokenContract.populateTransaction.approve(
+      this.pool.address,
+      amount.toBase()
+    );
+    const addPoolCall = this.pool.populateTransaction.add_to_delegation_pool(
+      walletAddress,
+      amount.toBase()
+    );
+    return [approveCall, addPoolCall];
+  }
+
+  /**
    * Add more tokens to an existing stake in the pool.
    *
    * The wallet must already be a member of the pool. Use `enter()` for first-time staking.
@@ -213,19 +266,26 @@ export class Staking {
     options?: ExecuteOptions
   ): Promise<Tx> {
     await this.assertIsMember(wallet);
+    const calls = this.populateAdd(wallet.address, amount);
+    return await wallet.execute(calls, options);
+  }
 
-    const tokenContract = this.tokenContract(wallet.getAccount());
-    const approveCall = tokenContract.populateTransaction.approve(
-      this.pool.address,
-      amount.toBase()
-    );
-
-    const addPoolCall = this.pool.populateTransaction.add_to_delegation_pool(
-      wallet.address,
-      amount.toBase()
-    );
-
-    return await wallet.execute([approveCall, addPoolCall], options);
+  /**
+   * Build a claim-rewards Call without executing.
+   *
+   * Useful for constructing multi-step transactions via {@link TxBuilder}.
+   * Does not validate membership or reward balance — that happens on-chain.
+   *
+   * @param walletAddress - The wallet address claiming rewards
+   * @returns A Call object for the claim_rewards transaction
+   *
+   * @example
+   * ```ts
+   * const call = staking.populateClaimRewards(wallet.address);
+   * ```
+   */
+  populateClaimRewards(walletAddress: Address): Call {
+    return this.pool.populateTransaction.claim_rewards(walletAddress);
   }
 
   /**
@@ -262,10 +322,28 @@ export class Staking {
       throw new Error(`No rewards to claim yet`);
     }
 
-    const claimCall = this.pool.populateTransaction.claim_rewards(
-      wallet.address
-    );
+    const claimCall = this.populateClaimRewards(wallet.address);
     return await wallet.execute([claimCall], options);
+  }
+
+  /**
+   * Build an exit-intent Call without executing.
+   *
+   * Useful for constructing multi-step transactions via {@link TxBuilder}.
+   * Does not validate membership or staked balance — that happens on-chain.
+   *
+   * @param amount - The amount to unstake
+   * @returns A Call object for the exit_delegation_pool_intent transaction
+   *
+   * @example
+   * ```ts
+   * const call = staking.populateExitIntent(Amount.parse(50, strkToken));
+   * ```
+   */
+  populateExitIntent(amount: Amount): Call {
+    return this.pool.populateTransaction.exit_delegation_pool_intent(
+      amount.toBase()
+    );
   }
 
   /**
@@ -316,11 +394,28 @@ export class Staking {
       );
     }
 
-    const exitCall = this.pool.populateTransaction.exit_delegation_pool_intent(
-      amount.toBase()
-    );
-
+    const exitCall = this.populateExitIntent(amount);
     return await wallet.execute([exitCall], options);
+  }
+
+  /**
+   * Build an exit-pool Call without executing.
+   *
+   * Useful for constructing multi-step transactions via {@link TxBuilder}.
+   * Does not validate exit window timing — that happens on-chain.
+   *
+   * @param walletAddress - The wallet address completing the exit
+   * @returns A Call object for the exit_delegation_pool_action transaction
+   *
+   * @example
+   * ```ts
+   * const call = staking.populateExit(wallet.address);
+   * ```
+   */
+  populateExit(walletAddress: Address): Call {
+    return this.pool.populateTransaction.exit_delegation_pool_action(
+      walletAddress
+    );
   }
 
   /**
@@ -356,10 +451,7 @@ export class Staking {
       throw new Error("Wallet cannot unstake yet.");
     }
 
-    const exitCall = this.pool.populateTransaction.exit_delegation_pool_action(
-      wallet.address
-    );
-
+    const exitCall = this.populateExit(wallet.address);
     return await wallet.execute([exitCall], options);
   }
 
@@ -466,7 +558,7 @@ export class Staking {
       );
     }
 
-    return new Staking(poolContract, token);
+    return new Staking(poolContract, token, provider);
   }
 
   /**
@@ -522,7 +614,7 @@ export class Staking {
       providerOrAccount: provider,
     }).typedv2(POOL_ABI);
 
-    return new Staking(poolContract, token);
+    return new Staking(poolContract, token, provider);
   }
 
   /**

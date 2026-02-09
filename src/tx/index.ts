@@ -168,3 +168,5 @@ function isFinalStatus(finality: string, execution?: string): boolean {
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
+
+export { TxBuilder } from "@/tx/builder";
