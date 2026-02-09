@@ -45,7 +45,6 @@ export interface ExplorerConfig {
  *   chainId: "SN_MAIN",
  *   staking: {
  *     contract: "0x03745ab04a431fc02871a139be6b93d9260b0ff3e779ad9c8b377183b23109f1",
- *     mintingCurveContract: "0x06043928ca93cff6d6f39378ba391d7152eea707bdd624c1b2074e71af2abaca",
  *   },
  * });
  * ```
@@ -53,8 +52,6 @@ export interface ExplorerConfig {
 export interface StakingConfig {
   /** Address of the core staking contract */
   contract: Address;
-  /** Address of the minting curve contract used for reward calculations */
-  mintingCurveContract: Address;
 }
 
 /**

@@ -15,7 +15,6 @@ import {
 } from "@/types";
 import { ABI as POOL_ABI } from "@/abi/pool";
 import { ABI as STAKING_ABI } from "@/abi/staking";
-import { ABI as MINTING_CURVE_ABI } from "@/abi/minting-curve";
 import { ABI as ERC20_ABI } from "@/abi/erc20";
 import type { WalletInterface } from "@/wallet";
 import type { Tx } from "@/tx";
@@ -48,19 +47,10 @@ import { groupBy } from "@/utils";
 export class Staking {
   private readonly pool: TypedContractV2<typeof POOL_ABI>;
   private readonly token: Token;
-  private readonly mintingCurve: TypedContractV2<typeof MINTING_CURVE_ABI>;
-  private readonly stakingContract: TypedContractV2<typeof STAKING_ABI>;
 
-  private constructor(
-    pool: TypedContractV2<typeof POOL_ABI>,
-    token: Token,
-    mintingCurve: TypedContractV2<typeof MINTING_CURVE_ABI>,
-    stakingContract: TypedContractV2<typeof STAKING_ABI>
-  ) {
+  private constructor(pool: TypedContractV2<typeof POOL_ABI>, token: Token) {
     this.pool = pool;
     this.token = token;
-    this.mintingCurve = mintingCurve;
-    this.stakingContract = stakingContract;
   }
 
   /**
@@ -199,101 +189,6 @@ export class Staking {
     const params = await this.pool.contract_parameters_v1();
     return Number(params.commission) / 100;
   }
-
-  // /**
-  //  * Calculate the theoretical maximum Annual Percentage Yield (APY) for delegators in this pool.
-  //  *
-  //  * This returns the maximum possible APY assuming perfect validator attestation every epoch.
-  //  * Actual returns may be lower based on validator liveness and performance.
-  //  *
-  //  * For STRK pools:
-  //  * - APY represents the percentage return in STRK on your STRK stake
-  //  *
-  //  * For non-STRK pools (e.g., wrapped BTC):
-  //  * - APY represents the STRK rewards as a percentage of your stake value
-  //  * - Note: This does not account for price differences between tokens
-  //  *
-  //  * The APY is calculated as:
-  //  * ```
-  //  * Token Yearly Rewards = yearly_mint * token_reward_share
-  //  * Base APY = (Token Yearly Rewards / token_total_stake) * 100
-  //  * Delegator APY = Base APY * (1 - commission)
-  //  * ```
-  //  *
-  //  * @returns The theoretical maximum APY as a percentage (e.g., 10.5 means 10.5%)
-  //  */
-  // async getMaxAPY(): Promise<number> {
-  //   // Get staking contract parameters to determine STRK address and reward supplier
-  //   const stakingParams = await this.stakingContract.contract_parameters_v1();
-  //   const strkAddress = fromAddress(stakingParams.token_address);
-  //   const isStrkPool = this.token.address === strkAddress;
-  //
-  //   // Get commission
-  //   const commission = await this.getCommission();
-  //
-  //   // Get yearly mint (total STRK rewards for the protocol)
-  //   const yearlyMint = await this.mintingCurve.yearly_mint();
-  //   const yearlyMintNum = Number(yearlyMint);
-  //
-  //   let yearlyRewards: number;
-  //   let totalStake: number;
-  //
-  //   if (isStrkPool) {
-  //     // For STRK pools: get STRK total stake and full reward share (minus alpha for BTC)
-  //     const rewardSupplierAddress = fromAddress(stakingParams.reward_supplier);
-  //     const rewardSupplier = new Contract({
-  //       abi: REWARD_SUPPLIER_ABI,
-  //       address: rewardSupplierAddress,
-  //       providerOrAccount: this.stakingContract.providerOrAccount,
-  //     }).typedv2(REWARD_SUPPLIER_ABI);
-  //
-  //     const [strkTotalStake, alpha] = await Promise.all([
-  //       this.stakingContract.get_total_stake(),
-  //       rewardSupplier.get_alpha(),
-  //     ]);
-  //
-  //     totalStake = Number(strkTotalStake);
-  //     // STRK rewards = yearly_mint * (100 - alpha) / 100
-  //     // Alpha is a percentage (0-100) representing BTC's share
-  //     const alphaNum = Number(alpha);
-  //     yearlyRewards = yearlyMintNum * (100 - alphaNum) / 100;
-  //   } else {
-  //     // For non-STRK pools (e.g., BTC): get token total stake and alpha share of rewards
-  //     const rewardSupplierAddress = fromAddress(stakingParams.reward_supplier);
-  //     const rewardSupplier = new Contract({
-  //       abi: REWARD_SUPPLIER_ABI,
-  //       address: rewardSupplierAddress,
-  //       providerOrAccount: this.stakingContract.providerOrAccount,
-  //     }).typedv2(REWARD_SUPPLIER_ABI);
-  //
-  //     let tokenTotalStake: bigint;
-  //     try {
-  //       tokenTotalStake = await this.stakingContract.get_total_stake_for_token(this.token.address);
-  //     } catch {
-  //       throw new Error(
-  //         `Token ${this.token.symbol} (${this.token.address}) is not supported for staking APY calculation. ` +
-  //         `The token may not be enabled or registered in the staking contract.`
-  //       );
-  //     }
-  //
-  //     const alpha = await rewardSupplier.get_alpha();
-  //
-  //     totalStake = Number(tokenTotalStake);
-  //     // Non-STRK rewards = yearly_mint * alpha / 100
-  //     const alphaNum = Number(alpha);
-  //     yearlyRewards = yearlyMintNum * alphaNum / 100;
-  //   }
-  //
-  //   if (totalStake === 0) {
-  //     return 0;
-  //   }
-  //
-  //   // Base APY as percentage
-  //   const baseAPY = (yearlyRewards / totalStake) * 100;
-  //
-  //   // Delegator APY after commission (commission is already in percentage, e.g., 10 = 10%)
-  //   return baseAPY * (1 - commission / 100);
-  // }
 
   /**
    * Add more tokens to an existing stake in the pool.
@@ -571,13 +466,7 @@ export class Staking {
       );
     }
 
-    const mintingCurve = new Contract({
-      abi: MINTING_CURVE_ABI,
-      address: config.mintingCurveContract,
-      providerOrAccount: provider,
-    }).typedv2(MINTING_CURVE_ABI);
-
-    return new Staking(poolContract, token, mintingCurve, stakingContract);
+    return new Staking(poolContract, token);
   }
 
   /**
@@ -633,13 +522,7 @@ export class Staking {
       providerOrAccount: provider,
     }).typedv2(POOL_ABI);
 
-    const mintingCurve = new Contract({
-      abi: MINTING_CURVE_ABI,
-      address: config.mintingCurveContract,
-      providerOrAccount: provider,
-    }).typedv2(MINTING_CURVE_ABI);
-
-    return new Staking(poolContract, token, mintingCurve, stakingContract);
+    return new Staking(poolContract, token);
   }
 
   /**

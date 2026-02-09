@@ -28,14 +28,11 @@ export default async function setup(project: TestProject) {
   const args = ["--seed", "0"];
   if (forkNetwork) {
     args.push("--fork-network", forkNetwork);
-    console.log(
-      `\nStarting starknet-devnet (forking from ${forkNetwork})...\n`
-    );
+    console.log("Starting starknet-devnet (with fork)...");
   } else {
-    console.log("\nStarting starknet-devnet...\n");
+    console.log("Starting starknet-devnet...");
   }
 
-  console.log("Devnet not installed, spawning compatible version...");
   devnet = await Devnet.spawnVersion(DEVNET_VERSION, {
     args,
     stdout: "ignore",
@@ -44,12 +41,14 @@ export default async function setup(project: TestProject) {
   });
 
   const devnetUrl = devnet.provider.url;
+  const config = await devnet.provider.getConfig();
   const sdkConfig: SDKConfig = {
     rpcUrl: devnetUrl,
-    chainId: "SN_SEPOLIA", // Devnet uses Sepolia chain ID
+    chainId: config.chain_id,
   };
 
-  console.log(`✅ Devnet running at ${devnetUrl}\n`);
+  console.log(`✅ Devnet running at ${devnetUrl}`);
+  console.log("🛜 Network: ", config.chain_id, "\n");
   project.provide("sdkConfig", sdkConfig);
 
   // Return teardown function

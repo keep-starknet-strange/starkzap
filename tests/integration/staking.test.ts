@@ -3,30 +3,34 @@ import { StarkSDK } from "@/sdk";
 import { sepoliaTokens } from "@/erc20";
 import { StarkSigner } from "@/signer";
 import { DevnetPreset } from "@/account";
-import { Amount, type Address } from "@/types";
+import { Amount, fromAddress, type Validator } from "@/types";
 import { testPrivateKeys } from "../config";
 import { fund } from "./shared";
 import { DevnetProvider } from "starknet-devnet";
-import { sepoliaValidators } from "@/staking";
+import { mainnetValidators, sepoliaValidators } from "@/staking";
 
-/**
- * Known pool addresses on Sepolia for testing.
- */
-const SEPOLIA_STAKING = {
-  CONTRACT:
-    "0x03745ab04a431fc02871a139be6b93d9260b0ff3e779ad9c8b377183b23109f1" as Address,
-  MINTING_CURVE:
-    "0x06043928ca93cff6d6f39378ba391d7152eea707bdd624c1b2074e71af2abaca" as Address,
-  VALIDATOR:
-    "0x01637463889a6907e21bf38Aaa7AC294ca14a8ea32906EC36A88687D46eDD4A8" as Address,
+const STAKING_PER_NETWORK = {
+  SN_MAIN: {
+    STAKING_CONTRACT:
+      "0x00ca1702e64c81d9a07b86bd2c540188d92a2c73cf5cc0e508d949015e7e84a7",
+    VALIDATOR_UNDER_TEST:
+      "0x00D3b910D8C528Bf0216866053c3821AC6C97983Dc096BFF642e9a3549210ee7",
+  },
+  SN_SEPOLIA: {
+    STAKING_CONTRACT:
+      "0x03745ab04a431fc02871a139be6b93d9260b0ff3e779ad9c8b377183b23109f1",
+    VALIDATOR_UNDER_TEST:
+      "0x01637463889a6907e21bf38Aaa7AC294ca14a8ea32906EC36A88687D46eDD4A8",
+  },
 };
 
 describe("Staking Lifecycle (Integration)", () => {
   const config = inject("sdkConfig");
+  const testPresets = STAKING_PER_NETWORK[config.chainId!];
   config.staking = {
-    contract: SEPOLIA_STAKING.CONTRACT,
-    mintingCurveContract: SEPOLIA_STAKING.MINTING_CURVE,
+    contract: fromAddress(testPresets.STAKING_CONTRACT),
   };
+  const validatorUnderTest = fromAddress(testPresets.VALIDATOR_UNDER_TEST);
 
   let sdk: StarkSDK;
   let devnetRunning = false;
@@ -75,11 +79,8 @@ describe("Staking Lifecycle (Integration)", () => {
     console.log("Wallet address:", wallet.address);
 
     // Get staking instance
-    const staking = await wallet.stakingInStaker(
-      SEPOLIA_STAKING.VALIDATOR,
-      STRK
-    );
-    console.log("Validator address:", SEPOLIA_STAKING.VALIDATOR);
+    const staking = await wallet.stakingInStaker(validatorUnderTest, STRK);
+    console.log("Validator address:", validatorUnderTest);
 
     // Get pool commission
     const commission = await wallet.getPoolCommission(staking.poolAddress);
@@ -239,10 +240,7 @@ describe("Staking Lifecycle (Integration)", () => {
       },
     });
 
-    const staking = await wallet.stakingInStaker(
-      SEPOLIA_STAKING.VALIDATOR,
-      STRK
-    );
+    const staking = await wallet.stakingInStaker(validatorUnderTest, STRK);
 
     await fund(wallet, Amount.parse(500, STRK));
     await wallet.ensureReady({ deploy: "if_needed" });
@@ -290,7 +288,12 @@ describe("Staking Lifecycle (Integration)", () => {
         return;
       }
 
-      const validator = sepoliaValidators.NETHERMIND;
+      let validator: Validator;
+      if (config.chainId == "SN_SEPOLIA") {
+        validator = sepoliaValidators.NETHERMIND;
+      } else {
+        validator = mainnetValidators.KARNOT;
+      }
       console.log("Testing getStakerPools for validator:", validator.name);
 
       const pools = await sdk.getStakerPools(validator.stakerAddress);
@@ -324,11 +327,20 @@ describe("Staking Lifecycle (Integration)", () => {
         return;
       }
 
-      const validators = [
-        sepoliaValidators.NETHERMIND,
-        sepoliaValidators.CHORUS_ONE,
-        sepoliaValidators.KEPLR,
-      ];
+      let validators: Validator[];
+      if (config.chainId == "SN_SEPOLIA") {
+        validators = [
+          sepoliaValidators.NETHERMIND,
+          sepoliaValidators.CHORUS_ONE,
+          sepoliaValidators.KEPLR,
+        ];
+      } else {
+        validators = [
+          mainnetValidators.KARNOT,
+          mainnetValidators.READY_PREV_ARGENT,
+          mainnetValidators.TWINSTAKE,
+        ];
+      }
 
       for (const validator of validators) {
         console.log("\nTesting validator:", validator.name);
@@ -351,91 +363,4 @@ describe("Staking Lifecycle (Integration)", () => {
       }
     });
   });
-
-  // describe("getMaxAPY", () => {
-  //   it("should calculate theoretical max APY for a delegation pool", async () => {
-  //     if (!stakingAvailable) {
-  //       console.log("Skipping: staking not available");
-  //       return;
-  //     }
-  //
-  //     const staking = await sdk.stakingInValidator(
-  //       SEPOLIA_STAKING.VALIDATOR,
-  //       STRK
-  //     );
-  //
-  //     const maxApy = await staking.getMaxAPY();
-  //     console.log("Theoretical Max APY:", maxApy.toFixed(4), "%");
-  //
-  //     // APY should be a valid number
-  //     expect(typeof maxApy).toBe("number");
-  //     expect(Number.isNaN(maxApy)).toBe(false);
-  //     expect(Number.isFinite(maxApy)).toBe(true);
-  //
-  //     // APY should be non-negative
-  //     expect(maxApy).toBeGreaterThanOrEqual(0);
-  //
-  //     // On testnet, APY can be very high due to low participation
-  //     // On mainnet, expect much lower values (2-10% range)
-  //   });
-  //
-  //   it("should return lower APY for pools with higher commission", async () => {
-  //     if (!stakingAvailable) {
-  //       console.log("Skipping: staking not available");
-  //       return;
-  //     }
-  //
-  //     // Get APY and commission from multiple validators
-  //     const validators = [
-  //       sepoliaValidators.MOONLI_ME,
-  //       sepoliaValidators.TEKU,
-  //       sepoliaValidators.ONCHAINAUSTRIA,
-  //     ];
-  //
-  //     const results: { name: string; commission: number; maxApy: number }[] = [];
-  //
-  //     for (const validator of validators) {
-  //       try {
-  //         const staking = await sdk.stakingInValidator(
-  //           validator.stakerAddress,
-  //           STRK
-  //         );
-  //         const [commission, maxApy] = await Promise.all([
-  //           staking.getCommission(),
-  //           staking.getMaxAPY(),
-  //         ]);
-  //
-  //         results.push({
-  //           name: validator.name,
-  //           commission,
-  //           maxApy,
-  //         });
-  //
-  //         console.log(
-  //           `${validator.name}: Commission ${commission}%, Max APY ${maxApy.toFixed(4)}%`
-  //         );
-  //       } catch {
-  //         console.log(`Skipping ${validator.name}: no STRK pool`);
-  //       }
-  //     }
-  //
-  //     // If we have multiple results, verify APY decreases with higher commission
-  //     // (assuming same base APY, which should be the case for same token)
-  //     if (results.length >= 2) {
-  //       // Sort by commission ascending
-  //       const sorted = [...results].sort((a, b) => a.commission - b.commission);
-  //
-  //       // Higher commission should mean lower APY (or equal if commission difference is small)
-  //       for (let i = 0; i < sorted.length - 1; i++) {
-  //         const current = sorted[i]!;
-  //         const next = sorted[i + 1]!;
-  //
-  //         // If commission is higher, APY should be lower or equal
-  //         if (next.commission > current.commission) {
-  //           expect(next.maxApy).toBeLessThanOrEqual(current.maxApy);
-  //         }
-  //       }
-  //     }
-  //   });
-  // });
 });
