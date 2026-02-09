@@ -9,7 +9,7 @@ export * from "@/erc20/token/presets";
 export * from "@/erc20/token/presets.sepolia";
 
 export function getPresets(chainId: ChainId): Record<string, Token> {
-  switch (chainId) {
+  switch (chainId.toLiteral()) {
     case "SN_MAIN":
       return mainnetTokens;
     case "SN_SEPOLIA":

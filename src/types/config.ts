@@ -1,4 +1,9 @@
-import { type PaymasterOptions, RpcProvider, CairoFelt252, constants } from "starknet";
+import {
+  type PaymasterOptions,
+  RpcProvider,
+  CairoFelt252,
+  constants,
+} from "starknet";
 import type { NetworkPreset, NetworkName } from "@/network";
 import type { Address } from "@/types";
 
@@ -20,11 +25,16 @@ export class ChainId {
   static from(literal: ChainIdLiteral): ChainId {
     return new ChainId(literal);
   }
+  static fromFelt252(felt252: string): ChainId {
+    return new ChainId(
+      new CairoFelt252(felt252).decodeUtf8() as ChainIdLiteral
+    );
+  }
 }
 
 export async function getChainId(provider: RpcProvider): Promise<ChainId> {
   const chainIdHex = await provider.getChainId();
-  return new CairoFelt252(chainIdHex).decodeUtf8() as ChainId;
+  return ChainId.fromFelt252(chainIdHex);
 }
 
 /** Supported block explorer providers */
