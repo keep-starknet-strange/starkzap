@@ -10,6 +10,8 @@ import type { Address } from "@/types";
 /** Supported Starknet chain identifiers */
 export type ChainIdLiteral = "SN_MAIN" | "SN_SEPOLIA";
 
+const VALID_CHAIN_IDS: readonly string[] = ["SN_MAIN", "SN_SEPOLIA"];
+
 export class ChainId {
   constructor(readonly value: ChainIdLiteral) {}
 
@@ -22,9 +24,9 @@ export class ChainId {
   }
 
   toFelt252(): string {
-    return this.isMainnet()
-      ? constants.StarknetChainId.SN_MAIN
-      : constants.StarknetChainId.SN_SEPOLIA;
+    if (this.isMainnet()) return constants.StarknetChainId.SN_MAIN;
+    if (this.isSepolia()) return constants.StarknetChainId.SN_SEPOLIA;
+    throw new Error(`Unknown chain ID: ${this.value}`);
   }
 
   toLiteral(): ChainIdLiteral {
@@ -39,9 +41,13 @@ export class ChainId {
   }
 
   static fromFelt252(felt252: string): ChainId {
-    return new ChainId(
-      new CairoFelt252(felt252).decodeUtf8() as ChainIdLiteral
-    );
+    const decoded = new CairoFelt252(felt252).decodeUtf8();
+    if (!VALID_CHAIN_IDS.includes(decoded)) {
+      throw new Error(
+        `Unsupported chain ID: "${decoded}". Expected one of: ${VALID_CHAIN_IDS.join(", ")}`
+      );
+    }
+    return new ChainId(decoded as ChainIdLiteral);
   }
 }
 
