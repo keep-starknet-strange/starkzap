@@ -143,6 +143,98 @@ describe("Erc20", () => {
     });
   });
 
+  describe("populateApprove", () => {
+    it("should return a Call with approve entrypoint", () => {
+      const wallet = createMockWallet();
+      const erc20 = new Erc20(mockUSDC, wallet.getProvider());
+      const amount = Amount.parse("100", mockUSDC);
+      const spender = "0xspender" as Address;
+
+      const call = erc20.populateApprove(spender, amount);
+
+      expect(call.entrypoint).toBe("approve");
+      expect(call.contractAddress).toBe(mockUSDC.address);
+    });
+
+    it("should throw on decimals mismatch", () => {
+      const wallet = createMockWallet();
+      const erc20 = new Erc20(mockUSDC, wallet.getProvider());
+      const amount = Amount.parse("100", mockETH); // 18 decimals vs 6
+
+      expect(() =>
+        erc20.populateApprove("0xspender" as Address, amount)
+      ).toThrow("Amount decimals mismatch");
+    });
+
+    it("should throw on symbol mismatch", () => {
+      const wallet = createMockWallet();
+      const erc20 = new Erc20(mockETH, wallet.getProvider());
+      const amount = Amount.parse("100", mockDAI); // same decimals, different symbol
+
+      expect(() =>
+        erc20.populateApprove("0xspender" as Address, amount)
+      ).toThrow('Amount symbol mismatch: expected "ETH", got "DAI"');
+    });
+  });
+
+  describe("populateTransfer", () => {
+    it("should return an array of transfer Calls", () => {
+      const wallet = createMockWallet();
+      const erc20 = new Erc20(mockUSDC, wallet.getProvider());
+      const amount = Amount.parse("50", mockUSDC);
+
+      const calls = erc20.populateTransfer([
+        { to: "0xrecipient" as Address, amount },
+      ]);
+
+      expect(calls).toHaveLength(1);
+      expect(calls[0].entrypoint).toBe("transfer");
+      expect(calls[0].contractAddress).toBe(mockUSDC.address);
+    });
+
+    it("should return multiple Calls for multiple transfers", () => {
+      const wallet = createMockWallet();
+      const erc20 = new Erc20(mockUSDC, wallet.getProvider());
+      const amount1 = Amount.parse("50", mockUSDC);
+      const amount2 = Amount.parse("25", mockUSDC);
+
+      const calls = erc20.populateTransfer([
+        { to: "0xrecipient1" as Address, amount: amount1 },
+        { to: "0xrecipient2" as Address, amount: amount2 },
+      ]);
+
+      expect(calls).toHaveLength(2);
+      expect(calls[0].entrypoint).toBe("transfer");
+      expect(calls[1].entrypoint).toBe("transfer");
+    });
+
+    it("should throw on decimals mismatch", () => {
+      const wallet = createMockWallet();
+      const erc20 = new Erc20(mockUSDC, wallet.getProvider());
+      const invalidAmount = Amount.parse("100", mockETH);
+
+      expect(() =>
+        erc20.populateTransfer([
+          { to: "0xrecipient" as Address, amount: invalidAmount },
+        ])
+      ).toThrow("Amount decimals mismatch");
+    });
+
+    it("should validate each transfer in a batch", () => {
+      const wallet = createMockWallet();
+      const erc20 = new Erc20(mockUSDC, wallet.getProvider());
+      const validAmount = Amount.parse("50", mockUSDC);
+      const invalidAmount = Amount.parse("50", mockETH);
+
+      expect(() =>
+        erc20.populateTransfer([
+          { to: "0xrecipient1" as Address, amount: validAmount },
+          { to: "0xrecipient2" as Address, amount: invalidAmount },
+        ])
+      ).toThrow("Amount decimals mismatch");
+    });
+  });
+
   describe("balanceOf", () => {
     it("should return Amount with correct token info", async () => {
       const wallet = createMockWallet();

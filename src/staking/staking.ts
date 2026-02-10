@@ -72,17 +72,7 @@ export class Staking {
   /**
    * Build approve + enter pool Calls without executing.
    *
-   * Useful for constructing multi-step transactions via {@link TxBuilder}.
-   * Does not perform membership validation — that happens on-chain.
-   *
-   * @param walletAddress - The wallet address entering the pool
-   * @param amount - The amount of tokens to stake
-   * @returns Array of Calls (approve + enter_delegation_pool)
-   *
-   * @example
-   * ```ts
-   * const calls = staking.populateEnter(wallet.address, Amount.parse(100, strkToken));
-   * ```
+   * @internal Used by {@link TxBuilder} — not part of the public API.
    */
   populateEnter(walletAddress: Address, amount: Amount): Call[] {
     const tokenContract = this.tokenContract(this.provider);
@@ -218,17 +208,7 @@ export class Staking {
   /**
    * Build approve + add-to-pool Calls without executing.
    *
-   * Useful for constructing multi-step transactions via {@link TxBuilder}.
-   * Does not perform membership validation — that happens on-chain.
-   *
-   * @param walletAddress - The wallet address adding to the pool
-   * @param amount - The amount of tokens to add
-   * @returns Array of Calls (approve + add_to_delegation_pool)
-   *
-   * @example
-   * ```ts
-   * const calls = staking.populateAdd(wallet.address, Amount.parse(50, strkToken));
-   * ```
+   * @internal Used by {@link TxBuilder} — not part of the public API.
    */
   populateAdd(walletAddress: Address, amount: Amount): Call[] {
     const tokenContract = this.tokenContract(this.provider);
@@ -273,16 +253,7 @@ export class Staking {
   /**
    * Build a claim-rewards Call without executing.
    *
-   * Useful for constructing multi-step transactions via {@link TxBuilder}.
-   * Does not validate membership or reward balance — that happens on-chain.
-   *
-   * @param walletAddress - The wallet address claiming rewards
-   * @returns A Call object for the claim_rewards transaction
-   *
-   * @example
-   * ```ts
-   * const call = staking.populateClaimRewards(wallet.address);
-   * ```
+   * @internal Used by {@link TxBuilder} — not part of the public API.
    */
   populateClaimRewards(walletAddress: Address): Call {
     return this.pool.populateTransaction.claim_rewards(walletAddress);
@@ -329,16 +300,7 @@ export class Staking {
   /**
    * Build an exit-intent Call without executing.
    *
-   * Useful for constructing multi-step transactions via {@link TxBuilder}.
-   * Does not validate membership or staked balance — that happens on-chain.
-   *
-   * @param amount - The amount to unstake
-   * @returns A Call object for the exit_delegation_pool_intent transaction
-   *
-   * @example
-   * ```ts
-   * const call = staking.populateExitIntent(Amount.parse(50, strkToken));
-   * ```
+   * @internal Used by {@link TxBuilder} — not part of the public API.
    */
   populateExitIntent(amount: Amount): Call {
     return this.pool.populateTransaction.exit_delegation_pool_intent(
@@ -401,16 +363,7 @@ export class Staking {
   /**
    * Build an exit-pool Call without executing.
    *
-   * Useful for constructing multi-step transactions via {@link TxBuilder}.
-   * Does not validate exit window timing — that happens on-chain.
-   *
-   * @param walletAddress - The wallet address completing the exit
-   * @returns A Call object for the exit_delegation_pool_action transaction
-   *
-   * @example
-   * ```ts
-   * const call = staking.populateExit(wallet.address);
-   * ```
+   * @internal Used by {@link TxBuilder} — not part of the public API.
    */
   populateExit(walletAddress: Address): Call {
     return this.pool.populateTransaction.exit_delegation_pool_action(
