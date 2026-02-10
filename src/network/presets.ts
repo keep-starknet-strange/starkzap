@@ -19,7 +19,7 @@ export interface NetworkPreset {
  */
 export const mainnet: NetworkPreset = {
   name: "Mainnet",
-  chainId: ChainId.from("SN_MAIN"),
+  chainId: ChainId.MAINNET,
   rpcUrl: "https://api.cartridge.gg/x/starknet/mainnet",
   explorerUrl: "https://voyager.online",
 };
@@ -29,7 +29,7 @@ export const mainnet: NetworkPreset = {
  */
 export const sepolia: NetworkPreset = {
   name: "Sepolia",
-  chainId: ChainId.from("SN_SEPOLIA"),
+  chainId: ChainId.SEPOLIA,
   rpcUrl: "https://api.cartridge.gg/x/starknet/sepolia",
   explorerUrl: "https://sepolia.voyager.online",
 };
@@ -39,7 +39,7 @@ export const sepolia: NetworkPreset = {
  */
 export const devnet: NetworkPreset = {
   name: "Devnet",
-  chainId: ChainId.from("SN_SEPOLIA"), // Devnet typically uses Sepolia chain ID
+  chainId: ChainId.SEPOLIA, // Devnet typically uses Sepolia chain ID
   rpcUrl: "http://localhost:5050",
 };
 

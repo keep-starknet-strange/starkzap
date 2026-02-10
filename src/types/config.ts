@@ -13,18 +13,31 @@ export type ChainIdLiteral = "SN_MAIN" | "SN_SEPOLIA";
 export class ChainId {
   constructor(readonly value: ChainIdLiteral) {}
 
+  isMainnet(): boolean {
+    return this.value === "SN_MAIN";
+  }
+
+  isSepolia(): boolean {
+    return this.value === "SN_SEPOLIA";
+  }
+
   toFelt252(): string {
-    return this.value === "SN_MAIN"
+    return this.isMainnet()
       ? constants.StarknetChainId.SN_MAIN
       : constants.StarknetChainId.SN_SEPOLIA;
   }
+
   toLiteral(): ChainIdLiteral {
     return this.value;
   }
 
+  static readonly MAINNET = new ChainId("SN_MAIN");
+  static readonly SEPOLIA = new ChainId("SN_SEPOLIA");
+
   static from(literal: ChainIdLiteral): ChainId {
     return new ChainId(literal);
   }
+
   static fromFelt252(felt252: string): ChainId {
     return new ChainId(
       new CairoFelt252(felt252).decodeUtf8() as ChainIdLiteral

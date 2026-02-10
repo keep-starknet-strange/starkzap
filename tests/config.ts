@@ -8,7 +8,7 @@ export const testnetConfig: SDKConfig = {
   rpcUrl:
     process.env.TESTNET_RPC_URL ??
     "https://starknet-sepolia.public.blastapi.io",
-  chainId: ChainId.from("SN_SEPOLIA"),
+  chainId: ChainId.SEPOLIA,
 };
 
 /**
@@ -20,7 +20,7 @@ export const testnetConfig: SDKConfig = {
  */
 export const devnetConfig: SDKConfig = {
   rpcUrl: process.env.DEVNET_RPC_URL ?? "http://127.0.0.1:5050",
-  chainId: ChainId.from("SN_SEPOLIA"), // Devnet uses Sepolia chain ID
+  chainId: ChainId.SEPOLIA, // Devnet uses Sepolia chain ID
 };
 
 /**
