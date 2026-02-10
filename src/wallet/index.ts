@@ -7,7 +7,6 @@ import {
   type PaymasterTimeBounds,
   type TypedData,
   type Signature,
-  CairoFelt252,
 } from "starknet";
 import { Tx } from "@/tx";
 import { AccountProvider } from "@/wallet/accounts/provider";
@@ -180,12 +179,18 @@ export class Wallet extends BaseWallet {
       ...(paymaster && { paymaster }),
     });
 
+    if (!config.chainId) {
+      throw new Error(
+        "Wallet requires 'chainId' in the SDK config. Use 'network' or set 'chainId' explicitly."
+      );
+    }
+
     return new Wallet({
       address,
       accountProvider,
       account,
       provider,
-      chainId: config.chainId!,
+      chainId: config.chainId,
       ...(config.explorer && { explorerConfig: config.explorer }),
       defaultFeeMode: feeMode,
       ...(timeBounds && { defaultTimeBounds: timeBounds }),
@@ -313,7 +318,7 @@ export class Wallet extends BaseWallet {
 
     // Build Braavos deployment params
     // Format: [impl_class_hash, ...9 zeros, chain_id, aux_sig_r, aux_sig_s]
-    const chainIdFelt = new CairoFelt252(this.chainId).decodeUtf8(); // Default to SN_SEPOLIA
+    const chainIdFelt = this.chainId.toFelt252();
 
     // Build the aux data to sign: [impl_class_hash, 9 zeros, chain_id]
     const auxData: string[] = [
