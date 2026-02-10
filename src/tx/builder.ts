@@ -166,11 +166,11 @@ export class TxBuilder {
    * ```
    */
   enterPool(poolAddress: Address, amount: Amount): this {
-    this.pending.push(
-      this.wallet
-        .staking(poolAddress)
-        .then((s) => s.populateEnter(this.wallet.address, amount))
-    );
+    const p = this.wallet
+      .staking(poolAddress)
+      .then((s) => s.populateEnter(this.wallet.address, amount));
+    p.catch(() => {});
+    this.pending.push(p);
     return this;
   }
 
@@ -191,11 +191,11 @@ export class TxBuilder {
    * ```
    */
   addToPool(poolAddress: Address, amount: Amount): this {
-    this.pending.push(
-      this.wallet
-        .staking(poolAddress)
-        .then((s) => s.populateAdd(this.wallet.address, amount))
-    );
+    const p = this.wallet
+      .staking(poolAddress)
+      .then((s) => s.populateAdd(this.wallet.address, amount));
+    p.catch(() => {});
+    this.pending.push(p);
     return this;
   }
 
@@ -213,11 +213,11 @@ export class TxBuilder {
    * ```
    */
   claimPoolRewards(poolAddress: Address): this {
-    this.pending.push(
-      this.wallet
-        .staking(poolAddress)
-        .then((s) => [s.populateClaimRewards(this.wallet.address)])
-    );
+    const p = this.wallet
+      .staking(poolAddress)
+      .then((s) => [s.populateClaimRewards(this.wallet.address)]);
+    p.catch(() => {});
+    this.pending.push(p);
     return this;
   }
 
@@ -239,11 +239,11 @@ export class TxBuilder {
    * ```
    */
   exitPoolIntent(poolAddress: Address, amount: Amount): this {
-    this.pending.push(
-      this.wallet
-        .staking(poolAddress)
-        .then((s) => [s.populateExitIntent(amount)])
-    );
+    const p = this.wallet
+      .staking(poolAddress)
+      .then((s) => [s.populateExitIntent(amount)]);
+    p.catch(() => {});
+    this.pending.push(p);
     return this;
   }
 
@@ -261,11 +261,11 @@ export class TxBuilder {
    * ```
    */
   exitPool(poolAddress: Address): this {
-    this.pending.push(
-      this.wallet
-        .staking(poolAddress)
-        .then((s) => [s.populateExit(this.wallet.address)])
-    );
+    const p = this.wallet
+      .staking(poolAddress)
+      .then((s) => [s.populateExit(this.wallet.address)]);
+    p.catch(() => {});
+    this.pending.push(p);
     return this;
   }
 
@@ -351,7 +351,8 @@ export class TxBuilder {
       );
     }
 
+    const tx = await this.wallet.execute(calls, options);
     this.sent = true;
-    return this.wallet.execute(calls, options);
+    return tx;
   }
 }

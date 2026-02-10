@@ -628,20 +628,23 @@ describe("TxBuilder", () => {
       await expect(builder.send()).rejects.toThrow("execution reverted");
     });
 
-    it("should not mark as sent when wallet.execute fails", async () => {
+    it("should allow retry when wallet.execute fails", async () => {
       const wallet = createMockWallet({
-        execute: vi.fn().mockRejectedValueOnce(new Error("network error")),
+        execute: vi
+          .fn()
+          .mockRejectedValueOnce(new Error("network error"))
+          .mockResolvedValueOnce({ hash: "0xretry" }),
       });
 
       const builder = new TxBuilder(wallet).add(rawCall);
 
+      // First attempt fails
       await expect(builder.send()).rejects.toThrow("network error");
 
-      // Fix: the builder currently marks sent=true before execute resolves,
-      // so a second send() would throw "already sent" — let's verify current behavior
-      await expect(builder.send()).rejects.toThrow(
-        "This transaction has already been sent"
-      );
+      // Retry succeeds — builder was not marked as sent
+      const tx = await builder.send();
+      expect(tx).toEqual({ hash: "0xretry" });
+      expect(wallet.execute).toHaveBeenCalledTimes(2);
     });
   });
 });
