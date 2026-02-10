@@ -10,6 +10,7 @@ import type {
   WaitOptions,
   ExplorerConfig,
 } from "@/types";
+import { ChainId } from "@/types";
 
 const DEFAULT_POLL_INTERVAL_MS = 5_000;
 
@@ -42,11 +43,12 @@ export class Tx {
   constructor(
     hash: string,
     provider: RpcProvider,
+    chainId: ChainId,
     explorerConfig?: ExplorerConfig
   ) {
     this.hash = hash;
     this.provider = provider;
-    this.explorerUrl = buildExplorerUrl(hash, provider, explorerConfig);
+    this.explorerUrl = buildExplorerUrl(hash, chainId, explorerConfig);
   }
 
   /**
@@ -138,14 +140,14 @@ export class Tx {
 
 function buildExplorerUrl(
   hash: string,
-  provider: RpcProvider,
+  chainId: ChainId,
   config?: ExplorerConfig
 ): string {
   if (config?.baseUrl) {
     return `${config.baseUrl}/tx/${hash}`;
   }
 
-  const isMainnet = provider.channel.nodeUrl.includes("mainnet");
+  const isMainnet = chainId.isMainnet();
   const explorerProvider = config?.provider ?? "voyager";
 
   if (explorerProvider === "starkscan") {

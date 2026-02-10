@@ -1,7 +1,11 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { RpcProvider, TransactionFinalityStatus } from "starknet";
 import { Tx } from "@/tx";
+import { ChainId } from "@/types";
 import { getTestConfig } from "./config.js";
+
+const SEPOLIA = ChainId.SEPOLIA;
+const MAINNET = ChainId.MAINNET;
 
 describe("Tx", () => {
   const { config } = getTestConfig();
@@ -13,7 +17,7 @@ describe("Tx", () => {
       });
       const hash = "0x123abc";
 
-      const tx = new Tx(hash, provider, { provider: "voyager" });
+      const tx = new Tx(hash, provider, SEPOLIA, { provider: "voyager" });
 
       expect(tx.explorerUrl).toBe("https://sepolia.voyager.online/tx/0x123abc");
     });
@@ -24,7 +28,7 @@ describe("Tx", () => {
       });
       const hash = "0x123abc";
 
-      const tx = new Tx(hash, provider, { provider: "starkscan" });
+      const tx = new Tx(hash, provider, SEPOLIA, { provider: "starkscan" });
 
       expect(tx.explorerUrl).toBe("https://sepolia.starkscan.co/tx/0x123abc");
     });
@@ -35,43 +39,42 @@ describe("Tx", () => {
       });
       const hash = "0x123abc";
 
-      const tx = new Tx(hash, provider, {
+      const tx = new Tx(hash, provider, SEPOLIA, {
         baseUrl: "https://my-explorer.com",
       });
 
       expect(tx.explorerUrl).toBe("https://my-explorer.com/tx/0x123abc");
     });
 
-    it("should default to voyager when no config", () => {
+    it("should default to voyager when no explorer config", () => {
       const provider = new RpcProvider({
         nodeUrl: "https://starknet-sepolia.example.com",
       });
       const hash = "0x123abc";
 
-      const tx = new Tx(hash, provider);
+      const tx = new Tx(hash, provider, SEPOLIA);
 
       expect(tx.explorerUrl).toBe("https://sepolia.voyager.online/tx/0x123abc");
     });
 
-    it("should use mainnet URL when nodeUrl contains mainnet", () => {
+    it("should use mainnet URL for voyager", () => {
       const provider = new RpcProvider({
-        nodeUrl: "https://starknet-mainnet.example.com",
+        nodeUrl: "https://rpc.mycompany.com/starknet",
       });
       const hash = "0x123abc";
 
-      const tx = new Tx(hash, provider, { provider: "voyager" });
+      const tx = new Tx(hash, provider, MAINNET, { provider: "voyager" });
 
-      // Mainnet URL should not have subdomain
       expect(tx.explorerUrl).toBe("https://voyager.online/tx/0x123abc");
     });
 
     it("should use mainnet URL for starkscan", () => {
       const provider = new RpcProvider({
-        nodeUrl: "https://starknet-mainnet.example.com",
+        nodeUrl: "https://rpc.mycompany.com/starknet",
       });
       const hash = "0x123abc";
 
-      const tx = new Tx(hash, provider, { provider: "starkscan" });
+      const tx = new Tx(hash, provider, MAINNET, { provider: "starkscan" });
 
       expect(tx.explorerUrl).toBe("https://starkscan.co/tx/0x123abc");
     });
@@ -80,7 +83,7 @@ describe("Tx", () => {
       const provider = new RpcProvider({ nodeUrl: config.rpcUrl });
       const hash = "0xdeadbeef";
 
-      const tx = new Tx(hash, provider);
+      const tx = new Tx(hash, provider, SEPOLIA);
 
       expect(tx.hash).toBe(hash);
     });
@@ -98,7 +101,7 @@ describe("Tx", () => {
         waitForTransaction: vi.fn().mockResolvedValue({}),
       });
 
-      const tx = new Tx("0x123", mockProvider);
+      const tx = new Tx("0x123", mockProvider, SEPOLIA);
 
       await tx.wait({
         successStates: [TransactionFinalityStatus.ACCEPTED_ON_L2],
@@ -119,7 +122,7 @@ describe("Tx", () => {
         waitForTransaction: vi.fn().mockResolvedValue({}),
       });
 
-      const tx = new Tx("0x123", mockProvider);
+      const tx = new Tx("0x123", mockProvider, SEPOLIA);
 
       await tx.wait();
 
@@ -147,7 +150,7 @@ describe("Tx", () => {
         getTransactionReceipt: vi.fn().mockResolvedValue(mockReceipt),
       } as unknown as RpcProvider;
 
-      const tx = new Tx("0x123", mockProvider);
+      const tx = new Tx("0x123", mockProvider, SEPOLIA);
       const receipt = await tx.receipt();
 
       expect(receipt).toEqual(mockReceipt);
@@ -161,7 +164,7 @@ describe("Tx", () => {
         getTransactionReceipt: vi.fn().mockResolvedValue(mockReceipt),
       } as unknown as RpcProvider;
 
-      const tx = new Tx("0x123", mockProvider);
+      const tx = new Tx("0x123", mockProvider, SEPOLIA);
 
       await tx.receipt();
       await tx.receipt();
@@ -190,7 +193,7 @@ describe("Tx", () => {
         }),
       } as unknown as RpcProvider;
 
-      const tx = new Tx("0x123", mockProvider);
+      const tx = new Tx("0x123", mockProvider, SEPOLIA);
       const callback = vi.fn();
 
       const unsubscribe = tx.watch(callback);
@@ -214,7 +217,7 @@ describe("Tx", () => {
         }),
       } as unknown as RpcProvider;
 
-      const tx = new Tx("0x123", mockProvider);
+      const tx = new Tx("0x123", mockProvider, SEPOLIA);
       const callback = vi.fn();
 
       const unsubscribe = tx.watch(callback);
@@ -240,7 +243,7 @@ describe("Tx", () => {
         }),
       } as unknown as RpcProvider;
 
-      const tx = new Tx("0x123", mockProvider);
+      const tx = new Tx("0x123", mockProvider, SEPOLIA);
       const callback = vi.fn();
 
       tx.watch(callback);
@@ -274,7 +277,7 @@ describe("Tx", () => {
         }),
       } as unknown as RpcProvider;
 
-      const tx = new Tx("0x123", mockProvider);
+      const tx = new Tx("0x123", mockProvider, SEPOLIA);
       const callback = vi.fn();
 
       const unsubscribe = tx.watch(callback);
@@ -302,7 +305,7 @@ describe("Tx", () => {
         }),
       } as unknown as RpcProvider;
 
-      const tx = new Tx("0x123", mockProvider);
+      const tx = new Tx("0x123", mockProvider, SEPOLIA);
       const callback = vi.fn();
 
       tx.watch(callback);

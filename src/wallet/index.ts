@@ -255,7 +255,12 @@ export class Wallet extends BaseWallet {
     );
 
     this.deployedCache = true;
-    return new Tx(transaction_hash, this.provider, this.explorerConfig);
+    return new Tx(
+      transaction_hash,
+      this.provider,
+      this.chainId,
+      this.explorerConfig
+    );
   }
 
   private async deployPaymasterWith(
@@ -276,7 +281,12 @@ export class Wallet extends BaseWallet {
       sponsoredDetails(timeBounds ?? this.defaultTimeBounds, deploymentData)
     );
     this.deployedCache = true;
-    return new Tx(transaction_hash, this.provider, this.explorerConfig);
+    return new Tx(
+      transaction_hash,
+      this.provider,
+      this.chainId,
+      this.explorerConfig
+    );
   }
 
   /**
@@ -386,7 +396,12 @@ export class Wallet extends BaseWallet {
     }
 
     this.deployedCache = true;
-    return new Tx(transactionHash, this.provider, this.explorerConfig);
+    return new Tx(
+      transactionHash,
+      this.provider,
+      this.chainId,
+      this.explorerConfig
+    );
   }
 
   async execute(calls: Call[], options: ExecuteOptions = {}): Promise<Tx> {
@@ -410,7 +425,12 @@ export class Wallet extends BaseWallet {
       transactionHash = (await this.account.execute(calls)).transaction_hash;
     }
 
-    return new Tx(transactionHash, this.provider, this.explorerConfig);
+    return new Tx(
+      transactionHash,
+      this.provider,
+      this.chainId,
+      this.explorerConfig
+    );
   }
 
   async signMessage(typedData: TypedData): Promise<Signature> {

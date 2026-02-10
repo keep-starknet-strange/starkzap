@@ -85,7 +85,7 @@ export class CartridgeWallet extends BaseWallet {
     this.controller = controller;
     this.walletAccount = walletAccount;
     this.provider = provider;
-    this.chainId = options.chainId ?? ChainId.from("SN_MAIN");
+    this.chainId = options.chainId ?? ChainId.MAINNET;
     this.explorerConfig = options.explorer;
     this.defaultFeeMode = options.feeMode ?? "user_pays";
     this.defaultTimeBounds = options.timeBounds;
@@ -181,7 +181,12 @@ export class CartridgeWallet extends BaseWallet {
     if (!result || result.code !== "SUCCESS") {
       throw new Error(result?.message ?? "Cartridge deployment failed");
     }
-    return new Tx(result.transaction_hash, this.provider, this.explorerConfig);
+    return new Tx(
+      result.transaction_hash,
+      this.provider,
+      this.chainId,
+      this.explorerConfig
+    );
   }
 
   async execute(calls: Call[], options: ExecuteOptions = {}): Promise<Tx> {
@@ -196,7 +201,12 @@ export class CartridgeWallet extends BaseWallet {
           )
         : await this.walletAccount.execute(calls);
 
-    return new Tx(transaction_hash, this.provider, this.explorerConfig);
+    return new Tx(
+      transaction_hash,
+      this.provider,
+      this.chainId,
+      this.explorerConfig
+    );
   }
 
   async signMessage(typedData: TypedData): Promise<Signature> {
