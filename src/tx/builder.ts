@@ -1,7 +1,13 @@
 import type { Call } from "starknet";
 import type { WalletInterface } from "@/wallet/interface";
 import type { Tx } from "@/tx";
-import type { Address, Amount, ExecuteOptions, Token } from "@/types";
+import type {
+  Address,
+  Amount,
+  ExecuteOptions,
+  PreflightResult,
+  Token,
+} from "@/types";
 
 /**
  * Fluent transaction builder for batching multiple operations into a single transaction.
@@ -50,6 +56,34 @@ export class TxBuilder {
 
   constructor(wallet: WalletInterface) {
     this.wallet = wallet;
+  }
+
+  // ============================================================
+  // State accessors
+  // ============================================================
+
+  /**
+   * The number of pending operations in the builder.
+   *
+   * Each chained method counts as one operation, even if it expands
+   * into multiple calls once resolved.
+   */
+  get length(): number {
+    return this.pending.length;
+  }
+
+  /**
+   * Whether the builder has no pending operations.
+   */
+  get isEmpty(): boolean {
+    return this.pending.length === 0;
+  }
+
+  /**
+   * Whether `send()` has already been called successfully on this builder.
+   */
+  get isSent(): boolean {
+    return this.sent;
   }
 
   // ============================================================
@@ -357,6 +391,35 @@ export class TxBuilder {
   async estimateFee() {
     const calls = await this.calls();
     return this.wallet.estimateFee(calls);
+  }
+
+  /**
+   * Simulate the transaction to check if it would succeed.
+   *
+   * Resolves all pending operations and runs them through the wallet's
+   * preflight simulation without submitting on-chain. Use this to
+   * validate the transaction before calling {@link send}.
+   *
+   * @returns `{ ok: true }` if the simulation succeeds, or
+   *          `{ ok: false, reason: string }` with a human-readable error
+   *
+   * @example
+   * ```ts
+   * const builder = wallet.tx()
+   *   .stake(poolAddress, amount)
+   *   .transfer(USDC, { to: alice, amount: usdcAmount });
+   *
+   * const result = await builder.preflight();
+   * if (!result.ok) {
+   *   console.error("Transaction would fail:", result.reason);
+   * } else {
+   *   await builder.send();
+   * }
+   * ```
+   */
+  async preflight(): Promise<PreflightResult> {
+    const calls = await this.calls();
+    return this.wallet.preflight({ calls });
   }
 
   /**
