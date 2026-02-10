@@ -55,9 +55,12 @@ export class Tx {
    * Wait for the transaction to reach a target status.
    * Wraps starknet.js `waitForTransaction`.
    *
+   * @param options - Optional overrides for success/error states and retry interval
+   * @throws Error if transaction is reverted or reaches an error state
+   *
    * @example
    * ```ts
-   * // Wait for L2 (default behavior)
+   * // Wait for L2 acceptance (default)
    * await tx.wait();
    *
    * // Wait for L1 finality
@@ -65,8 +68,6 @@ export class Tx {
    *   successStates: [TransactionFinalityStatus.ACCEPTED_ON_L1],
    * });
    * ```
-   *
-   * @throws Error if transaction is reverted
    */
   async wait(options?: WaitOptions): Promise<void> {
     await this.provider.waitForTransaction(this.hash, {
@@ -81,10 +82,24 @@ export class Tx {
   }
 
   /**
-   * Watch transaction status changes.
-   * Polls the transaction status and calls the callback on each change.
+   * Watch transaction status changes in real-time.
    *
-   * @returns Unsubscribe function to stop watching
+   * Polls the transaction status and calls the callback whenever the
+   * finality status changes. Automatically stops when the transaction
+   * reaches a final state (accepted or reverted).
+   *
+   * @param callback - Called on each status change with `{ finality, execution }`
+   * @returns Unsubscribe function — call it to stop watching early
+   *
+   * @example
+   * ```ts
+   * const unsubscribe = tx.watch(({ finality, execution }) => {
+   *   console.log(`Status: ${finality} (${execution})`);
+   * });
+   *
+   * // Stop watching early if needed
+   * unsubscribe();
+   * ```
    */
   watch(callback: TxWatchCallback): TxUnsubscribe {
     let stopped = false;
@@ -123,7 +138,18 @@ export class Tx {
 
   /**
    * Get the full transaction receipt.
-   * Result is cached after first successful fetch.
+   *
+   * The result is cached after the first successful fetch, so subsequent
+   * calls return immediately without an RPC round-trip.
+   *
+   * @returns The transaction receipt
+   *
+   * @example
+   * ```ts
+   * await tx.wait();
+   * const receipt = await tx.receipt();
+   * console.log("Fee paid:", receipt.actual_fee);
+   * ```
    */
   async receipt(): Promise<TxReceipt> {
     if (this.cachedReceipt) {

@@ -15,6 +15,23 @@ function toHex(value: string | number | bigint): string {
 
 /**
  * Account provider that combines a signer with an account class configuration.
+ *
+ * Computes and caches the Starknet address from the signer's public key
+ * and the account class constructor. This is the bridge between a
+ * {@link SignerInterface} and a deployed (or counterfactual) account contract.
+ *
+ * @example
+ * ```ts
+ * import { AccountProvider, StarkSigner, ArgentPreset } from "x";
+ *
+ * const provider = new AccountProvider(
+ *   new StarkSigner(privateKey),
+ *   ArgentPreset
+ * );
+ *
+ * const address = await provider.getAddress();
+ * const publicKey = await provider.getPublicKey();
+ * ```
  */
 export class AccountProvider {
   private readonly signer: SignerInterface;
@@ -22,11 +39,23 @@ export class AccountProvider {
   private cachedPublicKey: string | null = null;
   private cachedAddress: Address | null = null;
 
+  /**
+   * @param signer - The signer implementation for signing operations
+   * @param accountClass - Account class configuration (default: {@link OpenZeppelinPreset})
+   */
   constructor(signer: SignerInterface, accountClass?: AccountClassConfig) {
     this.signer = signer;
     this.accountClass = accountClass ?? OpenZeppelinPreset;
   }
 
+  /**
+   * Compute and return the counterfactual address for this account.
+   *
+   * The address is derived from the signer's public key, the account class
+   * hash, and the constructor calldata. Cached after first computation.
+   *
+   * @returns The Starknet address for this account
+   */
   async getAddress(): Promise<Address> {
     if (this.cachedAddress) {
       return this.cachedAddress;
@@ -52,6 +81,10 @@ export class AccountProvider {
     return this.cachedAddress;
   }
 
+  /**
+   * Get the public key from the underlying signer. Cached after first call.
+   * @returns The public key as a hex string
+   */
   async getPublicKey(): Promise<string> {
     if (this.cachedPublicKey) {
       return this.cachedPublicKey;
@@ -61,18 +94,22 @@ export class AccountProvider {
     return pubKey;
   }
 
+  /** Get the underlying signer instance. */
   getSigner(): SignerInterface {
     return this.signer;
   }
 
+  /** Get the account contract class hash. */
   getClassHash(): string {
     return this.accountClass.classHash;
   }
 
+  /** Build the constructor calldata from the given public key. */
   getConstructorCalldata(publicKey: string): Calldata {
     return this.accountClass.buildConstructorCalldata(publicKey);
   }
 
+  /** Compute the address salt from the given public key. */
   getSalt(publicKey: string): string {
     return this.accountClass.getSalt
       ? this.accountClass.getSalt(publicKey)

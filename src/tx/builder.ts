@@ -233,6 +233,13 @@ export class TxBuilder {
    * @param poolAddress - The pool contract address to enter
    * @param amount - The amount of tokens to stake
    * @returns this (for chaining)
+   *
+   * @example
+   * ```ts
+   * wallet.tx()
+   *   .enterPool(poolAddress, Amount.parse("100", STRK))
+   *   .send();
+   * ```
    */
   enterPool(poolAddress: Address, amount: Amount): this {
     const p = this.wallet
@@ -255,6 +262,13 @@ export class TxBuilder {
    * @param poolAddress - The pool contract address
    * @param amount - The amount of tokens to add
    * @returns this (for chaining)
+   *
+   * @example
+   * ```ts
+   * wallet.tx()
+   *   .addToPool(poolAddress, Amount.parse("50", STRK))
+   *   .send();
+   * ```
    */
   addToPool(poolAddress: Address, amount: Amount): this {
     const p = this.wallet
@@ -378,14 +392,16 @@ export class TxBuilder {
    *
    * Resolves any pending async operations and estimates the execution fee.
    *
-   * @returns Fee estimation result
+   * @returns Fee estimation including overall fee, gas price, and gas bounds
    *
    * @example
    * ```ts
    * const fee = await wallet.tx()
    *   .transfer(USDC, { to: alice, amount })
-   *   .enterPool(poolAddress, stakeAmount)
+   *   .stake(poolAddress, stakeAmount)
    *   .estimateFee();
+   *
+   * console.log("Estimated fee:", fee.overall_fee);
    * ```
    */
   async estimateFee() {

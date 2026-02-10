@@ -71,7 +71,7 @@ function parsePrivySignature(signature: string): Signature {
  * });
  *
  * // Use with the SDK
- * const sdk = new StarkSDK({ rpcUrl: '...', chainId: 'SN_SEPOLIA' });
+ * const sdk = new StarkSDK({ rpcUrl: '...', chainId: ChainId.SEPOLIA });
  * const wallet = await sdk.connectWallet({
  *   account: { signer, accountClass: ArgentPreset }
  * });

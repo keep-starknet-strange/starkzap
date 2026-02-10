@@ -26,10 +26,25 @@ function intDAM(mode: string | EDAMode): 0 | 1 {
 }
 
 /**
- * Adapter that wraps any SignerInterface and implements StarknetSignerInterface.
+ * Adapter that bridges the SDK's minimal {@link SignerInterface} to the
+ * full `starknet.js` `SignerInterface`.
  *
- * This allows custom signers to only implement the simple SignerInterface
- * (getPubKey + signRaw) while being fully compatible with starknet.js Account.
+ * Custom signers only need to implement two methods (`getPubKey` + `signRaw`).
+ * This adapter handles the complex transaction hash computations required by
+ * `starknet.js` Account for invoke, deploy-account, and declare transactions.
+ *
+ * @remarks
+ * You don't normally create this directly — the SDK creates it internally
+ * when you call `sdk.connectWallet()`.
+ *
+ * @example
+ * ```ts
+ * import { SignerAdapter, StarkSigner } from "x";
+ * import { Account, RpcProvider } from "starknet";
+ *
+ * const adapter = new SignerAdapter(new StarkSigner(privateKey));
+ * const account = new Account({ provider, address, signer: adapter });
+ * ```
  */
 export class SignerAdapter implements StarknetSignerInterface {
   constructor(private readonly signer: SignerInterface) {}

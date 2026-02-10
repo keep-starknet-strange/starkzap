@@ -12,34 +12,76 @@ export type ChainIdLiteral = "SN_MAIN" | "SN_SEPOLIA";
 
 const VALID_CHAIN_IDS: readonly string[] = ["SN_MAIN", "SN_SEPOLIA"];
 
+/**
+ * Represents a Starknet chain identifier.
+ *
+ * Provides helpers for chain detection and conversion between
+ * literal strings and felt252 on-chain representations.
+ *
+ * @example
+ * ```ts
+ * // Use static constants (recommended)
+ * const chain = ChainId.MAINNET;
+ * const chain = ChainId.SEPOLIA;
+ *
+ * // Create from a literal
+ * const chain = ChainId.from("SN_MAIN");
+ *
+ * // Create from an on-chain felt252 value
+ * const chain = ChainId.fromFelt252(chainIdHex);
+ *
+ * // Check which chain
+ * if (chain.isMainnet()) { ... }
+ * if (chain.isSepolia()) { ... }
+ * ```
+ */
 export class ChainId {
   constructor(readonly value: ChainIdLiteral) {}
 
+  /** Returns `true` if this is Starknet Mainnet (`SN_MAIN`). */
   isMainnet(): boolean {
     return this.value === "SN_MAIN";
   }
 
+  /** Returns `true` if this is Starknet Sepolia testnet (`SN_SEPOLIA`). */
   isSepolia(): boolean {
     return this.value === "SN_SEPOLIA";
   }
 
+  /**
+   * Returns the felt252 (hex) representation used on-chain.
+   * @throws Error if the chain ID is not recognized
+   */
   toFelt252(): string {
     if (this.isMainnet()) return constants.StarknetChainId.SN_MAIN;
     if (this.isSepolia()) return constants.StarknetChainId.SN_SEPOLIA;
     throw new Error(`Unknown chain ID: ${this.value}`);
   }
 
+  /** Returns the literal string value (e.g. `"SN_MAIN"` or `"SN_SEPOLIA"`). */
   toLiteral(): ChainIdLiteral {
     return this.value;
   }
 
+  /** Pre-built instance for Starknet Mainnet. */
   static readonly MAINNET = new ChainId("SN_MAIN");
+
+  /** Pre-built instance for Starknet Sepolia testnet. */
   static readonly SEPOLIA = new ChainId("SN_SEPOLIA");
 
+  /**
+   * Create a ChainId from a literal string.
+   * @param literal - `"SN_MAIN"` or `"SN_SEPOLIA"`
+   */
   static from(literal: ChainIdLiteral): ChainId {
     return new ChainId(literal);
   }
 
+  /**
+   * Create a ChainId from an on-chain felt252 hex value.
+   * @param felt252 - The hex-encoded chain ID (e.g. from `provider.getChainId()`)
+   * @throws Error if the decoded value is not a supported chain
+   */
   static fromFelt252(felt252: string): ChainId {
     const decoded = new CairoFelt252(felt252).decodeUtf8();
     if (!VALID_CHAIN_IDS.includes(decoded)) {
@@ -51,6 +93,12 @@ export class ChainId {
   }
 }
 
+/**
+ * Detect the chain ID from an RPC provider.
+ * @param provider - The RPC provider to query
+ * @returns The detected ChainId
+ * @throws Error if the provider returns an unsupported chain
+ */
 export async function getChainId(provider: RpcProvider): Promise<ChainId> {
   const chainIdHex = await provider.getChainId();
   return ChainId.fromFelt252(chainIdHex);
@@ -88,7 +136,7 @@ export interface ExplorerConfig {
  * ```ts
  * const sdk = new StarkSDK({
  *   rpcUrl: "https://starknet-mainnet.infura.io/v3/YOUR_KEY",
- *   chainId: "SN_MAIN",
+ *   chainId: ChainId.MAINNET,
  *   staking: {
  *     contract: "0x03745ab04a431fc02871a139be6b93d9260b0ff3e779ad9c8b377183b23109f1",
  *   },
@@ -118,7 +166,7 @@ export interface StakingConfig {
  * // Custom configuration
  * const sdk = new StarkSDK({
  *   rpcUrl: "https://my-rpc.example.com",
- *   chainId: "SN_MAIN",
+ *   chainId: ChainId.MAINNET,
  * });
  *
  * // With custom paymaster endpoint

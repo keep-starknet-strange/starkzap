@@ -42,7 +42,9 @@ import { groupBy } from "@/utils";
  *
  * // Check your position
  * const position = await staking.getPosition(wallet);
- * console.log(`Staked: ${position.staked.toFormatted()}`);
+ * if (position) {
+ *   console.log(`Staked: ${position.staked.toFormatted()}`);
+ * }
  * ```
  */
 export class Staking {
@@ -268,12 +270,14 @@ export class Staking {
    * @param wallet - The wallet to claim rewards for
    * @param options - Optional execution options
    * @returns A transaction object that can be awaited for confirmation
-   * @throws Error if the wallet is not a member or has no rewards to claim
+   * @throws Error if the wallet is not a member of the pool
+   * @throws Error if the caller is not the reward address for this member
+   * @throws Error if there are no rewards to claim
    *
    * @example
    * ```ts
    * const position = await staking.getPosition(wallet);
-   * if (!position.rewards.isZero()) {
+   * if (position && !position.rewards.isZero()) {
    *   const tx = await staking.claimRewards(wallet);
    *   await tx.wait();
    * }
@@ -322,7 +326,9 @@ export class Staking {
    * @param amount - The amount to unstake
    * @param options - Optional execution options
    * @returns A transaction object that can be awaited for confirmation
-   * @throws Error if the wallet is not a member or already has a pending exit
+   * @throws Error if the wallet is not a member of the pool
+   * @throws Error if the wallet already has a pending exit
+   * @throws Error if the requested amount exceeds the staked balance
    *
    * @example
    * ```ts
@@ -332,7 +338,7 @@ export class Staking {
    *
    * // Step 2: Wait for exit window (check position.unpoolTime)
    * const position = await staking.getPosition(wallet);
-   * console.log(`Can exit after: ${position.unpoolTime}`);
+   * console.log(`Can exit after: ${position?.unpoolTime}`);
    *
    * // Step 3: Complete exit after window passes
    * const completeTx = await staking.exit(wallet);
@@ -385,7 +391,7 @@ export class Staking {
    * @example
    * ```ts
    * const position = await staking.getPosition(wallet);
-   * if (position.unpoolTime && new Date() >= position.unpoolTime) {
+   * if (position?.unpoolTime && new Date() >= position.unpoolTime) {
    *   const tx = await staking.exit(wallet);
    *   await tx.wait();
    * }

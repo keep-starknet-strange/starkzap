@@ -41,7 +41,7 @@ import { Staking } from "@/staking";
  * ```ts
  * class CustomWallet extends BaseWallet {
  *   constructor(address: Address, private account: Account) {
- *     super(address);
+ *     super(address, undefined);
  *   }
  *
  *   async isDeployed(): Promise<boolean> {

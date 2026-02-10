@@ -30,7 +30,7 @@ interface ResolvedConfig extends Omit<SDKConfig, "rpcUrl" | "chainId"> {
  * // Or with custom RPC
  * const sdk = new StarkSDK({
  *   rpcUrl: "https://my-rpc.example.com",
- *   chainId: "SN_MAIN",
+ *   chainId: ChainId.MAINNET,
  * });
  *
  * // Connect with default account (OpenZeppelin)

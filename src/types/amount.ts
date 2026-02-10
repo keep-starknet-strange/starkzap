@@ -138,6 +138,7 @@ export class Amount {
    *   - `(token: Token)` - Uses the token's decimals and symbol
    *   - `(decimals: number, symbol?: string)` - Uses explicit decimals and optional symbol
    * @returns A new Amount instance
+   * @throws Error if the amount is negative
    *
    * @example
    * ```ts
