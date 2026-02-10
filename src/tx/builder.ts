@@ -150,20 +150,55 @@ export class TxBuilder {
   // ============================================================
 
   /**
-   * Enter a delegation pool as a new member.
+   * Stake tokens in a delegation pool, automatically choosing the right
+   * action based on current membership status.
    *
-   * Automatically includes the token approve call before the pool entry call.
+   * - If the wallet is **not** a member, calls `enter_delegation_pool`.
+   * - If the wallet **is** already a member, calls `add_to_delegation_pool`.
    *
-   * @param poolAddress - The pool contract address to enter
+   * In both cases the token approve call is included automatically.
+   *
+   * This is the **recommended** way to stake via the builder. Prefer this
+   * over {@link enterPool} and {@link addToPool} unless you need explicit
+   * control over which entrypoint is called.
+   *
+   * @param poolAddress - The pool contract address
    * @param amount - The amount of tokens to stake
    * @returns this (for chaining)
    *
    * @example
    * ```ts
-   * wallet.tx()
-   *   .enterPool(poolAddress, Amount.parse("100", STRK))
+   * // Works whether the wallet is a new or existing member
+   * const tx = await wallet.tx()
+   *   .stake(poolAddress, Amount.parse("100", STRK))
    *   .send();
+   * await tx.wait();
    * ```
+   */
+  stake(poolAddress: Address, amount: Amount): this {
+    const p = this.wallet.staking(poolAddress).then(async (s) => {
+      const isMember = await s.isMember(this.wallet);
+      return isMember
+        ? s.populateAdd(this.wallet.address, amount)
+        : s.populateEnter(this.wallet.address, amount);
+    });
+    p.catch(() => {});
+    this.pending.push(p);
+    return this;
+  }
+
+  /**
+   * Enter a delegation pool as a new member.
+   *
+   * Automatically includes the token approve call before the pool entry call.
+   *
+   * **Prefer {@link stake}** which auto-detects membership. Only use this if
+   * you are certain the wallet is not already a member — the transaction will
+   * revert on-chain otherwise.
+   *
+   * @param poolAddress - The pool contract address to enter
+   * @param amount - The amount of tokens to stake
+   * @returns this (for chaining)
    */
   enterPool(poolAddress: Address, amount: Amount): this {
     const p = this.wallet
@@ -179,16 +214,13 @@ export class TxBuilder {
    *
    * Automatically includes the token approve call before the add-to-pool call.
    *
+   * **Prefer {@link stake}** which auto-detects membership. Only use this if
+   * you are certain the wallet is already a member — the transaction will
+   * revert on-chain otherwise.
+   *
    * @param poolAddress - The pool contract address
    * @param amount - The amount of tokens to add
    * @returns this (for chaining)
-   *
-   * @example
-   * ```ts
-   * wallet.tx()
-   *   .addToPool(poolAddress, Amount.parse("50", STRK))
-   *   .send();
-   * ```
    */
   addToPool(poolAddress: Address, amount: Amount): this {
     const p = this.wallet
@@ -201,6 +233,10 @@ export class TxBuilder {
 
   /**
    * Claim accumulated staking rewards from a pool.
+   *
+   * **Note:** Unlike `wallet.claimPoolRewards()`, this does not verify
+   * membership. The transaction will revert on-chain if the wallet is not
+   * a member of the pool.
    *
    * @param poolAddress - The pool contract address
    * @returns this (for chaining)
@@ -224,8 +260,12 @@ export class TxBuilder {
   /**
    * Initiate an exit from a delegation pool.
    *
-   * After this, wait for the exit window to pass, then call `exitPool()` to
-   * complete the withdrawal.
+   * After this, wait for the exit window to pass, then call {@link exitPool}
+   * to complete the withdrawal.
+   *
+   * **Note:** Unlike `wallet.exitPoolIntent()`, this does not verify
+   * membership or balance. The transaction will revert on-chain if the
+   * wallet is not a member or has insufficient stake.
    *
    * @param poolAddress - The pool contract address
    * @param amount - The amount to unstake
@@ -249,6 +289,10 @@ export class TxBuilder {
 
   /**
    * Complete the exit from a delegation pool after the exit window has passed.
+   *
+   * **Note:** Unlike `wallet.exitPool()`, this does not verify that an exit
+   * intent exists. The transaction will revert on-chain if no prior
+   * {@link exitPoolIntent} was submitted or the exit window has not elapsed.
    *
    * @param poolAddress - The pool contract address
    * @returns this (for chaining)

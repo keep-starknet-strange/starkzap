@@ -50,7 +50,7 @@ export default defineConfig({
       exclude: [
         "src/index.ts",
         "src/types/**",
-        "src/erc20/**",
+        "src/erc20/token/index.ts",
         "src/staking/**",
         "src/onramp/**",
         "src/signer/index.ts",
