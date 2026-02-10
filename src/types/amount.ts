@@ -155,6 +155,12 @@ export class Amount {
   static fromRaw(amount: BigNumberish, ...args: AmountArgs): Amount {
     const baseValue = BigInt(amount);
 
+    if (baseValue < 0n) {
+      throw new Error(
+        `Negative amounts are not supported: ${baseValue.toString()}`
+      );
+    }
+
     let decimals: number;
     let symbol: string | undefined;
 
@@ -377,12 +383,12 @@ export class Amount {
    * Subtracts another Amount from this one.
    *
    * Both amounts must have the same decimals and symbol (if set).
-   * Note: This can result in a negative base value if other > this.
    *
    * @param other - The Amount to subtract
    * @returns A new Amount representing the difference
    * @throws Error if decimals don't match
    * @throws Error if symbols don't match (when both are set)
+   * @throws Error if the result would be negative (other > this)
    *
    * @example
    * ```ts
@@ -394,11 +400,13 @@ export class Amount {
    */
   public subtract(other: Amount): Amount {
     this.assertCompatible(other);
-    return new Amount(
-      this.baseValue - other.baseValue,
-      this.decimals,
-      this.symbol ?? other.symbol
-    );
+    const result = this.baseValue - other.baseValue;
+    if (result < 0n) {
+      throw new Error(
+        "Subtraction would result in a negative amount. Use gte() or gt() to check before subtracting."
+      );
+    }
+    return new Amount(result, this.decimals, this.symbol ?? other.symbol);
   }
 
   /**

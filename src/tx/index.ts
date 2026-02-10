@@ -161,10 +161,13 @@ function buildExplorerUrl(
 }
 
 function isFinalStatus(finality: string, execution?: string): boolean {
-  if (execution === "REVERTED") {
+  if (execution === TransactionExecutionStatus.REVERTED) {
     return true;
   }
-  return finality === "ACCEPTED_ON_L2" || finality === "ACCEPTED_ON_L1";
+  return (
+    finality === TransactionFinalityStatus.ACCEPTED_ON_L2 ||
+    finality === TransactionFinalityStatus.ACCEPTED_ON_L1
+  );
 }
 
 function sleep(ms: number): Promise<void> {
