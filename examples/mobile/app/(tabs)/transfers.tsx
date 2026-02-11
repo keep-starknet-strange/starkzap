@@ -46,8 +46,23 @@ const createEmptyTransfer = (): TransferItem => ({
   toAddress: "",
 });
 
+const normalizeAddress = (value: string): string => value.trim();
+
+const isValidAddress = (value: string): boolean => {
+  const candidate = normalizeAddress(value);
+  // Keep UI validation permissive while typing/pasting.
+  // Strict Starknet validation still happens at submit (`fromAddress`).
+  return /^0x[0-9a-fA-F]+$/.test(candidate);
+};
+
+const isValidAmount = (value: string): boolean => {
+  const parsed = Number.parseFloat(value.trim());
+  return Number.isFinite(parsed) && parsed > 0;
+};
+
 export default function TransfersScreen() {
-  const { wallet, chainId, addLog } = useWalletStore();
+  const { wallet, chainId, addLog, paymasterNodeUrl, preferSponsored } =
+    useWalletStore();
   const {
     getBalance,
     fetchBalances,
@@ -63,6 +78,9 @@ export default function TransfersScreen() {
     createEmptyTransfer(),
   ]);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [useSponsored, setUseSponsored] = useState(
+    preferSponsored && Boolean(paymasterNodeUrl)
+  );
 
   // Token picker modal state
   const [showTokenPicker, setShowTokenPicker] = useState(false);
@@ -146,16 +164,12 @@ export default function TransfersScreen() {
   // Validate transfers
   const validTransfers = useMemo(() => {
     return transfers.filter(
-      (t) =>
-        t.token &&
-        t.amount &&
-        parseFloat(t.amount) > 0 &&
-        t.toAddress &&
-        t.toAddress.startsWith("0x")
+      (t) => t.token && isValidAmount(t.amount) && isValidAddress(t.toAddress)
     );
   }, [transfers]);
 
   const canSubmit = validTransfers.length > 0 && !isSubmitting;
+  const canUseSponsored = Boolean(paymasterNodeUrl);
 
   const handleSubmit = useCallback(async () => {
     if (!wallet || validTransfers.length === 0) return;
@@ -178,17 +192,24 @@ export default function TransfersScreen() {
         const token = tokenTransfers[0]!.token!;
 
         const transfersData = tokenTransfers.map((t) => ({
-          to: fromAddress(t.toAddress),
-          amount: Amount.parse(t.amount, token),
+          to: fromAddress(normalizeAddress(t.toAddress)),
+          amount: Amount.parse(t.amount.trim(), token),
         }));
 
         addLog(
           `Transferring ${token.symbol} to ${transfersData.length} recipient(s)...`
         );
 
-        const tx = await wallet.transfer(token, transfersData);
+        const tx = await wallet.transfer(
+          token,
+          transfersData,
+          useSponsored && canUseSponsored ? { feeMode: "sponsored" } : undefined
+        );
 
         addLog(`Transfer tx submitted: ${tx.hash.slice(0, 10)}...`);
+        if (useSponsored && canUseSponsored) {
+          addLog("Transaction submitted in sponsored mode");
+        }
 
         // Show pending toast
         showTransactionToast(
@@ -225,7 +246,16 @@ export default function TransfersScreen() {
     } finally {
       setIsSubmitting(false);
     }
-  }, [wallet, validTransfers, chainId, addLog, handleClearAll, fetchBalances]);
+  }, [
+    wallet,
+    validTransfers,
+    chainId,
+    addLog,
+    handleClearAll,
+    fetchBalances,
+    useSponsored,
+    canUseSponsored,
+  ]);
 
   if (!wallet) {
     return null;
@@ -338,6 +368,27 @@ export default function TransfersScreen() {
         </TouchableOpacity>
 
         {/* Submit Button */}
+        <View style={styles.sponsoredRow}>
+          <TouchableOpacity
+            style={[
+              styles.sponsoredToggle,
+              useSponsored && styles.sponsoredToggleActive,
+              !canUseSponsored && styles.buttonDisabled,
+            ]}
+            onPress={() => setUseSponsored((v) => !v)}
+            disabled={!canUseSponsored || isSubmitting}
+          >
+            <ThemedText style={styles.sponsoredToggleText}>
+              {useSponsored ? "Sponsored: ON" : "Sponsored: OFF"}
+            </ThemedText>
+          </TouchableOpacity>
+          {!canUseSponsored && (
+            <ThemedText style={styles.sponsoredHint}>
+              Paymaster not configured
+            </ThemedText>
+          )}
+        </View>
+
         <TouchableOpacity
           style={[styles.submitButton, !canSubmit && styles.buttonDisabled]}
           onPress={handleSubmit}
@@ -559,6 +610,31 @@ const styles = StyleSheet.create({
     color: "#0a7ea4",
     fontSize: 16,
     fontWeight: "600",
+  },
+  sponsoredRow: {
+    marginBottom: 12,
+  },
+  sponsoredToggle: {
+    backgroundColor: "rgba(128, 128, 128, 0.2)",
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "rgba(128, 128, 128, 0.3)",
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    alignItems: "center",
+  },
+  sponsoredToggleActive: {
+    backgroundColor: "rgba(10, 126, 164, 0.2)",
+    borderColor: "rgba(10, 126, 164, 0.6)",
+  },
+  sponsoredToggleText: {
+    fontSize: 14,
+    fontWeight: "600",
+  },
+  sponsoredHint: {
+    marginTop: 6,
+    fontSize: 12,
+    opacity: 0.6,
   },
   submitButton: {
     backgroundColor: "#0a7ea4",
