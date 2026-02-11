@@ -19,10 +19,6 @@
     ".": {
       "types": "./dist/src/index.d.ts",
       "import": "./dist/src/index.js"
-    },
-    "./polyfills": {
-      "types": "./dist/polyfills.d.ts",
-      "import": "./dist/polyfills.js"
     }
   },
   "peerDependenciesMeta": {
@@ -56,11 +52,15 @@
     "generate:tokens:sepolia": "npx tsx scripts/generate-token-presets.ts --network sepolia",
     "generate:validators": "npx tsx scripts/generate-validator-presets.ts --network mainnet",
     "generate:validators:sepolia": "npx tsx scripts/generate-validator-presets.ts --network sepolia",
+    "docs:api": "typedoc --options typedoc.json",
+    "docs:export": "npm run docs:api && node scripts/docs-export.mjs && bestzip docs/export/x-docs.zip docs/export/*",
+    "docs:check": "npm run docs:api",
     "prepare": "husky"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.2",
     "@vitest/coverage-v8": "^4.0.17",
+    "bestzip": "^2.2.1",
     "dotenv": "^17.2.3",
     "eslint": "^9.39.2",
     "eslint-config-prettier": "^10.1.8",
@@ -69,6 +69,8 @@
     "starknet-devnet": "^0.7.2",
     "tsc-alias": "^1.8.16",
     "tsx": "^4.21.0",
+    "typedoc": "^0.28.16",
+    "typedoc-plugin-markdown": "^4.10.0",
     "typescript": "^5.9.3",
     "typescript-eslint": "^8.53.1",
     "vite": "^7.3.1",
