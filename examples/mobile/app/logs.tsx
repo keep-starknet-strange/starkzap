@@ -12,12 +12,20 @@ export default function LogsScreen() {
   return (
     <SafeAreaView style={styles.container} edges={["bottom"]}>
       <View style={styles.header}>
-        <ThemedText type="title">Logs</ThemedText>
+        <ThemedText type="title" lightColor="#ECEDEE" darkColor="#ECEDEE">
+          Logs
+        </ThemedText>
         <TouchableOpacity
           style={styles.closeButton}
           onPress={() => router.back()}
         >
-          <ThemedText style={styles.closeButtonText}>Close</ThemedText>
+          <ThemedText
+            style={styles.closeButtonText}
+            lightColor="#FFFFFF"
+            darkColor="#FFFFFF"
+          >
+            Close
+          </ThemedText>
         </TouchableOpacity>
       </View>
 
@@ -27,12 +35,23 @@ export default function LogsScreen() {
       >
         {logs.length === 0 ? (
           <ThemedView style={styles.emptyState}>
-            <ThemedText style={styles.emptyText}>No logs yet</ThemedText>
+            <ThemedText
+              style={styles.emptyText}
+              lightColor="#ECEDEE"
+              darkColor="#ECEDEE"
+            >
+              No logs yet
+            </ThemedText>
           </ThemedView>
         ) : (
           <ThemedView style={styles.logContainer}>
             {logs.map((log, index) => (
-              <ThemedText key={index} style={styles.logEntry}>
+              <ThemedText
+                key={index}
+                style={styles.logEntry}
+                lightColor="#ECEDEE"
+                darkColor="#ECEDEE"
+              >
                 {log}
               </ThemedText>
             ))}
@@ -43,7 +62,13 @@ export default function LogsScreen() {
       {logs.length > 0 && (
         <View style={styles.footer}>
           <TouchableOpacity style={styles.clearButton} onPress={clearLogs}>
-            <ThemedText style={styles.clearButtonText}>Clear Logs</ThemedText>
+            <ThemedText
+              style={styles.clearButtonText}
+              lightColor="#FFFFFF"
+              darkColor="#FFFFFF"
+            >
+              Clear Logs
+            </ThemedText>
           </TouchableOpacity>
         </View>
       )}
