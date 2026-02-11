@@ -12,10 +12,25 @@ export default defineConfig(
   {
     ignores: [
       "dist/",
+      "**/dist/**",
       "node_modules/",
+      "**/node_modules/**",
+      "coverage/",
+      "**/coverage/**",
+      "docs/api/**",
+      "docs/export/**",
       "examples/mobile/eslint.config.js",
       "examples/mobile/metro.config.js",
     ],
+  },
+  {
+    files: ["scripts/**/*.mjs"],
+    languageOptions: {
+      globals: {
+        console: "readonly",
+        process: "readonly",
+      },
+    },
   },
   {
     rules: {
