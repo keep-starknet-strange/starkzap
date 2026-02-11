@@ -47,7 +47,8 @@ const createEmptyTransfer = (): TransferItem => ({
 });
 
 export default function TransfersScreen() {
-  const { wallet, chainId, addLog } = useWalletStore();
+  const { wallet, chainId, addLog, paymasterNodeUrl, preferSponsored } =
+    useWalletStore();
   const {
     getBalance,
     fetchBalances,
@@ -63,6 +64,9 @@ export default function TransfersScreen() {
     createEmptyTransfer(),
   ]);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [useSponsored, setUseSponsored] = useState(
+    preferSponsored && Boolean(paymasterNodeUrl)
+  );
 
   // Token picker modal state
   const [showTokenPicker, setShowTokenPicker] = useState(false);
@@ -156,6 +160,7 @@ export default function TransfersScreen() {
   }, [transfers]);
 
   const canSubmit = validTransfers.length > 0 && !isSubmitting;
+  const canUseSponsored = Boolean(paymasterNodeUrl);
 
   const handleSubmit = useCallback(async () => {
     if (!wallet || validTransfers.length === 0) return;
@@ -186,9 +191,16 @@ export default function TransfersScreen() {
           `Transferring ${token.symbol} to ${transfersData.length} recipient(s)...`
         );
 
-        const tx = await wallet.transfer(token, transfersData);
+        const tx = await wallet.transfer(
+          token,
+          transfersData,
+          useSponsored && canUseSponsored ? { feeMode: "sponsored" } : undefined
+        );
 
         addLog(`Transfer tx submitted: ${tx.hash.slice(0, 10)}...`);
+        if (useSponsored && canUseSponsored) {
+          addLog("Transaction submitted in sponsored mode");
+        }
 
         // Show pending toast
         showTransactionToast(
@@ -225,7 +237,16 @@ export default function TransfersScreen() {
     } finally {
       setIsSubmitting(false);
     }
-  }, [wallet, validTransfers, chainId, addLog, handleClearAll, fetchBalances]);
+  }, [
+    wallet,
+    validTransfers,
+    chainId,
+    addLog,
+    handleClearAll,
+    fetchBalances,
+    useSponsored,
+    canUseSponsored,
+  ]);
 
   if (!wallet) {
     return null;
@@ -338,6 +359,27 @@ export default function TransfersScreen() {
         </TouchableOpacity>
 
         {/* Submit Button */}
+        <View style={styles.sponsoredRow}>
+          <TouchableOpacity
+            style={[
+              styles.sponsoredToggle,
+              useSponsored && styles.sponsoredToggleActive,
+              !canUseSponsored && styles.buttonDisabled,
+            ]}
+            onPress={() => setUseSponsored((v) => !v)}
+            disabled={!canUseSponsored || isSubmitting}
+          >
+            <ThemedText style={styles.sponsoredToggleText}>
+              {useSponsored ? "Sponsored: ON" : "Sponsored: OFF"}
+            </ThemedText>
+          </TouchableOpacity>
+          {!canUseSponsored && (
+            <ThemedText style={styles.sponsoredHint}>
+              Paymaster not configured
+            </ThemedText>
+          )}
+        </View>
+
         <TouchableOpacity
           style={[styles.submitButton, !canSubmit && styles.buttonDisabled]}
           onPress={handleSubmit}
@@ -559,6 +601,31 @@ const styles = StyleSheet.create({
     color: "#0a7ea4",
     fontSize: 16,
     fontWeight: "600",
+  },
+  sponsoredRow: {
+    marginBottom: 12,
+  },
+  sponsoredToggle: {
+    backgroundColor: "rgba(128, 128, 128, 0.2)",
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "rgba(128, 128, 128, 0.3)",
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    alignItems: "center",
+  },
+  sponsoredToggleActive: {
+    backgroundColor: "rgba(10, 126, 164, 0.2)",
+    borderColor: "rgba(10, 126, 164, 0.6)",
+  },
+  sponsoredToggleText: {
+    fontSize: 14,
+    fontWeight: "600",
+  },
+  sponsoredHint: {
+    marginTop: 6,
+    fontSize: 12,
+    opacity: 0.6,
   },
   submitButton: {
     backgroundColor: "#0a7ea4",

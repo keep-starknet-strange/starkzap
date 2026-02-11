@@ -45,10 +45,13 @@ export default function LandingScreen() {
     // Wallet
     privateKey,
     selectedPreset,
+    preferSponsored,
+    paymasterNodeUrl,
     wallet,
     isConnecting,
     setPrivateKey,
     setSelectedPreset,
+    setPreferSponsored,
     connect,
     // Privy
     privySelectedPreset,
@@ -281,6 +284,35 @@ export default function LandingScreen() {
                   </TouchableOpacity>
                 ))}
               </ThemedView>
+            </ThemedView>
+
+            <ThemedView style={styles.inputContainer}>
+              <ThemedText style={styles.label}>Default Fee Mode</ThemedText>
+              <TouchableOpacity
+                style={[
+                  styles.toggleButton,
+                  preferSponsored && styles.toggleButtonActive,
+                  !paymasterNodeUrl && styles.toggleButtonDisabled,
+                ]}
+                onPress={() => setPreferSponsored(!preferSponsored)}
+                disabled={!paymasterNodeUrl}
+              >
+                <ThemedText
+                  style={[
+                    styles.toggleButtonText,
+                    preferSponsored && styles.toggleButtonTextActive,
+                  ]}
+                >
+                  {preferSponsored
+                    ? "Sponsored (default)"
+                    : "User Pays (default)"}
+                </ThemedText>
+              </TouchableOpacity>
+              {!paymasterNodeUrl && (
+                <ThemedText style={styles.hintText}>
+                  Paymaster not configured for this network.
+                </ThemedText>
+              )}
             </ThemedView>
 
             <TouchableOpacity
@@ -633,6 +665,32 @@ const styles = StyleSheet.create({
     color: "#0a7ea4",
     fontSize: 16,
     fontWeight: "600",
+  },
+  toggleButton: {
+    borderWidth: 1,
+    borderColor: "rgba(128, 128, 128, 0.3)",
+    borderRadius: 8,
+    padding: 12,
+    backgroundColor: "rgba(0, 0, 0, 0.2)",
+  },
+  toggleButtonActive: {
+    borderColor: "#0a7ea4",
+    backgroundColor: "rgba(10, 126, 164, 0.2)",
+  },
+  toggleButtonDisabled: {
+    opacity: 0.5,
+  },
+  toggleButtonText: {
+    fontSize: 14,
+  },
+  toggleButtonTextActive: {
+    color: "#fff",
+    fontWeight: "600",
+  },
+  hintText: {
+    marginTop: 6,
+    fontSize: 12,
+    opacity: 0.6,
   },
   divider: {
     flexDirection: "row",
