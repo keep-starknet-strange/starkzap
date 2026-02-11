@@ -4,7 +4,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "dev:server": "tsx server.ts",
+    "dev:server": "cd ../server && npx tsx server.ts",
     "dev:all": "concurrently \"npm run dev\" \"npm run dev:server\"",
     "build": "vite build",
     "preview": "vite preview"

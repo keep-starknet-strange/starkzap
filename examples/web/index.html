@@ -44,14 +44,14 @@
       }
 
       .app {
-        max-width: 720px;
+        max-width: 760px;
         margin: 0 auto;
-        padding: 3rem 1.5rem;
+        padding: 2.5rem 1.5rem;
       }
 
       header {
         text-align: center;
-        margin-bottom: 3rem;
+        margin-bottom: 2.5rem;
       }
 
       h1 {
@@ -61,21 +61,21 @@
         -webkit-background-clip: text;
         -webkit-text-fill-color: transparent;
         background-clip: text;
-        margin-bottom: 0.5rem;
+        margin-bottom: 0.25rem;
         letter-spacing: -0.02em;
       }
 
       .subtitle {
         color: var(--text-secondary);
-        font-size: 1.1rem;
+        font-size: 1.05rem;
       }
 
       .card {
         background: var(--bg-secondary);
         border: 1px solid var(--border-color);
         border-radius: 16px;
-        padding: 1.75rem;
-        margin-bottom: 1.5rem;
+        padding: 1.5rem;
+        margin-bottom: 1.25rem;
       }
 
       .card-title {
@@ -84,15 +84,14 @@
         text-transform: uppercase;
         letter-spacing: 0.1em;
         color: var(--text-muted);
-        margin-bottom: 1.25rem;
+        margin-bottom: 1rem;
       }
 
       .connect-grid {
         display: grid;
         grid-template-columns: 1fr 1fr;
-        gap: 1rem;
+        gap: 0.75rem;
       }
-
       @media (max-width: 540px) {
         .connect-grid {
           grid-template-columns: 1fr;
@@ -101,9 +100,9 @@
 
       .btn {
         font-family: var(--font-sans);
-        font-size: 0.95rem;
+        font-size: 0.9rem;
         font-weight: 600;
-        padding: 1rem 1.5rem;
+        padding: 0.875rem 1.25rem;
         border-radius: 12px;
         border: none;
         cursor: pointer;
@@ -112,256 +111,93 @@
         align-items: center;
         justify-content: center;
         gap: 0.5rem;
+        color: white;
       }
-
       .btn:disabled {
         opacity: 0.5;
         cursor: not-allowed;
       }
-
       .btn-cartridge {
-        background: linear-gradient(135deg, #f97316 0%, #ea580c 100%);
-        color: white;
+        background: linear-gradient(135deg, #f97316, #ea580c);
       }
-
       .btn-cartridge:hover:not(:disabled) {
-        transform: translateY(-2px);
-        box-shadow: 0 8px 24px rgba(249, 115, 22, 0.3);
+        transform: translateY(-1px);
+        box-shadow: 0 6px 20px rgba(249, 115, 22, 0.3);
       }
-
       .btn-primary {
         background: var(--accent-gradient);
-        color: white;
       }
-
       .btn-primary:hover:not(:disabled) {
-        transform: translateY(-2px);
-        box-shadow: 0 8px 24px rgba(0, 212, 170, 0.3);
+        transform: translateY(-1px);
+        box-shadow: 0 6px 20px rgba(0, 212, 170, 0.3);
       }
-
       .btn-secondary {
         background: var(--bg-tertiary);
         color: var(--text-primary);
         border: 1px solid var(--border-color);
       }
-
       .btn-secondary:hover:not(:disabled) {
         background: var(--border-color);
       }
-
       .btn-disconnect {
         background: transparent;
         color: var(--error);
         border: 1px solid var(--error);
-        padding: 0.75rem 1rem;
-        font-size: 0.85rem;
+        padding: 0.65rem 1rem;
+        font-size: 0.8rem;
       }
-
       .btn-disconnect:hover:not(:disabled) {
         background: rgba(239, 68, 68, 0.1);
       }
-
-      .form-group {
-        margin-bottom: 1rem;
+      .btn-sm {
+        padding: 0.5rem 0.875rem;
+        font-size: 0.8rem;
+        border-radius: 8px;
       }
-
-      .form-group:last-child {
-        margin-bottom: 0;
+      .btn-green {
+        background: linear-gradient(135deg, #10b981, #059669);
       }
-
-      label {
-        display: block;
-        font-size: 0.85rem;
-        font-weight: 500;
-        color: var(--text-secondary);
-        margin-bottom: 0.5rem;
+      .btn-purple {
+        background: linear-gradient(135deg, #8b5cf6, #6366f1);
       }
 
       input,
       select {
         width: 100%;
-        padding: 0.875rem 1rem;
+        padding: 0.75rem 0.875rem;
         background: var(--bg-tertiary);
         border: 1px solid var(--border-color);
         border-radius: 10px;
         color: var(--text-primary);
         font-family: var(--font-mono);
-        font-size: 0.9rem;
-        transition: border-color 0.2s ease;
+        font-size: 0.85rem;
+        transition: border-color 0.2s;
       }
-
       input:focus,
       select:focus {
         outline: none;
         border-color: var(--accent-primary);
       }
-
       input::placeholder {
         color: var(--text-muted);
       }
-
       select {
         cursor: pointer;
         font-family: var(--font-sans);
       }
 
-      .wallet-info {
-        display: none;
-      }
-
-      .wallet-info.visible {
+      label {
         display: block;
-      }
-
-      .info-row {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        padding: 0.875rem 0;
-        border-bottom: 1px solid var(--border-color);
-      }
-
-      .info-row:last-child {
-        border-bottom: none;
-      }
-
-      .info-label {
-        color: var(--text-secondary);
-        font-size: 0.9rem;
-      }
-
-      .info-value {
-        font-family: var(--font-mono);
-        font-size: 0.85rem;
-        color: var(--text-primary);
-      }
-
-      .btn-copy {
-        background: transparent;
-        border: 1px solid var(--border-color);
-        border-radius: 6px;
-        padding: 0.25rem 0.5rem;
-        cursor: pointer;
-        font-size: 0.8rem;
-        transition: all 0.2s;
-        margin-left: 0.5rem;
-      }
-
-      .btn-copy:hover {
-        background: var(--bg-tertiary);
-        border-color: var(--accent-primary);
-      }
-
-      .address {
-        max-width: 200px;
-        overflow: hidden;
-        text-overflow: ellipsis;
-      }
-
-      .status-badge {
-        display: inline-flex;
-        align-items: center;
-        gap: 0.375rem;
-        padding: 0.375rem 0.75rem;
-        border-radius: 20px;
         font-size: 0.8rem;
         font-weight: 500;
-        font-family: var(--font-sans);
-      }
-
-      .status-badge::before {
-        content: "";
-        width: 6px;
-        height: 6px;
-        border-radius: 50%;
-      }
-
-      .status-deployed {
-        background: rgba(0, 212, 170, 0.15);
-        color: var(--success);
-      }
-
-      .status-deployed::before {
-        background: var(--success);
-      }
-
-      .status-not-deployed {
-        background: rgba(245, 158, 11, 0.15);
-        color: var(--warning);
-      }
-
-      .status-not-deployed::before {
-        background: var(--warning);
-      }
-
-      .status-checking {
-        background: rgba(136, 136, 160, 0.15);
         color: var(--text-secondary);
+        margin-bottom: 0.35rem;
       }
-
-      .status-checking::before {
-        background: var(--text-secondary);
-        animation: pulse 1s ease-in-out infinite;
+      .form-group {
+        margin-bottom: 0.875rem;
       }
-
-      @keyframes pulse {
-        0%,
-        100% {
-          opacity: 1;
-        }
-
-        50% {
-          opacity: 0.4;
-        }
-      }
-
-      .actions {
-        display: flex;
-        gap: 0.75rem;
-        margin-top: 1.25rem;
-        flex-wrap: wrap;
-      }
-
-      .actions .btn {
-        flex: 1;
-        min-width: 140px;
-      }
-
-      .log-container {
-        background: var(--bg-tertiary);
-        border-radius: 10px;
-        padding: 1rem;
-        max-height: 200px;
-        overflow-y: auto;
-        font-family: var(--font-mono);
-        font-size: 0.8rem;
-      }
-
-      .log-entry {
-        padding: 0.25rem 0;
-        color: var(--text-secondary);
-        border-bottom: 1px solid rgba(42, 42, 58, 0.5);
-      }
-
-      .log-entry:last-child {
-        border-bottom: none;
-      }
-
-      .log-entry.success {
-        color: var(--success);
-      }
-
-      .log-entry.error {
-        color: var(--error);
-      }
-
-      .log-entry.info {
-        color: var(--accent-primary);
-      }
-
-      .log-time {
-        color: var(--text-muted);
-        margin-right: 0.5rem;
+      .form-group:last-child {
+        margin-bottom: 0;
       }
 
       .hidden {
@@ -371,12 +207,11 @@
       .divider {
         display: flex;
         align-items: center;
-        gap: 1rem;
-        margin: 1.5rem 0;
+        gap: 0.75rem;
+        margin: 1.25rem 0;
         color: var(--text-muted);
-        font-size: 0.85rem;
+        font-size: 0.8rem;
       }
-
       .divider::before,
       .divider::after {
         content: "";
@@ -385,26 +220,383 @@
         background: var(--border-color);
       }
 
-      .wallet-type {
+      /* Wallet info */
+      .wallet-info {
+        display: none;
+      }
+      .wallet-info.visible {
+        display: block;
+      }
+
+      .info-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 0.75rem 0;
+        border-bottom: 1px solid var(--border-color);
+      }
+      .info-row:last-child {
+        border-bottom: none;
+      }
+      .info-label {
+        color: var(--text-secondary);
+        font-size: 0.85rem;
+      }
+      .info-value {
+        font-family: var(--font-mono);
+        font-size: 0.8rem;
+      }
+
+      .btn-copy {
+        background: transparent;
+        border: 1px solid var(--border-color);
+        border-radius: 6px;
+        padding: 0.2rem 0.4rem;
+        cursor: pointer;
+        font-size: 0.75rem;
+        transition: all 0.2s;
+        margin-left: 0.5rem;
+      }
+      .btn-copy:hover {
+        background: var(--bg-tertiary);
+        border-color: var(--accent-primary);
+      }
+
+      .status-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.3rem;
+        padding: 0.3rem 0.6rem;
+        border-radius: 20px;
+        font-size: 0.75rem;
+        font-weight: 500;
+      }
+      .status-badge::before {
+        content: "";
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+      }
+      .status-deployed {
+        background: rgba(0, 212, 170, 0.15);
+        color: var(--success);
+      }
+      .status-deployed::before {
+        background: var(--success);
+      }
+      .status-not-deployed {
+        background: rgba(245, 158, 11, 0.15);
+        color: var(--warning);
+      }
+      .status-not-deployed::before {
+        background: var(--warning);
+      }
+      .status-checking {
+        background: rgba(136, 136, 160, 0.15);
+        color: var(--text-secondary);
+      }
+      .status-checking::before {
+        background: var(--text-secondary);
+        animation: pulse 1s ease-in-out infinite;
+      }
+      @keyframes pulse {
+        0%,
+        100% {
+          opacity: 1;
+        }
+        50% {
+          opacity: 0.4;
+        }
+      }
+
+      .actions {
+        display: flex;
+        gap: 0.6rem;
+        margin-top: 1rem;
+        flex-wrap: wrap;
+      }
+      .actions .btn {
+        flex: 1;
+        min-width: 120px;
+      }
+
+      /* Tabs */
+      .tab-bar {
+        display: flex;
+        gap: 0;
+        border-bottom: 1px solid var(--border-color);
+        margin-bottom: 1.25rem;
+      }
+      .tab-btn {
+        font-family: var(--font-sans);
+        font-size: 0.85rem;
+        font-weight: 600;
+        padding: 0.75rem 1.25rem;
+        background: none;
+        border: none;
+        border-bottom: 2px solid transparent;
+        color: var(--text-muted);
+        cursor: pointer;
+        transition: all 0.2s;
+      }
+      .tab-btn:hover {
+        color: var(--text-secondary);
+      }
+      .tab-btn.active {
+        color: var(--accent-primary);
+        border-bottom-color: var(--accent-primary);
+      }
+      .tab-panel {
+        display: none;
+      }
+      .tab-panel.active {
+        display: block;
+      }
+
+      /* Balances */
+      .token-list {
+        display: flex;
+        flex-direction: column;
+        gap: 0;
+      }
+      .token-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 0.65rem 0;
+        border-bottom: 1px solid rgba(42, 42, 58, 0.5);
+      }
+      .token-row:last-child {
+        border-bottom: none;
+      }
+      .token-name {
+        font-weight: 500;
+        font-size: 0.9rem;
+      }
+      .token-symbol {
+        color: var(--text-muted);
+        font-size: 0.75rem;
+        margin-left: 0.5rem;
+      }
+      .token-balance {
+        font-family: var(--font-mono);
+        font-size: 0.85rem;
+        color: var(--text-primary);
+      }
+      .token-balance.zero {
+        color: var(--text-muted);
+      }
+
+      /* Transfer */
+      .transfer-row {
+        display: flex;
+        gap: 0.5rem;
+        align-items: flex-end;
+        margin-bottom: 0.5rem;
+        padding: 0.75rem;
+        background: var(--bg-tertiary);
+        border-radius: 10px;
+      }
+      .transfer-row .form-group {
+        margin-bottom: 0;
+        flex: 1;
+      }
+      .btn-remove-transfer {
+        background: none;
+        border: none;
+        color: var(--error);
+        cursor: pointer;
+        font-size: 1.1rem;
+        padding: 0.5rem;
+        line-height: 1;
+      }
+
+      /* Staking */
+      .validator-list {
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+      }
+      .validator-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 0.75rem;
+        background: var(--bg-tertiary);
+        border-radius: 10px;
+        cursor: pointer;
+        transition: background 0.2s;
+        border: 1px solid transparent;
+      }
+      .validator-row:hover {
+        background: var(--border-color);
+      }
+      .validator-row.selected {
+        border-color: var(--accent-primary);
+      }
+      .validator-name {
+        font-weight: 500;
+      }
+      .validator-address {
+        font-family: var(--font-mono);
         font-size: 0.75rem;
         color: var(--text-muted);
-        text-transform: uppercase;
-        letter-spacing: 0.05em;
+      }
+
+      .pool-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 0.65rem 0.75rem;
+        background: var(--bg-tertiary);
+        border-radius: 8px;
+        margin-bottom: 0.5rem;
+      }
+
+      .position-card {
+        padding: 1rem;
+        background: var(--bg-tertiary);
+        border-radius: 10px;
+        margin-bottom: 0.75rem;
+        border: 1px solid var(--border-color);
+      }
+      .position-card .header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 0.75rem;
+        padding-bottom: 0.5rem;
+        border-bottom: 1px solid var(--border-color);
+      }
+      .position-card .header strong {
+        font-size: 0.95rem;
+      }
+      .position-stat {
+        display: flex;
+        justify-content: space-between;
+        padding: 0.3rem 0;
+        font-size: 0.85rem;
+      }
+      .position-stat .label {
+        color: var(--text-secondary);
+      }
+      .position-stat .value {
+        font-family: var(--font-mono);
+      }
+
+      .staking-actions {
+        display: flex;
+        gap: 0.5rem;
+        margin-top: 0.75rem;
+        flex-wrap: wrap;
+      }
+      .staking-actions .btn {
+        font-size: 0.8rem;
+        padding: 0.5rem 0.75rem;
+      }
+
+      /* Log */
+      .log-container {
+        background: var(--bg-tertiary);
+        border-radius: 10px;
+        padding: 0.875rem;
+        max-height: 180px;
+        overflow-y: auto;
+        font-family: var(--font-mono);
+        font-size: 0.75rem;
+      }
+      .log-entry {
+        padding: 0.2rem 0;
+        color: var(--text-secondary);
+        border-bottom: 1px solid rgba(42, 42, 58, 0.5);
+      }
+      .log-entry:last-child {
+        border-bottom: none;
+      }
+      .log-entry.success {
+        color: var(--success);
+      }
+      .log-entry.error {
+        color: var(--error);
+      }
+      .log-entry.info {
+        color: var(--accent-primary);
+      }
+      .log-time {
+        color: var(--text-muted);
+        margin-right: 0.4rem;
       }
 
       .spinner {
-        width: 16px;
-        height: 16px;
+        width: 14px;
+        height: 14px;
         border: 2px solid transparent;
         border-top-color: currentColor;
         border-radius: 50%;
         animation: spin 0.8s linear infinite;
       }
-
       @keyframes spin {
         to {
           transform: rotate(360deg);
         }
+      }
+
+      .empty-state {
+        text-align: center;
+        padding: 2rem;
+        color: var(--text-muted);
+        font-size: 0.9rem;
+      }
+
+      /* Checkbox toggle */
+      .toggle-row {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.6rem 0;
+        font-size: 0.85rem;
+      }
+      .toggle-row input[type="checkbox"] {
+        width: 16px;
+        height: 16px;
+        accent-color: var(--accent-primary);
+        cursor: pointer;
+        margin: 0;
+      }
+      .toggle-row label {
+        margin: 0;
+        cursor: pointer;
+        color: var(--text-secondary);
+        font-size: 0.85rem;
+      }
+
+      /* Modal overlay */
+      .modal-overlay {
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.6);
+        display: none;
+        align-items: center;
+        justify-content: center;
+        z-index: 100;
+      }
+      .modal-overlay.visible {
+        display: flex;
+      }
+      .modal {
+        background: var(--bg-secondary);
+        border: 1px solid var(--border-color);
+        border-radius: 16px;
+        padding: 1.5rem;
+        width: 90%;
+        max-width: 440px;
+        max-height: 80vh;
+        overflow-y: auto;
+      }
+      .modal-title {
+        font-size: 1.1rem;
+        font-weight: 600;
+        margin-bottom: 1rem;
       }
     </style>
   </head>
@@ -416,82 +608,84 @@
         <p class="subtitle">Wallet Integration Playground</p>
       </header>
 
-      <!-- Connection Options -->
-      <div id="connect-section" class="card">
-        <div class="card-title">Connect Wallet</div>
+      <!-- Step 1: Network Selection -->
+      <div id="network-section" class="card">
+        <div class="card-title">Select Network</div>
+        <div class="connect-grid">
+          <button
+            id="btn-net-sepolia"
+            class="btn btn-secondary"
+            style="
+              border-color: var(--accent-primary);
+              color: var(--accent-primary);
+            "
+          >
+            Sepolia
+          </button>
+          <button id="btn-net-mainnet" class="btn btn-secondary">
+            Mainnet
+          </button>
+        </div>
+        <div id="custom-network-form" class="hidden">
+          <div class="divider">Custom Network</div>
+          <div class="form-group">
+            <label for="custom-rpc">RPC URL</label>
+            <input
+              type="text"
+              id="custom-rpc"
+              placeholder="http://localhost:5050"
+            />
+          </div>
+          <div class="form-group">
+            <label for="custom-chain">Chain ID</label>
+            <select id="custom-chain">
+              <option value="SN_SEPOLIA">SN_SEPOLIA</option>
+              <option value="SN_MAIN">SN_MAIN</option>
+            </select>
+          </div>
+        </div>
+        <div style="margin-top: 0.75rem; display: flex; gap: 0.5rem">
+          <button
+            id="btn-custom-toggle"
+            class="btn btn-secondary btn-sm"
+            style="flex: 0"
+          >
+            Custom
+          </button>
+          <button
+            id="btn-confirm-network"
+            class="btn btn-primary"
+            style="flex: 1"
+          >
+            Continue
+          </button>
+        </div>
+      </div>
 
-        <div class="connect-grid" style="grid-template-columns: 1fr 1fr">
+      <!-- Step 2: Connection Options -->
+      <div id="connect-section" class="card hidden">
+        <div class="card-title">
+          Connect Wallet
+          <span
+            id="network-badge"
+            style="
+              float: right;
+              font-size: 0.7rem;
+              background: var(--bg-tertiary);
+              padding: 0.2rem 0.5rem;
+              border-radius: 6px;
+              color: var(--accent-primary);
+            "
+          ></span>
+        </div>
+
+        <div class="connect-grid">
           <button id="btn-cartridge" class="btn btn-cartridge">
-            <svg
-              width="20"
-              height="20"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-            >
-              <path d="M12 2L2 7l10 5 10-5-10-5z" />
-              <path d="M2 17l10 5 10-5" />
-              <path d="M2 12l10 5 10-5" />
-            </svg>
             Cartridge
           </button>
-          <button
-            id="btn-webauthn"
-            class="btn"
-            style="
-              background: linear-gradient(135deg, #10b981 0%, #059669 100%);
-              color: white;
-            "
-          >
-            <svg
-              width="20"
-              height="20"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-            >
-              <path
-                d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2z"
-              />
-              <path d="M12 6v6l4 2" />
-              <circle cx="12" cy="12" r="3" />
-            </svg>
-            Face ID
-          </button>
-          <button
-            id="btn-privy"
-            class="btn btn-privy"
-            style="
-              background: linear-gradient(135deg, #8b5cf6 0%, #6366f1 100%);
-            "
-          >
-            <svg
-              width="20"
-              height="20"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-            >
-              <circle cx="12" cy="12" r="10" />
-              <path d="M12 6v6l4 2" />
-            </svg>
-            Privy
-          </button>
+          <button id="btn-webauthn" class="btn btn-green">Face ID</button>
+          <button id="btn-privy" class="btn btn-purple">Privy</button>
           <button id="btn-toggle-pk" class="btn btn-secondary">
-            <svg
-              width="20"
-              height="20"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-            >
-              <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
-              <path d="M7 11V7a5 5 0 0 1 10 0v4" />
-            </svg>
             Private Key
           </button>
         </div>
@@ -511,10 +705,9 @@
               <button
                 id="btn-generate-key"
                 class="btn btn-secondary"
-                type="button"
                 style="white-space: nowrap; padding: 0.5rem 0.75rem"
               >
-                🎲
+                &#x1F3B2;
               </button>
             </div>
           </div>
@@ -557,89 +750,161 @@
               <option value="argent">Argent</option>
               <option value="argentx050">ArgentX v0.5.0</option>
               <option value="braavos">Braavos</option>
-              <option value="devnet">Devnet</option>
             </select>
           </div>
-          <p
-            style="
-              font-size: 0.8rem;
-              color: var(--text-muted);
-              margin-bottom: 1rem;
-            "
-          >
-            Enter your email to register or login.<br />
-            Privy provides the signer, you choose the account contract.
-          </p>
           <div class="form-group">
             <button
               id="btn-connect-privy"
-              class="btn btn-primary"
-              style="
-                width: 100%;
-                background: linear-gradient(135deg, #8b5cf6 0%, #6366f1 100%);
-              "
+              class="btn btn-purple"
+              style="width: 100%"
             >
               Register / Login
             </button>
           </div>
         </div>
+
+        <div style="margin-top: 0.75rem">
+          <button
+            id="btn-change-network"
+            class="btn btn-secondary btn-sm"
+            style="width: 100%"
+          >
+            Change Network
+          </button>
+        </div>
       </div>
 
-      <!-- Wallet Info (shown when connected) -->
-      <div id="wallet-section" class="card wallet-info">
-        <div class="card-title">
-          <span id="wallet-type-label">Connected Wallet</span>
+      <!-- Step 3: Wallet Dashboard -->
+      <div id="wallet-section" class="wallet-info">
+        <!-- Wallet header -->
+        <div class="card">
+          <div class="card-title">
+            <span id="wallet-type-label">Connected Wallet</span>
+          </div>
+          <div class="info-row">
+            <span class="info-label">Address</span>
+            <span style="display: flex; align-items: center">
+              <span
+                id="wallet-address"
+                class="info-value"
+                style="
+                  max-width: 200px;
+                  overflow: hidden;
+                  text-overflow: ellipsis;
+                "
+                >—</span
+              >
+              <button id="btn-copy-address" class="btn-copy" title="Copy">
+                &#x1F4CB;
+              </button>
+            </span>
+          </div>
+          <div class="info-row">
+            <span class="info-label">Status</span>
+            <span id="wallet-status" class="status-badge status-checking"
+              >Checking...</span
+            >
+          </div>
+          <div class="toggle-row">
+            <input type="checkbox" id="chk-sponsored" />
+            <label for="chk-sponsored">Sponsored (gasless via paymaster)</label>
+          </div>
+          <div class="actions">
+            <button id="btn-check-deployed" class="btn btn-secondary btn-sm">
+              Check Status
+            </button>
+            <button id="btn-deploy" class="btn btn-primary btn-sm">
+              Deploy Account
+            </button>
+            <button id="btn-test-sign" class="btn btn-secondary btn-sm hidden">
+              Test Sign
+            </button>
+            <button id="btn-disconnect" class="btn btn-disconnect btn-sm">
+              Disconnect
+            </button>
+          </div>
         </div>
 
-        <div class="info-row">
-          <span class="info-label">Address</span>
-          <span id="wallet-address" class="info-value address">—</span>
-          <button
-            id="btn-copy-address"
-            class="btn-copy"
-            title="Copy full address"
-          >
-            📋
-          </button>
+        <!-- Tabs -->
+        <div class="tab-bar">
+          <button class="tab-btn active" data-tab="balances">Balances</button>
+          <button class="tab-btn" data-tab="transfer">Transfer</button>
+          <button class="tab-btn" data-tab="staking">Staking</button>
         </div>
 
-        <div class="info-row">
-          <span class="info-label">Status</span>
-          <span id="wallet-status" class="status-badge status-checking"
-            >Checking...</span
-          >
+        <!-- Balances Tab -->
+        <div id="tab-balances" class="tab-panel active">
+          <div class="card">
+            <div
+              class="card-title"
+              style="
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+              "
+            >
+              Token Balances
+              <button
+                id="btn-refresh-balances"
+                class="btn btn-secondary btn-sm"
+              >
+                Refresh
+              </button>
+            </div>
+            <div id="balances-list" class="token-list">
+              <div class="empty-state">Loading balances...</div>
+            </div>
+          </div>
         </div>
 
-        <div class="actions">
-          <button id="btn-check-deployed" class="btn btn-secondary">
-            Check Status
-          </button>
-          <button id="btn-deploy" class="btn btn-primary">
-            Deploy Account
-          </button>
-          <button id="btn-transfer" class="btn btn-primary">
-            Test Transfer
-          </button>
-          <button
-            id="btn-transfer-sponsored"
-            class="btn"
-            style="
-              background: linear-gradient(135deg, #10b981 0%, #059669 100%);
-              color: white;
-            "
-          >
-            Sponsored Tx
-          </button>
-          <button
-            id="btn-test-sign"
-            class="btn btn-secondary"
-            style="display: none"
-          >
-            Test Sign
-          </button>
-          <button id="btn-disconnect" class="btn btn-disconnect">
-            Disconnect
-          </button>
+        <!-- Transfer Tab -->
+        <div id="tab-transfer" class="tab-panel">
+          <div class="card">
+            <div class="card-title">Send Tokens</div>
+            <div class="form-group">
+              <label for="transfer-token">Token</label>
+              <select id="transfer-token"></select>
+            </div>
+            <div id="transfer-rows"></div>
+            <button
+              id="btn-add-transfer"
+              class="btn btn-secondary btn-sm"
+              style="width: 100%; margin-bottom: 0.75rem"
+            >
+              + Add Recipient
+            </button>
+            <button
+              id="btn-send-transfer"
+              class="btn btn-primary"
+              style="width: 100%"
+            >
+              Send Transfer
+            </button>
+          </div>
+        </div>
+
+        <!-- Staking Tab -->
+        <div id="tab-staking" class="tab-panel">
+          <div class="card">
+            <div
+              class="card-title"
+              style="
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+              "
+            >
+              Your Positions
+              <button id="btn-add-position" class="btn btn-primary btn-sm">
+                + Add Position
+              </button>
+            </div>
+            <div id="positions-list">
+              <div class="empty-state">
+                No staking positions. Click + Add Position to start staking.
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -647,7 +912,68 @@
       <div class="card">
         <div class="card-title">Activity Log</div>
         <div id="log" class="log-container">
-          <div class="log-entry">Ready to connect...</div>
+          <div class="log-entry">Ready...</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal: Validator Picker -->
+    <div id="modal-validator" class="modal-overlay">
+      <div class="modal">
+        <div class="modal-title">Select Validator</div>
+        <div id="validator-list" class="validator-list"></div>
+        <div style="margin-top: 1rem">
+          <button
+            id="btn-close-validator"
+            class="btn btn-secondary"
+            style="width: 100%"
+          >
+            Cancel
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal: Pool Picker -->
+    <div id="modal-pool" class="modal-overlay">
+      <div class="modal">
+        <div class="modal-title">Select Token Pool</div>
+        <div id="pool-list"></div>
+        <div style="margin-top: 1rem">
+          <button
+            id="btn-close-pool"
+            class="btn btn-secondary"
+            style="width: 100%"
+          >
+            Cancel
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal: Staking Action (stake / add / exit intent) -->
+    <div id="modal-staking-action" class="modal-overlay">
+      <div class="modal">
+        <div class="modal-title" id="staking-action-title">Stake</div>
+        <div class="form-group">
+          <label for="staking-action-amount">Amount</label>
+          <input type="text" id="staking-action-amount" placeholder="0.0" />
+        </div>
+        <div style="display: flex; gap: 0.5rem; margin-top: 0.75rem">
+          <button
+            id="btn-staking-action-confirm"
+            class="btn btn-primary"
+            style="flex: 1"
+          >
+            Confirm
+          </button>
+          <button
+            id="btn-staking-action-cancel"
+            class="btn btn-secondary"
+            style="flex: 0"
+          >
+            Cancel
+          </button>
         </div>
       </div>
     </div>

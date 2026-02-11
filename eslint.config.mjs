@@ -12,7 +12,11 @@ export default defineConfig(
   {
     ignores: [
       "dist/",
+      "**/dist/**",
       "node_modules/",
+      "**/node_modules/**",
+      "coverage/",
+      "**/coverage/**",
       "examples/mobile/eslint.config.js",
       "examples/mobile/metro.config.js",
     ],

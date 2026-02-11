@@ -24,7 +24,7 @@ export const DevnetPreset: AccountClassConfig = {
  */
 export const OpenZeppelinPreset: AccountClassConfig = {
   classHash:
-    "0x061dac032f228abef9c6626f995015233097ae253a7f72d68552db02f2971b8f",
+    "0x01d1777db36cdd06dd62cfde77b1b6ae06412af95d57a13dc40ac77b8a702381",
   buildConstructorCalldata(publicKey: string): Calldata {
     return CallData.compile({ publicKey });
   },
