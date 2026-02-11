@@ -4,6 +4,7 @@ export * from "@/types/config";
 export * from "@/types/sponsorship";
 export * from "@/types/validator";
 export * from "@/types/wallet";
+export * from "@/types/onboard";
 export * from "@/types/token";
 export * from "@/types/tx";
 export * from "@/types/pool";

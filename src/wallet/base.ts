@@ -515,7 +515,7 @@ export abstract class BaseWallet implements WalletInterface {
    * const position = await staking.getPosition(wallet);
    * ```
    *
-   * @see {@link Staking#fromPool}
+   * @see {@link Staking.fromPool}
    */
   async staking(poolAddress: Address): Promise<Staking> {
     const config = this.assertStakingConfig();
@@ -550,7 +550,7 @@ export abstract class BaseWallet implements WalletInterface {
    * await staking.enter(wallet, Amount.parse("100", STRK));
    * ```
    *
-   * @see {@link Staking#fromStaker}
+   * @see {@link Staking.fromStaker}
    */
   async stakingInStaker(
     stakerAddress: Address,
