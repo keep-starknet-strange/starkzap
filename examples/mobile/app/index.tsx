@@ -28,6 +28,45 @@ const CHAIN_OPTIONS = [
 
 const PRIVY_APP_ID = process.env.EXPO_PUBLIC_PRIVY_APP_ID || "";
 
+type ConnectionMethod = "privatekey" | "privy";
+
+interface AccountTypeSelectorProps {
+  selectedPreset: string;
+  onSelectPreset: (preset: string) => void;
+}
+
+function AccountTypeSelector({
+  selectedPreset,
+  onSelectPreset,
+}: AccountTypeSelectorProps) {
+  return (
+    <ThemedView style={styles.inputContainer}>
+      <ThemedText style={styles.label}>Account Type</ThemedText>
+      <ThemedView style={styles.presetContainer}>
+        {Object.keys(PRESETS).map((preset) => (
+          <TouchableOpacity
+            key={preset}
+            style={[
+              styles.presetButton,
+              selectedPreset === preset && styles.presetButtonActive,
+            ]}
+            onPress={() => onSelectPreset(preset)}
+          >
+            <ThemedText
+              style={[
+                styles.presetButtonText,
+                selectedPreset === preset && styles.presetButtonTextActive,
+              ]}
+            >
+              {preset}
+            </ThemedText>
+          </TouchableOpacity>
+        ))}
+      </ThemedView>
+    </ThemedView>
+  );
+}
+
 export default function LandingScreen() {
   const {
     // Network config
@@ -45,10 +84,13 @@ export default function LandingScreen() {
     // Wallet
     privateKey,
     selectedPreset,
+    preferSponsored,
+    paymasterNodeUrl,
     wallet,
     isConnecting,
     setPrivateKey,
     setSelectedPreset,
+    setPreferSponsored,
     connect,
     // Privy
     privySelectedPreset,
@@ -60,10 +102,19 @@ export default function LandingScreen() {
   const { isReady, user, logout, getAccessToken } = usePrivy();
   const { sendCode, loginWithCode, state: loginState } = useLoginWithEmail();
 
+  const [connectionMethod, setConnectionMethod] =
+    useState<ConnectionMethod>("privatekey");
   const [showPrivyForm, setShowPrivyForm] = useState(false);
   const [email, setEmail] = useState("");
   const [otp, setOtp] = useState("");
   const [isLoadingWallet, setIsLoadingWallet] = useState(false);
+
+  const activePreset =
+    connectionMethod === "privatekey" ? selectedPreset : privySelectedPreset;
+  const setActivePreset =
+    connectionMethod === "privatekey"
+      ? setSelectedPreset
+      : setPrivySelectedPreset;
 
   const fetchStarknetWallet = useCallback(async () => {
     if (!user || wallet || !isConfigured || isLoadingWallet) return;
@@ -85,7 +136,6 @@ export default function LandingScreen() {
         },
       });
 
-      console.log(res);
       if (!res.ok) {
         const err = await res.json();
         throw new Error(err.details || err.error || "Failed to get wallet");
@@ -103,7 +153,14 @@ export default function LandingScreen() {
     } finally {
       setIsLoadingWallet(false);
     }
-  }, [user, wallet, isConfigured, getAccessToken, connectWithPrivy]);
+  }, [
+    user,
+    wallet,
+    isConfigured,
+    isLoadingWallet,
+    getAccessToken,
+    connectWithPrivy,
+  ]);
 
   const handlePrivyLogout = useCallback(async () => {
     await logout();
@@ -243,81 +300,116 @@ export default function LandingScreen() {
               </ThemedView>
             </ThemedView>
 
-            <ThemedView style={styles.inputContainer}>
-              <ThemedText style={styles.label}>Private Key</ThemedText>
-              <TextInput
-                style={styles.input}
-                placeholder="Enter your private key"
-                placeholderTextColor="#888"
-                value={privateKey}
-                onChangeText={setPrivateKey}
-                secureTextEntry
-                autoCapitalize="none"
-                autoCorrect={false}
-              />
-            </ThemedView>
-
-            <ThemedView style={styles.inputContainer}>
-              <ThemedText style={styles.label}>Account Type</ThemedText>
-              <ThemedView style={styles.presetContainer}>
-                {Object.keys(PRESETS).map((preset) => (
+            {PRIVY_APP_ID ? (
+              <ThemedView style={styles.inputContainer}>
+                <ThemedText style={styles.label}>Connection Method</ThemedText>
+                <ThemedView style={styles.presetContainer}>
                   <TouchableOpacity
-                    key={preset}
                     style={[
                       styles.presetButton,
-                      selectedPreset === preset && styles.presetButtonActive,
+                      connectionMethod === "privatekey" &&
+                        styles.presetButtonActive,
                     ]}
-                    onPress={() => setSelectedPreset(preset)}
+                    onPress={() => setConnectionMethod("privatekey")}
                   >
                     <ThemedText
                       style={[
                         styles.presetButtonText,
-                        selectedPreset === preset &&
+                        connectionMethod === "privatekey" &&
                           styles.presetButtonTextActive,
                       ]}
                     >
-                      {preset}
+                      Private Key
                     </ThemedText>
                   </TouchableOpacity>
-                ))}
+                  <TouchableOpacity
+                    style={[
+                      styles.presetButton,
+                      connectionMethod === "privy" && styles.presetButtonActive,
+                    ]}
+                    onPress={() => setConnectionMethod("privy")}
+                  >
+                    <ThemedText
+                      style={[
+                        styles.presetButtonText,
+                        connectionMethod === "privy" &&
+                          styles.presetButtonTextActive,
+                      ]}
+                    >
+                      Privy
+                    </ThemedText>
+                  </TouchableOpacity>
+                </ThemedView>
               </ThemedView>
+            ) : null}
+
+            <AccountTypeSelector
+              selectedPreset={activePreset}
+              onSelectPreset={setActivePreset}
+            />
+
+            <ThemedView style={styles.inputContainer}>
+              <ThemedText style={styles.label}>Default Fee Mode</ThemedText>
+              <TouchableOpacity
+                style={[
+                  styles.toggleButton,
+                  preferSponsored && styles.toggleButtonActive,
+                  !paymasterNodeUrl && styles.toggleButtonDisabled,
+                ]}
+                onPress={() => setPreferSponsored(!preferSponsored)}
+                disabled={!paymasterNodeUrl}
+              >
+                <ThemedText
+                  style={[
+                    styles.toggleButtonText,
+                    preferSponsored && styles.toggleButtonTextActive,
+                  ]}
+                >
+                  {preferSponsored
+                    ? "Sponsored (default)"
+                    : "User Pays (default)"}
+                </ThemedText>
+              </TouchableOpacity>
+              {!paymasterNodeUrl && (
+                <ThemedText style={styles.hintText}>
+                  Paymaster not configured for this network.
+                </ThemedText>
+              )}
             </ThemedView>
 
-            <TouchableOpacity
-              style={[styles.button, styles.buttonPrimary]}
-              onPress={connect}
-              disabled={isConnecting}
-            >
-              {isConnecting ? (
-                <ActivityIndicator color="#fff" />
-              ) : (
-                <ThemedText style={styles.buttonText}>Connect</ThemedText>
-              )}
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[styles.button, styles.buttonSecondary]}
-              onPress={resetNetworkConfig}
-            >
-              <ThemedText style={styles.buttonTextSecondary}>
-                Change Network
-              </ThemedText>
-            </TouchableOpacity>
-
-            {/* Privy login - only when configured */}
-            {PRIVY_APP_ID && (
+            {connectionMethod === "privatekey" ? (
               <>
-                <ThemedView style={styles.divider}>
-                  <ThemedView style={styles.dividerLine} />
-                  <ThemedText style={styles.dividerText}>or</ThemedText>
-                  <ThemedView style={styles.dividerLine} />
+                <ThemedView style={styles.inputContainer}>
+                  <ThemedText style={styles.label}>Private Key</ThemedText>
+                  <TextInput
+                    style={styles.input}
+                    placeholder="Enter your private key"
+                    placeholderTextColor="#888"
+                    value={privateKey}
+                    onChangeText={setPrivateKey}
+                    secureTextEntry
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                  />
                 </ThemedView>
 
+                <TouchableOpacity
+                  style={[styles.button, styles.buttonPrimary]}
+                  onPress={connect}
+                  disabled={isConnecting}
+                >
+                  {isConnecting ? (
+                    <ActivityIndicator color="#fff" />
+                  ) : (
+                    <ThemedText style={styles.buttonText}>Connect</ThemedText>
+                  )}
+                </TouchableOpacity>
+              </>
+            ) : (
+              <>
                 {!isReady && (
-                  <ThemedText
-                    style={{ fontSize: 12, color: "#888", marginBottom: 8 }}
-                  >
-                    Initializing...
+                  <ThemedText style={styles.infoText}>
+                    Initializing Privy...
                   </ThemedText>
                 )}
 
@@ -336,19 +428,16 @@ export default function LandingScreen() {
                 {isReady && user && (
                   <ThemedView style={styles.otpInfo}>
                     <ThemedText style={styles.label}>
-                      {!isConfigured
-                        ? "Logged in! Configure network above to continue."
-                        : isLoadingWallet
-                          ? "Connecting wallet..."
-                          : "Logged in! Tap below to connect wallet."}
+                      {isLoadingWallet
+                        ? "Connecting wallet..."
+                        : "Logged in! Tap below to connect wallet."}
                     </ThemedText>
-                    {isLoadingWallet && (
+                    {isLoadingWallet ? (
                       <ActivityIndicator
                         color="#8b5cf6"
                         style={{ marginTop: 8 }}
                       />
-                    )}
-                    {isConfigured && !isLoadingWallet && !wallet && (
+                    ) : (
                       <TouchableOpacity
                         style={[
                           styles.button,
@@ -395,35 +484,6 @@ export default function LandingScreen() {
                             autoCorrect={false}
                             keyboardType="email-address"
                           />
-                        </ThemedView>
-
-                        <ThemedView style={styles.inputContainer}>
-                          <ThemedText style={styles.label}>
-                            Account Type
-                          </ThemedText>
-                          <ThemedView style={styles.presetContainer}>
-                            {Object.keys(PRESETS).map((preset) => (
-                              <TouchableOpacity
-                                key={preset}
-                                style={[
-                                  styles.presetButton,
-                                  privySelectedPreset === preset &&
-                                    styles.presetButtonActive,
-                                ]}
-                                onPress={() => setPrivySelectedPreset(preset)}
-                              >
-                                <ThemedText
-                                  style={[
-                                    styles.presetButtonText,
-                                    privySelectedPreset === preset &&
-                                      styles.presetButtonTextActive,
-                                  ]}
-                                >
-                                  {preset}
-                                </ThemedText>
-                              </TouchableOpacity>
-                            ))}
-                          </ThemedView>
                         </ThemedView>
 
                         {loginState.status === "error" && (
@@ -519,6 +579,15 @@ export default function LandingScreen() {
                 )}
               </>
             )}
+
+            <TouchableOpacity
+              style={[styles.button, styles.buttonSecondary]}
+              onPress={resetNetworkConfig}
+            >
+              <ThemedText style={styles.buttonTextSecondary}>
+                Change Network
+              </ThemedText>
+            </TouchableOpacity>
           </ThemedView>
         )}
       </ScrollView>
@@ -634,21 +703,36 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "600",
   },
-  divider: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginTop: 24,
-    marginBottom: 8,
+  toggleButton: {
+    borderWidth: 1,
+    borderColor: "rgba(128, 128, 128, 0.3)",
+    borderRadius: 8,
+    padding: 12,
+    backgroundColor: "rgba(0, 0, 0, 0.2)",
   },
-  dividerLine: {
-    flex: 1,
-    height: 1,
-    backgroundColor: "rgba(128, 128, 128, 0.3)",
+  toggleButtonActive: {
+    borderColor: "#0a7ea4",
+    backgroundColor: "rgba(10, 126, 164, 0.2)",
   },
-  dividerText: {
-    marginHorizontal: 12,
-    fontSize: 12,
+  toggleButtonDisabled: {
     opacity: 0.5,
+  },
+  toggleButtonText: {
+    fontSize: 14,
+  },
+  toggleButtonTextActive: {
+    color: "#fff",
+    fontWeight: "600",
+  },
+  hintText: {
+    marginTop: 6,
+    fontSize: 12,
+    opacity: 0.6,
+  },
+  infoText: {
+    fontSize: 12,
+    color: "#888",
+    marginTop: 12,
   },
   otpInfo: {
     marginTop: 16,

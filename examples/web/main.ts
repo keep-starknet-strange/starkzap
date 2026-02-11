@@ -1,7 +1,7 @@
 import {
   StarkSDK,
   StarkSigner,
-  PrivySigner,
+  OnboardStrategy,
   WebAuthnSigner,
   OpenZeppelinPreset,
   ArgentPreset,
@@ -201,9 +201,12 @@ async function connectCartridge() {
   log("Connecting to Cartridge Controller...", "info");
 
   try {
-    wallet = await sdk.connectCartridge({
-      policies: [DUMMY_POLICY],
+    const onboard = await sdk.onboard({
+      strategy: OnboardStrategy.Cartridge,
+      deploy: "never",
+      cartridge: { policies: [DUMMY_POLICY] },
     });
+    wallet = onboard.wallet;
     walletType = "cartridge";
 
     walletAddressEl.textContent = truncateAddress(wallet.address);
@@ -236,12 +239,13 @@ async function connectPrivateKey() {
 
   try {
     const signer = new StarkSigner(privateKey);
-    wallet = await sdk.connectWallet({
-      account: {
-        signer,
-        accountClass: preset,
-      },
+    const onboard = await sdk.onboard({
+      strategy: OnboardStrategy.Signer,
+      deploy: "never",
+      account: { signer },
+      accountPreset: preset,
     });
+    wallet = onboard.wallet;
     walletType = "privatekey";
 
     walletAddressEl.textContent = truncateAddress(wallet.address);
@@ -308,41 +312,27 @@ async function connectPrivy() {
     log(`Privy address: ${walletData.address}`, "info");
     log(`Privy public key: ${walletData.publicKey}`, "info");
 
-    // Store wallet ID for signing
+    // Store wallet ID for debugging
     privyWalletId = walletData.id;
-
-    // Create signer with rawSign callback
-    const signer = new PrivySigner({
-      walletId: walletData.id,
-      publicKey: walletData.publicKey,
-      rawSign: async (walletId: string, hash: string) => {
-        const signRes = await fetch(`${PRIVY_SERVER_URL}/api/wallet/sign`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ walletId, hash }),
-        });
-
-        if (!signRes.ok) {
-          const err = await signRes.json();
-          throw new Error(err.details || err.error || "Signing failed");
-        }
-
-        const { signature } = await signRes.json();
-        return signature;
-      },
-    });
 
     // Use selected account preset from Privy dropdown
     const presetKey = privyAccountPresetSelect.value;
     const preset = presets[presetKey];
     log(`Using account preset: ${presetKey}`, "info");
 
-    wallet = await sdk.connectWallet({
-      account: {
-        signer,
-        accountClass: preset,
+    const onboard = await sdk.onboard({
+      strategy: OnboardStrategy.Privy,
+      deploy: "never",
+      accountPreset: preset,
+      privy: {
+        resolve: async () => ({
+          walletId: walletData.id,
+          publicKey: walletData.publicKey,
+          serverUrl: `${PRIVY_SERVER_URL}/api/wallet/sign`,
+        }),
       },
     });
+    wallet = onboard.wallet;
     walletType = "privy";
 
     log(`Wallet address: ${wallet.address}`, "info");
