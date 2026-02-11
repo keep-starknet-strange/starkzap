@@ -104,3 +104,13 @@ export const ArgentXV050Preset: AccountClassConfig = {
     });
   },
 };
+
+export const accountPresets = {
+  devnet: DevnetPreset,
+  openzeppelin: OpenZeppelinPreset,
+  argent: ArgentPreset,
+  braavos: BraavosPreset,
+  argentXV050: ArgentXV050Preset,
+} as const;
+
+export type AccountPresetName = keyof typeof accountPresets;
