@@ -8,7 +8,19 @@ import {
   type CartridgeWalletOptions,
 } from "@/wallet/cartridge";
 import type { Address, Token, Pool } from "@/types";
+import type {
+  AccountClassConfig,
+  OnboardOptions,
+  OnboardResult,
+} from "@/types";
 import { Staking } from "@/staking";
+import { PrivySigner } from "@/signer";
+import {
+  ArgentXV050Preset,
+  OpenZeppelinPreset,
+  accountPresets,
+  type AccountPresetName,
+} from "@/account";
 
 /** Resolved SDK configuration with required rpcUrl and chainId */
 interface ResolvedConfig extends Omit<SDKConfig, "rpcUrl" | "chainId"> {
@@ -142,6 +154,132 @@ export class StarkSDK {
       ...(feeMode && { feeMode }),
       ...(timeBounds && { timeBounds }),
     });
+  }
+
+  private resolveAccountPreset(
+    preset: AccountPresetName | AccountClassConfig | undefined,
+    fallback: AccountClassConfig
+  ): AccountClassConfig {
+    if (!preset) return fallback;
+
+    if (typeof preset === "string") {
+      const resolved = accountPresets[preset];
+      if (!resolved) {
+        throw new Error(`Unknown account preset: ${preset}`);
+      }
+      return resolved;
+    }
+
+    return preset;
+  }
+
+  /**
+   * High-level onboarding API for app integrations.
+   *
+   * Strategy behaviors:
+   * - `signer`: connect with a provided signer/account config
+   * - `privy`: resolve Privy auth context, then connect via PrivySigner
+   * - `cartridge`: connect via Cartridge Controller
+   * - `webauthn`: reserved for upcoming native WebAuthn signer support
+   *
+   * By default, onboarding calls `wallet.ensureReady({ deploy: "if_needed" })`.
+   */
+  async onboard(options: OnboardOptions): Promise<OnboardResult> {
+    const deploy = options.deploy ?? "if_needed";
+    const feeMode = options.feeMode;
+    const timeBounds = options.timeBounds;
+
+    if (options.strategy === "signer") {
+      const wallet = await this.connectWallet({
+        account: {
+          signer: options.account.signer,
+          accountClass: this.resolveAccountPreset(
+            options.accountPreset ?? options.account.accountClass,
+            OpenZeppelinPreset
+          ),
+        },
+        ...(feeMode && { feeMode }),
+        ...(timeBounds && { timeBounds }),
+      });
+
+      await wallet.ensureReady({
+        deploy,
+        ...(feeMode && { feeMode }),
+        ...(options.onProgress && { onProgress: options.onProgress }),
+      });
+
+      return {
+        wallet,
+        strategy: options.strategy,
+        deployed: await wallet.isDeployed(),
+      };
+    }
+
+    if (options.strategy === "privy") {
+      const privy = await options.privy.resolve();
+      const signer = new PrivySigner({
+        walletId: privy.walletId,
+        publicKey: privy.publicKey,
+        ...(privy.serverUrl && { serverUrl: privy.serverUrl }),
+        ...(privy.rawSign && { rawSign: privy.rawSign }),
+      });
+
+      const wallet = await this.connectWallet({
+        account: {
+          signer,
+          accountClass: this.resolveAccountPreset(
+            options.accountPreset,
+            ArgentXV050Preset
+          ),
+        },
+        ...(feeMode && { feeMode }),
+        ...(timeBounds && { timeBounds }),
+      });
+
+      await wallet.ensureReady({
+        deploy,
+        ...(feeMode && { feeMode }),
+        ...(options.onProgress && { onProgress: options.onProgress }),
+      });
+
+      return {
+        wallet,
+        strategy: options.strategy,
+        deployed: await wallet.isDeployed(),
+        ...(privy.metadata && { metadata: privy.metadata }),
+      };
+    }
+
+    if (options.strategy === "cartridge") {
+      const wallet = await this.connectCartridge({
+        ...(options.cartridge ?? {}),
+        ...(feeMode && { feeMode }),
+        ...(timeBounds && { timeBounds }),
+      });
+
+      await wallet.ensureReady({
+        deploy,
+        ...(feeMode && { feeMode }),
+        ...(options.onProgress && { onProgress: options.onProgress }),
+      });
+
+      return {
+        wallet,
+        strategy: options.strategy,
+        deployed: await wallet.isDeployed(),
+      };
+    }
+
+    if (options.strategy === "webauthn") {
+      const err = new Error(
+        "Onboard strategy 'webauthn' is not implemented yet. Use 'privy', 'signer', or 'cartridge' for now."
+      ) as Error & { code?: string };
+      err.code = "X_ERR_NOT_IMPLEMENTED";
+      throw err;
+    }
+
+    const _never: never = options;
+    throw new Error(`Unknown onboard strategy: ${String(_never)}`);
   }
 
   /**
