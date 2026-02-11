@@ -1,0 +1,17 @@
+{
+  "$schema": "https://typedoc.org/schema.json",
+  "entryPoints": ["src/index.ts"],
+  "tsconfig": "tsconfig.json",
+  "plugin": ["typedoc-plugin-markdown"],
+  "out": "docs/api",
+  "readme": "docs/guide.md",
+  "hideGenerator": true,
+  "exclude": [
+    "**/*.test.ts",
+    "**/*.spec.ts",
+    "tests/**",
+    "examples/**",
+    "dist/**"
+  ],
+  "sort": ["source-order"]
+}

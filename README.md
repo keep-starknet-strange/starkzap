@@ -4,6 +4,21 @@ A TypeScript SDK for easy Starknet wallet integration. Supports multiple signer 
 
 Built on top of [starknet.js](https://github.com/starknet-io/starknet.js). Works in **Node.js**, **browsers**, and **React Native**.
 
+## Developer Docs Export
+
+The repository includes a full developer guide plus generated API reference that can be exported with npm:
+
+```bash
+npm run docs:api
+npm run docs:export
+```
+
+Exported bundle:
+
+- `docs/export/DEVELOPER_GUIDE.md`
+- `docs/export/api/`
+- `docs/export/x-docs.zip`
+
 ## Table of Contents
 
 - [Installation](#installation)
@@ -99,6 +114,31 @@ const tx = await wallet.transfer(STRK, [
 ]);
 console.log(tx.explorerUrl); // https://voyager.online/tx/0x...
 await tx.wait();
+```
+
+### Onboarding API (Recommended for App Integrations)
+
+Use `sdk.onboard(...)` to centralize strategy selection, signer setup, and account readiness in one call:
+
+```typescript
+import { StarkSDK, OnboardStrategy } from "x";
+
+const sdk = new StarkSDK({ network: "sepolia" });
+
+const onboard = await sdk.onboard({
+  strategy: OnboardStrategy.Privy,
+  privy: {
+    resolve: async () => ({
+      walletId: "privy-wallet-id",
+      publicKey: "0xPUBLIC_KEY",
+      serverUrl: "https://your-api.example/wallet/sign",
+    }),
+  },
+  accountPreset: "argentXV050",
+  deploy: "if_needed",
+});
+
+const wallet = onboard.wallet;
 ```
 
 ---
@@ -906,12 +946,7 @@ const chainId = await getChainId(provider);
 
 ## React Native Setup
 
-For React Native / Expo, import the polyfills entry point before anything else:
-
-```typescript
-// In your app's entry point (e.g., entrypoint.js)
-import "x/polyfills";
-```
+For React Native / Expo, ensure required runtime polyfills are installed and loaded by your app (for example random values and text encoding shims).
 
 Required optional peer dependencies for React Native:
 
