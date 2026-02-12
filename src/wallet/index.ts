@@ -43,52 +43,6 @@ import {
 const BRAAVOS_FACTORY_ADDRESS =
   "0x3d94f65ebc7552eb517ddb374250a9525b605f25f4e41ded6e7d7381ff1c2e8";
 
-function getErrorMessage(error: unknown): string {
-  if (error instanceof Error) return error.message;
-  return String(error);
-}
-
-function extractRawResponseText(value: unknown, depth = 0): string | undefined {
-  if (depth > 3 || value == null) return undefined;
-  if (typeof value === "string" && value.trim()) return value;
-  if (typeof value !== "object") return undefined;
-
-  const record = value as Record<string, unknown>;
-  const keys = [
-    "responseText",
-    "rawResponse",
-    "rawBody",
-    "body",
-    "text",
-    "data",
-    "details",
-    "cause",
-  ];
-
-  for (const key of keys) {
-    const found = extractRawResponseText(record[key], depth + 1);
-    if (found) return found;
-  }
-
-  return undefined;
-}
-
-function maybeWrapJsonParseError(error: unknown, context: string): unknown {
-  const message = getErrorMessage(error);
-  if (!/json|parse|unexpected token/i.test(message)) {
-    return error;
-  }
-
-  const rawResponse = extractRawResponseText(error);
-  const wrapped = new Error(
-    rawResponse
-      ? `${context}. JSON parse failed. Raw response: ${rawResponse}`
-      : `${context}. JSON parse failed: ${message}`
-  );
-  (wrapped as { cause?: unknown }).cause = error;
-  return wrapped;
-}
-
 export { type WalletInterface } from "@/wallet/interface";
 export { BaseWallet } from "@/wallet/base";
 export { AccountProvider } from "@/wallet/accounts/provider";
@@ -300,15 +254,10 @@ export class Wallet extends BaseWallet {
       l1_data_gas: multiply2x(l1_data_gas),
     };
 
-    let transaction_hash: string;
-    try {
-      ({ transaction_hash } = await this.account.deployAccount(
-        { classHash, constructorCalldata, addressSalt: publicKey },
-        { resourceBounds }
-      ));
-    } catch (error) {
-      throw maybeWrapJsonParseError(error, "Account deploy submission failed");
-    }
+    const { transaction_hash } = await this.account.deployAccount(
+      { classHash, constructorCalldata, addressSalt: publicKey },
+      { resourceBounds }
+    );
 
     this.deployedCache = true;
     return new Tx(
@@ -332,18 +281,10 @@ export class Wallet extends BaseWallet {
 
     // Standard deployment flow
     const deploymentData = await this.accountProvider.getDeploymentData();
-    let transaction_hash: string;
-    try {
-      ({ transaction_hash } = await this.account.executePaymasterTransaction(
-        calls,
-        sponsoredDetails(timeBounds ?? this.defaultTimeBounds, deploymentData)
-      ));
-    } catch (error) {
-      throw maybeWrapJsonParseError(
-        error,
-        "Sponsored deploy+execute submission failed"
-      );
-    }
+    const { transaction_hash } = await this.account.executePaymasterTransaction(
+      calls,
+      sponsoredDetails(timeBounds ?? this.defaultTimeBounds, deploymentData)
+    );
     this.deployedCache = true;
     return new Tx(
       transaction_hash,
@@ -443,37 +384,20 @@ export class Wallet extends BaseWallet {
     if (ozDeployed) {
       // OZ is deployed, just call the factory
       const allCalls = [factoryCall, ...calls];
-      try {
-        const result = await ozAccount.executePaymasterTransaction(
-          allCalls,
-          sponsoredDetails(timeBounds ?? this.defaultTimeBounds)
-        );
-        transactionHash = result.transaction_hash;
-      } catch (error) {
-        throw maybeWrapJsonParseError(
-          error,
-          "Braavos factory submission failed"
-        );
-      }
+      const result = await ozAccount.executePaymasterTransaction(
+        allCalls,
+        sponsoredDetails(timeBounds ?? this.defaultTimeBounds)
+      );
+      transactionHash = result.transaction_hash;
     } else {
       // Deploy OZ and call factory in one transaction
       const ozDeploymentData = await ozProvider.getDeploymentData();
       const allCalls = [factoryCall, ...calls];
-      try {
-        const result = await ozAccount.executePaymasterTransaction(
-          allCalls,
-          sponsoredDetails(
-            timeBounds ?? this.defaultTimeBounds,
-            ozDeploymentData
-          )
-        );
-        transactionHash = result.transaction_hash;
-      } catch (error) {
-        throw maybeWrapJsonParseError(
-          error,
-          "Braavos bootstrap deploy+factory submission failed"
-        );
-      }
+      const result = await ozAccount.executePaymasterTransaction(
+        allCalls,
+        sponsoredDetails(timeBounds ?? this.defaultTimeBounds, ozDeploymentData)
+      );
+      transactionHash = result.transaction_hash;
     }
 
     this.deployedCache = true;
@@ -494,30 +418,16 @@ export class Wallet extends BaseWallet {
     if (feeMode === "sponsored") {
       // Check if account needs deployment (paymaster can deploy + invoke in one tx)
       const deployed = await this.isDeployed();
-      if (deployed) {
-        try {
-          transactionHash = (
+      transactionHash = deployed
+        ? (
             await this.account.executePaymasterTransaction(
               calls,
               sponsoredDetails(timeBounds)
             )
-          ).transaction_hash;
-        } catch (error) {
-          throw maybeWrapJsonParseError(
-            error,
-            "Sponsored transaction submission failed"
-          );
-        }
-      } else {
-        transactionHash = (await this.deployPaymasterWith(calls, timeBounds))
-          .hash;
-      }
+          ).transaction_hash
+        : (await this.deployPaymasterWith(calls, timeBounds)).hash;
     } else {
-      try {
-        transactionHash = (await this.account.execute(calls)).transaction_hash;
-      } catch (error) {
-        throw maybeWrapJsonParseError(error, "Transaction submission failed");
-      }
+      transactionHash = (await this.account.execute(calls)).transaction_hash;
     }
 
     return new Tx(

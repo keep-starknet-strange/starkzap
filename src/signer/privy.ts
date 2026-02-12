@@ -105,39 +105,12 @@ export class PrivySigner implements SignerInterface {
         body: JSON.stringify({ walletId, hash }),
       });
 
-      const responseText = await response.text();
-
       if (!response.ok) {
-        let errMessage = "Privy signing failed";
-        try {
-          const err = JSON.parse(responseText) as {
-            details?: string;
-            error?: string;
-          };
-          errMessage = err.details || err.error || errMessage;
-        } catch {
-          if (responseText) {
-            errMessage = `Privy signing failed. Non-JSON error response: ${responseText}`;
-          }
-        }
-        throw new Error(errMessage);
+        const err = await response.json().catch(() => ({}));
+        throw new Error(err.details || err.error || "Privy signing failed");
       }
 
-      let parsed: { signature?: string };
-      try {
-        parsed = JSON.parse(responseText) as { signature?: string };
-      } catch {
-        throw new Error(
-          `Privy signing response JSON parse failed. Raw response: ${responseText}`
-        );
-      }
-
-      const { signature } = parsed;
-      if (!signature) {
-        throw new Error(
-          `Privy signing response missing "signature". Raw response: ${responseText}`
-        );
-      }
+      const { signature } = await response.json();
       return signature;
     };
   }
