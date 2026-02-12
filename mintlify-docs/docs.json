@@ -91,5 +91,15 @@
     "twitter": "https://twitter.com/StarknetEco",
     "github": "https://github.com/starknet-io/starknet-docs",
     "linkedin": "https://www.linkedin.com/company/starkware"
+  },
+  "contextual": {
+    "options": [
+      "copy",
+      "view",
+      "chatgpt",
+      "claude",
+      "mcp",
+      "cursor"
+    ]
   }
 }
