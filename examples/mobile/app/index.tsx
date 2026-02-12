@@ -294,8 +294,9 @@ export default function LandingScreen() {
               <ThemedText type="subtitle">Connect Wallet</ThemedText>
               <ThemedView style={styles.networkBadge}>
                 <ThemedText style={styles.networkBadgeText}>
-                  {NETWORKS.find((n) => n.chainId === chainId)?.name ||
-                    "Custom"}
+                  {NETWORKS.find(
+                    (n) => n.chainId.toLiteral() === chainId.toLiteral()
+                  )?.name || "Custom"}
                 </ThemedText>
               </ThemedView>
             </ThemedView>

@@ -4,14 +4,16 @@ import { useWalletStore, NETWORKS } from "@/stores/wallet";
 
 export function NetworkBadge() {
   const chainId = useWalletStore((state) => state.chainId);
-  const network = NETWORKS.find((n) => n.chainId === chainId);
+  const network = NETWORKS.find(
+    (n) => n.chainId.toLiteral() === chainId.toLiteral()
+  );
 
   return (
     <View style={styles.badge}>
       <View
         style={[
           styles.dot,
-          chainId === "SN_MAIN" ? styles.dotMainnet : styles.dotTestnet,
+          chainId.isMainnet() ? styles.dotMainnet : styles.dotTestnet,
         ]}
       />
       <ThemedText style={styles.text}>{network?.name || "Custom"}</ThemedText>

@@ -1,6 +1,7 @@
 import { StyleSheet, ScrollView, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { router } from "expo-router";
+import * as Clipboard from "expo-clipboard";
 
 import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
@@ -8,6 +9,7 @@ import { useWalletStore } from "@/stores/wallet";
 
 export default function LogsScreen() {
   const { logs, clearLogs } = useWalletStore();
+  const logsText = logs.join("\n");
 
   return (
     <SafeAreaView style={styles.container} edges={["bottom"]}>
@@ -51,6 +53,7 @@ export default function LogsScreen() {
                 style={styles.logEntry}
                 lightColor="#ECEDEE"
                 darkColor="#ECEDEE"
+                selectable
               >
                 {log}
               </ThemedText>
@@ -61,6 +64,18 @@ export default function LogsScreen() {
 
       {logs.length > 0 && (
         <View style={styles.footer}>
+          <TouchableOpacity
+            style={styles.copyButton}
+            onPress={() => void Clipboard.setStringAsync(logsText)}
+          >
+            <ThemedText
+              style={styles.copyButtonText}
+              lightColor="#FFFFFF"
+              darkColor="#FFFFFF"
+            >
+              Copy All
+            </ThemedText>
+          </TouchableOpacity>
           <TouchableOpacity style={styles.clearButton} onPress={clearLogs}>
             <ThemedText
               style={styles.clearButtonText}
@@ -131,6 +146,18 @@ const styles = StyleSheet.create({
     padding: 16,
     borderTopWidth: 1,
     borderTopColor: "rgba(128, 128, 128, 0.2)",
+    gap: 10,
+  },
+  copyButton: {
+    backgroundColor: "#0a7ea4",
+    padding: 14,
+    borderRadius: 8,
+    alignItems: "center",
+  },
+  copyButtonText: {
+    color: "#fff",
+    fontSize: 16,
+    fontWeight: "600",
   },
   clearButton: {
     backgroundColor: "#dc3545",

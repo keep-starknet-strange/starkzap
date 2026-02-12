@@ -24,7 +24,8 @@ export const DevnetPreset: AccountClassConfig = {
  */
 export const OpenZeppelinPreset: AccountClassConfig = {
   classHash:
-    "0x061dac032f228abef9c6626f995015233097ae253a7f72d68552db02f2971b8f",
+    // OZ AccountUpgradeable v3.0.0-alpha (supports SRC9 outside execution)
+    "0x002de258cce5b9e160bf83956b09f982059582469f7e6fad07b438128317d029",
   buildConstructorCalldata(publicKey: string): Calldata {
     return CallData.compile({ publicKey });
   },

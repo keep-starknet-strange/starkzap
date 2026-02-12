@@ -22,15 +22,25 @@ import type { Token } from "x";
 const BATCH_SIZE = 20;
 
 export default function BalancesScreen() {
-  const { wallet, chainId, walletType, disconnect, resetNetworkConfig } =
-    useWalletStore();
+  const {
+    wallet,
+    chainId,
+    walletType,
+    disconnect,
+    resetNetworkConfig,
+    isDeployed,
+    isConnecting,
+    deploy,
+    checkDeploymentStatus,
+  } = useWalletStore();
   const { logout } = usePrivy();
   const { balances, isLoading, fetchBalances, getBalance, clearBalances } =
     useBalancesStore();
 
   const allTokens = getTokensForNetwork(chainId);
   const networkName =
-    NETWORKS.find((n) => n.chainId === chainId)?.name ?? "Custom";
+    NETWORKS.find((n) => n.chainId.toLiteral() === chainId.toLiteral())?.name ??
+    "Custom";
 
   // Pagination state
   const [visibleCount, setVisibleCount] = useState(BATCH_SIZE);
@@ -80,6 +90,12 @@ export default function BalancesScreen() {
       fetchBalances(wallet, chainId);
     }
   }, [wallet, chainId, fetchBalances]);
+
+  useEffect(() => {
+    if (wallet && isDeployed === null) {
+      void checkDeploymentStatus();
+    }
+  }, [wallet, isDeployed, checkDeploymentStatus]);
 
   const renderToken = useCallback(
     ({ item: token }: { item: Token }) => (
@@ -157,6 +173,39 @@ export default function BalancesScreen() {
         <ThemedText style={styles.address} numberOfLines={1}>
           {wallet.address}
         </ThemedText>
+        <View style={styles.accountStatusRow}>
+          <ThemedText style={styles.accountStatusLabel}>
+            Account Status
+          </ThemedText>
+          <ThemedText
+            style={[
+              styles.accountStatusValue,
+              isDeployed === true
+                ? styles.accountStatusDeployed
+                : styles.accountStatusNotDeployed,
+            ]}
+          >
+            {isDeployed === true ? "Deployed" : "Not Deployed"}
+          </ThemedText>
+        </View>
+        {isDeployed === false && (
+          <TouchableOpacity
+            style={[
+              styles.deployButton,
+              isConnecting && styles.deployButtonDisabled,
+            ]}
+            onPress={() => void deploy()}
+            disabled={isConnecting}
+          >
+            {isConnecting ? (
+              <ActivityIndicator size="small" color="#fff" />
+            ) : (
+              <ThemedText style={styles.deployButtonText}>
+                Deploy Account
+              </ThemedText>
+            )}
+          </TouchableOpacity>
+        )}
       </TouchableOpacity>
 
       <FlatList
@@ -248,6 +297,42 @@ const styles = StyleSheet.create({
   address: {
     fontFamily: "monospace",
     fontSize: 12,
+  },
+  accountStatusRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginTop: 10,
+  },
+  accountStatusLabel: {
+    fontSize: 12,
+    opacity: 0.6,
+  },
+  accountStatusValue: {
+    fontSize: 12,
+    fontWeight: "600",
+  },
+  accountStatusDeployed: {
+    color: "#28a745",
+  },
+  accountStatusNotDeployed: {
+    color: "#dc3545",
+  },
+  deployButton: {
+    marginTop: 10,
+    backgroundColor: "#0a7ea4",
+    borderRadius: 8,
+    paddingVertical: 10,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  deployButtonDisabled: {
+    opacity: 0.6,
+  },
+  deployButtonText: {
+    color: "#fff",
+    fontSize: 14,
+    fontWeight: "600",
   },
   scrollView: {
     flex: 1,

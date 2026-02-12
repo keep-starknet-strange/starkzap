@@ -9,13 +9,13 @@ import {
 } from "x";
 
 export function getTokensForNetwork(chainId: ChainId): Token[] {
-  return chainId === "SN_SEPOLIA"
+  return chainId.isSepolia()
     ? Object.values(sepoliaTokens)
     : Object.values(mainnetTokens);
 }
 
 export function getStrkToken(chainId: ChainId): Token {
-  return chainId === "SN_SEPOLIA" ? sepoliaTokens.STRK : mainnetTokens.STRK;
+  return chainId.isSepolia() ? sepoliaTokens.STRK : mainnetTokens.STRK;
 }
 
 interface BalancesState {
