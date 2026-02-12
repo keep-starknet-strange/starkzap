@@ -7,7 +7,8 @@ export default defineConfig({
   },
   resolve: {
     alias: {
-      x: path.resolve(__dirname, "../src/index.ts"),
+      x: path.resolve(__dirname, "../../src/index.ts"),
+      "@": path.resolve(__dirname, "../../src"),
     },
   },
   optimizeDeps: {

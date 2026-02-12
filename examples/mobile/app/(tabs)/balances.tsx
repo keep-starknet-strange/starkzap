@@ -30,7 +30,8 @@ export default function BalancesScreen() {
 
   const allTokens = getTokensForNetwork(chainId);
   const networkName =
-    NETWORKS.find((n) => n.chainId === chainId)?.name ?? "Custom";
+    NETWORKS.find((n) => n.chainId.toLiteral() === chainId.toLiteral())?.name ??
+    "Custom";
 
   // Pagination state
   const [visibleCount, setVisibleCount] = useState(BATCH_SIZE);

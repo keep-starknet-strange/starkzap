@@ -69,7 +69,8 @@ export default function StakingScreen() {
   const validatorEntries = Object.entries(validators);
 
   const networkName =
-    NETWORKS.find((n) => n.chainId === chainId)?.name ?? "Custom";
+    NETWORKS.find((n) => n.chainId.toLiteral() === chainId.toLiteral())?.name ??
+    "Custom";
 
   // Get array of positions
   const positionsList = Object.values(positions);

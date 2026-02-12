@@ -57,7 +57,8 @@ export default function TransfersScreen() {
 
   const allTokens = getTokensForNetwork(chainId);
   const networkName =
-    NETWORKS.find((n) => n.chainId === chainId)?.name ?? "Custom";
+    NETWORKS.find((n) => n.chainId.toLiteral() === chainId.toLiteral())?.name ??
+    "Custom";
 
   // Transfer state
   const [transfers, setTransfers] = useState<TransferItem[]>([
@@ -179,7 +180,7 @@ export default function TransfersScreen() {
       }
 
       // Execute transfers for each token using wallet's transfer method
-      for (const [_, tokenTransfers] of transfersByToken) {
+      for (const tokenTransfers of transfersByToken.values()) {
         const token = tokenTransfers[0]!.token!;
 
         const transfersData = tokenTransfers.map((t) => ({

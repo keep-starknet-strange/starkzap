@@ -19,10 +19,9 @@ import {
 
 /** Get explorer URL for a transaction hash */
 function getExplorerUrl(txHash: string, chainId: ChainId): string {
-  const baseUrl =
-    chainId === "SN_SEPOLIA"
-      ? "https://sepolia.voyager.online/tx"
-      : "https://voyager.online/tx";
+  const baseUrl = chainId.isSepolia()
+    ? "https://sepolia.voyager.online/tx"
+    : "https://voyager.online/tx";
   return `${baseUrl}/${txHash}`;
 }
 
@@ -30,7 +29,7 @@ function getExplorerUrl(txHash: string, chainId: ChainId): string {
 export function getValidatorsForNetwork(
   chainId: ChainId
 ): Record<string, Validator> {
-  return chainId === "SN_SEPOLIA" ? sepoliaValidators : mainnetValidators;
+  return chainId.isSepolia() ? sepoliaValidators : mainnetValidators;
 }
 
 /** Data for a single staking position (validator + token combination) */
