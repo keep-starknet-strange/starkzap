@@ -66,14 +66,27 @@ const sdk = new StarkSDK({
 **Connecting a Wallet:**
 ```typescript
 // @docs -> Consumer App SDK: Wallet connection with Privy
+const accessToken = await privy.getAccessToken();
+
 const onboard = await sdk.onboard({
   strategy: OnboardStrategy.Privy,
   privy: {
-    resolve: async () => ({
-      walletId: "privy-wallet-id",
-      publicKey: "0xPUBLIC_KEY",
-      serverUrl: "https://your-api.example/wallet/sign",
-    }),
+    resolve: async () => {
+      const walletRes = await fetch("https://your-api.example/api/wallet/starknet", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${accessToken}`,
+        },
+      });
+      const { wallet } = await walletRes.json();
+
+      return {
+        walletId: wallet.id,
+        publicKey: wallet.publicKey,
+        serverUrl: "https://your-api.example/api/wallet/sign",
+      };
+    },
   },
 });
 ```

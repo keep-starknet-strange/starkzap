@@ -65,6 +65,16 @@ All examples are located in the `examples/` directory of the SDK repository.
     **Connecting with Privy:**
 
     ```typescript
+    const accessToken = await privy.getAccessToken();
+    const walletRes = await fetch(`${PRIVY_SERVER_URL}/api/wallet/starknet`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${accessToken}`,
+      },
+    });
+    const { wallet: walletData } = await walletRes.json();
+
     const onboard = await sdk.onboard({
       strategy: OnboardStrategy.Privy,
       deploy: "never",
@@ -152,21 +162,27 @@ All examples are located in the `examples/` directory of the SDK repository.
     import { PrivyProvider } from "@privy-io/expo";
     import { StarkSDK, OnboardStrategy } from "x";
 
+    const accessToken = await privyClient.getAccessToken();
+    const walletRes = await fetch("https://your-api.example/api/wallet/starknet", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${accessToken}`,
+      },
+    });
+    const { wallet: walletData } = await walletRes.json();
+
     const onboard = await sdk.onboard({
       strategy: OnboardStrategy.Privy,
+      deploy: "never",
       privy: {
-        resolve: async () => {
-          const user = await privyClient.getUser();
-          const wallet = user.starknetWallets[0];
-          return {
-            walletId: wallet.id,
-            publicKey: wallet.publicKey,
-            serverUrl: "https://your-api.example/wallet/sign",
-          };
-        },
+        resolve: async () => ({
+          walletId: walletData.id,
+          publicKey: walletData.publicKey,
+          serverUrl: "https://your-api.example/api/wallet/sign",
+        }),
       },
       accountPreset: accountPresets.argentXV050,
-      deploy: "if_needed",
     });
     ```
 

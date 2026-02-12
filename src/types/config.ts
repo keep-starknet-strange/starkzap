@@ -129,8 +129,10 @@ export interface ExplorerConfig {
 /**
  * Configuration for the Staking module.
  *
- * Required for using staking functionality such as entering/exiting pools,
- * querying validator pools, and retrieving active staking tokens.
+ * Optional override for the core staking contract.
+ *
+ * If omitted, the SDK uses the built-in chain-aware preset
+ * for the configured `chainId`.
  *
  * @example
  * ```ts
@@ -144,7 +146,7 @@ export interface ExplorerConfig {
  * ```
  */
 export interface StakingConfig {
-  /** Address of the core staking contract */
+  /** Address of the core staking contract (override default preset) */
   contract: Address;
 }
 
@@ -189,9 +191,9 @@ export interface SDKConfig {
   explorer?: ExplorerConfig;
 
   /**
-   * Optional: configuration for the Staking module.
+   * Optional: configuration for the Staking module (override default preset).
    *
-   * Required for staking functionality including:
+   * Staking functionality includes:
    * - Entering and exiting delegation pools
    * - Adding to existing stakes and claiming rewards
    * - Querying validator pools and active staking tokens

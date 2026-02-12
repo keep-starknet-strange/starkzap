@@ -317,6 +317,35 @@ export abstract class BaseWallet implements WalletInterface {
   }
 
   /**
+   * Stake in a pool, automatically entering or adding based on membership.
+   *
+   * This is the recommended staking method for most flows:
+   * - If the wallet is not a member, it enters the pool.
+   * - If the wallet is already a member, it adds to the existing stake.
+   *
+   * @param poolAddress - The pool contract address
+   * @param amount - The amount of tokens to stake
+   * @param options - Optional execution options
+   * @returns A Tx object to track the transaction
+   *
+   * @example
+   * ```ts
+   * const tx = await wallet.stake(poolAddress, Amount.parse("100", STRK));
+   * await tx.wait();
+   * ```
+   *
+   * @see {@link Staking#stake}
+   */
+  async stake(
+    poolAddress: Address,
+    amount: Amount,
+    options?: ExecuteOptions
+  ): Promise<Tx> {
+    const staking = await this.staking(poolAddress);
+    return await staking.stake(this, amount, options);
+  }
+
+  /**
    * Claim accumulated staking rewards from a pool.
    *
    * Transfers all unclaimed rewards to the wallet's reward address.

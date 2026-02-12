@@ -82,7 +82,17 @@ The `StarkSDK` accepts configuration through a single options object. You can us
     - 🔄 **Manage their positions** by adding more tokens, claiming rewards, or exiting pools
     - 🏦 **Support network security** while earning passive income
 
-    Configure staking by providing the core staking contract address:
+    Staking works out of the box using chain-aware staking contract presets:
+
+    ```typescript
+    import { StarkSDK } from "x";
+
+    const sdk = new StarkSDK({
+      network: "mainnet",
+    });
+    ```
+
+    If needed, you can override the default preset:
 
     ```typescript
     import { StarkSDK, fromAddress } from "x";
@@ -91,15 +101,11 @@ The `StarkSDK` accepts configuration through a single options object. You can us
       network: "mainnet",
       staking: {
         contract: fromAddress(
-          "0x03745ab04a431fc02871a139be6b93d9260b0ff3e779ad9c8b377183b23109f1"
+          "0x00ca1702e64c81d9a07b86bd2c540188d92a2c73cf5cc0e508d949015e7e84a7"
         ),
       },
     });
     ```
-
-    <Warning>
-      Staking methods (`wallet.enterPool()`, `sdk.stakingTokens()`, etc.) throw if `staking` is not configured.
-    </Warning>
 
     <Info>
       **Ready to implement staking?** See the [Staking & Delegation Guide](/build/consumer-app-sdk/staking) for complete instructions on how users can stake tokens, claim rewards, and manage their positions.
@@ -120,10 +126,10 @@ const sdk = new StarkSDK({
   // Network configuration
   network: "mainnet",
   
-  // Optional: Staking contract
+  // Optional: override staking contract preset
   staking: {
     contract: fromAddress(
-      "0x03745ab04a431fc02871a139be6b93d9260b0ff3e779ad9c8b377183b23109f1"
+      "0x00ca1702e64c81d9a07b86bd2c540188d92a2c73cf5cc0e508d949015e7e84a7"
     ),
   },
 });
@@ -139,10 +145,10 @@ const sdk = new StarkSDK({
   rpcUrl: "https://starknet-mainnet.infura.io/v3/YOUR_KEY",
   chainId: ChainId.MAINNET,
   
-  // Optional: Staking contract
+  // Optional: override staking contract preset
   staking: {
     contract: fromAddress(
-      "0x03745ab04a431fc02871a139be6b93d9260b0ff3e779ad9c8b377183b23109f1"
+      "0x00ca1702e64c81d9a07b86bd2c540188d92a2c73cf5cc0e508d949015e7e84a7"
     ),
   },
 });
@@ -167,7 +173,7 @@ interface SDKConfig {
 }
 
 interface StakingConfig {
-  contract: Address;
+  contract: Address; // optional override
 }
 ```
 

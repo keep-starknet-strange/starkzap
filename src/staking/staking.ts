@@ -123,6 +123,37 @@ export class Staking {
   }
 
   /**
+   * Stake tokens in this pool, automatically choosing enter or add.
+   *
+   * - If the wallet is not yet a member, this performs `enter()`.
+   * - If the wallet is already a member, this performs `add()`.
+   *
+   * This is the recommended high-level staking method for most app flows.
+   *
+   * @param wallet - The wallet to stake from
+   * @param amount - The amount of tokens to stake
+   * @param options - Optional execution options
+   * @returns A transaction object that can be awaited for confirmation
+   *
+   * @example
+   * ```ts
+   * const tx = await staking.stake(wallet, Amount.parse(100, strkToken));
+   * await tx.wait();
+   * ```
+   */
+  async stake(
+    wallet: WalletInterface,
+    amount: Amount,
+    options?: ExecuteOptions
+  ): Promise<Tx> {
+    const isMember = await this.isMember(wallet);
+    const calls = isMember
+      ? this.populateAdd(wallet.address, amount)
+      : this.populateEnter(wallet.address, amount);
+    return await wallet.execute(calls, options);
+  }
+
+  /**
    * Check if a wallet is a member of this delegation pool.
    *
    * @param wallet - The wallet to check

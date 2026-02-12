@@ -205,6 +205,15 @@ export interface WalletInterface {
   ): Promise<Tx>;
 
   /**
+   * Stake in a pool, automatically entering or adding based on membership.
+   */
+  stake(
+    poolAddress: Address,
+    amount: Amount,
+    options?: ExecuteOptions
+  ): Promise<Tx>;
+
+  /**
    * Claim accumulated staking rewards from a pool.
    */
   claimPoolRewards(poolAddress: Address, options?: ExecuteOptions): Promise<Tx>;

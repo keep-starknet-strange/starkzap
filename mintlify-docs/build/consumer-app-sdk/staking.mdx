@@ -16,13 +16,23 @@ The Consumer App SDK supports Starknet's native staking protocol. Validators run
 
 **Real-world analogy:** Think of staking like putting money in a high-yield savings account or certificate of deposit (CD). You lock up your tokens for a period, and in return, you earn interest (rewards). The longer you stake, the more you can potentially earn.
 
-<Warning>
-  Staking requires `staking.contract` configuration in the SDK. See [Configuration](/build/consumer-app-sdk/configuration#staking-configuration) for setup.
-</Warning>
+<Info>
+  Staking contract is selected automatically from chain-aware presets. You only need `staking.contract` if you want to override the default.
+</Info>
 
 ## Configuration
 
-Enable staking functionality by providing the core staking contract address:
+Staking works out of the box when using a supported chain preset:
+
+```typescript
+import { StarkSDK } from "x";
+
+const sdk = new StarkSDK({
+  network: "mainnet",
+});
+```
+
+Optional override:
 
 ```typescript
 import { StarkSDK, fromAddress } from "x";
@@ -31,7 +41,7 @@ const sdk = new StarkSDK({
   network: "mainnet",
   staking: {
     contract: fromAddress(
-      "0x03745ab04a431fc02871a139be6b93d9260b0ff3e779ad9c8b377183b23109f1"
+      "0x00ca1702e64c81d9a07b86bd2c540188d92a2c73cf5cc0e508d949015e7e84a7"
     ),
   },
 });
@@ -81,6 +91,19 @@ This will:
 1. Approve the staking contract to spend your tokens (if needed)
 2. Call `enter_delegation_pool` on the staking contract
 3. Return a transaction you can track
+
+## Smart Stake (Recommended)
+
+Use `wallet.stake()` when you don't want to branch on membership manually:
+
+```typescript
+const tx = await wallet.stake(poolAddress, Amount.parse("100", STRK));
+await tx.wait();
+```
+
+`wallet.stake()` automatically:
+- calls `enter_delegation_pool` for first-time stakers
+- calls `add_to_delegation_pool` for existing members
 
 ## Adding to an Existing Stake
 
@@ -298,23 +321,15 @@ async function checkRewards(wallet, poolAddress) {
 2. **Monitor rewards regularly** and show users their earnings
 3. **Help users understand exit windows** before initiating exit
 4. **Use transaction builder** to batch staking with other operations
-5. **Keep staking contract config chain-aware** (different addresses per network)
+5. **Override staking contract only if needed** (custom deployments, forks, or private environments)
 6. **Display earnings clearly** - Show users their staked amount, earned rewards, and total position value
 
 ## Troubleshooting
 
-### "staking.contract is not defined"
+### "Staking contract address is wrong in the config."
 
-Add `staking.contract` to `StarkSDK` config before calling staking APIs:
-
-```typescript
-const sdk = new StarkSDK({
-  network: "mainnet",
-  staking: {
-    contract: fromAddress("0x..."),
-  },
-});
-```
+If you override `staking.contract`, ensure it matches the selected chain and pool.
+If unsure, remove the override and use the built-in preset for your chain.
 
 ### Pool Not Found
 
