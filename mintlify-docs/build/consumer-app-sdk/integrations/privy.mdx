@@ -91,6 +91,7 @@ Use Privy with the Consumer App SDK:
 import { StarkSDK, PrivySigner, OnboardStrategy, accountPresets } from "x";
 
 const sdk = new StarkSDK({ network: "sepolia" });
+const accessToken = await privy.getAccessToken();
 
 // Option 1: Using onboard API (recommended)
 const onboard = await sdk.onboard({
@@ -98,12 +99,19 @@ const onboard = await sdk.onboard({
   accountPreset: accountPresets.argentXV050,
   privy: {
     resolve: async () => {
-      // Get wallet info from your backend or Privy
-      const walletData = await fetch("/api/wallet/starknet").then(r => r.json());
-      
+      // Get/create the user's Starknet wallet from your backend
+      const walletRes = await fetch("https://your-api.example/api/wallet/starknet", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${accessToken}`,
+        },
+      });
+      const walletData = await walletRes.json();
+
       return {
         walletId: walletData.wallet.id,
-        publicKey: walletData.wallet.public_key,
+        publicKey: walletData.wallet.publicKey,
         serverUrl: "https://your-api.example/api/wallet/sign",
       };
     },
@@ -113,14 +121,23 @@ const onboard = await sdk.onboard({
 
 const wallet = onboard.wallet;
 
-// Option 2: Using PrivySigner directly
+// Option 2: Using PrivySigner directly (reuse accessToken)
+const walletRes = await fetch("https://your-api.example/api/wallet/starknet", {
+  method: "POST",
+  headers: {
+    "Content-Type": "application/json",
+    Authorization: `Bearer ${accessToken}`,
+  },
+});
+const { wallet: privyWallet } = await walletRes.json();
+
 const signer = new PrivySigner({
-  walletId: "privy-wallet-id",
-  publicKey: "0xPUBLIC_KEY",
+  walletId: privyWallet.id,
+  publicKey: privyWallet.publicKey,
   serverUrl: "https://your-api.example/api/wallet/sign",
 });
 
-const wallet = await sdk.connectWallet({
+const walletFromSigner = await sdk.connectWallet({
   account: { signer, accountClass: accountPresets.argentXV050 },
 });
 ```
@@ -189,26 +206,29 @@ app.listen(3001);
 import { StarkSDK, OnboardStrategy, accountPresets } from "x";
 
 const sdk = new StarkSDK({ network: "sepolia" });
-
-// Get wallet from backend
-const walletResponse = await fetch("http://localhost:3001/api/wallet/starknet", {
-  method: "POST",
-  headers: { "Content-Type": "application/json" },
-  body: JSON.stringify({ userId: "user-123" }),
-});
-
-const { wallet } = await walletResponse.json();
+const accessToken = await privy.getAccessToken();
 
 // Connect with SDK
 const onboard = await sdk.onboard({
   strategy: OnboardStrategy.Privy,
   accountPreset: accountPresets.argentXV050,
   privy: {
-    resolve: async () => ({
-      walletId: wallet.id,
-      publicKey: wallet.publicKey,
-      serverUrl: "http://localhost:3001/api/wallet/sign",
-    }),
+    resolve: async () => {
+      const walletRes = await fetch("http://localhost:3001/api/wallet/starknet", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${accessToken}`,
+        },
+      });
+      const { wallet } = await walletRes.json();
+
+      return {
+        walletId: wallet.id,
+        publicKey: wallet.publicKey,
+        serverUrl: "http://localhost:3001/api/wallet/sign",
+      };
+    },
   },
   deploy: "if_needed",
 });
@@ -235,15 +255,23 @@ import { StarkSDK, OnboardStrategy } from "x";
 
 // In your component
 const privyClient = usePrivy();
-const user = await privyClient.getUser();
-const wallet = user.starknetWallets[0];
+const accessToken = await privyClient.getAccessToken();
+const walletRes = await fetch("https://your-api.example/api/wallet/starknet", {
+  method: "POST",
+  headers: {
+    "Content-Type": "application/json",
+    Authorization: `Bearer ${accessToken}`,
+  },
+});
+const { wallet: walletData } = await walletRes.json();
 
 const onboard = await sdk.onboard({
   strategy: OnboardStrategy.Privy,
+  deploy: "never",
   privy: {
     resolve: async () => ({
-      walletId: wallet.id,
-      publicKey: wallet.publicKey,
+      walletId: walletData.id,
+      publicKey: walletData.publicKey,
       serverUrl: "https://your-api.example/api/wallet/sign",
     }),
   },

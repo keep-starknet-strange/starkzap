@@ -77,15 +77,31 @@ import {
 
 const sdk = new StarkSDK({ network: "sepolia" });
 
+// Example: user is already authenticated with Privy in your app
+const accessToken = await privy.getAccessToken();
+
 // Onboard with Privy (recommended for consumer apps)
 const onboard = await sdk.onboard({
   strategy: OnboardStrategy.Privy,
   privy: {
-    resolve: async () => ({
-      walletId: "privy-wallet-id",
-      publicKey: "0xPUBLIC_KEY",
-      serverUrl: "https://your-api.example/wallet/sign",
-    }),
+    resolve: async () => {
+      // 1) Fetch/create the Privy Starknet wallet for this user from backend
+      const walletRes = await fetch("https://your-api.example/api/wallet/starknet", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${accessToken}`,
+        },
+      });
+      const { wallet } = await walletRes.json();
+
+      // 2) Return wallet context + signing endpoint for the SDK
+      return {
+        walletId: wallet.id,
+        publicKey: wallet.publicKey,
+        serverUrl: "https://your-api.example/api/wallet/sign",
+      };
+    },
   },
   accountPreset: accountPresets.argentXV050,
   feeMode: "sponsored",
@@ -112,11 +128,25 @@ The `sdk.onboard()` method lets you choose how users authenticate and connect th
     const onboard = await sdk.onboard({
       strategy: OnboardStrategy.Privy,
       privy: {
-        resolve: async () => ({
-          walletId: "privy-wallet-id",
-          publicKey: "0xPUBLIC_KEY",
-          serverUrl: "https://your-api.example/wallet/sign",
-        }),
+        resolve: async () => {
+          const walletRes = await fetch(
+            "https://your-api.example/api/wallet/starknet",
+            {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${accessToken}`,
+              },
+            }
+          );
+          const { wallet } = await walletRes.json();
+
+          return {
+            walletId: wallet.id,
+            publicKey: wallet.publicKey,
+            serverUrl: "https://your-api.example/api/wallet/sign",
+          };
+        },
       },
       accountPreset: accountPresets.argentXV050,
       deploy: "if_needed",

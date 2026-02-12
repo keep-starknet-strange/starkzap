@@ -89,9 +89,19 @@ const wallet = await sdk.connectWallet({
 ```typescript
 import { StarkSDK, PrivySigner, ArgentXV050Preset } from "x";
 
+const accessToken = await privy.getAccessToken();
+const walletRes = await fetch("https://your-backend.com/api/wallet/starknet", {
+  method: "POST",
+  headers: {
+    "Content-Type": "application/json",
+    Authorization: `Bearer ${accessToken}`,
+  },
+});
+const { wallet: privyWallet } = await walletRes.json();
+
 const signer = new PrivySigner({
-  walletId: "wallet-id-from-privy",
-  publicKey: "0xPUBLIC_KEY_FROM_PRIVY",
+  walletId: privyWallet.id,
+  publicKey: privyWallet.publicKey,
   serverUrl: "https://your-backend.com/api/wallet/sign",
 });
 
@@ -107,9 +117,13 @@ Your backend endpoint receives `{ walletId, hash }` and must return `{ signature
 ```typescript
 import { PrivySigner } from "x";
 
+// Use the wallet identity returned by your /api/wallet/starknet endpoint
+const walletId = "wallet-id-from-backend";
+const publicKey = "0xPUBLIC_KEY_FROM_BACKEND";
+
 const signer = new PrivySigner({
-  walletId: "wallet-id",
-  publicKey: "0xPUBLIC_KEY",
+  walletId,
+  publicKey,
   rawSign: async (walletId, messageHash) => {
     const response = await privyClient.wallets().rawSign(walletId, {
       params: { hash: messageHash },
@@ -281,15 +295,27 @@ The onboarding API simplifies wallet connection by handling strategy selection, 
 import { StarkSDK, OnboardStrategy } from "x";
 
 const sdk = new StarkSDK({ network: "sepolia" });
+const accessToken = await privy.getAccessToken();
 
 const onboard = await sdk.onboard({
   strategy: OnboardStrategy.Privy,
   privy: {
-    resolve: async () => ({
-      walletId: "privy-wallet-id",
-      publicKey: "0xPUBLIC_KEY",
-      serverUrl: "https://your-api.example/wallet/sign",
-    }),
+    resolve: async () => {
+      const walletRes = await fetch("https://your-api.example/api/wallet/starknet", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${accessToken}`,
+        },
+      });
+      const { wallet } = await walletRes.json();
+
+      return {
+        walletId: wallet.id,
+        publicKey: wallet.publicKey,
+        serverUrl: "https://your-api.example/api/wallet/sign",
+      };
+    },
   },
   accountPreset: "argentXV050",
   deploy: "if_needed",
