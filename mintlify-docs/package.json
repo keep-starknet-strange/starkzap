@@ -1,0 +1,21 @@
+{
+  "name": "consumer-app-sdk-docs",
+  "version": "1.0.0",
+  "description": "Mintlify documentation for Consumer App SDK",
+  "scripts": {
+    "dev": "mintlify dev",
+    "build": "mintlify build",
+    "start": "mintlify start"
+  },
+  "keywords": [
+    "mintlify",
+    "documentation",
+    "starknet",
+    "sdk"
+  ],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "mintlify": "^4.0.0"
+  }
+}
