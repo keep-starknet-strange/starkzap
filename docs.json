@@ -28,61 +28,65 @@
       "url": "https://discord.gg/starknet-community"
     }
   ],
-  "navigation": [
-    "mintlify-docs/build/consumer-app-sdk/overview",
-    {
-      "group": "Getting Started",
-      "pages": [
-        "mintlify-docs/build/consumer-app-sdk/installation",
-        "mintlify-docs/build/consumer-app-sdk/quick-start",
-        {
-          "group": "Configuration",
-          "pages": [
-            "mintlify-docs/build/consumer-app-sdk/configuration",
-            "mintlify-docs/build/consumer-app-sdk/paymasters"
-          ]
-        }
-      ]
-    },
-    {
-      "group": "Using LLMs",
-      "pages": [
-        "mintlify-docs/build/consumer-app-sdk/using-llms"
-      ]
-    },
-    {
-      "group": "Modules",
-      "pages": [
-        "mintlify-docs/build/consumer-app-sdk/connecting-wallets",
-        "mintlify-docs/build/consumer-app-sdk/erc20",
-        "mintlify-docs/build/consumer-app-sdk/staking",
-        "mintlify-docs/build/consumer-app-sdk/transactions",
-        "mintlify-docs/build/consumer-app-sdk/tx-builder"
-      ]
-    },
-    {
-      "group": "Integrations",
-      "pages": [
-        "mintlify-docs/build/consumer-app-sdk/integrations/avnu-paymaster",
-        "mintlify-docs/build/consumer-app-sdk/integrations/privy",
-        "mintlify-docs/build/consumer-app-sdk/integrations/cartridge-controller"
-      ]
-    },
-    {
-      "group": "Examples",
-      "pages": [
-        "mintlify-docs/build/consumer-app-sdk/examples"
-      ]
-    },
-    {
-      "group": "Reference",
-      "pages": [
-        "mintlify-docs/build/consumer-app-sdk/glossary",
-        "mintlify-docs/build/consumer-app-sdk/troubleshooting",
-        "mintlify-docs/build/consumer-app-sdk/api-reference"
-      ]
-    }
-  ],
+  "navigation": {
+    "pages": [
+      "mintlify-docs/build/consumer-app-sdk/overview"
+    ],
+    "groups": [
+      {
+        "group": "Getting Started",
+        "pages": [
+          "mintlify-docs/build/consumer-app-sdk/installation",
+          "mintlify-docs/build/consumer-app-sdk/quick-start",
+          {
+            "group": "Configuration",
+            "pages": [
+              "mintlify-docs/build/consumer-app-sdk/configuration",
+              "mintlify-docs/build/consumer-app-sdk/paymasters"
+            ]
+          }
+        ]
+      },
+      {
+        "group": "Using LLMs",
+        "pages": [
+          "mintlify-docs/build/consumer-app-sdk/using-llms"
+        ]
+      },
+      {
+        "group": "Modules",
+        "pages": [
+          "mintlify-docs/build/consumer-app-sdk/connecting-wallets",
+          "mintlify-docs/build/consumer-app-sdk/erc20",
+          "mintlify-docs/build/consumer-app-sdk/staking",
+          "mintlify-docs/build/consumer-app-sdk/transactions",
+          "mintlify-docs/build/consumer-app-sdk/tx-builder"
+        ]
+      },
+      {
+        "group": "Integrations",
+        "pages": [
+          "mintlify-docs/build/consumer-app-sdk/integrations/avnu-paymaster",
+          "mintlify-docs/build/consumer-app-sdk/integrations/privy",
+          "mintlify-docs/build/consumer-app-sdk/integrations/cartridge-controller"
+        ]
+      },
+      {
+        "group": "Examples",
+        "pages": [
+          "mintlify-docs/build/consumer-app-sdk/examples"
+        ]
+      },
+      {
+        "group": "Reference",
+        "pages": [
+          "mintlify-docs/build/consumer-app-sdk/glossary",
+          "mintlify-docs/build/consumer-app-sdk/troubleshooting",
+          "mintlify-docs/build/consumer-app-sdk/api-reference"
+        ]
+      }
+    ]
+  },
   "footerSocials": {
     "twitter": "https://twitter.com/StarknetEco",
     "github": "https://github.com/starknet-io/starknet-docs",
