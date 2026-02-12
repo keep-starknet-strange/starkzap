@@ -34,6 +34,7 @@ If `.mint` directory is created with HTML/CSS/JS files, then Vercel should work.
 ## Vercel Configuration
 
 The `vercel.json` is configured to:
+
 - Build command: `npm run build`
 - Output directory: `.mint`
 - Framework: None (static site)

@@ -54,6 +54,7 @@ Once the server starts, you can:
 If you encounter issues:
 
 1. **Port already in use**: Use a different port
+
    ```bash
    mintlify dev --port 3001
    ```
@@ -65,6 +66,7 @@ If you encounter issues:
 ## Next Steps
 
 After previewing, you can:
+
 - Copy the `build/consumer-app-sdk/` directory to the starknet-docs repository
 - Update the navigation in starknet-docs to include the new section
 - Test the integration in the full docs site

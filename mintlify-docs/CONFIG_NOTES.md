@@ -5,12 +5,14 @@
 There are **two different formats** needed:
 
 ### 1. Local Development (`mint.json`)
+
 - Used by `mintlify dev` command
 - **Navigation**: Must be an **array**
 - **Theme**: Must be `'venus' | 'quill' | 'prism'`
 - **Favicon**: Required field
 
 ### 2. Production Platform (`docs.json`)
+
 - Used by Mintlify hosting platform
 - **Navigation**: Must be an **object** with `pages` and `groups` properties
 - **Theme**: Can be `'mint' | 'maple' | 'palm' | 'willow' | 'linden' | 'almond' | 'aspen' | 'sequoia'`

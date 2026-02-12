@@ -47,9 +47,7 @@
     },
     {
       "group": "Using LLMs",
-      "pages": [
-        "build/consumer-app-sdk/using-llms"
-      ]
+      "pages": ["build/consumer-app-sdk/using-llms"]
     },
     {
       "group": "Modules",
@@ -71,9 +69,7 @@
     },
     {
       "group": "Examples",
-      "pages": [
-        "build/consumer-app-sdk/examples"
-      ]
+      "pages": ["build/consumer-app-sdk/examples"]
     },
     {
       "group": "Reference",

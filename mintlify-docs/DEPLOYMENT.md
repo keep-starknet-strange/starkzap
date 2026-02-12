@@ -45,6 +45,7 @@ If you prefer to deploy to Vercel manually, follow these steps:
 ### Prerequisites
 
 1. Install dependencies:
+
    ```bash
    cd mintlify-docs
    npm install
@@ -58,11 +59,13 @@ If you prefer to deploy to Vercel manually, follow these steps:
 ### Deploy to Vercel
 
 1. **Install Vercel CLI** (if not already installed):
+
    ```bash
    npm i -g vercel
    ```
 
 2. **Deploy:**
+
    ```bash
    cd mintlify-docs
    vercel
@@ -77,6 +80,7 @@ If you prefer to deploy to Vercel manually, follow these steps:
 ### Vercel Configuration
 
 The `vercel.json` file is already configured with:
+
 - Build command: `npm run build`
 - Output directory: `.mint` (Mintlify's build output)
 - Framework: None (static site)

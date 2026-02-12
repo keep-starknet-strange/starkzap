@@ -7,28 +7,33 @@ Mintlify can be configured in two ways:
 ### Option 1: Root Directory = `mintlify-docs` (Recommended)
 
 **In Mintlify Dashboard:**
+
 - Root Directory: `mintlify-docs`
 - Branch: `docs/mintlify`
 - Mintlify will look for `docs.json` or `mint.json` in `mintlify-docs/`
 
 **File paths in navigation:**
+
 - Use: `build/consumer-app-sdk/overview`
 - NOT: `mintlify-docs/build/consumer-app-sdk/overview`
 
 ### Option 2: Root Directory = `.` (Repository Root)
 
 **In Mintlify Dashboard:**
+
 - Root Directory: `.` (or leave empty)
 - Branch: `docs/mintlify`
 - Mintlify will look for `docs.json` at repository root
 
 **File paths in navigation:**
+
 - Use: `mintlify-docs/build/consumer-app-sdk/overview`
 - NOT: `build/consumer-app-sdk/overview`
 
 ## Current Setup
 
 We have both configurations:
+
 - `docs.json` at repo root (for Option 2)
 - `docs.json` in `mintlify-docs/` (for Option 1)
 
