@@ -29,69 +29,57 @@
     }
   ],
   "navigation": [
+    "build/consumer-app-sdk/overview",
     {
-      "group": "Build",
+      "group": "Getting Started",
       "pages": [
-        "build/consumer-app-sdk/overview",
+        "build/consumer-app-sdk/installation",
+        "build/consumer-app-sdk/quick-start",
         {
-          "group": "Getting Started",
-          "icon": "rocket",
+          "group": "Configuration",
           "pages": [
-            "build/consumer-app-sdk/installation",
-            "build/consumer-app-sdk/quick-start",
-            {
-              "group": "Configuration",
-              "icon": "cog",
-              "pages": [
-                "build/consumer-app-sdk/configuration",
-                "build/consumer-app-sdk/paymasters"
-              ]
-            }
-          ]
-        },
-        {
-          "group": "Using LLMs",
-          "icon": "code",
-          "pages": [
-            "build/consumer-app-sdk/using-llms"
-          ]
-        },
-        {
-          "group": "Modules",
-          "icon": "puzzle-piece",
-          "pages": [
-            "build/consumer-app-sdk/connecting-wallets",
-            "build/consumer-app-sdk/erc20",
-            "build/consumer-app-sdk/staking",
-            "build/consumer-app-sdk/transactions",
-            "build/consumer-app-sdk/tx-builder"
-          ]
-        },
-        {
-          "group": "Integrations",
-          "icon": "plug",
-          "pages": [
-            "build/consumer-app-sdk/integrations/avnu-paymaster",
-            "build/consumer-app-sdk/integrations/privy",
-            "build/consumer-app-sdk/integrations/cartridge-controller"
-          ]
-        },
-        {
-          "group": "Examples",
-          "icon": "flask",
-          "pages": [
-            "build/consumer-app-sdk/examples"
-          ]
-        },
-        {
-          "group": "Reference",
-          "icon": "book",
-          "pages": [
-            "build/consumer-app-sdk/glossary",
-            "build/consumer-app-sdk/troubleshooting",
-            "build/consumer-app-sdk/api-reference"
+            "build/consumer-app-sdk/configuration",
+            "build/consumer-app-sdk/paymasters"
           ]
         }
+      ]
+    },
+    {
+      "group": "Using LLMs",
+      "pages": [
+        "build/consumer-app-sdk/using-llms"
+      ]
+    },
+    {
+      "group": "Modules",
+      "pages": [
+        "build/consumer-app-sdk/connecting-wallets",
+        "build/consumer-app-sdk/erc20",
+        "build/consumer-app-sdk/staking",
+        "build/consumer-app-sdk/transactions",
+        "build/consumer-app-sdk/tx-builder"
+      ]
+    },
+    {
+      "group": "Integrations",
+      "pages": [
+        "build/consumer-app-sdk/integrations/avnu-paymaster",
+        "build/consumer-app-sdk/integrations/privy",
+        "build/consumer-app-sdk/integrations/cartridge-controller"
+      ]
+    },
+    {
+      "group": "Examples",
+      "pages": [
+        "build/consumer-app-sdk/examples"
+      ]
+    },
+    {
+      "group": "Reference",
+      "pages": [
+        "build/consumer-app-sdk/glossary",
+        "build/consumer-app-sdk/troubleshooting",
+        "build/consumer-app-sdk/api-reference"
       ]
     }
   ],
