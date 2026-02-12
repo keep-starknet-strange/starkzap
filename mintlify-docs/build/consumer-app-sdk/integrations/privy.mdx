@@ -99,7 +99,7 @@ const onboard = await sdk.onboard({
   accountPreset: accountPresets.argentXV050,
   privy: {
     resolve: async () => {
-      // Get/create the user's Starknet wallet from your backend
+      // Get Privy signer context (walletId + publicKey) from your backend
       const walletRes = await fetch("https://your-api.example/api/wallet/starknet", {
         method: "POST",
         headers: {

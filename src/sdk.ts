@@ -13,7 +13,7 @@ import type {
   OnboardOptions,
   OnboardResult,
 } from "@/types";
-import { Staking } from "@/staking";
+import { getStakingPreset, Staking } from "@/staking";
 import { PrivySigner } from "@/signer";
 import {
   ArgentXV050Preset,
@@ -98,12 +98,24 @@ export class StarkSDK {
         ? { baseUrl: networkPreset.explorerUrl }
         : undefined);
 
+    const staking = config.staking ?? getStakingPreset(chainId);
+
     return {
       ...config,
       rpcUrl,
       chainId,
+      staking,
       ...(explorer && { explorer }),
     };
+  }
+
+  private getStakingConfig(): NonNullable<ResolvedConfig["staking"]> {
+    if (!this.config.staking?.contract) {
+      throw new Error(
+        `No staking contract configured for chain ${this.config.chainId.toLiteral()}. Set \`staking.contract\` explicitly in SDK config.`
+      );
+    }
+    return this.config.staking;
   }
 
   /**
@@ -336,11 +348,7 @@ export class StarkSDK {
    * ```
    */
   async stakingTokens(): Promise<Token[]> {
-    if (!this.config.staking?.contract) {
-      throw new Error("`staking.contract` is not defined in the sdk config.");
-    }
-
-    return Staking.activeTokens(this.provider, this.config.staking);
+    return Staking.activeTokens(this.provider, this.getStakingConfig());
   }
 
   /**
@@ -363,14 +371,10 @@ export class StarkSDK {
    * ```
    */
   async getStakerPools(staker: Address): Promise<Pool[]> {
-    if (!this.config.staking?.contract) {
-      throw new Error("`staking.contract` is not defined in the sdk config.");
-    }
-
     return await Staking.getStakerPools(
       this.provider,
       staker,
-      this.config.staking
+      this.getStakingConfig()
     );
   }
 

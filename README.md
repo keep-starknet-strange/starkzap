@@ -128,30 +128,33 @@ const sdk = new StarkSDK({ network: "sepolia" });
 // Example: your app already authenticated the user with Privy
 const accessToken = await privy.getAccessToken();
 
-// Your backend returns (or creates) the user's Privy Starknet wallet
-const walletRes = await fetch("https://your-api.example/wallet/starknet", {
-  method: "POST",
-  headers: {
-    "Content-Type": "application/json",
-    Authorization: `Bearer ${accessToken}`,
-  },
-});
-const { wallet } = await walletRes.json();
-
 const onboard = await sdk.onboard({
   strategy: OnboardStrategy.Privy,
   accountPreset: accountPresets.argentXV050,
   privy: {
     // resolve() must return wallet context for the CURRENT authenticated user
-    resolve: async () => ({
-      // returned by your backend / Privy wallet API
-      walletId: wallet.id,
-      publicKey: wallet.publicKey,
+    resolve: async () => {
+      // 1) Ask your backend for this user's Privy Starknet wallet
+      const walletRes = await fetch(
+        "https://your-api.example/wallet/starknet",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${accessToken}`,
+          },
+        }
+      );
+      const { wallet } = await walletRes.json();
 
-      // backend endpoint that signs Starknet hashes with this wallet
-      // expects { walletId, hash } and returns { signature }
-      serverUrl: "https://your-api.example/wallet/sign",
-    }),
+      // 2) Return wallet context + signing endpoint
+      // signer endpoint expects { walletId, hash } and returns { signature }
+      return {
+        walletId: wallet.id,
+        publicKey: wallet.publicKey,
+        serverUrl: "https://your-api.example/wallet/sign",
+      };
+    },
   },
   deploy: "if_needed",
 });

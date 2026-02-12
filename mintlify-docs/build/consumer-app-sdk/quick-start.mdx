@@ -11,11 +11,11 @@ icon: rocket
 Here's a minimal example to get you started:
 
 <Info>
-  **For testing, use Sepolia testnet** - Replace `"mainnet"` with `"sepolia"` and use `sepoliaTokens` instead of `mainnetTokens`. The [Starknet Sepolia Faucet](https://starknet-faucet.vercel.app/) is only available for Sepolia testnet (not mainnet). On mainnet, you'll need to purchase or transfer real tokens.
+  **For testing, use Sepolia testnet** - Replace `"mainnet"` with `"sepolia"` and select tokens from `getPresets(wallet.getChainId())`. The [Starknet Sepolia Faucet](https://starknet-faucet.vercel.app/) is only available for Sepolia testnet (not mainnet). On mainnet, you'll need to purchase or transfer real tokens.
 </Info>
 
 ```typescript
-import { StarkSDK, StarkSigner, Amount, fromAddress, sepoliaTokens } from "x";
+import { StarkSDK, StarkSigner, Amount, fromAddress, getPresets } from "x";
 
 // 1. Initialize the SDK (use "sepolia" for testing)
 const sdk = new StarkSDK({ network: "sepolia" });
@@ -38,7 +38,7 @@ console.log("Your account address:", address.toString());
 await wallet.ensureReady({ deploy: "if_needed" });
 
 // 5. Check a token balance
-const STRK = sepoliaTokens.STRK;
+const STRK = getPresets(wallet.getChainId()).STRK;
 const balance = await wallet.balanceOf(STRK);
 console.log(balance.toFormatted()); // "100 STRK" or "0 STRK" if empty
 
@@ -65,6 +65,17 @@ if (!balance.isZero() && balance.gte(Amount.parse("10", STRK))) {
 
 For most consumer applications, the **Onboarding API** is the recommended approach. Instead of manually setting up signers, creating wallets, and checking if accounts exist, the `onboard()` method does all of this in one call:
 
+<Info>
+  Privy login/signup already happened before this snippet.
+
+  `accessToken` identifies the current Privy user so your backend can return the correct signer context (`walletId`, `publicKey`) and authorize signatures.
+
+  Your backend is a thin relay to Privy server APIs:
+  1. verify `accessToken`
+  2. return `{ walletId, publicKey, serverUrl }`
+  3. relay sign requests to Privy `rawSign` using `PRIVY_APP_SECRET` (kept server-side)
+</Info>
+
 ```typescript
 import {
   StarkSDK,
@@ -72,7 +83,7 @@ import {
   accountPresets,
   Amount,
   fromAddress,
-  sepoliaTokens,
+  getPresets,
 } from "x";
 
 const sdk = new StarkSDK({ network: "sepolia" });
@@ -81,37 +92,25 @@ const sdk = new StarkSDK({ network: "sepolia" });
 const accessToken = await privy.getAccessToken();
 
 // Onboard with Privy (recommended for consumer apps)
-const onboard = await sdk.onboard({
+const { wallet } = await sdk.onboard({
   strategy: OnboardStrategy.Privy,
   privy: {
-    resolve: async () => {
-      // 1) Fetch/create the Privy Starknet wallet for this user from backend
-      const walletRes = await fetch("https://your-api.example/api/wallet/starknet", {
+    resolve: async () =>
+      fetch("https://your-api.example/signer-context", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${accessToken}`,
         },
-      });
-      const { wallet } = await walletRes.json();
-
-      // 2) Return wallet context + signing endpoint for the SDK
-      return {
-        walletId: wallet.id,
-        publicKey: wallet.publicKey,
-        serverUrl: "https://your-api.example/api/wallet/sign",
-      };
-    },
+      }).then((r) => r.json()), // { walletId, publicKey, serverUrl }
   },
   accountPreset: accountPresets.argentXV050,
   feeMode: "sponsored",
   deploy: "if_needed",
 });
 
-const wallet = onboard.wallet;
-
 // Use the wallet immediately
-const token = sepoliaTokens.STRK;
+const token = getPresets(wallet.getChainId()).STRK;
 const balance = await wallet.balanceOf(token);
 console.log(balance.toFormatted(true));
 ```
@@ -128,25 +127,14 @@ The `sdk.onboard()` method lets you choose how users authenticate and connect th
     const onboard = await sdk.onboard({
       strategy: OnboardStrategy.Privy,
       privy: {
-        resolve: async () => {
-          const walletRes = await fetch(
-            "https://your-api.example/api/wallet/starknet",
-            {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-                Authorization: `Bearer ${accessToken}`,
-              },
-            }
-          );
-          const { wallet } = await walletRes.json();
-
-          return {
-            walletId: wallet.id,
-            publicKey: wallet.publicKey,
-            serverUrl: "https://your-api.example/api/wallet/sign",
-          };
-        },
+        resolve: async () =>
+          fetch("https://your-api.example/signer-context", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${accessToken}`,
+            },
+          }).then((r) => r.json()), // { walletId, publicKey, serverUrl }
       },
       accountPreset: accountPresets.argentXV050,
       deploy: "if_needed",

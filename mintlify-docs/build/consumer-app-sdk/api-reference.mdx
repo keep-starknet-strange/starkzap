@@ -60,6 +60,7 @@ The wallet interface provides access to account operations, transactions, and to
 | `tx()`                                   | `TxBuilder`                    | Create a transaction builder |
 | `balanceOf(token)`                       | `Promise<Amount>`              | Get token balance            |
 | `transfer(token, transfers, options?)`   | `Promise<Tx>`                  | Transfer ERC20 tokens        |
+| `stake(pool, amount, options?)`          | `Promise<Tx>`                  | Smart stake (enter or add)   |
 | `enterPool(pool, amount, options?)`      | `Promise<Tx>`                  | Enter staking pool           |
 | `addToPool(pool, amount, options?)`       | `Promise<Tx>`                  | Add to existing stake        |
 | `claimPoolRewards(pool, options?)`        | `Promise<Tx>`                  | Claim staking rewards        |

@@ -5,23 +5,17 @@ description: Common issues and solutions when using the Consumer App SDK
 
 ## Common Issues
 
-### "staking.contract is not defined"
+### "Staking contract address is wrong in the config."
 
-**Problem:** You're trying to call staking methods but haven't configured the staking contract.
+**Problem:** You set a custom `staking.contract` that doesn't match the selected chain/pool.
 
-**Solution:** Add `staking.contract` to your `StarkSDK` configuration:
+**Solution:** Remove the custom override to use chain-aware defaults, or set the correct contract for your network:
 
 ```typescript
-import { StarkSDK, fromAddress } from "x";
+import { StarkSDK } from "x";
 
-const sdk = new StarkSDK({
-  network: "mainnet",
-  staking: {
-    contract: fromAddress(
-      "0x03745ab04a431fc02871a139be6b93d9260b0ff3e779ad9c8b377183b23109f1"
-    ),
-  },
-});
+// Recommended: use built-in chain-aware staking preset
+const sdk = new StarkSDK({ network: "mainnet" });
 ```
 
 ### Transaction Submits but Explorer URL is Missing
