@@ -50,13 +50,27 @@ import {
 
 const sdk = new StarkSDK({ network: "sepolia" });
 
+// Example: user is already logged in with Privy in your app
+const accessToken = await privy.getAccessToken();
+
+// Ask your backend for the Privy Starknet wallet linked to this user
+const walletRes = await fetch("https://your-api.example/wallet/starknet", {
+  method: "POST",
+  headers: {
+    "Content-Type": "application/json",
+    Authorization: `Bearer ${accessToken}`,
+  },
+});
+const { wallet: walletData } = await walletRes.json();
+
 const onboard = await sdk.onboard({
   strategy: OnboardStrategy.Privy,
   accountPreset: accountPresets.argentXV050,
   privy: {
+    // resolve() returns signer context for the current authenticated user
     resolve: async () => ({
-      walletId: "privy-wallet-id",
-      publicKey: "0xPUBLIC_KEY",
+      walletId: walletData.id,
+      publicKey: walletData.publicKey,
       serverUrl: "https://your-api.example/wallet/sign",
     }),
   },
@@ -75,6 +89,12 @@ const tx = await wallet.transfer(token, [
 
 await tx.wait();
 ```
+
+`resolve()` is expected to return:
+
+- `walletId`: the Privy wallet id for the logged-in user
+- `publicKey`: the Starknet public key for that wallet
+- `serverUrl` OR `rawSign`: how signatures are produced
 
 ## Onboarding API
 

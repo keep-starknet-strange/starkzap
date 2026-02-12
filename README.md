@@ -121,25 +121,49 @@ await tx.wait();
 Use `sdk.onboard(...)` to centralize strategy selection, signer setup, and account readiness in one call:
 
 ```typescript
-import { StarkSDK, OnboardStrategy } from "x";
+import { StarkSDK, OnboardStrategy, accountPresets } from "x";
 
 const sdk = new StarkSDK({ network: "sepolia" });
 
+// Example: your app already authenticated the user with Privy
+const accessToken = await privy.getAccessToken();
+
+// Your backend returns (or creates) the user's Privy Starknet wallet
+const walletRes = await fetch("https://your-api.example/wallet/starknet", {
+  method: "POST",
+  headers: {
+    "Content-Type": "application/json",
+    Authorization: `Bearer ${accessToken}`,
+  },
+});
+const { wallet } = await walletRes.json();
+
 const onboard = await sdk.onboard({
   strategy: OnboardStrategy.Privy,
+  accountPreset: accountPresets.argentXV050,
   privy: {
+    // resolve() must return wallet context for the CURRENT authenticated user
     resolve: async () => ({
-      walletId: "privy-wallet-id",
-      publicKey: "0xPUBLIC_KEY",
+      // returned by your backend / Privy wallet API
+      walletId: wallet.id,
+      publicKey: wallet.publicKey,
+
+      // backend endpoint that signs Starknet hashes with this wallet
+      // expects { walletId, hash } and returns { signature }
       serverUrl: "https://your-api.example/wallet/sign",
     }),
   },
-  accountPreset: "argentXV050",
   deploy: "if_needed",
 });
 
 const wallet = onboard.wallet;
 ```
+
+`resolve()` is called at onboarding time and should return:
+
+- `walletId`: Privy wallet identifier for the logged-in user
+- `publicKey`: Stark public key for that wallet
+- `serverUrl` OR `rawSign`: how the SDK should request signatures
 
 ---
 
