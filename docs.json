@@ -34,7 +34,10 @@
       {
         "group": "Getting Started",
         "pages": [
-          "mintlify-docs/build/consumer-app-sdk/overview",
+          {
+            "page": "mintlify-docs/build/consumer-app-sdk/overview",
+            "icon": "book-open"
+          },
           "mintlify-docs/build/consumer-app-sdk/installation",
           "mintlify-docs/build/consumer-app-sdk/quick-start",
           {
@@ -79,9 +82,15 @@
       {
         "group": "Reference",
         "pages": [
-          "mintlify-docs/build/consumer-app-sdk/glossary",
+          {
+            "page": "mintlify-docs/build/consumer-app-sdk/glossary",
+            "icon": "book"
+          },
           "mintlify-docs/build/consumer-app-sdk/troubleshooting",
-          "mintlify-docs/build/consumer-app-sdk/api-reference"
+          {
+            "page": "mintlify-docs/build/consumer-app-sdk/api-reference",
+            "icon": "code-branch"
+          }
         ]
       }
     ]

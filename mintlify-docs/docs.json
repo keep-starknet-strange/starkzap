@@ -34,7 +34,10 @@
       {
         "group": "Getting Started",
         "pages": [
-          "build/consumer-app-sdk/overview",
+          {
+            "page": "build/consumer-app-sdk/overview",
+            "icon": "book-open"
+          },
           "build/consumer-app-sdk/installation",
           "build/consumer-app-sdk/quick-start",
           {
@@ -79,9 +82,15 @@
       {
         "group": "Reference",
         "pages": [
-          "build/consumer-app-sdk/glossary",
+          {
+            "page": "build/consumer-app-sdk/glossary",
+            "icon": "book"
+          },
           "build/consumer-app-sdk/troubleshooting",
-          "build/consumer-app-sdk/api-reference"
+          {
+            "page": "build/consumer-app-sdk/api-reference",
+            "icon": "code-branch"
+          }
         ]
       }
     ]
