@@ -39,6 +39,7 @@
           "build/consumer-app-sdk/quick-start",
           {
             "group": "Configuration",
+            "icon": "cog",
             "pages": [
               "build/consumer-app-sdk/configuration",
               "build/consumer-app-sdk/paymasters"

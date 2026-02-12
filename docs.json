@@ -39,6 +39,7 @@
           "mintlify-docs/build/consumer-app-sdk/quick-start",
           {
             "group": "Configuration",
+            "icon": "cog",
             "pages": [
               "mintlify-docs/build/consumer-app-sdk/configuration",
               "mintlify-docs/build/consumer-app-sdk/paymasters"
