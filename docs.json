@@ -1,0 +1,106 @@
+{
+  "name": "Consumer App SDK Documentation",
+  "colors": {
+    "primary": "#6366F1",
+    "light": "#818CF8",
+    "dark": "#4F46E5",
+    "anchors": {
+      "from": "#6366F1",
+      "to": "#818CF8"
+    }
+  },
+  "topbarLinks": [
+    {
+      "name": "Support",
+      "url": "https://discord.gg/starknet-community"
+    }
+  ],
+  "topbarCtaButton": {
+    "name": "GitHub",
+    "url": "https://github.com/starknet-io/starknet-docs"
+  },
+  "anchors": [
+    {
+      "name": "Documentation",
+      "icon": "book-open-cover",
+      "url": "https://docs.starknet.io"
+    },
+    {
+      "name": "Community",
+      "icon": "slack",
+      "url": "https://discord.gg/starknet-community"
+    }
+  ],
+  "navigation": [
+    {
+      "group": "Build",
+      "pages": [
+        "mintlify-docs/build/consumer-app-sdk/overview",
+        {
+          "group": "Getting Started",
+          "icon": "rocket",
+          "pages": [
+            "mintlify-docs/build/consumer-app-sdk/installation",
+            "mintlify-docs/build/consumer-app-sdk/quick-start",
+            {
+              "group": "Configuration",
+              "icon": "cog",
+              "pages": [
+                "mintlify-docs/build/consumer-app-sdk/configuration",
+                "mintlify-docs/build/consumer-app-sdk/paymasters"
+              ]
+            }
+          ]
+        },
+        {
+          "group": "Using LLMs",
+          "icon": "code",
+          "pages": [
+            "mintlify-docs/build/consumer-app-sdk/using-llms"
+          ]
+        },
+        {
+          "group": "Modules",
+          "icon": "puzzle-piece",
+          "pages": [
+            "mintlify-docs/build/consumer-app-sdk/connecting-wallets",
+            "mintlify-docs/build/consumer-app-sdk/erc20",
+            "mintlify-docs/build/consumer-app-sdk/staking",
+            "mintlify-docs/build/consumer-app-sdk/transactions",
+            "mintlify-docs/build/consumer-app-sdk/tx-builder"
+          ]
+        },
+        {
+          "group": "Integrations",
+          "icon": "plug",
+          "pages": [
+            "mintlify-docs/build/consumer-app-sdk/integrations/avnu-paymaster",
+            "mintlify-docs/build/consumer-app-sdk/integrations/privy",
+            "mintlify-docs/build/consumer-app-sdk/integrations/cartridge-controller"
+          ]
+        },
+        {
+          "group": "Examples",
+          "icon": "flask",
+          "pages": [
+            "mintlify-docs/build/consumer-app-sdk/examples"
+          ]
+        },
+        {
+          "group": "Reference",
+          "icon": "book",
+          "pages": [
+            "mintlify-docs/build/consumer-app-sdk/glossary",
+            "mintlify-docs/build/consumer-app-sdk/troubleshooting",
+            "mintlify-docs/build/consumer-app-sdk/api-reference"
+          ]
+        }
+      ]
+    }
+  ],
+  "footerSocials": {
+    "twitter": "https://twitter.com/StarknetEco",
+    "github": "https://github.com/starknet-io/starknet-docs",
+    "linkedin": "https://www.linkedin.com/company/starkware"
+  }
+}
