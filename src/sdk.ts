@@ -188,6 +188,7 @@ export class StarkSDK {
     const deploy = options.deploy ?? "if_needed";
     const feeMode = options.feeMode;
     const timeBounds = options.timeBounds;
+    const shouldEnsureReady = deploy !== "never";
 
     if (options.strategy === "signer") {
       const wallet = await this.connectWallet({
@@ -202,11 +203,13 @@ export class StarkSDK {
         ...(timeBounds && { timeBounds }),
       });
 
-      await wallet.ensureReady({
-        deploy,
-        ...(feeMode && { feeMode }),
-        ...(options.onProgress && { onProgress: options.onProgress }),
-      });
+      if (shouldEnsureReady) {
+        await wallet.ensureReady({
+          deploy,
+          ...(feeMode && { feeMode }),
+          ...(options.onProgress && { onProgress: options.onProgress }),
+        });
+      }
 
       return {
         wallet,
@@ -236,11 +239,13 @@ export class StarkSDK {
         ...(timeBounds && { timeBounds }),
       });
 
-      await wallet.ensureReady({
-        deploy,
-        ...(feeMode && { feeMode }),
-        ...(options.onProgress && { onProgress: options.onProgress }),
-      });
+      if (shouldEnsureReady) {
+        await wallet.ensureReady({
+          deploy,
+          ...(feeMode && { feeMode }),
+          ...(options.onProgress && { onProgress: options.onProgress }),
+        });
+      }
 
       return {
         wallet,
@@ -257,11 +262,13 @@ export class StarkSDK {
         ...(timeBounds && { timeBounds }),
       });
 
-      await wallet.ensureReady({
-        deploy,
-        ...(feeMode && { feeMode }),
-        ...(options.onProgress && { onProgress: options.onProgress }),
-      });
+      if (shouldEnsureReady) {
+        await wallet.ensureReady({
+          deploy,
+          ...(feeMode && { feeMode }),
+          ...(options.onProgress && { onProgress: options.onProgress }),
+        });
+      }
 
       return {
         wallet,
