@@ -30,13 +30,11 @@
     }
   ],
   "navigation": {
-    "pages": [
-      "mintlify-docs/build/consumer-app-sdk/overview"
-    ],
     "groups": [
       {
         "group": "Getting Started",
         "pages": [
+          "mintlify-docs/build/consumer-app-sdk/overview",
           "mintlify-docs/build/consumer-app-sdk/installation",
           "mintlify-docs/build/consumer-app-sdk/quick-start",
           {

@@ -30,13 +30,11 @@
     }
   ],
   "navigation": {
-    "pages": [
-      "build/consumer-app-sdk/overview"
-    ],
     "groups": [
       {
         "group": "Getting Started",
         "pages": [
+          "build/consumer-app-sdk/overview",
           "build/consumer-app-sdk/installation",
           "build/consumer-app-sdk/quick-start",
           {
