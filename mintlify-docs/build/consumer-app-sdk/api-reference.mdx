@@ -1,6 +1,6 @@
 ---
 title: API Reference
-description: Complete API documentation for the Consumer App SDK
+description: Complete API documentation for the Starkzap
 icon: code-branch
 ---
 
@@ -307,7 +307,7 @@ interface PreflightResult {
 ### Token Presets
 
 ```typescript
-import { mainnetTokens, sepoliaTokens } from "x";
+import { mainnetTokens, sepoliaTokens } from "starkzap";
 
 // Access tokens
 const STRK = mainnetTokens.STRK;
@@ -317,7 +317,7 @@ const USDC = mainnetTokens.USDC;
 ### Validator Presets
 
 ```typescript
-import { mainnetValidators, sepoliaValidators } from "x";
+import { mainnetValidators, sepoliaValidators } from "starkzap";
 
 // Access validators
 for (const validator of Object.values(mainnetValidators)) {
@@ -334,7 +334,7 @@ import {
   ArgentXV050Preset,
   BraavosPreset,
   DevnetPreset,
-} from "x";
+} from "starkzap";
 ```
 
 ## Utility Functions

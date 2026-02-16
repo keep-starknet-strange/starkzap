@@ -1,6 +1,6 @@
-# Consumer App SDK Mintlify Documentation
+# Starkzap Mintlify Documentation
 
-This directory contains the Mintlify documentation structure for the Consumer App SDK that should be integrated into the [starknet-docs](https://github.com/starknet-io/starknet-docs) repository.
+This directory contains the Mintlify documentation structure for the Starkzap that should be integrated into the [starknet-docs](https://github.com/starknet-io/starknet-docs) repository.
 
 ## Structure
 

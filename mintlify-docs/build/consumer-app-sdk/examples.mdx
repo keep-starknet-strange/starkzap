@@ -1,12 +1,12 @@
 ---
 title: Examples
-description: "Complete example applications demonstrating the Consumer App SDK in action"
+description: "Complete example applications demonstrating Starkzap in action"
 icon: flask
 ---
 
 ## Overview
 
-The Consumer App SDK repository includes three complete example applications that demonstrate different integration patterns and use cases:
+The Starkzap repository includes three complete example applications that demonstrate different integration patterns and use cases:
 
 1. **Web Example** - Vanilla TypeScript + Vite app with multiple wallet connection methods
 2. **Mobile Example** - React Native + Expo app with full-featured UI
@@ -161,7 +161,7 @@ All examples are located in the `examples/` directory of the SDK repository.
 
     ```typescript
     import { PrivyProvider } from "@privy-io/expo";
-    import { StarkSDK, OnboardStrategy } from "x";
+    import { StarkSDK, OnboardStrategy } from "starkzap";
 
     const accessToken = await privyClient.getAccessToken();
     const walletRes = await fetch("https://your-api.example/api/wallet/starknet", {

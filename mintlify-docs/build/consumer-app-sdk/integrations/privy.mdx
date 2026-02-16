@@ -55,7 +55,7 @@ console.log("Wallet Address:", wallet.address);
 console.log("Public Key:", wallet.public_key);
 ```
 
-## Integration with Consumer App SDK
+## Integration with Starkzap
 
 ### Server-Side Signing Endpoint
 
@@ -85,10 +85,10 @@ app.post("/api/wallet/sign", async (req, res) => {
 
 ### Client-Side Integration
 
-Use Privy with the Consumer App SDK:
+Use Privy with the Starkzap:
 
 ```typescript
-import { StarkSDK, PrivySigner, OnboardStrategy, accountPresets } from "x";
+import { StarkSDK, PrivySigner, OnboardStrategy, accountPresets } from "starkzap";
 
 const sdk = new StarkSDK({ network: "sepolia" });
 const accessToken = await privy.getAccessToken();
@@ -203,7 +203,7 @@ app.listen(3001);
 ### Frontend
 
 ```typescript
-import { StarkSDK, OnboardStrategy, accountPresets } from "x";
+import { StarkSDK, OnboardStrategy, accountPresets } from "starkzap";
 
 const sdk = new StarkSDK({ network: "sepolia" });
 const accessToken = await privy.getAccessToken();
@@ -246,7 +246,7 @@ For React Native applications, use `@privy-io/expo`:
 
 ```typescript
 import { PrivyProvider } from "@privy-io/expo";
-import { StarkSDK, OnboardStrategy } from "x";
+import { StarkSDK, OnboardStrategy } from "starkzap";
 
 // Wrap your app with PrivyProvider
 <PrivyProvider appId={PRIVY_APP_ID}>

@@ -1,6 +1,6 @@
 ---
 title: Troubleshooting
-description: Common issues and solutions when using the Consumer App SDK
+description: Common issues and solutions when using the Starkzap
 icon: wrench
 ---
 
@@ -13,7 +13,7 @@ icon: wrench
 **Solution:** Remove the custom override to use chain-aware defaults, or set the correct contract for your network:
 
 ```typescript
-import { StarkSDK } from "x";
+import { StarkSDK } from "starkzap";
 
 // Recommended: use built-in chain-aware staking preset
 const sdk = new StarkSDK({ network: "mainnet" });
@@ -146,7 +146,7 @@ try {
 **Solution:** Ensure you're using the correct types:
 
 ```typescript
-import { Address, Amount, ChainId } from "x";
+import { Address, Amount, ChainId } from "starkzap";
 
 // Use fromAddress for addresses
 const addr: Address = fromAddress("0x...");

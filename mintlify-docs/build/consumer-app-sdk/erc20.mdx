@@ -6,7 +6,7 @@ icon: credit-card
 
 ## Overview
 
-The Consumer App SDK provides comprehensive support for ERC20 token operations, including balance queries, transfers, and type-safe amount handling. This module allows you to work with:
+The Starkzap provides comprehensive support for ERC20 token operations, including balance queries, transfers, and type-safe amount handling. This module allows you to work with:
 
 - **Bitcoin wrappers on Starknet** - wBTC, lBTC, tBTC (wrapped Bitcoin tokens that represent Bitcoin on Starknet)
 - **Stablecoins** - USDC, USDT, and other stablecoins
@@ -19,7 +19,7 @@ This guide covers all token-related functionality for these different token type
 The SDK ships with pre-configured token definitions for mainnet and Sepolia:
 
 ```typescript
-import { mainnetTokens, sepoliaTokens } from "x";
+import { mainnetTokens, sepoliaTokens } from "starkzap";
 
 // Access specific tokens
 const STRK = mainnetTokens.STRK;
@@ -42,7 +42,7 @@ interface Token {
 ### Getting Tokens for Current Network
 
 ```typescript
-import { getPresets } from "x";
+import { getPresets } from "starkzap";
 
 const tokens = getPresets(wallet.getChainId()); // Record<string, Token>
 ```
@@ -52,7 +52,7 @@ const tokens = getPresets(wallet.getChainId()); // Record<string, Token>
 Resolve tokens from on-chain contract addresses:
 
 ```typescript
-import { getTokensFromAddresses } from "x";
+import { getTokensFromAddresses } from "starkzap";
 
 const tokens = await getTokensFromAddresses(
   [fromAddress("0xTOKEN_CONTRACT")],
@@ -113,7 +113,7 @@ The `Amount` class provides precision-safe handling of token amounts, preventing
 ### Creating Amounts
 
 ```typescript
-import { Amount } from "x";
+import { Amount } from "starkzap";
 
 // From human-readable values (what users type)
 const amount = Amount.parse("1.5", STRK); // 1.5 STRK

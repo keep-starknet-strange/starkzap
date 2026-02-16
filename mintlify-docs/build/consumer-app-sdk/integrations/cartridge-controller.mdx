@@ -13,7 +13,7 @@ description: "Controller API for Cartridge access and ownership logic on Starkne
 - **Delegated Transactions**: Users can approve transactions without managing keys directly
 - **Built-in Paymaster**: **Automatic gasless transactions** - Cartridge sponsors (pays for) all transaction fees automatically
 
-The Consumer App SDK integrates seamlessly with Cartridge Controller, making it perfect for gaming applications where you want seamless, gasless transactions.
+The Starkzap integrates seamlessly with Cartridge Controller, making it perfect for gaming applications where you want seamless, gasless transactions.
 
 ## Why Use Cartridge?
 
@@ -33,7 +33,7 @@ The Consumer App SDK integrates seamlessly with Cartridge Controller, making it 
 
 ### 1. Install Cartridge Controller
 
-The Cartridge Controller is included as a peer dependency of the Consumer App SDK:
+The Cartridge Controller is included as a peer dependency of the Starkzap:
 
 ```bash
 npm install @cartridge/controller
@@ -42,7 +42,7 @@ npm install @cartridge/controller
 ### 2. Initialize SDK
 
 ```typescript
-import { StarkSDK, OnboardStrategy } from "x";
+import { StarkSDK, OnboardStrategy } from "starkzap";
 
 const sdk = new StarkSDK({ network: "mainnet" });
 ```
@@ -146,7 +146,7 @@ const isAuthenticated = controller.isAuthenticated();
 ## Complete Example
 
 ```typescript
-import { StarkSDK, OnboardStrategy, Amount, fromAddress, mainnetTokens } from "x";
+import { StarkSDK, OnboardStrategy, Amount, fromAddress, mainnetTokens } from "starkzap";
 
 const sdk = new StarkSDK({ network: "mainnet" });
 

@@ -6,7 +6,7 @@ icon: gift
 
 ## Overview
 
-Paymasters allow you to sponsor (pay for) transaction fees so users don't have to worry about gas costs. The Consumer App SDK supports two paymaster options depending on your wallet connection strategy.
+Paymasters allow you to sponsor (pay for) transaction fees so users don't have to worry about gas costs. The Starkzap supports two paymaster options depending on your wallet connection strategy.
 
 <Tabs>
   <Tab title="AVNU Paymaster">
@@ -35,7 +35,7 @@ Paymasters allow you to sponsor (pay for) transaction fees so users don't have t
         ### 2. Configure the SDK
 
         ```typescript
-        import { StarkSDK } from "x";
+        import { StarkSDK } from "starkzap";
 
         const sdk = new StarkSDK({
           network: "mainnet",
@@ -108,7 +108,7 @@ Paymasters allow you to sponsor (pay for) transaction fees so users don't have t
         ### 1. Configure the SDK
 
         ```typescript
-        import { StarkSDK } from "x";
+        import { StarkSDK } from "starkzap";
 
         const sdk = new StarkSDK({
           network: "mainnet",
@@ -216,7 +216,7 @@ Paymasters allow you to sponsor (pay for) transaction fees so users don't have t
     Simply connect with Cartridge Controller and define policies. All transactions matching those policies are automatically sponsored:
 
     ```typescript
-    import { StarkSDK, OnboardStrategy } from "x";
+    import { StarkSDK, OnboardStrategy } from "starkzap";
 
     const sdk = new StarkSDK({ network: "mainnet" });
 
