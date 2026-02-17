@@ -1,5 +1,6 @@
 import {
   RpcProvider,
+  RpcError,
   TransactionFinalityStatus,
   type Call,
   type PaymasterTimeBounds,
@@ -29,9 +30,31 @@ export async function checkDeployed(
   try {
     const classHash = await provider.getClassHashAt(address);
     return !!classHash;
-  } catch {
-    return false;
+  } catch (error) {
+    // Undeployed accounts are expected to throw "contract not found".
+    // Other RPC failures should propagate so callers can distinguish
+    // connectivity/runtime issues from undeployed state.
+    if (isContractNotFound(error)) {
+      return false;
+    }
+    throw error;
   }
+}
+
+function isContractNotFound(error: unknown): boolean {
+  if (error instanceof RpcError) {
+    return error.isType("CONTRACT_NOT_FOUND");
+  }
+
+  if (error instanceof Error) {
+    const message = error.message.toLowerCase();
+    return (
+      message.includes("contract not found") ||
+      message.includes("contract_not_found")
+    );
+  }
+
+  return false;
 }
 
 /**

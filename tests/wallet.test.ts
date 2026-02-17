@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll } from "vitest";
+import { describe, it, expect, beforeAll, vi } from "vitest";
 import { StarkSDK } from "@/sdk";
 import { StarkSigner } from "@/signer";
 import { OpenZeppelinPreset, ArgentPreset, BraavosPreset } from "@/account";
@@ -127,6 +127,9 @@ describe("Wallet", () => {
       const wallet = await sdk.connectWallet({
         account: { signer },
       });
+      vi.spyOn(wallet.getProvider(), "getClassHashAt").mockRejectedValue(
+        new Error("Contract not found")
+      );
 
       const deployed = await wallet.isDeployed();
       expect(deployed).toBe(false);
@@ -140,6 +143,7 @@ describe("Wallet", () => {
       const wallet = await sdk.connectWallet({
         account: { signer },
       });
+      vi.spyOn(wallet, "isDeployed").mockResolvedValue(false);
 
       const result = await wallet.preflight({
         calls: [
