@@ -28,7 +28,7 @@ import type {
  * Interface for a connected Starknet wallet.
  *
  * This interface defines the contract that all wallet implementations must follow,
- * allowing for different wallet providers (custom signers, Cartridge, etc.)
+ * allowing for different wallet providers (custom signers, Privy, etc.)
  * to be used interchangeably.
  *
  * @example
@@ -38,12 +38,7 @@ import type {
  *   account: { signer: new StarkSigner(privateKey) }
  * });
  *
- * // Using with Cartridge
- * const wallet = await sdk.connectCartridge({
- *   policies: [{ target: "0x...", method: "transfer" }]
- * });
- *
- * // Both implement WalletInterface
+ * // All wallet implementations share WalletInterface
  * await wallet.execute([...]);
  * ```
  */
@@ -144,11 +139,6 @@ export interface WalletInterface {
   // ============================================================
 
   /**
-   * Get all ERC20 instances that have been accessed by this wallet.
-   */
-  readonly activeErc20: Erc20[];
-
-  /**
    * Gets or creates an Erc20 instance for the given token.
    */
   erc20(token: Token): Erc20;
@@ -170,11 +160,6 @@ export interface WalletInterface {
   // ============================================================
   // Staking methods
   // ============================================================
-
-  /**
-   * Get all Staking instances that have been accessed by this wallet.
-   */
-  readonly activeStaking: Staking[];
 
   /**
    * Get or create a Staking instance for a specific pool.

@@ -63,11 +63,7 @@ export class AccountProvider {
 
     const publicKey = await this.getPublicKey();
     const calldata = this.getConstructorCalldata(publicKey);
-
-    // Use custom salt computation if provided, otherwise use public key directly
-    const salt = this.accountClass.getSalt
-      ? this.accountClass.getSalt(publicKey)
-      : publicKey;
+    const salt = this.getSalt(publicKey);
 
     const addressStr = hash.calculateContractAddressFromHash(
       salt,

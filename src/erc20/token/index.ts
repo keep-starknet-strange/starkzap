@@ -99,12 +99,12 @@ export async function getTokensFromAddresses(
           }
         }
 
-        if (name && symbol && decimals) {
+        if (name !== null && symbol !== null && decimals !== null) {
           tokens.push({
-            name: name,
+            name,
             address: unknownTokenAddress,
-            decimals: decimals,
-            symbol: symbol,
+            decimals,
+            symbol,
           });
         } else {
           console.warn("Could not determine token", unknownTokenAddress);

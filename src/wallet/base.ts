@@ -30,7 +30,7 @@ import { Staking } from "@/staking";
  * Abstract base class for wallet implementations.
  *
  * Provides shared functionality, ERC20 token operations, and staking operations
- * for all wallet types. Child classes (e.g., `Wallet`, `CartridgeWallet`) must
+ * for all wallet types. Child classes (e.g., `Wallet`) must
  * implement the abstract methods to provide wallet-specific behavior.
  *
  * @remarks
@@ -81,30 +81,6 @@ export abstract class BaseWallet implements WalletInterface {
   ) {
     this.address = address;
     this.stakingConfig = stakingConfig;
-  }
-
-  /**
-   * Get all ERC20 instances that have been accessed by this wallet.
-   *
-   * Returns cached Erc20 instances for tokens that have been interacted with
-   * via `erc20()`, `transfer()`, or `balanceOf()` methods.
-   *
-   * @returns Array of active Erc20 instances
-   */
-  get activeErc20(): Erc20[] {
-    return Array.from(this.erc20s.values());
-  }
-
-  /**
-   * Get all Staking instances that have been accessed by this wallet.
-   *
-   * Returns cached Staking instances for pools that have been interacted with
-   * via `staking()`, `stakingInStaker()`, or any pool operation methods.
-   *
-   * @returns Array of active Staking instances
-   */
-  get activeStaking(): Staking[] {
-    return Array.from(this.stakingMap.values());
   }
 
   // ============================================================
@@ -226,6 +202,9 @@ export abstract class BaseWallet implements WalletInterface {
     transfers: { to: Address; amount: Amount }[],
     options?: ExecuteOptions
   ): Promise<Tx> {
+    if (!transfers.length) {
+      throw new Error("At least one transfer is required");
+    }
     const erc20 = this.erc20(token);
     return await erc20.transfer(this, transfers, options);
   }
