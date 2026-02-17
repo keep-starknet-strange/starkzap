@@ -52,7 +52,6 @@ export default defineConfig({
         "src/types/**",
         "src/erc20/token/index.ts",
         "src/staking/**",
-        "src/onramp/**",
         "src/signer/index.ts",
         "src/signer/interface.ts",
         "src/account/index.ts",
