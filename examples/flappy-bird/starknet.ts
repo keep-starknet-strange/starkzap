@@ -9,10 +9,9 @@ import {
   OnboardStrategy,
   ChainId,
   networks,
-  Contract,
   type WalletInterface,
-  type RpcProvider,
 } from "x";
+import { Contract, type RpcProvider } from "starknet";
 
 // FOS demo game contract on Sepolia (same as https://github.com/0xsisyfos/fos)
 // Use lowercase so it matches Cartridge session policy key and RPC address comparison
