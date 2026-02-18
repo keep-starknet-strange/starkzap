@@ -94,7 +94,6 @@ Supported strategies:
 - `OnboardStrategy.Privy`
 - `OnboardStrategy.Signer`
 - `OnboardStrategy.Cartridge`
-- `OnboardStrategy.WebAuthn` (reserved; not implemented yet)
 
 ### Signer strategy
 
@@ -182,6 +181,8 @@ const wallet = await sdk.connectWallet({
 ```
 
 ### 3) Cartridge controller
+
+`connectCartridge()` is web-only.
 
 ```ts
 const wallet = await sdk.connectCartridge({

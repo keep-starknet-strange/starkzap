@@ -380,6 +380,7 @@ export const useWalletStore = create<WalletState>((set, get) => ({
             walletId,
             publicKey,
             serverUrl: `${PRIVY_SERVER_URL}/api/wallet/sign`,
+            headers: { Authorization: `Bearer ${accessToken}` },
           }),
         },
       });

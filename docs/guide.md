@@ -101,6 +101,7 @@ await tx.wait();
 - `walletId`: the Privy wallet id for the logged-in user
 - `publicKey`: the Starknet public key for that wallet
 - `serverUrl` OR `rawSign`: how signatures are produced
+- optional `headers` and `buildBody` for auth/challenge-capable signing endpoints
 
 ## Onboarding API
 
@@ -116,7 +117,6 @@ Supported strategies:
 - `OnboardStrategy.Privy`
 - `OnboardStrategy.Signer`
 - `OnboardStrategy.Cartridge`
-- `OnboardStrategy.WebAuthn` (reserved; not implemented yet)
 
 ### Signer strategy
 
@@ -204,6 +204,8 @@ const wallet = await sdk.connectWallet({
 ```
 
 ### 3) Cartridge controller
+
+`connectCartridge()` is web-only.
 
 ```ts
 const wallet = await sdk.connectCartridge({
