@@ -1,5 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { CartridgeWallet } from "@/wallet/cartridge";
+import { ChainId } from "@/types";
+import Controller, { toSessionPolicies } from "@cartridge/controller";
 
 // Mock the @cartridge/controller module
 vi.mock("@cartridge/controller", () => {
@@ -33,6 +35,12 @@ vi.mock("@cartridge/controller", () => {
   };
 
   class MockController {
+    static options: unknown[] = [];
+
+    constructor(options?: unknown) {
+      MockController.options.push(options);
+    }
+
     probe = vi.fn().mockResolvedValue(null);
     connect = vi.fn().mockResolvedValue(mockWalletAccount);
     disconnect = vi.fn().mockResolvedValue(undefined);
@@ -49,7 +57,10 @@ vi.mock("@cartridge/controller", () => {
     };
   }
 
-  return { default: MockController };
+  return {
+    default: MockController,
+    toSessionPolicies: vi.fn((policies) => policies),
+  };
 });
 
 // Mock starknet RpcProvider
@@ -70,6 +81,7 @@ vi.mock("starknet", async (importOriginal) => {
 describe("CartridgeWallet", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    (Controller as unknown as { options: unknown[] }).options = [];
   });
 
   describe("create", () => {
@@ -82,14 +94,35 @@ describe("CartridgeWallet", () => {
       expect(wallet.address).toBe(
         "0x0000000000000000000000000000000000000000000000001234567890abcdef"
       );
+
+      const options = (
+        Controller as unknown as { options: Array<Record<string, unknown>> }
+      ).options[0];
+      expect(options.chains).toEqual([
+        { rpcUrl: "https://api.cartridge.gg/x/starknet/sepolia" },
+      ]);
+    });
+
+    it("should forward chainId as defaultChainId", async () => {
+      await CartridgeWallet.create({
+        rpcUrl: "https://api.cartridge.gg/x/starknet/sepolia",
+        chainId: ChainId.SEPOLIA,
+      });
+
+      const options = (
+        Controller as unknown as { options: Array<Record<string, unknown>> }
+      ).options[0];
+      expect(options.defaultChainId).toBe(ChainId.SEPOLIA.toFelt252());
     });
 
     it("should accept policies option", async () => {
+      const policies = [{ target: "0xCONTRACT", method: "transfer" }];
       const wallet = await CartridgeWallet.create({
-        policies: [{ target: "0xCONTRACT", method: "transfer" }],
+        policies,
       });
 
       expect(wallet.address).toBeDefined();
+      expect(toSessionPolicies).toHaveBeenCalledWith(policies);
     });
 
     it("should work with no options", async () => {

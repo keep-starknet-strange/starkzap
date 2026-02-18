@@ -1,4 +1,4 @@
-import Controller from "@cartridge/controller";
+import Controller, { toSessionPolicies } from "@cartridge/controller";
 import {
   RpcProvider,
   type Account,
@@ -104,29 +104,15 @@ export class CartridgeWallet extends BaseWallet {
       controllerOptions.defaultChainId = options.chainId.toFelt252();
     }
 
-    if (options.rpcUrl && !options.rpcUrl.includes("api.cartridge.gg")) {
+    if (options.rpcUrl) {
       controllerOptions.chains = [{ rpcUrl: options.rpcUrl }];
     }
 
     if (options.policies && options.policies.length > 0) {
-      // Group by contract address so all methods for the same contract are in one entry.
-      // Using .map() then Object.fromEntries() with the same target would overwrite (only last method kept).
-      const byTarget = new Map<string, Array<{ name: string; entrypoint: string }>>();
-      for (const p of options.policies) {
-        const target = p.target.toLowerCase().startsWith("0x")
-          ? p.target.toLowerCase()
-          : `0x${p.target.toLowerCase()}`;
-        if (!byTarget.has(target)) byTarget.set(target, []);
-        byTarget.get(target)!.push({ name: p.method, entrypoint: p.method });
-      }
-      controllerOptions.policies = {
-        contracts: Object.fromEntries(
-          Array.from(byTarget.entries(), ([target, methods]) => [
-            target,
-            { methods },
-          ])
-        ),
-      };
+      // Normalize through Cartridge's own helper to avoid malformed policy payloads.
+      controllerOptions.policies = toSessionPolicies(
+        options.policies as Parameters<typeof toSessionPolicies>[0]
+      );
     }
 
     if (options.preset) {
