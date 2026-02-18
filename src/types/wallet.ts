@@ -172,6 +172,13 @@ export interface ExecuteOptions {
 export interface PreflightOptions {
   /** The calls to simulate */
   calls: Call[];
+  /**
+   * Fee mode used for preflight assumptions.
+   *
+   * When `"sponsored"` and the account is undeployed, preflight returns `{ ok: true }`
+   * because the paymaster path can deploy + execute atomically.
+   */
+  feeMode?: FeeMode;
 }
 
 /** Preflight succeeded — operation can proceed */

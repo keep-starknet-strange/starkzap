@@ -221,19 +221,19 @@ export class Wallet extends BaseWallet {
 
     if (feeMode === "sponsored") {
       const tx = await this.deployPaymasterWith([], timeBounds);
-      this.deployedCache = true;
       return tx;
     }
 
     const classHash = this.accountProvider.getClassHash();
     const publicKey = await this.accountProvider.getPublicKey();
+    const addressSalt = this.accountProvider.getSalt(publicKey);
     const constructorCalldata =
       this.accountProvider.getConstructorCalldata(publicKey);
 
     const estimateFee = await this.account.estimateAccountDeployFee({
       classHash,
       constructorCalldata,
-      addressSalt: publicKey,
+      addressSalt,
     });
 
     const multiply2x = (value: {
@@ -255,11 +255,10 @@ export class Wallet extends BaseWallet {
     };
 
     const { transaction_hash } = await this.account.deployAccount(
-      { classHash, constructorCalldata, addressSalt: publicKey },
+      { classHash, constructorCalldata, addressSalt },
       { resourceBounds }
     );
 
-    this.deployedCache = true;
     return new Tx(
       transaction_hash,
       this.provider,
@@ -285,7 +284,6 @@ export class Wallet extends BaseWallet {
       calls,
       sponsoredDetails(timeBounds ?? this.defaultTimeBounds, deploymentData)
     );
-    this.deployedCache = true;
     return new Tx(
       transaction_hash,
       this.provider,
@@ -400,7 +398,6 @@ export class Wallet extends BaseWallet {
       transactionHash = result.transaction_hash;
     }
 
-    this.deployedCache = true;
     return new Tx(
       transactionHash,
       this.provider,
@@ -443,7 +440,11 @@ export class Wallet extends BaseWallet {
   }
 
   async preflight(options: PreflightOptions): Promise<PreflightResult> {
-    return preflightTransaction(this, this.account, options);
+    const feeMode = options.feeMode ?? this.defaultFeeMode;
+    return preflightTransaction(this, this.account, {
+      ...options,
+      feeMode,
+    });
   }
 
   getAccount(): Account {

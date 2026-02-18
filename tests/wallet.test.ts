@@ -2,6 +2,7 @@ import { describe, it, expect, beforeAll, vi } from "vitest";
 import { StarkSDK } from "@/sdk";
 import { StarkSigner } from "@/signer";
 import { OpenZeppelinPreset, ArgentPreset, BraavosPreset } from "@/account";
+import { ChainId } from "@/types";
 import { getTestConfig, testPrivateKeys } from "./config.js";
 
 describe("Wallet", () => {
@@ -10,6 +11,9 @@ describe("Wallet", () => {
 
   beforeAll(() => {
     sdk = new StarkSDK(config);
+    vi.spyOn(sdk.getProvider(), "getChainId").mockResolvedValue(
+      config.chainId!.toFelt252()
+    );
     console.log(`Running tests on ${network}`);
   });
 
@@ -136,6 +140,77 @@ describe("Wallet", () => {
     });
   });
 
+  describe("deploy", () => {
+    it("should use account salt from accountClass when deploying", async () => {
+      const signer = new StarkSigner(testPrivateKeys.key1);
+      const customSalt = "0x12345";
+      const wallet = await sdk.connectWallet({
+        account: {
+          signer,
+          accountClass: {
+            classHash:
+              "0x061dac032f228abef9c6626f995015233097ae253a7f72d68552db02f2971b8f",
+            buildConstructorCalldata: (pk) => [pk],
+            getSalt: () => customSalt,
+          },
+        },
+      });
+
+      const account = wallet.getAccount();
+      const estimateSpy = vi.spyOn(account, "estimateAccountDeployFee");
+      estimateSpy.mockResolvedValue({
+        resourceBounds: {
+          l1_gas: { max_amount: 1n, max_price_per_unit: 1n },
+          l2_gas: { max_amount: 1n, max_price_per_unit: 1n },
+          l1_data_gas: { max_amount: 1n, max_price_per_unit: 1n },
+        },
+      } as Awaited<ReturnType<typeof account.estimateAccountDeployFee>>);
+
+      const deploySpy = vi.spyOn(account, "deployAccount");
+      deploySpy.mockResolvedValue({
+        transaction_hash: "0x123",
+      } as Awaited<ReturnType<typeof account.deployAccount>>);
+
+      await wallet.deploy({ feeMode: "user_pays" });
+
+      expect(estimateSpy).toHaveBeenCalledWith(
+        expect.objectContaining({ addressSalt: customSalt })
+      );
+      expect(deploySpy).toHaveBeenCalledWith(
+        expect.objectContaining({ addressSalt: customSalt }),
+        expect.any(Object)
+      );
+    });
+
+    it("should not mark deployed cache true before deployment finality", async () => {
+      const signer = new StarkSigner(testPrivateKeys.key1);
+      const wallet = await sdk.connectWallet({
+        account: { signer },
+      });
+
+      const account = wallet.getAccount();
+      vi.spyOn(account, "estimateAccountDeployFee").mockResolvedValue({
+        resourceBounds: {
+          l1_gas: { max_amount: 1n, max_price_per_unit: 1n },
+          l2_gas: { max_amount: 1n, max_price_per_unit: 1n },
+          l1_data_gas: { max_amount: 1n, max_price_per_unit: 1n },
+        },
+      } as Awaited<ReturnType<typeof account.estimateAccountDeployFee>>);
+      vi.spyOn(account, "deployAccount").mockResolvedValue({
+        transaction_hash: "0x456",
+      } as Awaited<ReturnType<typeof account.deployAccount>>);
+
+      vi.spyOn(wallet.getProvider(), "getClassHashAt").mockRejectedValue(
+        new Error("Contract not found")
+      );
+
+      await wallet.deploy({ feeMode: "user_pays" });
+      const deployed = await wallet.isDeployed();
+
+      expect(deployed).toBe(false);
+    });
+  });
+
   describe("preflight", () => {
     it("should fail preflight for undeployed account", async () => {
       const signer = new StarkSigner(testPrivateKeys.random());
@@ -159,6 +234,59 @@ describe("Wallet", () => {
       if (!result.ok) {
         expect(result.reason).toContain("not deployed");
       }
+    });
+
+    it("should return ok for sponsored mode with default paymaster", async () => {
+      const signer = new StarkSigner(testPrivateKeys.random());
+      const wallet = await sdk.connectWallet({
+        account: { signer },
+        feeMode: "sponsored",
+      });
+      vi.spyOn(wallet, "isDeployed").mockResolvedValue(false);
+      const simulateSpy = vi.spyOn(wallet.getAccount(), "simulateTransaction");
+
+      const result = await wallet.preflight({
+        calls: [
+          {
+            contractAddress: "0x123",
+            entrypoint: "transfer",
+            calldata: [],
+          },
+        ],
+      });
+
+      expect(result.ok).toBe(true);
+      expect(simulateSpy).not.toHaveBeenCalled();
+    });
+
+    it("should return ok for sponsored mode when paymaster is configured", async () => {
+      const paymasterSdk = new StarkSDK({
+        ...config,
+        paymaster: { nodeUrl: "https://paymaster.example.com" },
+      });
+      vi.spyOn(paymasterSdk.getProvider(), "getChainId").mockResolvedValue(
+        config.chainId!.toFelt252()
+      );
+      const signer = new StarkSigner(testPrivateKeys.random());
+      const wallet = await paymasterSdk.connectWallet({
+        account: { signer },
+        feeMode: "sponsored",
+      });
+      vi.spyOn(wallet, "isDeployed").mockResolvedValue(false);
+      const simulateSpy = vi.spyOn(wallet.getAccount(), "simulateTransaction");
+
+      const result = await wallet.preflight({
+        calls: [
+          {
+            contractAddress: "0x123",
+            entrypoint: "transfer",
+            calldata: [],
+          },
+        ],
+      });
+
+      expect(result.ok).toBe(true);
+      expect(simulateSpy).not.toHaveBeenCalled();
     });
   });
 
@@ -195,6 +323,24 @@ describe("Wallet", () => {
       expect(wallet.getProvider().callContract).toHaveBeenCalledWith(call);
     });
   });
+
+  describe("chain validation", () => {
+    it("should reject connectWallet when provider chain mismatches config", async () => {
+      const sdk = new StarkSDK(config);
+      const mismatchChain = config.chainId?.isMainnet()
+        ? ChainId.SEPOLIA
+        : ChainId.MAINNET;
+      vi.spyOn(sdk.getProvider(), "getChainId").mockResolvedValue(
+        mismatchChain.toFelt252()
+      );
+
+      await expect(
+        sdk.connectWallet({
+          account: { signer: new StarkSigner(testPrivateKeys.key1) },
+        })
+      ).rejects.toThrow("RPC chain mismatch");
+    });
+  });
 });
 
 describe("StarkSDK", () => {
@@ -224,6 +370,25 @@ describe("StarkSDK", () => {
       const result = await sdk.callContract(call);
       expect(result).toEqual(["0x2a"]);
       expect(sdk.getProvider().callContract).toHaveBeenCalledWith(call);
+    });
+  });
+
+  describe("connectCartridge", () => {
+    it("should reject in react-native-like runtime", async () => {
+      const sdk = new StarkSDK(config);
+      vi.spyOn(sdk.getProvider(), "getChainId").mockResolvedValue(
+        config.chainId!.toFelt252()
+      );
+      try {
+        vi.stubGlobal("window", {});
+        vi.stubGlobal("navigator", { product: "ReactNative" });
+
+        await expect(sdk.connectCartridge()).rejects.toThrow(
+          "Cartridge is only supported in web environments"
+        );
+      } finally {
+        vi.unstubAllGlobals();
+      }
     });
   });
 });

@@ -4,9 +4,9 @@ import {
   type Account,
   type Call,
   type PaymasterTimeBounds,
+  type EstimateFeeResponseOverhead,
   type TypedData,
   type Signature,
-  type WalletAccount,
 } from "starknet";
 import { Tx } from "@/tx";
 import {
@@ -67,7 +67,7 @@ export interface CartridgeWalletOptions {
  */
 export class CartridgeWallet extends BaseWallet {
   private readonly controller: Controller;
-  private readonly walletAccount: WalletAccount;
+  private readonly walletAccount: CartridgeWalletAccount;
   private readonly provider: RpcProvider;
   private readonly chainId: ChainId;
   private readonly explorerConfig: ExplorerConfig | undefined;
@@ -76,7 +76,7 @@ export class CartridgeWallet extends BaseWallet {
 
   private constructor(
     controller: Controller,
-    walletAccount: WalletAccount,
+    walletAccount: CartridgeWalletAccount,
     provider: RpcProvider,
     stakingConfig: StakingConfig | undefined,
     options: CartridgeWalletOptions = {}
@@ -142,7 +142,7 @@ export class CartridgeWallet extends BaseWallet {
 
     const walletAccount = await controller.connect();
 
-    if (!walletAccount) {
+    if (!isCartridgeWalletAccount(walletAccount)) {
       throw new Error(
         "Cartridge connection failed. Make sure popups are allowed and try again."
       );
@@ -154,7 +154,6 @@ export class CartridgeWallet extends BaseWallet {
 
     return new CartridgeWallet(
       controller,
-      // @ts-expect-error This is a preexisting issue with the starknet.js version mismatch and cartridge's starknet.js version.
       walletAccount,
       provider,
       stakingConfig,
@@ -172,9 +171,10 @@ export class CartridgeWallet extends BaseWallet {
 
   async deploy(_options: DeployOptions = {}): Promise<Tx> {
     // Cartridge Controller handles deployment internally
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const result = await (this.controller as any).keychain?.deploy();
-    if (!result || result.code !== "SUCCESS") {
+    const result = await (
+      this.controller as unknown as ControllerWithKeychain
+    ).keychain?.deploy?.();
+    if (!result || result.code !== "SUCCESS" || !result.transaction_hash) {
       throw new Error(result?.message ?? "Cartridge deployment failed");
     }
     return new Tx(
@@ -210,7 +210,11 @@ export class CartridgeWallet extends BaseWallet {
   }
 
   async preflight(options: PreflightOptions): Promise<PreflightResult> {
-    return preflightTransaction(this, this.walletAccount, options);
+    const feeMode = options.feeMode ?? this.defaultFeeMode;
+    return preflightTransaction(this, this.walletAccount, {
+      ...options,
+      feeMode,
+    });
   }
 
   getAccount(): Account {
@@ -255,4 +259,50 @@ export class CartridgeWallet extends BaseWallet {
   async username(): Promise<string | undefined> {
     return this.controller.username();
   }
+}
+
+interface CartridgeWalletAccount {
+  address: string;
+  execute: (calls: Call[]) => Promise<{
+    transaction_hash: string;
+  }>;
+  executePaymasterTransaction: (
+    calls: Call[],
+    details: ReturnType<typeof sponsoredDetails>
+  ) => Promise<{
+    transaction_hash: string;
+  }>;
+  signMessage: (typedData: TypedData) => Promise<Signature>;
+  simulateTransaction: (
+    invocations: Array<{ type: "INVOKE"; payload: Call[] }>
+  ) => Promise<unknown[]>;
+  estimateInvokeFee: (calls: Call[]) => Promise<EstimateFeeResponseOverhead>;
+}
+
+type ControllerWithKeychain = {
+  keychain?: {
+    deploy?: () => Promise<{
+      code?: string;
+      message?: string;
+      transaction_hash?: string;
+    }>;
+  };
+};
+
+function isCartridgeWalletAccount(
+  value: unknown
+): value is CartridgeWalletAccount {
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+
+  const account = value as Partial<CartridgeWalletAccount>;
+  return (
+    typeof account.address === "string" &&
+    typeof account.execute === "function" &&
+    typeof account.executePaymasterTransaction === "function" &&
+    typeof account.signMessage === "function" &&
+    typeof account.simulateTransaction === "function" &&
+    typeof account.estimateInvokeFee === "function"
+  );
 }
