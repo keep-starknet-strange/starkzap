@@ -175,6 +175,26 @@ describe("Wallet", () => {
       expect(account.address).toBe(wallet.address);
     });
   });
+
+  describe("callContract", () => {
+    it("should call provider.callContract for read-only calls", async () => {
+      const signer = new StarkSigner(privateKey);
+      const wallet = await sdk.connectWallet({
+        account: { signer },
+      });
+
+      const call = {
+        contractAddress: "0x123",
+        entrypoint: "balance_of",
+        calldata: ["0xabc"],
+      };
+      vi.spyOn(wallet.getProvider(), "callContract").mockResolvedValue(["0x1"]);
+
+      const result = await wallet.callContract(call);
+      expect(result).toEqual(["0x1"]);
+      expect(wallet.getProvider().callContract).toHaveBeenCalledWith(call);
+    });
+  });
 });
 
 describe("StarkSDK", () => {
@@ -187,6 +207,23 @@ describe("StarkSDK", () => {
 
       expect(provider).toBeDefined();
       expect(provider.channel).toBeDefined();
+    });
+  });
+
+  describe("callContract", () => {
+    it("should call provider.callContract", async () => {
+      const sdk = new StarkSDK(config);
+      const call = {
+        contractAddress: "0x123",
+        entrypoint: "total_supply",
+        calldata: [],
+      };
+
+      vi.spyOn(sdk.getProvider(), "callContract").mockResolvedValue(["0x2a"]);
+
+      const result = await sdk.callContract(call);
+      expect(result).toEqual(["0x2a"]);
+      expect(sdk.getProvider().callContract).toHaveBeenCalledWith(call);
     });
   });
 });

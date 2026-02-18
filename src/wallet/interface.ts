@@ -72,6 +72,14 @@ export interface WalletInterface {
   execute(calls: Call[], options?: ExecuteOptions): Promise<Tx>;
 
   /**
+   * Call a read-only contract entrypoint.
+   *
+   * This executes an RPC `call` without sending a transaction.
+   * Use this for view methods that don't mutate state.
+   */
+  callContract(call: Call): ReturnType<RpcProvider["callContract"]>;
+
+  /**
    * Create a transaction builder for batching multiple operations into a single transaction.
    *
    * Chain operations fluently and call `.send()` to execute them atomically.

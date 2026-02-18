@@ -1,5 +1,5 @@
-import { RpcProvider } from "starknet";
-import type { SDKConfig, ChainId } from "@/types/config";
+import { RpcProvider, type Call } from "starknet";
+import { ChainId, type SDKConfig } from "@/types/config";
 import type { ConnectWalletOptions } from "@/types/wallet";
 import { networks, type NetworkPreset } from "@/network";
 import { Wallet } from "@/wallet";
@@ -390,5 +390,15 @@ export class StarkSDK {
    */
   getProvider(): RpcProvider {
     return this.provider;
+  }
+
+  /**
+   * Call a read-only contract entrypoint using the SDK provider.
+   *
+   * This executes an RPC `call` without sending a transaction.
+   * Useful before wallet connection or for app-level reads.
+   */
+  callContract(call: Call): ReturnType<RpcProvider["callContract"]> {
+    return this.provider.callContract(call);
   }
 }

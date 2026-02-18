@@ -100,6 +100,11 @@ export abstract class BaseWallet implements WalletInterface {
   abstract execute(calls: Call[], options?: ExecuteOptions): Promise<Tx>;
 
   /** @inheritdoc */
+  callContract(call: Call): ReturnType<RpcProvider["callContract"]> {
+    return this.getProvider().callContract(call);
+  }
+
+  /** @inheritdoc */
   abstract signMessage(typedData: TypedData): Promise<Signature>;
 
   /** @inheritdoc */
