@@ -1,0 +1,79 @@
+language: en-US
+early_access: false
+
+reviews:
+  profile: assertive
+  request_changes_workflow: false
+
+  # Keep signal high: no poems/fortune cookie status updates.
+  poem: false
+  in_progress_fortune: false
+
+  # Put the summary in the walkthrough comment by default (avoid editing PR bodies).
+  high_level_summary: true
+  high_level_summary_in_walkthrough: true
+  review_details: true
+  collapse_walkthrough: true
+
+  auto_review:
+    enabled: true
+    drafts: false
+    base_branches:
+      - main
+    ignore_title_keywords:
+      - wip
+      - draft
+      - do not review
+
+  # Exclude generated / noisy artifacts from review context.
+  path_filters:
+    - "!dist/**"
+    - "!docs/api/**"
+    - "!docs/export/**"
+    - "!node_modules/**"
+    - "!**/package-lock.json"
+    - "!**/*.tgz"
+
+  # Repo-specific guidance (keeps reviews aligned with project norms).
+  path_instructions:
+    - path: "packages/mcp-server/**"
+      instructions: |
+        This MCP server can handle real funds. Prioritize:
+        - Write gating defaults (read-only by default; write tools require explicit opt-in)
+        - Amount/fee caps and safe token/address validation
+        - Defense-in-depth around unrestricted execution paths (e.g. x_execute)
+        - Avoid leaking secrets or full internal errors to tool callers
+
+    - path: "src/**"
+      instructions: |
+        This is a public SDK. Prioritize:
+        - Backwards compatibility and clear, typed public APIs
+        - Deterministic behavior across mainnet/sepolia presets
+        - Tests for behavior changes (prefer unit tests)
+
+    - path: "tests/**"
+      instructions: |
+        Integration tests can be flaky depending on devnet/RPC assumptions.
+        Prefer stable unit tests unless an integration test is strictly necessary.
+
+  tools:
+    # Most useful for this repo: rely on GitHub Actions + eslint + secret scanners.
+    github-checks:
+      enabled: true
+      timeout_ms: 300000
+    eslint:
+      enabled: true
+    actionlint:
+      enabled: true
+    gitleaks:
+      enabled: true
+    trufflehog:
+      enabled: true
+
+    # Avoid duplicate/noisy linters by default.
+    biome:
+      enabled: false
+    languagetool:
+      enabled: false
+    markdownlint:
+      enabled: false
