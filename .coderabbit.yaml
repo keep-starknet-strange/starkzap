@@ -62,24 +62,24 @@ reviews:
         - Proper error handling (set -e equivalent, exit codes)
         - Idempotency where possible
 
-tools:
-  eslint:
-    enabled: true
-  biome:
-    enabled: true
-  markdownlint:
-    enabled: true
-  shellcheck:
-    enabled: true
-  gitleaks:
-    enabled: true
-  actionlint:
-    enabled: true
-  yamllint:
-    enabled: true
-  github-checks:
-    enabled: true
-    timeout_ms: 120000
+  tools:
+    eslint:
+      enabled: true
+    biome:
+      enabled: true
+    markdownlint:
+      enabled: true
+    shellcheck:
+      enabled: true
+    gitleaks:
+      enabled: true
+    actionlint:
+      enabled: true
+    yamllint:
+      enabled: true
+    github-checks:
+      enabled: true
+      timeout_ms: 120000
 
 chat:
   auto_reply: true
