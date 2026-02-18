@@ -21,7 +21,9 @@ describe("wallet utils", () => {
 
     it("returns false when contract is not deployed", async () => {
       const provider = {
-        getClassHashAt: vi.fn().mockRejectedValue(new Error("Contract not found")),
+        getClassHashAt: vi
+          .fn()
+          .mockRejectedValue(new Error("Contract not found")),
       };
 
       await expect(
