@@ -105,6 +105,17 @@ app.post("/api/wallet/sign", async (req, res) => {
 3. Verify network configuration matches Cartridge's supported networks
 4. Check browser console for Cartridge-specific errors
 
+### "Account is not compatible with SNIP-9"
+
+**Problem:** Sponsored execution fails with `"Account is not compatible with SNIP-9"` (or similar paymaster/session mismatch errors).
+
+**What it means:** The current account/session cannot use the paymaster path for the selected network.
+
+**Solution:**
+1. Fallback to `feeMode: "user_pays"` for that action
+2. Use a Cartridge account/session that supports SNIP-9 on the target chain
+3. Ensure SDK and Cartridge session chain match (`rpcUrl` + `chainId` from your `StarkSDK` config)
+
 ### Amount Arithmetic Errors
 
 **Problem:** Getting errors when performing arithmetic on amounts.
