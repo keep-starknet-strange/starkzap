@@ -1,4 +1,4 @@
-import { Amount } from "@/types";
+import { Amount, ChainId, type ChainIdLiteral, type SDKConfig } from "@/types";
 import type { Wallet } from "@/wallet";
 import { sepoliaTokens } from "@/erc20";
 
@@ -58,4 +58,16 @@ export function forkRPC(version: string): string | null {
   }
 
   return url.toString();
+}
+
+export type TestConfig = {
+  rpcUrl: string;
+  chainId: ChainIdLiteral;
+};
+
+export function toSdkConfig(testConfig: TestConfig): SDKConfig {
+  return {
+    rpcUrl: testConfig.rpcUrl,
+    chainId: ChainId.from(testConfig.chainId),
+  };
 }

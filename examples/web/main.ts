@@ -10,7 +10,7 @@ import {
   DevnetPreset,
   type WalletInterface,
   type AccountClassConfig,
-} from "x";
+} from "starkzap";
 import { ec } from "starknet";
 
 // Configuration

@@ -17,7 +17,7 @@ import { TokenBalance } from "@/components/TokenBalance";
 import { LogsFAB } from "@/components/LogsFAB";
 import { useWalletStore, NETWORKS } from "@/stores/wallet";
 import { useBalancesStore, getTokensForNetwork } from "@/stores/balances";
-import type { Token } from "x";
+import type { Token } from "starkzap";
 
 const BATCH_SIZE = 20;
 

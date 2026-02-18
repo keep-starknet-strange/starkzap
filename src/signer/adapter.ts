@@ -39,7 +39,7 @@ function intDAM(mode: string | EDAMode): 0 | 1 {
  *
  * @example
  * ```ts
- * import { SignerAdapter, StarkSigner } from "x";
+ * import { SignerAdapter, StarkSigner } from "starkzap";
  * import { Account, RpcProvider } from "starknet";
  *
  * const adapter = new SignerAdapter(new StarkSigner(privateKey));

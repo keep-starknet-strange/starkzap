@@ -5,11 +5,11 @@ import { StarkSigner } from "@/signer";
 import { DevnetPreset } from "@/account";
 import { Amount } from "@/types";
 import { testPrivateKeys } from "../config";
-import { fund } from "./shared";
+import { fund, toSdkConfig } from "./shared";
 import { DevnetProvider } from "starknet-devnet";
 
 describe("ERC20 (Integration)", () => {
-  const config = inject("sdkConfig");
+  const config = toSdkConfig(inject("testConfig"));
   let sdk: StarkSDK;
   let devnetRunning = false;
 

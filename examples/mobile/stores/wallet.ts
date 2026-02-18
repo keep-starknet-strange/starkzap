@@ -14,7 +14,7 @@ import {
   type WalletInterface,
   type ChainIdLiteral,
   ChainId,
-} from "x";
+} from "starkzap";
 import {
   showTransactionToast,
   updateTransactionToast,

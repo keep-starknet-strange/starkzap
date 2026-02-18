@@ -22,7 +22,7 @@ function toHex(value: string | number | bigint): string {
  *
  * @example
  * ```ts
- * import { AccountProvider, StarkSigner, ArgentPreset } from "x";
+ * import { AccountProvider, StarkSigner, ArgentPreset } from "starkzap";
  *
  * const provider = new AccountProvider(
  *   new StarkSigner(privateKey),

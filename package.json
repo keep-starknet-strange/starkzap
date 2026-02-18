@@ -1,5 +1,5 @@
 {
-  "name": "x",
+  "name": "starkzap",
   "version": "1.0.0",
   "description": "Helper sdk for easy wallet integration",
   "homepage": "https://github.com/keep-starknet-strange/x#readme",
@@ -53,7 +53,7 @@
     "generate:validators": "npx tsx scripts/generate-validator-presets.ts --network mainnet",
     "generate:validators:sepolia": "npx tsx scripts/generate-validator-presets.ts --network sepolia",
     "docs:api": "typedoc --options typedoc.json",
-    "docs:export": "npm run docs:api && node scripts/docs-export.mjs && bestzip docs/export/x-docs.zip docs/export/*",
+    "docs:export": "npm run docs:api && node scripts/docs-export.mjs && bestzip docs/export/starkzap-docs.zip docs/export/*",
     "docs:check": "npm run docs:api",
     "prepare": "husky"
   },

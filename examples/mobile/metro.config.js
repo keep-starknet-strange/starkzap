@@ -11,16 +11,16 @@ config.resolver.nodeModulesPaths = [
   path.resolve(sdkRoot, "node_modules"),
 ];
 
-// Custom resolver to handle "x" package and path alias resolution
+// Custom resolver to handle "starkzap" package and path alias resolution
 config.resolver.resolveRequest = (context, moduleName, platform) => {
-  // Resolve "x" to source files directly
-  if (moduleName === "x") {
+  // Resolve "starkzap" to source files directly
+  if (moduleName === "starkzap") {
     return {
       filePath: path.resolve(sdkRoot, "src/index.ts"),
       type: "sourceFile",
     };
   }
-  if (moduleName === "x/polyfills") {
+  if (moduleName === "starkzap/polyfills") {
     return {
       filePath: path.resolve(sdkRoot, "src/polyfills.ts"),
       type: "sourceFile",

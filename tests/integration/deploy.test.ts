@@ -3,11 +3,11 @@ import { StarkSDK } from "@/sdk";
 import { StarkSigner } from "@/signer";
 import { DevnetPreset } from "@/account";
 import { DevnetProvider } from "starknet-devnet";
-import { fund } from "./shared";
+import { fund, toSdkConfig } from "./shared";
 import { testPrivateKeys } from "../config";
 
 describe("Account Deployment (Integration)", () => {
-  const config = inject("sdkConfig");
+  const config = toSdkConfig(inject("testConfig"));
   let sdk: StarkSDK;
   let devnetRunning: boolean;
 

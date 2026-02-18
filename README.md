@@ -28,7 +28,13 @@ For specific integrations, you may need:
 ## Quick Start
 
 ```typescript
-import { StarkZap, StarkSigner, Amount, fromAddress, mainnetTokens } from "starkzap";
+import {
+  StarkZap,
+  StarkSigner,
+  Amount,
+  fromAddress,
+  mainnetTokens,
+} from "starkzap";
 
 const STRK = mainnetTokens.STRK;
 const sdk = new StarkZap({ network: "sepolia" });
