@@ -27,10 +27,12 @@ This server handles real funds. The following protections are built in:
 3. **Batch size limits.** Maximum 20 transfers per batch, 10 calls per execute batch.
 4. **Address validation.** All addresses are validated against Starknet felt252 format before use.
 5. **Runtime argument validation.** Every tool's arguments are validated with zod schemas before execution. Malformed inputs are rejected with clear error messages.
-6. **Transaction timeout.** `tx.wait()` has a 2-minute timeout to prevent the server from hanging on stuck transactions.
-7. **Token allowlist.** Only tokens in the x SDK's built-in presets are accepted. Arbitrary contract addresses for unknown tokens are rejected.
-8. **stdio transport only.** The server runs locally via stdio — no network exposure.
-9. **Early CLI validation.** Invalid `--network` values are rejected immediately at startup with a clear error.
+6. **Optional human confirmation for writes.** When `--require-confirmation` is enabled, write tools return a `pending_confirmation` preview and require a follow-up `x_confirm` call with an out-of-band code printed to server logs (stderr).
+7. **Rate limiting (optional).** Configure `--max-writes-per-minute` to throttle write operations.
+8. **Transaction timeout.** `tx.wait()` has a 2-minute timeout to prevent the server from hanging on stuck transactions.
+9. **Token allowlist.** Only tokens in the x SDK's built-in presets are accepted. Arbitrary contract addresses for unknown tokens are rejected.
+10. **stdio transport only.** The server runs locally via stdio — no network exposure.
+11. **Early CLI validation.** Invalid `--network` values are rejected immediately at startup with a clear error.
 
 **Recommendations for production use:**
 
@@ -51,12 +53,15 @@ This server handles real funds. The following protections are built in:
 
 ### CLI Arguments
 
-| Argument           | Default   | Description                                                   |
-| ------------------ | --------- | ------------------------------------------------------------- |
-| `--network`        | `mainnet` | Network preset: `mainnet` or `sepolia` (validated at startup) |
-| `--max-amount`     | `1000`    | Max tokens per individual operation (transfers + staking)     |
-| `--enable-write`   | off       | Enable state-changing tools (transfer, stake, deploy)         |
-| `--enable-execute` | off       | Enable the unrestricted `x_execute` tool (implies write)      |
+| Argument                  | Default   | Description                                                   |
+| ------------------------- | --------- | ------------------------------------------------------------- |
+| `--network`               | `mainnet` | Network preset: `mainnet` or `sepolia` (validated at startup) |
+| `--max-amount`            | `1000`    | Max tokens per individual operation (transfers + staking)     |
+| `--enable-write`          | off       | Enable state-changing tools (transfer, stake, deploy)         |
+| `--enable-execute`        | off       | Enable the unrestricted `x_execute` tool (implies write)      |
+| `--require-confirmation`  | off       | Stage write operations and require `x_confirm` to execute     |
+| `--confirmation-ttl-ms`   | `60000`   | Pending confirmation expiry (milliseconds)                    |
+| `--max-writes-per-minute` | `0`       | Write op rate limit (0 = unlimited)                           |
 
 ## MCP Client Configuration
 
@@ -115,6 +120,7 @@ const mcpServer = new McpServerStdio({
 | `x_execute`        | Execute raw contract calls atomically          |
 | `x_deploy_account` | Deploy the account contract on-chain           |
 | `x_estimate_fee`   | Estimate gas cost for contract calls           |
+| `x_confirm`        | Confirm a staged write operation               |
 
 ### Staking
 

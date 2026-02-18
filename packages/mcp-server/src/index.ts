@@ -42,6 +42,7 @@ import {
   type Tool,
 } from "@modelcontextprotocol/sdk/types.js";
 import { z } from "zod";
+import crypto from "node:crypto";
 import {
   StarkSDK,
   StarkSigner,
@@ -57,9 +58,15 @@ import type { Address, Token } from "x";
 // CLI args
 // ---------------------------------------------------------------------------
 const cliArgs = process.argv.slice(2);
-function getArg(name: string, fallback: string): string {
+function getArgMaybe(name: string): string | undefined {
   const idx = cliArgs.indexOf(`--${name}`);
-  return idx !== -1 && cliArgs[idx + 1] ? cliArgs[idx + 1]! : fallback;
+  if (idx === -1) return undefined;
+  const v = cliArgs[idx + 1];
+  if (!v || v.startsWith("--")) return undefined;
+  return v;
+}
+function getArg(name: string, fallback: string): string {
+  return getArgMaybe(name) ?? fallback;
 }
 function hasFlag(name: string): boolean {
   return cliArgs.includes(`--${name}`);
@@ -80,14 +87,43 @@ const network: Network = rawNetwork as Network;
 const enableWrite = hasFlag("enable-write");
 const enableExecute = hasFlag("enable-execute");
 const maxAmount = getArg("max-amount", "1000"); // human-readable cap per write operation
+const requireConfirmation = hasFlag("require-confirmation");
+const confirmationTtlMsRaw = getArg("confirmation-ttl-ms", "60000");
+const maxWritesPerMinuteRaw = getArg("max-writes-per-minute", "0"); // 0 = unlimited
+
+if (!/^\d+(\.\d+)?$/.test(maxAmount) || Number(maxAmount) <= 0) {
+  console.error(
+    `Error: Invalid --max-amount value "${maxAmount}". Must be a positive number (e.g. 1000, 0.1).`
+  );
+  process.exit(1);
+}
+const confirmationTtlMs = Number.parseInt(confirmationTtlMsRaw, 10);
+if (!Number.isFinite(confirmationTtlMs) || confirmationTtlMs <= 0) {
+  console.error(
+    `Error: Invalid --confirmation-ttl-ms value "${confirmationTtlMsRaw}". Must be a positive integer.`
+  );
+  process.exit(1);
+}
+const maxWritesPerMinute = Number.parseInt(maxWritesPerMinuteRaw, 10);
+if (!Number.isFinite(maxWritesPerMinute) || maxWritesPerMinute < 0) {
+  console.error(
+    `Error: Invalid --max-writes-per-minute value "${maxWritesPerMinuteRaw}". Must be 0 (unlimited) or a non-negative integer.`
+  );
+  process.exit(1);
+}
 
 // ---------------------------------------------------------------------------
 // Environment
 // ---------------------------------------------------------------------------
 const envSchema = z.object({
-  STARKNET_PRIVATE_KEY: z.string().startsWith("0x"),
+  STARKNET_PRIVATE_KEY: z
+    .string()
+    .regex(/^0x[0-9a-fA-F]{1,64}$/, "Invalid STARKNET_PRIVATE_KEY format"),
   STARKNET_RPC_URL: z.string().url().optional(),
-  STARKNET_STAKING_CONTRACT: z.string().startsWith("0x").optional(),
+  STARKNET_STAKING_CONTRACT: z
+    .string()
+    .regex(/^0x[0-9a-fA-F]{1,64}$/, "Invalid STARKNET_STAKING_CONTRACT format")
+    .optional(),
 });
 
 const env = envSchema.parse(process.env);
@@ -148,6 +184,75 @@ async function getWallet(): Promise<Wallet> {
     });
   }
   return _wallet;
+}
+
+// ---------------------------------------------------------------------------
+// Execution controls (confirmation, rate limiting, write serialization, logging)
+// ---------------------------------------------------------------------------
+type PendingAction = {
+  id: string;
+  code: string;
+  name: string;
+  args: Record<string, unknown>;
+  createdAtMs: number;
+  expiresAtMs: number;
+};
+
+const pendingActions = new Map<string, PendingAction>();
+const MAX_PENDING_ACTIONS = 25;
+
+function audit(event: Record<string, unknown>): void {
+  // JSONL on stderr (never on stdout which is used for MCP transport).
+  console.error(
+    JSON.stringify({ ts: new Date().toISOString(), network, ...event })
+  );
+}
+
+function newPendingId(): string {
+  return crypto.randomUUID();
+}
+
+function newConfirmationCode(): string {
+  // Short human-copyable code; not returned to the tool caller.
+  return crypto.randomBytes(3).toString("hex"); // 6 hex chars
+}
+
+const writeTimestampsMs: number[] = [];
+function pruneWriteTimestamps(nowMs: number): void {
+  const windowStart = nowMs - 60_000;
+  while (writeTimestampsMs.length > 0 && writeTimestampsMs[0]! < windowStart) {
+    writeTimestampsMs.shift();
+  }
+}
+function assertWriteRateLimit(): void {
+  if (maxWritesPerMinute === 0) return;
+  const now = Date.now();
+  pruneWriteTimestamps(now);
+  if (writeTimestampsMs.length >= maxWritesPerMinute) {
+    throw new Error(
+      `Rate limit exceeded: max ${maxWritesPerMinute} write operations per minute.`
+    );
+  }
+}
+function noteWriteExecuted(): void {
+  const now = Date.now();
+  writeTimestampsMs.push(now);
+  pruneWriteTimestamps(now);
+}
+
+let writeChain: Promise<void> = Promise.resolve();
+async function runSerializedWrite<T>(fn: () => Promise<T>): Promise<T> {
+  const prev = writeChain;
+  let release: (() => void) | undefined;
+  writeChain = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  await prev;
+  try {
+    return await fn();
+  } finally {
+    release?.();
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -264,6 +369,10 @@ const schemas = {
         })
       )
       .min(1),
+  }),
+  x_confirm: z.object({
+    id: z.string().min(1),
+    code: z.string().min(1),
   }),
 } as const;
 
@@ -516,6 +625,26 @@ const allTools: Tool[] = [
       required: ["calls"],
     },
   },
+  {
+    name: "x_confirm",
+    description:
+      "Confirm and execute a previously staged write operation. Only available when server is started with --require-confirmation. The confirmation code is printed to the server logs (stderr).",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        id: {
+          type: "string",
+          description: "Pending operation id returned by the staged tool call",
+        },
+        code: {
+          type: "string",
+          description:
+            "Confirmation code printed to the server logs (stderr) when the operation was staged",
+        },
+      },
+      required: ["id", "code"],
+    },
+  },
 ];
 
 // ---------------------------------------------------------------------------
@@ -538,6 +667,8 @@ const STAKING_TOOLS = new Set([
 
 const tools: Tool[] = allTools.filter((t) => {
   if (READ_ONLY_TOOLS.has(t.name)) return true;
+  if (t.name === "x_confirm")
+    return requireConfirmation && (enableWrite || enableExecute);
   if (t.name === "x_execute") return enableExecute;
   return enableWrite || enableExecute; // --enable-execute implies write access
 });
@@ -582,20 +713,156 @@ async function waitWithTimeout(
   await Promise.race([tx.wait(), timeout]);
 }
 
+function buildWritePreview(name: string, args: unknown): unknown {
+  switch (name) {
+    case "x_transfer": {
+      const parsed = args as z.infer<typeof schemas.x_transfer>;
+      const token = resolveToken(parsed.token);
+      const transfers = parsed.transfers.map((t) => {
+        const amount = Amount.parse(t.amount, token);
+        assertAmountWithinCap(amount, token, maxAmount);
+        return {
+          to: validateAddress(t.to, "recipient"),
+          amount: amount.toUnit(),
+          symbol: token.symbol,
+        };
+      });
+      return {
+        token: token.symbol,
+        transfers,
+        sponsored: parsed.sponsored ?? false,
+      };
+    }
+    case "x_execute": {
+      const parsed = args as z.infer<typeof schemas.x_execute>;
+      const calls = parsed.calls.map((c) => ({
+        contractAddress: validateAddress(c.contractAddress, "contract"),
+        entrypoint: c.entrypoint,
+        calldataLength: (c.calldata ?? []).length,
+      }));
+      return {
+        callCount: calls.length,
+        calls,
+        sponsored: parsed.sponsored ?? false,
+        warning:
+          "x_execute is unrestricted. Prefer enabling contract allowlists for production.",
+      };
+    }
+    case "x_deploy_account": {
+      const parsed = args as z.infer<typeof schemas.x_deploy_account>;
+      return {
+        sponsored: parsed.sponsored ?? false,
+        note: "Account address will be derived at execution time.",
+      };
+    }
+    case "x_enter_pool": {
+      const parsed = args as z.infer<typeof schemas.x_enter_pool>;
+      const token = resolveToken(parsed.token ?? "STRK");
+      const amount = Amount.parse(parsed.amount, token);
+      assertAmountWithinCap(amount, token, maxAmount);
+      const pool = validateAddress(parsed.pool, "pool");
+      return { pool, amount: amount.toUnit(), symbol: token.symbol };
+    }
+    case "x_add_to_pool": {
+      const parsed = args as z.infer<typeof schemas.x_add_to_pool>;
+      const token = resolveToken(parsed.token ?? "STRK");
+      const amount = Amount.parse(parsed.amount, token);
+      assertAmountWithinCap(amount, token, maxAmount);
+      const pool = validateAddress(parsed.pool, "pool");
+      return { pool, amount: amount.toUnit(), symbol: token.symbol };
+    }
+    case "x_claim_rewards": {
+      const parsed = args as z.infer<typeof schemas.x_claim_rewards>;
+      const pool = validateAddress(parsed.pool, "pool");
+      return { pool };
+    }
+    case "x_exit_pool_intent": {
+      const parsed = args as z.infer<typeof schemas.x_exit_pool_intent>;
+      const token = resolveToken(parsed.token ?? "STRK");
+      const amount = Amount.parse(parsed.amount, token);
+      assertAmountWithinCap(amount, token, maxAmount);
+      const pool = validateAddress(parsed.pool, "pool");
+      return { pool, amount: amount.toUnit(), symbol: token.symbol };
+    }
+    case "x_exit_pool": {
+      const parsed = args as z.infer<typeof schemas.x_exit_pool>;
+      const pool = validateAddress(parsed.pool, "pool");
+      return { pool };
+    }
+    default:
+      throw new Error(`Cannot build preview for tool: ${name}`);
+  }
+}
+
 async function handleTool(
-  name: string,
+  requestedName: string,
   rawArgs: Record<string, unknown>
 ): Promise<{ content: Array<{ type: "text"; text: string }> }> {
+  const ok = (data: unknown) => ({
+    content: [{ type: "text" as const, text: JSON.stringify(data, null, 2) }],
+  });
+
+  let name = requestedName;
+  let argsForTool: Record<string, unknown> = rawArgs;
+  let confirmedExecution = false;
+
+  // Confirmation flow: convert x_confirm(id, code) into the actual pending tool call.
+  if (requestedName === "x_confirm") {
+    if (!requireConfirmation) {
+      throw new Error(
+        "x_confirm is disabled. Start the server with --require-confirmation to stage and confirm write operations."
+      );
+    }
+    if (!enableWrite && !enableExecute) {
+      throw new Error(
+        "x_confirm requires write access. Start the server with --enable-write (or --enable-execute)."
+      );
+    }
+    const confirmArgs = schemas.x_confirm.parse(rawArgs);
+    const pending = pendingActions.get(confirmArgs.id);
+    if (!pending) {
+      throw new Error(`No pending operation found for id "${confirmArgs.id}".`);
+    }
+    if (Date.now() > pending.expiresAtMs) {
+      pendingActions.delete(confirmArgs.id);
+      throw new Error(`Pending operation "${confirmArgs.id}" has expired.`);
+    }
+    if (pending.code !== confirmArgs.code) {
+      throw new Error("Invalid confirmation code.");
+    }
+    pendingActions.delete(confirmArgs.id);
+    name = pending.name;
+    argsForTool = pending.args;
+    confirmedExecution = true;
+    audit({
+      event: "write_confirmed",
+      tool: name,
+      pendingId: confirmArgs.id,
+    });
+  }
+
   // Runtime schema validation
   const schema = schemas[name as keyof typeof schemas];
   if (!schema) {
     throw new Error(`Unknown tool: ${name}`);
   }
-  const args = schema.parse(rawArgs);
+  const args = schema.parse(argsForTool);
+
+  const isReadOnly = READ_ONLY_TOOLS.has(name);
+  const isWriteTool = !isReadOnly;
+
+  audit({
+    event: "tool_call",
+    tool: requestedName,
+    resolvedTool: name,
+    write: isWriteTool,
+    requireConfirmation,
+    confirmedExecution,
+  });
 
   // Enforce write-tool gate at runtime (defense-in-depth: tool list is already
   // filtered, but a malicious client could call tools by name directly).
-  if (!READ_ONLY_TOOLS.has(name)) {
+  if (isWriteTool) {
     if (name === "x_execute" && !enableExecute) {
       throw new Error(
         "x_execute is disabled. Start the server with --enable-execute to allow raw contract calls. " +
@@ -617,262 +884,310 @@ async function handleTool(
     );
   }
 
-  const wallet = await getWallet();
-
-  const ok = (data: unknown) => ({
-    content: [{ type: "text" as const, text: JSON.stringify(data, null, 2) }],
-  });
-
-  switch (name) {
-    // -----------------------------------------------------------------------
-    // Balance (read-only)
-    // -----------------------------------------------------------------------
-    case "x_get_balance": {
-      const parsed = args as z.infer<typeof schemas.x_get_balance>;
-      const token = resolveToken(parsed.token);
-      const balance = await wallet.balanceOf(token);
-      return ok({
-        token: token.symbol,
-        address: token.address,
-        balance: balance.toUnit(),
-        formatted: balance.toFormatted(),
-        raw: balance.toBase().toString(),
-        decimals: balance.getDecimals(),
-      });
+  // Confirmation staging: when enabled, stage write operations and require
+  // a follow-up x_confirm with an out-of-band code (printed to stderr).
+  if (requireConfirmation && isWriteTool && !confirmedExecution) {
+    const now = Date.now();
+    for (const [id, pending] of pendingActions) {
+      if (pending.expiresAtMs <= now) pendingActions.delete(id);
     }
-
-    // -----------------------------------------------------------------------
-    // Transfer (state-changing, amount-capped)
-    // -----------------------------------------------------------------------
-    case "x_transfer": {
-      const parsed = args as z.infer<typeof schemas.x_transfer>;
-      const token = resolveToken(parsed.token);
-      const transfers = parsed.transfers.map((t) => {
-        const amount = Amount.parse(t.amount, token);
-        assertAmountWithinCap(amount, token, maxAmount);
-        return {
-          to: validateAddress(t.to, "recipient"),
-          amount,
-        };
-      });
-      const feeMode = parsed.sponsored ? "sponsored" : undefined;
-      const tx = await wallet.transfer(token, transfers, {
-        ...(feeMode && { feeMode: feeMode as "sponsored" }),
-      });
-      await waitWithTimeout(tx);
-      return ok({
-        hash: tx.hash,
-        explorerUrl: tx.explorerUrl,
-        transfers: transfers.map((t) => ({
-          to: t.to,
-          amount: t.amount.toUnit(),
-          symbol: token.symbol,
-        })),
-      });
+    if (pendingActions.size >= MAX_PENDING_ACTIONS) {
+      throw new Error(
+        `Too many pending operations (${pendingActions.size}). Confirm or wait for expiry before staging more.`
+      );
     }
+    const preview = buildWritePreview(name, args);
+    const id = newPendingId();
+    const code = newConfirmationCode();
+    const expiresAtMs = now + confirmationTtlMs;
+    pendingActions.set(id, {
+      id,
+      code,
+      name,
+      args: args as Record<string, unknown>,
+      createdAtMs: now,
+      expiresAtMs,
+    });
+    audit({ event: "write_staged", tool: name, pendingId: id, expiresAtMs });
+    console.error(
+      `[x-mcp] confirmation required: id=${id} code=${code} tool=${name} expires=${new Date(expiresAtMs).toISOString()}`
+    );
+    return ok({
+      status: "pending_confirmation",
+      id,
+      tool: name,
+      expiresAt: new Date(expiresAtMs).toISOString(),
+      preview,
+      note: "Call x_confirm with {id, code} (code is printed to server logs) to execute.",
+    });
+  }
 
-    // -----------------------------------------------------------------------
-    // Execute (state-changing, restricted)
-    // -----------------------------------------------------------------------
-    case "x_execute": {
-      const parsed = args as z.infer<typeof schemas.x_execute>;
-      const calls = parsed.calls.map((c) => ({
-        contractAddress: validateAddress(c.contractAddress, "contract"),
-        entrypoint: c.entrypoint,
-        calldata: c.calldata ?? [],
-      }));
-      const feeMode = parsed.sponsored ? "sponsored" : undefined;
-      const tx = await wallet.execute(calls, {
-        ...(feeMode && { feeMode: feeMode as "sponsored" }),
-      });
-      await waitWithTimeout(tx);
-      return ok({
-        hash: tx.hash,
-        explorerUrl: tx.explorerUrl,
-        callCount: calls.length,
-      });
-    }
+  if (name === "x_confirm") {
+    // x_confirm is handled above by resolving to a pending action.
+    throw new Error("Internal error: unresolved x_confirm.");
+  }
 
-    // -----------------------------------------------------------------------
-    // Deploy (state-changing)
-    // -----------------------------------------------------------------------
-    case "x_deploy_account": {
-      const parsed = args as z.infer<typeof schemas.x_deploy_account>;
-      const deployed = await wallet.isDeployed();
-      if (deployed) {
+  if (isWriteTool) {
+    assertWriteRateLimit();
+    // Count all write-tool executions (including no-ops) to prevent tight loops.
+    noteWriteExecuted();
+  }
+
+  const exec = async () => {
+    const wallet = await getWallet();
+    switch (name) {
+      // -----------------------------------------------------------------------
+      // Balance (read-only)
+      // -----------------------------------------------------------------------
+      case "x_get_balance": {
+        const parsed = args as z.infer<typeof schemas.x_get_balance>;
+        const token = resolveToken(parsed.token);
+        const balance = await wallet.balanceOf(token);
         return ok({
-          status: "already_deployed",
+          token: token.symbol,
+          address: token.address,
+          balance: balance.toUnit(),
+          formatted: balance.toFormatted(),
+          raw: balance.toBase().toString(),
+          decimals: balance.getDecimals(),
+        });
+      }
+
+      // -----------------------------------------------------------------------
+      // Transfer (state-changing, amount-capped)
+      // -----------------------------------------------------------------------
+      case "x_transfer": {
+        const parsed = args as z.infer<typeof schemas.x_transfer>;
+        const token = resolveToken(parsed.token);
+        const transfers = parsed.transfers.map((t) => {
+          const amount = Amount.parse(t.amount, token);
+          assertAmountWithinCap(amount, token, maxAmount);
+          return {
+            to: validateAddress(t.to, "recipient"),
+            amount,
+          };
+        });
+        const feeMode = parsed.sponsored ? "sponsored" : undefined;
+        const tx = await wallet.transfer(token, transfers, {
+          ...(feeMode && { feeMode: feeMode as "sponsored" }),
+        });
+        await waitWithTimeout(tx);
+        return ok({
+          hash: tx.hash,
+          explorerUrl: tx.explorerUrl,
+          transfers: transfers.map((t) => ({
+            to: t.to,
+            amount: t.amount.toUnit(),
+            symbol: token.symbol,
+          })),
+        });
+      }
+
+      // -----------------------------------------------------------------------
+      // Execute (state-changing, restricted)
+      // -----------------------------------------------------------------------
+      case "x_execute": {
+        const parsed = args as z.infer<typeof schemas.x_execute>;
+        const calls = parsed.calls.map((c) => ({
+          contractAddress: validateAddress(c.contractAddress, "contract"),
+          entrypoint: c.entrypoint,
+          calldata: c.calldata ?? [],
+        }));
+        const feeMode = parsed.sponsored ? "sponsored" : undefined;
+        const tx = await wallet.execute(calls, {
+          ...(feeMode && { feeMode: feeMode as "sponsored" }),
+        });
+        await waitWithTimeout(tx);
+        return ok({
+          hash: tx.hash,
+          explorerUrl: tx.explorerUrl,
+          callCount: calls.length,
+        });
+      }
+
+      // -----------------------------------------------------------------------
+      // Deploy (state-changing)
+      // -----------------------------------------------------------------------
+      case "x_deploy_account": {
+        const parsed = args as z.infer<typeof schemas.x_deploy_account>;
+        const deployed = await wallet.isDeployed();
+        if (deployed) {
+          return ok({
+            status: "already_deployed",
+            address: wallet.address,
+          });
+        }
+        const feeMode = parsed.sponsored ? "sponsored" : undefined;
+        const tx = await wallet.deploy({
+          ...(feeMode && { feeMode: feeMode as "sponsored" }),
+        });
+        await waitWithTimeout(tx);
+        return ok({
+          status: "deployed",
+          hash: tx.hash,
+          explorerUrl: tx.explorerUrl,
           address: wallet.address,
         });
       }
-      const feeMode = parsed.sponsored ? "sponsored" : undefined;
-      const tx = await wallet.deploy({
-        ...(feeMode && { feeMode: feeMode as "sponsored" }),
-      });
-      await waitWithTimeout(tx);
-      return ok({
-        status: "deployed",
-        hash: tx.hash,
-        explorerUrl: tx.explorerUrl,
-        address: wallet.address,
-      });
-    }
 
-    // -----------------------------------------------------------------------
-    // Staking — enter pool
-    // -----------------------------------------------------------------------
-    case "x_enter_pool": {
-      const parsed = args as z.infer<typeof schemas.x_enter_pool>;
-      const token = resolveToken(parsed.token ?? "STRK");
-      const amount = Amount.parse(parsed.amount, token);
-      assertAmountWithinCap(amount, token, maxAmount);
-      const poolAddr = validateAddress(parsed.pool, "pool");
-      const tx = await wallet.enterPool(poolAddr, amount);
-      await waitWithTimeout(tx);
-      return ok({
-        hash: tx.hash,
-        explorerUrl: tx.explorerUrl,
-        pool: poolAddr,
-        amount: amount.toUnit(),
-        symbol: token.symbol,
-      });
-    }
-
-    // -----------------------------------------------------------------------
-    // Staking — add to pool
-    // -----------------------------------------------------------------------
-    case "x_add_to_pool": {
-      const parsed = args as z.infer<typeof schemas.x_add_to_pool>;
-      const token = resolveToken(parsed.token ?? "STRK");
-      const amount = Amount.parse(parsed.amount, token);
-      assertAmountWithinCap(amount, token, maxAmount);
-      const poolAddr = validateAddress(parsed.pool, "pool");
-      const tx = await wallet.addToPool(poolAddr, amount);
-      await waitWithTimeout(tx);
-      return ok({
-        hash: tx.hash,
-        explorerUrl: tx.explorerUrl,
-        pool: poolAddr,
-        amount: amount.toUnit(),
-        symbol: token.symbol,
-      });
-    }
-
-    // -----------------------------------------------------------------------
-    // Staking — claim rewards
-    // -----------------------------------------------------------------------
-    case "x_claim_rewards": {
-      const parsed = args as z.infer<typeof schemas.x_claim_rewards>;
-      const poolAddr = validateAddress(parsed.pool, "pool");
-      const tx = await wallet.claimPoolRewards(poolAddr);
-      await waitWithTimeout(tx);
-      return ok({
-        hash: tx.hash,
-        explorerUrl: tx.explorerUrl,
-        pool: poolAddr,
-      });
-    }
-
-    // -----------------------------------------------------------------------
-    // Staking — exit intent
-    // -----------------------------------------------------------------------
-    case "x_exit_pool_intent": {
-      const parsed = args as z.infer<typeof schemas.x_exit_pool_intent>;
-      const token = resolveToken(parsed.token ?? "STRK");
-      const amount = Amount.parse(parsed.amount, token);
-      assertAmountWithinCap(amount, token, maxAmount);
-      const poolAddr = validateAddress(parsed.pool, "pool");
-      const tx = await wallet.exitPoolIntent(poolAddr, amount);
-      await waitWithTimeout(tx);
-      return ok({
-        hash: tx.hash,
-        explorerUrl: tx.explorerUrl,
-        pool: poolAddr,
-        amount: amount.toUnit(),
-        symbol: token.symbol,
-        note: "Tokens stop earning rewards now. Call x_exit_pool after the waiting period.",
-      });
-    }
-
-    // -----------------------------------------------------------------------
-    // Staking — exit pool (complete)
-    // -----------------------------------------------------------------------
-    case "x_exit_pool": {
-      const parsed = args as z.infer<typeof schemas.x_exit_pool>;
-      const poolAddr = validateAddress(parsed.pool, "pool");
-      const tx = await wallet.exitPool(poolAddr);
-      await waitWithTimeout(tx);
-      return ok({
-        hash: tx.hash,
-        explorerUrl: tx.explorerUrl,
-        pool: poolAddr,
-      });
-    }
-
-    // -----------------------------------------------------------------------
-    // Staking — get position (read-only)
-    // -----------------------------------------------------------------------
-    case "x_get_pool_position": {
-      const parsed = args as z.infer<typeof schemas.x_get_pool_position>;
-      const poolAddr = validateAddress(parsed.pool, "pool");
-      const position = await wallet.getPoolPosition(poolAddr);
-      if (!position) {
+      // -----------------------------------------------------------------------
+      // Staking — enter pool
+      // -----------------------------------------------------------------------
+      case "x_enter_pool": {
+        const parsed = args as z.infer<typeof schemas.x_enter_pool>;
+        const token = resolveToken(parsed.token ?? "STRK");
+        const amount = Amount.parse(parsed.amount, token);
+        assertAmountWithinCap(amount, token, maxAmount);
+        const poolAddr = validateAddress(parsed.pool, "pool");
+        const tx = await wallet.enterPool(poolAddr, amount);
+        await waitWithTimeout(tx);
         return ok({
+          hash: tx.hash,
+          explorerUrl: tx.explorerUrl,
           pool: poolAddr,
-          isMember: false,
+          amount: amount.toUnit(),
+          symbol: token.symbol,
         });
       }
-      return ok({
-        pool: poolAddr,
-        isMember: true,
-        staked: position.staked.toUnit(),
-        stakedFormatted: position.staked.toFormatted(),
-        rewards: position.rewards.toUnit(),
-        rewardsFormatted: position.rewards.toFormatted(),
-        total: position.total.toUnit(),
-        totalFormatted: position.total.toFormatted(),
-        commissionPercent: position.commissionPercent,
-        unpooling: position.unpooling.toUnit(),
-        unpoolTime: position.unpoolTime?.toISOString() ?? null,
-      });
-    }
 
-    // -----------------------------------------------------------------------
-    // Estimate fee (read-only)
-    // -----------------------------------------------------------------------
-    case "x_estimate_fee": {
-      const parsed = args as z.infer<typeof schemas.x_estimate_fee>;
-      const calls = parsed.calls.map((c) => ({
-        contractAddress: validateAddress(c.contractAddress, "contract"),
-        entrypoint: c.entrypoint,
-        calldata: c.calldata ?? [],
-      }));
-      const fee = await wallet.estimateFee(calls);
-      // starknet.js v9 EstimateFeeResponseOverhead: { overall_fee, resourceBounds, unit }
-      const { l1_gas, l2_gas, l1_data_gas } = fee.resourceBounds;
-      return ok({
-        overall_fee: fee.overall_fee.toString(),
-        unit: fee.unit,
-        resource_bounds: {
-          l1_gas: {
-            max_amount: l1_gas.max_amount.toString(),
-            max_price_per_unit: l1_gas.max_price_per_unit.toString(),
-          },
-          l2_gas: {
-            max_amount: l2_gas.max_amount.toString(),
-            max_price_per_unit: l2_gas.max_price_per_unit.toString(),
-          },
-          l1_data_gas: {
-            max_amount: l1_data_gas.max_amount.toString(),
-            max_price_per_unit: l1_data_gas.max_price_per_unit.toString(),
-          },
-        },
-      });
-    }
+      // -----------------------------------------------------------------------
+      // Staking — add to pool
+      // -----------------------------------------------------------------------
+      case "x_add_to_pool": {
+        const parsed = args as z.infer<typeof schemas.x_add_to_pool>;
+        const token = resolveToken(parsed.token ?? "STRK");
+        const amount = Amount.parse(parsed.amount, token);
+        assertAmountWithinCap(amount, token, maxAmount);
+        const poolAddr = validateAddress(parsed.pool, "pool");
+        const tx = await wallet.addToPool(poolAddr, amount);
+        await waitWithTimeout(tx);
+        return ok({
+          hash: tx.hash,
+          explorerUrl: tx.explorerUrl,
+          pool: poolAddr,
+          amount: amount.toUnit(),
+          symbol: token.symbol,
+        });
+      }
 
-    default:
-      throw new Error(`Unknown tool: ${name}`);
-  }
+      // -----------------------------------------------------------------------
+      // Staking — claim rewards
+      // -----------------------------------------------------------------------
+      case "x_claim_rewards": {
+        const parsed = args as z.infer<typeof schemas.x_claim_rewards>;
+        const poolAddr = validateAddress(parsed.pool, "pool");
+        const tx = await wallet.claimPoolRewards(poolAddr);
+        await waitWithTimeout(tx);
+        return ok({
+          hash: tx.hash,
+          explorerUrl: tx.explorerUrl,
+          pool: poolAddr,
+        });
+      }
+
+      // -----------------------------------------------------------------------
+      // Staking — exit intent
+      // -----------------------------------------------------------------------
+      case "x_exit_pool_intent": {
+        const parsed = args as z.infer<typeof schemas.x_exit_pool_intent>;
+        const token = resolveToken(parsed.token ?? "STRK");
+        const amount = Amount.parse(parsed.amount, token);
+        assertAmountWithinCap(amount, token, maxAmount);
+        const poolAddr = validateAddress(parsed.pool, "pool");
+        const tx = await wallet.exitPoolIntent(poolAddr, amount);
+        await waitWithTimeout(tx);
+        return ok({
+          hash: tx.hash,
+          explorerUrl: tx.explorerUrl,
+          pool: poolAddr,
+          amount: amount.toUnit(),
+          symbol: token.symbol,
+          note: "Tokens stop earning rewards now. Call x_exit_pool after the waiting period.",
+        });
+      }
+
+      // -----------------------------------------------------------------------
+      // Staking — exit pool (complete)
+      // -----------------------------------------------------------------------
+      case "x_exit_pool": {
+        const parsed = args as z.infer<typeof schemas.x_exit_pool>;
+        const poolAddr = validateAddress(parsed.pool, "pool");
+        const tx = await wallet.exitPool(poolAddr);
+        await waitWithTimeout(tx);
+        return ok({
+          hash: tx.hash,
+          explorerUrl: tx.explorerUrl,
+          pool: poolAddr,
+        });
+      }
+
+      // -----------------------------------------------------------------------
+      // Staking — get position (read-only)
+      // -----------------------------------------------------------------------
+      case "x_get_pool_position": {
+        const parsed = args as z.infer<typeof schemas.x_get_pool_position>;
+        const poolAddr = validateAddress(parsed.pool, "pool");
+        const position = await wallet.getPoolPosition(poolAddr);
+        if (!position) {
+          return ok({
+            pool: poolAddr,
+            isMember: false,
+          });
+        }
+        return ok({
+          pool: poolAddr,
+          isMember: true,
+          staked: position.staked.toUnit(),
+          stakedFormatted: position.staked.toFormatted(),
+          rewards: position.rewards.toUnit(),
+          rewardsFormatted: position.rewards.toFormatted(),
+          total: position.total.toUnit(),
+          totalFormatted: position.total.toFormatted(),
+          commissionPercent: position.commissionPercent,
+          unpooling: position.unpooling.toUnit(),
+          unpoolTime: position.unpoolTime?.toISOString() ?? null,
+        });
+      }
+
+      // -----------------------------------------------------------------------
+      // Estimate fee (read-only)
+      // -----------------------------------------------------------------------
+      case "x_estimate_fee": {
+        const parsed = args as z.infer<typeof schemas.x_estimate_fee>;
+        const calls = parsed.calls.map((c) => ({
+          contractAddress: validateAddress(c.contractAddress, "contract"),
+          entrypoint: c.entrypoint,
+          calldata: c.calldata ?? [],
+        }));
+        const fee = await wallet.estimateFee(calls);
+        // starknet.js v9 EstimateFeeResponseOverhead: { overall_fee, resourceBounds, unit }
+        const { l1_gas, l2_gas, l1_data_gas } = fee.resourceBounds;
+        return ok({
+          overall_fee: fee.overall_fee.toString(),
+          unit: fee.unit,
+          resource_bounds: {
+            l1_gas: {
+              max_amount: l1_gas.max_amount.toString(),
+              max_price_per_unit: l1_gas.max_price_per_unit.toString(),
+            },
+            l2_gas: {
+              max_amount: l2_gas.max_amount.toString(),
+              max_price_per_unit: l2_gas.max_price_per_unit.toString(),
+            },
+            l1_data_gas: {
+              max_amount: l1_data_gas.max_amount.toString(),
+              max_price_per_unit: l1_data_gas.max_price_per_unit.toString(),
+            },
+          },
+        });
+      }
+
+      default:
+        throw new Error(`Unknown tool: ${name}`);
+    }
+  };
+
+  return isWriteTool ? runSerializedWrite(exec) : exec();
 }
 
 // ---------------------------------------------------------------------------
@@ -907,6 +1222,12 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
             .map((i) => `${i.path.join(".")}: ${i.message}`)
             .join("; ")
         : undefined;
+    audit({
+      event: "tool_error",
+      tool: name,
+      message,
+      ...(details && { details }),
+    });
     return {
       content: [
         {
@@ -929,7 +1250,12 @@ async function main() {
     `x-mcp server running (network: ${network}, transport: stdio, ` +
       `write: ${enableWrite || enableExecute ? "ENABLED" : "disabled"}, ` +
       `execute: ${enableExecute ? "ENABLED" : "disabled"}, ` +
-      `max-amount: ${maxAmount})`
+      `confirm: ${requireConfirmation ? "ENABLED" : "disabled"}, ` +
+      `max-amount: ${maxAmount}, ` +
+      `max-writes-per-minute: ${
+        maxWritesPerMinute === 0 ? "unlimited" : maxWritesPerMinute
+      }, ` +
+      `confirmation-ttl-ms: ${confirmationTtlMs})`
   );
 }
 
