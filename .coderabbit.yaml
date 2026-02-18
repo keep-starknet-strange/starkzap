@@ -1,0 +1,92 @@
+# yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
+
+language: en-US
+early_access: true
+tone_instructions: >
+  Be direct, concise, and technically precise.
+  Focus on correctness, security, and performance.
+
+reviews:
+  profile: assertive
+  high_level_summary: true
+  poem: false
+  review_status: true
+  collapse_walkthrough: true
+  sequence_diagrams: false
+  changed_files_summary: true
+
+  auto_review:
+    enabled: true
+    drafts: false
+    base_branches:
+      - "^main$"
+
+  path_filters:
+    - "!dist/**"
+    - "!**/*.lock"
+    - "!**/package-lock.json"
+    - "!**/*.min.js"
+    - "!**/generated/**"
+
+  path_instructions:
+    - path: "src/**/*.ts"
+      instructions: |
+        This is the core x SDK (TypeScript). Review for:
+        - Type safety: no `any` types, proper generics, branded types for Address/Amount
+        - Starknet correctness: validate felt252 ranges, calldata encoding, signature schemes
+        - Security: no private keys in logs/errors, no unbounded approvals, no raw calldata from untrusted input
+        - Error handling: SDK errors should be descriptive and actionable
+        - Breaking changes: flag any public API signature changes
+
+    - path: "packages/mcp-server/**"
+      instructions: |
+        MCP server exposing wallet operations to AI agents. Review for:
+        - Security: all state-changing tools must be gated behind --enable-write/--enable-execute
+        - Amount caps: every operation accepting an amount must enforce --max-amount
+        - Address validation: all addresses must go through validateAddress() before use
+        - Token allowlist: only preset tokens should be accepted, never arbitrary addresses
+        - Defense-in-depth: runtime guards must exist even if tool filtering is in place
+        - Error messages: must be clear and actionable for AI agent consumption
+
+    - path: "**/*.test.ts"
+      instructions: |
+        Review test files for:
+        - Coverage of edge cases (zero amounts, max felt252, invalid addresses)
+        - No hardcoded private keys or secrets (use test fixtures)
+        - Deterministic assertions (no flaky timing-dependent tests)
+
+    - path: "scripts/**"
+      instructions: |
+        Review scripts for:
+        - No hardcoded secrets or credentials
+        - Proper error handling (set -e equivalent, exit codes)
+        - Idempotency where possible
+
+tools:
+  eslint:
+    enabled: true
+  biome:
+    enabled: true
+  markdownlint:
+    enabled: true
+  shellcheck:
+    enabled: true
+  gitleaks:
+    enabled: true
+  actionlint:
+    enabled: true
+  yamllint:
+    enabled: true
+  github-checks:
+    enabled: true
+    timeout_ms: 120000
+
+chat:
+  auto_reply: true
+
+knowledge_base:
+  opt_out: false
+  learnings:
+    scope: auto
+  pull_requests:
+    scope: auto
