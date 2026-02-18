@@ -11,26 +11,31 @@ Following the pattern established by [Stripe](https://github.com/stripe/agent-to
 ## Quick Start
 
 ```bash
+# Read-only mode (balance checks, fee estimates, pool positions)
 STARKNET_PRIVATE_KEY=0x... npx @keep-starknet-strange/x-mcp --network mainnet
+
+# Enable transfers and staking
+STARKNET_PRIVATE_KEY=0x... npx @keep-starknet-strange/x-mcp --network mainnet --enable-write
 ```
 
 ## Security Model
 
 This server handles real funds. The following protections are built in:
 
-1. **`x_execute` is disabled by default.** The raw contract call tool is only available when you explicitly pass `--enable-execute`. Without it, agents can only use the typed, bounded tools (transfer, stake, etc.).
-2. **Per-transfer amount cap.** Transfers are bounded by `--max-transfer` (default: 1000 tokens). An agent cannot send more than this in a single transfer entry.
+1. **All state-changing tools are disabled by default.** Read-only tools (`x_get_balance`, `x_get_pool_position`, `x_estimate_fee`) are always available. Write tools (`x_transfer`, staking, `x_deploy_account`) require `--enable-write`. The unrestricted `x_execute` tool requires its own `--enable-execute` flag.
+2. **Per-operation amount cap.** All amount-bearing operations (transfers and staking) are bounded by `--max-amount` (default: 1000 tokens). An agent cannot move more than this in a single operation.
 3. **Batch size limits.** Maximum 20 transfers per batch, 10 calls per execute batch.
 4. **Address validation.** All addresses are validated against Starknet felt252 format before use.
 5. **Runtime argument validation.** Every tool's arguments are validated with zod schemas before execution. Malformed inputs are rejected with clear error messages.
 6. **Transaction timeout.** `tx.wait()` has a 2-minute timeout to prevent the server from hanging on stuck transactions.
 7. **Token allowlist.** Only tokens in the x SDK's built-in presets are accepted. Arbitrary contract addresses for unknown tokens are rejected.
 8. **stdio transport only.** The server runs locally via stdio — no network exposure.
+9. **Early CLI validation.** Invalid `--network` values are rejected immediately at startup with a clear error.
 
 **Recommendations for production use:**
 
 - Use a dedicated agent wallet with limited funds, not your main wallet
-- Set `--max-transfer` to the lowest value that makes sense for your use case
+- Set `--max-amount` to the lowest value that makes sense for your use case
 - Do NOT pass `--enable-execute` unless you understand the risk (arbitrary contract calls)
 - Store `STARKNET_PRIVATE_KEY` in a secret manager, not in plaintext config
 
@@ -46,11 +51,12 @@ This server handles real funds. The following protections are built in:
 
 ### CLI Arguments
 
-| Argument           | Default   | Description                                         |
-| ------------------ | --------- | --------------------------------------------------- |
-| `--network`        | `mainnet` | Network preset: `mainnet` or `sepolia`              |
-| `--max-transfer`   | `1000`    | Max tokens per individual transfer (human-readable) |
-| `--enable-execute` | off       | Enable the unrestricted `x_execute` tool            |
+| Argument           | Default   | Description                                                   |
+| ------------------ | --------- | ------------------------------------------------------------- |
+| `--network`        | `mainnet` | Network preset: `mainnet` or `sepolia` (validated at startup) |
+| `--max-amount`     | `1000`    | Max tokens per individual operation (transfers + staking)     |
+| `--enable-write`   | off       | Enable state-changing tools (transfer, stake, deploy)         |
+| `--enable-execute` | off       | Enable the unrestricted `x_execute` tool (implies write)      |
 
 ## MCP Client Configuration
 
@@ -63,7 +69,13 @@ Add to your MCP config (`mcp.json` or Claude Desktop settings):
   "mcpServers": {
     "x-wallet": {
       "command": "npx",
-      "args": ["-y", "@keep-starknet-strange/x-mcp", "--network", "mainnet"],
+      "args": [
+        "-y",
+        "@keep-starknet-strange/x-mcp",
+        "--network",
+        "mainnet",
+        "--enable-write"
+      ],
       "env": {
         "STARKNET_PRIVATE_KEY": "0xYOUR_PRIVATE_KEY"
       }
@@ -79,7 +91,13 @@ import { McpServerStdio } from "@openai/agents/mcp";
 
 const mcpServer = new McpServerStdio({
   command: "npx",
-  args: ["-y", "@keep-starknet-strange/x-mcp", "--network", "mainnet"],
+  args: [
+    "-y",
+    "@keep-starknet-strange/x-mcp",
+    "--network",
+    "mainnet",
+    "--enable-write",
+  ],
   env: {
     STARKNET_PRIVATE_KEY: "0x...",
   },
@@ -149,7 +167,8 @@ Tools accept token symbols (`ETH`, `STRK`, `USDC`, etc.) or contract addresses. 
 
 - [ ] Using a **dedicated agent wallet** with limited funds (not your main wallet)
 - [ ] `STARKNET_PRIVATE_KEY` stored in a secret manager, not plaintext
-- [ ] `--max-transfer` set to the lowest practical value for your use case
+- [ ] `--max-amount` set to the lowest practical value for your use case
+- [ ] `--enable-write` only passed when the agent needs to send transactions
 - [ ] `--enable-execute` is **NOT** passed unless explicitly needed
 - [ ] Running via **stdio** (local) — not exposed over HTTP without auth
 

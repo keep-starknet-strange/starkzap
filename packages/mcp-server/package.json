@@ -19,13 +19,13 @@
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.26.0",
-    "x": "file:../../",
     "zod": "^3.25.0"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
     "tsup": "^8.5.0",
-    "typescript": "^5.9.0"
+    "typescript": "^5.9.0",
+    "x": "file:../../"
   },
   "engines": {
     "node": ">=18"

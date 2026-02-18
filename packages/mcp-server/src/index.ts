@@ -11,9 +11,8 @@
  *   - x_get_pool_position Query staking position in a pool
  *   - x_estimate_fee      Estimate gas cost for a set of calls
  *
- * Tools (state-changing — require confirmation by default):
+ * Tools (state-changing — disabled by default, opt-in via --enable-write):
  *   - x_transfer          Send tokens to one or more recipients
- *   - x_execute           Execute raw contract calls (restricted by default)
  *   - x_deploy_account    Deploy the account contract on-chain
  *   - x_enter_pool        Enter a staking/delegation pool
  *   - x_add_to_pool       Add more tokens to an existing stake
@@ -21,10 +20,14 @@
  *   - x_exit_pool_intent  Start the exit process from a pool
  *   - x_exit_pool         Complete the exit after the waiting period
  *
+ * Tools (unrestricted — disabled by default, opt-in via --enable-execute):
+ *   - x_execute           Execute raw contract calls
+ *
  * Security:
+ *   - All state-changing tools disabled unless --enable-write is passed
  *   - All addresses are validated before use
- *   - Transfer amounts are bounded by MAX_TRANSFER_AMOUNT
- *   - x_execute is disabled by default (opt-in via --enable-execute)
+ *   - Operation amounts are bounded by --max-amount (default: 1000)
+ *   - x_execute requires separate --enable-execute flag
  *   - Tool argument schemas are validated at runtime with zod
  *
  * Usage:
@@ -62,9 +65,21 @@ function hasFlag(name: string): boolean {
   return cliArgs.includes(`--${name}`);
 }
 
-const network = getArg("network", "mainnet") as "mainnet" | "sepolia";
+const VALID_NETWORKS = ["mainnet", "sepolia"] as const;
+type Network = (typeof VALID_NETWORKS)[number];
+
+const rawNetwork = getArg("network", "mainnet");
+if (!VALID_NETWORKS.includes(rawNetwork as Network)) {
+  console.error(
+    `Error: Invalid --network value "${rawNetwork}". Must be one of: ${VALID_NETWORKS.join(", ")}`
+  );
+  process.exit(1);
+}
+const network: Network = rawNetwork as Network;
+
+const enableWrite = hasFlag("enable-write");
 const enableExecute = hasFlag("enable-execute");
-const maxTransferAmount = getArg("max-transfer", "1000"); // human-readable cap per transfer
+const maxAmount = getArg("max-amount", "1000"); // human-readable cap per write operation
 
 // ---------------------------------------------------------------------------
 // Environment
@@ -276,7 +291,7 @@ const allTools: Tool[] = [
     name: "x_transfer",
     description:
       `Transfer ERC20 tokens to one or more recipients in a single transaction. ` +
-      `Maximum ${maxTransferAmount} tokens per individual transfer. Maximum 20 recipients per batch.`,
+      `Maximum ${maxAmount} tokens per individual transfer. Maximum 20 recipients per batch.`,
     inputSchema: {
       type: "object" as const,
       properties: {
@@ -292,7 +307,7 @@ const allTools: Tool[] = [
               to: { type: "string", description: "Recipient address (0x...)" },
               amount: {
                 type: "string",
-                description: `Human-readable amount (e.g. "10.5"). Max ${maxTransferAmount} per transfer.`,
+                description: `Human-readable amount (e.g. "10.5"). Max ${maxAmount} per transfer.`,
               },
             },
             required: ["to", "amount"],
@@ -360,8 +375,7 @@ const allTools: Tool[] = [
   },
   {
     name: "x_enter_pool",
-    description:
-      "Enter a staking/delegation pool as a new member. Handles token approval automatically.",
+    description: `Enter a staking/delegation pool as a new member. Handles token approval automatically. Maximum ${maxAmount} tokens per operation.`,
     inputSchema: {
       type: "object" as const,
       properties: {
@@ -383,7 +397,7 @@ const allTools: Tool[] = [
   },
   {
     name: "x_add_to_pool",
-    description: "Add more tokens to an existing stake in a pool.",
+    description: `Add more tokens to an existing stake in a pool. Maximum ${maxAmount} tokens per operation.`,
     inputSchema: {
       type: "object" as const,
       properties: {
@@ -419,8 +433,7 @@ const allTools: Tool[] = [
   },
   {
     name: "x_exit_pool_intent",
-    description:
-      "Start the exit process from a pool. Tokens stop earning rewards immediately. Must wait for the exit window before calling x_exit_pool.",
+    description: `Start the exit process from a pool. Maximum ${maxAmount} tokens per operation. Tokens stop earning rewards immediately. Must wait for the exit window before calling x_exit_pool.`,
     inputSchema: {
       type: "object" as const,
       properties: {
@@ -505,16 +518,35 @@ const allTools: Tool[] = [
   },
 ];
 
-// Filter tools based on flags
-const tools: Tool[] = enableExecute
-  ? allTools
-  : allTools.filter((t) => t.name !== "x_execute");
+// ---------------------------------------------------------------------------
+// Tool access control
+// ---------------------------------------------------------------------------
+const READ_ONLY_TOOLS = new Set([
+  "x_get_balance",
+  "x_get_pool_position",
+  "x_estimate_fee",
+]);
+
+const STAKING_TOOLS = new Set([
+  "x_enter_pool",
+  "x_add_to_pool",
+  "x_claim_rewards",
+  "x_exit_pool_intent",
+  "x_exit_pool",
+  "x_get_pool_position",
+]);
+
+const tools: Tool[] = allTools.filter((t) => {
+  if (READ_ONLY_TOOLS.has(t.name)) return true;
+  if (t.name === "x_execute") return enableExecute;
+  return enableWrite || enableExecute; // --enable-execute implies write access
+});
 
 // ---------------------------------------------------------------------------
 // Tool handlers
 // ---------------------------------------------------------------------------
 
-/** Validates a single transfer amount against the configured cap. */
+/** Validates a single operation amount against the configured cap. */
 function assertAmountWithinCap(
   amount: Amount,
   token: Token,
@@ -523,8 +555,8 @@ function assertAmountWithinCap(
   const capAmount = Amount.parse(cap, token);
   if (amount.gt(capAmount)) {
     throw new Error(
-      `Transfer amount ${amount.toUnit()} ${token.symbol} exceeds the per-transfer cap of ${cap}. ` +
-        `Adjust --max-transfer to increase the limit.`
+      `Amount ${amount.toUnit()} ${token.symbol} exceeds the per-operation cap of ${cap}. ` +
+        `Adjust --max-amount to increase the limit.`
     );
   }
 }
@@ -561,6 +593,30 @@ async function handleTool(
   }
   const args = schema.parse(rawArgs);
 
+  // Enforce write-tool gate at runtime (defense-in-depth: tool list is already
+  // filtered, but a malicious client could call tools by name directly).
+  if (!READ_ONLY_TOOLS.has(name)) {
+    if (name === "x_execute" && !enableExecute) {
+      throw new Error(
+        "x_execute is disabled. Start the server with --enable-execute to allow raw contract calls. " +
+          "WARNING: this gives the agent unrestricted access to execute any contract call."
+      );
+    }
+    if (name !== "x_execute" && !enableWrite && !enableExecute) {
+      throw new Error(
+        `${name} is a state-changing tool and is disabled by default. ` +
+          `Start the server with --enable-write to allow write operations.`
+      );
+    }
+  }
+
+  // Staking tools require STARKNET_STAKING_CONTRACT to be configured.
+  if (STAKING_TOOLS.has(name) && !env.STARKNET_STAKING_CONTRACT) {
+    throw new Error(
+      `${name} requires the STARKNET_STAKING_CONTRACT environment variable to be set.`
+    );
+  }
+
   const wallet = await getWallet();
 
   const ok = (data: unknown) => ({
@@ -593,7 +649,7 @@ async function handleTool(
       const token = resolveToken(parsed.token);
       const transfers = parsed.transfers.map((t) => {
         const amount = Amount.parse(t.amount, token);
-        assertAmountWithinCap(amount, token, maxTransferAmount);
+        assertAmountWithinCap(amount, token, maxAmount);
         return {
           to: validateAddress(t.to, "recipient"),
           amount,
@@ -619,12 +675,6 @@ async function handleTool(
     // Execute (state-changing, restricted)
     // -----------------------------------------------------------------------
     case "x_execute": {
-      if (!enableExecute) {
-        throw new Error(
-          "x_execute is disabled. Start the server with --enable-execute to allow raw contract calls. " +
-            "WARNING: this gives the agent unrestricted access to execute any contract call."
-        );
-      }
       const parsed = args as z.infer<typeof schemas.x_execute>;
       const calls = parsed.calls.map((c) => ({
         contractAddress: validateAddress(c.contractAddress, "contract"),
@@ -675,6 +725,7 @@ async function handleTool(
       const parsed = args as z.infer<typeof schemas.x_enter_pool>;
       const token = resolveToken(parsed.token ?? "STRK");
       const amount = Amount.parse(parsed.amount, token);
+      assertAmountWithinCap(amount, token, maxAmount);
       const poolAddr = validateAddress(parsed.pool, "pool");
       const tx = await wallet.enterPool(poolAddr, amount);
       await waitWithTimeout(tx);
@@ -694,6 +745,7 @@ async function handleTool(
       const parsed = args as z.infer<typeof schemas.x_add_to_pool>;
       const token = resolveToken(parsed.token ?? "STRK");
       const amount = Amount.parse(parsed.amount, token);
+      assertAmountWithinCap(amount, token, maxAmount);
       const poolAddr = validateAddress(parsed.pool, "pool");
       const tx = await wallet.addToPool(poolAddr, amount);
       await waitWithTimeout(tx);
@@ -728,6 +780,7 @@ async function handleTool(
       const parsed = args as z.infer<typeof schemas.x_exit_pool_intent>;
       const token = resolveToken(parsed.token ?? "STRK");
       const amount = Amount.parse(parsed.amount, token);
+      assertAmountWithinCap(amount, token, maxAmount);
       const poolAddr = validateAddress(parsed.pool, "pool");
       const tx = await wallet.exitPoolIntent(poolAddr, amount);
       await waitWithTimeout(tx);
@@ -874,8 +927,9 @@ async function main() {
   await server.connect(transport);
   console.error(
     `x-mcp server running (network: ${network}, transport: stdio, ` +
+      `write: ${enableWrite || enableExecute ? "ENABLED" : "disabled"}, ` +
       `execute: ${enableExecute ? "ENABLED" : "disabled"}, ` +
-      `max-transfer: ${maxTransferAmount})`
+      `max-amount: ${maxAmount})`
   );
 }
 
