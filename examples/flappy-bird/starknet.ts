@@ -20,9 +20,9 @@ export const GAME_CONTRACT = getChecksumAddress(
 );
 
 const GAME_POLICIES = [
-  { target: GAME_CONTRACT, method: "start_new_game" },
-  { target: GAME_CONTRACT, method: "increment_score" },
   { target: GAME_CONTRACT, method: "end_game" },
+  { target: GAME_CONTRACT, method: "increment_score" },
+  { target: GAME_CONTRACT, method: "start_new_game" },
 ];
 
 // ABI for view calls — matches FOS (https://github.com/0xsisyfos/fos/blob/main/src/hooks/useGameContract.js)
