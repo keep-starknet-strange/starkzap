@@ -63,6 +63,25 @@ export class Staking {
   }
 
   /**
+   * Ensure an Amount matches this pool token's decimals and symbol.
+   */
+  private assertAmountMatchesToken(amount: Amount): void {
+    const amountDecimals = amount.getDecimals();
+    if (amountDecimals !== this.token.decimals) {
+      throw new Error(
+        `Amount decimals mismatch: expected ${this.token.decimals} (${this.token.symbol}), got ${amountDecimals}`
+      );
+    }
+
+    const amountSymbol = amount.getSymbol();
+    if (amountSymbol !== undefined && amountSymbol !== this.token.symbol) {
+      throw new Error(
+        `Amount symbol mismatch: expected "${this.token.symbol}", got "${amountSymbol}"`
+      );
+    }
+  }
+
+  /**
    * The pool contract address for this staking instance.
    *
    * @returns The Starknet address of the delegation pool contract
@@ -77,6 +96,7 @@ export class Staking {
    * @internal Used by {@link TxBuilder} — not part of the public API.
    */
   populateEnter(walletAddress: Address, amount: Amount): Call[] {
+    this.assertAmountMatchesToken(amount);
     const tokenContract = this.tokenContract(this.provider);
     const approveCall = tokenContract.populateTransaction.approve(
       this.pool.address,
@@ -112,6 +132,7 @@ export class Staking {
     amount: Amount,
     options?: ExecuteOptions
   ): Promise<Tx> {
+    this.assertAmountMatchesToken(amount);
     if (await this.isMember(wallet)) {
       throw new Error(
         `Wallet ${wallet.address} is already a member in pool ${this.pool.address}`
@@ -146,6 +167,7 @@ export class Staking {
     amount: Amount,
     options?: ExecuteOptions
   ): Promise<Tx> {
+    this.assertAmountMatchesToken(amount);
     const isMember = await this.isMember(wallet);
     const calls = isMember
       ? this.populateAdd(wallet.address, amount)
@@ -244,6 +266,7 @@ export class Staking {
    * @internal Used by {@link TxBuilder} — not part of the public API.
    */
   populateAdd(walletAddress: Address, amount: Amount): Call[] {
+    this.assertAmountMatchesToken(amount);
     const tokenContract = this.tokenContract(this.provider);
     const approveCall = tokenContract.populateTransaction.approve(
       this.pool.address,
@@ -278,6 +301,7 @@ export class Staking {
     amount: Amount,
     options?: ExecuteOptions
   ): Promise<Tx> {
+    this.assertAmountMatchesToken(amount);
     await this.assertIsMember(wallet);
     const calls = this.populateAdd(wallet.address, amount);
     return await wallet.execute(calls, options);
@@ -338,6 +362,7 @@ export class Staking {
    * @internal Used by {@link TxBuilder} — not part of the public API.
    */
   populateExitIntent(amount: Amount): Call {
+    this.assertAmountMatchesToken(amount);
     return this.pool.populateTransaction.exit_delegation_pool_intent(
       amount.toBase()
     );
@@ -381,6 +406,7 @@ export class Staking {
     amount: Amount,
     options?: ExecuteOptions
   ): Promise<Tx> {
+    this.assertAmountMatchesToken(amount);
     const member = await this.assertIsMember(wallet);
 
     if (!member.unpooling.isZero()) {

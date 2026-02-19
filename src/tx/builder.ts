@@ -52,10 +52,45 @@ import type {
 export class TxBuilder {
   private readonly wallet: WalletInterface;
   private readonly pending: (Call[] | Promise<Call[]>)[] = [];
+  private readonly pendingErrors: unknown[] = [];
   private sent = false;
+  private sendPromise: Promise<Tx> | null = null;
 
   constructor(wallet: WalletInterface) {
     this.wallet = wallet;
+  }
+
+  private queueAsyncCalls(promise: Promise<Call[]>): void {
+    const tracked = promise.catch((error) => {
+      this.pendingErrors.push(error);
+      return [];
+    });
+    this.pending.push(tracked);
+  }
+
+  private throwPendingErrorsIfAny(): void {
+    if (this.pendingErrors.length === 0) {
+      return;
+    }
+
+    const errors = this.pendingErrors.splice(0, this.pendingErrors.length);
+    if (errors.length === 1) {
+      const first = errors[0];
+      throw first instanceof Error
+        ? first
+        : new Error(String(first ?? "Unknown async builder error"));
+    }
+
+    const messages = errors
+      .map((error) =>
+        error instanceof Error
+          ? error.message
+          : String(error ?? "Unknown async builder error")
+      )
+      .join("; ");
+    throw new Error(
+      `Multiple transaction builder operations failed: ${messages}`
+    );
   }
 
   // ============================================================
@@ -216,8 +251,7 @@ export class TxBuilder {
         ? s.populateAdd(this.wallet.address, amount)
         : s.populateEnter(this.wallet.address, amount);
     });
-    p.catch(() => {});
-    this.pending.push(p);
+    this.queueAsyncCalls(p);
     return this;
   }
 
@@ -245,8 +279,7 @@ export class TxBuilder {
     const p = this.wallet
       .staking(poolAddress)
       .then((s) => s.populateEnter(this.wallet.address, amount));
-    p.catch(() => {});
-    this.pending.push(p);
+    this.queueAsyncCalls(p);
     return this;
   }
 
@@ -274,8 +307,7 @@ export class TxBuilder {
     const p = this.wallet
       .staking(poolAddress)
       .then((s) => s.populateAdd(this.wallet.address, amount));
-    p.catch(() => {});
-    this.pending.push(p);
+    this.queueAsyncCalls(p);
     return this;
   }
 
@@ -300,8 +332,7 @@ export class TxBuilder {
     const p = this.wallet
       .staking(poolAddress)
       .then((s) => [s.populateClaimRewards(this.wallet.address)]);
-    p.catch(() => {});
-    this.pending.push(p);
+    this.queueAsyncCalls(p);
     return this;
   }
 
@@ -330,8 +361,7 @@ export class TxBuilder {
     const p = this.wallet
       .staking(poolAddress)
       .then((s) => [s.populateExitIntent(amount)]);
-    p.catch(() => {});
-    this.pending.push(p);
+    this.queueAsyncCalls(p);
     return this;
   }
 
@@ -356,8 +386,7 @@ export class TxBuilder {
     const p = this.wallet
       .staking(poolAddress)
       .then((s) => [s.populateExit(this.wallet.address)]);
-    p.catch(() => {});
-    this.pending.push(p);
+    this.queueAsyncCalls(p);
     return this;
   }
 
@@ -384,6 +413,7 @@ export class TxBuilder {
    */
   async calls(): Promise<Call[]> {
     const resolved = await Promise.all(this.pending);
+    this.throwPendingErrorsIfAny();
     return resolved.flat();
   }
 
@@ -466,16 +496,27 @@ export class TxBuilder {
     if (this.sent) {
       throw new Error("This transaction has already been sent.");
     }
-
-    const calls = await this.calls();
-    if (calls.length === 0) {
-      throw new Error(
-        "No calls to execute. Add at least one operation before calling send()."
-      );
+    if (this.sendPromise) {
+      throw new Error("This transaction is currently being sent.");
     }
 
-    const tx = await this.wallet.execute(calls, options);
-    this.sent = true;
-    return tx;
+    this.sendPromise = (async () => {
+      const calls = await this.calls();
+      if (calls.length === 0) {
+        throw new Error(
+          "No calls to execute. Add at least one operation before calling send()."
+        );
+      }
+
+      const tx = await this.wallet.execute(calls, options);
+      this.sent = true;
+      return tx;
+    })();
+
+    try {
+      return await this.sendPromise;
+    } finally {
+      this.sendPromise = null;
+    }
   }
 }

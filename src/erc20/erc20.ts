@@ -38,6 +38,7 @@ import { ABI as ERC20_ABI } from "@/abi/erc20";
 export class Erc20 {
   private readonly token: Token;
   private readonly contract: TypedContractV2<typeof ERC20_ABI>;
+  private balanceEntrypoint: "balance_of" | "balanceOf" | null = null;
 
   constructor(token: Token, provider: RpcProvider) {
     this.token = token;
@@ -145,13 +146,19 @@ export class Erc20 {
    */
   public async balanceOf(wallet: WalletInterface): Promise<Amount> {
     let result: number | bigint | Uint256;
-    try {
-      result = await this.contract.balance_of(wallet.address);
-    } catch (error) {
-      if (error instanceof RpcError && error.isType("ENTRYPOINT_NOT_FOUND")) {
-        result = await this.contract.balanceOf(wallet.address);
-      } else {
-        throw error;
+    if (this.balanceEntrypoint === "balanceOf") {
+      result = await this.contract.balanceOf(wallet.address);
+    } else {
+      try {
+        result = await this.contract.balance_of(wallet.address);
+        this.balanceEntrypoint = "balance_of";
+      } catch (error) {
+        if (error instanceof RpcError && error.isType("ENTRYPOINT_NOT_FOUND")) {
+          result = await this.contract.balanceOf(wallet.address);
+          this.balanceEntrypoint = "balanceOf";
+        } else {
+          throw error;
+        }
       }
     }
 
