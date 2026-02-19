@@ -13,7 +13,11 @@ const MAX_SCIENTIFIC_EXPONENT = 10_000;
 const NBSP = "\u00A0";
 
 function assertValidDecimals(decimals: number): void {
-  if (!Number.isFinite(decimals) || !Number.isInteger(decimals) || decimals < 0) {
+  if (
+    !Number.isFinite(decimals) ||
+    !Number.isInteger(decimals) ||
+    decimals < 0
+  ) {
     throw new Error(
       `Invalid decimals: ${decimals}. Must be a non-negative integer.`
     );
@@ -49,9 +53,7 @@ function expandScientificNotation(value: string): string {
     throw new Error(`Invalid scientific notation exponent: ${exponentRaw}`);
   }
   if (Math.abs(exponent) > MAX_SCIENTIFIC_EXPONENT) {
-    throw new Error(
-      `Scientific notation exponent too large: ${exponentRaw}.`
-    );
+    throw new Error(`Scientific notation exponent too large: ${exponentRaw}.`);
   }
 
   if (exponent >= 0) {
@@ -75,7 +77,9 @@ function expandScientificNotation(value: string): string {
 function normalizeUnitNumberish(amount: BigNumberish): string {
   if (typeof amount === "number") {
     if (!Number.isFinite(amount) || amount < 0) {
-      throw new Error(`Invalid unit amount: "${amount}". Must be a positive number.`);
+      throw new Error(
+        `Invalid unit amount: "${amount}". Must be a positive number.`
+      );
     }
 
     if (Number.isInteger(amount) && !Number.isSafeInteger(amount)) {
@@ -102,7 +106,9 @@ function normalizeUnitNumberish(amount: BigNumberish): string {
 function normalizeRawNumberish(amount: BigNumberish): string {
   if (typeof amount === "number") {
     if (!Number.isFinite(amount) || amount < 0) {
-      throw new Error(`Invalid raw amount: "${amount}". Must be a non-negative integer.`);
+      throw new Error(
+        `Invalid raw amount: "${amount}". Must be a non-negative integer.`
+      );
     }
     if (!Number.isInteger(amount)) {
       throw new Error(

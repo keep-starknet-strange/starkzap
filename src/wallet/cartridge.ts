@@ -147,10 +147,7 @@ export class CartridgeWallet extends BaseWallet {
     let waited = 0;
     let pollIntervalMs = INITIAL_CONTROLLER_POLL_MS;
     while (!controller.isReady() && waited < MAX_CONTROLLER_WAIT_MS) {
-      const sleepMs = Math.min(
-        pollIntervalMs,
-        MAX_CONTROLLER_WAIT_MS - waited
-      );
+      const sleepMs = Math.min(pollIntervalMs, MAX_CONTROLLER_WAIT_MS - waited);
       await new Promise((resolve) => setTimeout(resolve, sleepMs));
       waited += sleepMs;
       pollIntervalMs = Math.min(pollIntervalMs * 2, MAX_CONTROLLER_POLL_MS);

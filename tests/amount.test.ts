@@ -282,9 +282,9 @@ describe("Amount", () => {
       });
 
       it("should reject unsafe integer numbers", () => {
-        expect(() => Amount.fromRaw(Number.MAX_SAFE_INTEGER + 1, 6, "USDC")).toThrow(
-          "safe integers"
-        );
+        expect(() =>
+          Amount.fromRaw(Number.MAX_SAFE_INTEGER + 1, 6, "USDC")
+        ).toThrow("safe integers");
       });
     });
 
@@ -824,9 +824,7 @@ describe("Amount arithmetic operations", () => {
 
     it("should throw a precision error on tiny non-zero divisors", () => {
       const amount = Amount.parse("10", 18, "ETH");
-      expect(() => amount.divide("0.0000000000000000001")).toThrow(
-        "too small"
-      );
+      expect(() => amount.divide("0.0000000000000000001")).toThrow("too small");
     });
 
     it("should preserve decimals and symbol", () => {

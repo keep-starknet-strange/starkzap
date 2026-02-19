@@ -380,7 +380,7 @@ export class StarkSDK {
 
     await this.ensureProviderChainMatchesConfig();
 
-    const { CartridgeWallet } = await import("./wallet/cartridge.js");
+    const { CartridgeWallet } = await import("./wallet/cartridge");
     const explorer = options.explorer ?? this.config.explorer;
     const wallet = await CartridgeWallet.create(
       {
