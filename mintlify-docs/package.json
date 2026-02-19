@@ -1,7 +1,7 @@
 {
   "name": "consumer-app-sdk-docs",
   "version": "1.0.0",
-  "description": "Mintlify documentation for Consumer App SDK",
+  "description": "Mintlify documentation for Starkzap",
   "scripts": {
     "dev": "mintlify dev",
     "build": "mintlify build",

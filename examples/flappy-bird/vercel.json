@@ -1,0 +1,6 @@
+{
+  "buildCommand": "npm run build",
+  "outputDirectory": "dist",
+  "framework": "vite",
+  "installCommand": "cd ../.. && npm install && npm run build && cd examples/flappy-bird && npm install"
+}

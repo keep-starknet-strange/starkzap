@@ -10,7 +10,7 @@ description: "Paymaster integration for covering transaction gas costs on behalf
 - **Gasfree**: You sponsor all gas costs for your users
 - **Gasless**: Users pay gas in any supported token (USDC, USDT, etc.) instead of STRK
 
-AVNU pioneered paymaster on Starknet and powers 50+ dApps. The Consumer App SDK integrates seamlessly with AVNU Paymaster for sponsored transactions.
+AVNU pioneered paymaster on Starknet and powers 50+ dApps. Starkzap integrates seamlessly with AVNU Paymaster for sponsored transactions.
 
 <Info>
   **For complete setup instructions and detailed configuration**, see the [Paymasters Guide](/build/consumer-app-sdk/paymasters) which covers both AVNU Paymaster and Cartridge's built-in paymaster with step-by-step instructions, code examples, and best practices.
@@ -28,7 +28,7 @@ AVNU pioneered paymaster on Starknet and powers 50+ dApps. The Consumer App SDK 
 ### Basic Configuration
 
 ```typescript
-import { StarkSDK } from "x";
+import { StarkSDK } from "starkzap";
 
 const sdk = new StarkSDK({
   network: "mainnet",

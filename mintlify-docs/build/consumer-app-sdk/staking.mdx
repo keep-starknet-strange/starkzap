@@ -6,7 +6,7 @@ icon: chart-line
 
 ## Overview
 
-The Consumer App SDK supports Starknet's native staking protocol. Validators run pools where delegators can stake tokens and earn rewards.
+Starkzap supports Starknet's native staking protocol. Validators run pools where delegators can stake tokens and earn rewards.
 
 **What users can do with staking:**
 - 💰 **Earn passive income** - Stake tokens (like STRK) and earn rewards over time, similar to a savings account with interest
@@ -25,7 +25,7 @@ The Consumer App SDK supports Starknet's native staking protocol. Validators run
 Staking works out of the box when using a supported chain preset:
 
 ```typescript
-import { StarkSDK } from "x";
+import { StarkSDK } from "starkzap";
 
 const sdk = new StarkSDK({
   network: "mainnet",
@@ -35,7 +35,7 @@ const sdk = new StarkSDK({
 Optional override:
 
 ```typescript
-import { StarkSDK, fromAddress } from "x";
+import { StarkSDK, fromAddress } from "starkzap";
 
 const sdk = new StarkSDK({
   network: "mainnet",
@@ -52,7 +52,7 @@ const sdk = new StarkSDK({
 ### Using Validator Presets
 
 ```typescript
-import { mainnetValidators, sepoliaValidators } from "x";
+import { mainnetValidators, sepoliaValidators } from "starkzap";
 
 // Use built-in validator presets
 for (const validator of Object.values(mainnetValidators)) {

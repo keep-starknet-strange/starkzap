@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+   <head>
+      <title>Floppy Bird × Starknet | StarkZap SDK</title>
+      <meta http-equiv="content-type" content="text/html; charset=utf-8" />
+      <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0" />
+
+      <link href="/css/reset.css" rel="stylesheet">
+      <link href="/css/main.css" rel="stylesheet">
+      <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+      <style>
+         /* FOS-style controller & leaderboard (https://github.com/0xsisyfos/fos) */
+         .controller-ui { position: absolute; top: 20px; right: 20px; display: flex; flex-direction: column; gap: 8px; z-index: 3000; }
+         .controller-btn, .leaderboard-btn {
+            padding: 6px 8px; font-size: 8px; color: #fff; border: 2px solid #34495e; border-radius: 4px;
+            cursor: pointer; font-family: 'Press Start 2P', cursive; text-shadow: 1px 1px 0 rgba(0,0,0,0.5);
+            transition: all 0.2s ease; box-shadow: 2px 2px 0 #34495e; background-color: #2c3e50;
+         }
+         .leaderboard-btn { top: 40px; background-color: #2c3e50; }
+         .controller-btn:hover, .leaderboard-btn:hover { transform: translate(1px, 1px); box-shadow: 1px 1px 0 #34495e; }
+         .controller-btn:active, .leaderboard-btn:active { transform: translate(2px, 2px); box-shadow: none; }
+         .controller-btn:disabled { opacity: 0.7; cursor: not-allowed; }
+         .overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background-color: rgba(0,0,0,0.7); display: none; justify-content: center; align-items: center; z-index: 10000; }
+         .overlay.show { display: flex; }
+         .popup {
+            background-color: #4ec0ca; border: 4px solid #2c3e50; border-radius: 0; padding: 20px;
+            width: 90%; max-width: 400px; max-height: 80vh; overflow-y: auto; position: relative;
+            box-shadow: 4px 4px 0 #2c3e50; font-family: 'Press Start 2P', cursive;
+         }
+         .popup-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; padding-bottom: 10px; border-bottom: 2px solid #2c3e50; }
+         .popup-title { margin: 0; color: #2c3e50; font-size: 12px; text-shadow: 2px 2px 0 rgba(0,0,0,0.2); }
+         .close-btn { background: none; border: none; font-size: 16px; cursor: pointer; color: #2c3e50; padding: 4px 8px; line-height: 1; font-family: 'Press Start 2P', cursive; }
+         .popup-content { display: flex; flex-direction: column; gap: 8px; font-size: 8px; color: #2c3e50; text-shadow: 1px 1px 0 rgba(0,0,0,0.1); }
+         .leaderboard-entry { display: flex; justify-content: space-between; align-items: center; padding: 8px; background: rgba(255,255,255,0.9); border: 2px solid #2c3e50; font-size: 8px; }
+         .leaderboard-entry .rank { font-weight: bold; min-width: 30px; }
+         .leaderboard-entry .addr { flex: 1; margin: 0 10px; overflow: hidden; text-overflow: ellipsis; }
+         .leaderboard-entry .score { font-weight: bold; }
+         #leaderboard-list .muted { font-size: 8px; color: #2c3e50; padding: 12px; }
+         .address-line { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+         .address-line .address-actions { display: flex; gap: 6px; align-items: center; }
+         .address-copy-btn { padding: 4px 6px; font-size: 6px; font-family: 'Press Start 2P', cursive; background: #2c3e50; color: #fff; border: 2px solid #34495e; border-radius: 4px; cursor: pointer; }
+         .address-copy-btn:hover { background: #34495e; }
+         .address-voyager-link { font-size: 6px; color: #2c3e50; text-decoration: underline; }
+         .address-voyager-link:hover { color: #1a252f; }
+      </style>
+   </head>
+   <body>
+      <div id="gamecontainer">
+         <div id="gamescreen">
+            <div id="sky" class="animated">
+               <div id="flyarea">
+                  <div id="ceiling" class="animated"></div>
+                  <div id="player" class="bird animated"></div>
+                  <div id="bigscore"></div>
+                  <div id="splash"></div>
+                  <div class="controller-ui">
+                     <button type="button" id="starknet-connect" class="controller-btn">Connect Controller</button>
+                     <button type="button" id="starknet-leaderboard" class="leaderboard-btn">Leaderboard</button>
+                  </div>
+                  <div id="scoreboard">
+                     <div id="medal"></div>
+                     <div id="currentscore"></div>
+                     <div id="highscore"></div>
+                     <div id="replay"><img src="/assets/replay.png" alt="replay"></div>
+                  </div>
+               </div>
+            </div>
+            <div id="land" class="animated"><div id="debug"></div></div>
+         </div>
+      </div>
+      <div id="footer">
+         <a href="https://www.dotgears.com/">original game/concept/art by dong nguyen</a>
+         <a href="https://nebezb.com/">recreated by nebez briefkani</a>
+         <a href="https://github.com/nebez/floppybird/">view github project</a>
+         This is a demo of StarkZap SDK using the Cartridge Controller.
+      </div>
+      <div class="boundingbox" id="playerbox"></div>
+      <div class="boundingbox" id="pipebox"></div>
+
+      <!-- Controller status popup (FOS-style) -->
+      <div id="controller-overlay" class="overlay">
+         <div class="popup">
+            <div class="popup-header">
+               <h2 class="popup-title">Controller Status</h2>
+               <button type="button" class="close-btn" id="controller-popup-close" aria-label="Close">×</button>
+            </div>
+            <div class="popup-content" id="controller-popup-content">
+               <p id="controller-status-line">Status: Disconnected</p>
+               <p id="controller-username-line" style="display:none;"></p>
+               <p id="controller-address-line" class="address-line" style="display:none;">
+                  <span id="controller-address-short"></span>
+                  <span class="address-actions">
+                     <button type="button" class="address-copy-btn" id="controller-address-copy" title="Copy address">Copy</button>
+                     <a id="controller-address-voyager" class="address-voyager-link" target="_blank" rel="noopener noreferrer" title="Open in Voyager">Voyager</a>
+                  </span>
+               </p>
+               <button type="button" class="controller-btn" id="starknet-disconnect">Disconnect</button>
+            </div>
+         </div>
+      </div>
+
+      <!-- Leaderboard popup (FOS-style) -->
+      <div id="leaderboard-overlay" class="overlay">
+         <div class="popup">
+            <div class="popup-header">
+               <h2 class="popup-title">Top 10 Players</h2>
+               <button type="button" class="close-btn" id="leaderboard-popup-close" aria-label="Close">×</button>
+            </div>
+            <div id="leaderboard-list" class="popup-content"></div>
+         </div>
+      </div>
+
+      <script src="/js/jquery.min.js"></script>
+      <script src="/js/jquery.transit.min.js"></script>
+      <script src="/js/buzz.min.js"></script>
+      <script src="/js/main.js"></script>
+      <script type="module" src="/main.ts"></script>
+   </body>
+</html>

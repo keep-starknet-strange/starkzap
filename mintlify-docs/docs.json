@@ -1,5 +1,5 @@
 {
-  "name": "Consumer App SDK Documentation",
+  "name": "Starkzap Documentation",
   "theme": "mint",
   "favicon": "/favicon.svg",
   "colors": {
@@ -9,19 +9,7 @@
   },
   "topbarLinks": [
     {
-      "name": "Starknet Ecosystem Founders",
-      "url": "https://t.me/+J6u7yj3DrghiZDA1"
-    },
-    {
-      "name": "Cairo Core Stars",
-      "url": "https://t.me/sncorestars"
-    },
-    {
-      "name": "Starknet Ecosystem",
-      "url": "https://t.me/+9xp-85igaUtlYTY8"
-    },
-    {
-      "name": "Discord",
+      "name": "Support",
       "url": "https://discord.gg/starknet-community"
     }
   ],
@@ -36,22 +24,7 @@
       "url": "https://docs.starknet.io"
     },
     {
-      "name": "Ecosystem Founders",
-      "icon": "users",
-      "url": "https://t.me/+J6u7yj3DrghiZDA1"
-    },
-    {
-      "name": "Cairo Core Stars",
-      "icon": "star",
-      "url": "https://t.me/sncorestars"
-    },
-    {
-      "name": "Starknet Ecosystem",
-      "icon": "globe",
-      "url": "https://t.me/+9xp-85igaUtlYTY8"
-    },
-    {
-      "name": "Discord",
+      "name": "Community",
       "icon": "slack",
       "url": "https://discord.gg/starknet-community"
     }

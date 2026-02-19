@@ -1,16 +1,16 @@
 ---
 title: Setup Cursor
-description: "Set up Cursor IDE and MCP with Consumer App SDK documentation for AI-powered development"
+description: "Set up Cursor IDE and MCP with Starkzap documentation for AI-powered development"
 icon: code
 ---
 
 ## Overview
 
-Using Docs in Cursor - Learn how to set up Cursor IDE and MCP with Consumer App SDK documentation
+Using Docs in Cursor - Learn how to set up Cursor IDE and MCP with Starkzap documentation
 
-## Setting Up LLM Integrations with Consumer App SDK
+## Setting Up LLM Integrations with Starkzap
 
-This guide covers two powerful ways to integrate Consumer App SDK with LLMs: Cursor IDE integration and Model Context Protocol (MCP) setup.
+This guide covers two powerful ways to integrate Starkzap with LLMs: Cursor IDE integration and Model Context Protocol (MCP) setup.
 
 ## Cursor IDE Setup
 
@@ -29,16 +29,16 @@ This guide covers two powerful ways to integrate Consumer App SDK with LLMs: Cur
    https://docs.starknet.io/llms-full.txt
    ```
 
-## Using Consumer App SDK Documentation in Cursor
+## Using Starkzap Documentation in Cursor
 
-Once configured, you can access Consumer App SDK's documentation directly within Cursor using the following methods:
+Once configured, you can access Starkzap's documentation directly within Cursor using the following methods:
 
 ### Method 1: Using @docs Command
 
-Type `@docs` followed by "Consumer App SDK" to reference the documentation in your code. For example:
+Type `@docs` followed by "Starkzap" to reference the documentation in your code. For example:
 
 ```typescript
-// @docs -> Consumer App SDK: How to initialize a wallet connection
+// @docs -> Starkzap: How to initialize a wallet connection
 const wallet = await sdk.onboard({
   strategy: OnboardStrategy.Privy,
   // ...
@@ -47,7 +47,7 @@ const wallet = await sdk.onboard({
 
 ### Method 2: Local Docs MCP Setup
 
-You can also ask questions about Consumer App SDK directly in comments, and Cursor will use the documentation to provide relevant answers and code suggestions.
+You can also ask questions about Starkzap directly in comments, and Cursor will use the documentation to provide relevant answers and code suggestions.
 
 ## Example Usage
 
@@ -55,8 +55,8 @@ Here are some examples of how to use the documentation in Cursor:
 
 **Initializing the SDK:**
 ```typescript
-// @docs -> Consumer App SDK: SDK initialization and configuration
-import { StarkSDK } from "x";
+// @docs -> Starkzap: SDK initialization and configuration
+import { StarkSDK } from "starkzap";
 
 const sdk = new StarkSDK({
   network: "mainnet",
@@ -65,7 +65,7 @@ const sdk = new StarkSDK({
 
 **Connecting a Wallet:**
 ```typescript
-// @docs -> Consumer App SDK: Wallet connection with Privy
+// @docs -> Starkzap: Wallet connection with Privy
 const accessToken = await privy.getAccessToken();
 
 const onboard = await sdk.onboard({
@@ -93,7 +93,7 @@ const onboard = await sdk.onboard({
 
 **Executing Transactions:**
 ```typescript
-// @docs -> Consumer App SDK: Transaction execution and batching
+// @docs -> Starkzap: Transaction execution and batching
 const tx = await wallet.execute([call]);
 await tx.wait();
 ```

@@ -6,7 +6,7 @@ icon: wallet
 
 ## Overview
 
-The Consumer App SDK supports multiple ways to connect wallets, each suited for different use cases and security requirements. This guide covers all available connection methods.
+Starkzap supports multiple ways to connect wallets, each suited for different use cases and security requirements. This guide covers all available connection methods.
 
 <Info>
   **New to wallets?** A **wallet** is like a bank account on the blockchain—it has an address (like an account number) and uses a **signer** (like authentication) to authorize transactions. A **signer** is what proves you own the wallet, similar to how OAuth tokens prove you're logged in. See the [Glossary](/build/consumer-app-sdk/glossary) for more details.
@@ -47,7 +47,7 @@ The simplest approach — sign transactions locally using a private key (like st
 </Info>
 
 ```typescript
-import { StarkSDK, StarkSigner, OpenZeppelinPreset } from "x";
+import { StarkSDK, StarkSigner, OpenZeppelinPreset } from "starkzap";
 
 const sdk = new StarkSDK({ network: "sepolia" });
 const signer = new StarkSigner("0xYOUR_PRIVATE_KEY");
@@ -87,7 +87,7 @@ const wallet = await sdk.connectWallet({
 **Option A: Provide your backend URL (recommended for mobile/web clients)**
 
 ```typescript
-import { StarkSDK, PrivySigner, ArgentXV050Preset } from "x";
+import { StarkSDK, PrivySigner, ArgentXV050Preset } from "starkzap";
 
 const accessToken = await privy.getAccessToken();
 const walletRes = await fetch("https://your-backend.com/api/wallet/starknet", {
@@ -115,7 +115,7 @@ Your backend endpoint receives `{ walletId, hash }` and must return `{ signature
 **Option B: Custom signing function (for server-side Node.js)**
 
 ```typescript
-import { PrivySigner } from "x";
+import { PrivySigner } from "starkzap";
 
 // Use the wallet identity returned by your /api/wallet/starknet endpoint
 const walletId = "wallet-id-from-backend";
@@ -146,7 +146,7 @@ const signer = new PrivySigner({
 </Info>
 
 ```typescript
-import { StarkSDK } from "x";
+import { StarkSDK } from "starkzap";
 
 const sdk = new StarkSDK({ network: "mainnet" });
 
@@ -170,7 +170,7 @@ controller.openProfile();
 Implement `SignerInterface` to integrate any key management solution (hardware wallets, MPC, HSMs, etc.):
 
 ```typescript
-import type { SignerInterface } from "x";
+import type { SignerInterface } from "starkzap";
 import type { Signature } from "starknet";
 
 class MySigner implements SignerInterface {
@@ -207,7 +207,7 @@ import {
   ArgentXV050Preset, // Argent v0.5.0 (used by Privy)
   BraavosPreset, // Braavos v1.2.0
   DevnetPreset, // Local devnet accounts
-} from "x";
+} from "starkzap";
 
 // Use when connecting a wallet
 const wallet = await sdk.connectWallet({
@@ -221,7 +221,7 @@ const wallet = await sdk.connectWallet({
 ### Custom Account Class
 
 ```typescript
-import type { AccountClassConfig } from "x";
+import type { AccountClassConfig } from "starkzap";
 import { CallData } from "starknet";
 
 const MyAccountPreset: AccountClassConfig = {
@@ -292,7 +292,7 @@ await wallet.ensureReady({
 The onboarding API simplifies wallet connection by handling strategy selection, signer construction, and account readiness:
 
 ```typescript
-import { StarkSDK, OnboardStrategy } from "x";
+import { StarkSDK, OnboardStrategy } from "starkzap";
 
 const sdk = new StarkSDK({ network: "sepolia" });
 const accessToken = await privy.getAccessToken();
