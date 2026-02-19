@@ -25,6 +25,24 @@ function intDAM(mode: string | EDAMode): 0 | 1 {
   return 0;
 }
 
+function assertV3Version(
+  version: string,
+  operation: "invoke" | "deploy_account" | "declare"
+): void {
+  let isV3 = false;
+  try {
+    isV3 = (BigInt(version) & 0xffn) === 0x3n;
+  } catch {
+    isV3 = false;
+  }
+
+  if (!isV3) {
+    throw new Error(
+      `SignerAdapter only supports V3 ${operation} transactions (received version ${version}).`
+    );
+  }
+}
+
 /**
  * Adapter that bridges the SDK's minimal {@link SignerInterface} to the
  * full `starknet.js` `SignerInterface`.
@@ -65,6 +83,7 @@ export class SignerAdapter implements StarknetSignerInterface {
     transactions: Call[],
     details: InvocationsSignerDetails
   ): Promise<Signature> {
+    assertV3Version(details.version, "invoke");
     const det = details as V3InvocationsSignerDetails;
     // Use getExecuteCalldata to properly format multicall for the account's cairo version
     const compiledCalldata = transaction.getExecuteCalldata(
@@ -92,6 +111,7 @@ export class SignerAdapter implements StarknetSignerInterface {
   async signDeployAccountTransaction(
     details: DeployAccountSignerDetails
   ): Promise<Signature> {
+    assertV3Version(details.version, "deploy_account");
     const det = details as V3DeployAccountSignerDetails;
     const compiledConstructorCalldata = CallData.compile(
       det.constructorCalldata
@@ -118,6 +138,7 @@ export class SignerAdapter implements StarknetSignerInterface {
   async signDeclareTransaction(
     details: DeclareSignerDetails
   ): Promise<Signature> {
+    assertV3Version(details.version, "declare");
     const det = details as V3DeclareSignerDetails;
 
     const msgHash = hash.calculateDeclareTransactionHash({
