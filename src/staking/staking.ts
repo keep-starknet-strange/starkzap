@@ -22,6 +22,13 @@ import type { Tx } from "@/tx";
 import type { Pool, PoolMember } from "@/types/pool";
 import { groupBy } from "@/utils";
 
+const DEFAULT_FROM_POOL_TIMEOUT_MS = 20_000;
+
+interface FromPoolOptions {
+  timeoutMs?: number;
+  signal?: AbortSignal;
+}
+
 /**
  * Represents a staking delegation pool and provides methods to interact with it.
  *
@@ -528,14 +535,41 @@ export class Staking {
   static async fromPool(
     poolAddress: Address,
     provider: RpcProvider,
-    config: StakingConfig
+    config: StakingConfig,
+    options: FromPoolOptions = {}
   ): Promise<Staking> {
+    const timeoutMs = options.timeoutMs ?? DEFAULT_FROM_POOL_TIMEOUT_MS;
+    if (!Number.isFinite(timeoutMs) || timeoutMs <= 0) {
+      throw new Error("Staking.fromPool timeoutMs must be a positive number");
+    }
+
+    const startedAt = Date.now();
+    const runStep = async <T>(
+      label: string,
+      operation: () => Promise<T>
+    ): Promise<T> => {
+      throwIfAborted(options.signal);
+      const elapsedMs = Date.now() - startedAt;
+      const remainingMs = timeoutMs - elapsedMs;
+      if (remainingMs <= 0) {
+        throw new Error(`Staking.fromPool timed out after ${timeoutMs}ms`);
+      }
+      return withTimeout(
+        operation(),
+        remainingMs,
+        `Staking.fromPool timed out while ${label}`,
+        options.signal
+      );
+    };
+
     const poolContract = new Contract({
       abi: POOL_ABI,
       address: poolAddress,
       providerOrAccount: provider,
     }).typedv2(POOL_ABI);
-    const poolParameters = await poolContract.contract_parameters_v1();
+    const poolParameters = await runStep("loading pool parameters", () =>
+      poolContract.contract_parameters_v1()
+    );
 
     const stakerAddress = fromAddress(poolParameters.staker_address);
     const stakingContractAddressFromPool = fromAddress(
@@ -552,7 +586,9 @@ export class Staking {
       providerOrAccount: provider,
     }).typedv2(STAKING_ABI);
 
-    const staker = await stakingContract.staker_pool_info(stakerAddress);
+    const staker = await runStep("loading staker pool info", () =>
+      stakingContract.staker_pool_info(stakerAddress)
+    );
     const pool = staker.pools.find((pool) => {
       return fromAddress(pool.pool_contract) === poolAddress;
     });
@@ -561,12 +597,13 @@ export class Staking {
       throw new Error(`Could not verify pool address ${poolAddress}`);
     }
 
-    const token = await getTokensFromAddresses(
-      [fromAddress(pool.token_address)],
-      provider
-    ).then((tokens) => {
-      return tokens[0];
-    });
+    const token = await runStep("resolving token metadata", () =>
+      getTokensFromAddresses([fromAddress(pool.token_address)], provider).then(
+        (tokens) => {
+          return tokens[0];
+        }
+      )
+    );
 
     if (!token) {
       throw new Error(
@@ -726,4 +763,52 @@ export class Staking {
       ];
     });
   }
+}
+
+function throwIfAborted(signal?: AbortSignal): void {
+  if (signal?.aborted) {
+    throw new Error("Staking.fromPool aborted");
+  }
+}
+
+function withTimeout<T>(
+  promise: Promise<T>,
+  timeoutMs: number,
+  timeoutMessage: string,
+  signal?: AbortSignal
+): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    if (signal?.aborted) {
+      reject(new Error("Staking.fromPool aborted"));
+      return;
+    }
+
+    const timer = setTimeout(() => {
+      cleanup();
+      reject(new Error(timeoutMessage));
+    }, timeoutMs);
+
+    const onAbort = () => {
+      cleanup();
+      reject(new Error("Staking.fromPool aborted"));
+    };
+
+    const cleanup = () => {
+      clearTimeout(timer);
+      signal?.removeEventListener("abort", onAbort);
+    };
+
+    signal?.addEventListener("abort", onAbort, { once: true });
+
+    promise.then(
+      (value) => {
+        cleanup();
+        resolve(value);
+      },
+      (error) => {
+        cleanup();
+        reject(error);
+      }
+    );
+  });
 }
