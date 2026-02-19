@@ -103,6 +103,12 @@ describe("Amount", () => {
         expect(amount.toBase()).toBe(0n);
         expect(amount.toUnit()).toBe("0");
       });
+
+      it("should reject unsafe decimal numbers", () => {
+        expect(() => Amount.parse(0.1 + 0.2, 18, "ETH")).toThrow(
+          "cannot safely represent this decimal"
+        );
+      });
     });
 
     describe("with bigint input", () => {
@@ -149,6 +155,12 @@ describe("Amount", () => {
         expect(amount.toBase()).toBe(9999n);
         expect(amount.toUnit()).toBe("99.99");
       });
+
+      it("should parse scientific notation strings", () => {
+        const amount = Amount.parse("1e3", 18, "ETH");
+        expect(amount.toBase()).toBe(1000000000000000000000n);
+        expect(amount.toUnit()).toBe("1000");
+      });
     });
 
     describe("error handling", () => {
@@ -185,6 +197,13 @@ describe("Amount", () => {
       it("should throw on precision overflow", () => {
         expect(() => Amount.parse("1.1234567", 6, "USDC")).toThrow(
           "Precision overflow"
+        );
+      });
+
+      it("should throw on invalid decimals argument", () => {
+        expect(() => Amount.parse("1", -1, "ETH")).toThrow("Invalid decimals");
+        expect(() => Amount.parse("1", Number.NaN, "ETH")).toThrow(
+          "Invalid decimals"
         );
       });
 
@@ -260,6 +279,12 @@ describe("Amount", () => {
         const amount = Amount.fromRaw(1000000, 6, "USDC");
         expect(amount.toBase()).toBe(1000000n);
         expect(amount.toUnit()).toBe("1");
+      });
+
+      it("should reject unsafe integer numbers", () => {
+        expect(() => Amount.fromRaw(Number.MAX_SAFE_INTEGER + 1, 6, "USDC")).toThrow(
+          "safe integers"
+        );
       });
     });
 
@@ -404,8 +429,7 @@ describe("Amount", () => {
 
     it("should handle amounts with many decimal places", () => {
       const amount = Amount.parse("1.123456789012345678", 18, "ETH");
-      // Note: Float precision loss occurs at ~16 significant digits
-      expect(amount.toFormatted()).toBe(`ETH${NBSP}1.1234567890123457`);
+      expect(amount.toFormatted()).toBe(`ETH${NBSP}1.123456789012345678`);
     });
 
     it("should handle small fractional amounts", () => {
@@ -544,9 +568,8 @@ describe("tokenAmountToFormatted", () => {
   });
 
   it("should compress decimals when requested", () => {
-    // Note: Float precision loss occurs at ~16 significant digits
     expect(tokenAmountToFormatted(false, 1234567890123456789n, 18, "ETH")).toBe(
-      `ETH${NBSP}1.2345678901234567`
+      `ETH${NBSP}1.234567890123456789`
     );
     expect(tokenAmountToFormatted(true, 1234567890123456789n, 18, "ETH")).toBe(
       `ETH${NBSP}1.2346`
@@ -797,6 +820,13 @@ describe("Amount arithmetic operations", () => {
     it("should throw on division by zero string", () => {
       const amount = Amount.parse("10", 18, "ETH");
       expect(() => amount.divide("0")).toThrow("Division by zero");
+    });
+
+    it("should throw a precision error on tiny non-zero divisors", () => {
+      const amount = Amount.parse("10", 18, "ETH");
+      expect(() => amount.divide("0.0000000000000000001")).toThrow(
+        "too small"
+      );
     });
 
     it("should preserve decimals and symbol", () => {
