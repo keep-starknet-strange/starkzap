@@ -63,7 +63,7 @@
     "generate:validators": "npx tsx scripts/generate-validator-presets.ts --network mainnet",
     "generate:validators:sepolia": "npx tsx scripts/generate-validator-presets.ts --network sepolia",
     "docs:api": "typedoc --options typedoc.json",
-    "docs:export": "npm run docs:api && node scripts/docs-export.mjs && bestzip docs/export/starkzap-docs.zip docs/export/*",
+    "docs:export": "npm run docs:api && node scripts/docs-export.mjs",
     "docs:check": "npm run docs:api",
     "prepare": "husky"
   },

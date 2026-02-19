@@ -385,6 +385,5 @@ Outputs:
 - `docs/api/` generated API reference (TypeDoc markdown)
 - `docs/export/DEVELOPER_GUIDE.md`
 - `docs/export/api/`
-- `docs/export/starkzap-docs.zip`
 
 Use `docs/export` as the distributable documentation bundle.
