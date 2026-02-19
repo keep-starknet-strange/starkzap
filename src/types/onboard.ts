@@ -41,6 +41,7 @@ export interface OnboardPrivyResolveResult {
   rawSign?: (walletId: string, messageHash: string) => Promise<string>;
   headers?: PrivySigningHeaders;
   buildBody?: PrivySigningBody;
+  requestTimeoutMs?: number;
   metadata?: Record<string, unknown>;
 }
 

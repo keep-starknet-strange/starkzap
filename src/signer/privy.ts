@@ -1,5 +1,6 @@
 import type { Signature } from "starknet";
 import type { SignerInterface } from "@/signer/interface";
+import { assertSafeHttpUrl } from "@/utils";
 
 type PrivySigningHeaders =
   | Record<string, string>
@@ -44,6 +45,11 @@ export interface PrivySignerConfig {
    * Default body is `{ walletId, hash }`.
    */
   buildBody?: PrivySigningBody;
+  /**
+   * Timeout for serverUrl requests in milliseconds.
+   * @default 10000
+   */
+  requestTimeoutMs?: number;
 }
 
 /**
@@ -133,6 +139,7 @@ export class PrivySigner implements SignerInterface {
       this.defaultRawSignFn(config.serverUrl!, {
         headers: config.headers,
         buildBody: config.buildBody,
+        requestTimeoutMs: config.requestTimeoutMs,
       });
   }
 
@@ -150,8 +157,20 @@ export class PrivySigner implements SignerInterface {
     options: {
       headers: PrivySigningHeaders | undefined;
       buildBody: PrivySigningBody | undefined;
+      requestTimeoutMs: number | undefined;
     }
   ) {
+    const normalizedUrl = assertSafeHttpUrl(
+      serverUrl,
+      "PrivySigner serverUrl"
+    ).toString();
+    const timeoutMs = options.requestTimeoutMs ?? 10_000;
+    if (!Number.isFinite(timeoutMs) || timeoutMs <= 0) {
+      throw new Error(
+        "PrivySigner requestTimeoutMs must be a positive finite number"
+      );
+    }
+
     return async (walletId: string, hash: string): Promise<string> => {
       const extraHeaders = await this.resolveHeaders(options.headers);
       const payload = (await options.buildBody?.({ walletId, hash })) ?? {
@@ -159,18 +178,64 @@ export class PrivySigner implements SignerInterface {
         hash,
       };
 
-      const response = await fetch(serverUrl, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", ...extraHeaders },
-        body: JSON.stringify(payload),
-      });
+      const controller =
+        typeof AbortController !== "undefined"
+          ? new AbortController()
+          : undefined;
+      const timeoutHandle =
+        controller &&
+        setTimeout(() => {
+          controller.abort();
+        }, timeoutMs);
 
-      if (!response.ok) {
-        const err = await response.json().catch(() => ({}));
-        throw new Error(err.details || err.error || "Privy signing failed");
+      let response: Awaited<ReturnType<typeof fetch>>;
+      try {
+        const requestInit: RequestInit = {
+          method: "POST",
+          headers: { "Content-Type": "application/json", ...extraHeaders },
+          body: JSON.stringify(payload),
+        };
+        if (controller) {
+          requestInit.signal = controller.signal;
+        }
+
+        response = await fetch(normalizedUrl, requestInit);
+      } catch (error) {
+        if (error instanceof Error && error.name === "AbortError") {
+          throw new Error(
+            `Privy signing request timed out after ${timeoutMs}ms`
+          );
+        }
+        throw error;
+      } finally {
+        if (timeoutHandle) {
+          clearTimeout(timeoutHandle);
+        }
       }
 
-      const { signature } = await response.json();
+      let data: unknown;
+      try {
+        data = await response.json();
+      } catch {
+        throw new Error("Privy signing failed: invalid JSON response");
+      }
+
+      if (!response.ok) {
+        const err =
+          typeof data === "object" && data !== null
+            ? (data as Record<string, unknown>)
+            : {};
+        throw new Error(
+          (typeof err.details === "string" && err.details) ||
+            (typeof err.error === "string" && err.error) ||
+            "Privy signing failed"
+        );
+      }
+
+      const signature =
+        typeof data === "object" && data !== null
+          ? (data as Record<string, unknown>).signature
+          : undefined;
       if (typeof signature !== "string") {
         throw new Error("Privy signing failed: invalid server response");
       }

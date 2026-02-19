@@ -5,6 +5,7 @@ import { networks, type NetworkPreset } from "@/network";
 import { Wallet } from "@/wallet";
 import type { WalletInterface } from "@/wallet/interface";
 import type { Address, Token, Pool } from "@/types";
+import { assertSafeHttpUrl } from "@/utils";
 import type {
   AccountClassConfig,
   OnboardCartridgeConfig,
@@ -102,6 +103,7 @@ export class StarkSDK {
         "StarkSDK requires either 'network' or 'rpcUrl' to be specified"
       );
     }
+    const normalizedRpcUrl = assertSafeHttpUrl(rpcUrl, "rpcUrl").toString();
 
     // Resolve chainId (explicit > network preset)
     const chainId = config.chainId ?? networkPreset?.chainId;
@@ -112,17 +114,26 @@ export class StarkSDK {
     }
 
     // Resolve explorer (explicit > network preset)
-    const explorer =
+    let explorer =
       config.explorer ??
       (networkPreset?.explorerUrl
         ? { baseUrl: networkPreset.explorerUrl }
         : undefined);
+    if (explorer?.baseUrl) {
+      explorer = {
+        ...explorer,
+        baseUrl: assertSafeHttpUrl(
+          explorer.baseUrl,
+          "explorer.baseUrl"
+        ).toString(),
+      };
+    }
 
     const staking = config.staking ?? getStakingPreset(chainId);
 
     return {
       ...config,
-      rpcUrl,
+      rpcUrl: normalizedRpcUrl,
       chainId,
       staking,
       ...(explorer && { explorer }),
@@ -277,6 +288,9 @@ export class StarkSDK {
         ...(privy.rawSign && { rawSign: privy.rawSign }),
         ...(privy.headers && { headers: privy.headers }),
         ...(privy.buildBody && { buildBody: privy.buildBody }),
+        ...(privy.requestTimeoutMs && {
+          requestTimeoutMs: privy.requestTimeoutMs,
+        }),
       });
 
       const wallet = await this.connectWallet({
