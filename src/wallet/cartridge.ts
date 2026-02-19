@@ -11,6 +11,7 @@ import {
 import { Tx } from "@/tx";
 import {
   ChainId,
+  getChainId,
   type DeployOptions,
   type EnsureReadyOptions,
   type ExecuteOptions,
@@ -28,6 +29,7 @@ import {
   sponsoredDetails,
 } from "@/wallet/utils";
 import { BaseWallet } from "@/wallet/base";
+import { assertSafeHttpUrl } from "@/utils";
 
 /**
  * Options for connecting with Cartridge Controller.
@@ -70,14 +72,18 @@ export class CartridgeWallet extends BaseWallet {
   private readonly walletAccount: CartridgeWalletAccount;
   private readonly provider: RpcProvider;
   private readonly chainId: ChainId;
+  private readonly classHash: string;
   private readonly explorerConfig: ExplorerConfig | undefined;
   private readonly defaultFeeMode: FeeMode;
   private readonly defaultTimeBounds: PaymasterTimeBounds | undefined;
+  private deployedCache: boolean | null = null;
 
   private constructor(
     controller: Controller,
     walletAccount: CartridgeWalletAccount,
     provider: RpcProvider,
+    chainId: ChainId,
+    classHash: string,
     stakingConfig: StakingConfig | undefined,
     options: CartridgeWalletOptions = {}
   ) {
@@ -85,7 +91,8 @@ export class CartridgeWallet extends BaseWallet {
     this.controller = controller;
     this.walletAccount = walletAccount;
     this.provider = provider;
-    this.chainId = options.chainId ?? ChainId.MAINNET;
+    this.classHash = classHash;
+    this.chainId = chainId;
     this.explorerConfig = options.explorer;
     this.defaultFeeMode = options.feeMode ?? "user_pays";
     this.defaultTimeBounds = options.timeBounds;
@@ -105,7 +112,11 @@ export class CartridgeWallet extends BaseWallet {
     }
 
     if (options.rpcUrl) {
-      controllerOptions.chains = [{ rpcUrl: options.rpcUrl }];
+      const rpcUrl = assertSafeHttpUrl(
+        options.rpcUrl,
+        "Cartridge RPC URL"
+      ).toString();
+      controllerOptions.chains = [{ rpcUrl }];
     }
 
     if (options.policies && options.policies.length > 0) {
@@ -120,7 +131,10 @@ export class CartridgeWallet extends BaseWallet {
     }
 
     if (options.url) {
-      controllerOptions.url = options.url;
+      controllerOptions.url = assertSafeHttpUrl(
+        options.url,
+        "Cartridge controller URL"
+      ).toString();
     }
 
     const controller = new Controller(controllerOptions);
@@ -148,21 +162,42 @@ export class CartridgeWallet extends BaseWallet {
       );
     }
 
-    const provider = new RpcProvider({
-      nodeUrl: options.rpcUrl ?? controller.rpcUrl(),
-    });
+    const nodeUrl = assertSafeHttpUrl(
+      options.rpcUrl ?? controller.rpcUrl(),
+      "Cartridge RPC URL"
+    ).toString();
+    const provider = new RpcProvider({ nodeUrl });
+
+    let classHash = "0x0";
+    try {
+      classHash = await provider.getClassHashAt(
+        fromAddress(walletAccount.address)
+      );
+    } catch {
+      // Keep "0x0" for undeployed accounts or unsupported providers.
+    }
+    const chainId = options.chainId ?? (await getChainId(provider));
 
     return new CartridgeWallet(
       controller,
       walletAccount,
       provider,
+      chainId,
+      classHash,
       stakingConfig,
       options
     );
   }
 
   async isDeployed(): Promise<boolean> {
-    return checkDeployed(this.provider, this.address);
+    if (this.deployedCache === true) {
+      return true;
+    }
+    const deployed = await checkDeployed(this.provider, this.address);
+    if (deployed) {
+      this.deployedCache = true;
+    }
+    return deployed;
   }
 
   async ensureReady(options: EnsureReadyOptions = {}): Promise<void> {
@@ -189,13 +224,27 @@ export class CartridgeWallet extends BaseWallet {
     const feeMode = options.feeMode ?? this.defaultFeeMode;
     const timeBounds = options.timeBounds ?? this.defaultTimeBounds;
 
-    const { transaction_hash } =
-      feeMode === "sponsored"
-        ? await this.walletAccount.executePaymasterTransaction(
-            calls,
-            sponsoredDetails(timeBounds)
-          )
-        : await this.walletAccount.execute(calls);
+    let transaction_hash: string;
+
+    if (feeMode === "sponsored") {
+      // Allow provider/controller implementations to handle undeployed accounts
+      // atomically via paymaster flow when supported.
+      transaction_hash = (
+        await this.walletAccount.executePaymasterTransaction(
+          calls,
+          sponsoredDetails(timeBounds)
+        )
+      ).transaction_hash;
+    } else {
+      const deployed = await this.isDeployed();
+      if (!deployed) {
+        throw new Error(
+          'Account is not deployed. Call wallet.ensureReady({ deploy: "if_needed" }) before execute() in user_pays mode.'
+        );
+      }
+      transaction_hash = (await this.walletAccount.execute(calls))
+        .transaction_hash;
+    }
 
     return new Tx(
       transaction_hash,
@@ -234,8 +283,7 @@ export class CartridgeWallet extends BaseWallet {
   }
 
   getClassHash(): string {
-    // Cartridge Controller manages its own account class
-    return "cartridge-controller";
+    return this.classHash;
   }
 
   async estimateFee(calls: Call[]) {

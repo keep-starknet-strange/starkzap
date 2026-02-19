@@ -69,30 +69,35 @@ export async function ensureWalletReady(
 ): Promise<void> {
   const { deploy = "if_needed", feeMode, onProgress } = options;
 
-  onProgress?.({ step: "CONNECTED" });
+  try {
+    onProgress?.({ step: "CONNECTED" });
 
-  onProgress?.({ step: "CHECK_DEPLOYED" });
-  const deployed = await wallet.isDeployed();
+    onProgress?.({ step: "CHECK_DEPLOYED" });
+    const deployed = await wallet.isDeployed();
 
-  if (deployed && deploy !== "always") {
+    if (deployed && deploy !== "always") {
+      onProgress?.({ step: "READY" });
+      return;
+    }
+
+    if (!deployed && deploy === "never") {
+      throw new Error("Account not deployed and deploy mode is 'never'");
+    }
+
+    onProgress?.({ step: "DEPLOYING" });
+    const tx = await wallet.deploy(feeMode ? { feeMode } : undefined);
+    await tx.wait({
+      successStates: [
+        TransactionFinalityStatus.ACCEPTED_ON_L2,
+        TransactionFinalityStatus.ACCEPTED_ON_L1,
+      ],
+    });
+
     onProgress?.({ step: "READY" });
-    return;
+  } catch (error) {
+    onProgress?.({ step: "FAILED" });
+    throw error;
   }
-
-  if (!deployed && deploy === "never") {
-    throw new Error("Account not deployed and deploy mode is 'never'");
-  }
-
-  onProgress?.({ step: "DEPLOYING" });
-  const tx = await wallet.deploy(feeMode ? { feeMode } : undefined);
-  await tx.wait({
-    successStates: [
-      TransactionFinalityStatus.ACCEPTED_ON_L2,
-      TransactionFinalityStatus.ACCEPTED_ON_L1,
-    ],
-  });
-
-  onProgress?.({ step: "READY" });
 }
 
 /**

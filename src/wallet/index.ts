@@ -424,6 +424,12 @@ export class Wallet extends BaseWallet {
           ).transaction_hash
         : (await this.deployPaymasterWith(calls, timeBounds)).hash;
     } else {
+      const deployed = await this.isDeployed();
+      if (!deployed) {
+        throw new Error(
+          'Account is not deployed. Call wallet.ensureReady({ deploy: "if_needed" }) before execute() in user_pays mode.'
+        );
+      }
       transactionHash = (await this.account.execute(calls)).transaction_hash;
     }
 

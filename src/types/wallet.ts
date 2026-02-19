@@ -62,7 +62,7 @@ export interface AccountConfig {
 
 /**
  * How transaction fees are paid.
- * - `"sponsored"`: Paymaster covers gas (requires SDK sponsor config)
+ * - `"sponsored"`: Paymaster covers gas
  * - `"user_pays"`: User's account pays gas in ETH/STRK
  */
 export type FeeMode = "sponsored" | "user_pays";
@@ -115,6 +115,7 @@ export type ProgressStep =
   | "CONNECTED"
   | "CHECK_DEPLOYED"
   | "DEPLOYING"
+  | "FAILED"
   | "READY";
 
 /** Progress event emitted during `wallet.ensureReady()` */

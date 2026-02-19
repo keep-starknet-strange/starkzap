@@ -150,6 +150,24 @@ describe("CartridgeWallet", () => {
     });
   });
 
+  describe("deploy", () => {
+    it("should not cache deployment as successful before on-chain confirmation", async () => {
+      const wallet = await CartridgeWallet.create();
+      const getClassHashAt = (
+        wallet.getProvider() as unknown as {
+          getClassHashAt: ReturnType<typeof vi.fn>;
+        }
+      ).getClassHashAt;
+
+      // Simulate an undeployed account even after deploy() returned a hash.
+      getClassHashAt.mockRejectedValue(new Error("contract not found"));
+
+      const tx = await wallet.deploy();
+      expect(tx.hash).toBe("0xdeploy");
+      await expect(wallet.isDeployed()).resolves.toBe(false);
+    });
+  });
+
   describe("execute", () => {
     it("should execute calls and return Tx", async () => {
       const wallet = await CartridgeWallet.create();
@@ -181,6 +199,77 @@ describe("CartridgeWallet", () => {
       const tx = await wallet.execute(calls);
 
       expect(tx.hash).toBe("0xsponsored");
+    });
+
+    it("should not pre-deploy before sponsored execution", async () => {
+      const wallet = await CartridgeWallet.create({
+        feeMode: "sponsored",
+      });
+      const calls = [
+        {
+          contractAddress: "0x123",
+          entrypoint: "transfer",
+          calldata: ["0x456", "100"],
+        },
+      ];
+
+      const getClassHashAt = (
+        wallet.getProvider() as unknown as {
+          getClassHashAt: ReturnType<typeof vi.fn>;
+        }
+      ).getClassHashAt;
+      const initialDeploymentChecks = getClassHashAt.mock.calls.length;
+
+      // If execute() starts checking deployment first again, this will be hit.
+      getClassHashAt.mockRejectedValue(new Error("contract not found"));
+
+      const tx = await wallet.execute(calls);
+
+      const controller = wallet.getController() as unknown as {
+        keychain: { deploy: ReturnType<typeof vi.fn> };
+      };
+      const account = wallet.getAccount() as unknown as {
+        executePaymasterTransaction: ReturnType<typeof vi.fn>;
+      };
+
+      expect(tx.hash).toBe("0xsponsored");
+      expect(account.executePaymasterTransaction).toHaveBeenCalledTimes(1);
+      expect(controller.keychain.deploy).not.toHaveBeenCalled();
+      expect(getClassHashAt.mock.calls.length).toBe(initialDeploymentChecks);
+    });
+
+    it("should throw in user_pays mode when account is undeployed", async () => {
+      const wallet = await CartridgeWallet.create();
+      const calls = [
+        {
+          contractAddress: "0x123",
+          entrypoint: "transfer",
+          calldata: ["0x456", "100"],
+        },
+      ];
+
+      const getClassHashAt = (
+        wallet.getProvider() as unknown as {
+          getClassHashAt: ReturnType<typeof vi.fn>;
+        }
+      ).getClassHashAt;
+      getClassHashAt.mockRejectedValue(new Error("contract not found"));
+
+      await expect(
+        wallet.execute(calls, { feeMode: "user_pays" })
+      ).rejects.toThrow(
+        'Account is not deployed. Call wallet.ensureReady({ deploy: "if_needed" }) before execute() in user_pays mode.'
+      );
+
+      const controller = wallet.getController() as unknown as {
+        keychain: { deploy: ReturnType<typeof vi.fn> };
+      };
+      const account = wallet.getAccount() as unknown as {
+        execute: ReturnType<typeof vi.fn>;
+      };
+
+      expect(controller.keychain.deploy).not.toHaveBeenCalled();
+      expect(account.execute).not.toHaveBeenCalled();
     });
   });
 
