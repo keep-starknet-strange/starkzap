@@ -14,6 +14,113 @@ export function getPresets(chainId: ChainId): Record<string, Token> {
   return {};
 }
 
+const MAX_PARALLEL_TOKEN_REQUESTS = 8;
+const MAX_TOKEN_NAME_LENGTH = 128;
+const MAX_TOKEN_SYMBOL_LENGTH = 32;
+const MAX_TOKEN_DECIMALS = 255n;
+
+function sanitizeTokenText(input: string, maxLength: number): string {
+  const clean = Array.from(input)
+    .filter((char) => {
+      const code = char.charCodeAt(0);
+      return code >= 0x20 && code !== 0x7f;
+    })
+    .join("")
+    .trim();
+  return clean.slice(0, maxLength);
+}
+
+function parseTokenDecimals(decimals: unknown): number {
+  let asBigInt: bigint;
+  try {
+    asBigInt = BigInt(decimals as string | number | bigint);
+  } catch {
+    throw new Error(`Invalid token decimals value: ${String(decimals)}`);
+  }
+  if (asBigInt < 0n) {
+    throw new Error("Token decimals cannot be negative");
+  }
+  if (asBigInt > MAX_TOKEN_DECIMALS) {
+    throw new Error(`Token decimals too large: ${asBigInt.toString()}`);
+  }
+  return Number(asBigInt);
+}
+
+async function mapWithConcurrency<T, R>(
+  items: T[],
+  concurrency: number,
+  mapper: (item: T) => Promise<R>
+): Promise<R[]> {
+  const results = new Array<R>(items.length);
+  let index = 0;
+
+  const worker = async () => {
+    while (index < items.length) {
+      const current = index;
+      index += 1;
+      const item = items[current];
+      if (item === undefined) {
+        continue;
+      }
+      results[current] = await mapper(item);
+    }
+  };
+
+  const workers = Array.from(
+    { length: Math.min(concurrency, items.length) },
+    () => worker()
+  );
+  await Promise.all(workers);
+  return results;
+}
+
+async function resolveUnknownToken(
+  address: Address,
+  provider: RpcProvider
+): Promise<Token | null> {
+  const contract = new Contract({
+    abi: ERC20_ABI,
+    address: address,
+    providerOrAccount: provider,
+  }).typedv2(ERC20_ABI);
+
+  try {
+    const [rawName, rawSymbol, rawDecimals] = await Promise.all([
+      contract.name(),
+      contract.symbol(),
+      contract.decimals(),
+    ]);
+
+    const name = sanitizeTokenText(
+      new CairoFelt252(rawName).decodeUtf8(),
+      MAX_TOKEN_NAME_LENGTH
+    );
+    const symbol = sanitizeTokenText(
+      new CairoFelt252(rawSymbol).decodeUtf8(),
+      MAX_TOKEN_SYMBOL_LENGTH
+    );
+    const decimals = parseTokenDecimals(rawDecimals);
+
+    if (!name || !symbol) {
+      throw new Error("Token metadata returned empty name or symbol");
+    }
+
+    return {
+      name,
+      address,
+      decimals,
+      symbol,
+    };
+  } catch (error) {
+    console.warn(
+      `Could not determine token ${address}: ${
+        error instanceof Error ? error.message : String(error)
+      }`
+    );
+    return null;
+  }
+}
+
 export async function getTokensFromAddresses(
   tokenAddresses: Address[],
   provider: RpcProvider
@@ -23,11 +130,10 @@ export async function getTokensFromAddresses(
 
   const tokens: Token[] = [];
   const unknownTokenAddresses: Address[] = [];
+  const presetByAddress = groupBy(presetTokens, (preset) => preset.address);
 
   for (const tokenAddress of tokenAddresses) {
-    const token = presetTokens.find((preset) => {
-      return preset.address === tokenAddress;
-    });
+    const token = presetByAddress.get(tokenAddress)?.[0];
 
     if (token) {
       tokens.push(token);
@@ -37,82 +143,14 @@ export async function getTokensFromAddresses(
   }
 
   if (unknownTokenAddresses.length > 0) {
-    const erc20Contracts = unknownTokenAddresses.map((address) => {
-      return new Contract({
-        abi: ERC20_ABI,
-        address: address,
-        providerOrAccount: provider,
-      }).typedv2(ERC20_ABI);
-    });
-
-    const results = await Promise.all(
-      erc20Contracts
-        .map((contract) => {
-          return [
-            contract.name().then((name) => {
-              return {
-                token: contract.address as Address,
-                type: "name",
-                value: new CairoFelt252(name).decodeUtf8(),
-              };
-            }),
-            contract.symbol().then((symbol) => {
-              return {
-                token: contract.address as Address,
-                type: "symbol",
-                value: new CairoFelt252(symbol).decodeUtf8(),
-              };
-            }),
-            contract.decimals().then((decimals) => {
-              return {
-                token: contract.address as Address,
-                type: "decimals",
-                value: Number(decimals),
-              };
-            }),
-          ];
-        })
-        .flat()
+    const resolvedUnknownTokens = await mapWithConcurrency(
+      unknownTokenAddresses,
+      MAX_PARALLEL_TOKEN_REQUESTS,
+      async (address) => resolveUnknownToken(address, provider)
     );
-
-    const tokenDetails = groupBy(results, (r) => r.token);
-
-    for (const unknownTokenAddress of unknownTokenAddresses) {
-      const details = tokenDetails.get(unknownTokenAddress);
-      if (details) {
-        let name: string | null = null;
-        let symbol: string | null = null;
-        let decimals: number | null = null;
-        for (const detail of details) {
-          if (detail.type === "name" && typeof detail.value === "string") {
-            name = detail.value as string;
-          } else if (
-            detail.type === "symbol" &&
-            typeof detail.value === "string"
-          ) {
-            symbol = detail.value as string;
-          } else if (
-            detail.type === "decimals" &&
-            typeof detail.value === "number"
-          ) {
-            decimals = detail.value;
-          }
-        }
-
-        if (name && symbol && decimals) {
-          tokens.push({
-            name: name,
-            address: unknownTokenAddress,
-            decimals: decimals,
-            symbol: symbol,
-          });
-        } else {
-          console.warn("Could not determine token", unknownTokenAddress);
-        }
-      } else {
-        console.warn("Could not determine token", unknownTokenAddress);
-      }
-    }
+    tokens.push(
+      ...resolvedUnknownTokens.filter((token): token is Token => token !== null)
+    );
   }
 
   return tokens;

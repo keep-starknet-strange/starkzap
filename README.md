@@ -12,10 +12,10 @@ Bring Bitcoin, stablecoins, and DeFi to any web or mobile app via Starknet in mi
 npm install starkzap
 ```
 
-Peer dependencies (installed automatically with `starkzap`):
+Dependency and optional peers:
 
-- [`starknet`](https://www.npmjs.com/package/starknet) (v9+) — Starknet.js core
-- [`@cartridge/controller`](https://www.npmjs.com/package/@cartridge/controller) — Cartridge wallet (optional, only for Cartridge support)
+- [`starknet`](https://www.npmjs.com/package/starknet) (v9+) — Starknet.js core (installed with `starkzap`)
+- [`@cartridge/controller`](https://www.npmjs.com/package/@cartridge/controller) — optional peer, only needed for Cartridge support
 
 For specific integrations, you may need:
 
@@ -29,15 +29,15 @@ For specific integrations, you may need:
 
 ```typescript
 import {
-  StarkZap,
+  StarkSDK,
   StarkSigner,
   Amount,
   fromAddress,
-  mainnetTokens,
+  sepoliaTokens,
 } from "starkzap";
 
-const STRK = mainnetTokens.STRK;
-const sdk = new StarkZap({ network: "sepolia" });
+const STRK = sepoliaTokens.STRK;
+const sdk = new StarkSDK({ network: "sepolia" });
 
 const wallet = await sdk.connectWallet({
   account: { signer: new StarkSigner("0xYOUR_PRIVATE_KEY") },
@@ -90,8 +90,8 @@ The repo includes web, mobile, and server examples in `examples/`. See the [Exam
 ```bash
 npm install
 npm run typecheck
-npm test
-npm run test:integration   # requires starknet-devnet
+npm test                    # unit tests (some flows require reachable RPC/devnet)
+npm run test:integration    # requires starknet-devnet
 npm run lint
 npm run prettier
 npm run build

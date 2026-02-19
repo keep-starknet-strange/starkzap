@@ -1,17 +1,16 @@
-[**x**](../README.md)
+[**starkzap**](../README.md)
 
----
+***
 
-[x](../globals.md) / PaymasterFeeMode
+[starkzap](../globals.md) / PaymasterFeeMode
 
 # Type Alias: PaymasterFeeMode
 
 > **PaymasterFeeMode** = `StarknetFeeMode`
 
-Defined in: [src/types/sponsorship.ts:25](https://github.com/keep-starknet-strange/x/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/types/sponsorship.ts#L25)
+Defined in: [src/types/sponsorship.ts:25](https://github.com/keep-starknet-strange/x/blob/5e54d8974744c392df7cac56b636788dfe6ae268/src/types/sponsorship.ts#L25)
 
 Fee mode for paymaster transactions.
-
 - `{ mode: 'sponsored' }`: AVNU paymaster covers gas
 - `{ mode: 'default', gasToken: '0x...' }`: Pay in specified token
 

@@ -1,19 +1,19 @@
-[**x**](../README.md)
+[**starkzap**](../README.md)
 
----
+***
 
-[x](../globals.md) / StarkSDK
+[starkzap](../globals.md) / StarkSDK
 
 # Class: StarkSDK
 
-Defined in: [src/sdk.ts:59](https://github.com/keep-starknet-strange/x/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/sdk.ts#L59)
+Defined in: [src/sdk.ts:79](https://github.com/keep-starknet-strange/x/blob/5e54d8974744c392df7cac56b636788dfe6ae268/src/sdk.ts#L79)
 
 Main SDK class for Starknet wallet integration.
 
 ## Example
 
 ```ts
-import { StarkSDK, StarkSigner, ArgentPreset } from "x";
+import { StarkSDK, StarkSigner, ArgentPreset } from "starkzap";
 
 // Using network presets (recommended)
 const sdk = new StarkSDK({ network: "mainnet" });
@@ -42,7 +42,7 @@ await tx.wait();
 
 > **new StarkSDK**(`config`): `StarkSDK`
 
-Defined in: [src/sdk.ts:63](https://github.com/keep-starknet-strange/x/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/sdk.ts#L63)
+Defined in: [src/sdk.ts:84](https://github.com/keep-starknet-strange/x/blob/5e54d8974744c392df7cac56b636788dfe6ae268/src/sdk.ts#L84)
 
 #### Parameters
 
@@ -60,7 +60,7 @@ Defined in: [src/sdk.ts:63](https://github.com/keep-starknet-strange/x/blob/a595
 
 > **connectWallet**(`options`): `Promise`\<[`Wallet`](Wallet.md)\>
 
-Defined in: [src/sdk.ts:147](https://github.com/keep-starknet-strange/x/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/sdk.ts#L147)
+Defined in: [src/sdk.ts:208](https://github.com/keep-starknet-strange/x/blob/5e54d8974744c392df7cac56b636788dfe6ae268/src/sdk.ts#L208)
 
 Connect a wallet using the specified signer and account configuration.
 
@@ -77,7 +77,7 @@ Connect a wallet using the specified signer and account configuration.
 #### Example
 
 ```ts
-import { StarkSigner, OpenZeppelinPreset, ArgentPreset } from "x";
+import { StarkSigner, OpenZeppelinPreset, ArgentPreset } from "starkzap";
 
 // Default: OpenZeppelin account
 const wallet = await sdk.connectWallet({
@@ -110,22 +110,20 @@ const wallet = await sdk.connectWallet({
 });
 ```
 
----
+***
 
 ### onboard()
 
 > **onboard**(`options`): `Promise`\<[`OnboardResult`](../interfaces/OnboardResult.md)\<[`WalletInterface`](../interfaces/WalletInterface.md)\>\>
 
-Defined in: [src/sdk.ts:187](https://github.com/keep-starknet-strange/x/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/sdk.ts#L187)
+Defined in: [src/sdk.ts:248](https://github.com/keep-starknet-strange/x/blob/5e54d8974744c392df7cac56b636788dfe6ae268/src/sdk.ts#L248)
 
 High-level onboarding API for app integrations.
 
 Strategy behaviors:
-
 - `signer`: connect with a provided signer/account config
 - `privy`: resolve Privy auth context, then connect via PrivySigner
 - `cartridge`: connect via Cartridge Controller
-- `webauthn`: reserved for upcoming native WebAuthn signer support
 
 By default, onboarding calls `wallet.ensureReady({ deploy: "if_needed" })`.
 
@@ -139,13 +137,13 @@ By default, onboarding calls `wallet.ensureReady({ deploy: "if_needed" })`.
 
 `Promise`\<[`OnboardResult`](../interfaces/OnboardResult.md)\<[`WalletInterface`](../interfaces/WalletInterface.md)\>\>
 
----
+***
 
 ### connectCartridge()
 
-> **connectCartridge**(`options?`): `Promise`\<[`CartridgeWallet`](CartridgeWallet.md)\>
+> **connectCartridge**(`options?`): `Promise`\<`CartridgeWalletInterface`\>
 
-Defined in: [src/sdk.ts:307](https://github.com/keep-starknet-strange/x/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/sdk.ts#L307)
+Defined in: [src/sdk.ts:372](https://github.com/keep-starknet-strange/x/blob/5e54d8974744c392df7cac56b636788dfe6ae268/src/sdk.ts#L372)
 
 Connect using Cartridge Controller.
 
@@ -156,11 +154,11 @@ Returns a CartridgeWallet that implements WalletInterface.
 
 ##### options?
 
-`Omit`\<[`CartridgeWalletOptions`](../interfaces/CartridgeWalletOptions.md), `"rpcUrl"` \| `"chainId"`\> = `{}`
+`ConnectCartridgeOptions` = `{}`
 
 #### Returns
 
-`Promise`\<[`CartridgeWallet`](CartridgeWallet.md)\>
+`Promise`\<`CartridgeWalletInterface`\>
 
 #### Example
 
@@ -179,13 +177,13 @@ const controller = wallet.getController();
 controller.openProfile();
 ```
 
----
+***
 
 ### stakingTokens()
 
 > **stakingTokens**(): `Promise`\<[`Token`](../interfaces/Token.md)[]\>
 
-Defined in: [src/sdk.ts:338](https://github.com/keep-starknet-strange/x/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/sdk.ts#L338)
+Defined in: [src/sdk.ts:413](https://github.com/keep-starknet-strange/x/blob/5e54d8974744c392df7cac56b636788dfe6ae268/src/sdk.ts#L413)
 
 Get all tokens that are currently enabled for staking.
 
@@ -206,17 +204,17 @@ Error if staking is not configured in the SDK config
 
 ```ts
 const tokens = await sdk.stakingTokens();
-console.log(`Stakeable tokens: ${tokens.map((t) => t.symbol).join(", ")}`);
+console.log(`Stakeable tokens: ${tokens.map(t => t.symbol).join(', ')}`);
 // Output: "Stakeable tokens: STRK, BTC"
 ```
 
----
+***
 
 ### getStakerPools()
 
 > **getStakerPools**(`staker`): `Promise`\<[`Pool`](../interfaces/Pool.md)[]\>
 
-Defined in: [src/sdk.ts:365](https://github.com/keep-starknet-strange/x/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/sdk.ts#L365)
+Defined in: [src/sdk.ts:436](https://github.com/keep-starknet-strange/x/blob/5e54d8974744c392df7cac56b636788dfe6ae268/src/sdk.ts#L436)
 
 Get all delegation pools managed by a specific validator.
 
@@ -251,16 +249,39 @@ for (const pool of pools) {
 }
 ```
 
----
+***
 
 ### getProvider()
 
 > **getProvider**(): `RpcProvider`
 
-Defined in: [src/sdk.ts:380](https://github.com/keep-starknet-strange/x/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/sdk.ts#L380)
+Defined in: [src/sdk.ts:447](https://github.com/keep-starknet-strange/x/blob/5e54d8974744c392df7cac56b636788dfe6ae268/src/sdk.ts#L447)
 
 Get the underlying RPC provider.
 
 #### Returns
 
 `RpcProvider`
+
+***
+
+### callContract()
+
+> **callContract**(`call`): `Promise`\<`string`[]\>
+
+Defined in: [src/sdk.ts:457](https://github.com/keep-starknet-strange/x/blob/5e54d8974744c392df7cac56b636788dfe6ae268/src/sdk.ts#L457)
+
+Call a read-only contract entrypoint using the SDK provider.
+
+This executes an RPC `call` without sending a transaction.
+Useful before wallet connection or for app-level reads.
+
+#### Parameters
+
+##### call
+
+[`Call`](../type-aliases/Call.md)
+
+#### Returns
+
+`Promise`\<`string`[]\>

@@ -1,14 +1,14 @@
-[**x**](../README.md)
+[**starkzap**](../README.md)
 
----
+***
 
-[x](../globals.md) / TxUnsubscribe
+[starkzap](../globals.md) / TxUnsubscribe
 
 # Type Alias: TxUnsubscribe()
 
 > **TxUnsubscribe** = () => `void`
 
-Defined in: [src/types/tx.ts:30](https://github.com/keep-starknet-strange/x/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/types/tx.ts#L30)
+Defined in: [src/types/tx.ts:44](https://github.com/keep-starknet-strange/x/blob/5e54d8974744c392df7cac56b636788dfe6ae268/src/types/tx.ts#L44)
 
 Function to stop watching (returned by `tx.watch()`)
 

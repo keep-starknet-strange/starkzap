@@ -1,19 +1,19 @@
-[**x**](../README.md)
+[**starkzap**](../README.md)
 
----
+***
 
-[x](../globals.md) / AccountConfig
+[starkzap](../globals.md) / AccountConfig
 
 # Interface: AccountConfig
 
-Defined in: [src/types/wallet.ts:54](https://github.com/keep-starknet-strange/x/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/types/wallet.ts#L54)
+Defined in: [src/types/wallet.ts:54](https://github.com/keep-starknet-strange/x/blob/5e54d8974744c392df7cac56b636788dfe6ae268/src/types/wallet.ts#L54)
 
 Full account configuration for connecting a wallet.
 
 ## Example
 
 ```ts
-import { StarkSigner, OpenZeppelinPreset } from "x";
+import { StarkSigner, OpenZeppelinPreset } from "starkzap";
 
 {
   signer: new StarkSigner(privateKey),
@@ -27,16 +27,16 @@ import { StarkSigner, OpenZeppelinPreset } from "x";
 
 > **signer**: [`SignerInterface`](SignerInterface.md)
 
-Defined in: [src/types/wallet.ts:56](https://github.com/keep-starknet-strange/x/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/types/wallet.ts#L56)
+Defined in: [src/types/wallet.ts:56](https://github.com/keep-starknet-strange/x/blob/5e54d8974744c392df7cac56b636788dfe6ae268/src/types/wallet.ts#L56)
 
 Signer for transaction signing
 
----
+***
 
 ### accountClass?
 
 > `optional` **accountClass**: [`AccountClassConfig`](AccountClassConfig.md)
 
-Defined in: [src/types/wallet.ts:58](https://github.com/keep-starknet-strange/x/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/types/wallet.ts#L58)
+Defined in: [src/types/wallet.ts:58](https://github.com/keep-starknet-strange/x/blob/5e54d8974744c392df7cac56b636788dfe6ae268/src/types/wallet.ts#L58)
 
 Account class configuration (default: OpenZeppelin)

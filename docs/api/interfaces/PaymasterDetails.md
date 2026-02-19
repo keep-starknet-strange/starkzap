@@ -1,12 +1,12 @@
-[**x**](../README.md)
+[**starkzap**](../README.md)
 
----
+***
 
-[x](../globals.md) / PaymasterDetails
+[starkzap](../globals.md) / PaymasterDetails
 
 # Interface: PaymasterDetails
 
-Defined in: node_modules/starknet/dist/index.d.ts:2403
+Defined in: node\_modules/starknet/dist/index.d.ts:2403
 
 ## Properties
 
@@ -14,20 +14,20 @@ Defined in: node_modules/starknet/dist/index.d.ts:2403
 
 > **feeMode**: `FeeMode`
 
-Defined in: node_modules/starknet/dist/index.d.ts:2404
+Defined in: node\_modules/starknet/dist/index.d.ts:2404
 
----
+***
 
 ### deploymentData?
 
 > `optional` **deploymentData**: `ACCOUNT_DEPLOYMENT_DATA`
 
-Defined in: node_modules/starknet/dist/index.d.ts:2405
+Defined in: node\_modules/starknet/dist/index.d.ts:2405
 
----
+***
 
 ### timeBounds?
 
 > `optional` **timeBounds**: [`PaymasterTimeBounds`](PaymasterTimeBounds.md)
 
-Defined in: node_modules/starknet/dist/index.d.ts:2406
+Defined in: node\_modules/starknet/dist/index.d.ts:2406

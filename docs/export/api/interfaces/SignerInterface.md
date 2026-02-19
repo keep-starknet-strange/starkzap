@@ -1,18 +1,17 @@
-[**x**](../README.md)
+[**starkzap**](../README.md)
 
----
+***
 
-[x](../globals.md) / SignerInterface
+[starkzap](../globals.md) / SignerInterface
 
 # Interface: SignerInterface
 
-Defined in: [src/signer/interface.ts:13](https://github.com/keep-starknet-strange/x/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/signer/interface.ts#L13)
+Defined in: [src/signer/interface.ts:13](https://github.com/keep-starknet-strange/x/blob/5e54d8974744c392df7cac56b636788dfe6ae268/src/signer/interface.ts#L13)
 
 Signer interface for the SDK.
 Implement this to create custom signers (hardware wallets, MPC, Privy, etc.)
 
 Only requires implementing two methods:
-
 - `getPubKey()` - returns the public key
 - `signRaw(hash)` - signs a message hash and returns the signature
 
@@ -24,7 +23,7 @@ The SDK uses `SignerAdapter` to bridge this interface with starknet.js internall
 
 > **getPubKey**(): `Promise`\<`string`\>
 
-Defined in: [src/signer/interface.ts:17](https://github.com/keep-starknet-strange/x/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/signer/interface.ts#L17)
+Defined in: [src/signer/interface.ts:17](https://github.com/keep-starknet-strange/x/blob/5e54d8974744c392df7cac56b636788dfe6ae268/src/signer/interface.ts#L17)
 
 Get the public key.
 
@@ -32,13 +31,13 @@ Get the public key.
 
 `Promise`\<`string`\>
 
----
+***
 
 ### signRaw()
 
 > **signRaw**(`hash`): `Promise`\<`Signature`\>
 
-Defined in: [src/signer/interface.ts:26](https://github.com/keep-starknet-strange/x/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/signer/interface.ts#L26)
+Defined in: [src/signer/interface.ts:26](https://github.com/keep-starknet-strange/x/blob/5e54d8974744c392df7cac56b636788dfe6ae268/src/signer/interface.ts#L26)
 
 Sign a raw message hash.
 This is the core signing primitive - all transaction signing ultimately calls this.

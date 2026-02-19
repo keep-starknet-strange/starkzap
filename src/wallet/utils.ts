@@ -1,5 +1,6 @@
 import {
   RpcProvider,
+  RpcError,
   TransactionFinalityStatus,
   type Call,
   type PaymasterTimeBounds,
@@ -29,9 +30,31 @@ export async function checkDeployed(
   try {
     const classHash = await provider.getClassHashAt(address);
     return !!classHash;
-  } catch {
-    return false;
+  } catch (error) {
+    // Undeployed accounts are expected to throw "contract not found".
+    // Other RPC failures should propagate so callers can distinguish
+    // connectivity/runtime issues from undeployed state.
+    if (isContractNotFound(error)) {
+      return false;
+    }
+    throw error;
   }
+}
+
+function isContractNotFound(error: unknown): boolean {
+  if (error instanceof RpcError) {
+    return error.isType("CONTRACT_NOT_FOUND");
+  }
+
+  if (error instanceof Error) {
+    const message = error.message.toLowerCase();
+    return (
+      message.includes("contract not found") ||
+      message.includes("contract_not_found")
+    );
+  }
+
+  return false;
 }
 
 /**
@@ -46,30 +69,35 @@ export async function ensureWalletReady(
 ): Promise<void> {
   const { deploy = "if_needed", feeMode, onProgress } = options;
 
-  onProgress?.({ step: "CONNECTED" });
+  try {
+    onProgress?.({ step: "CONNECTED" });
 
-  onProgress?.({ step: "CHECK_DEPLOYED" });
-  const deployed = await wallet.isDeployed();
+    onProgress?.({ step: "CHECK_DEPLOYED" });
+    const deployed = await wallet.isDeployed();
 
-  if (deployed && deploy !== "always") {
+    if (deployed) {
+      onProgress?.({ step: "READY" });
+      return;
+    }
+
+    if (!deployed && deploy === "never") {
+      throw new Error("Account not deployed and deploy mode is 'never'");
+    }
+
+    onProgress?.({ step: "DEPLOYING" });
+    const tx = await wallet.deploy(feeMode ? { feeMode } : undefined);
+    await tx.wait({
+      successStates: [
+        TransactionFinalityStatus.ACCEPTED_ON_L2,
+        TransactionFinalityStatus.ACCEPTED_ON_L1,
+      ],
+    });
+
     onProgress?.({ step: "READY" });
-    return;
+  } catch (error) {
+    onProgress?.({ step: "FAILED" });
+    throw error;
   }
-
-  if (!deployed && deploy === "never") {
-    throw new Error("Account not deployed and deploy mode is 'never'");
-  }
-
-  onProgress?.({ step: "DEPLOYING" });
-  const tx = await wallet.deploy(feeMode ? { feeMode } : undefined);
-  await tx.wait({
-    successStates: [
-      TransactionFinalityStatus.ACCEPTED_ON_L2,
-      TransactionFinalityStatus.ACCEPTED_ON_L1,
-    ],
-  });
-
-  onProgress?.({ step: "READY" });
 }
 
 /**
@@ -86,11 +114,14 @@ export async function preflightTransaction(
   },
   options: PreflightOptions
 ): Promise<PreflightResult> {
-  const { calls } = options;
+  const { calls, feeMode } = options;
 
   try {
     const deployed = await wallet.isDeployed();
     if (!deployed) {
+      if (feeMode === "sponsored") {
+        return { ok: true };
+      }
       return { ok: false, reason: "Account not deployed" };
     }
 

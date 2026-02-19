@@ -7,6 +7,152 @@ import type { Token } from "@/types/token";
  */
 export type AmountArgs = [token: Token] | [decimals: number, symbol?: string];
 
+const MAX_DECIMALS = 255;
+const MAX_SIGNIFICANT_NUMBER_DIGITS = 15;
+const MAX_SCIENTIFIC_EXPONENT = 10_000;
+const NBSP = "\u00A0";
+
+function assertValidDecimals(decimals: number): void {
+  if (
+    !Number.isFinite(decimals) ||
+    !Number.isInteger(decimals) ||
+    decimals < 0
+  ) {
+    throw new Error(
+      `Invalid decimals: ${decimals}. Must be a non-negative integer.`
+    );
+  }
+  if (decimals > MAX_DECIMALS) {
+    throw new Error(
+      `Invalid decimals: ${decimals}. Must be <= ${MAX_DECIMALS}.`
+    );
+  }
+}
+
+function countSignificantDigits(decimal: string): number {
+  const strippedLeadingZeros = decimal.replace(/^0+/, "");
+  const withoutDot = strippedLeadingZeros.replace(".", "");
+  const strippedTrailingZeros = withoutDot.replace(/0+$/, "");
+  return strippedTrailingZeros.length;
+}
+
+function expandScientificNotation(value: string): string {
+  const scientificMatch = value.match(/^(\d+)(?:\.(\d+))?[eE]([+-]?\d+)$/);
+  if (!scientificMatch) {
+    return value;
+  }
+
+  const integerPart = scientificMatch[1] ?? "";
+  const fractionPart = scientificMatch[2] ?? "";
+  const exponentRaw = scientificMatch[3];
+  if (!exponentRaw) {
+    throw new Error(`Invalid scientific notation: ${value}`);
+  }
+  const exponent = Number(exponentRaw);
+  if (!Number.isInteger(exponent)) {
+    throw new Error(`Invalid scientific notation exponent: ${exponentRaw}`);
+  }
+  if (Math.abs(exponent) > MAX_SCIENTIFIC_EXPONENT) {
+    throw new Error(`Scientific notation exponent too large: ${exponentRaw}.`);
+  }
+
+  if (exponent >= 0) {
+    const digits = `${integerPart}${fractionPart}`;
+    if (exponent >= fractionPart.length) {
+      return digits + "0".repeat(exponent - fractionPart.length);
+    }
+    const splitIndex = integerPart.length + exponent;
+    return `${digits.slice(0, splitIndex)}.${digits.slice(splitIndex)}`;
+  }
+
+  const shift = Math.abs(exponent);
+  const digits = `${integerPart}${fractionPart}`;
+  if (shift >= integerPart.length) {
+    return `0.${"0".repeat(shift - integerPart.length)}${digits}`;
+  }
+  const splitIndex = integerPart.length - shift;
+  return `${integerPart.slice(0, splitIndex)}.${integerPart.slice(splitIndex)}${fractionPart}`;
+}
+
+function normalizeUnitNumberish(amount: BigNumberish): string {
+  if (typeof amount === "number") {
+    if (!Number.isFinite(amount) || amount < 0) {
+      throw new Error(
+        `Invalid unit amount: "${amount}". Must be a positive number.`
+      );
+    }
+
+    if (Number.isInteger(amount) && !Number.isSafeInteger(amount)) {
+      throw new Error(
+        "Amount.parse(number) only accepts safe integers. Pass a string or bigint for exact large values."
+      );
+    }
+
+    if (!Number.isInteger(amount)) {
+      const significantDigits = countSignificantDigits(
+        expandScientificNotation(amount.toString())
+      );
+      if (significantDigits > MAX_SIGNIFICANT_NUMBER_DIGITS) {
+        throw new Error(
+          "Amount.parse(number) cannot safely represent this decimal. Pass a string for exact values."
+        );
+      }
+    }
+  }
+
+  return expandScientificNotation(amount.toString());
+}
+
+function normalizeRawNumberish(amount: BigNumberish): string {
+  if (typeof amount === "number") {
+    if (!Number.isFinite(amount) || amount < 0) {
+      throw new Error(
+        `Invalid raw amount: "${amount}". Must be a non-negative integer.`
+      );
+    }
+    if (!Number.isInteger(amount)) {
+      throw new Error(
+        "Amount.fromRaw(number) only accepts integer numbers. Pass a string or bigint for exact values."
+      );
+    }
+    if (!Number.isSafeInteger(amount)) {
+      throw new Error(
+        "Amount.fromRaw(number) only accepts safe integers. Pass a string or bigint for exact large values."
+      );
+    }
+  }
+
+  return expandScientificNotation(amount.toString());
+}
+
+function isZeroString(value: string): boolean {
+  return /^0+(\.0+)?$/.test(value);
+}
+
+function formatIntegerPart(integerPart: string): string {
+  try {
+    return BigInt(integerPart).toLocaleString("default");
+  } catch {
+    return integerPart.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+  }
+}
+
+function localeDecimalSeparator(): string {
+  const formatter = Intl.NumberFormat("default", {
+    minimumFractionDigits: 1,
+    maximumFractionDigits: 1,
+  });
+  if (typeof formatter.formatToParts === "function") {
+    const decimal = formatter
+      .formatToParts(1.1)
+      .find((part) => part.type === "decimal");
+    if (decimal?.value) {
+      return decimal.value;
+    }
+  }
+  return ".";
+}
+
 /**
  * Represents a token amount with precision handling for blockchain operations.
  *
@@ -55,6 +201,7 @@ export class Amount {
   private readonly symbol: string | undefined;
 
   private constructor(value: bigint, decimals: number, symbol?: string) {
+    assertValidDecimals(decimals);
     this.baseValue = value;
     this.decimals = decimals;
     this.symbol = symbol;
@@ -101,10 +248,11 @@ export class Amount {
       decimals = args[0].decimals;
       symbol = args[0].symbol;
     }
+    assertValidDecimals(decimals);
 
     // If someone passes a raw bigint here, it's ambiguous.
     // We treat it as whole units (e.g., 10n -> 10 STRK).
-    const amountStr = amount.toString();
+    const amountStr = normalizeUnitNumberish(amount);
 
     if (!amountStr.match(/^\d+(\.\d+)?$/)) {
       throw new Error(
@@ -154,14 +302,6 @@ export class Amount {
    * ```
    */
   static fromRaw(amount: BigNumberish, ...args: AmountArgs): Amount {
-    const baseValue = BigInt(amount);
-
-    if (baseValue < 0n) {
-      throw new Error(
-        `Negative amounts are not supported: ${baseValue.toString()}`
-      );
-    }
-
     let decimals: number;
     let symbol: string | undefined;
 
@@ -173,6 +313,21 @@ export class Amount {
       // TypeScript knows this is Shape A (Token)
       decimals = args[0].decimals;
       symbol = args[0].symbol;
+    }
+    assertValidDecimals(decimals);
+
+    const normalizedAmount = normalizeRawNumberish(amount);
+    if (!normalizedAmount.match(/^\d+$|^0x[0-9a-fA-F]+$/)) {
+      throw new Error(
+        `Invalid raw amount: "${normalizedAmount}". Must be a non-negative integer or hex value.`
+      );
+    }
+    const baseValue = BigInt(normalizedAmount);
+
+    if (baseValue < 0n) {
+      throw new Error(
+        `Negative amounts are not supported: ${baseValue.toString()}`
+      );
     }
 
     return new Amount(baseValue, decimals, symbol);
@@ -494,6 +649,11 @@ export class Amount {
     const scaledDivisor = BigInt(`${integer}${paddedFraction}`);
 
     if (scaledDivisor === 0n) {
+      if (!isZeroString(divisorStr)) {
+        throw new Error(
+          `Divisor "${divisorStr}" is too small: precision is limited to ${PRECISION} decimal places.`
+        );
+      }
       throw new Error("Division by zero");
     }
 
@@ -677,12 +837,6 @@ export class Amount {
  * @param symbol - Token symbol to append (e.g., "ETH", "STRK")
  * @returns Locale-formatted string with symbol
  *
- * @remarks
- * Current implementation converts to float for formatting, which may lose precision
- * for very large or very precise values. A future improvement would use
- * `Intl.NumberFormat.formatToParts` for lossless formatting, but this is not
- * currently polyfilled for React Native.
- *
  * @example
  * ```ts
  * // Basic usage
@@ -704,24 +858,37 @@ export function tokenAmountToFormatted(
   decimals: number,
   symbol: string
 ): string {
-  const divisor = BigInt(10) ** BigInt(decimals);
-  const integerPart = (balance / divisor).toString();
-  const fractionalPart = (balance % divisor).toString().padStart(decimals, "0");
+  assertValidDecimals(decimals);
+
+  const isNegative = balance < 0n;
+  const absoluteBalance = isNegative ? -balance : balance;
   const maxFractionDigits = compressed ? Math.min(4, decimals) : decimals;
 
-  const decimalString = `${integerPart}.${fractionalPart}`;
-  const numberValue = parseFloat(decimalString);
+  let integerPart: string;
+  let fractionalPart: string;
+  if (compressed && maxFractionDigits < decimals) {
+    const droppedDigits = decimals - maxFractionDigits;
+    const roundingFactor = BigInt(10) ** BigInt(droppedDigits);
+    const rounded = (absoluteBalance + roundingFactor / 2n) / roundingFactor;
+    const displayDivisor = BigInt(10) ** BigInt(maxFractionDigits);
+    integerPart = (rounded / displayDivisor).toString();
+    fractionalPart = (rounded % displayDivisor)
+      .toString()
+      .padStart(maxFractionDigits, "0");
+  } else {
+    const divisor = BigInt(10) ** BigInt(decimals);
+    integerPart = (absoluteBalance / divisor).toString();
+    fractionalPart = (absoluteBalance % divisor)
+      .toString()
+      .padStart(decimals, "0");
+  }
 
-  // Using formatter to get the device's preferred locale
-  // USD symbol will be replaced with the token's symbol
-  const formatter = Intl.NumberFormat("default", {
-    style: "currency",
-    currency: "USD", // This will help replace USD with this token's symbol,
-    currencyDisplay: "code",
-    minimumFractionDigits: 0,
-    maximumFractionDigits: maxFractionDigits,
-  });
+  const fractionalDisplay = fractionalPart.replace(/0+$/, "");
+  const integerDisplay = formatIntegerPart(integerPart);
+  const sign = isNegative ? "-" : "";
+  const amountDisplay = fractionalDisplay
+    ? `${sign}${integerDisplay}${localeDecimalSeparator()}${fractionalDisplay}`
+    : `${sign}${integerDisplay}`;
 
-  const formattedUSDLike = formatter.format(numberValue);
-  return formattedUSDLike.replace("USD", symbol);
+  return `${symbol}${NBSP}${amountDisplay}`;
 }

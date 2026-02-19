@@ -62,7 +62,7 @@ export interface AccountConfig {
 
 /**
  * How transaction fees are paid.
- * - `"sponsored"`: Paymaster covers gas (requires SDK sponsor config)
+ * - `"sponsored"`: Paymaster covers gas
  * - `"user_pays"`: User's account pays gas in ETH/STRK
  */
 export type FeeMode = "sponsored" | "user_pays";
@@ -115,6 +115,7 @@ export type ProgressStep =
   | "CONNECTED"
   | "CHECK_DEPLOYED"
   | "DEPLOYING"
+  | "FAILED"
   | "READY";
 
 /** Progress event emitted during `wallet.ensureReady()` */
@@ -172,6 +173,13 @@ export interface ExecuteOptions {
 export interface PreflightOptions {
   /** The calls to simulate */
   calls: Call[];
+  /**
+   * Fee mode used for preflight assumptions.
+   *
+   * When `"sponsored"` and the account is undeployed, preflight returns `{ ok: true }`
+   * because the paymaster path can deploy + execute atomically.
+   */
+  feeMode?: FeeMode;
 }
 
 /** Preflight succeeded — operation can proceed */

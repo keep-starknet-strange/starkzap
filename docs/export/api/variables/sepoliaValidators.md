@@ -1,30 +1,30 @@
-[**x**](../README.md)
+[**starkzap**](../README.md)
 
----
+***
 
-[x](../globals.md) / sepoliaValidators
+[starkzap](../globals.md) / sepoliaValidators
 
 # Variable: sepoliaValidators
 
 > `const` **sepoliaValidators**: `object`
 
-Defined in: [src/staking/validator/presets.sepolia.ts:11](https://github.com/keep-starknet-strange/x/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/staking/validator/presets.sepolia.ts#L11)
+Defined in: [src/staking/validator/presets.sepolia.ts:11](https://github.com/keep-starknet-strange/x/blob/5e54d8974744c392df7cac56b636788dfe6ae268/src/staking/validator/presets.sepolia.ts#L11)
 
 ## Type Declaration
 
-### MOONLI_ME
+### MOONLI\_ME
 
-> `readonly` **MOONLI_ME**: `object`
+> `readonly` **MOONLI\_ME**: `object`
 
-#### MOONLI_ME.name
+#### MOONLI\_ME.name
 
 > `readonly` **name**: `"moonli.me"` = `"moonli.me"`
 
-#### MOONLI_ME.stakerAddress
+#### MOONLI\_ME.stakerAddress
 
 > `readonly` **stakerAddress**: [`Address`](../type-aliases/Address.md)
 
-#### MOONLI_ME.logoUrl
+#### MOONLI\_ME.logoUrl
 
 > `readonly` **logoUrl**: `URL`
 
@@ -124,19 +124,19 @@ Defined in: [src/staking/validator/presets.sepolia.ts:11](https://github.com/kee
 
 > `readonly` **logoUrl**: `URL`
 
-### SATOSHI_UNIVERSITY
+### SATOSHI\_UNIVERSITY
 
-> `readonly` **SATOSHI_UNIVERSITY**: `object`
+> `readonly` **SATOSHI\_UNIVERSITY**: `object`
 
-#### SATOSHI_UNIVERSITY.name
+#### SATOSHI\_UNIVERSITY.name
 
 > `readonly` **name**: `"Satoshi University"` = `"Satoshi University"`
 
-#### SATOSHI_UNIVERSITY.stakerAddress
+#### SATOSHI\_UNIVERSITY.stakerAddress
 
 > `readonly` **stakerAddress**: [`Address`](../type-aliases/Address.md)
 
-#### SATOSHI_UNIVERSITY.logoUrl
+#### SATOSHI\_UNIVERSITY.logoUrl
 
 > `readonly` **logoUrl**: `URL`
 
@@ -252,50 +252,50 @@ Defined in: [src/staking/validator/presets.sepolia.ts:11](https://github.com/kee
 
 > `readonly` **logoUrl**: `URL`
 
-### VALIDATION_CLOUD
+### VALIDATION\_CLOUD
 
-> `readonly` **VALIDATION_CLOUD**: `object`
+> `readonly` **VALIDATION\_CLOUD**: `object`
 
-#### VALIDATION_CLOUD.name
+#### VALIDATION\_CLOUD.name
 
 > `readonly` **name**: `"Validation Cloud"` = `"Validation Cloud"`
 
-#### VALIDATION_CLOUD.stakerAddress
+#### VALIDATION\_CLOUD.stakerAddress
 
 > `readonly` **stakerAddress**: [`Address`](../type-aliases/Address.md)
 
-#### VALIDATION_CLOUD.logoUrl
+#### VALIDATION\_CLOUD.logoUrl
 
 > `readonly` **logoUrl**: `URL`
 
-### KEYSTONE_NODES
+### KEYSTONE\_NODES
 
-> `readonly` **KEYSTONE_NODES**: `object`
+> `readonly` **KEYSTONE\_NODES**: `object`
 
-#### KEYSTONE_NODES.name
+#### KEYSTONE\_NODES.name
 
 > `readonly` **name**: `"Keystone Nodes"` = `"Keystone Nodes"`
 
-#### KEYSTONE_NODES.stakerAddress
+#### KEYSTONE\_NODES.stakerAddress
 
 > `readonly` **stakerAddress**: [`Address`](../type-aliases/Address.md)
 
-#### KEYSTONE_NODES.logoUrl
+#### KEYSTONE\_NODES.logoUrl
 
 > `readonly` **logoUrl**: `URL`
 
-### CHORUS_ONE
+### CHORUS\_ONE
 
-> `readonly` **CHORUS_ONE**: `object`
+> `readonly` **CHORUS\_ONE**: `object`
 
-#### CHORUS_ONE.name
+#### CHORUS\_ONE.name
 
 > `readonly` **name**: `"Chorus One"` = `"Chorus One"`
 
-#### CHORUS_ONE.stakerAddress
+#### CHORUS\_ONE.stakerAddress
 
 > `readonly` **stakerAddress**: [`Address`](../type-aliases/Address.md)
 
-#### CHORUS_ONE.logoUrl
+#### CHORUS\_ONE.logoUrl
 
 > `readonly` **logoUrl**: `URL`

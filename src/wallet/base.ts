@@ -26,11 +26,14 @@ import type {
 import { Erc20 } from "@/erc20";
 import { Staking } from "@/staking";
 
+const MAX_ERC20_CACHE_SIZE = 128;
+const MAX_STAKING_CACHE_SIZE = 128;
+
 /**
  * Abstract base class for wallet implementations.
  *
  * Provides shared functionality, ERC20 token operations, and staking operations
- * for all wallet types. Child classes (e.g., `Wallet`, `CartridgeWallet`) must
+ * for all wallet types. Child classes (e.g., `Wallet`) must
  * implement the abstract methods to provide wallet-specific behavior.
  *
  * @remarks
@@ -69,6 +72,7 @@ export abstract class BaseWallet implements WalletInterface {
    * Prevents creating multiple instances for the same pool.
    */
   private stakingMap: Map<Address, Staking> = new Map();
+  private stakingInFlight: Map<Address, Promise<Staking>> = new Map();
 
   /**
    * Creates a new BaseWallet instance.
@@ -81,30 +85,6 @@ export abstract class BaseWallet implements WalletInterface {
   ) {
     this.address = address;
     this.stakingConfig = stakingConfig;
-  }
-
-  /**
-   * Get all ERC20 instances that have been accessed by this wallet.
-   *
-   * Returns cached Erc20 instances for tokens that have been interacted with
-   * via `erc20()`, `transfer()`, or `balanceOf()` methods.
-   *
-   * @returns Array of active Erc20 instances
-   */
-  get activeErc20(): Erc20[] {
-    return Array.from(this.erc20s.values());
-  }
-
-  /**
-   * Get all Staking instances that have been accessed by this wallet.
-   *
-   * Returns cached Staking instances for pools that have been interacted with
-   * via `staking()`, `stakingInStaker()`, or any pool operation methods.
-   *
-   * @returns Array of active Staking instances
-   */
-  get activeStaking(): Staking[] {
-    return Array.from(this.stakingMap.values());
   }
 
   // ============================================================
@@ -122,6 +102,11 @@ export abstract class BaseWallet implements WalletInterface {
 
   /** @inheritdoc */
   abstract execute(calls: Call[], options?: ExecuteOptions): Promise<Tx>;
+
+  /** @inheritdoc */
+  callContract(call: Call): ReturnType<RpcProvider["callContract"]> {
+    return this.getProvider().callContract(call);
+  }
 
   /** @inheritdoc */
   abstract signMessage(typedData: TypedData): Promise<Signature>;
@@ -172,6 +157,19 @@ export abstract class BaseWallet implements WalletInterface {
     return new TxBuilder(this);
   }
 
+  protected clearCaches(): void {
+    this.erc20s.clear();
+    this.stakingMap.clear();
+    this.stakingInFlight.clear();
+  }
+
+  private evictOldest<K, V>(cache: Map<K, V>): void {
+    const oldest = cache.keys().next().value;
+    if (oldest !== undefined) {
+      cache.delete(oldest);
+    }
+  }
+
   // ============================================================
   // ERC20 delegated methods
   // ============================================================
@@ -188,6 +186,9 @@ export abstract class BaseWallet implements WalletInterface {
   erc20(token: Token): Erc20 {
     let erc20 = this.erc20s.get(token.address);
     if (!erc20) {
+      if (this.erc20s.size >= MAX_ERC20_CACHE_SIZE) {
+        this.evictOldest(this.erc20s);
+      }
       erc20 = new Erc20(token, this.getProvider());
       this.erc20s.set(token.address, erc20);
     }
@@ -226,6 +227,9 @@ export abstract class BaseWallet implements WalletInterface {
     transfers: { to: Address; amount: Amount }[],
     options?: ExecuteOptions
   ): Promise<Tx> {
+    if (!transfers.length) {
+      throw new Error("At least one transfer is required");
+    }
     const erc20 = this.erc20(token);
     return await erc20.transfer(this, transfers, options);
   }
@@ -549,14 +553,30 @@ export abstract class BaseWallet implements WalletInterface {
   async staking(poolAddress: Address): Promise<Staking> {
     const config = this.assertStakingConfig();
 
-    let staking = this.stakingMap.get(poolAddress);
-
-    if (!staking) {
-      staking = await Staking.fromPool(poolAddress, this.getProvider(), config);
-      this.stakingMap.set(poolAddress, staking);
+    const cached = this.stakingMap.get(poolAddress);
+    if (cached) {
+      return cached;
     }
 
-    return staking;
+    const inFlight = this.stakingInFlight.get(poolAddress);
+    if (inFlight) {
+      return inFlight;
+    }
+
+    const loading = Staking.fromPool(poolAddress, this.getProvider(), config)
+      .then((staking) => {
+        if (this.stakingMap.size >= MAX_STAKING_CACHE_SIZE) {
+          this.evictOldest(this.stakingMap);
+        }
+        this.stakingMap.set(poolAddress, staking);
+        return staking;
+      })
+      .finally(() => {
+        this.stakingInFlight.delete(poolAddress);
+      });
+
+    this.stakingInFlight.set(poolAddress, loading);
+    return loading;
   }
 
   /**
@@ -595,7 +615,11 @@ export abstract class BaseWallet implements WalletInterface {
     );
 
     const poolAddress = staking.poolAddress;
+    if (this.stakingMap.size >= MAX_STAKING_CACHE_SIZE) {
+      this.evictOldest(this.stakingMap);
+    }
     this.stakingMap.set(poolAddress, staking);
+    this.stakingInFlight.delete(poolAddress);
 
     return staking;
   }

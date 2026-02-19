@@ -1,14 +1,14 @@
-[**x**](../README.md)
+[**starkzap**](../README.md)
 
----
+***
 
-[x](../globals.md) / accountPresets
+[starkzap](../globals.md) / accountPresets
 
 # Variable: accountPresets
 
 > `const` **accountPresets**: `object`
 
-Defined in: [src/account/presets.ts:108](https://github.com/keep-starknet-strange/x/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/account/presets.ts#L108)
+Defined in: [src/account/presets.ts:109](https://github.com/keep-starknet-strange/x/blob/5e54d8974744c392df7cac56b636788dfe6ae268/src/account/presets.ts#L109)
 
 ## Type Declaration
 

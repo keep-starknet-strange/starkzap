@@ -1,14 +1,14 @@
-[**x**](../README.md)
+[**starkzap**](../README.md)
 
----
+***
 
-[x](../globals.md) / mainnetTokens
+[starkzap](../globals.md) / mainnetTokens
 
 # Variable: mainnetTokens
 
 > `const` **mainnetTokens**: `object`
 
-Defined in: [src/erc20/token/presets.ts:11](https://github.com/keep-starknet-strange/x/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/erc20/token/presets.ts#L11)
+Defined in: [src/erc20/token/presets.ts:11](https://github.com/keep-starknet-strange/x/blob/5e54d8974744c392df7cac56b636788dfe6ae268/src/erc20/token/presets.ts#L11)
 
 ## Type Declaration
 
@@ -124,31 +124,31 @@ Defined in: [src/erc20/token/presets.ts:11](https://github.com/keep-starknet-str
 
 > `readonly` **logoUrl**: `URL`
 
-### USDC_E
+### USDC\_E
 
-> `readonly` **USDC_E**: `object`
+> `readonly` **USDC\_E**: `object`
 
-#### USDC_E.name
+#### USDC\_E.name
 
 > `readonly` **name**: `"Bridged USDC"` = `"Bridged USDC"`
 
-#### USDC_E.address
+#### USDC\_E.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### USDC_E.decimals
+#### USDC\_E.decimals
 
 > `readonly` **decimals**: `6` = `6`
 
-#### USDC_E.symbol
+#### USDC\_E.symbol
 
 > `readonly` **symbol**: `"USDC.e"` = `"USDC.e"`
 
-#### USDC_E.metadata
+#### USDC\_E.metadata
 
 > `readonly` **metadata**: `object`
 
-#### USDC_E.metadata.logoUrl
+#### USDC\_E.metadata.logoUrl
 
 > `readonly` **logoUrl**: `URL`
 
@@ -488,31 +488,31 @@ Defined in: [src/erc20/token/presets.ts:11](https://github.com/keep-starknet-str
 
 > `readonly` **logoUrl**: `URL`
 
-### WSTETH_LEGACY
+### WSTETH\_LEGACY
 
-> `readonly` **WSTETH_LEGACY**: `object`
+> `readonly` **WSTETH\_LEGACY**: `object`
 
-#### WSTETH_LEGACY.name
+#### WSTETH\_LEGACY.name
 
 > `readonly` **name**: `"Legacy Starknet Wrapped Staked Ether"` = `"Legacy Starknet Wrapped Staked Ether"`
 
-#### WSTETH_LEGACY.address
+#### WSTETH\_LEGACY.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### WSTETH_LEGACY.decimals
+#### WSTETH\_LEGACY.decimals
 
 > `readonly` **decimals**: `18` = `18`
 
-#### WSTETH_LEGACY.symbol
+#### WSTETH\_LEGACY.symbol
 
 > `readonly` **symbol**: `"wstETH(legacy)"` = `"wstETH(legacy)"`
 
-#### WSTETH_LEGACY.metadata
+#### WSTETH\_LEGACY.metadata
 
 > `readonly` **metadata**: `object`
 
-#### WSTETH_LEGACY.metadata.logoUrl
+#### WSTETH\_LEGACY.metadata.logoUrl
 
 > `readonly` **logoUrl**: `URL`
 
@@ -1972,31 +1972,31 @@ Defined in: [src/erc20/token/presets.ts:11](https://github.com/keep-starknet-str
 
 > `readonly` **logoUrl**: `URL`
 
-### RUSDC_STARK
+### RUSDC\_STARK
 
-> `readonly` **RUSDC_STARK**: `object`
+> `readonly` **RUSDC\_STARK**: `object`
 
-#### RUSDC_STARK.name
+#### RUSDC\_STARK.name
 
 > `readonly` **name**: `"Relend Network USDC - Starknet"` = `"Relend Network USDC - Starknet"`
 
-#### RUSDC_STARK.address
+#### RUSDC\_STARK.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### RUSDC_STARK.decimals
+#### RUSDC\_STARK.decimals
 
 > `readonly` **decimals**: `6` = `6`
 
-#### RUSDC_STARK.symbol
+#### RUSDC\_STARK.symbol
 
 > `readonly` **symbol**: `"rUSDC-stark"` = `"rUSDC-stark"`
 
-#### RUSDC_STARK.metadata
+#### RUSDC\_STARK.metadata
 
 > `readonly` **metadata**: `object`
 
-#### RUSDC_STARK.metadata.logoUrl
+#### RUSDC\_STARK.metadata.logoUrl
 
 > `readonly` **logoUrl**: `URL`
 

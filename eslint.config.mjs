@@ -19,6 +19,7 @@ export default defineConfig(
       "**/coverage/**",
       "docs/api/**",
       "docs/export/**",
+      "examples/flappy-bird/**",
       "examples/mobile/eslint.config.js",
       "examples/mobile/metro.config.js",
     ],

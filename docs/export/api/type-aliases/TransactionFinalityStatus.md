@@ -1,11 +1,11 @@
-[**x**](../README.md)
+[**starkzap**](../README.md)
 
----
+***
 
-[x](../globals.md) / TransactionFinalityStatus
+[starkzap](../globals.md) / TransactionFinalityStatus
 
 # Type Alias: TransactionFinalityStatus
 
 > **TransactionFinalityStatus** = `RPC$1.ETransactionFinalityStatus`
 
-Defined in: node_modules/starknet/dist/index.d.ts:583
+Defined in: node\_modules/starknet/dist/index.d.ts:583

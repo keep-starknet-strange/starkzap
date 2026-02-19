@@ -1,5 +1,14 @@
 import type { Signature } from "starknet";
 import type { SignerInterface } from "@/signer/interface";
+import { assertSafeHttpUrl } from "@/utils";
+
+type PrivySigningHeaders =
+  | Record<string, string>
+  | (() => Record<string, string> | Promise<Record<string, string>>);
+
+type PrivySigningBody = (
+  params: Readonly<{ walletId: string; hash: string }>
+) => Record<string, unknown> | Promise<Record<string, unknown>>;
 
 /**
  * Configuration for the Privy signer.
@@ -24,15 +33,46 @@ export interface PrivySignerConfig {
    * Use this for server-side signing with PrivyClient directly.
    */
   rawSign?: (walletId: string, messageHash: string) => Promise<string>;
+  /**
+   * Optional headers (or header factory) for authenticated signing requests.
+   *
+   * Use this to pass session/JWT headers when calling your backend endpoint.
+   */
+  headers?: PrivySigningHeaders;
+  /**
+   * Optional payload builder for challenge/nonce aware signing endpoints.
+   *
+   * Default body is `{ walletId, hash }`.
+   */
+  buildBody?: PrivySigningBody;
+  /**
+   * Timeout for serverUrl requests in milliseconds.
+   * @default 10000
+   */
+  requestTimeoutMs?: number;
 }
 
 /**
  * Parse Privy signature (64-byte hex string) into [r, s] tuple.
  */
 function parsePrivySignature(signature: string): Signature {
+  if (typeof signature !== "string" || signature.length === 0) {
+    throw new Error("Privy signing failed: empty signature response");
+  }
+
   const sigWithout0x = signature.startsWith("0x")
     ? signature.slice(2)
     : signature;
+
+  if (!/^[0-9a-fA-F]+$/.test(sigWithout0x)) {
+    throw new Error("Privy signing failed: signature is not valid hex");
+  }
+
+  if (sigWithout0x.length !== 128) {
+    throw new Error(
+      "Privy signing failed: expected a 64-byte signature (r||s)"
+    );
+  }
 
   // Privy returns 64-byte (128 hex char) signature: r (32 bytes) || s (32 bytes)
   const r = "0x" + sigWithout0x.slice(0, 64);
@@ -94,23 +134,111 @@ export class PrivySigner implements SignerInterface {
     this.publicKey = config.publicKey;
 
     // Use provided rawSign or create one from serverUrl
-    this.rawSignFn = config.rawSign ?? this.defaultRawSignFn(config.serverUrl!);
+    this.rawSignFn =
+      config.rawSign ??
+      this.defaultRawSignFn(config.serverUrl!, {
+        headers: config.headers,
+        buildBody: config.buildBody,
+        requestTimeoutMs: config.requestTimeoutMs,
+      });
   }
 
-  private defaultRawSignFn(serverUrl: string) {
-    return async (walletId: string, hash: string): Promise<string> => {
-      const response = await fetch(serverUrl, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ walletId, hash }),
-      });
+  private async resolveHeaders(
+    headers: PrivySigningHeaders | undefined
+  ): Promise<Record<string, string>> {
+    if (!headers) {
+      return {};
+    }
+    return typeof headers === "function" ? await headers() : headers;
+  }
 
-      if (!response.ok) {
-        const err = await response.json().catch(() => ({}));
-        throw new Error(err.details || err.error || "Privy signing failed");
+  private defaultRawSignFn(
+    serverUrl: string,
+    options: {
+      headers: PrivySigningHeaders | undefined;
+      buildBody: PrivySigningBody | undefined;
+      requestTimeoutMs: number | undefined;
+    }
+  ) {
+    const normalizedUrl = assertSafeHttpUrl(
+      serverUrl,
+      "PrivySigner serverUrl"
+    ).toString();
+    const timeoutMs = options.requestTimeoutMs ?? 10_000;
+    if (!Number.isFinite(timeoutMs) || timeoutMs <= 0) {
+      throw new Error(
+        "PrivySigner requestTimeoutMs must be a positive finite number"
+      );
+    }
+
+    return async (walletId: string, hash: string): Promise<string> => {
+      const extraHeaders = await this.resolveHeaders(options.headers);
+      const payload = (await options.buildBody?.({ walletId, hash })) ?? {
+        walletId,
+        hash,
+      };
+
+      const controller =
+        typeof AbortController !== "undefined"
+          ? new AbortController()
+          : undefined;
+      const timeoutHandle =
+        controller &&
+        setTimeout(() => {
+          controller.abort();
+        }, timeoutMs);
+
+      let response: Awaited<ReturnType<typeof fetch>>;
+      try {
+        const requestInit: RequestInit = {
+          method: "POST",
+          headers: { "Content-Type": "application/json", ...extraHeaders },
+          body: JSON.stringify(payload),
+        };
+        if (controller) {
+          requestInit.signal = controller.signal;
+        }
+
+        response = await fetch(normalizedUrl, requestInit);
+      } catch (error) {
+        if (error instanceof Error && error.name === "AbortError") {
+          throw new Error(
+            `Privy signing request timed out after ${timeoutMs}ms`
+          );
+        }
+        throw error;
+      } finally {
+        if (timeoutHandle) {
+          clearTimeout(timeoutHandle);
+        }
       }
 
-      const { signature } = await response.json();
+      let data: unknown;
+      try {
+        data = await response.json();
+      } catch {
+        throw new Error("Privy signing failed: invalid JSON response");
+      }
+
+      if (!response.ok) {
+        const err =
+          typeof data === "object" && data !== null
+            ? (data as Record<string, unknown>)
+            : {};
+        throw new Error(
+          (typeof err.details === "string" && err.details) ||
+            (typeof err.error === "string" && err.error) ||
+            "Privy signing failed"
+        );
+      }
+
+      const signature =
+        typeof data === "object" && data !== null
+          ? (data as Record<string, unknown>).signature
+          : undefined;
+      if (typeof signature !== "string") {
+        throw new Error("Privy signing failed: invalid server response");
+      }
       return signature;
     };
   }

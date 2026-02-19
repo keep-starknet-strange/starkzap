@@ -1,12 +1,12 @@
-[**x**](../README.md)
+[**starkzap**](../README.md)
 
----
+***
 
-[x](../globals.md) / PaymasterTimeBounds
+[starkzap](../globals.md) / PaymasterTimeBounds
 
 # Interface: PaymasterTimeBounds
 
-Defined in: node_modules/starknet/dist/index.d.ts:1070
+Defined in: node\_modules/starknet/dist/index.d.ts:1070
 
 ## Properties
 
@@ -14,12 +14,12 @@ Defined in: node_modules/starknet/dist/index.d.ts:1070
 
 > `optional` **executeAfter**: `number`
 
-Defined in: node_modules/starknet/dist/index.d.ts:1071
+Defined in: node\_modules/starknet/dist/index.d.ts:1071
 
----
+***
 
 ### executeBefore
 
 > **executeBefore**: `number`
 
-Defined in: node_modules/starknet/dist/index.d.ts:1072
+Defined in: node\_modules/starknet/dist/index.d.ts:1072

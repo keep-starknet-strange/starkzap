@@ -1,14 +1,14 @@
-[**x**](../README.md)
+[**starkzap**](../README.md)
 
----
+***
 
-[x](../globals.md) / TransactionStatus
+[starkzap](../globals.md) / TransactionStatus
 
 # Variable: TransactionStatus
 
 > **TransactionStatus**: `object`
 
-Defined in: node_modules/starknet/dist/index.d.ts:554
+Defined in: node\_modules/starknet/dist/index.d.ts:554
 
 ## Type Declaration
 
@@ -20,14 +20,14 @@ Defined in: node_modules/starknet/dist/index.d.ts:554
 
 > `readonly` **CANDIDATE**: `"CANDIDATE"`
 
-### PRE_CONFIRMED
+### PRE\_CONFIRMED
 
-> `readonly` **PRE_CONFIRMED**: `"PRE_CONFIRMED"`
+> `readonly` **PRE\_CONFIRMED**: `"PRE_CONFIRMED"`
 
-### ACCEPTED_ON_L2
+### ACCEPTED\_ON\_L2
 
-> `readonly` **ACCEPTED_ON_L2**: `"ACCEPTED_ON_L2"`
+> `readonly` **ACCEPTED\_ON\_L2**: `"ACCEPTED_ON_L2"`
 
-### ACCEPTED_ON_L1
+### ACCEPTED\_ON\_L1
 
-> `readonly` **ACCEPTED_ON_L1**: `"ACCEPTED_ON_L1"`
+> `readonly` **ACCEPTED\_ON\_L1**: `"ACCEPTED_ON_L1"`

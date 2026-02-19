@@ -1,14 +1,14 @@
-[**x**](../README.md)
+[**starkzap**](../README.md)
 
----
+***
 
-[x](../globals.md) / mainnetValidators
+[starkzap](../globals.md) / mainnetValidators
 
 # Variable: mainnetValidators
 
 > `const` **mainnetValidators**: `object`
 
-Defined in: [src/staking/validator/presets.ts:11](https://github.com/keep-starknet-strange/x/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/staking/validator/presets.ts#L11)
+Defined in: [src/staking/validator/presets.ts:11](https://github.com/keep-starknet-strange/x/blob/5e54d8974744c392df7cac56b636788dfe6ae268/src/staking/validator/presets.ts#L11)
 
 ## Type Declaration
 
@@ -28,19 +28,19 @@ Defined in: [src/staking/validator/presets.ts:11](https://github.com/keep-starkn
 
 > `readonly` **logoUrl**: `URL`
 
-### READY_PREV_ARGENT
+### READY\_PREV\_ARGENT
 
-> `readonly` **READY_PREV_ARGENT**: `object`
+> `readonly` **READY\_PREV\_ARGENT**: `object`
 
-#### READY_PREV_ARGENT.name
+#### READY\_PREV\_ARGENT.name
 
 > `readonly` **name**: `"Ready (prev. Argent)"` = `"Ready (prev. Argent)"`
 
-#### READY_PREV_ARGENT.stakerAddress
+#### READY\_PREV\_ARGENT.stakerAddress
 
 > `readonly` **stakerAddress**: [`Address`](../type-aliases/Address.md)
 
-#### READY_PREV_ARGENT.logoUrl
+#### READY\_PREV\_ARGENT.logoUrl
 
 > `readonly` **logoUrl**: `URL`
 
@@ -92,19 +92,19 @@ Defined in: [src/staking/validator/presets.ts:11](https://github.com/keep-starkn
 
 > `readonly` **logoUrl**: `URL`
 
-### ANCHORAGE_DIGITAL
+### ANCHORAGE\_DIGITAL
 
-> `readonly` **ANCHORAGE_DIGITAL**: `object`
+> `readonly` **ANCHORAGE\_DIGITAL**: `object`
 
-#### ANCHORAGE_DIGITAL.name
+#### ANCHORAGE\_DIGITAL.name
 
 > `readonly` **name**: `"Anchorage Digital"` = `"Anchorage Digital"`
 
-#### ANCHORAGE_DIGITAL.stakerAddress
+#### ANCHORAGE\_DIGITAL.stakerAddress
 
 > `readonly` **stakerAddress**: [`Address`](../type-aliases/Address.md)
 
-#### ANCHORAGE_DIGITAL.logoUrl
+#### ANCHORAGE\_DIGITAL.logoUrl
 
 > `readonly` **logoUrl**: `URL`
 
@@ -124,19 +124,19 @@ Defined in: [src/staking/validator/presets.ts:11](https://github.com/keep-starkn
 
 > `readonly` **logoUrl**: `URL`
 
-### BITWISE_ONCHAIN_SOLUTIONS
+### BITWISE\_ONCHAIN\_SOLUTIONS
 
-> `readonly` **BITWISE_ONCHAIN_SOLUTIONS**: `object`
+> `readonly` **BITWISE\_ONCHAIN\_SOLUTIONS**: `object`
 
-#### BITWISE_ONCHAIN_SOLUTIONS.name
+#### BITWISE\_ONCHAIN\_SOLUTIONS.name
 
 > `readonly` **name**: `"Bitwise Onchain Solutions"` = `"Bitwise Onchain Solutions"`
 
-#### BITWISE_ONCHAIN_SOLUTIONS.stakerAddress
+#### BITWISE\_ONCHAIN\_SOLUTIONS.stakerAddress
 
 > `readonly` **stakerAddress**: [`Address`](../type-aliases/Address.md)
 
-#### BITWISE_ONCHAIN_SOLUTIONS.logoUrl
+#### BITWISE\_ONCHAIN\_SOLUTIONS.logoUrl
 
 > `readonly` **logoUrl**: `URL`
 
@@ -300,19 +300,19 @@ Defined in: [src/staking/validator/presets.ts:11](https://github.com/keep-starkn
 
 > `readonly` **logoUrl**: `URL`
 
-### P2P_ORG
+### P2P\_ORG
 
-> `readonly` **P2P_ORG**: `object`
+> `readonly` **P2P\_ORG**: `object`
 
-#### P2P_ORG.name
+#### P2P\_ORG.name
 
 > `readonly` **name**: `"P2P.org"` = `"P2P.org"`
 
-#### P2P_ORG.stakerAddress
+#### P2P\_ORG.stakerAddress
 
 > `readonly` **stakerAddress**: [`Address`](../type-aliases/Address.md)
 
-#### P2P_ORG.logoUrl
+#### P2P\_ORG.logoUrl
 
 > `readonly` **logoUrl**: `URL`
 
@@ -380,35 +380,35 @@ Defined in: [src/staking/validator/presets.ts:11](https://github.com/keep-starkn
 
 > `readonly` **logoUrl**: `URL`
 
-### CHAINBASE_STAKING
+### CHAINBASE\_STAKING
 
-> `readonly` **CHAINBASE_STAKING**: `object`
+> `readonly` **CHAINBASE\_STAKING**: `object`
 
-#### CHAINBASE_STAKING.name
+#### CHAINBASE\_STAKING.name
 
 > `readonly` **name**: `"Chainbase Staking"` = `"Chainbase Staking"`
 
-#### CHAINBASE_STAKING.stakerAddress
+#### CHAINBASE\_STAKING.stakerAddress
 
 > `readonly` **stakerAddress**: [`Address`](../type-aliases/Address.md)
 
-#### CHAINBASE_STAKING.logoUrl
+#### CHAINBASE\_STAKING.logoUrl
 
 > `readonly` **logoUrl**: `URL`
 
-### POSTHUMAN_STAKEDROP
+### POSTHUMAN\_STAKEDROP
 
-> `readonly` **POSTHUMAN_STAKEDROP**: `object`
+> `readonly` **POSTHUMAN\_STAKEDROP**: `object`
 
-#### POSTHUMAN_STAKEDROP.name
+#### POSTHUMAN\_STAKEDROP.name
 
 > `readonly` **name**: `"POSTHUMAN 🧬 StakeDrop"` = `"POSTHUMAN 🧬 StakeDrop"`
 
-#### POSTHUMAN_STAKEDROP.stakerAddress
+#### POSTHUMAN\_STAKEDROP.stakerAddress
 
 > `readonly` **stakerAddress**: [`Address`](../type-aliases/Address.md)
 
-#### POSTHUMAN_STAKEDROP.logoUrl
+#### POSTHUMAN\_STAKEDROP.logoUrl
 
 > `readonly` **logoUrl**: `URL`
 
@@ -476,19 +476,19 @@ Defined in: [src/staking/validator/presets.ts:11](https://github.com/keep-starkn
 
 > `readonly` **logoUrl**: `URL`
 
-### SLUH_AI
+### SLUH\_AI
 
-> `readonly` **SLUH_AI**: `object`
+> `readonly` **SLUH\_AI**: `object`
 
-#### SLUH_AI.name
+#### SLUH\_AI.name
 
 > `readonly` **name**: `"sluh.ai"` = `"sluh.ai"`
 
-#### SLUH_AI.stakerAddress
+#### SLUH\_AI.stakerAddress
 
 > `readonly` **stakerAddress**: [`Address`](../type-aliases/Address.md)
 
-#### SLUH_AI.logoUrl
+#### SLUH\_AI.logoUrl
 
 > `readonly` **logoUrl**: `URL`
 
@@ -524,19 +524,19 @@ Defined in: [src/staking/validator/presets.ts:11](https://github.com/keep-starkn
 
 > `readonly` **logoUrl**: `URL`
 
-### STEAK_LI
+### STEAK\_LI
 
-> `readonly` **STEAK_LI**: `object`
+> `readonly` **STEAK\_LI**: `object`
 
-#### STEAK_LI.name
+#### STEAK\_LI.name
 
 > `readonly` **name**: `"steak.li"` = `"steak.li"`
 
-#### STEAK_LI.stakerAddress
+#### STEAK\_LI.stakerAddress
 
 > `readonly` **stakerAddress**: [`Address`](../type-aliases/Address.md)
 
-#### STEAK_LI.logoUrl
+#### STEAK\_LI.logoUrl
 
 > `readonly` **logoUrl**: `URL`
 
@@ -588,19 +588,19 @@ Defined in: [src/staking/validator/presets.ts:11](https://github.com/keep-starkn
 
 > `readonly` **logoUrl**: `URL`
 
-### EUROPA_VALIDATOR
+### EUROPA\_VALIDATOR
 
-> `readonly` **EUROPA_VALIDATOR**: `object`
+> `readonly` **EUROPA\_VALIDATOR**: `object`
 
-#### EUROPA_VALIDATOR.name
+#### EUROPA\_VALIDATOR.name
 
 > `readonly` **name**: `"Europa Validator"` = `"Europa Validator"`
 
-#### EUROPA_VALIDATOR.stakerAddress
+#### EUROPA\_VALIDATOR.stakerAddress
 
 > `readonly` **stakerAddress**: [`Address`](../type-aliases/Address.md)
 
-#### EUROPA_VALIDATOR.logoUrl
+#### EUROPA\_VALIDATOR.logoUrl
 
 > `readonly` **logoUrl**: `URL`
 
@@ -636,19 +636,19 @@ Defined in: [src/staking/validator/presets.ts:11](https://github.com/keep-starkn
 
 > `readonly` **logoUrl**: `URL`
 
-### FRUTERO_CLUB
+### FRUTERO\_CLUB
 
-> `readonly` **FRUTERO_CLUB**: `object`
+> `readonly` **FRUTERO\_CLUB**: `object`
 
-#### FRUTERO_CLUB.name
+#### FRUTERO\_CLUB.name
 
 > `readonly` **name**: `"Frutero Club"` = `"Frutero Club"`
 
-#### FRUTERO_CLUB.stakerAddress
+#### FRUTERO\_CLUB.stakerAddress
 
 > `readonly` **stakerAddress**: [`Address`](../type-aliases/Address.md)
 
-#### FRUTERO_CLUB.logoUrl
+#### FRUTERO\_CLUB.logoUrl
 
 > `readonly` **logoUrl**: `URL`
 
@@ -732,19 +732,19 @@ Defined in: [src/staking/validator/presets.ts:11](https://github.com/keep-starkn
 
 > `readonly` **logoUrl**: `URL`
 
-### SETHEE_IT_LTD
+### SETHEE\_IT\_LTD
 
-> `readonly` **SETHEE_IT_LTD**: `object`
+> `readonly` **SETHEE\_IT\_LTD**: `object`
 
-#### SETHEE_IT_LTD.name
+#### SETHEE\_IT\_LTD.name
 
 > `readonly` **name**: `"Sethee IT LTD."` = `"Sethee IT LTD."`
 
-#### SETHEE_IT_LTD.stakerAddress
+#### SETHEE\_IT\_LTD.stakerAddress
 
 > `readonly` **stakerAddress**: [`Address`](../type-aliases/Address.md)
 
-#### SETHEE_IT_LTD.logoUrl
+#### SETHEE\_IT\_LTD.logoUrl
 
 > `readonly` **logoUrl**: `URL`
 
@@ -764,19 +764,19 @@ Defined in: [src/staking/validator/presets.ts:11](https://github.com/keep-starkn
 
 > `readonly` **logoUrl**: `URL`
 
-### ARCHETYPAL_TECH
+### ARCHETYPAL\_TECH
 
-> `readonly` **ARCHETYPAL_TECH**: `object`
+> `readonly` **ARCHETYPAL\_TECH**: `object`
 
-#### ARCHETYPAL_TECH.name
+#### ARCHETYPAL\_TECH.name
 
 > `readonly` **name**: `"Archetypal Tech"` = `"Archetypal Tech"`
 
-#### ARCHETYPAL_TECH.stakerAddress
+#### ARCHETYPAL\_TECH.stakerAddress
 
 > `readonly` **stakerAddress**: [`Address`](../type-aliases/Address.md)
 
-#### ARCHETYPAL_TECH.logoUrl
+#### ARCHETYPAL\_TECH.logoUrl
 
 > `readonly` **logoUrl**: `URL`
 
@@ -796,19 +796,19 @@ Defined in: [src/staking/validator/presets.ts:11](https://github.com/keep-starkn
 
 > `readonly` **logoUrl**: `URL`
 
-### BUBBLE_STUDIO
+### BUBBLE\_STUDIO
 
-> `readonly` **BUBBLE_STUDIO**: `object`
+> `readonly` **BUBBLE\_STUDIO**: `object`
 
-#### BUBBLE_STUDIO.name
+#### BUBBLE\_STUDIO.name
 
 > `readonly` **name**: `"Bubble Studio"` = `"Bubble Studio"`
 
-#### BUBBLE_STUDIO.stakerAddress
+#### BUBBLE\_STUDIO.stakerAddress
 
 > `readonly` **stakerAddress**: [`Address`](../type-aliases/Address.md)
 
-#### BUBBLE_STUDIO.logoUrl
+#### BUBBLE\_STUDIO.logoUrl
 
 > `readonly` **logoUrl**: `URL`
 
@@ -860,19 +860,19 @@ Defined in: [src/staking/validator/presets.ts:11](https://github.com/keep-starkn
 
 > `readonly` **logoUrl**: `null` = `null`
 
-### J_NODE
+### J\_NODE
 
-> `readonly` **J_NODE**: `object`
+> `readonly` **J\_NODE**: `object`
 
-#### J_NODE.name
+#### J\_NODE.name
 
 > `readonly` **name**: `"J•Node"` = `"J•Node"`
 
-#### J_NODE.stakerAddress
+#### J\_NODE.stakerAddress
 
 > `readonly` **stakerAddress**: [`Address`](../type-aliases/Address.md)
 
-#### J_NODE.logoUrl
+#### J\_NODE.logoUrl
 
 > `readonly` **logoUrl**: `URL`
 
@@ -940,35 +940,35 @@ Defined in: [src/staking/validator/presets.ts:11](https://github.com/keep-starkn
 
 > `readonly` **logoUrl**: `URL`
 
-### PERFECT_NODES
+### PERFECT\_NODES
 
-> `readonly` **PERFECT_NODES**: `object`
+> `readonly` **PERFECT\_NODES**: `object`
 
-#### PERFECT_NODES.name
+#### PERFECT\_NODES.name
 
 > `readonly` **name**: `"Perfect-nodes"` = `"Perfect-nodes"`
 
-#### PERFECT_NODES.stakerAddress
+#### PERFECT\_NODES.stakerAddress
 
 > `readonly` **stakerAddress**: [`Address`](../type-aliases/Address.md)
 
-#### PERFECT_NODES.logoUrl
+#### PERFECT\_NODES.logoUrl
 
 > `readonly` **logoUrl**: `URL`
 
-### GAME_MACHINE_LABS
+### GAME\_MACHINE\_LABS
 
-> `readonly` **GAME_MACHINE_LABS**: `object`
+> `readonly` **GAME\_MACHINE\_LABS**: `object`
 
-#### GAME_MACHINE_LABS.name
+#### GAME\_MACHINE\_LABS.name
 
 > `readonly` **name**: `"Game Machine Labs"` = `"Game Machine Labs"`
 
-#### GAME_MACHINE_LABS.stakerAddress
+#### GAME\_MACHINE\_LABS.stakerAddress
 
 > `readonly` **stakerAddress**: [`Address`](../type-aliases/Address.md)
 
-#### GAME_MACHINE_LABS.logoUrl
+#### GAME\_MACHINE\_LABS.logoUrl
 
 > `readonly` **logoUrl**: `URL`
 
@@ -988,67 +988,67 @@ Defined in: [src/staking/validator/presets.ts:11](https://github.com/keep-starkn
 
 > `readonly` **logoUrl**: `null` = `null`
 
-### CRYPTONATIVE_SYSTEMS
+### CRYPTONATIVE\_SYSTEMS
 
-> `readonly` **CRYPTONATIVE_SYSTEMS**: `object`
+> `readonly` **CRYPTONATIVE\_SYSTEMS**: `object`
 
-#### CRYPTONATIVE_SYSTEMS.name
+#### CRYPTONATIVE\_SYSTEMS.name
 
 > `readonly` **name**: `"cryptonative.systems"` = `"cryptonative.systems"`
 
-#### CRYPTONATIVE_SYSTEMS.stakerAddress
+#### CRYPTONATIVE\_SYSTEMS.stakerAddress
 
 > `readonly` **stakerAddress**: [`Address`](../type-aliases/Address.md)
 
-#### CRYPTONATIVE_SYSTEMS.logoUrl
+#### CRYPTONATIVE\_SYSTEMS.logoUrl
 
 > `readonly` **logoUrl**: `URL`
 
-### MOONLI_ME
+### MOONLI\_ME
 
-> `readonly` **MOONLI_ME**: `object`
+> `readonly` **MOONLI\_ME**: `object`
 
-#### MOONLI_ME.name
+#### MOONLI\_ME.name
 
 > `readonly` **name**: `"moonli.me"` = `"moonli.me"`
 
-#### MOONLI_ME.stakerAddress
+#### MOONLI\_ME.stakerAddress
 
 > `readonly` **stakerAddress**: [`Address`](../type-aliases/Address.md)
 
-#### MOONLI_ME.logoUrl
+#### MOONLI\_ME.logoUrl
 
 > `readonly` **logoUrl**: `URL`
 
-### M_E_D_I_U_M_R_A_R_E
+### M\_E\_D\_I\_U\_M\_R\_A\_R\_E
 
-> `readonly` **M_E_D_I_U_M_R_A_R_E**: `object`
+> `readonly` **M\_E\_D\_I\_U\_M\_R\_A\_R\_E**: `object`
 
-#### M_E_D_I_U_M_R_A_R_E.name
+#### M\_E\_D\_I\_U\_M\_R\_A\_R\_E.name
 
 > `readonly` **name**: `"M E D I U M ⬩ R A R E"` = `"M E D I U M ⬩ R A R E"`
 
-#### M_E_D_I_U_M_R_A_R_E.stakerAddress
+#### M\_E\_D\_I\_U\_M\_R\_A\_R\_E.stakerAddress
 
 > `readonly` **stakerAddress**: [`Address`](../type-aliases/Address.md)
 
-#### M_E_D_I_U_M_R_A_R_E.logoUrl
+#### M\_E\_D\_I\_U\_M\_R\_A\_R\_E.logoUrl
 
 > `readonly` **logoUrl**: `URL`
 
-### BAREMETAL_LIVE
+### BAREMETAL\_LIVE
 
-> `readonly` **BAREMETAL_LIVE**: `object`
+> `readonly` **BAREMETAL\_LIVE**: `object`
 
-#### BAREMETAL_LIVE.name
+#### BAREMETAL\_LIVE.name
 
 > `readonly` **name**: `"BareMetal.live"` = `"BareMetal.live"`
 
-#### BAREMETAL_LIVE.stakerAddress
+#### BAREMETAL\_LIVE.stakerAddress
 
 > `readonly` **stakerAddress**: [`Address`](../type-aliases/Address.md)
 
-#### BAREMETAL_LIVE.logoUrl
+#### BAREMETAL\_LIVE.logoUrl
 
 > `readonly` **logoUrl**: `URL`
 
@@ -1068,19 +1068,19 @@ Defined in: [src/staking/validator/presets.ts:11](https://github.com/keep-starkn
 
 > `readonly` **logoUrl**: `URL`
 
-### STAKELAB_ZONE
+### STAKELAB\_ZONE
 
-> `readonly` **STAKELAB_ZONE**: `object`
+> `readonly` **STAKELAB\_ZONE**: `object`
 
-#### STAKELAB_ZONE.name
+#### STAKELAB\_ZONE.name
 
 > `readonly` **name**: `"StakeLab.zone"` = `"StakeLab.zone"`
 
-#### STAKELAB_ZONE.stakerAddress
+#### STAKELAB\_ZONE.stakerAddress
 
 > `readonly` **stakerAddress**: [`Address`](../type-aliases/Address.md)
 
-#### STAKELAB_ZONE.logoUrl
+#### STAKELAB\_ZONE.logoUrl
 
 > `readonly` **logoUrl**: `URL`
 
@@ -1180,19 +1180,19 @@ Defined in: [src/staking/validator/presets.ts:11](https://github.com/keep-starkn
 
 > `readonly` **logoUrl**: `URL`
 
-### SIMPLY_STAKING
+### SIMPLY\_STAKING
 
-> `readonly` **SIMPLY_STAKING**: `object`
+> `readonly` **SIMPLY\_STAKING**: `object`
 
-#### SIMPLY_STAKING.name
+#### SIMPLY\_STAKING.name
 
 > `readonly` **name**: `"Simply Staking"` = `"Simply Staking"`
 
-#### SIMPLY_STAKING.stakerAddress
+#### SIMPLY\_STAKING.stakerAddress
 
 > `readonly` **stakerAddress**: [`Address`](../type-aliases/Address.md)
 
-#### SIMPLY_STAKING.logoUrl
+#### SIMPLY\_STAKING.logoUrl
 
 > `readonly` **logoUrl**: `URL`
 
@@ -1228,19 +1228,19 @@ Defined in: [src/staking/validator/presets.ts:11](https://github.com/keep-starkn
 
 > `readonly` **logoUrl**: `null` = `null`
 
-### DAS_RHEINGOLD
+### DAS\_RHEINGOLD
 
-> `readonly` **DAS_RHEINGOLD**: `object`
+> `readonly` **DAS\_RHEINGOLD**: `object`
 
-#### DAS_RHEINGOLD.name
+#### DAS\_RHEINGOLD.name
 
 > `readonly` **name**: `"Das.Rheingold"` = `"Das.Rheingold"`
 
-#### DAS_RHEINGOLD.stakerAddress
+#### DAS\_RHEINGOLD.stakerAddress
 
 > `readonly` **stakerAddress**: [`Address`](../type-aliases/Address.md)
 
-#### DAS_RHEINGOLD.logoUrl
+#### DAS\_RHEINGOLD.logoUrl
 
 > `readonly` **logoUrl**: `null` = `null`
 
@@ -1340,35 +1340,35 @@ Defined in: [src/staking/validator/presets.ts:11](https://github.com/keep-starkn
 
 > `readonly` **logoUrl**: `URL`
 
-### CRYPTO_ROOM
+### CRYPTO\_ROOM
 
-> `readonly` **CRYPTO_ROOM**: `object`
+> `readonly` **CRYPTO\_ROOM**: `object`
 
-#### CRYPTO_ROOM.name
+#### CRYPTO\_ROOM.name
 
 > `readonly` **name**: `"Crypto_room"` = `"Crypto_room"`
 
-#### CRYPTO_ROOM.stakerAddress
+#### CRYPTO\_ROOM.stakerAddress
 
 > `readonly` **stakerAddress**: [`Address`](../type-aliases/Address.md)
 
-#### CRYPTO_ROOM.logoUrl
+#### CRYPTO\_ROOM.logoUrl
 
 > `readonly` **logoUrl**: `URL`
 
-### WOLFEDGE_LABS
+### WOLFEDGE\_LABS
 
-> `readonly` **WOLFEDGE_LABS**: `object`
+> `readonly` **WOLFEDGE\_LABS**: `object`
 
-#### WOLFEDGE_LABS.name
+#### WOLFEDGE\_LABS.name
 
 > `readonly` **name**: `"WolfEdge Labs"` = `"WolfEdge Labs"`
 
-#### WOLFEDGE_LABS.stakerAddress
+#### WOLFEDGE\_LABS.stakerAddress
 
 > `readonly` **stakerAddress**: [`Address`](../type-aliases/Address.md)
 
-#### WOLFEDGE_LABS.logoUrl
+#### WOLFEDGE\_LABS.logoUrl
 
 > `readonly` **logoUrl**: `URL`
 
@@ -1388,19 +1388,19 @@ Defined in: [src/staking/validator/presets.ts:11](https://github.com/keep-starkn
 
 > `readonly` **logoUrl**: `URL`
 
-### TRUST_YOUR_TECHNOLUST
+### TRUST\_YOUR\_TECHNOLUST
 
-> `readonly` **TRUST_YOUR_TECHNOLUST**: `object`
+> `readonly` **TRUST\_YOUR\_TECHNOLUST**: `object`
 
-#### TRUST_YOUR_TECHNOLUST.name
+#### TRUST\_YOUR\_TECHNOLUST.name
 
 > `readonly` **name**: `"Trust Your Technolust"` = `"Trust Your Technolust"`
 
-#### TRUST_YOUR_TECHNOLUST.stakerAddress
+#### TRUST\_YOUR\_TECHNOLUST.stakerAddress
 
 > `readonly` **stakerAddress**: [`Address`](../type-aliases/Address.md)
 
-#### TRUST_YOUR_TECHNOLUST.logoUrl
+#### TRUST\_YOUR\_TECHNOLUST.logoUrl
 
 > `readonly` **logoUrl**: `URL`
 
@@ -1452,19 +1452,19 @@ Defined in: [src/staking/validator/presets.ts:11](https://github.com/keep-starkn
 
 > `readonly` **logoUrl**: `URL`
 
-### CYPHER_NETWORKS
+### CYPHER\_NETWORKS
 
-> `readonly` **CYPHER_NETWORKS**: `object`
+> `readonly` **CYPHER\_NETWORKS**: `object`
 
-#### CYPHER_NETWORKS.name
+#### CYPHER\_NETWORKS.name
 
 > `readonly` **name**: `"Cypher Networks"` = `"Cypher Networks"`
 
-#### CYPHER_NETWORKS.stakerAddress
+#### CYPHER\_NETWORKS.stakerAddress
 
 > `readonly` **stakerAddress**: [`Address`](../type-aliases/Address.md)
 
-#### CYPHER_NETWORKS.logoUrl
+#### CYPHER\_NETWORKS.logoUrl
 
 > `readonly` **logoUrl**: `URL`
 
@@ -1516,35 +1516,35 @@ Defined in: [src/staking/validator/presets.ts:11](https://github.com/keep-starkn
 
 > `readonly` **logoUrl**: `URL`
 
-### MOST_YIELD
+### MOST\_YIELD
 
-> `readonly` **MOST_YIELD**: `object`
+> `readonly` **MOST\_YIELD**: `object`
 
-#### MOST_YIELD.name
+#### MOST\_YIELD.name
 
 > `readonly` **name**: `"Most Yield"` = `"Most Yield"`
 
-#### MOST_YIELD.stakerAddress
+#### MOST\_YIELD.stakerAddress
 
 > `readonly` **stakerAddress**: [`Address`](../type-aliases/Address.md)
 
-#### MOST_YIELD.logoUrl
+#### MOST\_YIELD.logoUrl
 
 > `readonly` **logoUrl**: `URL`
 
-### AURI_0X
+### AURI\_0X
 
-> `readonly` **AURI_0X**: `object`
+> `readonly` **AURI\_0X**: `object`
 
-#### AURI_0X.name
+#### AURI\_0X.name
 
 > `readonly` **name**: `"Auri_0x"` = `"Auri_0x"`
 
-#### AURI_0X.stakerAddress
+#### AURI\_0X.stakerAddress
 
 > `readonly` **stakerAddress**: [`Address`](../type-aliases/Address.md)
 
-#### AURI_0X.logoUrl
+#### AURI\_0X.logoUrl
 
 > `readonly` **logoUrl**: `URL`
 
@@ -1564,19 +1564,19 @@ Defined in: [src/staking/validator/presets.ts:11](https://github.com/keep-starkn
 
 > `readonly` **logoUrl**: `URL`
 
-### NODERS_TEAM
+### NODERS\_TEAM
 
-> `readonly` **NODERS_TEAM**: `object`
+> `readonly` **NODERS\_TEAM**: `object`
 
-#### NODERS_TEAM.name
+#### NODERS\_TEAM.name
 
 > `readonly` **name**: `"NODERS TEAM"` = `"NODERS TEAM"`
 
-#### NODERS_TEAM.stakerAddress
+#### NODERS\_TEAM.stakerAddress
 
 > `readonly` **stakerAddress**: [`Address`](../type-aliases/Address.md)
 
-#### NODERS_TEAM.logoUrl
+#### NODERS\_TEAM.logoUrl
 
 > `readonly` **logoUrl**: `URL`
 
@@ -1756,19 +1756,19 @@ Defined in: [src/staking/validator/presets.ts:11](https://github.com/keep-starkn
 
 > `readonly` **logoUrl**: `URL`
 
-### CHAIN_DIGITAL
+### CHAIN\_DIGITAL
 
-> `readonly` **CHAIN_DIGITAL**: `object`
+> `readonly` **CHAIN\_DIGITAL**: `object`
 
-#### CHAIN_DIGITAL.name
+#### CHAIN\_DIGITAL.name
 
 > `readonly` **name**: `"CHAIN DIGITAL"` = `"CHAIN DIGITAL"`
 
-#### CHAIN_DIGITAL.stakerAddress
+#### CHAIN\_DIGITAL.stakerAddress
 
 > `readonly` **stakerAddress**: [`Address`](../type-aliases/Address.md)
 
-#### CHAIN_DIGITAL.logoUrl
+#### CHAIN\_DIGITAL.logoUrl
 
 > `readonly` **logoUrl**: `URL`
 
@@ -1804,19 +1804,19 @@ Defined in: [src/staking/validator/presets.ts:11](https://github.com/keep-starkn
 
 > `readonly` **logoUrl**: `URL`
 
-### VALIDATION_CLOUD
+### VALIDATION\_CLOUD
 
-> `readonly` **VALIDATION_CLOUD**: `object`
+> `readonly` **VALIDATION\_CLOUD**: `object`
 
-#### VALIDATION_CLOUD.name
+#### VALIDATION\_CLOUD.name
 
 > `readonly` **name**: `"Validation Cloud"` = `"Validation Cloud"`
 
-#### VALIDATION_CLOUD.stakerAddress
+#### VALIDATION\_CLOUD.stakerAddress
 
 > `readonly` **stakerAddress**: [`Address`](../type-aliases/Address.md)
 
-#### VALIDATION_CLOUD.logoUrl
+#### VALIDATION\_CLOUD.logoUrl
 
 > `readonly` **logoUrl**: `URL`
 
@@ -1852,51 +1852,51 @@ Defined in: [src/staking/validator/presets.ts:11](https://github.com/keep-starkn
 
 > `readonly` **logoUrl**: `URL`
 
-### SATOSHI_UNIVERSITY
+### SATOSHI\_UNIVERSITY
 
-> `readonly` **SATOSHI_UNIVERSITY**: `object`
+> `readonly` **SATOSHI\_UNIVERSITY**: `object`
 
-#### SATOSHI_UNIVERSITY.name
+#### SATOSHI\_UNIVERSITY.name
 
 > `readonly` **name**: `"Satoshi University"` = `"Satoshi University"`
 
-#### SATOSHI_UNIVERSITY.stakerAddress
+#### SATOSHI\_UNIVERSITY.stakerAddress
 
 > `readonly` **stakerAddress**: [`Address`](../type-aliases/Address.md)
 
-#### SATOSHI_UNIVERSITY.logoUrl
+#### SATOSHI\_UNIVERSITY.logoUrl
 
 > `readonly` **logoUrl**: `URL`
 
-### SUBUTAI_OPERATIONAL_HASH_UNIT
+### SUBUTAI\_OPERATIONAL\_HASH\_UNIT
 
-> `readonly` **SUBUTAI_OPERATIONAL_HASH_UNIT**: `object`
+> `readonly` **SUBUTAI\_OPERATIONAL\_HASH\_UNIT**: `object`
 
-#### SUBUTAI_OPERATIONAL_HASH_UNIT.name
+#### SUBUTAI\_OPERATIONAL\_HASH\_UNIT.name
 
 > `readonly` **name**: `"Subutai Operational Hash Unit"` = `"Subutai Operational Hash Unit"`
 
-#### SUBUTAI_OPERATIONAL_HASH_UNIT.stakerAddress
+#### SUBUTAI\_OPERATIONAL\_HASH\_UNIT.stakerAddress
 
 > `readonly` **stakerAddress**: [`Address`](../type-aliases/Address.md)
 
-#### SUBUTAI_OPERATIONAL_HASH_UNIT.logoUrl
+#### SUBUTAI\_OPERATIONAL\_HASH\_UNIT.logoUrl
 
 > `readonly` **logoUrl**: `URL`
 
-### JONATHAN_LEI
+### JONATHAN\_LEI
 
-> `readonly` **JONATHAN_LEI**: `object`
+> `readonly` **JONATHAN\_LEI**: `object`
 
-#### JONATHAN_LEI.name
+#### JONATHAN\_LEI.name
 
 > `readonly` **name**: `"Jonathan LEI"` = `"Jonathan LEI"`
 
-#### JONATHAN_LEI.stakerAddress
+#### JONATHAN\_LEI.stakerAddress
 
 > `readonly` **stakerAddress**: [`Address`](../type-aliases/Address.md)
 
-#### JONATHAN_LEI.logoUrl
+#### JONATHAN\_LEI.logoUrl
 
 > `readonly` **logoUrl**: `URL`
 
@@ -1948,67 +1948,67 @@ Defined in: [src/staking/validator/presets.ts:11](https://github.com/keep-starkn
 
 > `readonly` **logoUrl**: `URL`
 
-### STARKNET_ASTRO
+### STARKNET\_ASTRO
 
-> `readonly` **STARKNET_ASTRO**: `object`
+> `readonly` **STARKNET\_ASTRO**: `object`
 
-#### STARKNET_ASTRO.name
+#### STARKNET\_ASTRO.name
 
 > `readonly` **name**: `"Starknet Astro"` = `"Starknet Astro"`
 
-#### STARKNET_ASTRO.stakerAddress
+#### STARKNET\_ASTRO.stakerAddress
 
 > `readonly` **stakerAddress**: [`Address`](../type-aliases/Address.md)
 
-#### STARKNET_ASTRO.logoUrl
+#### STARKNET\_ASTRO.logoUrl
 
 > `readonly` **logoUrl**: `URL`
 
-### LAVENDER_FIVE_NODES
+### LAVENDER\_FIVE\_NODES
 
-> `readonly` **LAVENDER_FIVE_NODES**: `object`
+> `readonly` **LAVENDER\_FIVE\_NODES**: `object`
 
-#### LAVENDER_FIVE_NODES.name
+#### LAVENDER\_FIVE\_NODES.name
 
 > `readonly` **name**: `"Lavender.Five Nodes"` = `"Lavender.Five Nodes"`
 
-#### LAVENDER_FIVE_NODES.stakerAddress
+#### LAVENDER\_FIVE\_NODES.stakerAddress
 
 > `readonly` **stakerAddress**: [`Address`](../type-aliases/Address.md)
 
-#### LAVENDER_FIVE_NODES.logoUrl
+#### LAVENDER\_FIVE\_NODES.logoUrl
 
 > `readonly` **logoUrl**: `URL`
 
-### PULSAR_MONEY_BY_ASTRARIZON
+### PULSAR\_MONEY\_BY\_ASTRARIZON
 
-> `readonly` **PULSAR_MONEY_BY_ASTRARIZON**: `object`
+> `readonly` **PULSAR\_MONEY\_BY\_ASTRARIZON**: `object`
 
-#### PULSAR_MONEY_BY_ASTRARIZON.name
+#### PULSAR\_MONEY\_BY\_ASTRARIZON.name
 
 > `readonly` **name**: `"Pulsar Money by Astrarizon"` = `"Pulsar Money by Astrarizon"`
 
-#### PULSAR_MONEY_BY_ASTRARIZON.stakerAddress
+#### PULSAR\_MONEY\_BY\_ASTRARIZON.stakerAddress
 
 > `readonly` **stakerAddress**: [`Address`](../type-aliases/Address.md)
 
-#### PULSAR_MONEY_BY_ASTRARIZON.logoUrl
+#### PULSAR\_MONEY\_BY\_ASTRARIZON.logoUrl
 
 > `readonly` **logoUrl**: `URL`
 
-### ATLAS_STAKING
+### ATLAS\_STAKING
 
-> `readonly` **ATLAS_STAKING**: `object`
+> `readonly` **ATLAS\_STAKING**: `object`
 
-#### ATLAS_STAKING.name
+#### ATLAS\_STAKING.name
 
 > `readonly` **name**: `"Atlas Staking"` = `"Atlas Staking"`
 
-#### ATLAS_STAKING.stakerAddress
+#### ATLAS\_STAKING.stakerAddress
 
 > `readonly` **stakerAddress**: [`Address`](../type-aliases/Address.md)
 
-#### ATLAS_STAKING.logoUrl
+#### ATLAS\_STAKING.logoUrl
 
 > `readonly` **logoUrl**: `URL`
 
@@ -2060,19 +2060,19 @@ Defined in: [src/staking/validator/presets.ts:11](https://github.com/keep-starkn
 
 > `readonly` **logoUrl**: `URL`
 
-### IMPERATOR_CO
+### IMPERATOR\_CO
 
-> `readonly` **IMPERATOR_CO**: `object`
+> `readonly` **IMPERATOR\_CO**: `object`
 
-#### IMPERATOR_CO.name
+#### IMPERATOR\_CO.name
 
 > `readonly` **name**: `"Imperator.co"` = `"Imperator.co"`
 
-#### IMPERATOR_CO.stakerAddress
+#### IMPERATOR\_CO.stakerAddress
 
 > `readonly` **stakerAddress**: [`Address`](../type-aliases/Address.md)
 
-#### IMPERATOR_CO.logoUrl
+#### IMPERATOR\_CO.logoUrl
 
 > `readonly` **logoUrl**: `URL`
 
@@ -2108,19 +2108,19 @@ Defined in: [src/staking/validator/presets.ts:11](https://github.com/keep-starkn
 
 > `readonly` **logoUrl**: `URL`
 
-### CHAINUP_CLOUD
+### CHAINUP\_CLOUD
 
-> `readonly` **CHAINUP_CLOUD**: `object`
+> `readonly` **CHAINUP\_CLOUD**: `object`
 
-#### CHAINUP_CLOUD.name
+#### CHAINUP\_CLOUD.name
 
 > `readonly` **name**: `"ChainUp Cloud"` = `"ChainUp Cloud"`
 
-#### CHAINUP_CLOUD.stakerAddress
+#### CHAINUP\_CLOUD.stakerAddress
 
 > `readonly` **stakerAddress**: [`Address`](../type-aliases/Address.md)
 
-#### CHAINUP_CLOUD.logoUrl
+#### CHAINUP\_CLOUD.logoUrl
 
 > `readonly` **logoUrl**: `URL`
 
@@ -2156,19 +2156,19 @@ Defined in: [src/staking/validator/presets.ts:11](https://github.com/keep-starkn
 
 > `readonly` **logoUrl**: `URL`
 
-### KEYSTONE_NODES
+### KEYSTONE\_NODES
 
-> `readonly` **KEYSTONE_NODES**: `object`
+> `readonly` **KEYSTONE\_NODES**: `object`
 
-#### KEYSTONE_NODES.name
+#### KEYSTONE\_NODES.name
 
 > `readonly` **name**: `"Keystone Nodes"` = `"Keystone Nodes"`
 
-#### KEYSTONE_NODES.stakerAddress
+#### KEYSTONE\_NODES.stakerAddress
 
 > `readonly` **stakerAddress**: [`Address`](../type-aliases/Address.md)
 
-#### KEYSTONE_NODES.logoUrl
+#### KEYSTONE\_NODES.logoUrl
 
 > `readonly` **logoUrl**: `URL`
 
@@ -2204,18 +2204,18 @@ Defined in: [src/staking/validator/presets.ts:11](https://github.com/keep-starkn
 
 > `readonly` **logoUrl**: `URL`
 
-### CITADEL_ONE
+### CITADEL\_ONE
 
-> `readonly` **CITADEL_ONE**: `object`
+> `readonly` **CITADEL\_ONE**: `object`
 
-#### CITADEL_ONE.name
+#### CITADEL\_ONE.name
 
 > `readonly` **name**: `"Citadel.one"` = `"Citadel.one"`
 
-#### CITADEL_ONE.stakerAddress
+#### CITADEL\_ONE.stakerAddress
 
 > `readonly` **stakerAddress**: [`Address`](../type-aliases/Address.md)
 
-#### CITADEL_ONE.logoUrl
+#### CITADEL\_ONE.logoUrl
 
 > `readonly` **logoUrl**: `URL`

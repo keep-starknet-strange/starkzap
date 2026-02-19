@@ -1,11 +1,11 @@
-[**x**](../README.md)
+[**starkzap**](../README.md)
 
----
+***
 
-[x](../globals.md) / TxReceipt
+[starkzap](../globals.md) / TxReceipt
 
 # Type Alias: TxReceipt
 
 > **TxReceipt** = `SuccessfulTransactionReceiptResponseHelper` \| `RevertedTransactionReceiptResponseHelper` \| `ErrorReceiptResponseHelper`
 
-Defined in: node_modules/starknet/dist/index.d.ts:1803
+Defined in: node\_modules/starknet/dist/index.d.ts:1803

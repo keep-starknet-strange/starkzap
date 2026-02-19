@@ -1,12 +1,12 @@
-[**x**](../README.md)
+[**starkzap**](../README.md)
 
----
+***
 
-[x](../globals.md) / OnboardCartridgeOptions
+[starkzap](../globals.md) / OnboardCartridgeOptions
 
 # Interface: OnboardCartridgeOptions
 
-Defined in: src/types/onboard.ts:46
+Defined in: [src/types/onboard.ts:62](https://github.com/keep-starknet-strange/x/blob/5e54d8974744c392df7cac56b636788dfe6ae268/src/types/onboard.ts#L62)
 
 ## Extends
 
@@ -18,43 +18,43 @@ Defined in: src/types/onboard.ts:46
 
 > `optional` **feeMode**: [`FeeMode`](../type-aliases/FeeMode.md)
 
-Defined in: src/types/onboard.ts:18
+Defined in: [src/types/onboard.ts:31](https://github.com/keep-starknet-strange/x/blob/5e54d8974744c392df7cac56b636788dfe6ae268/src/types/onboard.ts#L31)
 
 #### Inherited from
 
 [`OnboardBaseOptions`](OnboardBaseOptions.md).[`feeMode`](OnboardBaseOptions.md#feemode)
 
----
+***
 
 ### timeBounds?
 
 > `optional` **timeBounds**: [`PaymasterTimeBounds`](PaymasterTimeBounds.md)
 
-Defined in: src/types/onboard.ts:19
+Defined in: [src/types/onboard.ts:32](https://github.com/keep-starknet-strange/x/blob/5e54d8974744c392df7cac56b636788dfe6ae268/src/types/onboard.ts#L32)
 
 #### Inherited from
 
 [`OnboardBaseOptions`](OnboardBaseOptions.md).[`timeBounds`](OnboardBaseOptions.md#timebounds)
 
----
+***
 
 ### deploy?
 
 > `optional` **deploy**: [`DeployMode`](../type-aliases/DeployMode.md)
 
-Defined in: src/types/onboard.ts:20
+Defined in: [src/types/onboard.ts:33](https://github.com/keep-starknet-strange/x/blob/5e54d8974744c392df7cac56b636788dfe6ae268/src/types/onboard.ts#L33)
 
 #### Inherited from
 
 [`OnboardBaseOptions`](OnboardBaseOptions.md).[`deploy`](OnboardBaseOptions.md#deploy)
 
----
+***
 
 ### onProgress()?
 
 > `optional` **onProgress**: (`event`) => `void`
 
-Defined in: src/types/onboard.ts:21
+Defined in: [src/types/onboard.ts:34](https://github.com/keep-starknet-strange/x/blob/5e54d8974744c392df7cac56b636788dfe6ae268/src/types/onboard.ts#L34)
 
 #### Parameters
 
@@ -70,18 +70,18 @@ Defined in: src/types/onboard.ts:21
 
 [`OnboardBaseOptions`](OnboardBaseOptions.md).[`onProgress`](OnboardBaseOptions.md#onprogress)
 
----
+***
 
 ### strategy
 
 > **strategy**: `"cartridge"`
 
-Defined in: src/types/onboard.ts:47
+Defined in: [src/types/onboard.ts:63](https://github.com/keep-starknet-strange/x/blob/5e54d8974744c392df7cac56b636788dfe6ae268/src/types/onboard.ts#L63)
 
----
+***
 
 ### cartridge?
 
-> `optional` **cartridge**: `Omit`\<[`CartridgeWalletOptions`](CartridgeWalletOptions.md), `"feeMode"` \| `"timeBounds"`\>
+> `optional` **cartridge**: [`OnboardCartridgeConfig`](OnboardCartridgeConfig.md)
 
-Defined in: src/types/onboard.ts:48
+Defined in: [src/types/onboard.ts:64](https://github.com/keep-starknet-strange/x/blob/5e54d8974744c392df7cac56b636788dfe6ae268/src/types/onboard.ts#L64)

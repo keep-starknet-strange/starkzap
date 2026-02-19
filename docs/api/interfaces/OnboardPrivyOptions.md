@@ -1,12 +1,12 @@
-[**x**](../README.md)
+[**starkzap**](../README.md)
 
----
+***
 
-[x](../globals.md) / OnboardPrivyOptions
+[starkzap](../globals.md) / OnboardPrivyOptions
 
 # Interface: OnboardPrivyOptions
 
-Defined in: src/types/onboard.ts:38
+Defined in: [src/types/onboard.ts:54](https://github.com/keep-starknet-strange/x/blob/5e54d8974744c392df7cac56b636788dfe6ae268/src/types/onboard.ts#L54)
 
 ## Extends
 
@@ -18,43 +18,43 @@ Defined in: src/types/onboard.ts:38
 
 > `optional` **feeMode**: [`FeeMode`](../type-aliases/FeeMode.md)
 
-Defined in: src/types/onboard.ts:18
+Defined in: [src/types/onboard.ts:31](https://github.com/keep-starknet-strange/x/blob/5e54d8974744c392df7cac56b636788dfe6ae268/src/types/onboard.ts#L31)
 
 #### Inherited from
 
 [`OnboardBaseOptions`](OnboardBaseOptions.md).[`feeMode`](OnboardBaseOptions.md#feemode)
 
----
+***
 
 ### timeBounds?
 
 > `optional` **timeBounds**: [`PaymasterTimeBounds`](PaymasterTimeBounds.md)
 
-Defined in: src/types/onboard.ts:19
+Defined in: [src/types/onboard.ts:32](https://github.com/keep-starknet-strange/x/blob/5e54d8974744c392df7cac56b636788dfe6ae268/src/types/onboard.ts#L32)
 
 #### Inherited from
 
 [`OnboardBaseOptions`](OnboardBaseOptions.md).[`timeBounds`](OnboardBaseOptions.md#timebounds)
 
----
+***
 
 ### deploy?
 
 > `optional` **deploy**: [`DeployMode`](../type-aliases/DeployMode.md)
 
-Defined in: src/types/onboard.ts:20
+Defined in: [src/types/onboard.ts:33](https://github.com/keep-starknet-strange/x/blob/5e54d8974744c392df7cac56b636788dfe6ae268/src/types/onboard.ts#L33)
 
 #### Inherited from
 
 [`OnboardBaseOptions`](OnboardBaseOptions.md).[`deploy`](OnboardBaseOptions.md#deploy)
 
----
+***
 
 ### onProgress()?
 
 > `optional` **onProgress**: (`event`) => `void`
 
-Defined in: src/types/onboard.ts:21
+Defined in: [src/types/onboard.ts:34](https://github.com/keep-starknet-strange/x/blob/5e54d8974744c392df7cac56b636788dfe6ae268/src/types/onboard.ts#L34)
 
 #### Parameters
 
@@ -70,21 +70,21 @@ Defined in: src/types/onboard.ts:21
 
 [`OnboardBaseOptions`](OnboardBaseOptions.md).[`onProgress`](OnboardBaseOptions.md#onprogress)
 
----
+***
 
 ### strategy
 
 > **strategy**: `"privy"`
 
-Defined in: src/types/onboard.ts:39
+Defined in: [src/types/onboard.ts:55](https://github.com/keep-starknet-strange/x/blob/5e54d8974744c392df7cac56b636788dfe6ae268/src/types/onboard.ts#L55)
 
----
+***
 
 ### privy
 
 > **privy**: `object`
 
-Defined in: src/types/onboard.ts:40
+Defined in: [src/types/onboard.ts:56](https://github.com/keep-starknet-strange/x/blob/5e54d8974744c392df7cac56b636788dfe6ae268/src/types/onboard.ts#L56)
 
 #### resolve()
 
@@ -94,10 +94,10 @@ Defined in: src/types/onboard.ts:40
 
 `Promise`\<[`OnboardPrivyResolveResult`](OnboardPrivyResolveResult.md)\>
 
----
+***
 
 ### accountPreset?
 
-> `optional` **accountPreset**: [`AccountClassConfig`](AccountClassConfig.md) \| `"devnet"` \| `"openzeppelin"` \| `"argent"` \| `"braavos"` \| `"argentXV050"`
+> `optional` **accountPreset**: `"devnet"` \| [`AccountClassConfig`](AccountClassConfig.md) \| `"openzeppelin"` \| `"argent"` \| `"braavos"` \| `"argentXV050"`
 
-Defined in: src/types/onboard.ts:43
+Defined in: [src/types/onboard.ts:59](https://github.com/keep-starknet-strange/x/blob/5e54d8974744c392df7cac56b636788dfe6ae268/src/types/onboard.ts#L59)

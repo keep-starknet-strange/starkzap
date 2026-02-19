@@ -1,15 +1,14 @@
-import { RpcProvider } from "starknet";
-import type { SDKConfig, ChainId } from "@/types/config";
-import type { ConnectWalletOptions } from "@/types/wallet";
+import { RpcProvider, type Call, type PaymasterTimeBounds } from "starknet";
+import { ChainId, getChainId, type SDKConfig } from "@/types/config";
+import type { ConnectWalletOptions, FeeMode } from "@/types/wallet";
 import { networks, type NetworkPreset } from "@/network";
 import { Wallet } from "@/wallet";
-import {
-  CartridgeWallet,
-  type CartridgeWalletOptions,
-} from "@/wallet/cartridge";
+import type { WalletInterface } from "@/wallet/interface";
 import type { Address, Token, Pool } from "@/types";
+import { assertSafeHttpUrl } from "@/utils";
 import type {
   AccountClassConfig,
+  OnboardCartridgeConfig,
   OnboardOptions,
   OnboardResult,
 } from "@/types";
@@ -26,6 +25,27 @@ import {
 interface ResolvedConfig extends Omit<SDKConfig, "rpcUrl" | "chainId"> {
   rpcUrl: string;
   chainId: ChainId;
+}
+
+export interface ConnectCartridgeOptions extends OnboardCartridgeConfig {
+  feeMode?: FeeMode;
+  timeBounds?: PaymasterTimeBounds;
+}
+
+export interface CartridgeWalletInterface extends WalletInterface {
+  getController(): unknown;
+  username(): Promise<string | undefined>;
+}
+
+function isWebRuntimeForCartridge(): boolean {
+  const hasDom =
+    typeof window !== "undefined" &&
+    typeof document !== "undefined" &&
+    typeof document.createElement === "function";
+  const isReactNative =
+    typeof navigator !== "undefined" && navigator.product === "ReactNative";
+
+  return hasDom && !isReactNative;
 }
 
 /**
@@ -59,6 +79,7 @@ interface ResolvedConfig extends Omit<SDKConfig, "rpcUrl" | "chainId"> {
 export class StarkSDK {
   private readonly config: ResolvedConfig;
   private readonly provider: RpcProvider;
+  private chainValidationPromise: Promise<void> | null = null;
 
   constructor(config: SDKConfig) {
     this.config = this.resolveConfig(config);
@@ -82,6 +103,7 @@ export class StarkSDK {
         "StarkSDK requires either 'network' or 'rpcUrl' to be specified"
       );
     }
+    const normalizedRpcUrl = assertSafeHttpUrl(rpcUrl, "rpcUrl").toString();
 
     // Resolve chainId (explicit > network preset)
     const chainId = config.chainId ?? networkPreset?.chainId;
@@ -92,17 +114,26 @@ export class StarkSDK {
     }
 
     // Resolve explorer (explicit > network preset)
-    const explorer =
+    let explorer =
       config.explorer ??
       (networkPreset?.explorerUrl
         ? { baseUrl: networkPreset.explorerUrl }
         : undefined);
+    if (explorer?.baseUrl) {
+      explorer = {
+        ...explorer,
+        baseUrl: assertSafeHttpUrl(
+          explorer.baseUrl,
+          "explorer.baseUrl"
+        ).toString(),
+      };
+    }
 
     const staking = config.staking ?? getStakingPreset(chainId);
 
     return {
       ...config,
-      rpcUrl,
+      rpcUrl: normalizedRpcUrl,
       chainId,
       staking,
       ...(explorer && { explorer }),
@@ -116,6 +147,24 @@ export class StarkSDK {
       );
     }
     return this.config.staking;
+  }
+
+  private async ensureProviderChainMatchesConfig(): Promise<void> {
+    if (!this.chainValidationPromise) {
+      this.chainValidationPromise = (async () => {
+        const providerChainId = await getChainId(this.provider);
+        if (providerChainId.toLiteral() !== this.config.chainId.toLiteral()) {
+          throw new Error(
+            `RPC chain mismatch: provider returned ${providerChainId.toLiteral()} but SDK is configured for ${this.config.chainId.toLiteral()}.`
+          );
+        }
+      })().catch((error) => {
+        this.chainValidationPromise = null;
+        throw error;
+      });
+    }
+
+    await this.chainValidationPromise;
   }
 
   /**
@@ -157,6 +206,7 @@ export class StarkSDK {
    * ```
    */
   async connectWallet(options: ConnectWalletOptions): Promise<Wallet> {
+    await this.ensureProviderChainMatchesConfig();
     const { account, feeMode, timeBounds } = options;
 
     return Wallet.create({
@@ -192,7 +242,6 @@ export class StarkSDK {
    * - `signer`: connect with a provided signer/account config
    * - `privy`: resolve Privy auth context, then connect via PrivySigner
    * - `cartridge`: connect via Cartridge Controller
-   * - `webauthn`: reserved for upcoming native WebAuthn signer support
    *
    * By default, onboarding calls `wallet.ensureReady({ deploy: "if_needed" })`.
    */
@@ -237,6 +286,11 @@ export class StarkSDK {
         publicKey: privy.publicKey,
         ...(privy.serverUrl && { serverUrl: privy.serverUrl }),
         ...(privy.rawSign && { rawSign: privy.rawSign }),
+        ...(privy.headers && { headers: privy.headers }),
+        ...(privy.buildBody && { buildBody: privy.buildBody }),
+        ...(privy.requestTimeoutMs && {
+          requestTimeoutMs: privy.requestTimeoutMs,
+        }),
       });
 
       const wallet = await this.connectWallet({
@@ -289,14 +343,6 @@ export class StarkSDK {
       };
     }
 
-    if (options.strategy === "webauthn") {
-      const err = new Error(
-        "Onboard strategy 'webauthn' is not implemented yet. Use 'privy', 'signer', or 'cartridge' for now."
-      ) as Error & { code?: string };
-      err.code = "X_ERR_NOT_IMPLEMENTED";
-      throw err;
-    }
-
     const _never: never = options;
     throw new Error(`Unknown onboard strategy: ${String(_never)}`);
   }
@@ -324,10 +370,19 @@ export class StarkSDK {
    * ```
    */
   async connectCartridge(
-    options: Omit<CartridgeWalletOptions, "rpcUrl" | "chainId"> = {}
-  ): Promise<CartridgeWallet> {
+    options: ConnectCartridgeOptions = {}
+  ): Promise<CartridgeWalletInterface> {
+    if (!isWebRuntimeForCartridge()) {
+      throw new Error(
+        "Cartridge is only supported in web environments. Use signer/privy strategies on native or server runtimes."
+      );
+    }
+
+    await this.ensureProviderChainMatchesConfig();
+
+    const { CartridgeWallet } = await import("./wallet/cartridge");
     const explorer = options.explorer ?? this.config.explorer;
-    return CartridgeWallet.create(
+    const wallet = await CartridgeWallet.create(
       {
         ...options,
         rpcUrl: this.config.rpcUrl,
@@ -336,6 +391,7 @@ export class StarkSDK {
       },
       this.config.staking
     );
+    return wallet as CartridgeWalletInterface;
   }
 
   /**
@@ -390,5 +446,15 @@ export class StarkSDK {
    */
   getProvider(): RpcProvider {
     return this.provider;
+  }
+
+  /**
+   * Call a read-only contract entrypoint using the SDK provider.
+   *
+   * This executes an RPC `call` without sending a transaction.
+   * Useful before wallet connection or for app-level reads.
+   */
+  callContract(call: Call): ReturnType<RpcProvider["callContract"]> {
+    return this.provider.callContract(call);
   }
 }

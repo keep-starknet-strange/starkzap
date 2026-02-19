@@ -1,12 +1,12 @@
-[**x**](../README.md)
+[**starkzap**](../README.md)
 
----
+***
 
-[x](../globals.md) / EnsureReadyOptions
+[starkzap](../globals.md) / EnsureReadyOptions
 
 # Interface: EnsureReadyOptions
 
-Defined in: [src/types/wallet.ts:137](https://github.com/keep-starknet-strange/x/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/types/wallet.ts#L137)
+Defined in: [src/types/wallet.ts:138](https://github.com/keep-starknet-strange/x/blob/5e54d8974744c392df7cac56b636788dfe6ae268/src/types/wallet.ts#L138)
 
 Options for `wallet.ensureReady()`.
 
@@ -16,7 +16,7 @@ Options for `wallet.ensureReady()`.
 await wallet.ensureReady({
   deploy: "if_needed",
   feeMode: "sponsored",
-  onProgress: (e) => console.log(e.step),
+  onProgress: (e) => console.log(e.step)
 });
 ```
 
@@ -26,27 +26,27 @@ await wallet.ensureReady({
 
 > `optional` **deploy**: [`DeployMode`](../type-aliases/DeployMode.md)
 
-Defined in: [src/types/wallet.ts:139](https://github.com/keep-starknet-strange/x/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/types/wallet.ts#L139)
+Defined in: [src/types/wallet.ts:140](https://github.com/keep-starknet-strange/x/blob/5e54d8974744c392df7cac56b636788dfe6ae268/src/types/wallet.ts#L140)
 
 When to deploy (default: "if_needed")
 
----
+***
 
 ### feeMode?
 
 > `optional` **feeMode**: [`FeeMode`](../type-aliases/FeeMode.md)
 
-Defined in: [src/types/wallet.ts:141](https://github.com/keep-starknet-strange/x/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/types/wallet.ts#L141)
+Defined in: [src/types/wallet.ts:142](https://github.com/keep-starknet-strange/x/blob/5e54d8974744c392df7cac56b636788dfe6ae268/src/types/wallet.ts#L142)
 
 How to pay for deployment if needed (default: wallet's default)
 
----
+***
 
 ### onProgress()?
 
 > `optional` **onProgress**: (`event`) => `void`
 
-Defined in: [src/types/wallet.ts:143](https://github.com/keep-starknet-strange/x/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/types/wallet.ts#L143)
+Defined in: [src/types/wallet.ts:144](https://github.com/keep-starknet-strange/x/blob/5e54d8974744c392df7cac56b636788dfe6ae268/src/types/wallet.ts#L144)
 
 Callback for progress updates
 

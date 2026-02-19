@@ -1,12 +1,12 @@
-[**x**](../README.md)
+[**starkzap**](../README.md)
 
----
+***
 
-[x](../globals.md) / ExplorerConfig
+[starkzap](../globals.md) / ExplorerConfig
 
 # Interface: ExplorerConfig
 
-Defined in: [src/types/config.ts:122](https://github.com/keep-starknet-strange/x/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/types/config.ts#L122)
+Defined in: [src/types/config.ts:122](https://github.com/keep-starknet-strange/x/blob/5e54d8974744c392df7cac56b636788dfe6ae268/src/types/config.ts#L122)
 
 Configuration for building explorer URLs.
 
@@ -14,14 +14,10 @@ Configuration for building explorer URLs.
 
 ```ts
 // Use a known provider
-{
-  provider: "voyager";
-}
+{ provider: "voyager" }
 
 // Use a custom explorer
-{
-  baseUrl: "https://my-explorer.com";
-}
+{ baseUrl: "https://my-explorer.com" }
 ```
 
 ## Properties
@@ -30,16 +26,16 @@ Configuration for building explorer URLs.
 
 > `optional` **provider**: [`ExplorerProvider`](../type-aliases/ExplorerProvider.md)
 
-Defined in: [src/types/config.ts:124](https://github.com/keep-starknet-strange/x/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/types/config.ts#L124)
+Defined in: [src/types/config.ts:124](https://github.com/keep-starknet-strange/x/blob/5e54d8974744c392df7cac56b636788dfe6ae268/src/types/config.ts#L124)
 
 Use a known explorer provider
 
----
+***
 
 ### baseUrl?
 
 > `optional` **baseUrl**: `string`
 
-Defined in: [src/types/config.ts:126](https://github.com/keep-starknet-strange/x/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/types/config.ts#L126)
+Defined in: [src/types/config.ts:126](https://github.com/keep-starknet-strange/x/blob/5e54d8974744c392df7cac56b636788dfe6ae268/src/types/config.ts#L126)
 
 Or provide a custom base URL (takes precedence over provider)

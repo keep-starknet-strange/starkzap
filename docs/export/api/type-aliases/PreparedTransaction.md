@@ -1,11 +1,11 @@
-[**x**](../README.md)
+[**starkzap**](../README.md)
 
----
+***
 
-[x](../globals.md) / PreparedTransaction
+[starkzap](../globals.md) / PreparedTransaction
 
 # Type Alias: PreparedTransaction
 
 > **PreparedTransaction** = `PreparedDeployTransaction` \| `PreparedInvokeTransaction` \| `PreparedDeployAndInvokeTransaction`
 
-Defined in: node_modules/starknet/dist/index.d.ts:1016
+Defined in: node\_modules/starknet/dist/index.d.ts:1016

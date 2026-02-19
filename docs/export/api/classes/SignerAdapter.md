@@ -1,12 +1,12 @@
-[**x**](../README.md)
+[**starkzap**](../README.md)
 
----
+***
 
-[x](../globals.md) / SignerAdapter
+[starkzap](../globals.md) / SignerAdapter
 
 # Class: SignerAdapter
 
-Defined in: [src/signer/adapter.ts:49](https://github.com/keep-starknet-strange/x/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/signer/adapter.ts#L49)
+Defined in: [src/signer/adapter.ts:67](https://github.com/keep-starknet-strange/x/blob/5e54d8974744c392df7cac56b636788dfe6ae268/src/signer/adapter.ts#L67)
 
 Adapter that bridges the SDK's minimal [SignerInterface](../interfaces/SignerInterface.md) to the
 full `starknet.js` `SignerInterface`.
@@ -23,7 +23,7 @@ when you call `sdk.connectWallet()`.
 ## Example
 
 ```ts
-import { SignerAdapter, StarkSigner } from "x";
+import { SignerAdapter, StarkSigner } from "starkzap";
 import { Account, RpcProvider } from "starknet";
 
 const adapter = new SignerAdapter(new StarkSigner(privateKey));
@@ -40,7 +40,7 @@ const account = new Account({ provider, address, signer: adapter });
 
 > **new SignerAdapter**(`signer`): `SignerAdapter`
 
-Defined in: [src/signer/adapter.ts:50](https://github.com/keep-starknet-strange/x/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/signer/adapter.ts#L50)
+Defined in: [src/signer/adapter.ts:68](https://github.com/keep-starknet-strange/x/blob/5e54d8974744c392df7cac56b636788dfe6ae268/src/signer/adapter.ts#L68)
 
 #### Parameters
 
@@ -58,7 +58,7 @@ Defined in: [src/signer/adapter.ts:50](https://github.com/keep-starknet-strange/
 
 > **getPubKey**(): `Promise`\<`string`\>
 
-Defined in: [src/signer/adapter.ts:52](https://github.com/keep-starknet-strange/x/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/signer/adapter.ts#L52)
+Defined in: [src/signer/adapter.ts:70](https://github.com/keep-starknet-strange/x/blob/5e54d8974744c392df7cac56b636788dfe6ae268/src/signer/adapter.ts#L70)
 
 Method to get the public key of the signer
 
@@ -80,13 +80,13 @@ const result = await mySigner.getPubKey();
 
 `StarknetSignerInterface.getPubKey`
 
----
+***
 
 ### signMessage()
 
 > **signMessage**(`typedData`, `accountAddress`): `Promise`\<`Signature`\>
 
-Defined in: [src/signer/adapter.ts:56](https://github.com/keep-starknet-strange/x/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/signer/adapter.ts#L56)
+Defined in: [src/signer/adapter.ts:74](https://github.com/keep-starknet-strange/x/blob/5e54d8974744c392df7cac56b636788dfe6ae268/src/signer/adapter.ts#L74)
 
 Signs a JSON object for off-chain usage with the private key and returns the signature.
 This adds a message prefix so it can't be interchanged with transactions
@@ -119,23 +119,20 @@ const myTypedData: TypedData = {
   domain: {
     name: "Example DApp",
     chainId: constants.StarknetChainId.SN_SEPOLIA,
-    version: "0.0.3",
+    version: "0.0.3"
   },
   types: {
     StarkNetDomain: [
       { name: "name", type: "string" },
       { name: "chainId", type: "felt" },
-      { name: "version", type: "string" },
+      { name: "version", type: "string" }
     ],
-    Message: [{ name: "message", type: "felt" }],
+    Message: [{ name: "message", type: "felt" }]
   },
   primaryType: "Message",
-  message: { message: "1234" },
+  message: { message: "1234" }
 };
-const result = await mySigner.signMessage(
-  myTypedData,
-  "0x5d08a4e9188429da4e993c9bf25aafe5cd491ee2b501505d4d059f0c938f82d"
-);
+const result = await mySigner.signMessage(myTypedData, "0x5d08a4e9188429da4e993c9bf25aafe5cd491ee2b501505d4d059f0c938f82d");
 // result = Signature {r: 684915484701699003335398790608214855489903651271362390249153620883122231253n,
 // s: 1399150959912500412309102776989465580949387575375484933432871778355496929189n, recovery: 1}
 ```
@@ -144,13 +141,13 @@ const result = await mySigner.signMessage(
 
 `StarknetSignerInterface.signMessage`
 
----
+***
 
 ### signTransaction()
 
 > **signTransaction**(`transactions`, `details`): `Promise`\<`Signature`\>
 
-Defined in: [src/signer/adapter.ts:64](https://github.com/keep-starknet-strange/x/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/signer/adapter.ts#L64)
+Defined in: [src/signer/adapter.ts:82](https://github.com/keep-starknet-strange/x/blob/5e54d8974744c392df7cac56b636788dfe6ae268/src/signer/adapter.ts#L82)
 
 Signs INVOKE transactions with the private key and returns the signature
 
@@ -180,15 +177,13 @@ Only supports V3 transactions. V0, V1, and V2 transactions will throw an error.
 
 ```typescript
 const mySigner = new Signer("0x123");
-const calls: Call[] = [
-  {
-    contractAddress: "0x1234567890123456789012345678901234567890",
-    entrypoint: "transfer",
-    calldata: ["0xRecipient", "1000", "0"],
-  },
-];
+const calls: Call[] = [{
+  contractAddress: "0x1234567890123456789012345678901234567890",
+  entrypoint: "transfer",
+  calldata: ["0xRecipient", "1000", "0"]
+}];
 const transactionsDetail: InvocationsSignerDetails = {
-  walletAddress: "0x742d35Cc6634C0532925a3b844Bc454e4438f44e",
+  walletAddress: '0x742d35Cc6634C0532925a3b844Bc454e4438f44e',
   chainId: constants.StarknetChainId.SN_MAIN,
   cairoVersion: "1",
   version: "0x3",
@@ -196,13 +191,13 @@ const transactionsDetail: InvocationsSignerDetails = {
   resourceBounds: {
     l1_gas: { amount: "0x1000", price: "0x20" },
     l2_gas: { amount: "0x200", price: "0x5" },
-    l1_data_gas: { amount: "0x500", price: "0x10" },
+    l1_data_gas: { amount: "0x500", price: "0x10" }
   },
   tip: 0,
   paymasterData: [],
   accountDeploymentData: [],
   nonceDataAvailabilityMode: RPC.EDataAvailabilityMode.L1,
-  feeDataAvailabilityMode: RPC.EDataAvailabilityMode.L1,
+  feeDataAvailabilityMode: RPC.EDataAvailabilityMode.L1
 };
 const result = await mySigner.signTransaction(calls, transactionsDetail);
 // result = Signature {r: 304910226421970384958146916800275294114105560641204815169249090836676768876n,
@@ -213,13 +208,13 @@ const result = await mySigner.signTransaction(calls, transactionsDetail);
 
 `StarknetSignerInterface.signTransaction`
 
----
+***
 
 ### signDeployAccountTransaction()
 
 > **signDeployAccountTransaction**(`details`): `Promise`\<`Signature`\>
 
-Defined in: [src/signer/adapter.ts:92](https://github.com/keep-starknet-strange/x/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/signer/adapter.ts#L92)
+Defined in: [src/signer/adapter.ts:111](https://github.com/keep-starknet-strange/x/blob/5e54d8974744c392df7cac56b636788dfe6ae268/src/signer/adapter.ts#L111)
 
 Signs a DEPLOY_ACCOUNT transaction with the private key and returns the signature
 
@@ -244,25 +239,23 @@ Only supports V3 transactions. V0, V1, and V2 transactions will throw an error.
 ```typescript
 const mySigner = new Signer("0x123");
 const myDeployAcc: DeployAccountSignerDetails = {
-  contractAddress:
-    "0x65a822fbee1ae79e898688b5a4282dc79e0042cbed12f6169937fddb4c26641",
+  contractAddress: "0x65a822fbee1ae79e898688b5a4282dc79e0042cbed12f6169937fddb4c26641",
   version: "0x3",
   chainId: constants.StarknetChainId.SN_SEPOLIA,
-  classHash:
-    "0x5f3614e8671257aff9ac38e929c74d65b02d460ae966cd826c9f04a7fa8e0d4",
+  classHash: "0x5f3614e8671257aff9ac38e929c74d65b02d460ae966cd826c9f04a7fa8e0d4",
   constructorCalldata: ["0x123", "0x456"],
   addressSalt: "0x789",
   nonce: 0,
   resourceBounds: {
     l1_gas: { amount: "0x1000", price: "0x20" },
     l2_gas: { amount: "0x200", price: "0x5" },
-    l1_data_gas: { amount: "0x500", price: "0x10" },
+    l1_data_gas: { amount: "0x500", price: "0x10" }
   },
   tip: 0,
   paymasterData: [],
   accountDeploymentData: [],
   nonceDataAvailabilityMode: RPC.EDataAvailabilityMode.L1,
-  feeDataAvailabilityMode: RPC.EDataAvailabilityMode.L1,
+  feeDataAvailabilityMode: RPC.EDataAvailabilityMode.L1
 };
 const result = await mySigner.signDeployAccountTransaction(myDeployAcc);
 // result = Signature {r: 2871311234341436528393212130310036951068553852419934781736214693308640202748n,
@@ -273,13 +266,13 @@ const result = await mySigner.signDeployAccountTransaction(myDeployAcc);
 
 `StarknetSignerInterface.signDeployAccountTransaction`
 
----
+***
 
 ### signDeclareTransaction()
 
 > **signDeclareTransaction**(`details`): `Promise`\<`Signature`\>
 
-Defined in: [src/signer/adapter.ts:118](https://github.com/keep-starknet-strange/x/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/signer/adapter.ts#L118)
+Defined in: [src/signer/adapter.ts:138](https://github.com/keep-starknet-strange/x/blob/5e54d8974744c392df7cac56b636788dfe6ae268/src/signer/adapter.ts#L138)
 
 Signs a DECLARE transaction with the private key and returns the signature
 
@@ -306,23 +299,20 @@ const mySigner = new Signer("0x123");
 const myDeclare: DeclareSignerDetails = {
   version: "0x3",
   chainId: constants.StarknetChainId.SN_SEPOLIA,
-  senderAddress:
-    "0x65a822fbee1ae79e898688b5a4282dc79e0042cbed12f6169937fddb4c26641",
-  classHash:
-    "0x5f3614e8671257aff9ac38e929c74d65b02d460ae966cd826c9f04a7fa8e0d4",
-  compiledClassHash:
-    "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
+  senderAddress: "0x65a822fbee1ae79e898688b5a4282dc79e0042cbed12f6169937fddb4c26641",
+  classHash: "0x5f3614e8671257aff9ac38e929c74d65b02d460ae966cd826c9f04a7fa8e0d4",
+  compiledClassHash: "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
   nonce: 45,
   resourceBounds: {
     l1_gas: { amount: "0x1000", price: "0x20" },
     l2_gas: { amount: "0x200", price: "0x5" },
-    l1_data_gas: { amount: "0x500", price: "0x10" },
+    l1_data_gas: { amount: "0x500", price: "0x10" }
   },
   tip: 0,
   paymasterData: [],
   accountDeploymentData: [],
   nonceDataAvailabilityMode: RPC.EDataAvailabilityMode.L1,
-  feeDataAvailabilityMode: RPC.EDataAvailabilityMode.L1,
+  feeDataAvailabilityMode: RPC.EDataAvailabilityMode.L1
 };
 const result = await mySigner.signDeclareTransaction(myDeclare);
 // result = Signature {r: 2432056944313955951711774394836075930010416436707488863728289188289211995670n,

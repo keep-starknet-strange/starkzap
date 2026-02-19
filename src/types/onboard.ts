@@ -6,15 +6,22 @@ import type {
   FeeMode,
   ProgressEvent,
 } from "@/types/wallet";
-import type { CartridgeWalletOptions } from "@/wallet/cartridge";
+import type { ExplorerConfig } from "@/types/config";
 import type { WalletInterface } from "@/wallet/interface";
 import type { AccountPresetName } from "@/account/presets";
+
+type PrivySigningHeaders =
+  | Record<string, string>
+  | (() => Record<string, string> | Promise<Record<string, string>>);
+
+type PrivySigningBody = (
+  params: Readonly<{ walletId: string; hash: string }>
+) => Record<string, unknown> | Promise<Record<string, unknown>>;
 
 export const OnboardStrategy = {
   Signer: "signer",
   Privy: "privy",
   Cartridge: "cartridge",
-  WebAuthn: "webauthn",
 } as const;
 
 export type OnboardStrategy =
@@ -32,6 +39,9 @@ export interface OnboardPrivyResolveResult {
   publicKey: string;
   serverUrl?: string;
   rawSign?: (walletId: string, messageHash: string) => Promise<string>;
+  headers?: PrivySigningHeaders;
+  buildBody?: PrivySigningBody;
+  requestTimeoutMs?: number;
   metadata?: Record<string, unknown>;
 }
 
@@ -51,18 +61,20 @@ export interface OnboardPrivyOptions extends OnboardBaseOptions {
 
 export interface OnboardCartridgeOptions extends OnboardBaseOptions {
   strategy: typeof OnboardStrategy.Cartridge;
-  cartridge?: Omit<CartridgeWalletOptions, "feeMode" | "timeBounds">;
+  cartridge?: OnboardCartridgeConfig;
 }
 
-export interface OnboardWebAuthnOptions extends OnboardBaseOptions {
-  strategy: typeof OnboardStrategy.WebAuthn;
+export interface OnboardCartridgeConfig {
+  policies?: Array<{ target: string; method: string }>;
+  preset?: string;
+  url?: string;
+  explorer?: ExplorerConfig;
 }
 
 export type OnboardOptions =
   | OnboardSignerOptions
   | OnboardPrivyOptions
-  | OnboardCartridgeOptions
-  | OnboardWebAuthnOptions;
+  | OnboardCartridgeOptions;
 
 export interface OnboardResult<
   TWallet extends WalletInterface = WalletInterface,
