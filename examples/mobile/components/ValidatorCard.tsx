@@ -1,6 +1,6 @@
 import { StyleSheet, View, Image, TouchableOpacity } from "react-native";
 import { ThemedText } from "./themed-text";
-import type { Validator } from "x";
+import type { Validator } from "starkzap";
 
 interface ValidatorCardProps {
   validator: Validator;

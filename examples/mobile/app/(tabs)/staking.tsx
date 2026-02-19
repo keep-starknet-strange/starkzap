@@ -24,7 +24,7 @@ import {
   getValidatorsForNetwork,
   type StakingPosition as StakingPositionType,
 } from "@/stores/staking";
-import type { Validator, Pool } from "x";
+import type { Validator, Pool } from "starkzap";
 
 export default function StakingScreen() {
   const { wallet, sdk, chainId, addLog } = useWalletStore();

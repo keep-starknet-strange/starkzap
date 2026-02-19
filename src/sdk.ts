@@ -33,7 +33,7 @@ interface ResolvedConfig extends Omit<SDKConfig, "rpcUrl" | "chainId"> {
  *
  * @example
  * ```ts
- * import { StarkSDK, StarkSigner, ArgentPreset } from "x";
+ * import { StarkSDK, StarkSigner, ArgentPreset } from "starkzap";
  *
  * // Using network presets (recommended)
  * const sdk = new StarkSDK({ network: "mainnet" });
@@ -123,7 +123,7 @@ export class StarkSDK {
    *
    * @example
    * ```ts
-   * import { StarkSigner, OpenZeppelinPreset, ArgentPreset } from "x";
+   * import { StarkSigner, OpenZeppelinPreset, ArgentPreset } from "starkzap";
    *
    * // Default: OpenZeppelin account
    * const wallet = await sdk.connectWallet({

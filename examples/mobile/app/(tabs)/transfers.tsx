@@ -21,7 +21,7 @@ import {
   showTransactionToast,
   updateTransactionToast,
 } from "@/components/Toast";
-import { Amount, fromAddress, type Token, type ChainId } from "x";
+import { Amount, fromAddress, type Token, type ChainId } from "starkzap";
 
 /** Get explorer URL for a transaction hash */
 function getExplorerUrl(txHash: string, chainId: ChainId): string {

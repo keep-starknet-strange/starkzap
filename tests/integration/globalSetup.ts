@@ -1,8 +1,9 @@
 import type { TestProject } from "vitest/node";
 import { Devnet } from "starknet-devnet";
 import "dotenv/config";
-import { type SDKConfig } from "../../src/types/config.js";
-import { forkRPC } from "./shared";
+import { getChainId } from "../../src/types/config.js";
+import { forkRPC, type TestConfig } from "./shared";
+import { RpcProvider } from "starknet";
 
 let devnet: Devnet | null = null;
 
@@ -41,15 +42,16 @@ export default async function setup(project: TestProject) {
   });
 
   const devnetUrl = devnet.provider.url;
-  const config = await devnet.provider.getConfig();
-  const sdkConfig: SDKConfig = {
+  const provider = new RpcProvider({ nodeUrl: devnetUrl });
+  const chainId = await getChainId(provider);
+  const testConfig: TestConfig = {
     rpcUrl: devnetUrl,
-    chainId: config.chain_id,
+    chainId: chainId.toLiteral(),
   };
 
   console.log(`✅ Devnet running at ${devnetUrl}`);
-  console.log("🛜 Network: ", config.chain_id, "\n");
-  project.provide("sdkConfig", sdkConfig);
+  console.log("🛜 Network: ", chainId.toLiteral(), "\n");
+  project.provide("testConfig", testConfig);
 
   // Return teardown function
   return function teardown() {
@@ -64,6 +66,6 @@ export default async function setup(project: TestProject) {
 // Type declaration for inject/provide
 declare module "vitest" {
   export interface ProvidedContext {
-    sdkConfig: SDKConfig;
+    testConfig: TestConfig;
   }
 }

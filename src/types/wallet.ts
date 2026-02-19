@@ -10,7 +10,7 @@ import type { SignerInterface } from "@/signer/interface";
  * @example
  * ```ts
  * // Use a preset
- * import { OpenZeppelinPreset } from "x";
+ * import { OpenZeppelinPreset } from "starkzap";
  * { accountClass: OpenZeppelinPreset }
  *
  * // Or define custom
@@ -43,7 +43,7 @@ export interface AccountClassConfig {
  *
  * @example
  * ```ts
- * import { StarkSigner, OpenZeppelinPreset } from "x";
+ * import { StarkSigner, OpenZeppelinPreset } from "starkzap";
  *
  * {
  *   signer: new StarkSigner(privateKey),
@@ -74,7 +74,7 @@ export type FeeMode = "sponsored" | "user_pays";
  *
  * @example
  * ```ts
- * import { StarkSigner, ArgentPreset } from "x";
+ * import { StarkSigner, ArgentPreset } from "starkzap";
  *
  * // User pays fees
  * await sdk.connectWallet({

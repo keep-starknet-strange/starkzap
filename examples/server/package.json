@@ -1,4 +1,7 @@
 {
+  "scripts": {
+    "postinstall": "cd ../.. && npm run build"
+  },
   "dependencies": {
     "@privy-io/node": "^0.8.0",
     "cors": "^2.8.6",

@@ -1,6 +1,6 @@
 import { StyleSheet, View, TextInput, TouchableOpacity } from "react-native";
 import { ThemedText } from "./themed-text";
-import type { Token, Amount } from "x";
+import type { Token, Amount } from "starkzap";
 
 interface AmountInputProps {
   value: string;

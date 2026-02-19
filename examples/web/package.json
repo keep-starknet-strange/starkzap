@@ -1,8 +1,9 @@
 {
-  "name": "x-examples",
+  "name": "starkzap-examples",
   "private": true,
   "type": "module",
   "scripts": {
+    "postinstall": "cd ../.. && npm run build",
     "dev": "vite",
     "dev:server": "tsx server.ts",
     "dev:all": "concurrently \"npm run dev\" \"npm run dev:server\"",
@@ -10,7 +11,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "x": "file:../.."
+    "starkzap": "file:../.."
   },
   "devDependencies": {
     "@privy-io/node": "^0.8.0",

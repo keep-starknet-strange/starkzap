@@ -5,7 +5,7 @@ import { StarkSigner } from "@/signer";
 import { DevnetPreset } from "@/account";
 import { Amount, fromAddress, type Validator } from "@/types";
 import { testPrivateKeys } from "../config";
-import { fund } from "./shared";
+import { fund, toSdkConfig } from "./shared";
 import { DevnetProvider } from "starknet-devnet";
 import { mainnetValidators, sepoliaValidators } from "@/staking";
 
@@ -25,8 +25,8 @@ const STAKING_PER_NETWORK = {
 };
 
 describe("Staking Lifecycle (Integration)", () => {
-  const config = inject("sdkConfig");
-  const testPresets = STAKING_PER_NETWORK[config.chainId!];
+  const config = toSdkConfig(inject("testConfig"));
+  const testPresets = STAKING_PER_NETWORK[config.chainId!.toLiteral()];
   config.staking = {
     contract: fromAddress(testPresets.STAKING_CONTRACT),
   };
@@ -289,7 +289,7 @@ describe("Staking Lifecycle (Integration)", () => {
       }
 
       let validator: Validator;
-      if (config.chainId == "SN_SEPOLIA") {
+      if (config.chainId?.isSepolia()) {
         validator = sepoliaValidators.NETHERMIND;
       } else {
         validator = mainnetValidators.KARNOT;
@@ -328,7 +328,7 @@ describe("Staking Lifecycle (Integration)", () => {
       }
 
       let validators: Validator[];
-      if (config.chainId == "SN_SEPOLIA") {
+      if (config.chainId?.isSepolia()) {
         validators = [
           sepoliaValidators.NETHERMIND,
           sepoliaValidators.CHORUS_ONE,
