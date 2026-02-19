@@ -5,7 +5,7 @@ Browser-based playground for the SDK. Demonstrates three wallet connection strat
 ## Prerequisites
 
 - Node.js 18+
-- The SDK built locally (this example references the SDK source via the `x` alias in `vite.config.ts`)
+- The SDK built locally (this example references the SDK source via the `starkzap` alias in `vite.config.ts`)
 
 ## Quick Start
 
@@ -214,11 +214,11 @@ const PRIVY_SERVER_URL = "http://localhost:3001";
 
 ### Vite Path Aliases
 
-`vite.config.ts` maps `x` to the SDK source at `../../src/index.ts` and `@` to `../../src/`. This means:
+`vite.config.ts` maps `starkzap` to the SDK source at `../../src/index.ts` and `@` to `../../src/`. This means:
 
-- `import { StarkSDK } from "x"` resolves to the local SDK source, not an npm package.
+- `import { StarkSDK } from "starkzap"` resolves to the local SDK source, not a published npm bundle.
 - Changes to the SDK source are hot-reloaded automatically.
-- The `optimizeDeps.exclude: ["x"]` setting prevents Vite from pre-bundling the SDK.
+- The `optimizeDeps.exclude: ["starkzap"]` setting prevents Vite from pre-bundling the SDK.
 
 ## Scripts
 

@@ -1,6 +1,6 @@
-# x SDK Developer Guide
+# Starkzap SDK Developer Guide
 
-A full developer guide for integrating Starknet wallets with `x` across web, Node.js, and mobile runtimes.
+A full developer guide for integrating Starknet wallets with `starkzap` across web, Node.js, and mobile runtimes.
 
 ## Who This Guide Is For
 
@@ -9,7 +9,7 @@ Use this guide if you are:
 - Integrating Starknet account abstraction into an app.
 - Building wallet flows with private key, Privy, or Cartridge.
 - Shipping token operations, staking, and sponsored transactions.
-- Maintaining a codebase that uses `x` and needs predictable patterns.
+- Maintaining a codebase that uses `starkzap` and needs predictable patterns.
 
 ## What You Get in This SDK
 
@@ -27,7 +27,7 @@ Use this guide if you are:
 ## Installation
 
 ```bash
-npm install x
+npm install starkzap
 ```
 
 ## Runtime Compatibility
@@ -46,7 +46,7 @@ import {
   Amount,
   fromAddress,
   sepoliaTokens,
-} from "x";
+} from "starkzap";
 
 const sdk = new StarkSDK({ network: "sepolia" });
 
@@ -121,7 +121,7 @@ Supported strategies:
 ### Signer strategy
 
 ```ts
-import { StarkSigner, OnboardStrategy } from "x";
+import { StarkSigner, OnboardStrategy } from "starkzap";
 
 const onboard = await sdk.onboard({
   strategy: OnboardStrategy.Signer,
@@ -134,7 +134,7 @@ const onboard = await sdk.onboard({
 ### Cartridge strategy
 
 ```ts
-import { OnboardStrategy } from "x";
+import { OnboardStrategy } from "starkzap";
 
 const onboard = await sdk.onboard({
   strategy: OnboardStrategy.Cartridge,
@@ -158,7 +158,7 @@ Optional features:
 - `staking.contract` for staking methods.
 
 ```ts
-import { StarkSDK, ChainId, fromAddress } from "x";
+import { StarkSDK, ChainId, fromAddress } from "starkzap";
 
 const sdk = new StarkSDK({
   rpcUrl: "https://api.cartridge.gg/x/starknet/mainnet",
@@ -177,7 +177,7 @@ const sdk = new StarkSDK({
 ### 1) Local private key (server or trusted environment)
 
 ```ts
-import { StarkSigner, OpenZeppelinPreset } from "x";
+import { StarkSigner, OpenZeppelinPreset } from "starkzap";
 
 const wallet = await sdk.connectWallet({
   account: {
@@ -190,7 +190,7 @@ const wallet = await sdk.connectWallet({
 ### 2) Privy signer (recommended for many consumer apps)
 
 ```ts
-import { PrivySigner, ArgentXV050Preset } from "x";
+import { PrivySigner, ArgentXV050Preset } from "starkzap";
 
 const signer = new PrivySigner({
   walletId: "privy-wallet-id",
@@ -312,7 +312,7 @@ const position = await wallet.getPoolPosition(poolAddress);
 ### Address safety
 
 ```ts
-import { fromAddress } from "x";
+import { fromAddress } from "starkzap";
 
 const addr = fromAddress("0x1234");
 ```
@@ -329,7 +329,7 @@ console.log(c.toFormatted(true));
 ### Chain IDs
 
 ```ts
-import { ChainId } from "x";
+import { ChainId } from "starkzap";
 
 if (ChainId.MAINNET.isMainnet()) {
   // ...
@@ -381,6 +381,6 @@ Outputs:
 - `docs/api/` generated API reference (TypeDoc markdown)
 - `docs/export/DEVELOPER_GUIDE.md`
 - `docs/export/api/`
-- `docs/export/x-docs.zip`
+- `docs/export/starkzap-docs.zip`
 
 Use `docs/export` as the distributable documentation bundle.

@@ -6,7 +6,7 @@ Flappy Bird on Starknet. This example **forks [nebez/floppybird](https://github.
 
 - **Game:** Full [nebez/floppybird](https://github.com/nebez/floppybird) — same HTML, CSS, JS, and assets (bird, pipes, sky, sounds, fonts, etc.) from the `gh-pages` branch.
 - **Integration:** `public/js/main.js` is patched with hooks (`__starknetOnScore`, `__starknetOnGameOver`, `__starknetOnStart`, `__starknetCanStart`) so the StarkZap bundle can sync score and game-over to Starknet and gate play on wallet connection.
-- **StarkZap:** `main.ts` + `starknet.ts` use `StarkZap`, `OnboardStrategy.Cartridge`, `wallet.execute()` for game contract calls, and `wallet.getProvider()` + Contract for leaderboard reads.
+- **Starkzap SDK:** `main.ts` + `starknet.ts` use `StarkSDK`, `OnboardStrategy.Cartridge`, `wallet.execute()` for game contract calls, and `wallet.getProvider()` + Contract for leaderboard reads.
 
 ## Docs
 
@@ -17,7 +17,7 @@ Flappy Bird on Starknet. This example **forks [nebez/floppybird](https://github.
 
 ## Deploy to Vercel (live demo)
 
-This repo is a **fork of [keep-starknet-strange/x](https://github.com/keep-starknet-strange/x)**. The flappy-bird example depends on the parent SDK (`x`) via `file:../..`, so the **entire monorepo** must be in the repo you deploy from. This will be updated once the SDK is published. For now, use one of these flows.
+This repo is a **fork of [keep-starknet-strange/x](https://github.com/keep-starknet-strange/x)**. The flappy-bird example depends on the parent SDK (`starkzap`) via `file:../..`, so the **entire monorepo** must be in the repo you deploy from. This will be updated once the SDK is published. For now, use one of these flows.
 
 ### Option A: Deploy from this fork (recommended)
 
@@ -80,12 +80,12 @@ The **Cartridge Controller** (social login / passkey) only works in a **secure c
 ## Stack
 
 - **Vite + TypeScript** — Entry and StarkZap wiring; game is vanilla JS from floppybird.
-- **StarkZap SDK (x)** — `StarkZap`, `OnboardStrategy.Cartridge`, `networks`, `wallet.execute()`, `wallet.getProvider()`, `wallet.address`, `wallet.disconnect()`, Cartridge `username()`. Config: `StarkZap({ network: "sepolia" })`; explorer from `networks.sepolia.explorerUrl`.
+- **Starkzap SDK (`starkzap`)** — `StarkSDK`, `OnboardStrategy.Cartridge`, `networks`, `wallet.execute()`, `wallet.getProvider()`, `wallet.address`, `wallet.disconnect()`, Cartridge `username()`. Config: `new StarkSDK({ network: "sepolia" })`; explorer from `networks.sepolia.explorerUrl`.
 - **Game contract** — Demo contract on Starknet Sepolia: `start_new_game`, `increment_score`, `end_game`, plus view functions for high score and leaderboard. Address: `0x03730b941e8d3ece030a4a0d5f1008f34fbde0976e86577a78648c8b35079464`.
 
 ## What this example uses outside StarkZap
 
-This example import `starknet` . In the future, StarkZap re-exports `Contract` and `RpcProvider`; the provider comes from `wallet.getProvider()`. Use them from `x` for read-only contract calls so your app depends only on StarkZap.
+This example imports `starknet` directly for read-only contract calls. The provider still comes from `wallet.getProvider()`.
 
 | Thing | Purpose |
 |-------|--------|
