@@ -171,7 +171,11 @@ describe("Tx", () => {
     });
 
     it("should cache the receipt", async () => {
-      const mockReceipt = { transaction_hash: "0x123" };
+      const mockReceipt = {
+        transaction_hash: "0x123",
+        finality_status: "ACCEPTED_ON_L2",
+        execution_status: "SUCCEEDED",
+      };
       const mockProvider = {
         channel: { nodeUrl: "https://starknet-sepolia.example.com" },
         getTransactionReceipt: vi.fn().mockResolvedValue(mockReceipt),
@@ -185,6 +189,21 @@ describe("Tx", () => {
 
       // Should only be called once due to caching
       expect(mockProvider.getTransactionReceipt).toHaveBeenCalledTimes(1);
+    });
+
+    it("should not cache non-final receipts", async () => {
+      const mockProvider = {
+        channel: { nodeUrl: "https://starknet-sepolia.example.com" },
+        getTransactionReceipt: vi
+          .fn()
+          .mockResolvedValue({ transaction_hash: "0x123" }),
+      } as unknown as RpcProvider;
+
+      const tx = new Tx("0x123", mockProvider, SEPOLIA);
+      await tx.receipt();
+      await tx.receipt();
+
+      expect(mockProvider.getTransactionReceipt).toHaveBeenCalledTimes(2);
     });
   });
 

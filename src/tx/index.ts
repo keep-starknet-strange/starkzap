@@ -185,7 +185,9 @@ export class Tx {
     }
 
     const receipt = await this.provider.getTransactionReceipt(this.hash);
-    this.cachedReceipt = receipt;
+    if (isFinalReceipt(receipt)) {
+      this.cachedReceipt = receipt;
+    }
     return receipt;
   }
 }
@@ -221,7 +223,7 @@ function buildExplorerUrl(
   return `https://${subdomain}voyager.online/tx/${encodedHash}`;
 }
 
-function isFinalStatus(finality: string, execution?: string): boolean {
+function isFinalStatus(finality?: string, execution?: string): boolean {
   if (execution === TransactionExecutionStatus.REVERTED) {
     return true;
   }
@@ -229,6 +231,14 @@ function isFinalStatus(finality: string, execution?: string): boolean {
     finality === TransactionFinalityStatus.ACCEPTED_ON_L2 ||
     finality === TransactionFinalityStatus.ACCEPTED_ON_L1
   );
+}
+
+function isFinalReceipt(receipt: TxReceipt): boolean {
+  const value = receipt as {
+    finality_status?: string;
+    execution_status?: string;
+  };
+  return isFinalStatus(value.finality_status, value.execution_status);
 }
 
 function sleep(ms: number): Promise<void> {
