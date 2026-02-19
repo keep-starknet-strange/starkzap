@@ -1,8 +1,8 @@
-[**x**](README.md)
+[**starkzap**](README.md)
 
----
+***
 
-# x
+# starkzap
 
 ## Classes
 
@@ -18,7 +18,6 @@
 - [ChainId](classes/ChainId.md)
 - [AccountProvider](classes/AccountProvider.md)
 - [BaseWallet](classes/BaseWallet.md)
-- [CartridgeWallet](classes/CartridgeWallet.md)
 - [Wallet](classes/Wallet.md)
 
 ## Interfaces
@@ -37,13 +36,14 @@
 - [OnboardSignerOptions](interfaces/OnboardSignerOptions.md)
 - [OnboardPrivyOptions](interfaces/OnboardPrivyOptions.md)
 - [OnboardCartridgeOptions](interfaces/OnboardCartridgeOptions.md)
-- [OnboardWebAuthnOptions](interfaces/OnboardWebAuthnOptions.md)
+- [OnboardCartridgeConfig](interfaces/OnboardCartridgeConfig.md)
 - [OnboardResult](interfaces/OnboardResult.md)
 - [Pool](interfaces/Pool.md)
 - [PoolMember](interfaces/PoolMember.md)
 - [Token](interfaces/Token.md)
 - [TokenMetadata](interfaces/TokenMetadata.md)
 - [TxStatusUpdate](interfaces/TxStatusUpdate.md)
+- [TxWatchOptions](interfaces/TxWatchOptions.md)
 - [Validator](interfaces/Validator.md)
 - [AccountClassConfig](interfaces/AccountClassConfig.md)
 - [AccountConfig](interfaces/AccountConfig.md)
@@ -55,7 +55,6 @@
 - [PreflightOptions](interfaces/PreflightOptions.md)
 - [PreflightResultOk](interfaces/PreflightResultOk.md)
 - [PreflightResultError](interfaces/PreflightResultError.md)
-- [CartridgeWalletOptions](interfaces/CartridgeWalletOptions.md)
 - [WalletOptions](interfaces/WalletOptions.md)
 - [WalletInterface](interfaces/WalletInterface.md)
 
@@ -102,6 +101,7 @@
 - [sepolia](variables/sepolia.md)
 - [devnet](variables/devnet.md)
 - [networks](variables/networks.md)
+- [stakingPresets](variables/stakingPresets.md)
 - [sepoliaValidators](variables/sepoliaValidators.md)
 - [mainnetValidators](variables/mainnetValidators.md)
 - [OnboardStrategy](variables/OnboardStrategy.md)
@@ -110,6 +110,7 @@
 
 - [getPresets](functions/getPresets.md)
 - [getTokensFromAddresses](functions/getTokensFromAddresses.md)
+- [getStakingPreset](functions/getStakingPreset.md)
 - [fromAddress](functions/fromAddress.md)
 - [tokenAmountToFormatted](functions/tokenAmountToFormatted.md)
 - [getChainId](functions/getChainId.md)

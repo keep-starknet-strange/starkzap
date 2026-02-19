@@ -1,11 +1,11 @@
-[**x**](../README.md)
+[**starkzap**](../README.md)
 
----
+***
 
-[x](../globals.md) / NetworkName
+[starkzap](../globals.md) / NetworkName
 
 # Type Alias: NetworkName
 
-> **NetworkName** = keyof _typeof_ [`networks`](../variables/networks.md)
+> **NetworkName** = keyof *typeof* [`networks`](../variables/networks.md)
 
-Defined in: [src/network/presets.ts:55](https://github.com/keep-starknet-strange/x/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/network/presets.ts#L55)
+Defined in: [src/network/presets.ts:55](https://github.com/keep-starknet-strange/x/blob/5e54d8974744c392df7cac56b636788dfe6ae268/src/network/presets.ts#L55)

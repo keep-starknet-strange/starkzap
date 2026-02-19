@@ -1,14 +1,14 @@
-[**x**](../README.md)
+[**starkzap**](../README.md)
 
----
+***
 
-[x](../globals.md) / fromAddress
+[starkzap](../globals.md) / fromAddress
 
 # Function: fromAddress()
 
 > **fromAddress**(`value`): [`Address`](../type-aliases/Address.md)
 
-Defined in: [src/types/address.ts:17](https://github.com/keep-starknet-strange/x/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/types/address.ts#L17)
+Defined in: [src/types/address.ts:17](https://github.com/keep-starknet-strange/x/blob/5e54d8974744c392df7cac56b636788dfe6ae268/src/types/address.ts#L17)
 
 Parse a Starknet address from a BigNumberish value.
 

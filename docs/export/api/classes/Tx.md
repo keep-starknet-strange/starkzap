@@ -1,12 +1,12 @@
-[**x**](../README.md)
+[**starkzap**](../README.md)
 
----
+***
 
-[x](../globals.md) / Tx
+[starkzap](../globals.md) / Tx
 
 # Class: Tx
 
-Defined in: [src/tx/index.ts:34](https://github.com/keep-starknet-strange/x/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/tx/index.ts#L34)
+Defined in: [src/tx/index.ts:37](https://github.com/keep-starknet-strange/x/blob/5e54d8974744c392df7cac56b636788dfe6ae268/src/tx/index.ts#L37)
 
 Represents a submitted Starknet transaction.
 Provides methods to wait for confirmation, watch status changes, and get receipts.
@@ -31,7 +31,7 @@ const receipt = await tx.receipt();
 
 > **new Tx**(`hash`, `provider`, `chainId`, `explorerConfig?`): `Tx`
 
-Defined in: [src/tx/index.ts:43](https://github.com/keep-starknet-strange/x/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/tx/index.ts#L43)
+Defined in: [src/tx/index.ts:46](https://github.com/keep-starknet-strange/x/blob/5e54d8974744c392df7cac56b636788dfe6ae268/src/tx/index.ts#L46)
 
 #### Parameters
 
@@ -61,17 +61,17 @@ Defined in: [src/tx/index.ts:43](https://github.com/keep-starknet-strange/x/blob
 
 > `readonly` **hash**: `string`
 
-Defined in: [src/tx/index.ts:36](https://github.com/keep-starknet-strange/x/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/tx/index.ts#L36)
+Defined in: [src/tx/index.ts:39](https://github.com/keep-starknet-strange/x/blob/5e54d8974744c392df7cac56b636788dfe6ae268/src/tx/index.ts#L39)
 
 Transaction hash
 
----
+***
 
 ### explorerUrl
 
 > `readonly` **explorerUrl**: `string`
 
-Defined in: [src/tx/index.ts:38](https://github.com/keep-starknet-strange/x/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/tx/index.ts#L38)
+Defined in: [src/tx/index.ts:41](https://github.com/keep-starknet-strange/x/blob/5e54d8974744c392df7cac56b636788dfe6ae268/src/tx/index.ts#L41)
 
 URL to view transaction on block explorer
 
@@ -81,7 +81,7 @@ URL to view transaction on block explorer
 
 > **wait**(`options?`): `Promise`\<`void`\>
 
-Defined in: [src/tx/index.ts:72](https://github.com/keep-starknet-strange/x/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/tx/index.ts#L72)
+Defined in: [src/tx/index.ts:75](https://github.com/keep-starknet-strange/x/blob/5e54d8974744c392df7cac56b636788dfe6ae268/src/tx/index.ts#L75)
 
 Wait for the transaction to reach a target status.
 Wraps starknet.js `waitForTransaction`.
@@ -114,13 +114,13 @@ await tx.wait({
 });
 ```
 
----
+***
 
 ### watch()
 
-> **watch**(`callback`): [`TxUnsubscribe`](../type-aliases/TxUnsubscribe.md)
+> **watch**(`callback`, `options?`): [`TxUnsubscribe`](../type-aliases/TxUnsubscribe.md)
 
-Defined in: [src/tx/index.ts:104](https://github.com/keep-starknet-strange/x/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/tx/index.ts#L104)
+Defined in: [src/tx/index.ts:107](https://github.com/keep-starknet-strange/x/blob/5e54d8974744c392df7cac56b636788dfe6ae268/src/tx/index.ts#L107)
 
 Watch transaction status changes in real-time.
 
@@ -135,6 +135,10 @@ reaches a final state (accepted or reverted).
 [`TxWatchCallback`](../type-aliases/TxWatchCallback.md)
 
 Called on each status change with `{ finality, execution }`
+
+##### options?
+
+[`TxWatchOptions`](../interfaces/TxWatchOptions.md) = `{}`
 
 #### Returns
 
@@ -153,13 +157,13 @@ const unsubscribe = tx.watch(({ finality, execution }) => {
 unsubscribe();
 ```
 
----
+***
 
 ### receipt()
 
 > **receipt**(): `Promise`\<[`TxReceipt`](../type-aliases/TxReceipt.md)\>
 
-Defined in: [src/tx/index.ts:154](https://github.com/keep-starknet-strange/x/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/tx/index.ts#L154)
+Defined in: [src/tx/index.ts:182](https://github.com/keep-starknet-strange/x/blob/5e54d8974744c392df7cac56b636788dfe6ae268/src/tx/index.ts#L182)
 
 Get the full transaction receipt.
 

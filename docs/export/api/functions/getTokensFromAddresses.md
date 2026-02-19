@@ -1,14 +1,14 @@
-[**x**](../README.md)
+[**starkzap**](../README.md)
 
----
+***
 
-[x](../globals.md) / getTokensFromAddresses
+[starkzap](../globals.md) / getTokensFromAddresses
 
 # Function: getTokensFromAddresses()
 
 > **getTokensFromAddresses**(`tokenAddresses`, `provider`): `Promise`\<[`Token`](../interfaces/Token.md)[]\>
 
-Defined in: [src/erc20/token/index.ts:17](https://github.com/keep-starknet-strange/x/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/erc20/token/index.ts#L17)
+Defined in: [src/erc20/token/index.ts:124](https://github.com/keep-starknet-strange/x/blob/5e54d8974744c392df7cac56b636788dfe6ae268/src/erc20/token/index.ts#L124)
 
 ## Parameters
 

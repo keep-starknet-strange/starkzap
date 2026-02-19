@@ -1,14 +1,14 @@
-[**x**](../README.md)
+[**starkzap**](../README.md)
 
----
+***
 
-[x](../globals.md) / sepoliaTokens
+[starkzap](../globals.md) / sepoliaTokens
 
 # Variable: sepoliaTokens
 
 > `const` **sepoliaTokens**: `object`
 
-Defined in: [src/erc20/token/presets.sepolia.ts:11](https://github.com/keep-starknet-strange/x/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/erc20/token/presets.sepolia.ts#L11)
+Defined in: [src/erc20/token/presets.sepolia.ts:11](https://github.com/keep-starknet-strange/x/blob/5e54d8974744c392df7cac56b636788dfe6ae268/src/erc20/token/presets.sepolia.ts#L11)
 
 ## Type Declaration
 
@@ -96,31 +96,31 @@ Defined in: [src/erc20/token/presets.sepolia.ts:11](https://github.com/keep-star
 
 > `readonly` **logoUrl**: `URL`
 
-### USDC_E
+### USDC\_E
 
-> `readonly` **USDC_E**: `object`
+> `readonly` **USDC\_E**: `object`
 
-#### USDC_E.name
+#### USDC\_E.name
 
 > `readonly` **name**: `"USDC.e"` = `"USDC.e"`
 
-#### USDC_E.address
+#### USDC\_E.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### USDC_E.decimals
+#### USDC\_E.decimals
 
 > `readonly` **decimals**: `6` = `6`
 
-#### USDC_E.symbol
+#### USDC\_E.symbol
 
 > `readonly` **symbol**: `"USDC.e"` = `"USDC.e"`
 
-#### USDC_E.metadata
+#### USDC\_E.metadata
 
 > `readonly` **metadata**: `object`
 
-#### USDC_E.metadata.logoUrl
+#### USDC\_E.metadata.logoUrl
 
 > `readonly` **logoUrl**: `URL`
 
@@ -180,63 +180,63 @@ Defined in: [src/erc20/token/presets.sepolia.ts:11](https://github.com/keep-star
 
 > `readonly` **logoUrl**: `URL`
 
-### \_100_EXPO
+### \_100\_EXPO
 
-> `readonly` **\_100_EXPO**: `object`
+> `readonly` **\_100\_EXPO**: `object`
 
-#### \_100_EXPO.name
+#### \_100\_EXPO.name
 
 > `readonly` **name**: `"100 expo"` = `"100 expo"`
 
-#### \_100_EXPO.address
+#### \_100\_EXPO.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### \_100_EXPO.decimals
+#### \_100\_EXPO.decimals
 
 > `readonly` **decimals**: `18` = `18`
 
-#### \_100_EXPO.symbol
+#### \_100\_EXPO.symbol
 
 > `readonly` **symbol**: `"100 expo"` = `"100 expo"`
 
-### \_100_LINEAR
+### \_100\_LINEAR
 
-> `readonly` **\_100_LINEAR**: `object`
+> `readonly` **\_100\_LINEAR**: `object`
 
-#### \_100_LINEAR.name
+#### \_100\_LINEAR.name
 
 > `readonly` **name**: `"100 linear"` = `"100 linear"`
 
-#### \_100_LINEAR.address
+#### \_100\_LINEAR.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### \_100_LINEAR.decimals
+#### \_100\_LINEAR.decimals
 
 > `readonly` **decimals**: `18` = `18`
 
-#### \_100_LINEAR.symbol
+#### \_100\_LINEAR.symbol
 
 > `readonly` **symbol**: `"100 linear"` = `"100 linear"`
 
-### LINEAR_1M
+### LINEAR\_1M
 
-> `readonly` **LINEAR_1M**: `object`
+> `readonly` **LINEAR\_1M**: `object`
 
-#### LINEAR_1M.name
+#### LINEAR\_1M.name
 
 > `readonly` **name**: `"1m linear"` = `"1m linear"`
 
-#### LINEAR_1M.address
+#### LINEAR\_1M.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### LINEAR_1M.decimals
+#### LINEAR\_1M.decimals
 
 > `readonly` **decimals**: `18` = `18`
 
-#### LINEAR_1M.symbol
+#### LINEAR\_1M.symbol
 
 > `readonly` **symbol**: `"linear 1m"` = `"linear 1m"`
 
@@ -280,43 +280,43 @@ Defined in: [src/erc20/token/presets.sepolia.ts:11](https://github.com/keep-star
 
 > `readonly` **symbol**: `"AAA"` = `"AAA"`
 
-### AAA_1
+### AAA\_1
 
-> `readonly` **AAA_1**: `object`
+> `readonly` **AAA\_1**: `object`
 
-#### AAA_1.name
+#### AAA\_1.name
 
 > `readonly` **name**: `"AAA"` = `"AAA"`
 
-#### AAA_1.address
+#### AAA\_1.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### AAA_1.decimals
+#### AAA\_1.decimals
 
 > `readonly` **decimals**: `9` = `9`
 
-#### AAA_1.symbol
+#### AAA\_1.symbol
 
 > `readonly` **symbol**: `"AAA"` = `"AAA"`
 
-### AAA_2
+### AAA\_2
 
-> `readonly` **AAA_2**: `object`
+> `readonly` **AAA\_2**: `object`
 
-#### AAA_2.name
+#### AAA\_2.name
 
 > `readonly` **name**: `"aaa"` = `"aaa"`
 
-#### AAA_2.address
+#### AAA\_2.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### AAA_2.decimals
+#### AAA\_2.decimals
 
 > `readonly` **decimals**: `18` = `18`
 
-#### AAA_2.symbol
+#### AAA\_2.symbol
 
 > `readonly` **symbol**: `"aaa"` = `"aaa"`
 
@@ -1280,23 +1280,23 @@ Defined in: [src/erc20/token/presets.sepolia.ts:11](https://github.com/keep-star
 
 > `readonly` **symbol**: `"ekubo"` = `"ekubo"`
 
-### EKUBO_1
+### EKUBO\_1
 
-> `readonly` **EKUBO_1**: `object`
+> `readonly` **EKUBO\_1**: `object`
 
-#### EKUBO_1.name
+#### EKUBO\_1.name
 
 > `readonly` **name**: `"Ekubo Protocol"` = `"Ekubo Protocol"`
 
-#### EKUBO_1.address
+#### EKUBO\_1.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### EKUBO_1.decimals
+#### EKUBO\_1.decimals
 
 > `readonly` **decimals**: `18` = `18`
 
-#### EKUBO_1.symbol
+#### EKUBO\_1.symbol
 
 > `readonly` **symbol**: `"EKUBO"` = `"EKUBO"`
 
@@ -1500,23 +1500,23 @@ Defined in: [src/erc20/token/presets.sepolia.ts:11](https://github.com/keep-star
 
 > `readonly` **symbol**: `"xBTC2"` = `"xBTC2"`
 
-### ENERGY_LFG_POW_77803726186964B48C567B6F32F840762DE10884B38046B4D896ACFC473E0E8B
+### ENERGY\_LFG\_POW\_77803726186964B48C567B6F32F840762DE10884B38046B4D896ACFC473E0E8B
 
-> `readonly` **ENERGY_LFG_POW_77803726186964B48C567B6F32F840762DE10884B38046B4D896ACFC473E0E8B**: `object`
+> `readonly` **ENERGY\_LFG\_POW\_77803726186964B48C567B6F32F840762DE10884B38046B4D896ACFC473E0E8B**: `object`
 
-#### ENERGY_LFG_POW_77803726186964B48C567B6F32F840762DE10884B38046B4D896ACFC473E0E8B.name
+#### ENERGY\_LFG\_POW\_77803726186964B48C567B6F32F840762DE10884B38046B4D896ACFC473E0E8B.name
 
 > `readonly` **name**: `"energy lfg"` = `"energy lfg"`
 
-#### ENERGY_LFG_POW_77803726186964B48C567B6F32F840762DE10884B38046B4D896ACFC473E0E8B.address
+#### ENERGY\_LFG\_POW\_77803726186964B48C567B6F32F840762DE10884B38046B4D896ACFC473E0E8B.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### ENERGY_LFG_POW_77803726186964B48C567B6F32F840762DE10884B38046B4D896ACFC473E0E8B.decimals
+#### ENERGY\_LFG\_POW\_77803726186964B48C567B6F32F840762DE10884B38046B4D896ACFC473E0E8B.decimals
 
 > `readonly` **decimals**: `18` = `18`
 
-#### ENERGY_LFG_POW_77803726186964B48C567B6F32F840762DE10884B38046B4D896ACFC473E0E8B.symbol
+#### ENERGY\_LFG\_POW\_77803726186964B48C567B6F32F840762DE10884B38046B4D896ACFC473E0E8B.symbol
 
 > `readonly` **symbol**: `"energy lfg POW 77803726186964b48c567b6f32f840762de10884b38046b4d896acfc473e0e8b"` = `"energy lfg POW 77803726186964b48c567b6f32f840762de10884b38046b4d896acfc473e0e8b"`
 
@@ -1940,23 +1940,23 @@ Defined in: [src/erc20/token/presets.sepolia.ts:11](https://github.com/keep-star
 
 > `readonly` **symbol**: `"gold"` = `"gold"`
 
-### GOLD_1
+### GOLD\_1
 
-> `readonly` **GOLD_1**: `object`
+> `readonly` **GOLD\_1**: `object`
 
-#### GOLD_1.name
+#### GOLD\_1.name
 
 > `readonly` **name**: `"Gold"` = `"Gold"`
 
-#### GOLD_1.address
+#### GOLD\_1.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### GOLD_1.decimals
+#### GOLD\_1.decimals
 
 > `readonly` **decimals**: `18` = `18`
 
-#### GOLD_1.symbol
+#### GOLD\_1.symbol
 
 > `readonly` **symbol**: `"gold"` = `"gold"`
 
@@ -2000,23 +2000,23 @@ Defined in: [src/erc20/token/presets.sepolia.ts:11](https://github.com/keep-star
 
 > `readonly` **symbol**: `"good"` = `"good"`
 
-### GOO_1
+### GOO\_1
 
-> `readonly` **GOO_1**: `object`
+> `readonly` **GOO\_1**: `object`
 
-#### GOO_1.name
+#### GOO\_1.name
 
 > `readonly` **name**: `"good"` = `"good"`
 
-#### GOO_1.address
+#### GOO\_1.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### GOO_1.decimals
+#### GOO\_1.decimals
 
 > `readonly` **decimals**: `18` = `18`
 
-#### GOO_1.symbol
+#### GOO\_1.symbol
 
 > `readonly` **symbol**: `"GOO"` = `"GOO"`
 
@@ -2220,23 +2220,23 @@ Defined in: [src/erc20/token/presets.sepolia.ts:11](https://github.com/keep-star
 
 > `readonly` **symbol**: `"HWK2"` = `"HWK2"`
 
-### HEAL_POT
+### HEAL\_POT
 
-> `readonly` **HEAL_POT**: `object`
+> `readonly` **HEAL\_POT**: `object`
 
-#### HEAL_POT.name
+#### HEAL\_POT.name
 
 > `readonly` **name**: `"Healing Potion"` = `"Healing Potion"`
 
-#### HEAL_POT.address
+#### HEAL\_POT.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### HEAL_POT.decimals
+#### HEAL\_POT.decimals
 
 > `readonly` **decimals**: `18` = `18`
 
-#### HEAL_POT.symbol
+#### HEAL\_POT.symbol
 
 > `readonly` **symbol**: `"HEAL_POT"` = `"HEAL_POT"`
 
@@ -2880,63 +2880,63 @@ Defined in: [src/erc20/token/presets.sepolia.ts:11](https://github.com/keep-star
 
 > `readonly` **symbol**: `"lfg"` = `"lfg"`
 
-### LFG_1
+### LFG\_1
 
-> `readonly` **LFG_1**: `object`
+> `readonly` **LFG\_1**: `object`
 
-#### LFG_1.name
+#### LFG\_1.name
 
 > `readonly` **name**: `"lfg"` = `"lfg"`
 
-#### LFG_1.address
+#### LFG\_1.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### LFG_1.decimals
+#### LFG\_1.decimals
 
 > `readonly` **decimals**: `18` = `18`
 
-#### LFG_1.symbol
+#### LFG\_1.symbol
 
 > `readonly` **symbol**: `"lfg"` = `"lfg"`
 
-### LFG_1_CREEATOR_FEE
+### LFG\_1\_CREEATOR\_FEE
 
-> `readonly` **LFG_1_CREEATOR_FEE**: `object`
+> `readonly` **LFG\_1\_CREEATOR\_FEE**: `object`
 
-#### LFG_1_CREEATOR_FEE.name
+#### LFG\_1\_CREEATOR\_FEE.name
 
 > `readonly` **name**: `"lfg 1% creator fee"` = `"lfg 1% creator fee"`
 
-#### LFG_1_CREEATOR_FEE.address
+#### LFG\_1\_CREEATOR\_FEE.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### LFG_1_CREEATOR_FEE.decimals
+#### LFG\_1\_CREEATOR\_FEE.decimals
 
 > `readonly` **decimals**: `18` = `18`
 
-#### LFG_1_CREEATOR_FEE.symbol
+#### LFG\_1\_CREEATOR\_FEE.symbol
 
 > `readonly` **symbol**: `"lfg 1% creeator fee"` = `"lfg 1% creeator fee"`
 
-### LFG_10K
+### LFG\_10K
 
-> `readonly` **LFG_10K**: `object`
+> `readonly` **LFG\_10K**: `object`
 
-#### LFG_10K.name
+#### LFG\_10K.name
 
 > `readonly` **name**: `"lfg10k"` = `"lfg10k"`
 
-#### LFG_10K.address
+#### LFG\_10K.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### LFG_10K.decimals
+#### LFG\_10K.decimals
 
 > `readonly` **decimals**: `18` = `18`
 
-#### LFG_10K.symbol
+#### LFG\_10K.symbol
 
 > `readonly` **symbol**: `"lfg 10k"` = `"lfg 10k"`
 
@@ -3000,23 +3000,23 @@ Defined in: [src/erc20/token/presets.sepolia.ts:11](https://github.com/keep-star
 
 > `readonly` **symbol**: `"ljljla"` = `"ljljla"`
 
-### LJLJLA_1
+### LJLJLA\_1
 
-> `readonly` **LJLJLA_1**: `object`
+> `readonly` **LJLJLA\_1**: `object`
 
-#### LJLJLA_1.name
+#### LJLJLA\_1.name
 
 > `readonly` **name**: `"ljljla"` = `"ljljla"`
 
-#### LJLJLA_1.address
+#### LJLJLA\_1.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### LJLJLA_1.decimals
+#### LJLJLA\_1.decimals
 
 > `readonly` **decimals**: `18` = `18`
 
-#### LJLJLA_1.symbol
+#### LJLJLA\_1.symbol
 
 > `readonly` **symbol**: `"ljljla"` = `"ljljla"`
 
@@ -3420,103 +3420,103 @@ Defined in: [src/erc20/token/presets.sepolia.ts:11](https://github.com/keep-star
 
 > `readonly` **symbol**: `"MUSDC"` = `"MUSDC"`
 
-### MUSDC_1
+### MUSDC\_1
 
-> `readonly` **MUSDC_1**: `object`
+> `readonly` **MUSDC\_1**: `object`
 
-#### MUSDC_1.name
+#### MUSDC\_1.name
 
 > `readonly` **name**: `"Mock USDC"` = `"Mock USDC"`
 
-#### MUSDC_1.address
+#### MUSDC\_1.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### MUSDC_1.decimals
+#### MUSDC\_1.decimals
 
 > `readonly` **decimals**: `6` = `6`
 
-#### MUSDC_1.symbol
+#### MUSDC\_1.symbol
 
 > `readonly` **symbol**: `"MUSDC"` = `"MUSDC"`
 
-### MUSDC_2
+### MUSDC\_2
 
-> `readonly` **MUSDC_2**: `object`
+> `readonly` **MUSDC\_2**: `object`
 
-#### MUSDC_2.name
+#### MUSDC\_2.name
 
 > `readonly` **name**: `"Mock USDC"` = `"Mock USDC"`
 
-#### MUSDC_2.address
+#### MUSDC\_2.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### MUSDC_2.decimals
+#### MUSDC\_2.decimals
 
 > `readonly` **decimals**: `18` = `18`
 
-#### MUSDC_2.symbol
+#### MUSDC\_2.symbol
 
 > `readonly` **symbol**: `"mUSDC"` = `"mUSDC"`
 
-### MUSDC_3
+### MUSDC\_3
 
-> `readonly` **MUSDC_3**: `object`
+> `readonly` **MUSDC\_3**: `object`
 
-#### MUSDC_3.name
+#### MUSDC\_3.name
 
 > `readonly` **name**: `"Mock USDC"` = `"Mock USDC"`
 
-#### MUSDC_3.address
+#### MUSDC\_3.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### MUSDC_3.decimals
+#### MUSDC\_3.decimals
 
 > `readonly` **decimals**: `6` = `6`
 
-#### MUSDC_3.symbol
+#### MUSDC\_3.symbol
 
 > `readonly` **symbol**: `"MUSDC"` = `"MUSDC"`
 
-### MUSDC_4
+### MUSDC\_4
 
-> `readonly` **MUSDC_4**: `object`
+> `readonly` **MUSDC\_4**: `object`
 
-#### MUSDC_4.name
+#### MUSDC\_4.name
 
 > `readonly` **name**: `"Mock USDC"` = `"Mock USDC"`
 
-#### MUSDC_4.address
+#### MUSDC\_4.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### MUSDC_4.decimals
+#### MUSDC\_4.decimals
 
 > `readonly` **decimals**: `18` = `18`
 
-#### MUSDC_4.symbol
+#### MUSDC\_4.symbol
 
 > `readonly` **symbol**: `"MUSDC"` = `"MUSDC"`
 
-### MUSDC_5
+### MUSDC\_5
 
-> `readonly` **MUSDC_5**: `object`
+> `readonly` **MUSDC\_5**: `object`
 
-#### MUSDC_5.name
+#### MUSDC\_5.name
 
 > `readonly` **name**: `"Mock USDC"` = `"Mock USDC"`
 
-#### MUSDC_5.address
+#### MUSDC\_5.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### MUSDC_5.decimals
+#### MUSDC\_5.decimals
 
 > `readonly` **decimals**: `18` = `18`
 
-#### MUSDC_5.symbol
+#### MUSDC\_5.symbol
 
 > `readonly` **symbol**: `"MUSDC"` = `"MUSDC"`
 
@@ -3540,83 +3540,83 @@ Defined in: [src/erc20/token/presets.sepolia.ts:11](https://github.com/keep-star
 
 > `readonly` **symbol**: `"MUSDU"` = `"MUSDU"`
 
-### MUSDU_1
+### MUSDU\_1
 
-> `readonly` **MUSDU_1**: `object`
+> `readonly` **MUSDU\_1**: `object`
 
-#### MUSDU_1.name
+#### MUSDU\_1.name
 
 > `readonly` **name**: `"Mock USDU"` = `"Mock USDU"`
 
-#### MUSDU_1.address
+#### MUSDU\_1.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### MUSDU_1.decimals
+#### MUSDU\_1.decimals
 
 > `readonly` **decimals**: `18` = `18`
 
-#### MUSDU_1.symbol
+#### MUSDU\_1.symbol
 
 > `readonly` **symbol**: `"MUSDU"` = `"MUSDU"`
 
-### MUSDU_2
+### MUSDU\_2
 
-> `readonly` **MUSDU_2**: `object`
+> `readonly` **MUSDU\_2**: `object`
 
-#### MUSDU_2.name
+#### MUSDU\_2.name
 
 > `readonly` **name**: `"Mock USDU"` = `"Mock USDU"`
 
-#### MUSDU_2.address
+#### MUSDU\_2.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### MUSDU_2.decimals
+#### MUSDU\_2.decimals
 
 > `readonly` **decimals**: `18` = `18`
 
-#### MUSDU_2.symbol
+#### MUSDU\_2.symbol
 
 > `readonly` **symbol**: `"MUSDU"` = `"MUSDU"`
 
-### MUSDU_3
+### MUSDU\_3
 
-> `readonly` **MUSDU_3**: `object`
+> `readonly` **MUSDU\_3**: `object`
 
-#### MUSDU_3.name
+#### MUSDU\_3.name
 
 > `readonly` **name**: `"Mock USDU"` = `"Mock USDU"`
 
-#### MUSDU_3.address
+#### MUSDU\_3.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### MUSDU_3.decimals
+#### MUSDU\_3.decimals
 
 > `readonly` **decimals**: `18` = `18`
 
-#### MUSDU_3.symbol
+#### MUSDU\_3.symbol
 
 > `readonly` **symbol**: `"MUSDU"` = `"MUSDU"`
 
-### MUSDU_4
+### MUSDU\_4
 
-> `readonly` **MUSDU_4**: `object`
+> `readonly` **MUSDU\_4**: `object`
 
-#### MUSDU_4.name
+#### MUSDU\_4.name
 
 > `readonly` **name**: `"Mock USDU"` = `"Mock USDU"`
 
-#### MUSDU_4.address
+#### MUSDU\_4.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### MUSDU_4.decimals
+#### MUSDU\_4.decimals
 
 > `readonly` **decimals**: `18` = `18`
 
-#### MUSDU_4.symbol
+#### MUSDU\_4.symbol
 
 > `readonly` **symbol**: `"MUSDU"` = `"MUSDU"`
 
@@ -3640,103 +3640,103 @@ Defined in: [src/erc20/token/presets.sepolia.ts:11](https://github.com/keep-star
 
 > `readonly` **symbol**: `"MWBTC"` = `"MWBTC"`
 
-### MWBTC_1
+### MWBTC\_1
 
-> `readonly` **MWBTC_1**: `object`
+> `readonly` **MWBTC\_1**: `object`
 
-#### MWBTC_1.name
+#### MWBTC\_1.name
 
 > `readonly` **name**: `"MockWBTC"` = `"MockWBTC"`
 
-#### MWBTC_1.address
+#### MWBTC\_1.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### MWBTC_1.decimals
+#### MWBTC\_1.decimals
 
 > `readonly` **decimals**: `8` = `8`
 
-#### MWBTC_1.symbol
+#### MWBTC\_1.symbol
 
 > `readonly` **symbol**: `"MWBTC"` = `"MWBTC"`
 
-### MWBTC_2
+### MWBTC\_2
 
-> `readonly` **MWBTC_2**: `object`
+> `readonly` **MWBTC\_2**: `object`
 
-#### MWBTC_2.name
+#### MWBTC\_2.name
 
 > `readonly` **name**: `"MockWBTC"` = `"MockWBTC"`
 
-#### MWBTC_2.address
+#### MWBTC\_2.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### MWBTC_2.decimals
+#### MWBTC\_2.decimals
 
 > `readonly` **decimals**: `8` = `8`
 
-#### MWBTC_2.symbol
+#### MWBTC\_2.symbol
 
 > `readonly` **symbol**: `"MWBTC"` = `"MWBTC"`
 
-### MWBTC_3
+### MWBTC\_3
 
-> `readonly` **MWBTC_3**: `object`
+> `readonly` **MWBTC\_3**: `object`
 
-#### MWBTC_3.name
+#### MWBTC\_3.name
 
 > `readonly` **name**: `"MockWBTC"` = `"MockWBTC"`
 
-#### MWBTC_3.address
+#### MWBTC\_3.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### MWBTC_3.decimals
+#### MWBTC\_3.decimals
 
 > `readonly` **decimals**: `8` = `8`
 
-#### MWBTC_3.symbol
+#### MWBTC\_3.symbol
 
 > `readonly` **symbol**: `"MWBTC"` = `"MWBTC"`
 
-### MWBTC_4
+### MWBTC\_4
 
-> `readonly` **MWBTC_4**: `object`
+> `readonly` **MWBTC\_4**: `object`
 
-#### MWBTC_4.name
+#### MWBTC\_4.name
 
 > `readonly` **name**: `"MockWBTC"` = `"MockWBTC"`
 
-#### MWBTC_4.address
+#### MWBTC\_4.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### MWBTC_4.decimals
+#### MWBTC\_4.decimals
 
 > `readonly` **decimals**: `8` = `8`
 
-#### MWBTC_4.symbol
+#### MWBTC\_4.symbol
 
 > `readonly` **symbol**: `"MWBTC"` = `"MWBTC"`
 
-### MWBTC_5
+### MWBTC\_5
 
-> `readonly` **MWBTC_5**: `object`
+> `readonly` **MWBTC\_5**: `object`
 
-#### MWBTC_5.name
+#### MWBTC\_5.name
 
 > `readonly` **name**: `"MockWBTC"` = `"MockWBTC"`
 
-#### MWBTC_5.address
+#### MWBTC\_5.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### MWBTC_5.decimals
+#### MWBTC\_5.decimals
 
 > `readonly` **decimals**: `8` = `8`
 
-#### MWBTC_5.symbol
+#### MWBTC\_5.symbol
 
 > `readonly` **symbol**: `"MWBTC"` = `"MWBTC"`
 
@@ -4040,1323 +4040,1323 @@ Defined in: [src/erc20/token/presets.sepolia.ts:11](https://github.com/keep-star
 
 > `readonly` **symbol**: `"NO"` = `"NO"`
 
-### NO_1
+### NO\_1
 
-> `readonly` **NO_1**: `object`
+> `readonly` **NO\_1**: `object`
 
-#### NO_1.name
+#### NO\_1.name
 
 > `readonly` **name**: `"NO_Token"` = `"NO_Token"`
 
-#### NO_1.address
+#### NO\_1.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### NO_1.decimals
+#### NO\_1.decimals
 
 > `readonly` **decimals**: `6` = `6`
 
-#### NO_1.symbol
+#### NO\_1.symbol
 
 > `readonly` **symbol**: `"NO"` = `"NO"`
 
-### NO_2
+### NO\_2
 
-> `readonly` **NO_2**: `object`
+> `readonly` **NO\_2**: `object`
 
-#### NO_2.name
+#### NO\_2.name
 
 > `readonly` **name**: `"NO_Token"` = `"NO_Token"`
 
-#### NO_2.address
+#### NO\_2.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### NO_2.decimals
+#### NO\_2.decimals
 
 > `readonly` **decimals**: `6` = `6`
 
-#### NO_2.symbol
+#### NO\_2.symbol
 
 > `readonly` **symbol**: `"NO"` = `"NO"`
 
-### NO_3
+### NO\_3
 
-> `readonly` **NO_3**: `object`
+> `readonly` **NO\_3**: `object`
 
-#### NO_3.name
+#### NO\_3.name
 
 > `readonly` **name**: `"NO_Token"` = `"NO_Token"`
 
-#### NO_3.address
+#### NO\_3.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### NO_3.decimals
+#### NO\_3.decimals
 
 > `readonly` **decimals**: `6` = `6`
 
-#### NO_3.symbol
+#### NO\_3.symbol
 
 > `readonly` **symbol**: `"NO"` = `"NO"`
 
-### NO_4
+### NO\_4
 
-> `readonly` **NO_4**: `object`
+> `readonly` **NO\_4**: `object`
 
-#### NO_4.name
+#### NO\_4.name
 
 > `readonly` **name**: `"NO_Token"` = `"NO_Token"`
 
-#### NO_4.address
+#### NO\_4.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### NO_4.decimals
+#### NO\_4.decimals
 
 > `readonly` **decimals**: `6` = `6`
 
-#### NO_4.symbol
+#### NO\_4.symbol
 
 > `readonly` **symbol**: `"NO"` = `"NO"`
 
-### NO_5
+### NO\_5
 
-> `readonly` **NO_5**: `object`
+> `readonly` **NO\_5**: `object`
 
-#### NO_5.name
+#### NO\_5.name
 
 > `readonly` **name**: `"NO_Token"` = `"NO_Token"`
 
-#### NO_5.address
+#### NO\_5.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### NO_5.decimals
+#### NO\_5.decimals
 
 > `readonly` **decimals**: `6` = `6`
 
-#### NO_5.symbol
+#### NO\_5.symbol
 
 > `readonly` **symbol**: `"NO"` = `"NO"`
 
-### NO_6
+### NO\_6
 
-> `readonly` **NO_6**: `object`
+> `readonly` **NO\_6**: `object`
 
-#### NO_6.name
+#### NO\_6.name
 
 > `readonly` **name**: `"NO_Token"` = `"NO_Token"`
 
-#### NO_6.address
+#### NO\_6.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### NO_6.decimals
+#### NO\_6.decimals
 
 > `readonly` **decimals**: `6` = `6`
 
-#### NO_6.symbol
+#### NO\_6.symbol
 
 > `readonly` **symbol**: `"NO"` = `"NO"`
 
-### NO_7
+### NO\_7
 
-> `readonly` **NO_7**: `object`
+> `readonly` **NO\_7**: `object`
 
-#### NO_7.name
+#### NO\_7.name
 
 > `readonly` **name**: `"NO_Token"` = `"NO_Token"`
 
-#### NO_7.address
+#### NO\_7.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### NO_7.decimals
+#### NO\_7.decimals
 
 > `readonly` **decimals**: `6` = `6`
 
-#### NO_7.symbol
+#### NO\_7.symbol
 
 > `readonly` **symbol**: `"NO"` = `"NO"`
 
-### NO_8
+### NO\_8
 
-> `readonly` **NO_8**: `object`
+> `readonly` **NO\_8**: `object`
 
-#### NO_8.name
+#### NO\_8.name
 
 > `readonly` **name**: `"NO_Token"` = `"NO_Token"`
 
-#### NO_8.address
+#### NO\_8.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### NO_8.decimals
+#### NO\_8.decimals
 
 > `readonly` **decimals**: `6` = `6`
 
-#### NO_8.symbol
+#### NO\_8.symbol
 
 > `readonly` **symbol**: `"NO"` = `"NO"`
 
-### NO_9
+### NO\_9
 
-> `readonly` **NO_9**: `object`
+> `readonly` **NO\_9**: `object`
 
-#### NO_9.name
+#### NO\_9.name
 
 > `readonly` **name**: `"NO_Token"` = `"NO_Token"`
 
-#### NO_9.address
+#### NO\_9.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### NO_9.decimals
+#### NO\_9.decimals
 
 > `readonly` **decimals**: `6` = `6`
 
-#### NO_9.symbol
+#### NO\_9.symbol
 
 > `readonly` **symbol**: `"NO"` = `"NO"`
 
-### NO_10
+### NO\_10
 
-> `readonly` **NO_10**: `object`
+> `readonly` **NO\_10**: `object`
 
-#### NO_10.name
+#### NO\_10.name
 
 > `readonly` **name**: `"NO_Token"` = `"NO_Token"`
 
-#### NO_10.address
+#### NO\_10.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### NO_10.decimals
+#### NO\_10.decimals
 
 > `readonly` **decimals**: `6` = `6`
 
-#### NO_10.symbol
+#### NO\_10.symbol
 
 > `readonly` **symbol**: `"NO"` = `"NO"`
 
-### NO_11
+### NO\_11
 
-> `readonly` **NO_11**: `object`
+> `readonly` **NO\_11**: `object`
 
-#### NO_11.name
+#### NO\_11.name
 
 > `readonly` **name**: `"NO_Token"` = `"NO_Token"`
 
-#### NO_11.address
+#### NO\_11.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### NO_11.decimals
+#### NO\_11.decimals
 
 > `readonly` **decimals**: `6` = `6`
 
-#### NO_11.symbol
+#### NO\_11.symbol
 
 > `readonly` **symbol**: `"NO"` = `"NO"`
 
-### NO_12
+### NO\_12
 
-> `readonly` **NO_12**: `object`
+> `readonly` **NO\_12**: `object`
 
-#### NO_12.name
+#### NO\_12.name
 
 > `readonly` **name**: `"NO_Token"` = `"NO_Token"`
 
-#### NO_12.address
+#### NO\_12.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### NO_12.decimals
+#### NO\_12.decimals
 
 > `readonly` **decimals**: `6` = `6`
 
-#### NO_12.symbol
+#### NO\_12.symbol
 
 > `readonly` **symbol**: `"NO"` = `"NO"`
 
-### NO_13
+### NO\_13
 
-> `readonly` **NO_13**: `object`
+> `readonly` **NO\_13**: `object`
 
-#### NO_13.name
+#### NO\_13.name
 
 > `readonly` **name**: `"NO_Token"` = `"NO_Token"`
 
-#### NO_13.address
+#### NO\_13.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### NO_13.decimals
+#### NO\_13.decimals
 
 > `readonly` **decimals**: `6` = `6`
 
-#### NO_13.symbol
+#### NO\_13.symbol
 
 > `readonly` **symbol**: `"NO"` = `"NO"`
 
-### NO_14
+### NO\_14
 
-> `readonly` **NO_14**: `object`
+> `readonly` **NO\_14**: `object`
 
-#### NO_14.name
+#### NO\_14.name
 
 > `readonly` **name**: `"NO_Token"` = `"NO_Token"`
 
-#### NO_14.address
+#### NO\_14.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### NO_14.decimals
+#### NO\_14.decimals
 
 > `readonly` **decimals**: `6` = `6`
 
-#### NO_14.symbol
+#### NO\_14.symbol
 
 > `readonly` **symbol**: `"NO"` = `"NO"`
 
-### NO_15
+### NO\_15
 
-> `readonly` **NO_15**: `object`
+> `readonly` **NO\_15**: `object`
 
-#### NO_15.name
+#### NO\_15.name
 
 > `readonly` **name**: `"NO_Token"` = `"NO_Token"`
 
-#### NO_15.address
+#### NO\_15.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### NO_15.decimals
+#### NO\_15.decimals
 
 > `readonly` **decimals**: `6` = `6`
 
-#### NO_15.symbol
+#### NO\_15.symbol
 
 > `readonly` **symbol**: `"NO"` = `"NO"`
 
-### NO_16
+### NO\_16
 
-> `readonly` **NO_16**: `object`
+> `readonly` **NO\_16**: `object`
 
-#### NO_16.name
+#### NO\_16.name
 
 > `readonly` **name**: `"NO_Token"` = `"NO_Token"`
 
-#### NO_16.address
+#### NO\_16.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### NO_16.decimals
+#### NO\_16.decimals
 
 > `readonly` **decimals**: `6` = `6`
 
-#### NO_16.symbol
+#### NO\_16.symbol
 
 > `readonly` **symbol**: `"NO"` = `"NO"`
 
-### NO_17
+### NO\_17
 
-> `readonly` **NO_17**: `object`
+> `readonly` **NO\_17**: `object`
 
-#### NO_17.name
+#### NO\_17.name
 
 > `readonly` **name**: `"NO_Token"` = `"NO_Token"`
 
-#### NO_17.address
+#### NO\_17.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### NO_17.decimals
+#### NO\_17.decimals
 
 > `readonly` **decimals**: `6` = `6`
 
-#### NO_17.symbol
+#### NO\_17.symbol
 
 > `readonly` **symbol**: `"NO"` = `"NO"`
 
-### NO_18
+### NO\_18
 
-> `readonly` **NO_18**: `object`
+> `readonly` **NO\_18**: `object`
 
-#### NO_18.name
+#### NO\_18.name
 
 > `readonly` **name**: `"NO_Token"` = `"NO_Token"`
 
-#### NO_18.address
+#### NO\_18.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### NO_18.decimals
+#### NO\_18.decimals
 
 > `readonly` **decimals**: `6` = `6`
 
-#### NO_18.symbol
+#### NO\_18.symbol
 
 > `readonly` **symbol**: `"NO"` = `"NO"`
 
-### NO_19
+### NO\_19
 
-> `readonly` **NO_19**: `object`
+> `readonly` **NO\_19**: `object`
 
-#### NO_19.name
+#### NO\_19.name
 
 > `readonly` **name**: `"NO_Token"` = `"NO_Token"`
 
-#### NO_19.address
+#### NO\_19.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### NO_19.decimals
+#### NO\_19.decimals
 
 > `readonly` **decimals**: `6` = `6`
 
-#### NO_19.symbol
+#### NO\_19.symbol
 
 > `readonly` **symbol**: `"NO"` = `"NO"`
 
-### NO_20
+### NO\_20
 
-> `readonly` **NO_20**: `object`
+> `readonly` **NO\_20**: `object`
 
-#### NO_20.name
+#### NO\_20.name
 
 > `readonly` **name**: `"NO_Token"` = `"NO_Token"`
 
-#### NO_20.address
+#### NO\_20.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### NO_20.decimals
+#### NO\_20.decimals
 
 > `readonly` **decimals**: `6` = `6`
 
-#### NO_20.symbol
+#### NO\_20.symbol
 
 > `readonly` **symbol**: `"NO"` = `"NO"`
 
-### NO_21
+### NO\_21
 
-> `readonly` **NO_21**: `object`
+> `readonly` **NO\_21**: `object`
 
-#### NO_21.name
+#### NO\_21.name
 
 > `readonly` **name**: `"NO_Token"` = `"NO_Token"`
 
-#### NO_21.address
+#### NO\_21.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### NO_21.decimals
+#### NO\_21.decimals
 
 > `readonly` **decimals**: `6` = `6`
 
-#### NO_21.symbol
+#### NO\_21.symbol
 
 > `readonly` **symbol**: `"NO"` = `"NO"`
 
-### NO_22
+### NO\_22
 
-> `readonly` **NO_22**: `object`
+> `readonly` **NO\_22**: `object`
 
-#### NO_22.name
+#### NO\_22.name
 
 > `readonly` **name**: `"NO_Token"` = `"NO_Token"`
 
-#### NO_22.address
+#### NO\_22.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### NO_22.decimals
+#### NO\_22.decimals
 
 > `readonly` **decimals**: `6` = `6`
 
-#### NO_22.symbol
+#### NO\_22.symbol
 
 > `readonly` **symbol**: `"NO"` = `"NO"`
 
-### NO_23
+### NO\_23
 
-> `readonly` **NO_23**: `object`
+> `readonly` **NO\_23**: `object`
 
-#### NO_23.name
+#### NO\_23.name
 
 > `readonly` **name**: `"NO_Token"` = `"NO_Token"`
 
-#### NO_23.address
+#### NO\_23.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### NO_23.decimals
+#### NO\_23.decimals
 
 > `readonly` **decimals**: `6` = `6`
 
-#### NO_23.symbol
+#### NO\_23.symbol
 
 > `readonly` **symbol**: `"NO"` = `"NO"`
 
-### NO_24
+### NO\_24
 
-> `readonly` **NO_24**: `object`
+> `readonly` **NO\_24**: `object`
 
-#### NO_24.name
+#### NO\_24.name
 
 > `readonly` **name**: `"NO_Token"` = `"NO_Token"`
 
-#### NO_24.address
+#### NO\_24.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### NO_24.decimals
+#### NO\_24.decimals
 
 > `readonly` **decimals**: `6` = `6`
 
-#### NO_24.symbol
+#### NO\_24.symbol
 
 > `readonly` **symbol**: `"NO"` = `"NO"`
 
-### NO_25
+### NO\_25
 
-> `readonly` **NO_25**: `object`
+> `readonly` **NO\_25**: `object`
 
-#### NO_25.name
+#### NO\_25.name
 
 > `readonly` **name**: `"NO_Token"` = `"NO_Token"`
 
-#### NO_25.address
+#### NO\_25.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### NO_25.decimals
+#### NO\_25.decimals
 
 > `readonly` **decimals**: `6` = `6`
 
-#### NO_25.symbol
+#### NO\_25.symbol
 
 > `readonly` **symbol**: `"NO"` = `"NO"`
 
-### NO_26
+### NO\_26
 
-> `readonly` **NO_26**: `object`
+> `readonly` **NO\_26**: `object`
 
-#### NO_26.name
+#### NO\_26.name
 
 > `readonly` **name**: `"NO_Token"` = `"NO_Token"`
 
-#### NO_26.address
+#### NO\_26.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### NO_26.decimals
+#### NO\_26.decimals
 
 > `readonly` **decimals**: `6` = `6`
 
-#### NO_26.symbol
+#### NO\_26.symbol
 
 > `readonly` **symbol**: `"NO"` = `"NO"`
 
-### NO_27
+### NO\_27
 
-> `readonly` **NO_27**: `object`
+> `readonly` **NO\_27**: `object`
 
-#### NO_27.name
+#### NO\_27.name
 
 > `readonly` **name**: `"NO_Token"` = `"NO_Token"`
 
-#### NO_27.address
+#### NO\_27.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### NO_27.decimals
+#### NO\_27.decimals
 
 > `readonly` **decimals**: `6` = `6`
 
-#### NO_27.symbol
+#### NO\_27.symbol
 
 > `readonly` **symbol**: `"NO"` = `"NO"`
 
-### NO_28
+### NO\_28
 
-> `readonly` **NO_28**: `object`
+> `readonly` **NO\_28**: `object`
 
-#### NO_28.name
+#### NO\_28.name
 
 > `readonly` **name**: `"NO_Token"` = `"NO_Token"`
 
-#### NO_28.address
+#### NO\_28.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### NO_28.decimals
+#### NO\_28.decimals
 
 > `readonly` **decimals**: `6` = `6`
 
-#### NO_28.symbol
+#### NO\_28.symbol
 
 > `readonly` **symbol**: `"NO"` = `"NO"`
 
-### NO_29
+### NO\_29
 
-> `readonly` **NO_29**: `object`
+> `readonly` **NO\_29**: `object`
 
-#### NO_29.name
+#### NO\_29.name
 
 > `readonly` **name**: `"NO_Token"` = `"NO_Token"`
 
-#### NO_29.address
+#### NO\_29.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### NO_29.decimals
+#### NO\_29.decimals
 
 > `readonly` **decimals**: `6` = `6`
 
-#### NO_29.symbol
+#### NO\_29.symbol
 
 > `readonly` **symbol**: `"NO"` = `"NO"`
 
-### NO_30
+### NO\_30
 
-> `readonly` **NO_30**: `object`
+> `readonly` **NO\_30**: `object`
 
-#### NO_30.name
+#### NO\_30.name
 
 > `readonly` **name**: `"NO_Token"` = `"NO_Token"`
 
-#### NO_30.address
+#### NO\_30.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### NO_30.decimals
+#### NO\_30.decimals
 
 > `readonly` **decimals**: `6` = `6`
 
-#### NO_30.symbol
+#### NO\_30.symbol
 
 > `readonly` **symbol**: `"NO"` = `"NO"`
 
-### NO_31
+### NO\_31
 
-> `readonly` **NO_31**: `object`
+> `readonly` **NO\_31**: `object`
 
-#### NO_31.name
+#### NO\_31.name
 
 > `readonly` **name**: `"NO_Token"` = `"NO_Token"`
 
-#### NO_31.address
+#### NO\_31.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### NO_31.decimals
+#### NO\_31.decimals
 
 > `readonly` **decimals**: `6` = `6`
 
-#### NO_31.symbol
+#### NO\_31.symbol
 
 > `readonly` **symbol**: `"NO"` = `"NO"`
 
-### NO_32
+### NO\_32
 
-> `readonly` **NO_32**: `object`
+> `readonly` **NO\_32**: `object`
 
-#### NO_32.name
+#### NO\_32.name
 
 > `readonly` **name**: `"NO_Token"` = `"NO_Token"`
 
-#### NO_32.address
+#### NO\_32.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### NO_32.decimals
+#### NO\_32.decimals
 
 > `readonly` **decimals**: `6` = `6`
 
-#### NO_32.symbol
+#### NO\_32.symbol
 
 > `readonly` **symbol**: `"NO"` = `"NO"`
 
-### NO_33
+### NO\_33
 
-> `readonly` **NO_33**: `object`
+> `readonly` **NO\_33**: `object`
 
-#### NO_33.name
+#### NO\_33.name
 
 > `readonly` **name**: `"NO_Token"` = `"NO_Token"`
 
-#### NO_33.address
+#### NO\_33.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### NO_33.decimals
+#### NO\_33.decimals
 
 > `readonly` **decimals**: `6` = `6`
 
-#### NO_33.symbol
+#### NO\_33.symbol
 
 > `readonly` **symbol**: `"NO"` = `"NO"`
 
-### NO_34
+### NO\_34
 
-> `readonly` **NO_34**: `object`
+> `readonly` **NO\_34**: `object`
 
-#### NO_34.name
+#### NO\_34.name
 
 > `readonly` **name**: `"NO_Token"` = `"NO_Token"`
 
-#### NO_34.address
+#### NO\_34.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### NO_34.decimals
+#### NO\_34.decimals
 
 > `readonly` **decimals**: `6` = `6`
 
-#### NO_34.symbol
+#### NO\_34.symbol
 
 > `readonly` **symbol**: `"NO"` = `"NO"`
 
-### NO_35
+### NO\_35
 
-> `readonly` **NO_35**: `object`
+> `readonly` **NO\_35**: `object`
 
-#### NO_35.name
+#### NO\_35.name
 
 > `readonly` **name**: `"NO_Token"` = `"NO_Token"`
 
-#### NO_35.address
+#### NO\_35.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### NO_35.decimals
+#### NO\_35.decimals
 
 > `readonly` **decimals**: `6` = `6`
 
-#### NO_35.symbol
+#### NO\_35.symbol
 
 > `readonly` **symbol**: `"NO"` = `"NO"`
 
-### NO_36
+### NO\_36
 
-> `readonly` **NO_36**: `object`
+> `readonly` **NO\_36**: `object`
 
-#### NO_36.name
+#### NO\_36.name
 
 > `readonly` **name**: `"NO_Token"` = `"NO_Token"`
 
-#### NO_36.address
+#### NO\_36.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### NO_36.decimals
+#### NO\_36.decimals
 
 > `readonly` **decimals**: `6` = `6`
 
-#### NO_36.symbol
+#### NO\_36.symbol
 
 > `readonly` **symbol**: `"NO"` = `"NO"`
 
-### NO_37
+### NO\_37
 
-> `readonly` **NO_37**: `object`
+> `readonly` **NO\_37**: `object`
 
-#### NO_37.name
+#### NO\_37.name
 
 > `readonly` **name**: `"NO_Token"` = `"NO_Token"`
 
-#### NO_37.address
+#### NO\_37.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### NO_37.decimals
+#### NO\_37.decimals
 
 > `readonly` **decimals**: `6` = `6`
 
-#### NO_37.symbol
+#### NO\_37.symbol
 
 > `readonly` **symbol**: `"NO"` = `"NO"`
 
-### NO_38
+### NO\_38
 
-> `readonly` **NO_38**: `object`
+> `readonly` **NO\_38**: `object`
 
-#### NO_38.name
+#### NO\_38.name
 
 > `readonly` **name**: `"NO_Token"` = `"NO_Token"`
 
-#### NO_38.address
+#### NO\_38.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### NO_38.decimals
+#### NO\_38.decimals
 
 > `readonly` **decimals**: `6` = `6`
 
-#### NO_38.symbol
+#### NO\_38.symbol
 
 > `readonly` **symbol**: `"NO"` = `"NO"`
 
-### NO_39
+### NO\_39
 
-> `readonly` **NO_39**: `object`
+> `readonly` **NO\_39**: `object`
 
-#### NO_39.name
+#### NO\_39.name
 
 > `readonly` **name**: `"NO_Token"` = `"NO_Token"`
 
-#### NO_39.address
+#### NO\_39.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### NO_39.decimals
+#### NO\_39.decimals
 
 > `readonly` **decimals**: `6` = `6`
 
-#### NO_39.symbol
+#### NO\_39.symbol
 
 > `readonly` **symbol**: `"NO"` = `"NO"`
 
-### NO_40
+### NO\_40
 
-> `readonly` **NO_40**: `object`
+> `readonly` **NO\_40**: `object`
 
-#### NO_40.name
+#### NO\_40.name
 
 > `readonly` **name**: `"NO_Token"` = `"NO_Token"`
 
-#### NO_40.address
+#### NO\_40.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### NO_40.decimals
+#### NO\_40.decimals
 
 > `readonly` **decimals**: `6` = `6`
 
-#### NO_40.symbol
+#### NO\_40.symbol
 
 > `readonly` **symbol**: `"NO"` = `"NO"`
 
-### NO_41
+### NO\_41
 
-> `readonly` **NO_41**: `object`
+> `readonly` **NO\_41**: `object`
 
-#### NO_41.name
+#### NO\_41.name
 
 > `readonly` **name**: `"NO_Token"` = `"NO_Token"`
 
-#### NO_41.address
+#### NO\_41.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### NO_41.decimals
+#### NO\_41.decimals
 
 > `readonly` **decimals**: `6` = `6`
 
-#### NO_41.symbol
+#### NO\_41.symbol
 
 > `readonly` **symbol**: `"NO"` = `"NO"`
 
-### NO_42
+### NO\_42
 
-> `readonly` **NO_42**: `object`
+> `readonly` **NO\_42**: `object`
 
-#### NO_42.name
+#### NO\_42.name
 
 > `readonly` **name**: `"NO_Token"` = `"NO_Token"`
 
-#### NO_42.address
+#### NO\_42.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### NO_42.decimals
+#### NO\_42.decimals
 
 > `readonly` **decimals**: `6` = `6`
 
-#### NO_42.symbol
+#### NO\_42.symbol
 
 > `readonly` **symbol**: `"NO"` = `"NO"`
 
-### NO_43
+### NO\_43
 
-> `readonly` **NO_43**: `object`
+> `readonly` **NO\_43**: `object`
 
-#### NO_43.name
+#### NO\_43.name
 
 > `readonly` **name**: `"NO_Token"` = `"NO_Token"`
 
-#### NO_43.address
+#### NO\_43.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### NO_43.decimals
+#### NO\_43.decimals
 
 > `readonly` **decimals**: `6` = `6`
 
-#### NO_43.symbol
+#### NO\_43.symbol
 
 > `readonly` **symbol**: `"NO"` = `"NO"`
 
-### NO_44
+### NO\_44
 
-> `readonly` **NO_44**: `object`
+> `readonly` **NO\_44**: `object`
 
-#### NO_44.name
+#### NO\_44.name
 
 > `readonly` **name**: `"NO_Token"` = `"NO_Token"`
 
-#### NO_44.address
+#### NO\_44.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### NO_44.decimals
+#### NO\_44.decimals
 
 > `readonly` **decimals**: `6` = `6`
 
-#### NO_44.symbol
+#### NO\_44.symbol
 
 > `readonly` **symbol**: `"NO"` = `"NO"`
 
-### NO_45
+### NO\_45
 
-> `readonly` **NO_45**: `object`
+> `readonly` **NO\_45**: `object`
 
-#### NO_45.name
+#### NO\_45.name
 
 > `readonly` **name**: `"NO_Token"` = `"NO_Token"`
 
-#### NO_45.address
+#### NO\_45.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### NO_45.decimals
+#### NO\_45.decimals
 
 > `readonly` **decimals**: `6` = `6`
 
-#### NO_45.symbol
+#### NO\_45.symbol
 
 > `readonly` **symbol**: `"NO"` = `"NO"`
 
-### NO_46
+### NO\_46
 
-> `readonly` **NO_46**: `object`
+> `readonly` **NO\_46**: `object`
 
-#### NO_46.name
+#### NO\_46.name
 
 > `readonly` **name**: `"NO_Token"` = `"NO_Token"`
 
-#### NO_46.address
+#### NO\_46.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### NO_46.decimals
+#### NO\_46.decimals
 
 > `readonly` **decimals**: `6` = `6`
 
-#### NO_46.symbol
+#### NO\_46.symbol
 
 > `readonly` **symbol**: `"NO"` = `"NO"`
 
-### NO_47
+### NO\_47
 
-> `readonly` **NO_47**: `object`
+> `readonly` **NO\_47**: `object`
 
-#### NO_47.name
+#### NO\_47.name
 
 > `readonly` **name**: `"NO_Token"` = `"NO_Token"`
 
-#### NO_47.address
+#### NO\_47.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### NO_47.decimals
+#### NO\_47.decimals
 
 > `readonly` **decimals**: `6` = `6`
 
-#### NO_47.symbol
+#### NO\_47.symbol
 
 > `readonly` **symbol**: `"NO"` = `"NO"`
 
-### NO_48
+### NO\_48
 
-> `readonly` **NO_48**: `object`
+> `readonly` **NO\_48**: `object`
 
-#### NO_48.name
+#### NO\_48.name
 
 > `readonly` **name**: `"NO_Token"` = `"NO_Token"`
 
-#### NO_48.address
+#### NO\_48.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### NO_48.decimals
+#### NO\_48.decimals
 
 > `readonly` **decimals**: `6` = `6`
 
-#### NO_48.symbol
+#### NO\_48.symbol
 
 > `readonly` **symbol**: `"NO"` = `"NO"`
 
-### NO_49
+### NO\_49
 
-> `readonly` **NO_49**: `object`
+> `readonly` **NO\_49**: `object`
 
-#### NO_49.name
+#### NO\_49.name
 
 > `readonly` **name**: `"NO_Token"` = `"NO_Token"`
 
-#### NO_49.address
+#### NO\_49.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### NO_49.decimals
+#### NO\_49.decimals
 
 > `readonly` **decimals**: `6` = `6`
 
-#### NO_49.symbol
+#### NO\_49.symbol
 
 > `readonly` **symbol**: `"NO"` = `"NO"`
 
-### NO_50
+### NO\_50
 
-> `readonly` **NO_50**: `object`
+> `readonly` **NO\_50**: `object`
 
-#### NO_50.name
+#### NO\_50.name
 
 > `readonly` **name**: `"NO_Token"` = `"NO_Token"`
 
-#### NO_50.address
+#### NO\_50.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### NO_50.decimals
+#### NO\_50.decimals
 
 > `readonly` **decimals**: `6` = `6`
 
-#### NO_50.symbol
+#### NO\_50.symbol
 
 > `readonly` **symbol**: `"NO"` = `"NO"`
 
-### NO_51
+### NO\_51
 
-> `readonly` **NO_51**: `object`
+> `readonly` **NO\_51**: `object`
 
-#### NO_51.name
+#### NO\_51.name
 
 > `readonly` **name**: `"NO_Token"` = `"NO_Token"`
 
-#### NO_51.address
+#### NO\_51.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### NO_51.decimals
+#### NO\_51.decimals
 
 > `readonly` **decimals**: `6` = `6`
 
-#### NO_51.symbol
+#### NO\_51.symbol
 
 > `readonly` **symbol**: `"NO"` = `"NO"`
 
-### NO_52
+### NO\_52
 
-> `readonly` **NO_52**: `object`
+> `readonly` **NO\_52**: `object`
 
-#### NO_52.name
+#### NO\_52.name
 
 > `readonly` **name**: `"NO_Token"` = `"NO_Token"`
 
-#### NO_52.address
+#### NO\_52.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### NO_52.decimals
+#### NO\_52.decimals
 
 > `readonly` **decimals**: `6` = `6`
 
-#### NO_52.symbol
+#### NO\_52.symbol
 
 > `readonly` **symbol**: `"NO"` = `"NO"`
 
-### NO_53
+### NO\_53
 
-> `readonly` **NO_53**: `object`
+> `readonly` **NO\_53**: `object`
 
-#### NO_53.name
+#### NO\_53.name
 
 > `readonly` **name**: `"NO_Token"` = `"NO_Token"`
 
-#### NO_53.address
+#### NO\_53.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### NO_53.decimals
+#### NO\_53.decimals
 
 > `readonly` **decimals**: `6` = `6`
 
-#### NO_53.symbol
+#### NO\_53.symbol
 
 > `readonly` **symbol**: `"NO"` = `"NO"`
 
-### NO_54
+### NO\_54
 
-> `readonly` **NO_54**: `object`
+> `readonly` **NO\_54**: `object`
 
-#### NO_54.name
+#### NO\_54.name
 
 > `readonly` **name**: `"NO_Token"` = `"NO_Token"`
 
-#### NO_54.address
+#### NO\_54.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### NO_54.decimals
+#### NO\_54.decimals
 
 > `readonly` **decimals**: `6` = `6`
 
-#### NO_54.symbol
+#### NO\_54.symbol
 
 > `readonly` **symbol**: `"NO"` = `"NO"`
 
-### NO_55
+### NO\_55
 
-> `readonly` **NO_55**: `object`
+> `readonly` **NO\_55**: `object`
 
-#### NO_55.name
+#### NO\_55.name
 
 > `readonly` **name**: `"NO_Token"` = `"NO_Token"`
 
-#### NO_55.address
+#### NO\_55.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### NO_55.decimals
+#### NO\_55.decimals
 
 > `readonly` **decimals**: `6` = `6`
 
-#### NO_55.symbol
+#### NO\_55.symbol
 
 > `readonly` **symbol**: `"NO"` = `"NO"`
 
-### NO_56
+### NO\_56
 
-> `readonly` **NO_56**: `object`
+> `readonly` **NO\_56**: `object`
 
-#### NO_56.name
+#### NO\_56.name
 
 > `readonly` **name**: `"NO_Token"` = `"NO_Token"`
 
-#### NO_56.address
+#### NO\_56.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### NO_56.decimals
+#### NO\_56.decimals
 
 > `readonly` **decimals**: `6` = `6`
 
-#### NO_56.symbol
+#### NO\_56.symbol
 
 > `readonly` **symbol**: `"NO"` = `"NO"`
 
-### NO_57
+### NO\_57
 
-> `readonly` **NO_57**: `object`
+> `readonly` **NO\_57**: `object`
 
-#### NO_57.name
+#### NO\_57.name
 
 > `readonly` **name**: `"NO_Token"` = `"NO_Token"`
 
-#### NO_57.address
+#### NO\_57.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### NO_57.decimals
+#### NO\_57.decimals
 
 > `readonly` **decimals**: `6` = `6`
 
-#### NO_57.symbol
+#### NO\_57.symbol
 
 > `readonly` **symbol**: `"NO"` = `"NO"`
 
-### NO_58
+### NO\_58
 
-> `readonly` **NO_58**: `object`
+> `readonly` **NO\_58**: `object`
 
-#### NO_58.name
+#### NO\_58.name
 
 > `readonly` **name**: `"NO_Token"` = `"NO_Token"`
 
-#### NO_58.address
+#### NO\_58.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### NO_58.decimals
+#### NO\_58.decimals
 
 > `readonly` **decimals**: `6` = `6`
 
-#### NO_58.symbol
+#### NO\_58.symbol
 
 > `readonly` **symbol**: `"NO"` = `"NO"`
 
-### NO_59
+### NO\_59
 
-> `readonly` **NO_59**: `object`
+> `readonly` **NO\_59**: `object`
 
-#### NO_59.name
+#### NO\_59.name
 
 > `readonly` **name**: `"NO_Token"` = `"NO_Token"`
 
-#### NO_59.address
+#### NO\_59.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### NO_59.decimals
+#### NO\_59.decimals
 
 > `readonly` **decimals**: `6` = `6`
 
-#### NO_59.symbol
+#### NO\_59.symbol
 
 > `readonly` **symbol**: `"NO"` = `"NO"`
 
-### NO_60
+### NO\_60
 
-> `readonly` **NO_60**: `object`
+> `readonly` **NO\_60**: `object`
 
-#### NO_60.name
+#### NO\_60.name
 
 > `readonly` **name**: `"NO_Token"` = `"NO_Token"`
 
-#### NO_60.address
+#### NO\_60.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### NO_60.decimals
+#### NO\_60.decimals
 
 > `readonly` **decimals**: `6` = `6`
 
-#### NO_60.symbol
+#### NO\_60.symbol
 
 > `readonly` **symbol**: `"NO"` = `"NO"`
 
-### NO_61
+### NO\_61
 
-> `readonly` **NO_61**: `object`
+> `readonly` **NO\_61**: `object`
 
-#### NO_61.name
+#### NO\_61.name
 
 > `readonly` **name**: `"NO_Token"` = `"NO_Token"`
 
-#### NO_61.address
+#### NO\_61.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### NO_61.decimals
+#### NO\_61.decimals
 
 > `readonly` **decimals**: `6` = `6`
 
-#### NO_61.symbol
+#### NO\_61.symbol
 
 > `readonly` **symbol**: `"NO"` = `"NO"`
 
-### NO_62
+### NO\_62
 
-> `readonly` **NO_62**: `object`
+> `readonly` **NO\_62**: `object`
 
-#### NO_62.name
+#### NO\_62.name
 
 > `readonly` **name**: `"NO_Token"` = `"NO_Token"`
 
-#### NO_62.address
+#### NO\_62.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### NO_62.decimals
+#### NO\_62.decimals
 
 > `readonly` **decimals**: `6` = `6`
 
-#### NO_62.symbol
+#### NO\_62.symbol
 
 > `readonly` **symbol**: `"NO"` = `"NO"`
 
-### NO_63
+### NO\_63
 
-> `readonly` **NO_63**: `object`
+> `readonly` **NO\_63**: `object`
 
-#### NO_63.name
+#### NO\_63.name
 
 > `readonly` **name**: `"NO_Token"` = `"NO_Token"`
 
-#### NO_63.address
+#### NO\_63.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### NO_63.decimals
+#### NO\_63.decimals
 
 > `readonly` **decimals**: `6` = `6`
 
-#### NO_63.symbol
+#### NO\_63.symbol
 
 > `readonly` **symbol**: `"NO"` = `"NO"`
 
-### NO_64
+### NO\_64
 
-> `readonly` **NO_64**: `object`
+> `readonly` **NO\_64**: `object`
 
-#### NO_64.name
+#### NO\_64.name
 
 > `readonly` **name**: `"NO_Token"` = `"NO_Token"`
 
-#### NO_64.address
+#### NO\_64.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### NO_64.decimals
+#### NO\_64.decimals
 
 > `readonly` **decimals**: `6` = `6`
 
-#### NO_64.symbol
+#### NO\_64.symbol
 
 > `readonly` **symbol**: `"NO"` = `"NO"`
 
-### NO_65
+### NO\_65
 
-> `readonly` **NO_65**: `object`
+> `readonly` **NO\_65**: `object`
 
-#### NO_65.name
+#### NO\_65.name
 
 > `readonly` **name**: `"NO_Token"` = `"NO_Token"`
 
-#### NO_65.address
+#### NO\_65.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### NO_65.decimals
+#### NO\_65.decimals
 
 > `readonly` **decimals**: `6` = `6`
 
-#### NO_65.symbol
+#### NO\_65.symbol
 
 > `readonly` **symbol**: `"NO"` = `"NO"`
 
-### NO_66
+### NO\_66
 
-> `readonly` **NO_66**: `object`
+> `readonly` **NO\_66**: `object`
 
-#### NO_66.name
+#### NO\_66.name
 
 > `readonly` **name**: `"NO_Token"` = `"NO_Token"`
 
-#### NO_66.address
+#### NO\_66.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### NO_66.decimals
+#### NO\_66.decimals
 
 > `readonly` **decimals**: `6` = `6`
 
-#### NO_66.symbol
+#### NO\_66.symbol
 
 > `readonly` **symbol**: `"NO"` = `"NO"`
 
@@ -5480,43 +5480,43 @@ Defined in: [src/erc20/token/presets.sepolia.ts:11](https://github.com/keep-star
 
 > `readonly` **symbol**: `"okok"` = `"okok"`
 
-### OKOK_1
+### OKOK\_1
 
-> `readonly` **OKOK_1**: `object`
+> `readonly` **OKOK\_1**: `object`
 
-#### OKOK_1.name
+#### OKOK\_1.name
 
 > `readonly` **name**: `"okok"` = `"okok"`
 
-#### OKOK_1.address
+#### OKOK\_1.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### OKOK_1.decimals
+#### OKOK\_1.decimals
 
 > `readonly` **decimals**: `18` = `18`
 
-#### OKOK_1.symbol
+#### OKOK\_1.symbol
 
 > `readonly` **symbol**: `"okok"` = `"okok"`
 
-### OP_CAT
+### OP\_CAT
 
-> `readonly` **OP_CAT**: `object`
+> `readonly` **OP\_CAT**: `object`
 
-#### OP_CAT.name
+#### OP\_CAT.name
 
 > `readonly` **name**: `"OP_CAT"` = `"OP_CAT"`
 
-#### OP_CAT.address
+#### OP\_CAT.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### OP_CAT.decimals
+#### OP\_CAT.decimals
 
 > `readonly` **decimals**: `18` = `18`
 
-#### OP_CAT.symbol
+#### OP\_CAT.symbol
 
 > `readonly` **symbol**: `"OP_CAT"` = `"OP_CAT"`
 
@@ -5660,23 +5660,23 @@ Defined in: [src/erc20/token/presets.sepolia.ts:11](https://github.com/keep-star
 
 > `readonly` **symbol**: `"PINE"` = `"PINE"`
 
-### PLZ_HELP
+### PLZ\_HELP
 
-> `readonly` **PLZ_HELP**: `object`
+> `readonly` **PLZ\_HELP**: `object`
 
-#### PLZ_HELP.name
+#### PLZ\_HELP.name
 
 > `readonly` **name**: `"plz help"` = `"plz help"`
 
-#### PLZ_HELP.address
+#### PLZ\_HELP.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### PLZ_HELP.decimals
+#### PLZ\_HELP.decimals
 
 > `readonly` **decimals**: `18` = `18`
 
-#### PLZ_HELP.symbol
+#### PLZ\_HELP.symbol
 
 > `readonly` **symbol**: `"plz help"` = `"plz help"`
 
@@ -5740,223 +5740,223 @@ Defined in: [src/erc20/token/presets.sepolia.ts:11](https://github.com/keep-star
 
 > `readonly` **symbol**: `"pltBROTHER"` = `"pltBROTHER"`
 
-### PLTBROTHER_1
+### PLTBROTHER\_1
 
-> `readonly` **PLTBROTHER_1**: `object`
+> `readonly` **PLTBROTHER\_1**: `object`
 
-#### PLTBROTHER_1.name
+#### PLTBROTHER\_1.name
 
 > `readonly` **name**: `"Ponziland Test BROTHER"` = `"Ponziland Test BROTHER"`
 
-#### PLTBROTHER_1.address
+#### PLTBROTHER\_1.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### PLTBROTHER_1.decimals
+#### PLTBROTHER\_1.decimals
 
 > `readonly` **decimals**: `18` = `18`
 
-#### PLTBROTHER_1.symbol
+#### PLTBROTHER\_1.symbol
 
 > `readonly` **symbol**: `"pltBROTHER"` = `"pltBROTHER"`
 
-### PLTBROTHER_2
+### PLTBROTHER\_2
 
-> `readonly` **PLTBROTHER_2**: `object`
+> `readonly` **PLTBROTHER\_2**: `object`
 
-#### PLTBROTHER_2.name
+#### PLTBROTHER\_2.name
 
 > `readonly` **name**: `"Ponziland Test BROTHER"` = `"Ponziland Test BROTHER"`
 
-#### PLTBROTHER_2.address
+#### PLTBROTHER\_2.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### PLTBROTHER_2.decimals
+#### PLTBROTHER\_2.decimals
 
 > `readonly` **decimals**: `18` = `18`
 
-#### PLTBROTHER_2.symbol
+#### PLTBROTHER\_2.symbol
 
 > `readonly` **symbol**: `"pltBROTHER"` = `"pltBROTHER"`
 
-### PLTBROTHER_3
+### PLTBROTHER\_3
 
-> `readonly` **PLTBROTHER_3**: `object`
+> `readonly` **PLTBROTHER\_3**: `object`
 
-#### PLTBROTHER_3.name
+#### PLTBROTHER\_3.name
 
 > `readonly` **name**: `"Ponziland Test BROTHER"` = `"Ponziland Test BROTHER"`
 
-#### PLTBROTHER_3.address
+#### PLTBROTHER\_3.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### PLTBROTHER_3.decimals
+#### PLTBROTHER\_3.decimals
 
 > `readonly` **decimals**: `18` = `18`
 
-#### PLTBROTHER_3.symbol
+#### PLTBROTHER\_3.symbol
 
 > `readonly` **symbol**: `"pltBROTHER"` = `"pltBROTHER"`
 
-### PLTBROTHER_4
+### PLTBROTHER\_4
 
-> `readonly` **PLTBROTHER_4**: `object`
+> `readonly` **PLTBROTHER\_4**: `object`
 
-#### PLTBROTHER_4.name
+#### PLTBROTHER\_4.name
 
 > `readonly` **name**: `"Ponziland Test BROTHER"` = `"Ponziland Test BROTHER"`
 
-#### PLTBROTHER_4.address
+#### PLTBROTHER\_4.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### PLTBROTHER_4.decimals
+#### PLTBROTHER\_4.decimals
 
 > `readonly` **decimals**: `18` = `18`
 
-#### PLTBROTHER_4.symbol
+#### PLTBROTHER\_4.symbol
 
 > `readonly` **symbol**: `"pltBROTHER"` = `"pltBROTHER"`
 
-### PLTBROTHER_5
+### PLTBROTHER\_5
 
-> `readonly` **PLTBROTHER_5**: `object`
+> `readonly` **PLTBROTHER\_5**: `object`
 
-#### PLTBROTHER_5.name
+#### PLTBROTHER\_5.name
 
 > `readonly` **name**: `"Ponziland Test BROTHER"` = `"Ponziland Test BROTHER"`
 
-#### PLTBROTHER_5.address
+#### PLTBROTHER\_5.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### PLTBROTHER_5.decimals
+#### PLTBROTHER\_5.decimals
 
 > `readonly` **decimals**: `18` = `18`
 
-#### PLTBROTHER_5.symbol
+#### PLTBROTHER\_5.symbol
 
 > `readonly` **symbol**: `"pltBROTHER"` = `"pltBROTHER"`
 
-### PLTBROTHER_6
+### PLTBROTHER\_6
 
-> `readonly` **PLTBROTHER_6**: `object`
+> `readonly` **PLTBROTHER\_6**: `object`
 
-#### PLTBROTHER_6.name
+#### PLTBROTHER\_6.name
 
 > `readonly` **name**: `"Ponziland Test BROTHER"` = `"Ponziland Test BROTHER"`
 
-#### PLTBROTHER_6.address
+#### PLTBROTHER\_6.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### PLTBROTHER_6.decimals
+#### PLTBROTHER\_6.decimals
 
 > `readonly` **decimals**: `18` = `18`
 
-#### PLTBROTHER_6.symbol
+#### PLTBROTHER\_6.symbol
 
 > `readonly` **symbol**: `"pltBROTHER"` = `"pltBROTHER"`
 
-### PLTBROTHER_7
+### PLTBROTHER\_7
 
-> `readonly` **PLTBROTHER_7**: `object`
+> `readonly` **PLTBROTHER\_7**: `object`
 
-#### PLTBROTHER_7.name
+#### PLTBROTHER\_7.name
 
 > `readonly` **name**: `"Ponziland Test BROTHER"` = `"Ponziland Test BROTHER"`
 
-#### PLTBROTHER_7.address
+#### PLTBROTHER\_7.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### PLTBROTHER_7.decimals
+#### PLTBROTHER\_7.decimals
 
 > `readonly` **decimals**: `18` = `18`
 
-#### PLTBROTHER_7.symbol
+#### PLTBROTHER\_7.symbol
 
 > `readonly` **symbol**: `"pltBROTHER"` = `"pltBROTHER"`
 
-### PLTBROTHER_8
+### PLTBROTHER\_8
 
-> `readonly` **PLTBROTHER_8**: `object`
+> `readonly` **PLTBROTHER\_8**: `object`
 
-#### PLTBROTHER_8.name
+#### PLTBROTHER\_8.name
 
 > `readonly` **name**: `"Ponziland Test BROTHER"` = `"Ponziland Test BROTHER"`
 
-#### PLTBROTHER_8.address
+#### PLTBROTHER\_8.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### PLTBROTHER_8.decimals
+#### PLTBROTHER\_8.decimals
 
 > `readonly` **decimals**: `18` = `18`
 
-#### PLTBROTHER_8.symbol
+#### PLTBROTHER\_8.symbol
 
 > `readonly` **symbol**: `"pltBROTHER"` = `"pltBROTHER"`
 
-### PLTBROTHER_9
+### PLTBROTHER\_9
 
-> `readonly` **PLTBROTHER_9**: `object`
+> `readonly` **PLTBROTHER\_9**: `object`
 
-#### PLTBROTHER_9.name
+#### PLTBROTHER\_9.name
 
 > `readonly` **name**: `"Ponziland Test BROTHER"` = `"Ponziland Test BROTHER"`
 
-#### PLTBROTHER_9.address
+#### PLTBROTHER\_9.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### PLTBROTHER_9.decimals
+#### PLTBROTHER\_9.decimals
 
 > `readonly` **decimals**: `18` = `18`
 
-#### PLTBROTHER_9.symbol
+#### PLTBROTHER\_9.symbol
 
 > `readonly` **symbol**: `"pltBROTHER"` = `"pltBROTHER"`
 
-### PLTBROTHER_10
+### PLTBROTHER\_10
 
-> `readonly` **PLTBROTHER_10**: `object`
+> `readonly` **PLTBROTHER\_10**: `object`
 
-#### PLTBROTHER_10.name
+#### PLTBROTHER\_10.name
 
 > `readonly` **name**: `"Ponziland Test BROTHER"` = `"Ponziland Test BROTHER"`
 
-#### PLTBROTHER_10.address
+#### PLTBROTHER\_10.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### PLTBROTHER_10.decimals
+#### PLTBROTHER\_10.decimals
 
 > `readonly` **decimals**: `18` = `18`
 
-#### PLTBROTHER_10.symbol
+#### PLTBROTHER\_10.symbol
 
 > `readonly` **symbol**: `"pltBROTHER"` = `"pltBROTHER"`
 
-### PLTBROTHER_11
+### PLTBROTHER\_11
 
-> `readonly` **PLTBROTHER_11**: `object`
+> `readonly` **PLTBROTHER\_11**: `object`
 
-#### PLTBROTHER_11.name
+#### PLTBROTHER\_11.name
 
 > `readonly` **name**: `"Ponziland Test BROTHER"` = `"Ponziland Test BROTHER"`
 
-#### PLTBROTHER_11.address
+#### PLTBROTHER\_11.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### PLTBROTHER_11.decimals
+#### PLTBROTHER\_11.decimals
 
 > `readonly` **decimals**: `18` = `18`
 
-#### PLTBROTHER_11.symbol
+#### PLTBROTHER\_11.symbol
 
 > `readonly` **symbol**: `"pltBROTHER"` = `"pltBROTHER"`
 
@@ -5980,243 +5980,243 @@ Defined in: [src/erc20/token/presets.sepolia.ts:11](https://github.com/keep-star
 
 > `readonly` **symbol**: `"pltETH"` = `"pltETH"`
 
-### PLTETH_1
+### PLTETH\_1
 
-> `readonly` **PLTETH_1**: `object`
+> `readonly` **PLTETH\_1**: `object`
 
-#### PLTETH_1.name
+#### PLTETH\_1.name
 
 > `readonly` **name**: `"Ponziland Test ETH"` = `"Ponziland Test ETH"`
 
-#### PLTETH_1.address
+#### PLTETH\_1.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### PLTETH_1.decimals
+#### PLTETH\_1.decimals
 
 > `readonly` **decimals**: `18` = `18`
 
-#### PLTETH_1.symbol
+#### PLTETH\_1.symbol
 
 > `readonly` **symbol**: `"pltETH"` = `"pltETH"`
 
-### PLTETH_2
+### PLTETH\_2
 
-> `readonly` **PLTETH_2**: `object`
+> `readonly` **PLTETH\_2**: `object`
 
-#### PLTETH_2.name
+#### PLTETH\_2.name
 
 > `readonly` **name**: `"Ponziland Test ETH"` = `"Ponziland Test ETH"`
 
-#### PLTETH_2.address
+#### PLTETH\_2.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### PLTETH_2.decimals
+#### PLTETH\_2.decimals
 
 > `readonly` **decimals**: `18` = `18`
 
-#### PLTETH_2.symbol
+#### PLTETH\_2.symbol
 
 > `readonly` **symbol**: `"pltETH"` = `"pltETH"`
 
-### PLTETH_3
+### PLTETH\_3
 
-> `readonly` **PLTETH_3**: `object`
+> `readonly` **PLTETH\_3**: `object`
 
-#### PLTETH_3.name
+#### PLTETH\_3.name
 
 > `readonly` **name**: `"Ponziland Test ETH"` = `"Ponziland Test ETH"`
 
-#### PLTETH_3.address
+#### PLTETH\_3.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### PLTETH_3.decimals
+#### PLTETH\_3.decimals
 
 > `readonly` **decimals**: `18` = `18`
 
-#### PLTETH_3.symbol
+#### PLTETH\_3.symbol
 
 > `readonly` **symbol**: `"pltETH"` = `"pltETH"`
 
-### PLTETH_4
+### PLTETH\_4
 
-> `readonly` **PLTETH_4**: `object`
+> `readonly` **PLTETH\_4**: `object`
 
-#### PLTETH_4.name
+#### PLTETH\_4.name
 
 > `readonly` **name**: `"Ponziland Test ETH"` = `"Ponziland Test ETH"`
 
-#### PLTETH_4.address
+#### PLTETH\_4.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### PLTETH_4.decimals
+#### PLTETH\_4.decimals
 
 > `readonly` **decimals**: `18` = `18`
 
-#### PLTETH_4.symbol
+#### PLTETH\_4.symbol
 
 > `readonly` **symbol**: `"pltETH"` = `"pltETH"`
 
-### PLTETH_5
+### PLTETH\_5
 
-> `readonly` **PLTETH_5**: `object`
+> `readonly` **PLTETH\_5**: `object`
 
-#### PLTETH_5.name
+#### PLTETH\_5.name
 
 > `readonly` **name**: `"Ponziland Test ETH"` = `"Ponziland Test ETH"`
 
-#### PLTETH_5.address
+#### PLTETH\_5.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### PLTETH_5.decimals
+#### PLTETH\_5.decimals
 
 > `readonly` **decimals**: `18` = `18`
 
-#### PLTETH_5.symbol
+#### PLTETH\_5.symbol
 
 > `readonly` **symbol**: `"pltETH"` = `"pltETH"`
 
-### PLTETH_6
+### PLTETH\_6
 
-> `readonly` **PLTETH_6**: `object`
+> `readonly` **PLTETH\_6**: `object`
 
-#### PLTETH_6.name
+#### PLTETH\_6.name
 
 > `readonly` **name**: `"Ponziland Test ETH"` = `"Ponziland Test ETH"`
 
-#### PLTETH_6.address
+#### PLTETH\_6.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### PLTETH_6.decimals
+#### PLTETH\_6.decimals
 
 > `readonly` **decimals**: `18` = `18`
 
-#### PLTETH_6.symbol
+#### PLTETH\_6.symbol
 
 > `readonly` **symbol**: `"pltETH"` = `"pltETH"`
 
-### PLTETH_7
+### PLTETH\_7
 
-> `readonly` **PLTETH_7**: `object`
+> `readonly` **PLTETH\_7**: `object`
 
-#### PLTETH_7.name
+#### PLTETH\_7.name
 
 > `readonly` **name**: `"Ponziland Test ETH"` = `"Ponziland Test ETH"`
 
-#### PLTETH_7.address
+#### PLTETH\_7.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### PLTETH_7.decimals
+#### PLTETH\_7.decimals
 
 > `readonly` **decimals**: `18` = `18`
 
-#### PLTETH_7.symbol
+#### PLTETH\_7.symbol
 
 > `readonly` **symbol**: `"pltETH"` = `"pltETH"`
 
-### PLTETH_8
+### PLTETH\_8
 
-> `readonly` **PLTETH_8**: `object`
+> `readonly` **PLTETH\_8**: `object`
 
-#### PLTETH_8.name
+#### PLTETH\_8.name
 
 > `readonly` **name**: `"Ponziland Test ETH"` = `"Ponziland Test ETH"`
 
-#### PLTETH_8.address
+#### PLTETH\_8.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### PLTETH_8.decimals
+#### PLTETH\_8.decimals
 
 > `readonly` **decimals**: `18` = `18`
 
-#### PLTETH_8.symbol
+#### PLTETH\_8.symbol
 
 > `readonly` **symbol**: `"pltETH"` = `"pltETH"`
 
-### PLTETH_9
+### PLTETH\_9
 
-> `readonly` **PLTETH_9**: `object`
+> `readonly` **PLTETH\_9**: `object`
 
-#### PLTETH_9.name
+#### PLTETH\_9.name
 
 > `readonly` **name**: `"Ponziland Test ETH"` = `"Ponziland Test ETH"`
 
-#### PLTETH_9.address
+#### PLTETH\_9.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### PLTETH_9.decimals
+#### PLTETH\_9.decimals
 
 > `readonly` **decimals**: `18` = `18`
 
-#### PLTETH_9.symbol
+#### PLTETH\_9.symbol
 
 > `readonly` **symbol**: `"pltETH"` = `"pltETH"`
 
-### PLTETH_10
+### PLTETH\_10
 
-> `readonly` **PLTETH_10**: `object`
+> `readonly` **PLTETH\_10**: `object`
 
-#### PLTETH_10.name
+#### PLTETH\_10.name
 
 > `readonly` **name**: `"Ponziland Test ETH"` = `"Ponziland Test ETH"`
 
-#### PLTETH_10.address
+#### PLTETH\_10.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### PLTETH_10.decimals
+#### PLTETH\_10.decimals
 
 > `readonly` **decimals**: `18` = `18`
 
-#### PLTETH_10.symbol
+#### PLTETH\_10.symbol
 
 > `readonly` **symbol**: `"pltETH"` = `"pltETH"`
 
-### PLTETH_11
+### PLTETH\_11
 
-> `readonly` **PLTETH_11**: `object`
+> `readonly` **PLTETH\_11**: `object`
 
-#### PLTETH_11.name
+#### PLTETH\_11.name
 
 > `readonly` **name**: `"Ponziland Test ETH"` = `"Ponziland Test ETH"`
 
-#### PLTETH_11.address
+#### PLTETH\_11.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### PLTETH_11.decimals
+#### PLTETH\_11.decimals
 
 > `readonly` **decimals**: `18` = `18`
 
-#### PLTETH_11.symbol
+#### PLTETH\_11.symbol
 
 > `readonly` **symbol**: `"pltETH"` = `"pltETH"`
 
-### PLTETH_12
+### PLTETH\_12
 
-> `readonly` **PLTETH_12**: `object`
+> `readonly` **PLTETH\_12**: `object`
 
-#### PLTETH_12.name
+#### PLTETH\_12.name
 
 > `readonly` **name**: `"Ponziland Test ETH"` = `"Ponziland Test ETH"`
 
-#### PLTETH_12.address
+#### PLTETH\_12.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### PLTETH_12.decimals
+#### PLTETH\_12.decimals
 
 > `readonly` **decimals**: `18` = `18`
 
-#### PLTETH_12.symbol
+#### PLTETH\_12.symbol
 
 > `readonly` **symbol**: `"pltETH"` = `"pltETH"`
 
@@ -6240,243 +6240,243 @@ Defined in: [src/erc20/token/presets.sepolia.ts:11](https://github.com/keep-star
 
 > `readonly` **symbol**: `"pltLORDS"` = `"pltLORDS"`
 
-### PLTLORDS_1
+### PLTLORDS\_1
 
-> `readonly` **PLTLORDS_1**: `object`
+> `readonly` **PLTLORDS\_1**: `object`
 
-#### PLTLORDS_1.name
+#### PLTLORDS\_1.name
 
 > `readonly` **name**: `"Ponziland Test LORDS"` = `"Ponziland Test LORDS"`
 
-#### PLTLORDS_1.address
+#### PLTLORDS\_1.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### PLTLORDS_1.decimals
+#### PLTLORDS\_1.decimals
 
 > `readonly` **decimals**: `18` = `18`
 
-#### PLTLORDS_1.symbol
+#### PLTLORDS\_1.symbol
 
 > `readonly` **symbol**: `"pltLORDS"` = `"pltLORDS"`
 
-### PLTLORDS_2
+### PLTLORDS\_2
 
-> `readonly` **PLTLORDS_2**: `object`
+> `readonly` **PLTLORDS\_2**: `object`
 
-#### PLTLORDS_2.name
+#### PLTLORDS\_2.name
 
 > `readonly` **name**: `"Ponziland Test LORDS"` = `"Ponziland Test LORDS"`
 
-#### PLTLORDS_2.address
+#### PLTLORDS\_2.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### PLTLORDS_2.decimals
+#### PLTLORDS\_2.decimals
 
 > `readonly` **decimals**: `18` = `18`
 
-#### PLTLORDS_2.symbol
+#### PLTLORDS\_2.symbol
 
 > `readonly` **symbol**: `"pltLORDS"` = `"pltLORDS"`
 
-### PLTLORDS_3
+### PLTLORDS\_3
 
-> `readonly` **PLTLORDS_3**: `object`
+> `readonly` **PLTLORDS\_3**: `object`
 
-#### PLTLORDS_3.name
+#### PLTLORDS\_3.name
 
 > `readonly` **name**: `"Ponziland Test LORDS"` = `"Ponziland Test LORDS"`
 
-#### PLTLORDS_3.address
+#### PLTLORDS\_3.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### PLTLORDS_3.decimals
+#### PLTLORDS\_3.decimals
 
 > `readonly` **decimals**: `18` = `18`
 
-#### PLTLORDS_3.symbol
+#### PLTLORDS\_3.symbol
 
 > `readonly` **symbol**: `"pltLORDS"` = `"pltLORDS"`
 
-### PLTLORDS_4
+### PLTLORDS\_4
 
-> `readonly` **PLTLORDS_4**: `object`
+> `readonly` **PLTLORDS\_4**: `object`
 
-#### PLTLORDS_4.name
+#### PLTLORDS\_4.name
 
 > `readonly` **name**: `"Ponziland Test LORDS"` = `"Ponziland Test LORDS"`
 
-#### PLTLORDS_4.address
+#### PLTLORDS\_4.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### PLTLORDS_4.decimals
+#### PLTLORDS\_4.decimals
 
 > `readonly` **decimals**: `18` = `18`
 
-#### PLTLORDS_4.symbol
+#### PLTLORDS\_4.symbol
 
 > `readonly` **symbol**: `"pltLORDS"` = `"pltLORDS"`
 
-### PLTLORDS_5
+### PLTLORDS\_5
 
-> `readonly` **PLTLORDS_5**: `object`
+> `readonly` **PLTLORDS\_5**: `object`
 
-#### PLTLORDS_5.name
+#### PLTLORDS\_5.name
 
 > `readonly` **name**: `"Ponziland Test LORDS"` = `"Ponziland Test LORDS"`
 
-#### PLTLORDS_5.address
+#### PLTLORDS\_5.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### PLTLORDS_5.decimals
+#### PLTLORDS\_5.decimals
 
 > `readonly` **decimals**: `18` = `18`
 
-#### PLTLORDS_5.symbol
+#### PLTLORDS\_5.symbol
 
 > `readonly` **symbol**: `"pltLORDS"` = `"pltLORDS"`
 
-### PLTLORDS_6
+### PLTLORDS\_6
 
-> `readonly` **PLTLORDS_6**: `object`
+> `readonly` **PLTLORDS\_6**: `object`
 
-#### PLTLORDS_6.name
+#### PLTLORDS\_6.name
 
 > `readonly` **name**: `"Ponziland Test LORDS"` = `"Ponziland Test LORDS"`
 
-#### PLTLORDS_6.address
+#### PLTLORDS\_6.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### PLTLORDS_6.decimals
+#### PLTLORDS\_6.decimals
 
 > `readonly` **decimals**: `18` = `18`
 
-#### PLTLORDS_6.symbol
+#### PLTLORDS\_6.symbol
 
 > `readonly` **symbol**: `"pltLORDS"` = `"pltLORDS"`
 
-### PLTLORDS_7
+### PLTLORDS\_7
 
-> `readonly` **PLTLORDS_7**: `object`
+> `readonly` **PLTLORDS\_7**: `object`
 
-#### PLTLORDS_7.name
+#### PLTLORDS\_7.name
 
 > `readonly` **name**: `"Ponziland Test LORDS"` = `"Ponziland Test LORDS"`
 
-#### PLTLORDS_7.address
+#### PLTLORDS\_7.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### PLTLORDS_7.decimals
+#### PLTLORDS\_7.decimals
 
 > `readonly` **decimals**: `18` = `18`
 
-#### PLTLORDS_7.symbol
+#### PLTLORDS\_7.symbol
 
 > `readonly` **symbol**: `"pltLORDS"` = `"pltLORDS"`
 
-### PLTLORDS_8
+### PLTLORDS\_8
 
-> `readonly` **PLTLORDS_8**: `object`
+> `readonly` **PLTLORDS\_8**: `object`
 
-#### PLTLORDS_8.name
+#### PLTLORDS\_8.name
 
 > `readonly` **name**: `"Ponziland Test LORDS"` = `"Ponziland Test LORDS"`
 
-#### PLTLORDS_8.address
+#### PLTLORDS\_8.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### PLTLORDS_8.decimals
+#### PLTLORDS\_8.decimals
 
 > `readonly` **decimals**: `18` = `18`
 
-#### PLTLORDS_8.symbol
+#### PLTLORDS\_8.symbol
 
 > `readonly` **symbol**: `"pltLORDS"` = `"pltLORDS"`
 
-### PLTLORDS_9
+### PLTLORDS\_9
 
-> `readonly` **PLTLORDS_9**: `object`
+> `readonly` **PLTLORDS\_9**: `object`
 
-#### PLTLORDS_9.name
+#### PLTLORDS\_9.name
 
 > `readonly` **name**: `"Ponziland Test LORDS"` = `"Ponziland Test LORDS"`
 
-#### PLTLORDS_9.address
+#### PLTLORDS\_9.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### PLTLORDS_9.decimals
+#### PLTLORDS\_9.decimals
 
 > `readonly` **decimals**: `18` = `18`
 
-#### PLTLORDS_9.symbol
+#### PLTLORDS\_9.symbol
 
 > `readonly` **symbol**: `"pltLORDS"` = `"pltLORDS"`
 
-### PLTLORDS_10
+### PLTLORDS\_10
 
-> `readonly` **PLTLORDS_10**: `object`
+> `readonly` **PLTLORDS\_10**: `object`
 
-#### PLTLORDS_10.name
+#### PLTLORDS\_10.name
 
 > `readonly` **name**: `"Ponziland Test LORDS"` = `"Ponziland Test LORDS"`
 
-#### PLTLORDS_10.address
+#### PLTLORDS\_10.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### PLTLORDS_10.decimals
+#### PLTLORDS\_10.decimals
 
 > `readonly` **decimals**: `18` = `18`
 
-#### PLTLORDS_10.symbol
+#### PLTLORDS\_10.symbol
 
 > `readonly` **symbol**: `"pltLORDS"` = `"pltLORDS"`
 
-### PLTLORDS_11
+### PLTLORDS\_11
 
-> `readonly` **PLTLORDS_11**: `object`
+> `readonly` **PLTLORDS\_11**: `object`
 
-#### PLTLORDS_11.name
+#### PLTLORDS\_11.name
 
 > `readonly` **name**: `"Ponziland Test LORDS"` = `"Ponziland Test LORDS"`
 
-#### PLTLORDS_11.address
+#### PLTLORDS\_11.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### PLTLORDS_11.decimals
+#### PLTLORDS\_11.decimals
 
 > `readonly` **decimals**: `18` = `18`
 
-#### PLTLORDS_11.symbol
+#### PLTLORDS\_11.symbol
 
 > `readonly` **symbol**: `"pltLORDS"` = `"pltLORDS"`
 
-### PLTLORDS_12
+### PLTLORDS\_12
 
-> `readonly` **PLTLORDS_12**: `object`
+> `readonly` **PLTLORDS\_12**: `object`
 
-#### PLTLORDS_12.name
+#### PLTLORDS\_12.name
 
 > `readonly` **name**: `"Ponziland Test LORDS"` = `"Ponziland Test LORDS"`
 
-#### PLTLORDS_12.address
+#### PLTLORDS\_12.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### PLTLORDS_12.decimals
+#### PLTLORDS\_12.decimals
 
 > `readonly` **decimals**: `18` = `18`
 
-#### PLTLORDS_12.symbol
+#### PLTLORDS\_12.symbol
 
 > `readonly` **symbol**: `"pltLORDS"` = `"pltLORDS"`
 
@@ -6500,223 +6500,223 @@ Defined in: [src/erc20/token/presets.sepolia.ts:11](https://github.com/keep-star
 
 > `readonly` **symbol**: `"pltPAL"` = `"pltPAL"`
 
-### PLTPAL_1
+### PLTPAL\_1
 
-> `readonly` **PLTPAL_1**: `object`
+> `readonly` **PLTPAL\_1**: `object`
 
-#### PLTPAL_1.name
+#### PLTPAL\_1.name
 
 > `readonly` **name**: `"Ponziland Test PAL"` = `"Ponziland Test PAL"`
 
-#### PLTPAL_1.address
+#### PLTPAL\_1.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### PLTPAL_1.decimals
+#### PLTPAL\_1.decimals
 
 > `readonly` **decimals**: `18` = `18`
 
-#### PLTPAL_1.symbol
+#### PLTPAL\_1.symbol
 
 > `readonly` **symbol**: `"pltPAL"` = `"pltPAL"`
 
-### PLTPAL_2
+### PLTPAL\_2
 
-> `readonly` **PLTPAL_2**: `object`
+> `readonly` **PLTPAL\_2**: `object`
 
-#### PLTPAL_2.name
+#### PLTPAL\_2.name
 
 > `readonly` **name**: `"Ponziland Test PAL"` = `"Ponziland Test PAL"`
 
-#### PLTPAL_2.address
+#### PLTPAL\_2.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### PLTPAL_2.decimals
+#### PLTPAL\_2.decimals
 
 > `readonly` **decimals**: `18` = `18`
 
-#### PLTPAL_2.symbol
+#### PLTPAL\_2.symbol
 
 > `readonly` **symbol**: `"pltPAL"` = `"pltPAL"`
 
-### PLTPAL_3
+### PLTPAL\_3
 
-> `readonly` **PLTPAL_3**: `object`
+> `readonly` **PLTPAL\_3**: `object`
 
-#### PLTPAL_3.name
+#### PLTPAL\_3.name
 
 > `readonly` **name**: `"Ponziland Test PAL"` = `"Ponziland Test PAL"`
 
-#### PLTPAL_3.address
+#### PLTPAL\_3.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### PLTPAL_3.decimals
+#### PLTPAL\_3.decimals
 
 > `readonly` **decimals**: `18` = `18`
 
-#### PLTPAL_3.symbol
+#### PLTPAL\_3.symbol
 
 > `readonly` **symbol**: `"pltPAL"` = `"pltPAL"`
 
-### PLTPAL_4
+### PLTPAL\_4
 
-> `readonly` **PLTPAL_4**: `object`
+> `readonly` **PLTPAL\_4**: `object`
 
-#### PLTPAL_4.name
+#### PLTPAL\_4.name
 
 > `readonly` **name**: `"Ponziland Test PAL"` = `"Ponziland Test PAL"`
 
-#### PLTPAL_4.address
+#### PLTPAL\_4.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### PLTPAL_4.decimals
+#### PLTPAL\_4.decimals
 
 > `readonly` **decimals**: `18` = `18`
 
-#### PLTPAL_4.symbol
+#### PLTPAL\_4.symbol
 
 > `readonly` **symbol**: `"pltPAL"` = `"pltPAL"`
 
-### PLTPAL_5
+### PLTPAL\_5
 
-> `readonly` **PLTPAL_5**: `object`
+> `readonly` **PLTPAL\_5**: `object`
 
-#### PLTPAL_5.name
+#### PLTPAL\_5.name
 
 > `readonly` **name**: `"Ponziland Test PAL"` = `"Ponziland Test PAL"`
 
-#### PLTPAL_5.address
+#### PLTPAL\_5.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### PLTPAL_5.decimals
+#### PLTPAL\_5.decimals
 
 > `readonly` **decimals**: `18` = `18`
 
-#### PLTPAL_5.symbol
+#### PLTPAL\_5.symbol
 
 > `readonly` **symbol**: `"pltPAL"` = `"pltPAL"`
 
-### PLTPAL_6
+### PLTPAL\_6
 
-> `readonly` **PLTPAL_6**: `object`
+> `readonly` **PLTPAL\_6**: `object`
 
-#### PLTPAL_6.name
+#### PLTPAL\_6.name
 
 > `readonly` **name**: `"Ponziland Test PAL"` = `"Ponziland Test PAL"`
 
-#### PLTPAL_6.address
+#### PLTPAL\_6.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### PLTPAL_6.decimals
+#### PLTPAL\_6.decimals
 
 > `readonly` **decimals**: `18` = `18`
 
-#### PLTPAL_6.symbol
+#### PLTPAL\_6.symbol
 
 > `readonly` **symbol**: `"pltPAL"` = `"pltPAL"`
 
-### PLTPAL_7
+### PLTPAL\_7
 
-> `readonly` **PLTPAL_7**: `object`
+> `readonly` **PLTPAL\_7**: `object`
 
-#### PLTPAL_7.name
+#### PLTPAL\_7.name
 
 > `readonly` **name**: `"Ponziland Test PAL"` = `"Ponziland Test PAL"`
 
-#### PLTPAL_7.address
+#### PLTPAL\_7.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### PLTPAL_7.decimals
+#### PLTPAL\_7.decimals
 
 > `readonly` **decimals**: `18` = `18`
 
-#### PLTPAL_7.symbol
+#### PLTPAL\_7.symbol
 
 > `readonly` **symbol**: `"pltPAL"` = `"pltPAL"`
 
-### PLTPAL_8
+### PLTPAL\_8
 
-> `readonly` **PLTPAL_8**: `object`
+> `readonly` **PLTPAL\_8**: `object`
 
-#### PLTPAL_8.name
+#### PLTPAL\_8.name
 
 > `readonly` **name**: `"Ponziland Test PAL"` = `"Ponziland Test PAL"`
 
-#### PLTPAL_8.address
+#### PLTPAL\_8.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### PLTPAL_8.decimals
+#### PLTPAL\_8.decimals
 
 > `readonly` **decimals**: `18` = `18`
 
-#### PLTPAL_8.symbol
+#### PLTPAL\_8.symbol
 
 > `readonly` **symbol**: `"pltPAL"` = `"pltPAL"`
 
-### PLTPAL_9
+### PLTPAL\_9
 
-> `readonly` **PLTPAL_9**: `object`
+> `readonly` **PLTPAL\_9**: `object`
 
-#### PLTPAL_9.name
+#### PLTPAL\_9.name
 
 > `readonly` **name**: `"Ponziland Test PAL"` = `"Ponziland Test PAL"`
 
-#### PLTPAL_9.address
+#### PLTPAL\_9.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### PLTPAL_9.decimals
+#### PLTPAL\_9.decimals
 
 > `readonly` **decimals**: `18` = `18`
 
-#### PLTPAL_9.symbol
+#### PLTPAL\_9.symbol
 
 > `readonly` **symbol**: `"pltPAL"` = `"pltPAL"`
 
-### PLTPAL_10
+### PLTPAL\_10
 
-> `readonly` **PLTPAL_10**: `object`
+> `readonly` **PLTPAL\_10**: `object`
 
-#### PLTPAL_10.name
+#### PLTPAL\_10.name
 
 > `readonly` **name**: `"Ponziland Test PAL"` = `"Ponziland Test PAL"`
 
-#### PLTPAL_10.address
+#### PLTPAL\_10.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### PLTPAL_10.decimals
+#### PLTPAL\_10.decimals
 
 > `readonly` **decimals**: `18` = `18`
 
-#### PLTPAL_10.symbol
+#### PLTPAL\_10.symbol
 
 > `readonly` **symbol**: `"pltPAL"` = `"pltPAL"`
 
-### PLTPAL_11
+### PLTPAL\_11
 
-> `readonly` **PLTPAL_11**: `object`
+> `readonly` **PLTPAL\_11**: `object`
 
-#### PLTPAL_11.name
+#### PLTPAL\_11.name
 
 > `readonly` **name**: `"Ponziland Test PAL"` = `"Ponziland Test PAL"`
 
-#### PLTPAL_11.address
+#### PLTPAL\_11.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### PLTPAL_11.decimals
+#### PLTPAL\_11.decimals
 
 > `readonly` **decimals**: `18` = `18`
 
-#### PLTPAL_11.symbol
+#### PLTPAL\_11.symbol
 
 > `readonly` **symbol**: `"pltPAL"` = `"pltPAL"`
 
@@ -6740,243 +6740,243 @@ Defined in: [src/erc20/token/presets.sepolia.ts:11](https://github.com/keep-star
 
 > `readonly` **symbol**: `"pltPAPER"` = `"pltPAPER"`
 
-### PLTPAPER_1
+### PLTPAPER\_1
 
-> `readonly` **PLTPAPER_1**: `object`
+> `readonly` **PLTPAPER\_1**: `object`
 
-#### PLTPAPER_1.name
+#### PLTPAPER\_1.name
 
 > `readonly` **name**: `"Ponziland Test PAPER"` = `"Ponziland Test PAPER"`
 
-#### PLTPAPER_1.address
+#### PLTPAPER\_1.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### PLTPAPER_1.decimals
+#### PLTPAPER\_1.decimals
 
 > `readonly` **decimals**: `18` = `18`
 
-#### PLTPAPER_1.symbol
+#### PLTPAPER\_1.symbol
 
 > `readonly` **symbol**: `"pltPAPER"` = `"pltPAPER"`
 
-### PLTPAPER_2
+### PLTPAPER\_2
 
-> `readonly` **PLTPAPER_2**: `object`
+> `readonly` **PLTPAPER\_2**: `object`
 
-#### PLTPAPER_2.name
+#### PLTPAPER\_2.name
 
 > `readonly` **name**: `"Ponziland Test PAPER"` = `"Ponziland Test PAPER"`
 
-#### PLTPAPER_2.address
+#### PLTPAPER\_2.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### PLTPAPER_2.decimals
+#### PLTPAPER\_2.decimals
 
 > `readonly` **decimals**: `18` = `18`
 
-#### PLTPAPER_2.symbol
+#### PLTPAPER\_2.symbol
 
 > `readonly` **symbol**: `"pltPAPER"` = `"pltPAPER"`
 
-### PLTPAPER_3
+### PLTPAPER\_3
 
-> `readonly` **PLTPAPER_3**: `object`
+> `readonly` **PLTPAPER\_3**: `object`
 
-#### PLTPAPER_3.name
+#### PLTPAPER\_3.name
 
 > `readonly` **name**: `"Ponziland Test PAPER"` = `"Ponziland Test PAPER"`
 
-#### PLTPAPER_3.address
+#### PLTPAPER\_3.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### PLTPAPER_3.decimals
+#### PLTPAPER\_3.decimals
 
 > `readonly` **decimals**: `18` = `18`
 
-#### PLTPAPER_3.symbol
+#### PLTPAPER\_3.symbol
 
 > `readonly` **symbol**: `"pltPAPER"` = `"pltPAPER"`
 
-### PLTPAPER_4
+### PLTPAPER\_4
 
-> `readonly` **PLTPAPER_4**: `object`
+> `readonly` **PLTPAPER\_4**: `object`
 
-#### PLTPAPER_4.name
+#### PLTPAPER\_4.name
 
 > `readonly` **name**: `"Ponziland Test PAPER"` = `"Ponziland Test PAPER"`
 
-#### PLTPAPER_4.address
+#### PLTPAPER\_4.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### PLTPAPER_4.decimals
+#### PLTPAPER\_4.decimals
 
 > `readonly` **decimals**: `18` = `18`
 
-#### PLTPAPER_4.symbol
+#### PLTPAPER\_4.symbol
 
 > `readonly` **symbol**: `"pltPAPER"` = `"pltPAPER"`
 
-### PLTPAPER_5
+### PLTPAPER\_5
 
-> `readonly` **PLTPAPER_5**: `object`
+> `readonly` **PLTPAPER\_5**: `object`
 
-#### PLTPAPER_5.name
+#### PLTPAPER\_5.name
 
 > `readonly` **name**: `"Ponziland Test PAPER"` = `"Ponziland Test PAPER"`
 
-#### PLTPAPER_5.address
+#### PLTPAPER\_5.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### PLTPAPER_5.decimals
+#### PLTPAPER\_5.decimals
 
 > `readonly` **decimals**: `18` = `18`
 
-#### PLTPAPER_5.symbol
+#### PLTPAPER\_5.symbol
 
 > `readonly` **symbol**: `"pltPAPER"` = `"pltPAPER"`
 
-### PLTPAPER_6
+### PLTPAPER\_6
 
-> `readonly` **PLTPAPER_6**: `object`
+> `readonly` **PLTPAPER\_6**: `object`
 
-#### PLTPAPER_6.name
+#### PLTPAPER\_6.name
 
 > `readonly` **name**: `"Ponziland Test PAPER"` = `"Ponziland Test PAPER"`
 
-#### PLTPAPER_6.address
+#### PLTPAPER\_6.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### PLTPAPER_6.decimals
+#### PLTPAPER\_6.decimals
 
 > `readonly` **decimals**: `18` = `18`
 
-#### PLTPAPER_6.symbol
+#### PLTPAPER\_6.symbol
 
 > `readonly` **symbol**: `"pltPAPER"` = `"pltPAPER"`
 
-### PLTPAPER_7
+### PLTPAPER\_7
 
-> `readonly` **PLTPAPER_7**: `object`
+> `readonly` **PLTPAPER\_7**: `object`
 
-#### PLTPAPER_7.name
+#### PLTPAPER\_7.name
 
 > `readonly` **name**: `"Ponziland Test PAPER"` = `"Ponziland Test PAPER"`
 
-#### PLTPAPER_7.address
+#### PLTPAPER\_7.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### PLTPAPER_7.decimals
+#### PLTPAPER\_7.decimals
 
 > `readonly` **decimals**: `18` = `18`
 
-#### PLTPAPER_7.symbol
+#### PLTPAPER\_7.symbol
 
 > `readonly` **symbol**: `"pltPAPER"` = `"pltPAPER"`
 
-### PLTPAPER_8
+### PLTPAPER\_8
 
-> `readonly` **PLTPAPER_8**: `object`
+> `readonly` **PLTPAPER\_8**: `object`
 
-#### PLTPAPER_8.name
+#### PLTPAPER\_8.name
 
 > `readonly` **name**: `"Ponziland Test PAPER"` = `"Ponziland Test PAPER"`
 
-#### PLTPAPER_8.address
+#### PLTPAPER\_8.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### PLTPAPER_8.decimals
+#### PLTPAPER\_8.decimals
 
 > `readonly` **decimals**: `18` = `18`
 
-#### PLTPAPER_8.symbol
+#### PLTPAPER\_8.symbol
 
 > `readonly` **symbol**: `"pltPAPER"` = `"pltPAPER"`
 
-### PLTPAPER_9
+### PLTPAPER\_9
 
-> `readonly` **PLTPAPER_9**: `object`
+> `readonly` **PLTPAPER\_9**: `object`
 
-#### PLTPAPER_9.name
+#### PLTPAPER\_9.name
 
 > `readonly` **name**: `"Ponziland Test PAPER"` = `"Ponziland Test PAPER"`
 
-#### PLTPAPER_9.address
+#### PLTPAPER\_9.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### PLTPAPER_9.decimals
+#### PLTPAPER\_9.decimals
 
 > `readonly` **decimals**: `18` = `18`
 
-#### PLTPAPER_9.symbol
+#### PLTPAPER\_9.symbol
 
 > `readonly` **symbol**: `"pltPAPER"` = `"pltPAPER"`
 
-### PLTPAPER_10
+### PLTPAPER\_10
 
-> `readonly` **PLTPAPER_10**: `object`
+> `readonly` **PLTPAPER\_10**: `object`
 
-#### PLTPAPER_10.name
+#### PLTPAPER\_10.name
 
 > `readonly` **name**: `"Ponziland Test PAPER"` = `"Ponziland Test PAPER"`
 
-#### PLTPAPER_10.address
+#### PLTPAPER\_10.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### PLTPAPER_10.decimals
+#### PLTPAPER\_10.decimals
 
 > `readonly` **decimals**: `18` = `18`
 
-#### PLTPAPER_10.symbol
+#### PLTPAPER\_10.symbol
 
 > `readonly` **symbol**: `"pltPAPER"` = `"pltPAPER"`
 
-### PLTPAPER_11
+### PLTPAPER\_11
 
-> `readonly` **PLTPAPER_11**: `object`
+> `readonly` **PLTPAPER\_11**: `object`
 
-#### PLTPAPER_11.name
+#### PLTPAPER\_11.name
 
 > `readonly` **name**: `"Ponziland Test PAPER"` = `"Ponziland Test PAPER"`
 
-#### PLTPAPER_11.address
+#### PLTPAPER\_11.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### PLTPAPER_11.decimals
+#### PLTPAPER\_11.decimals
 
 > `readonly` **decimals**: `18` = `18`
 
-#### PLTPAPER_11.symbol
+#### PLTPAPER\_11.symbol
 
 > `readonly` **symbol**: `"pltPAPER"` = `"pltPAPER"`
 
-### PLTPAPER_12
+### PLTPAPER\_12
 
-> `readonly` **PLTPAPER_12**: `object`
+> `readonly` **PLTPAPER\_12**: `object`
 
-#### PLTPAPER_12.name
+#### PLTPAPER\_12.name
 
 > `readonly` **name**: `"Ponziland Test PAPER"` = `"Ponziland Test PAPER"`
 
-#### PLTPAPER_12.address
+#### PLTPAPER\_12.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### PLTPAPER_12.decimals
+#### PLTPAPER\_12.decimals
 
 > `readonly` **decimals**: `18` = `18`
 
-#### PLTPAPER_12.symbol
+#### PLTPAPER\_12.symbol
 
 > `readonly` **symbol**: `"pltPAPER"` = `"pltPAPER"`
 
@@ -7000,243 +7000,243 @@ Defined in: [src/erc20/token/presets.sepolia.ts:11](https://github.com/keep-star
 
 > `readonly` **symbol**: `"pltSTRK"` = `"pltSTRK"`
 
-### PLTSTRK_1
+### PLTSTRK\_1
 
-> `readonly` **PLTSTRK_1**: `object`
+> `readonly` **PLTSTRK\_1**: `object`
 
-#### PLTSTRK_1.name
+#### PLTSTRK\_1.name
 
 > `readonly` **name**: `"Ponziland Test STRK"` = `"Ponziland Test STRK"`
 
-#### PLTSTRK_1.address
+#### PLTSTRK\_1.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### PLTSTRK_1.decimals
+#### PLTSTRK\_1.decimals
 
 > `readonly` **decimals**: `18` = `18`
 
-#### PLTSTRK_1.symbol
+#### PLTSTRK\_1.symbol
 
 > `readonly` **symbol**: `"pltSTRK"` = `"pltSTRK"`
 
-### PLTSTRK_2
+### PLTSTRK\_2
 
-> `readonly` **PLTSTRK_2**: `object`
+> `readonly` **PLTSTRK\_2**: `object`
 
-#### PLTSTRK_2.name
+#### PLTSTRK\_2.name
 
 > `readonly` **name**: `"Ponziland Test STRK"` = `"Ponziland Test STRK"`
 
-#### PLTSTRK_2.address
+#### PLTSTRK\_2.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### PLTSTRK_2.decimals
+#### PLTSTRK\_2.decimals
 
 > `readonly` **decimals**: `18` = `18`
 
-#### PLTSTRK_2.symbol
+#### PLTSTRK\_2.symbol
 
 > `readonly` **symbol**: `"pltSTRK"` = `"pltSTRK"`
 
-### PLTSTRK_3
+### PLTSTRK\_3
 
-> `readonly` **PLTSTRK_3**: `object`
+> `readonly` **PLTSTRK\_3**: `object`
 
-#### PLTSTRK_3.name
+#### PLTSTRK\_3.name
 
 > `readonly` **name**: `"Ponziland Test STRK"` = `"Ponziland Test STRK"`
 
-#### PLTSTRK_3.address
+#### PLTSTRK\_3.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### PLTSTRK_3.decimals
+#### PLTSTRK\_3.decimals
 
 > `readonly` **decimals**: `18` = `18`
 
-#### PLTSTRK_3.symbol
+#### PLTSTRK\_3.symbol
 
 > `readonly` **symbol**: `"pltSTRK"` = `"pltSTRK"`
 
-### PLTSTRK_4
+### PLTSTRK\_4
 
-> `readonly` **PLTSTRK_4**: `object`
+> `readonly` **PLTSTRK\_4**: `object`
 
-#### PLTSTRK_4.name
+#### PLTSTRK\_4.name
 
 > `readonly` **name**: `"Ponziland Test STRK"` = `"Ponziland Test STRK"`
 
-#### PLTSTRK_4.address
+#### PLTSTRK\_4.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### PLTSTRK_4.decimals
+#### PLTSTRK\_4.decimals
 
 > `readonly` **decimals**: `18` = `18`
 
-#### PLTSTRK_4.symbol
+#### PLTSTRK\_4.symbol
 
 > `readonly` **symbol**: `"pltSTRK"` = `"pltSTRK"`
 
-### PLTSTRK_5
+### PLTSTRK\_5
 
-> `readonly` **PLTSTRK_5**: `object`
+> `readonly` **PLTSTRK\_5**: `object`
 
-#### PLTSTRK_5.name
+#### PLTSTRK\_5.name
 
 > `readonly` **name**: `"Ponziland Test STRK"` = `"Ponziland Test STRK"`
 
-#### PLTSTRK_5.address
+#### PLTSTRK\_5.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### PLTSTRK_5.decimals
+#### PLTSTRK\_5.decimals
 
 > `readonly` **decimals**: `18` = `18`
 
-#### PLTSTRK_5.symbol
+#### PLTSTRK\_5.symbol
 
 > `readonly` **symbol**: `"pltSTRK"` = `"pltSTRK"`
 
-### PLTSTRK_6
+### PLTSTRK\_6
 
-> `readonly` **PLTSTRK_6**: `object`
+> `readonly` **PLTSTRK\_6**: `object`
 
-#### PLTSTRK_6.name
+#### PLTSTRK\_6.name
 
 > `readonly` **name**: `"Ponziland Test STRK"` = `"Ponziland Test STRK"`
 
-#### PLTSTRK_6.address
+#### PLTSTRK\_6.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### PLTSTRK_6.decimals
+#### PLTSTRK\_6.decimals
 
 > `readonly` **decimals**: `18` = `18`
 
-#### PLTSTRK_6.symbol
+#### PLTSTRK\_6.symbol
 
 > `readonly` **symbol**: `"pltSTRK"` = `"pltSTRK"`
 
-### PLTSTRK_7
+### PLTSTRK\_7
 
-> `readonly` **PLTSTRK_7**: `object`
+> `readonly` **PLTSTRK\_7**: `object`
 
-#### PLTSTRK_7.name
+#### PLTSTRK\_7.name
 
 > `readonly` **name**: `"Ponziland Test STRK"` = `"Ponziland Test STRK"`
 
-#### PLTSTRK_7.address
+#### PLTSTRK\_7.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### PLTSTRK_7.decimals
+#### PLTSTRK\_7.decimals
 
 > `readonly` **decimals**: `18` = `18`
 
-#### PLTSTRK_7.symbol
+#### PLTSTRK\_7.symbol
 
 > `readonly` **symbol**: `"pltSTRK"` = `"pltSTRK"`
 
-### PLTSTRK_8
+### PLTSTRK\_8
 
-> `readonly` **PLTSTRK_8**: `object`
+> `readonly` **PLTSTRK\_8**: `object`
 
-#### PLTSTRK_8.name
+#### PLTSTRK\_8.name
 
 > `readonly` **name**: `"Ponziland Test STRK"` = `"Ponziland Test STRK"`
 
-#### PLTSTRK_8.address
+#### PLTSTRK\_8.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### PLTSTRK_8.decimals
+#### PLTSTRK\_8.decimals
 
 > `readonly` **decimals**: `18` = `18`
 
-#### PLTSTRK_8.symbol
+#### PLTSTRK\_8.symbol
 
 > `readonly` **symbol**: `"pltSTRK"` = `"pltSTRK"`
 
-### PLTSTRK_9
+### PLTSTRK\_9
 
-> `readonly` **PLTSTRK_9**: `object`
+> `readonly` **PLTSTRK\_9**: `object`
 
-#### PLTSTRK_9.name
+#### PLTSTRK\_9.name
 
 > `readonly` **name**: `"Ponziland Test STRK"` = `"Ponziland Test STRK"`
 
-#### PLTSTRK_9.address
+#### PLTSTRK\_9.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### PLTSTRK_9.decimals
+#### PLTSTRK\_9.decimals
 
 > `readonly` **decimals**: `18` = `18`
 
-#### PLTSTRK_9.symbol
+#### PLTSTRK\_9.symbol
 
 > `readonly` **symbol**: `"pltSTRK"` = `"pltSTRK"`
 
-### PLTSTRK_10
+### PLTSTRK\_10
 
-> `readonly` **PLTSTRK_10**: `object`
+> `readonly` **PLTSTRK\_10**: `object`
 
-#### PLTSTRK_10.name
+#### PLTSTRK\_10.name
 
 > `readonly` **name**: `"Ponziland Test STRK"` = `"Ponziland Test STRK"`
 
-#### PLTSTRK_10.address
+#### PLTSTRK\_10.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### PLTSTRK_10.decimals
+#### PLTSTRK\_10.decimals
 
 > `readonly` **decimals**: `18` = `18`
 
-#### PLTSTRK_10.symbol
+#### PLTSTRK\_10.symbol
 
 > `readonly` **symbol**: `"pltSTRK"` = `"pltSTRK"`
 
-### PLTSTRK_11
+### PLTSTRK\_11
 
-> `readonly` **PLTSTRK_11**: `object`
+> `readonly` **PLTSTRK\_11**: `object`
 
-#### PLTSTRK_11.name
+#### PLTSTRK\_11.name
 
 > `readonly` **name**: `"Ponziland Test STRK"` = `"Ponziland Test STRK"`
 
-#### PLTSTRK_11.address
+#### PLTSTRK\_11.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### PLTSTRK_11.decimals
+#### PLTSTRK\_11.decimals
 
 > `readonly` **decimals**: `18` = `18`
 
-#### PLTSTRK_11.symbol
+#### PLTSTRK\_11.symbol
 
 > `readonly` **symbol**: `"pltSTRK"` = `"pltSTRK"`
 
-### PLTSTRK_12
+### PLTSTRK\_12
 
-> `readonly` **PLTSTRK_12**: `object`
+> `readonly` **PLTSTRK\_12**: `object`
 
-#### PLTSTRK_12.name
+#### PLTSTRK\_12.name
 
 > `readonly` **name**: `"Ponziland Test STRK"` = `"Ponziland Test STRK"`
 
-#### PLTSTRK_12.address
+#### PLTSTRK\_12.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### PLTSTRK_12.decimals
+#### PLTSTRK\_12.decimals
 
 > `readonly` **decimals**: `18` = `18`
 
-#### PLTSTRK_12.symbol
+#### PLTSTRK\_12.symbol
 
 > `readonly` **symbol**: `"pltSTRK"` = `"pltSTRK"`
 
@@ -7260,43 +7260,43 @@ Defined in: [src/erc20/token/presets.sepolia.ts:11](https://github.com/keep-star
 
 > `readonly` **symbol**: `"popopo"` = `"popopo"`
 
-### POPOPO_1
+### POPOPO\_1
 
-> `readonly` **POPOPO_1**: `object`
+> `readonly` **POPOPO\_1**: `object`
 
-#### POPOPO_1.name
+#### POPOPO\_1.name
 
 > `readonly` **name**: `"popopo"` = `"popopo"`
 
-#### POPOPO_1.address
+#### POPOPO\_1.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### POPOPO_1.decimals
+#### POPOPO\_1.decimals
 
 > `readonly` **decimals**: `18` = `18`
 
-#### POPOPO_1.symbol
+#### POPOPO\_1.symbol
 
 > `readonly` **symbol**: `"popopo"` = `"popopo"`
 
-### POPOPO_2
+### POPOPO\_2
 
-> `readonly` **POPOPO_2**: `object`
+> `readonly` **POPOPO\_2**: `object`
 
-#### POPOPO_2.name
+#### POPOPO\_2.name
 
 > `readonly` **name**: `"popopo"` = `"popopo"`
 
-#### POPOPO_2.address
+#### POPOPO\_2.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### POPOPO_2.decimals
+#### POPOPO\_2.decimals
 
 > `readonly` **decimals**: `18` = `18`
 
-#### POPOPO_2.symbol
+#### POPOPO\_2.symbol
 
 > `readonly` **symbol**: `"popopo"` = `"popopo"`
 
@@ -7800,43 +7800,43 @@ Defined in: [src/erc20/token/presets.sepolia.ts:11](https://github.com/keep-star
 
 > `readonly` **symbol**: `"zezt"` = `"zezt"`
 
-### STKP_1
+### STKP\_1
 
-> `readonly` **STKP_1**: `object`
+> `readonly` **STKP\_1**: `object`
 
-#### STKP_1.name
+#### STKP\_1.name
 
 > `readonly` **name**: `"STKP"` = `"STKP"`
 
-#### STKP_1.address
+#### STKP\_1.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### STKP_1.decimals
+#### STKP\_1.decimals
 
 > `readonly` **decimals**: `18` = `18`
 
-#### STKP_1.symbol
+#### STKP\_1.symbol
 
 > `readonly` **symbol**: `"STKP"` = `"STKP"`
 
-### STOP_MAKING_STUPID_PEOPLE_FAMOUS
+### STOP\_MAKING\_STUPID\_PEOPLE\_FAMOUS
 
-> `readonly` **STOP_MAKING_STUPID_PEOPLE_FAMOUS**: `object`
+> `readonly` **STOP\_MAKING\_STUPID\_PEOPLE\_FAMOUS**: `object`
 
-#### STOP_MAKING_STUPID_PEOPLE_FAMOUS.name
+#### STOP\_MAKING\_STUPID\_PEOPLE\_FAMOUS.name
 
 > `readonly` **name**: `"stop making stupid people famous"` = `"stop making stupid people famous"`
 
-#### STOP_MAKING_STUPID_PEOPLE_FAMOUS.address
+#### STOP\_MAKING\_STUPID\_PEOPLE\_FAMOUS.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### STOP_MAKING_STUPID_PEOPLE_FAMOUS.decimals
+#### STOP\_MAKING\_STUPID\_PEOPLE\_FAMOUS.decimals
 
 > `readonly` **decimals**: `18` = `18`
 
-#### STOP_MAKING_STUPID_PEOPLE_FAMOUS.symbol
+#### STOP\_MAKING\_STUPID\_PEOPLE\_FAMOUS.symbol
 
 > `readonly` **symbol**: `"stop making stupid people famous"` = `"stop making stupid people famous"`
 
@@ -7980,103 +7980,103 @@ Defined in: [src/erc20/token/presets.sepolia.ts:11](https://github.com/keep-star
 
 > `readonly` **symbol**: `"test"` = `"test"`
 
-### TEST_1
+### TEST\_1
 
-> `readonly` **TEST_1**: `object`
+> `readonly` **TEST\_1**: `object`
 
-#### TEST_1.name
-
-> `readonly` **name**: `"test"` = `"test"`
-
-#### TEST_1.address
-
-> `readonly` **address**: [`Address`](../type-aliases/Address.md)
-
-#### TEST_1.decimals
-
-> `readonly` **decimals**: `18` = `18`
-
-#### TEST_1.symbol
-
-> `readonly` **symbol**: `"test"` = `"test"`
-
-### TEST_2
-
-> `readonly` **TEST_2**: `object`
-
-#### TEST_2.name
+#### TEST\_1.name
 
 > `readonly` **name**: `"test"` = `"test"`
 
-#### TEST_2.address
+#### TEST\_1.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### TEST_2.decimals
+#### TEST\_1.decimals
 
 > `readonly` **decimals**: `18` = `18`
 
-#### TEST_2.symbol
+#### TEST\_1.symbol
 
 > `readonly` **symbol**: `"test"` = `"test"`
 
-### TEST_3
+### TEST\_2
 
-> `readonly` **TEST_3**: `object`
+> `readonly` **TEST\_2**: `object`
 
-#### TEST_3.name
+#### TEST\_2.name
+
+> `readonly` **name**: `"test"` = `"test"`
+
+#### TEST\_2.address
+
+> `readonly` **address**: [`Address`](../type-aliases/Address.md)
+
+#### TEST\_2.decimals
+
+> `readonly` **decimals**: `18` = `18`
+
+#### TEST\_2.symbol
+
+> `readonly` **symbol**: `"test"` = `"test"`
+
+### TEST\_3
+
+> `readonly` **TEST\_3**: `object`
+
+#### TEST\_3.name
 
 > `readonly` **name**: `"Test"` = `"Test"`
 
-#### TEST_3.address
+#### TEST\_3.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### TEST_3.decimals
+#### TEST\_3.decimals
 
 > `readonly` **decimals**: `18` = `18`
 
-#### TEST_3.symbol
+#### TEST\_3.symbol
 
 > `readonly` **symbol**: `"TEST"` = `"TEST"`
 
-### TEST_4
+### TEST\_4
 
-> `readonly` **TEST_4**: `object`
+> `readonly` **TEST\_4**: `object`
 
-#### TEST_4.name
+#### TEST\_4.name
 
 > `readonly` **name**: `"TEST"` = `"TEST"`
 
-#### TEST_4.address
+#### TEST\_4.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### TEST_4.decimals
+#### TEST\_4.decimals
 
 > `readonly` **decimals**: `9` = `9`
 
-#### TEST_4.symbol
+#### TEST\_4.symbol
 
 > `readonly` **symbol**: `"TEST"` = `"TEST"`
 
-### TEST_5
+### TEST\_5
 
-> `readonly` **TEST_5**: `object`
+> `readonly` **TEST\_5**: `object`
 
-#### TEST_5.name
+#### TEST\_5.name
 
 > `readonly` **name**: `"test"` = `"test"`
 
-#### TEST_5.address
+#### TEST\_5.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### TEST_5.decimals
+#### TEST\_5.decimals
 
 > `readonly` **decimals**: `18` = `18`
 
-#### TEST_5.symbol
+#### TEST\_5.symbol
 
 > `readonly` **symbol**: `"test"` = `"test"`
 
@@ -8100,23 +8100,23 @@ Defined in: [src/erc20/token/presets.sepolia.ts:11](https://github.com/keep-star
 
 > `readonly` **symbol**: `"testt"` = `"testt"`
 
-### TEST_6
+### TEST\_6
 
-> `readonly` **TEST_6**: `object`
+> `readonly` **TEST\_6**: `object`
 
-#### TEST_6.name
+#### TEST\_6.name
 
 > `readonly` **name**: `"test"` = `"test"`
 
-#### TEST_6.address
+#### TEST\_6.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### TEST_6.decimals
+#### TEST\_6.decimals
 
 > `readonly` **decimals**: `18` = `18`
 
-#### TEST_6.symbol
+#### TEST\_6.symbol
 
 > `readonly` **symbol**: `"test"` = `"test"`
 
@@ -8420,523 +8420,523 @@ Defined in: [src/erc20/token/presets.sepolia.ts:11](https://github.com/keep-star
 
 > `readonly` **symbol**: `"TPOOL"` = `"TPOOL"`
 
-### TPOOL_1
+### TPOOL\_1
 
-> `readonly` **TPOOL_1**: `object`
+> `readonly` **TPOOL\_1**: `object`
 
-#### TPOOL_1.name
-
-> `readonly` **name**: `"TestPool"` = `"TestPool"`
-
-#### TPOOL_1.address
-
-> `readonly` **address**: [`Address`](../type-aliases/Address.md)
-
-#### TPOOL_1.decimals
-
-> `readonly` **decimals**: `18` = `18`
-
-#### TPOOL_1.symbol
-
-> `readonly` **symbol**: `"TPOOL"` = `"TPOOL"`
-
-### TPOOL_2
-
-> `readonly` **TPOOL_2**: `object`
-
-#### TPOOL_2.name
+#### TPOOL\_1.name
 
 > `readonly` **name**: `"TestPool"` = `"TestPool"`
 
-#### TPOOL_2.address
+#### TPOOL\_1.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### TPOOL_2.decimals
+#### TPOOL\_1.decimals
 
 > `readonly` **decimals**: `18` = `18`
 
-#### TPOOL_2.symbol
+#### TPOOL\_1.symbol
 
 > `readonly` **symbol**: `"TPOOL"` = `"TPOOL"`
 
-### TPOOL_3
+### TPOOL\_2
 
-> `readonly` **TPOOL_3**: `object`
+> `readonly` **TPOOL\_2**: `object`
 
-#### TPOOL_3.name
+#### TPOOL\_2.name
 
 > `readonly` **name**: `"TestPool"` = `"TestPool"`
 
-#### TPOOL_3.address
+#### TPOOL\_2.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### TPOOL_3.decimals
+#### TPOOL\_2.decimals
 
 > `readonly` **decimals**: `18` = `18`
 
-#### TPOOL_3.symbol
+#### TPOOL\_2.symbol
 
 > `readonly` **symbol**: `"TPOOL"` = `"TPOOL"`
 
-### TPOOL_4
+### TPOOL\_3
 
-> `readonly` **TPOOL_4**: `object`
+> `readonly` **TPOOL\_3**: `object`
 
-#### TPOOL_4.name
+#### TPOOL\_3.name
 
 > `readonly` **name**: `"TestPool"` = `"TestPool"`
 
-#### TPOOL_4.address
+#### TPOOL\_3.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### TPOOL_4.decimals
+#### TPOOL\_3.decimals
 
 > `readonly` **decimals**: `18` = `18`
 
-#### TPOOL_4.symbol
+#### TPOOL\_3.symbol
 
 > `readonly` **symbol**: `"TPOOL"` = `"TPOOL"`
 
-### TPOOL_5
+### TPOOL\_4
 
-> `readonly` **TPOOL_5**: `object`
+> `readonly` **TPOOL\_4**: `object`
 
-#### TPOOL_5.name
+#### TPOOL\_4.name
 
 > `readonly` **name**: `"TestPool"` = `"TestPool"`
 
-#### TPOOL_5.address
+#### TPOOL\_4.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### TPOOL_5.decimals
+#### TPOOL\_4.decimals
 
 > `readonly` **decimals**: `18` = `18`
 
-#### TPOOL_5.symbol
+#### TPOOL\_4.symbol
 
 > `readonly` **symbol**: `"TPOOL"` = `"TPOOL"`
 
-### TPOOL_6
+### TPOOL\_5
 
-> `readonly` **TPOOL_6**: `object`
+> `readonly` **TPOOL\_5**: `object`
 
-#### TPOOL_6.name
+#### TPOOL\_5.name
 
 > `readonly` **name**: `"TestPool"` = `"TestPool"`
 
-#### TPOOL_6.address
+#### TPOOL\_5.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### TPOOL_6.decimals
+#### TPOOL\_5.decimals
 
 > `readonly` **decimals**: `18` = `18`
 
-#### TPOOL_6.symbol
+#### TPOOL\_5.symbol
 
 > `readonly` **symbol**: `"TPOOL"` = `"TPOOL"`
 
-### TPOOL_7
+### TPOOL\_6
 
-> `readonly` **TPOOL_7**: `object`
+> `readonly` **TPOOL\_6**: `object`
 
-#### TPOOL_7.name
+#### TPOOL\_6.name
 
 > `readonly` **name**: `"TestPool"` = `"TestPool"`
 
-#### TPOOL_7.address
+#### TPOOL\_6.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### TPOOL_7.decimals
+#### TPOOL\_6.decimals
 
 > `readonly` **decimals**: `18` = `18`
 
-#### TPOOL_7.symbol
+#### TPOOL\_6.symbol
 
 > `readonly` **symbol**: `"TPOOL"` = `"TPOOL"`
 
-### TPOOL_8
+### TPOOL\_7
 
-> `readonly` **TPOOL_8**: `object`
+> `readonly` **TPOOL\_7**: `object`
 
-#### TPOOL_8.name
+#### TPOOL\_7.name
 
 > `readonly` **name**: `"TestPool"` = `"TestPool"`
 
-#### TPOOL_8.address
+#### TPOOL\_7.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### TPOOL_8.decimals
+#### TPOOL\_7.decimals
 
 > `readonly` **decimals**: `18` = `18`
 
-#### TPOOL_8.symbol
+#### TPOOL\_7.symbol
 
 > `readonly` **symbol**: `"TPOOL"` = `"TPOOL"`
 
-### TPOOL_9
+### TPOOL\_8
 
-> `readonly` **TPOOL_9**: `object`
+> `readonly` **TPOOL\_8**: `object`
 
-#### TPOOL_9.name
+#### TPOOL\_8.name
 
 > `readonly` **name**: `"TestPool"` = `"TestPool"`
 
-#### TPOOL_9.address
+#### TPOOL\_8.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### TPOOL_9.decimals
+#### TPOOL\_8.decimals
 
 > `readonly` **decimals**: `18` = `18`
 
-#### TPOOL_9.symbol
+#### TPOOL\_8.symbol
 
 > `readonly` **symbol**: `"TPOOL"` = `"TPOOL"`
 
-### TPOOL_10
+### TPOOL\_9
 
-> `readonly` **TPOOL_10**: `object`
+> `readonly` **TPOOL\_9**: `object`
 
-#### TPOOL_10.name
+#### TPOOL\_9.name
 
 > `readonly` **name**: `"TestPool"` = `"TestPool"`
 
-#### TPOOL_10.address
+#### TPOOL\_9.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### TPOOL_10.decimals
+#### TPOOL\_9.decimals
 
 > `readonly` **decimals**: `18` = `18`
 
-#### TPOOL_10.symbol
+#### TPOOL\_9.symbol
 
 > `readonly` **symbol**: `"TPOOL"` = `"TPOOL"`
 
-### TPOOL_11
+### TPOOL\_10
 
-> `readonly` **TPOOL_11**: `object`
+> `readonly` **TPOOL\_10**: `object`
 
-#### TPOOL_11.name
+#### TPOOL\_10.name
 
 > `readonly` **name**: `"TestPool"` = `"TestPool"`
 
-#### TPOOL_11.address
+#### TPOOL\_10.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### TPOOL_11.decimals
+#### TPOOL\_10.decimals
 
 > `readonly` **decimals**: `18` = `18`
 
-#### TPOOL_11.symbol
+#### TPOOL\_10.symbol
 
 > `readonly` **symbol**: `"TPOOL"` = `"TPOOL"`
 
-### TPOOL_12
+### TPOOL\_11
 
-> `readonly` **TPOOL_12**: `object`
+> `readonly` **TPOOL\_11**: `object`
 
-#### TPOOL_12.name
+#### TPOOL\_11.name
 
 > `readonly` **name**: `"TestPool"` = `"TestPool"`
 
-#### TPOOL_12.address
+#### TPOOL\_11.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### TPOOL_12.decimals
+#### TPOOL\_11.decimals
 
 > `readonly` **decimals**: `18` = `18`
 
-#### TPOOL_12.symbol
+#### TPOOL\_11.symbol
 
 > `readonly` **symbol**: `"TPOOL"` = `"TPOOL"`
 
-### TPOOL_13
+### TPOOL\_12
 
-> `readonly` **TPOOL_13**: `object`
+> `readonly` **TPOOL\_12**: `object`
 
-#### TPOOL_13.name
+#### TPOOL\_12.name
 
 > `readonly` **name**: `"TestPool"` = `"TestPool"`
 
-#### TPOOL_13.address
+#### TPOOL\_12.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### TPOOL_13.decimals
+#### TPOOL\_12.decimals
 
 > `readonly` **decimals**: `18` = `18`
 
-#### TPOOL_13.symbol
+#### TPOOL\_12.symbol
 
 > `readonly` **symbol**: `"TPOOL"` = `"TPOOL"`
 
-### TPOOL_14
+### TPOOL\_13
 
-> `readonly` **TPOOL_14**: `object`
+> `readonly` **TPOOL\_13**: `object`
 
-#### TPOOL_14.name
+#### TPOOL\_13.name
 
 > `readonly` **name**: `"TestPool"` = `"TestPool"`
 
-#### TPOOL_14.address
+#### TPOOL\_13.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### TPOOL_14.decimals
+#### TPOOL\_13.decimals
 
 > `readonly` **decimals**: `18` = `18`
 
-#### TPOOL_14.symbol
+#### TPOOL\_13.symbol
 
 > `readonly` **symbol**: `"TPOOL"` = `"TPOOL"`
 
-### TEST_7
+### TPOOL\_14
 
-> `readonly` **TEST_7**: `object`
+> `readonly` **TPOOL\_14**: `object`
 
-#### TEST_7.name
+#### TPOOL\_14.name
+
+> `readonly` **name**: `"TestPool"` = `"TestPool"`
+
+#### TPOOL\_14.address
+
+> `readonly` **address**: [`Address`](../type-aliases/Address.md)
+
+#### TPOOL\_14.decimals
+
+> `readonly` **decimals**: `18` = `18`
+
+#### TPOOL\_14.symbol
+
+> `readonly` **symbol**: `"TPOOL"` = `"TPOOL"`
+
+### TEST\_7
+
+> `readonly` **TEST\_7**: `object`
+
+#### TEST\_7.name
 
 > `readonly` **name**: `"TestToken"` = `"TestToken"`
 
-#### TEST_7.address
+#### TEST\_7.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### TEST_7.decimals
+#### TEST\_7.decimals
 
 > `readonly` **decimals**: `18` = `18`
 
-#### TEST_7.symbol
+#### TEST\_7.symbol
 
 > `readonly` **symbol**: `"TEST"` = `"TEST"`
 
-### TEST_8
+### TEST\_8
 
-> `readonly` **TEST_8**: `object`
+> `readonly` **TEST\_8**: `object`
 
-#### TEST_8.name
+#### TEST\_8.name
 
 > `readonly` **name**: `"TestToken"` = `"TestToken"`
 
-#### TEST_8.address
+#### TEST\_8.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### TEST_8.decimals
+#### TEST\_8.decimals
 
 > `readonly` **decimals**: `18` = `18`
 
-#### TEST_8.symbol
+#### TEST\_8.symbol
 
 > `readonly` **symbol**: `"TEST"` = `"TEST"`
 
-### TEST_9
+### TEST\_9
 
-> `readonly` **TEST_9**: `object`
+> `readonly` **TEST\_9**: `object`
 
-#### TEST_9.name
+#### TEST\_9.name
 
 > `readonly` **name**: `"TestToken"` = `"TestToken"`
 
-#### TEST_9.address
+#### TEST\_9.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### TEST_9.decimals
+#### TEST\_9.decimals
 
 > `readonly` **decimals**: `18` = `18`
 
-#### TEST_9.symbol
+#### TEST\_9.symbol
 
 > `readonly` **symbol**: `"TEST"` = `"TEST"`
 
-### TEST_10
+### TEST\_10
 
-> `readonly` **TEST_10**: `object`
+> `readonly` **TEST\_10**: `object`
 
-#### TEST_10.name
+#### TEST\_10.name
 
 > `readonly` **name**: `"TestToken"` = `"TestToken"`
 
-#### TEST_10.address
+#### TEST\_10.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### TEST_10.decimals
+#### TEST\_10.decimals
 
 > `readonly` **decimals**: `18` = `18`
 
-#### TEST_10.symbol
+#### TEST\_10.symbol
 
 > `readonly` **symbol**: `"TEST"` = `"TEST"`
 
-### TEST_11
+### TEST\_11
 
-> `readonly` **TEST_11**: `object`
+> `readonly` **TEST\_11**: `object`
 
-#### TEST_11.name
+#### TEST\_11.name
 
 > `readonly` **name**: `"TestToken"` = `"TestToken"`
 
-#### TEST_11.address
+#### TEST\_11.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### TEST_11.decimals
+#### TEST\_11.decimals
 
 > `readonly` **decimals**: `18` = `18`
 
-#### TEST_11.symbol
+#### TEST\_11.symbol
 
 > `readonly` **symbol**: `"TEST"` = `"TEST"`
 
-### TEST_12
+### TEST\_12
 
-> `readonly` **TEST_12**: `object`
+> `readonly` **TEST\_12**: `object`
 
-#### TEST_12.name
+#### TEST\_12.name
 
 > `readonly` **name**: `"TestToken"` = `"TestToken"`
 
-#### TEST_12.address
+#### TEST\_12.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### TEST_12.decimals
+#### TEST\_12.decimals
 
 > `readonly` **decimals**: `18` = `18`
 
-#### TEST_12.symbol
+#### TEST\_12.symbol
 
 > `readonly` **symbol**: `"TEST"` = `"TEST"`
 
-### TEST_13
+### TEST\_13
 
-> `readonly` **TEST_13**: `object`
+> `readonly` **TEST\_13**: `object`
 
-#### TEST_13.name
+#### TEST\_13.name
 
 > `readonly` **name**: `"TestToken"` = `"TestToken"`
 
-#### TEST_13.address
+#### TEST\_13.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### TEST_13.decimals
+#### TEST\_13.decimals
 
 > `readonly` **decimals**: `18` = `18`
 
-#### TEST_13.symbol
+#### TEST\_13.symbol
 
 > `readonly` **symbol**: `"TEST"` = `"TEST"`
 
-### TEST_14
+### TEST\_14
 
-> `readonly` **TEST_14**: `object`
+> `readonly` **TEST\_14**: `object`
 
-#### TEST_14.name
+#### TEST\_14.name
 
 > `readonly` **name**: `"TestToken"` = `"TestToken"`
 
-#### TEST_14.address
+#### TEST\_14.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### TEST_14.decimals
+#### TEST\_14.decimals
 
 > `readonly` **decimals**: `18` = `18`
 
-#### TEST_14.symbol
+#### TEST\_14.symbol
 
 > `readonly` **symbol**: `"TEST"` = `"TEST"`
 
-### TEST_15
+### TEST\_15
 
-> `readonly` **TEST_15**: `object`
+> `readonly` **TEST\_15**: `object`
 
-#### TEST_15.name
+#### TEST\_15.name
 
 > `readonly` **name**: `"TestToken"` = `"TestToken"`
 
-#### TEST_15.address
+#### TEST\_15.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### TEST_15.decimals
+#### TEST\_15.decimals
 
 > `readonly` **decimals**: `18` = `18`
 
-#### TEST_15.symbol
+#### TEST\_15.symbol
 
 > `readonly` **symbol**: `"TEST"` = `"TEST"`
 
-### TEST_16
+### TEST\_16
 
-> `readonly` **TEST_16**: `object`
+> `readonly` **TEST\_16**: `object`
 
-#### TEST_16.name
+#### TEST\_16.name
 
 > `readonly` **name**: `"TestToken"` = `"TestToken"`
 
-#### TEST_16.address
+#### TEST\_16.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### TEST_16.decimals
+#### TEST\_16.decimals
 
 > `readonly` **decimals**: `18` = `18`
 
-#### TEST_16.symbol
+#### TEST\_16.symbol
 
 > `readonly` **symbol**: `"TEST"` = `"TEST"`
 
-### TEST_17
+### TEST\_17
 
-> `readonly` **TEST_17**: `object`
+> `readonly` **TEST\_17**: `object`
 
-#### TEST_17.name
+#### TEST\_17.name
 
 > `readonly` **name**: `"TestToken"` = `"TestToken"`
 
-#### TEST_17.address
+#### TEST\_17.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### TEST_17.decimals
+#### TEST\_17.decimals
 
 > `readonly` **decimals**: `18` = `18`
 
-#### TEST_17.symbol
+#### TEST\_17.symbol
 
 > `readonly` **symbol**: `"TEST"` = `"TEST"`
 
-### TEST_18
+### TEST\_18
 
-> `readonly` **TEST_18**: `object`
+> `readonly` **TEST\_18**: `object`
 
-#### TEST_18.name
+#### TEST\_18.name
 
 > `readonly` **name**: `"TestToken"` = `"TestToken"`
 
-#### TEST_18.address
+#### TEST\_18.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### TEST_18.decimals
+#### TEST\_18.decimals
 
 > `readonly` **decimals**: `18` = `18`
 
-#### TEST_18.symbol
+#### TEST\_18.symbol
 
 > `readonly` **symbol**: `"TEST"` = `"TEST"`
 
@@ -8960,263 +8960,263 @@ Defined in: [src/erc20/token/presets.sepolia.ts:11](https://github.com/keep-star
 
 > `readonly` **symbol**: `"TTK"` = `"TTK"`
 
-### TEST_19
+### TEST\_19
 
-> `readonly` **TEST_19**: `object`
+> `readonly` **TEST\_19**: `object`
 
-#### TEST_19.name
+#### TEST\_19.name
 
 > `readonly` **name**: `"TestToken"` = `"TestToken"`
 
-#### TEST_19.address
+#### TEST\_19.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### TEST_19.decimals
+#### TEST\_19.decimals
 
 > `readonly` **decimals**: `18` = `18`
 
-#### TEST_19.symbol
+#### TEST\_19.symbol
 
 > `readonly` **symbol**: `"TEST"` = `"TEST"`
 
-### TEST_20
+### TEST\_20
 
-> `readonly` **TEST_20**: `object`
+> `readonly` **TEST\_20**: `object`
 
-#### TEST_20.name
+#### TEST\_20.name
 
 > `readonly` **name**: `"TestToken"` = `"TestToken"`
 
-#### TEST_20.address
+#### TEST\_20.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### TEST_20.decimals
+#### TEST\_20.decimals
 
 > `readonly` **decimals**: `18` = `18`
 
-#### TEST_20.symbol
+#### TEST\_20.symbol
 
 > `readonly` **symbol**: `"TEST"` = `"TEST"`
 
-### TEST_21
+### TEST\_21
 
-> `readonly` **TEST_21**: `object`
+> `readonly` **TEST\_21**: `object`
 
-#### TEST_21.name
+#### TEST\_21.name
 
 > `readonly` **name**: `"TestToken"` = `"TestToken"`
 
-#### TEST_21.address
+#### TEST\_21.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### TEST_21.decimals
+#### TEST\_21.decimals
 
 > `readonly` **decimals**: `18` = `18`
 
-#### TEST_21.symbol
+#### TEST\_21.symbol
 
 > `readonly` **symbol**: `"TEST"` = `"TEST"`
 
-### TEST_22
+### TEST\_22
 
-> `readonly` **TEST_22**: `object`
+> `readonly` **TEST\_22**: `object`
 
-#### TEST_22.name
+#### TEST\_22.name
 
 > `readonly` **name**: `"TestToken"` = `"TestToken"`
 
-#### TEST_22.address
+#### TEST\_22.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### TEST_22.decimals
+#### TEST\_22.decimals
 
 > `readonly` **decimals**: `18` = `18`
 
-#### TEST_22.symbol
+#### TEST\_22.symbol
 
 > `readonly` **symbol**: `"TEST"` = `"TEST"`
 
-### TEST_23
+### TEST\_23
 
-> `readonly` **TEST_23**: `object`
+> `readonly` **TEST\_23**: `object`
 
-#### TEST_23.name
+#### TEST\_23.name
 
 > `readonly` **name**: `"TestToken"` = `"TestToken"`
 
-#### TEST_23.address
+#### TEST\_23.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### TEST_23.decimals
+#### TEST\_23.decimals
 
 > `readonly` **decimals**: `18` = `18`
 
-#### TEST_23.symbol
+#### TEST\_23.symbol
 
 > `readonly` **symbol**: `"TEST"` = `"TEST"`
 
-### TEST_24
+### TEST\_24
 
-> `readonly` **TEST_24**: `object`
+> `readonly` **TEST\_24**: `object`
 
-#### TEST_24.name
+#### TEST\_24.name
 
 > `readonly` **name**: `"TestToken"` = `"TestToken"`
 
-#### TEST_24.address
+#### TEST\_24.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### TEST_24.decimals
+#### TEST\_24.decimals
 
 > `readonly` **decimals**: `18` = `18`
 
-#### TEST_24.symbol
+#### TEST\_24.symbol
 
 > `readonly` **symbol**: `"TEST"` = `"TEST"`
 
-### TEST_25
+### TEST\_25
 
-> `readonly` **TEST_25**: `object`
+> `readonly` **TEST\_25**: `object`
 
-#### TEST_25.name
+#### TEST\_25.name
 
 > `readonly` **name**: `"TestToken"` = `"TestToken"`
 
-#### TEST_25.address
+#### TEST\_25.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### TEST_25.decimals
+#### TEST\_25.decimals
 
 > `readonly` **decimals**: `18` = `18`
 
-#### TEST_25.symbol
+#### TEST\_25.symbol
 
 > `readonly` **symbol**: `"TEST"` = `"TEST"`
 
-### TEST_26
+### TEST\_26
 
-> `readonly` **TEST_26**: `object`
+> `readonly` **TEST\_26**: `object`
 
-#### TEST_26.name
+#### TEST\_26.name
 
 > `readonly` **name**: `"TestToken"` = `"TestToken"`
 
-#### TEST_26.address
+#### TEST\_26.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### TEST_26.decimals
+#### TEST\_26.decimals
 
 > `readonly` **decimals**: `18` = `18`
 
-#### TEST_26.symbol
+#### TEST\_26.symbol
 
 > `readonly` **symbol**: `"TEST"` = `"TEST"`
 
-### TEST_27
+### TEST\_27
 
-> `readonly` **TEST_27**: `object`
+> `readonly` **TEST\_27**: `object`
 
-#### TEST_27.name
+#### TEST\_27.name
 
 > `readonly` **name**: `"TestToken"` = `"TestToken"`
 
-#### TEST_27.address
+#### TEST\_27.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### TEST_27.decimals
+#### TEST\_27.decimals
 
 > `readonly` **decimals**: `18` = `18`
 
-#### TEST_27.symbol
+#### TEST\_27.symbol
 
 > `readonly` **symbol**: `"TEST"` = `"TEST"`
 
-### TEST_28
+### TEST\_28
 
-> `readonly` **TEST_28**: `object`
+> `readonly` **TEST\_28**: `object`
 
-#### TEST_28.name
+#### TEST\_28.name
 
 > `readonly` **name**: `"TestToken"` = `"TestToken"`
 
-#### TEST_28.address
+#### TEST\_28.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### TEST_28.decimals
+#### TEST\_28.decimals
 
 > `readonly` **decimals**: `18` = `18`
 
-#### TEST_28.symbol
+#### TEST\_28.symbol
 
 > `readonly` **symbol**: `"TEST"` = `"TEST"`
 
-### TEST_29
+### TEST\_29
 
-> `readonly` **TEST_29**: `object`
+> `readonly` **TEST\_29**: `object`
 
-#### TEST_29.name
+#### TEST\_29.name
 
 > `readonly` **name**: `"TestToken"` = `"TestToken"`
 
-#### TEST_29.address
+#### TEST\_29.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### TEST_29.decimals
+#### TEST\_29.decimals
 
 > `readonly` **decimals**: `18` = `18`
 
-#### TEST_29.symbol
+#### TEST\_29.symbol
 
 > `readonly` **symbol**: `"TEST"` = `"TEST"`
 
-### TEST_30
+### TEST\_30
 
-> `readonly` **TEST_30**: `object`
+> `readonly` **TEST\_30**: `object`
 
-#### TEST_30.name
+#### TEST\_30.name
 
 > `readonly` **name**: `"TestToken"` = `"TestToken"`
 
-#### TEST_30.address
+#### TEST\_30.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### TEST_30.decimals
+#### TEST\_30.decimals
 
 > `readonly` **decimals**: `18` = `18`
 
-#### TEST_30.symbol
+#### TEST\_30.symbol
 
 > `readonly` **symbol**: `"TEST"` = `"TEST"`
 
-### TEST_31
+### TEST\_31
 
-> `readonly` **TEST_31**: `object`
+> `readonly` **TEST\_31**: `object`
 
-#### TEST_31.name
+#### TEST\_31.name
 
 > `readonly` **name**: `"TestToken"` = `"TestToken"`
 
-#### TEST_31.address
+#### TEST\_31.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### TEST_31.decimals
+#### TEST\_31.decimals
 
 > `readonly` **decimals**: `18` = `18`
 
-#### TEST_31.symbol
+#### TEST\_31.symbol
 
 > `readonly` **symbol**: `"TEST"` = `"TEST"`
 
@@ -9320,23 +9320,23 @@ Defined in: [src/erc20/token/presets.sepolia.ts:11](https://github.com/keep-star
 
 > `readonly` **symbol**: `"toast"` = `"toast"`
 
-### TOAST_1
+### TOAST\_1
 
-> `readonly` **TOAST_1**: `object`
+> `readonly` **TOAST\_1**: `object`
 
-#### TOAST_1.name
+#### TOAST\_1.name
 
 > `readonly` **name**: `"toast"` = `"toast"`
 
-#### TOAST_1.address
+#### TOAST\_1.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### TOAST_1.decimals
+#### TOAST\_1.decimals
 
 > `readonly` **decimals**: `18` = `18`
 
-#### TOAST_1.symbol
+#### TOAST\_1.symbol
 
 > `readonly` **symbol**: `"toast"` = `"toast"`
 
@@ -9480,23 +9480,23 @@ Defined in: [src/erc20/token/presets.sepolia.ts:11](https://github.com/keep-star
 
 > `readonly` **symbol**: `"USDU"` = `"USDU"`
 
-### USDU_1
+### USDU\_1
 
-> `readonly` **USDU_1**: `object`
+> `readonly` **USDU\_1**: `object`
 
-#### USDU_1.name
+#### USDU\_1.name
 
 > `readonly` **name**: `"Uncap USD"` = `"Uncap USD"`
 
-#### USDU_1.address
+#### USDU\_1.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### USDU_1.decimals
+#### USDU\_1.decimals
 
 > `readonly` **decimals**: `18` = `18`
 
-#### USDU_1.symbol
+#### USDU\_1.symbol
 
 > `readonly` **symbol**: `"USDU"` = `"USDU"`
 
@@ -9520,43 +9520,43 @@ Defined in: [src/erc20/token/presets.sepolia.ts:11](https://github.com/keep-star
 
 > `readonly` **symbol**: `"asdf"` = `"asdf"`
 
-### ASDF_1
+### ASDF\_1
 
-> `readonly` **ASDF_1**: `object`
+> `readonly` **ASDF\_1**: `object`
 
-#### ASDF_1.name
+#### ASDF\_1.name
 
 > `readonly` **name**: `"uncapname"` = `"uncapname"`
 
-#### ASDF_1.address
+#### ASDF\_1.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### ASDF_1.decimals
+#### ASDF\_1.decimals
 
 > `readonly` **decimals**: `18` = `18`
 
-#### ASDF_1.symbol
+#### ASDF\_1.symbol
 
 > `readonly` **symbol**: `"asdf"` = `"asdf"`
 
-### ASDF_2
+### ASDF\_2
 
-> `readonly` **ASDF_2**: `object`
+> `readonly` **ASDF\_2**: `object`
 
-#### ASDF_2.name
+#### ASDF\_2.name
 
 > `readonly` **name**: `"uncapname"` = `"uncapname"`
 
-#### ASDF_2.address
+#### ASDF\_2.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### ASDF_2.decimals
+#### ASDF\_2.decimals
 
 > `readonly` **decimals**: `18` = `18`
 
-#### ASDF_2.symbol
+#### ASDF\_2.symbol
 
 > `readonly` **symbol**: `"asdf"` = `"asdf"`
 
@@ -9600,83 +9600,83 @@ Defined in: [src/erc20/token/presets.sepolia.ts:11](https://github.com/keep-star
 
 > `readonly` **symbol**: `"USDCM"` = `"USDCM"`
 
-### USDCM_1
+### USDCM\_1
 
-> `readonly` **USDCM_1**: `object`
+> `readonly` **USDCM\_1**: `object`
 
-#### USDCM_1.name
+#### USDCM\_1.name
 
 > `readonly` **name**: `"USDC Mock"` = `"USDC Mock"`
 
-#### USDCM_1.address
+#### USDCM\_1.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### USDCM_1.decimals
+#### USDCM\_1.decimals
 
 > `readonly` **decimals**: `6` = `6`
 
-#### USDCM_1.symbol
+#### USDCM\_1.symbol
 
 > `readonly` **symbol**: `"USDCM"` = `"USDCM"`
 
-### USDCM_2
+### USDCM\_2
 
-> `readonly` **USDCM_2**: `object`
+> `readonly` **USDCM\_2**: `object`
 
-#### USDCM_2.name
+#### USDCM\_2.name
 
 > `readonly` **name**: `"USDC Mock"` = `"USDC Mock"`
 
-#### USDCM_2.address
+#### USDCM\_2.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### USDCM_2.decimals
+#### USDCM\_2.decimals
 
 > `readonly` **decimals**: `6` = `6`
 
-#### USDCM_2.symbol
+#### USDCM\_2.symbol
 
 > `readonly` **symbol**: `"USDCM"` = `"USDCM"`
 
-### USDCM_3
+### USDCM\_3
 
-> `readonly` **USDCM_3**: `object`
+> `readonly` **USDCM\_3**: `object`
 
-#### USDCM_3.name
+#### USDCM\_3.name
 
 > `readonly` **name**: `"USDC Mock"` = `"USDC Mock"`
 
-#### USDCM_3.address
+#### USDCM\_3.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### USDCM_3.decimals
+#### USDCM\_3.decimals
 
 > `readonly` **decimals**: `6` = `6`
 
-#### USDCM_3.symbol
+#### USDCM\_3.symbol
 
 > `readonly` **symbol**: `"USDCM"` = `"USDCM"`
 
-### USDCM_4
+### USDCM\_4
 
-> `readonly` **USDCM_4**: `object`
+> `readonly` **USDCM\_4**: `object`
 
-#### USDCM_4.name
+#### USDCM\_4.name
 
 > `readonly` **name**: `"USDC Mock"` = `"USDC Mock"`
 
-#### USDCM_4.address
+#### USDCM\_4.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### USDCM_4.decimals
+#### USDCM\_4.decimals
 
 > `readonly` **decimals**: `6` = `6`
 
-#### USDCM_4.symbol
+#### USDCM\_4.symbol
 
 > `readonly` **symbol**: `"USDCM"` = `"USDCM"`
 
@@ -9860,63 +9860,63 @@ Defined in: [src/erc20/token/presets.sepolia.ts:11](https://github.com/keep-star
 
 > `readonly` **symbol**: `"WBTC"` = `"WBTC"`
 
-### WBTC_1
+### WBTC\_1
 
-> `readonly` **WBTC_1**: `object`
+> `readonly` **WBTC\_1**: `object`
 
-#### WBTC_1.name
+#### WBTC\_1.name
 
 > `readonly` **name**: `"wrapped-bitcoin"` = `"wrapped-bitcoin"`
 
-#### WBTC_1.address
+#### WBTC\_1.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### WBTC_1.decimals
+#### WBTC\_1.decimals
 
 > `readonly` **decimals**: `8` = `8`
 
-#### WBTC_1.symbol
+#### WBTC\_1.symbol
 
 > `readonly` **symbol**: `"WBTC"` = `"WBTC"`
 
-### WBTC_2
+### WBTC\_2
 
-> `readonly` **WBTC_2**: `object`
+> `readonly` **WBTC\_2**: `object`
 
-#### WBTC_2.name
+#### WBTC\_2.name
 
 > `readonly` **name**: `"wrapped-bitcoin"` = `"wrapped-bitcoin"`
 
-#### WBTC_2.address
+#### WBTC\_2.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### WBTC_2.decimals
+#### WBTC\_2.decimals
 
 > `readonly` **decimals**: `8` = `8`
 
-#### WBTC_2.symbol
+#### WBTC\_2.symbol
 
 > `readonly` **symbol**: `"WBTC"` = `"WBTC"`
 
-### WBTC_3
+### WBTC\_3
 
-> `readonly` **WBTC_3**: `object`
+> `readonly` **WBTC\_3**: `object`
 
-#### WBTC_3.name
+#### WBTC\_3.name
 
 > `readonly` **name**: `"wrapped-bitcoin"` = `"wrapped-bitcoin"`
 
-#### WBTC_3.address
+#### WBTC\_3.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### WBTC_3.decimals
+#### WBTC\_3.decimals
 
 > `readonly` **decimals**: `8` = `8`
 
-#### WBTC_3.symbol
+#### WBTC\_3.symbol
 
 > `readonly` **symbol**: `"WBTC"` = `"WBTC"`
 
@@ -10000,23 +10000,23 @@ Defined in: [src/erc20/token/presets.sepolia.ts:11](https://github.com/keep-star
 
 > `readonly` **symbol**: `"yata"` = `"yata"`
 
-### YATA_1
+### YATA\_1
 
-> `readonly` **YATA_1**: `object`
+> `readonly` **YATA\_1**: `object`
 
-#### YATA_1.name
+#### YATA\_1.name
 
 > `readonly` **name**: `"yata"` = `"yata"`
 
-#### YATA_1.address
+#### YATA\_1.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### YATA_1.decimals
+#### YATA\_1.decimals
 
 > `readonly` **decimals**: `18` = `18`
 
-#### YATA_1.symbol
+#### YATA\_1.symbol
 
 > `readonly` **symbol**: `"yata"` = `"yata"`
 
@@ -10040,1323 +10040,1323 @@ Defined in: [src/erc20/token/presets.sepolia.ts:11](https://github.com/keep-star
 
 > `readonly` **symbol**: `"YES"` = `"YES"`
 
-### YES_1
+### YES\_1
 
-> `readonly` **YES_1**: `object`
+> `readonly` **YES\_1**: `object`
 
-#### YES_1.name
+#### YES\_1.name
 
 > `readonly` **name**: `"YES_Token"` = `"YES_Token"`
 
-#### YES_1.address
+#### YES\_1.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### YES_1.decimals
+#### YES\_1.decimals
 
 > `readonly` **decimals**: `6` = `6`
 
-#### YES_1.symbol
+#### YES\_1.symbol
 
 > `readonly` **symbol**: `"YES"` = `"YES"`
 
-### YES_2
+### YES\_2
 
-> `readonly` **YES_2**: `object`
+> `readonly` **YES\_2**: `object`
 
-#### YES_2.name
+#### YES\_2.name
 
 > `readonly` **name**: `"YES_Token"` = `"YES_Token"`
 
-#### YES_2.address
+#### YES\_2.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### YES_2.decimals
+#### YES\_2.decimals
 
 > `readonly` **decimals**: `6` = `6`
 
-#### YES_2.symbol
+#### YES\_2.symbol
 
 > `readonly` **symbol**: `"YES"` = `"YES"`
 
-### YES_3
+### YES\_3
 
-> `readonly` **YES_3**: `object`
+> `readonly` **YES\_3**: `object`
 
-#### YES_3.name
+#### YES\_3.name
 
 > `readonly` **name**: `"YES_Token"` = `"YES_Token"`
 
-#### YES_3.address
+#### YES\_3.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### YES_3.decimals
+#### YES\_3.decimals
 
 > `readonly` **decimals**: `6` = `6`
 
-#### YES_3.symbol
+#### YES\_3.symbol
 
 > `readonly` **symbol**: `"YES"` = `"YES"`
 
-### YES_4
+### YES\_4
 
-> `readonly` **YES_4**: `object`
+> `readonly` **YES\_4**: `object`
 
-#### YES_4.name
+#### YES\_4.name
 
 > `readonly` **name**: `"YES_Token"` = `"YES_Token"`
 
-#### YES_4.address
+#### YES\_4.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### YES_4.decimals
+#### YES\_4.decimals
 
 > `readonly` **decimals**: `6` = `6`
 
-#### YES_4.symbol
+#### YES\_4.symbol
 
 > `readonly` **symbol**: `"YES"` = `"YES"`
 
-### YES_5
+### YES\_5
 
-> `readonly` **YES_5**: `object`
+> `readonly` **YES\_5**: `object`
 
-#### YES_5.name
+#### YES\_5.name
 
 > `readonly` **name**: `"YES_Token"` = `"YES_Token"`
 
-#### YES_5.address
+#### YES\_5.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### YES_5.decimals
+#### YES\_5.decimals
 
 > `readonly` **decimals**: `6` = `6`
 
-#### YES_5.symbol
+#### YES\_5.symbol
 
 > `readonly` **symbol**: `"YES"` = `"YES"`
 
-### YES_6
+### YES\_6
 
-> `readonly` **YES_6**: `object`
+> `readonly` **YES\_6**: `object`
 
-#### YES_6.name
+#### YES\_6.name
 
 > `readonly` **name**: `"YES_Token"` = `"YES_Token"`
 
-#### YES_6.address
+#### YES\_6.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### YES_6.decimals
+#### YES\_6.decimals
 
 > `readonly` **decimals**: `6` = `6`
 
-#### YES_6.symbol
+#### YES\_6.symbol
 
 > `readonly` **symbol**: `"YES"` = `"YES"`
 
-### YES_7
+### YES\_7
 
-> `readonly` **YES_7**: `object`
+> `readonly` **YES\_7**: `object`
 
-#### YES_7.name
+#### YES\_7.name
 
 > `readonly` **name**: `"YES_Token"` = `"YES_Token"`
 
-#### YES_7.address
+#### YES\_7.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### YES_7.decimals
+#### YES\_7.decimals
 
 > `readonly` **decimals**: `6` = `6`
 
-#### YES_7.symbol
+#### YES\_7.symbol
 
 > `readonly` **symbol**: `"YES"` = `"YES"`
 
-### YES_8
+### YES\_8
 
-> `readonly` **YES_8**: `object`
+> `readonly` **YES\_8**: `object`
 
-#### YES_8.name
+#### YES\_8.name
 
 > `readonly` **name**: `"YES_Token"` = `"YES_Token"`
 
-#### YES_8.address
+#### YES\_8.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### YES_8.decimals
+#### YES\_8.decimals
 
 > `readonly` **decimals**: `6` = `6`
 
-#### YES_8.symbol
+#### YES\_8.symbol
 
 > `readonly` **symbol**: `"YES"` = `"YES"`
 
-### YES_9
+### YES\_9
 
-> `readonly` **YES_9**: `object`
+> `readonly` **YES\_9**: `object`
 
-#### YES_9.name
+#### YES\_9.name
 
 > `readonly` **name**: `"YES_Token"` = `"YES_Token"`
 
-#### YES_9.address
+#### YES\_9.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### YES_9.decimals
+#### YES\_9.decimals
 
 > `readonly` **decimals**: `6` = `6`
 
-#### YES_9.symbol
+#### YES\_9.symbol
 
 > `readonly` **symbol**: `"YES"` = `"YES"`
 
-### YES_10
+### YES\_10
 
-> `readonly` **YES_10**: `object`
+> `readonly` **YES\_10**: `object`
 
-#### YES_10.name
+#### YES\_10.name
 
 > `readonly` **name**: `"YES_Token"` = `"YES_Token"`
 
-#### YES_10.address
+#### YES\_10.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### YES_10.decimals
+#### YES\_10.decimals
 
 > `readonly` **decimals**: `6` = `6`
 
-#### YES_10.symbol
+#### YES\_10.symbol
 
 > `readonly` **symbol**: `"YES"` = `"YES"`
 
-### YES_11
+### YES\_11
 
-> `readonly` **YES_11**: `object`
+> `readonly` **YES\_11**: `object`
 
-#### YES_11.name
+#### YES\_11.name
 
 > `readonly` **name**: `"YES_Token"` = `"YES_Token"`
 
-#### YES_11.address
+#### YES\_11.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### YES_11.decimals
+#### YES\_11.decimals
 
 > `readonly` **decimals**: `6` = `6`
 
-#### YES_11.symbol
+#### YES\_11.symbol
 
 > `readonly` **symbol**: `"YES"` = `"YES"`
 
-### YES_12
+### YES\_12
 
-> `readonly` **YES_12**: `object`
+> `readonly` **YES\_12**: `object`
 
-#### YES_12.name
+#### YES\_12.name
 
 > `readonly` **name**: `"YES_Token"` = `"YES_Token"`
 
-#### YES_12.address
+#### YES\_12.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### YES_12.decimals
+#### YES\_12.decimals
 
 > `readonly` **decimals**: `6` = `6`
 
-#### YES_12.symbol
+#### YES\_12.symbol
 
 > `readonly` **symbol**: `"YES"` = `"YES"`
 
-### YES_13
+### YES\_13
 
-> `readonly` **YES_13**: `object`
+> `readonly` **YES\_13**: `object`
 
-#### YES_13.name
+#### YES\_13.name
 
 > `readonly` **name**: `"YES_Token"` = `"YES_Token"`
 
-#### YES_13.address
+#### YES\_13.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### YES_13.decimals
+#### YES\_13.decimals
 
 > `readonly` **decimals**: `6` = `6`
 
-#### YES_13.symbol
+#### YES\_13.symbol
 
 > `readonly` **symbol**: `"YES"` = `"YES"`
 
-### YES_14
+### YES\_14
 
-> `readonly` **YES_14**: `object`
+> `readonly` **YES\_14**: `object`
 
-#### YES_14.name
+#### YES\_14.name
 
 > `readonly` **name**: `"YES_Token"` = `"YES_Token"`
 
-#### YES_14.address
+#### YES\_14.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### YES_14.decimals
+#### YES\_14.decimals
 
 > `readonly` **decimals**: `6` = `6`
 
-#### YES_14.symbol
+#### YES\_14.symbol
 
 > `readonly` **symbol**: `"YES"` = `"YES"`
 
-### YES_15
+### YES\_15
 
-> `readonly` **YES_15**: `object`
+> `readonly` **YES\_15**: `object`
 
-#### YES_15.name
+#### YES\_15.name
 
 > `readonly` **name**: `"YES_Token"` = `"YES_Token"`
 
-#### YES_15.address
+#### YES\_15.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### YES_15.decimals
+#### YES\_15.decimals
 
 > `readonly` **decimals**: `6` = `6`
 
-#### YES_15.symbol
+#### YES\_15.symbol
 
 > `readonly` **symbol**: `"YES"` = `"YES"`
 
-### YES_16
+### YES\_16
 
-> `readonly` **YES_16**: `object`
+> `readonly` **YES\_16**: `object`
 
-#### YES_16.name
+#### YES\_16.name
 
 > `readonly` **name**: `"YES_Token"` = `"YES_Token"`
 
-#### YES_16.address
+#### YES\_16.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### YES_16.decimals
+#### YES\_16.decimals
 
 > `readonly` **decimals**: `6` = `6`
 
-#### YES_16.symbol
+#### YES\_16.symbol
 
 > `readonly` **symbol**: `"YES"` = `"YES"`
 
-### YES_17
+### YES\_17
 
-> `readonly` **YES_17**: `object`
+> `readonly` **YES\_17**: `object`
 
-#### YES_17.name
+#### YES\_17.name
 
 > `readonly` **name**: `"YES_Token"` = `"YES_Token"`
 
-#### YES_17.address
+#### YES\_17.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### YES_17.decimals
+#### YES\_17.decimals
 
 > `readonly` **decimals**: `6` = `6`
 
-#### YES_17.symbol
+#### YES\_17.symbol
 
 > `readonly` **symbol**: `"YES"` = `"YES"`
 
-### YES_18
+### YES\_18
 
-> `readonly` **YES_18**: `object`
+> `readonly` **YES\_18**: `object`
 
-#### YES_18.name
+#### YES\_18.name
 
 > `readonly` **name**: `"YES_Token"` = `"YES_Token"`
 
-#### YES_18.address
+#### YES\_18.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### YES_18.decimals
+#### YES\_18.decimals
 
 > `readonly` **decimals**: `6` = `6`
 
-#### YES_18.symbol
+#### YES\_18.symbol
 
 > `readonly` **symbol**: `"YES"` = `"YES"`
 
-### YES_19
+### YES\_19
 
-> `readonly` **YES_19**: `object`
+> `readonly` **YES\_19**: `object`
 
-#### YES_19.name
+#### YES\_19.name
 
 > `readonly` **name**: `"YES_Token"` = `"YES_Token"`
 
-#### YES_19.address
+#### YES\_19.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### YES_19.decimals
+#### YES\_19.decimals
 
 > `readonly` **decimals**: `6` = `6`
 
-#### YES_19.symbol
+#### YES\_19.symbol
 
 > `readonly` **symbol**: `"YES"` = `"YES"`
 
-### YES_20
+### YES\_20
 
-> `readonly` **YES_20**: `object`
+> `readonly` **YES\_20**: `object`
 
-#### YES_20.name
+#### YES\_20.name
 
 > `readonly` **name**: `"YES_Token"` = `"YES_Token"`
 
-#### YES_20.address
+#### YES\_20.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### YES_20.decimals
+#### YES\_20.decimals
 
 > `readonly` **decimals**: `6` = `6`
 
-#### YES_20.symbol
+#### YES\_20.symbol
 
 > `readonly` **symbol**: `"YES"` = `"YES"`
 
-### YES_21
+### YES\_21
 
-> `readonly` **YES_21**: `object`
+> `readonly` **YES\_21**: `object`
 
-#### YES_21.name
+#### YES\_21.name
 
 > `readonly` **name**: `"YES_Token"` = `"YES_Token"`
 
-#### YES_21.address
+#### YES\_21.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### YES_21.decimals
+#### YES\_21.decimals
 
 > `readonly` **decimals**: `6` = `6`
 
-#### YES_21.symbol
+#### YES\_21.symbol
 
 > `readonly` **symbol**: `"YES"` = `"YES"`
 
-### YES_22
+### YES\_22
 
-> `readonly` **YES_22**: `object`
+> `readonly` **YES\_22**: `object`
 
-#### YES_22.name
+#### YES\_22.name
 
 > `readonly` **name**: `"YES_Token"` = `"YES_Token"`
 
-#### YES_22.address
+#### YES\_22.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### YES_22.decimals
+#### YES\_22.decimals
 
 > `readonly` **decimals**: `6` = `6`
 
-#### YES_22.symbol
+#### YES\_22.symbol
 
 > `readonly` **symbol**: `"YES"` = `"YES"`
 
-### YES_23
+### YES\_23
 
-> `readonly` **YES_23**: `object`
+> `readonly` **YES\_23**: `object`
 
-#### YES_23.name
+#### YES\_23.name
 
 > `readonly` **name**: `"YES_Token"` = `"YES_Token"`
 
-#### YES_23.address
+#### YES\_23.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### YES_23.decimals
+#### YES\_23.decimals
 
 > `readonly` **decimals**: `6` = `6`
 
-#### YES_23.symbol
+#### YES\_23.symbol
 
 > `readonly` **symbol**: `"YES"` = `"YES"`
 
-### YES_24
+### YES\_24
 
-> `readonly` **YES_24**: `object`
+> `readonly` **YES\_24**: `object`
 
-#### YES_24.name
+#### YES\_24.name
 
 > `readonly` **name**: `"YES_Token"` = `"YES_Token"`
 
-#### YES_24.address
+#### YES\_24.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### YES_24.decimals
+#### YES\_24.decimals
 
 > `readonly` **decimals**: `6` = `6`
 
-#### YES_24.symbol
+#### YES\_24.symbol
 
 > `readonly` **symbol**: `"YES"` = `"YES"`
 
-### YES_25
+### YES\_25
 
-> `readonly` **YES_25**: `object`
+> `readonly` **YES\_25**: `object`
 
-#### YES_25.name
+#### YES\_25.name
 
 > `readonly` **name**: `"YES_Token"` = `"YES_Token"`
 
-#### YES_25.address
+#### YES\_25.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### YES_25.decimals
+#### YES\_25.decimals
 
 > `readonly` **decimals**: `6` = `6`
 
-#### YES_25.symbol
+#### YES\_25.symbol
 
 > `readonly` **symbol**: `"YES"` = `"YES"`
 
-### YES_26
+### YES\_26
 
-> `readonly` **YES_26**: `object`
+> `readonly` **YES\_26**: `object`
 
-#### YES_26.name
+#### YES\_26.name
 
 > `readonly` **name**: `"YES_Token"` = `"YES_Token"`
 
-#### YES_26.address
+#### YES\_26.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### YES_26.decimals
+#### YES\_26.decimals
 
 > `readonly` **decimals**: `6` = `6`
 
-#### YES_26.symbol
+#### YES\_26.symbol
 
 > `readonly` **symbol**: `"YES"` = `"YES"`
 
-### YES_27
+### YES\_27
 
-> `readonly` **YES_27**: `object`
+> `readonly` **YES\_27**: `object`
 
-#### YES_27.name
+#### YES\_27.name
 
 > `readonly` **name**: `"YES_Token"` = `"YES_Token"`
 
-#### YES_27.address
+#### YES\_27.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### YES_27.decimals
+#### YES\_27.decimals
 
 > `readonly` **decimals**: `6` = `6`
 
-#### YES_27.symbol
+#### YES\_27.symbol
 
 > `readonly` **symbol**: `"YES"` = `"YES"`
 
-### YES_28
+### YES\_28
 
-> `readonly` **YES_28**: `object`
+> `readonly` **YES\_28**: `object`
 
-#### YES_28.name
+#### YES\_28.name
 
 > `readonly` **name**: `"YES_Token"` = `"YES_Token"`
 
-#### YES_28.address
+#### YES\_28.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### YES_28.decimals
+#### YES\_28.decimals
 
 > `readonly` **decimals**: `6` = `6`
 
-#### YES_28.symbol
+#### YES\_28.symbol
 
 > `readonly` **symbol**: `"YES"` = `"YES"`
 
-### YES_29
+### YES\_29
 
-> `readonly` **YES_29**: `object`
+> `readonly` **YES\_29**: `object`
 
-#### YES_29.name
+#### YES\_29.name
 
 > `readonly` **name**: `"YES_Token"` = `"YES_Token"`
 
-#### YES_29.address
+#### YES\_29.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### YES_29.decimals
+#### YES\_29.decimals
 
 > `readonly` **decimals**: `6` = `6`
 
-#### YES_29.symbol
+#### YES\_29.symbol
 
 > `readonly` **symbol**: `"YES"` = `"YES"`
 
-### YES_30
+### YES\_30
 
-> `readonly` **YES_30**: `object`
+> `readonly` **YES\_30**: `object`
 
-#### YES_30.name
+#### YES\_30.name
 
 > `readonly` **name**: `"YES_Token"` = `"YES_Token"`
 
-#### YES_30.address
+#### YES\_30.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### YES_30.decimals
+#### YES\_30.decimals
 
 > `readonly` **decimals**: `6` = `6`
 
-#### YES_30.symbol
+#### YES\_30.symbol
 
 > `readonly` **symbol**: `"YES"` = `"YES"`
 
-### YES_31
+### YES\_31
 
-> `readonly` **YES_31**: `object`
+> `readonly` **YES\_31**: `object`
 
-#### YES_31.name
+#### YES\_31.name
 
 > `readonly` **name**: `"YES_Token"` = `"YES_Token"`
 
-#### YES_31.address
+#### YES\_31.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### YES_31.decimals
+#### YES\_31.decimals
 
 > `readonly` **decimals**: `6` = `6`
 
-#### YES_31.symbol
+#### YES\_31.symbol
 
 > `readonly` **symbol**: `"YES"` = `"YES"`
 
-### YES_32
+### YES\_32
 
-> `readonly` **YES_32**: `object`
+> `readonly` **YES\_32**: `object`
 
-#### YES_32.name
+#### YES\_32.name
 
 > `readonly` **name**: `"YES_Token"` = `"YES_Token"`
 
-#### YES_32.address
+#### YES\_32.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### YES_32.decimals
+#### YES\_32.decimals
 
 > `readonly` **decimals**: `6` = `6`
 
-#### YES_32.symbol
+#### YES\_32.symbol
 
 > `readonly` **symbol**: `"YES"` = `"YES"`
 
-### YES_33
+### YES\_33
 
-> `readonly` **YES_33**: `object`
+> `readonly` **YES\_33**: `object`
 
-#### YES_33.name
+#### YES\_33.name
 
 > `readonly` **name**: `"YES_Token"` = `"YES_Token"`
 
-#### YES_33.address
+#### YES\_33.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### YES_33.decimals
+#### YES\_33.decimals
 
 > `readonly` **decimals**: `6` = `6`
 
-#### YES_33.symbol
+#### YES\_33.symbol
 
 > `readonly` **symbol**: `"YES"` = `"YES"`
 
-### YES_34
+### YES\_34
 
-> `readonly` **YES_34**: `object`
+> `readonly` **YES\_34**: `object`
 
-#### YES_34.name
+#### YES\_34.name
 
 > `readonly` **name**: `"YES_Token"` = `"YES_Token"`
 
-#### YES_34.address
+#### YES\_34.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### YES_34.decimals
+#### YES\_34.decimals
 
 > `readonly` **decimals**: `6` = `6`
 
-#### YES_34.symbol
+#### YES\_34.symbol
 
 > `readonly` **symbol**: `"YES"` = `"YES"`
 
-### YES_35
+### YES\_35
 
-> `readonly` **YES_35**: `object`
+> `readonly` **YES\_35**: `object`
 
-#### YES_35.name
+#### YES\_35.name
 
 > `readonly` **name**: `"YES_Token"` = `"YES_Token"`
 
-#### YES_35.address
+#### YES\_35.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### YES_35.decimals
+#### YES\_35.decimals
 
 > `readonly` **decimals**: `6` = `6`
 
-#### YES_35.symbol
+#### YES\_35.symbol
 
 > `readonly` **symbol**: `"YES"` = `"YES"`
 
-### YES_36
+### YES\_36
 
-> `readonly` **YES_36**: `object`
+> `readonly` **YES\_36**: `object`
 
-#### YES_36.name
+#### YES\_36.name
 
 > `readonly` **name**: `"YES_Token"` = `"YES_Token"`
 
-#### YES_36.address
+#### YES\_36.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### YES_36.decimals
+#### YES\_36.decimals
 
 > `readonly` **decimals**: `6` = `6`
 
-#### YES_36.symbol
+#### YES\_36.symbol
 
 > `readonly` **symbol**: `"YES"` = `"YES"`
 
-### YES_37
+### YES\_37
 
-> `readonly` **YES_37**: `object`
+> `readonly` **YES\_37**: `object`
 
-#### YES_37.name
+#### YES\_37.name
 
 > `readonly` **name**: `"YES_Token"` = `"YES_Token"`
 
-#### YES_37.address
+#### YES\_37.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### YES_37.decimals
+#### YES\_37.decimals
 
 > `readonly` **decimals**: `6` = `6`
 
-#### YES_37.symbol
+#### YES\_37.symbol
 
 > `readonly` **symbol**: `"YES"` = `"YES"`
 
-### YES_38
+### YES\_38
 
-> `readonly` **YES_38**: `object`
+> `readonly` **YES\_38**: `object`
 
-#### YES_38.name
+#### YES\_38.name
 
 > `readonly` **name**: `"YES_Token"` = `"YES_Token"`
 
-#### YES_38.address
+#### YES\_38.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### YES_38.decimals
+#### YES\_38.decimals
 
 > `readonly` **decimals**: `6` = `6`
 
-#### YES_38.symbol
+#### YES\_38.symbol
 
 > `readonly` **symbol**: `"YES"` = `"YES"`
 
-### YES_39
+### YES\_39
 
-> `readonly` **YES_39**: `object`
+> `readonly` **YES\_39**: `object`
 
-#### YES_39.name
+#### YES\_39.name
 
 > `readonly` **name**: `"YES_Token"` = `"YES_Token"`
 
-#### YES_39.address
+#### YES\_39.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### YES_39.decimals
+#### YES\_39.decimals
 
 > `readonly` **decimals**: `6` = `6`
 
-#### YES_39.symbol
+#### YES\_39.symbol
 
 > `readonly` **symbol**: `"YES"` = `"YES"`
 
-### YES_40
+### YES\_40
 
-> `readonly` **YES_40**: `object`
+> `readonly` **YES\_40**: `object`
 
-#### YES_40.name
+#### YES\_40.name
 
 > `readonly` **name**: `"YES_Token"` = `"YES_Token"`
 
-#### YES_40.address
+#### YES\_40.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### YES_40.decimals
+#### YES\_40.decimals
 
 > `readonly` **decimals**: `6` = `6`
 
-#### YES_40.symbol
+#### YES\_40.symbol
 
 > `readonly` **symbol**: `"YES"` = `"YES"`
 
-### YES_41
+### YES\_41
 
-> `readonly` **YES_41**: `object`
+> `readonly` **YES\_41**: `object`
 
-#### YES_41.name
+#### YES\_41.name
 
 > `readonly` **name**: `"YES_Token"` = `"YES_Token"`
 
-#### YES_41.address
+#### YES\_41.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### YES_41.decimals
+#### YES\_41.decimals
 
 > `readonly` **decimals**: `6` = `6`
 
-#### YES_41.symbol
+#### YES\_41.symbol
 
 > `readonly` **symbol**: `"YES"` = `"YES"`
 
-### YES_42
+### YES\_42
 
-> `readonly` **YES_42**: `object`
+> `readonly` **YES\_42**: `object`
 
-#### YES_42.name
+#### YES\_42.name
 
 > `readonly` **name**: `"YES_Token"` = `"YES_Token"`
 
-#### YES_42.address
+#### YES\_42.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### YES_42.decimals
+#### YES\_42.decimals
 
 > `readonly` **decimals**: `6` = `6`
 
-#### YES_42.symbol
+#### YES\_42.symbol
 
 > `readonly` **symbol**: `"YES"` = `"YES"`
 
-### YES_43
+### YES\_43
 
-> `readonly` **YES_43**: `object`
+> `readonly` **YES\_43**: `object`
 
-#### YES_43.name
+#### YES\_43.name
 
 > `readonly` **name**: `"YES_Token"` = `"YES_Token"`
 
-#### YES_43.address
+#### YES\_43.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### YES_43.decimals
+#### YES\_43.decimals
 
 > `readonly` **decimals**: `6` = `6`
 
-#### YES_43.symbol
+#### YES\_43.symbol
 
 > `readonly` **symbol**: `"YES"` = `"YES"`
 
-### YES_44
+### YES\_44
 
-> `readonly` **YES_44**: `object`
+> `readonly` **YES\_44**: `object`
 
-#### YES_44.name
+#### YES\_44.name
 
 > `readonly` **name**: `"YES_Token"` = `"YES_Token"`
 
-#### YES_44.address
+#### YES\_44.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### YES_44.decimals
+#### YES\_44.decimals
 
 > `readonly` **decimals**: `6` = `6`
 
-#### YES_44.symbol
+#### YES\_44.symbol
 
 > `readonly` **symbol**: `"YES"` = `"YES"`
 
-### YES_45
+### YES\_45
 
-> `readonly` **YES_45**: `object`
+> `readonly` **YES\_45**: `object`
 
-#### YES_45.name
+#### YES\_45.name
 
 > `readonly` **name**: `"YES_Token"` = `"YES_Token"`
 
-#### YES_45.address
+#### YES\_45.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### YES_45.decimals
+#### YES\_45.decimals
 
 > `readonly` **decimals**: `6` = `6`
 
-#### YES_45.symbol
+#### YES\_45.symbol
 
 > `readonly` **symbol**: `"YES"` = `"YES"`
 
-### YES_46
+### YES\_46
 
-> `readonly` **YES_46**: `object`
+> `readonly` **YES\_46**: `object`
 
-#### YES_46.name
+#### YES\_46.name
 
 > `readonly` **name**: `"YES_Token"` = `"YES_Token"`
 
-#### YES_46.address
+#### YES\_46.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### YES_46.decimals
+#### YES\_46.decimals
 
 > `readonly` **decimals**: `6` = `6`
 
-#### YES_46.symbol
+#### YES\_46.symbol
 
 > `readonly` **symbol**: `"YES"` = `"YES"`
 
-### YES_47
+### YES\_47
 
-> `readonly` **YES_47**: `object`
+> `readonly` **YES\_47**: `object`
 
-#### YES_47.name
+#### YES\_47.name
 
 > `readonly` **name**: `"YES_Token"` = `"YES_Token"`
 
-#### YES_47.address
+#### YES\_47.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### YES_47.decimals
+#### YES\_47.decimals
 
 > `readonly` **decimals**: `6` = `6`
 
-#### YES_47.symbol
+#### YES\_47.symbol
 
 > `readonly` **symbol**: `"YES"` = `"YES"`
 
-### YES_48
+### YES\_48
 
-> `readonly` **YES_48**: `object`
+> `readonly` **YES\_48**: `object`
 
-#### YES_48.name
+#### YES\_48.name
 
 > `readonly` **name**: `"YES_Token"` = `"YES_Token"`
 
-#### YES_48.address
+#### YES\_48.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### YES_48.decimals
+#### YES\_48.decimals
 
 > `readonly` **decimals**: `6` = `6`
 
-#### YES_48.symbol
+#### YES\_48.symbol
 
 > `readonly` **symbol**: `"YES"` = `"YES"`
 
-### YES_49
+### YES\_49
 
-> `readonly` **YES_49**: `object`
+> `readonly` **YES\_49**: `object`
 
-#### YES_49.name
+#### YES\_49.name
 
 > `readonly` **name**: `"YES_Token"` = `"YES_Token"`
 
-#### YES_49.address
+#### YES\_49.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### YES_49.decimals
+#### YES\_49.decimals
 
 > `readonly` **decimals**: `6` = `6`
 
-#### YES_49.symbol
+#### YES\_49.symbol
 
 > `readonly` **symbol**: `"YES"` = `"YES"`
 
-### YES_50
+### YES\_50
 
-> `readonly` **YES_50**: `object`
+> `readonly` **YES\_50**: `object`
 
-#### YES_50.name
+#### YES\_50.name
 
 > `readonly` **name**: `"YES_Token"` = `"YES_Token"`
 
-#### YES_50.address
+#### YES\_50.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### YES_50.decimals
+#### YES\_50.decimals
 
 > `readonly` **decimals**: `6` = `6`
 
-#### YES_50.symbol
+#### YES\_50.symbol
 
 > `readonly` **symbol**: `"YES"` = `"YES"`
 
-### YES_51
+### YES\_51
 
-> `readonly` **YES_51**: `object`
+> `readonly` **YES\_51**: `object`
 
-#### YES_51.name
+#### YES\_51.name
 
 > `readonly` **name**: `"YES_Token"` = `"YES_Token"`
 
-#### YES_51.address
+#### YES\_51.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### YES_51.decimals
+#### YES\_51.decimals
 
 > `readonly` **decimals**: `6` = `6`
 
-#### YES_51.symbol
+#### YES\_51.symbol
 
 > `readonly` **symbol**: `"YES"` = `"YES"`
 
-### YES_52
+### YES\_52
 
-> `readonly` **YES_52**: `object`
+> `readonly` **YES\_52**: `object`
 
-#### YES_52.name
+#### YES\_52.name
 
 > `readonly` **name**: `"YES_Token"` = `"YES_Token"`
 
-#### YES_52.address
+#### YES\_52.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### YES_52.decimals
+#### YES\_52.decimals
 
 > `readonly` **decimals**: `6` = `6`
 
-#### YES_52.symbol
+#### YES\_52.symbol
 
 > `readonly` **symbol**: `"YES"` = `"YES"`
 
-### YES_53
+### YES\_53
 
-> `readonly` **YES_53**: `object`
+> `readonly` **YES\_53**: `object`
 
-#### YES_53.name
+#### YES\_53.name
 
 > `readonly` **name**: `"YES_Token"` = `"YES_Token"`
 
-#### YES_53.address
+#### YES\_53.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### YES_53.decimals
+#### YES\_53.decimals
 
 > `readonly` **decimals**: `6` = `6`
 
-#### YES_53.symbol
+#### YES\_53.symbol
 
 > `readonly` **symbol**: `"YES"` = `"YES"`
 
-### YES_54
+### YES\_54
 
-> `readonly` **YES_54**: `object`
+> `readonly` **YES\_54**: `object`
 
-#### YES_54.name
+#### YES\_54.name
 
 > `readonly` **name**: `"YES_Token"` = `"YES_Token"`
 
-#### YES_54.address
+#### YES\_54.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### YES_54.decimals
+#### YES\_54.decimals
 
 > `readonly` **decimals**: `6` = `6`
 
-#### YES_54.symbol
+#### YES\_54.symbol
 
 > `readonly` **symbol**: `"YES"` = `"YES"`
 
-### YES_55
+### YES\_55
 
-> `readonly` **YES_55**: `object`
+> `readonly` **YES\_55**: `object`
 
-#### YES_55.name
+#### YES\_55.name
 
 > `readonly` **name**: `"YES_Token"` = `"YES_Token"`
 
-#### YES_55.address
+#### YES\_55.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### YES_55.decimals
+#### YES\_55.decimals
 
 > `readonly` **decimals**: `6` = `6`
 
-#### YES_55.symbol
+#### YES\_55.symbol
 
 > `readonly` **symbol**: `"YES"` = `"YES"`
 
-### YES_56
+### YES\_56
 
-> `readonly` **YES_56**: `object`
+> `readonly` **YES\_56**: `object`
 
-#### YES_56.name
+#### YES\_56.name
 
 > `readonly` **name**: `"YES_Token"` = `"YES_Token"`
 
-#### YES_56.address
+#### YES\_56.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### YES_56.decimals
+#### YES\_56.decimals
 
 > `readonly` **decimals**: `6` = `6`
 
-#### YES_56.symbol
+#### YES\_56.symbol
 
 > `readonly` **symbol**: `"YES"` = `"YES"`
 
-### YES_57
+### YES\_57
 
-> `readonly` **YES_57**: `object`
+> `readonly` **YES\_57**: `object`
 
-#### YES_57.name
+#### YES\_57.name
 
 > `readonly` **name**: `"YES_Token"` = `"YES_Token"`
 
-#### YES_57.address
+#### YES\_57.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### YES_57.decimals
+#### YES\_57.decimals
 
 > `readonly` **decimals**: `6` = `6`
 
-#### YES_57.symbol
+#### YES\_57.symbol
 
 > `readonly` **symbol**: `"YES"` = `"YES"`
 
-### YES_58
+### YES\_58
 
-> `readonly` **YES_58**: `object`
+> `readonly` **YES\_58**: `object`
 
-#### YES_58.name
+#### YES\_58.name
 
 > `readonly` **name**: `"YES_Token"` = `"YES_Token"`
 
-#### YES_58.address
+#### YES\_58.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### YES_58.decimals
+#### YES\_58.decimals
 
 > `readonly` **decimals**: `6` = `6`
 
-#### YES_58.symbol
+#### YES\_58.symbol
 
 > `readonly` **symbol**: `"YES"` = `"YES"`
 
-### YES_59
+### YES\_59
 
-> `readonly` **YES_59**: `object`
+> `readonly` **YES\_59**: `object`
 
-#### YES_59.name
+#### YES\_59.name
 
 > `readonly` **name**: `"YES_Token"` = `"YES_Token"`
 
-#### YES_59.address
+#### YES\_59.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### YES_59.decimals
+#### YES\_59.decimals
 
 > `readonly` **decimals**: `6` = `6`
 
-#### YES_59.symbol
+#### YES\_59.symbol
 
 > `readonly` **symbol**: `"YES"` = `"YES"`
 
-### YES_60
+### YES\_60
 
-> `readonly` **YES_60**: `object`
+> `readonly` **YES\_60**: `object`
 
-#### YES_60.name
+#### YES\_60.name
 
 > `readonly` **name**: `"YES_Token"` = `"YES_Token"`
 
-#### YES_60.address
+#### YES\_60.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### YES_60.decimals
+#### YES\_60.decimals
 
 > `readonly` **decimals**: `6` = `6`
 
-#### YES_60.symbol
+#### YES\_60.symbol
 
 > `readonly` **symbol**: `"YES"` = `"YES"`
 
-### YES_61
+### YES\_61
 
-> `readonly` **YES_61**: `object`
+> `readonly` **YES\_61**: `object`
 
-#### YES_61.name
+#### YES\_61.name
 
 > `readonly` **name**: `"YES_Token"` = `"YES_Token"`
 
-#### YES_61.address
+#### YES\_61.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### YES_61.decimals
+#### YES\_61.decimals
 
 > `readonly` **decimals**: `6` = `6`
 
-#### YES_61.symbol
+#### YES\_61.symbol
 
 > `readonly` **symbol**: `"YES"` = `"YES"`
 
-### YES_62
+### YES\_62
 
-> `readonly` **YES_62**: `object`
+> `readonly` **YES\_62**: `object`
 
-#### YES_62.name
+#### YES\_62.name
 
 > `readonly` **name**: `"YES_Token"` = `"YES_Token"`
 
-#### YES_62.address
+#### YES\_62.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### YES_62.decimals
+#### YES\_62.decimals
 
 > `readonly` **decimals**: `6` = `6`
 
-#### YES_62.symbol
+#### YES\_62.symbol
 
 > `readonly` **symbol**: `"YES"` = `"YES"`
 
-### YES_63
+### YES\_63
 
-> `readonly` **YES_63**: `object`
+> `readonly` **YES\_63**: `object`
 
-#### YES_63.name
+#### YES\_63.name
 
 > `readonly` **name**: `"YES_Token"` = `"YES_Token"`
 
-#### YES_63.address
+#### YES\_63.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### YES_63.decimals
+#### YES\_63.decimals
 
 > `readonly` **decimals**: `6` = `6`
 
-#### YES_63.symbol
+#### YES\_63.symbol
 
 > `readonly` **symbol**: `"YES"` = `"YES"`
 
-### YES_64
+### YES\_64
 
-> `readonly` **YES_64**: `object`
+> `readonly` **YES\_64**: `object`
 
-#### YES_64.name
+#### YES\_64.name
 
 > `readonly` **name**: `"YES_Token"` = `"YES_Token"`
 
-#### YES_64.address
+#### YES\_64.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### YES_64.decimals
+#### YES\_64.decimals
 
 > `readonly` **decimals**: `6` = `6`
 
-#### YES_64.symbol
+#### YES\_64.symbol
 
 > `readonly` **symbol**: `"YES"` = `"YES"`
 
-### YES_65
+### YES\_65
 
-> `readonly` **YES_65**: `object`
+> `readonly` **YES\_65**: `object`
 
-#### YES_65.name
+#### YES\_65.name
 
 > `readonly` **name**: `"YES_Token"` = `"YES_Token"`
 
-#### YES_65.address
+#### YES\_65.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### YES_65.decimals
+#### YES\_65.decimals
 
 > `readonly` **decimals**: `6` = `6`
 
-#### YES_65.symbol
+#### YES\_65.symbol
 
 > `readonly` **symbol**: `"YES"` = `"YES"`
 
-### YES_66
+### YES\_66
 
-> `readonly` **YES_66**: `object`
+> `readonly` **YES\_66**: `object`
 
-#### YES_66.name
+#### YES\_66.name
 
 > `readonly` **name**: `"YES_Token"` = `"YES_Token"`
 
-#### YES_66.address
+#### YES\_66.address
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-#### YES_66.decimals
+#### YES\_66.decimals
 
 > `readonly` **decimals**: `6` = `6`
 
-#### YES_66.symbol
+#### YES\_66.symbol
 
 > `readonly` **symbol**: `"YES"` = `"YES"`
 

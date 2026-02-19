@@ -1,12 +1,12 @@
-[**x**](../README.md)
+[**starkzap**](../README.md)
 
----
+***
 
-[x](../globals.md) / Token
+[starkzap](../globals.md) / Token
 
 # Interface: Token
 
-Defined in: [src/types/token.ts:26](https://github.com/keep-starknet-strange/x/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/types/token.ts#L26)
+Defined in: [src/types/token.ts:26](https://github.com/keep-starknet-strange/x/blob/5e54d8974744c392df7cac56b636788dfe6ae268/src/types/token.ts#L26)
 
 ERC20 token configuration.
 
@@ -14,7 +14,7 @@ ERC20 token configuration.
 
 ```ts
 // Use a preset
-import { TBTC, USDC } from "x";
+import { TBTC, USDC } from "starkzap";
 sdk.erc20({ token: TBTC });
 
 // Or define custom
@@ -27,7 +27,7 @@ sdk.erc20({
     metadata: {
       logoUrl: new URL("https://example.com/logo.png"),
     },
-  },
+  }
 });
 ```
 
@@ -37,46 +37,46 @@ sdk.erc20({
 
 > **name**: `string`
 
-Defined in: [src/types/token.ts:28](https://github.com/keep-starknet-strange/x/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/types/token.ts#L28)
+Defined in: [src/types/token.ts:28](https://github.com/keep-starknet-strange/x/blob/5e54d8974744c392df7cac56b636788dfe6ae268/src/types/token.ts#L28)
 
 Human-readable name of the token
 
----
+***
 
 ### address
 
 > **address**: [`Address`](../type-aliases/Address.md)
 
-Defined in: [src/types/token.ts:30](https://github.com/keep-starknet-strange/x/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/types/token.ts#L30)
+Defined in: [src/types/token.ts:30](https://github.com/keep-starknet-strange/x/blob/5e54d8974744c392df7cac56b636788dfe6ae268/src/types/token.ts#L30)
 
 Contract address of the token
 
----
+***
 
 ### decimals
 
 > **decimals**: `number`
 
-Defined in: [src/types/token.ts:32](https://github.com/keep-starknet-strange/x/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/types/token.ts#L32)
+Defined in: [src/types/token.ts:32](https://github.com/keep-starknet-strange/x/blob/5e54d8974744c392df7cac56b636788dfe6ae268/src/types/token.ts#L32)
 
 Number of decimal places (e.g., 18 for ETH, 6 for USDC, 8 for BTC)
 
----
+***
 
 ### symbol
 
 > **symbol**: `string`
 
-Defined in: [src/types/token.ts:34](https://github.com/keep-starknet-strange/x/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/types/token.ts#L34)
+Defined in: [src/types/token.ts:34](https://github.com/keep-starknet-strange/x/blob/5e54d8974744c392df7cac56b636788dfe6ae268/src/types/token.ts#L34)
 
 Token symbol for display
 
----
+***
 
 ### metadata?
 
 > `optional` **metadata**: [`TokenMetadata`](TokenMetadata.md)
 
-Defined in: [src/types/token.ts:36](https://github.com/keep-starknet-strange/x/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/types/token.ts#L36)
+Defined in: [src/types/token.ts:36](https://github.com/keep-starknet-strange/x/blob/5e54d8974744c392df7cac56b636788dfe6ae268/src/types/token.ts#L36)
 
 Token metadata

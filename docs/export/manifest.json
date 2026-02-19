@@ -1,6 +1,9 @@
 {
-  "name": "x",
+  "name": "starkzap",
   "version": "1.0.0",
-  "generatedAt": "2026-02-11T12:57:45.498Z",
-  "contents": ["DEVELOPER_GUIDE.md", "api/README.md"]
+  "generatedAt": "2026-02-19T12:08:34.050Z",
+  "contents": [
+    "DEVELOPER_GUIDE.md",
+    "api/README.md"
+  ]
 }

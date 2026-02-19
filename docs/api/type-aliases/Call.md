@@ -1,14 +1,14 @@
-[**x**](../README.md)
+[**starkzap**](../README.md)
 
----
+***
 
-[x](../globals.md) / Call
+[starkzap](../globals.md) / Call
 
 # Type Alias: Call
 
 > **Call** = `CallDetails` & `object`
 
-Defined in: node_modules/starknet/dist/index.d.ts:741
+Defined in: node\_modules/starknet/dist/index.d.ts:741
 
 ## Type Declaration
 

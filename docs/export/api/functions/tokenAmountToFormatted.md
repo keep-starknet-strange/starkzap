@@ -1,14 +1,14 @@
-[**x**](../README.md)
+[**starkzap**](../README.md)
 
----
+***
 
-[x](../globals.md) / tokenAmountToFormatted
+[starkzap](../globals.md) / tokenAmountToFormatted
 
 # Function: tokenAmountToFormatted()
 
 > **tokenAmountToFormatted**(`compressed?`, `balance`, `decimals`, `symbol`): `string`
 
-Defined in: [src/types/amount.ts:701](https://github.com/keep-starknet-strange/x/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/types/amount.ts#L701)
+Defined in: [src/types/amount.ts:701](https://github.com/keep-starknet-strange/x/blob/5e54d8974744c392df7cac56b636788dfe6ae268/src/types/amount.ts#L701)
 
 Formats a token amount for display in the UI with locale-aware number formatting.
 
@@ -59,14 +59,14 @@ currently polyfilled for React Native.
 
 ```ts
 // Basic usage
-tokenAmountToFormatted(false, 1500000000000000000n, 18, "ETH");
+tokenAmountToFormatted(false, 1500000000000000000n, 18, "ETH")
 // Returns: "1.5 ETH" (exact format depends on locale)
 
 // Compressed format for UI
-tokenAmountToFormatted(true, 1234567890123456789n, 18, "ETH");
+tokenAmountToFormatted(true, 1234567890123456789n, 18, "ETH")
 // Returns: "1.2346 ETH" (rounded to 4 decimal places)
 
 // Large numbers with thousand separators
-tokenAmountToFormatted(false, 1500000000000n, 6, "USDC");
+tokenAmountToFormatted(false, 1500000000000n, 6, "USDC")
 // Returns: "1,500,000 USDC" (in US locale)
 ```

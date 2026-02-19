@@ -1,12 +1,12 @@
-[**x**](../README.md)
+[**starkzap**](../README.md)
 
----
+***
 
-[x](../globals.md) / PaymasterOptions
+[starkzap](../globals.md) / PaymasterOptions
 
 # Interface: PaymasterOptions
 
-Defined in: node_modules/starknet/dist/index.d.ts:976
+Defined in: node\_modules/starknet/dist/index.d.ts:976
 
 ## Extends
 
@@ -18,43 +18,43 @@ Defined in: node_modules/starknet/dist/index.d.ts:976
 
 > `optional` **nodeUrl**: `string`
 
-Defined in: node_modules/starknet/dist/index.d.ts:979
+Defined in: node\_modules/starknet/dist/index.d.ts:979
 
 #### Inherited from
 
 `PaymasterRpcOptions.nodeUrl`
 
----
+***
 
 ### default?
 
 > `optional` **default**: `boolean`
 
-Defined in: node_modules/starknet/dist/index.d.ts:980
+Defined in: node\_modules/starknet/dist/index.d.ts:980
 
 #### Inherited from
 
 `PaymasterRpcOptions.default`
 
----
+***
 
 ### headers?
 
 > `optional` **headers**: `object`
 
-Defined in: node_modules/starknet/dist/index.d.ts:981
+Defined in: node\_modules/starknet/dist/index.d.ts:981
 
 #### Inherited from
 
 `PaymasterRpcOptions.headers`
 
----
+***
 
 ### baseFetch()?
 
 > `optional` **baseFetch**: (`input`, `init?`) => `Promise`\<`Response`\>
 
-Defined in: node_modules/starknet/dist/index.d.ts:982
+Defined in: node\_modules/starknet/dist/index.d.ts:982
 
 [MDN Reference](https://developer.mozilla.org/docs/Web/API/Window/fetch)
 

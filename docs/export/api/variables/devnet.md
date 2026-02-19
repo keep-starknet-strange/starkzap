@@ -1,13 +1,13 @@
-[**x**](../README.md)
+[**starkzap**](../README.md)
 
----
+***
 
-[x](../globals.md) / devnet
+[starkzap](../globals.md) / devnet
 
 # Variable: devnet
 
 > `const` **devnet**: [`NetworkPreset`](../interfaces/NetworkPreset.md)
 
-Defined in: [src/network/presets.ts:40](https://github.com/keep-starknet-strange/x/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/network/presets.ts#L40)
+Defined in: [src/network/presets.ts:40](https://github.com/keep-starknet-strange/x/blob/5e54d8974744c392df7cac56b636788dfe6ae268/src/network/presets.ts#L40)
 
 Local devnet configuration (using starknet-devnet-rs defaults).

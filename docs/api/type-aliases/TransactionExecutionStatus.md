@@ -1,11 +1,11 @@
-[**x**](../README.md)
+[**starkzap**](../README.md)
 
----
+***
 
-[x](../globals.md) / TransactionExecutionStatus
+[starkzap](../globals.md) / TransactionExecutionStatus
 
 # Type Alias: TransactionExecutionStatus
 
 > **TransactionExecutionStatus** = `RPC$1.ETransactionExecutionStatus`
 
-Defined in: node_modules/starknet/dist/index.d.ts:589
+Defined in: node\_modules/starknet/dist/index.d.ts:589

@@ -1,19 +1,19 @@
-[**x**](../README.md)
+[**starkzap**](../README.md)
 
----
+***
 
-[x](../globals.md) / ConnectWalletOptions
+[starkzap](../globals.md) / ConnectWalletOptions
 
 # Interface: ConnectWalletOptions
 
-Defined in: [src/types/wallet.ts:94](https://github.com/keep-starknet-strange/x/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/types/wallet.ts#L94)
+Defined in: [src/types/wallet.ts:94](https://github.com/keep-starknet-strange/x/blob/5e54d8974744c392df7cac56b636788dfe6ae268/src/types/wallet.ts#L94)
 
 Options for `sdk.connectWallet()`.
 
 ## Example
 
 ```ts
-import { StarkSigner, ArgentPreset } from "x";
+import { StarkSigner, ArgentPreset } from "starkzap";
 
 // User pays fees
 await sdk.connectWallet({
@@ -36,26 +36,26 @@ await sdk.connectWallet({
 
 > **account**: [`AccountConfig`](AccountConfig.md)
 
-Defined in: [src/types/wallet.ts:96](https://github.com/keep-starknet-strange/x/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/types/wallet.ts#L96)
+Defined in: [src/types/wallet.ts:96](https://github.com/keep-starknet-strange/x/blob/5e54d8974744c392df7cac56b636788dfe6ae268/src/types/wallet.ts#L96)
 
 Account configuration
 
----
+***
 
 ### feeMode?
 
 > `optional` **feeMode**: [`FeeMode`](../type-aliases/FeeMode.md)
 
-Defined in: [src/types/wallet.ts:98](https://github.com/keep-starknet-strange/x/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/types/wallet.ts#L98)
+Defined in: [src/types/wallet.ts:98](https://github.com/keep-starknet-strange/x/blob/5e54d8974744c392df7cac56b636788dfe6ae268/src/types/wallet.ts#L98)
 
 How fees are paid (default: "user_pays")
 
----
+***
 
 ### timeBounds?
 
 > `optional` **timeBounds**: [`PaymasterTimeBounds`](PaymasterTimeBounds.md)
 
-Defined in: [src/types/wallet.ts:100](https://github.com/keep-starknet-strange/x/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/types/wallet.ts#L100)
+Defined in: [src/types/wallet.ts:100](https://github.com/keep-starknet-strange/x/blob/5e54d8974744c392df7cac56b636788dfe6ae268/src/types/wallet.ts#L100)
 
 Optional time bounds for paymaster transactions

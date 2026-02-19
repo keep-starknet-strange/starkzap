@@ -1,12 +1,12 @@
-[**x**](../README.md)
+[**starkzap**](../README.md)
 
----
+***
 
-[x](../globals.md) / Erc20
+[starkzap](../globals.md) / Erc20
 
 # Class: Erc20
 
-Defined in: [src/erc20/erc20.ts:38](https://github.com/keep-starknet-strange/x/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/erc20/erc20.ts#L38)
+Defined in: [src/erc20/erc20.ts:38](https://github.com/keep-starknet-strange/x/blob/5e54d8974744c392df7cac56b636788dfe6ae268/src/erc20/erc20.ts#L38)
 
 ERC20 token interaction helper.
 
@@ -36,7 +36,7 @@ const balance = await erc20.balanceOf(wallet);
 
 > **new Erc20**(`token`, `provider`): `Erc20`
 
-Defined in: [src/erc20/erc20.ts:42](https://github.com/keep-starknet-strange/x/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/erc20/erc20.ts#L42)
+Defined in: [src/erc20/erc20.ts:43](https://github.com/keep-starknet-strange/x/blob/5e54d8974744c392df7cac56b636788dfe6ae268/src/erc20/erc20.ts#L43)
 
 #### Parameters
 
@@ -58,13 +58,13 @@ Defined in: [src/erc20/erc20.ts:42](https://github.com/keep-starknet-strange/x/b
 
 > **populateApprove**(`spender`, `amount`): [`Call`](../type-aliases/Call.md)
 
-Defined in: [src/erc20/erc20.ts:79](https://github.com/keep-starknet-strange/x/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/erc20/erc20.ts#L79)
+Defined in: [src/erc20/erc20.ts:80](https://github.com/keep-starknet-strange/x/blob/5e54d8974744c392df7cac56b636788dfe6ae268/src/erc20/erc20.ts#L80)
 
 **`Internal`**
 
 Build an ERC20 approve Call without executing.
 
-Used by [TxBuilder](TxBuilder.md) — not part of the public API.
+ Used by [TxBuilder](TxBuilder.md) — not part of the public API.
 
 #### Parameters
 
@@ -80,19 +80,19 @@ Used by [TxBuilder](TxBuilder.md) — not part of the public API.
 
 [`Call`](../type-aliases/Call.md)
 
----
+***
 
 ### populateTransfer()
 
 > **populateTransfer**(`transfers`): [`Call`](../type-aliases/Call.md)[]
 
-Defined in: [src/erc20/erc20.ts:92](https://github.com/keep-starknet-strange/x/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/erc20/erc20.ts#L92)
+Defined in: [src/erc20/erc20.ts:93](https://github.com/keep-starknet-strange/x/blob/5e54d8974744c392df7cac56b636788dfe6ae268/src/erc20/erc20.ts#L93)
 
 **`Internal`**
 
 Build transfer Call(s) without executing.
 
-Used by [TxBuilder](TxBuilder.md) — not part of the public API.
+ Used by [TxBuilder](TxBuilder.md) — not part of the public API.
 
 #### Parameters
 
@@ -104,13 +104,13 @@ Used by [TxBuilder](TxBuilder.md) — not part of the public API.
 
 [`Call`](../type-aliases/Call.md)[]
 
----
+***
 
 ### transfer()
 
 > **transfer**(`from`, `transfers`, `options?`): `Promise`\<[`Tx`](Tx.md)\>
 
-Defined in: [src/erc20/erc20.ts:123](https://github.com/keep-starknet-strange/x/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/erc20/erc20.ts#L123)
+Defined in: [src/erc20/erc20.ts:124](https://github.com/keep-starknet-strange/x/blob/5e54d8974744c392df7cac56b636788dfe6ae268/src/erc20/erc20.ts#L124)
 
 Transfer tokens to one or more addresses.
 
@@ -144,7 +144,9 @@ Optional execution options
 const erc20 = wallet.erc20(USDC);
 const amount = Amount.parse("100", USDC);
 
-const tx = await erc20.transfer(wallet, [{ to: recipientAddress, amount }]);
+const tx = await erc20.transfer(wallet, [
+  { to: recipientAddress, amount },
+]);
 await tx.wait();
 ```
 
@@ -152,13 +154,13 @@ await tx.wait();
 
 Error if any amount's decimals or symbol don't match the token
 
----
+***
 
 ### balanceOf()
 
 > **balanceOf**(`wallet`): `Promise`\<[`Amount`](Amount.md)\>
 
-Defined in: [src/erc20/erc20.ts:146](https://github.com/keep-starknet-strange/x/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/erc20/erc20.ts#L146)
+Defined in: [src/erc20/erc20.ts:147](https://github.com/keep-starknet-strange/x/blob/5e54d8974744c392df7cac56b636788dfe6ae268/src/erc20/erc20.ts#L147)
 
 Get the balance in a wallet.
 
@@ -182,6 +184,6 @@ Amount representing the token balance
 const erc20 = wallet.erc20(USDC);
 const balance = await erc20.balanceOf(wallet);
 
-console.log(balance.toUnit()); // "100.5"
+console.log(balance.toUnit());      // "100.5"
 console.log(balance.toFormatted()); // "100.5 USDC"
 ```

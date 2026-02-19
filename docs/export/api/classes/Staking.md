@@ -1,17 +1,16 @@
-[**x**](../README.md)
+[**starkzap**](../README.md)
 
----
+***
 
-[x](../globals.md) / Staking
+[starkzap](../globals.md) / Staking
 
 # Class: Staking
 
-Defined in: [src/staking/staking.ts:50](https://github.com/keep-starknet-strange/x/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/staking/staking.ts#L50)
+Defined in: [src/staking/staking.ts:50](https://github.com/keep-starknet-strange/x/blob/5e54d8974744c392df7cac56b636788dfe6ae268/src/staking/staking.ts#L50)
 
 Represents a staking delegation pool and provides methods to interact with it.
 
 The Staking class allows delegators to:
-
 - Enter and exit delegation pools
 - Add to existing stakes
 - Claim rewards
@@ -21,12 +20,7 @@ The Staking class allows delegators to:
 
 ```ts
 // Get a staking instance for a specific validator
-const staking = await Staking.fromStaker(
-  validatorAddress,
-  strkToken,
-  provider,
-  config
-);
+const staking = await Staking.fromStaker(validatorAddress, strkToken, provider, config);
 
 // Enter the pool
 const tx = await staking.enter(wallet, Amount.parse(100, strkToken));
@@ -47,7 +41,7 @@ if (position) {
 
 > **get** **poolAddress**(): [`Address`](../type-aliases/Address.md)
 
-Defined in: [src/staking/staking.ts:70](https://github.com/keep-starknet-strange/x/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/staking/staking.ts#L70)
+Defined in: [src/staking/staking.ts:89](https://github.com/keep-starknet-strange/x/blob/5e54d8974744c392df7cac56b636788dfe6ae268/src/staking/staking.ts#L89)
 
 The pool contract address for this staking instance.
 
@@ -63,13 +57,13 @@ The Starknet address of the delegation pool contract
 
 > **populateEnter**(`walletAddress`, `amount`): [`Call`](../type-aliases/Call.md)[]
 
-Defined in: [src/staking/staking.ts:79](https://github.com/keep-starknet-strange/x/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/staking/staking.ts#L79)
+Defined in: [src/staking/staking.ts:98](https://github.com/keep-starknet-strange/x/blob/5e54d8974744c392df7cac56b636788dfe6ae268/src/staking/staking.ts#L98)
 
 **`Internal`**
 
 Build approve + enter pool Calls without executing.
 
-Used by [TxBuilder](TxBuilder.md) — not part of the public API.
+ Used by [TxBuilder](TxBuilder.md) — not part of the public API.
 
 #### Parameters
 
@@ -85,13 +79,13 @@ Used by [TxBuilder](TxBuilder.md) — not part of the public API.
 
 [`Call`](../type-aliases/Call.md)[]
 
----
+***
 
 ### enter()
 
 > **enter**(`wallet`, `amount`, `options?`): `Promise`\<[`Tx`](Tx.md)\>
 
-Defined in: [src/staking/staking.ts:110](https://github.com/keep-starknet-strange/x/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/staking/staking.ts#L110)
+Defined in: [src/staking/staking.ts:130](https://github.com/keep-starknet-strange/x/blob/5e54d8974744c392df7cac56b636788dfe6ae268/src/staking/staking.ts#L130)
 
 Enter the delegation pool as a new member.
 
@@ -135,13 +129,61 @@ const tx = await staking.enter(wallet, Amount.parse(100, strkToken));
 await tx.wait();
 ```
 
----
+***
+
+### stake()
+
+> **stake**(`wallet`, `amount`, `options?`): `Promise`\<[`Tx`](Tx.md)\>
+
+Defined in: [src/staking/staking.ts:165](https://github.com/keep-starknet-strange/x/blob/5e54d8974744c392df7cac56b636788dfe6ae268/src/staking/staking.ts#L165)
+
+Stake tokens in this pool, automatically choosing enter or add.
+
+- If the wallet is not yet a member, this performs `enter()`.
+- If the wallet is already a member, this performs `add()`.
+
+This is the recommended high-level staking method for most app flows.
+
+#### Parameters
+
+##### wallet
+
+[`WalletInterface`](../interfaces/WalletInterface.md)
+
+The wallet to stake from
+
+##### amount
+
+[`Amount`](Amount.md)
+
+The amount of tokens to stake
+
+##### options?
+
+[`ExecuteOptions`](../interfaces/ExecuteOptions.md)
+
+Optional execution options
+
+#### Returns
+
+`Promise`\<[`Tx`](Tx.md)\>
+
+A transaction object that can be awaited for confirmation
+
+#### Example
+
+```ts
+const tx = await staking.stake(wallet, Amount.parse(100, strkToken));
+await tx.wait();
+```
+
+***
 
 ### isMember()
 
 > **isMember**(`wallet`): `Promise`\<`boolean`\>
 
-Defined in: [src/staking/staking.ts:131](https://github.com/keep-starknet-strange/x/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/staking/staking.ts#L131)
+Defined in: [src/staking/staking.ts:184](https://github.com/keep-starknet-strange/x/blob/5e54d8974744c392df7cac56b636788dfe6ae268/src/staking/staking.ts#L184)
 
 Check if a wallet is a member of this delegation pool.
 
@@ -159,18 +201,17 @@ The wallet to check
 
 True if the wallet is a pool member, false otherwise
 
----
+***
 
 ### getPosition()
 
 > **getPosition**(`wallet`): `Promise`\<[`PoolMember`](../interfaces/PoolMember.md) \| `null`\>
 
-Defined in: [src/staking/staking.ts:157](https://github.com/keep-starknet-strange/x/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/staking/staking.ts#L157)
+Defined in: [src/staking/staking.ts:210](https://github.com/keep-starknet-strange/x/blob/5e54d8974744c392df7cac56b636788dfe6ae268/src/staking/staking.ts#L210)
 
 Get the current staking position for a wallet in this pool.
 
 Returns detailed information about the delegator's stake including:
-
 - Staked amount
 - Unclaimed rewards
 - Exit/unpooling status
@@ -200,13 +241,13 @@ if (position) {
 }
 ```
 
----
+***
 
 ### getCommission()
 
 > **getCommission**(): `Promise`\<`number`\>
 
-Defined in: [src/staking/staking.ts:205](https://github.com/keep-starknet-strange/x/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/staking/staking.ts#L205)
+Defined in: [src/staking/staking.ts:258](https://github.com/keep-starknet-strange/x/blob/5e54d8974744c392df7cac56b636788dfe6ae268/src/staking/staking.ts#L258)
 
 Get the validator's commission rate for this pool.
 
@@ -226,19 +267,19 @@ const commission = await staking.getCommission();
 console.log(`Validator commission: ${commission}%`);
 ```
 
----
+***
 
 ### populateAdd()
 
 > **populateAdd**(`walletAddress`, `amount`): [`Call`](../type-aliases/Call.md)[]
 
-Defined in: [src/staking/staking.ts:215](https://github.com/keep-starknet-strange/x/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/staking/staking.ts#L215)
+Defined in: [src/staking/staking.ts:268](https://github.com/keep-starknet-strange/x/blob/5e54d8974744c392df7cac56b636788dfe6ae268/src/staking/staking.ts#L268)
 
 **`Internal`**
 
 Build approve + add-to-pool Calls without executing.
 
-Used by [TxBuilder](TxBuilder.md) — not part of the public API.
+ Used by [TxBuilder](TxBuilder.md) — not part of the public API.
 
 #### Parameters
 
@@ -254,13 +295,13 @@ Used by [TxBuilder](TxBuilder.md) — not part of the public API.
 
 [`Call`](../type-aliases/Call.md)[]
 
----
+***
 
 ### add()
 
 > **add**(`wallet`, `amount`, `options?`): `Promise`\<[`Tx`](Tx.md)\>
 
-Defined in: [src/staking/staking.ts:245](https://github.com/keep-starknet-strange/x/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/staking/staking.ts#L245)
+Defined in: [src/staking/staking.ts:299](https://github.com/keep-starknet-strange/x/blob/5e54d8974744c392df7cac56b636788dfe6ae268/src/staking/staking.ts#L299)
 
 Add more tokens to an existing stake in the pool.
 
@@ -303,19 +344,19 @@ const tx = await staking.add(wallet, Amount.parse(50, strkToken));
 await tx.wait();
 ```
 
----
+***
 
 ### populateClaimRewards()
 
 > **populateClaimRewards**(`walletAddress`): [`Call`](../type-aliases/Call.md)
 
-Defined in: [src/staking/staking.ts:260](https://github.com/keep-starknet-strange/x/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/staking/staking.ts#L260)
+Defined in: [src/staking/staking.ts:315](https://github.com/keep-starknet-strange/x/blob/5e54d8974744c392df7cac56b636788dfe6ae268/src/staking/staking.ts#L315)
 
 **`Internal`**
 
 Build a claim-rewards Call without executing.
 
-Used by [TxBuilder](TxBuilder.md) — not part of the public API.
+ Used by [TxBuilder](TxBuilder.md) — not part of the public API.
 
 #### Parameters
 
@@ -327,13 +368,13 @@ Used by [TxBuilder](TxBuilder.md) — not part of the public API.
 
 [`Call`](../type-aliases/Call.md)
 
----
+***
 
 ### claimRewards()
 
 > **claimRewards**(`wallet`, `options?`): `Promise`\<[`Tx`](Tx.md)\>
 
-Defined in: [src/staking/staking.ts:286](https://github.com/keep-starknet-strange/x/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/staking/staking.ts#L286)
+Defined in: [src/staking/staking.ts:341](https://github.com/keep-starknet-strange/x/blob/5e54d8974744c392df7cac56b636788dfe6ae268/src/staking/staking.ts#L341)
 
 Claim accumulated staking rewards.
 
@@ -382,19 +423,19 @@ if (position && !position.rewards.isZero()) {
 }
 ```
 
----
+***
 
 ### populateExitIntent()
 
 > **populateExitIntent**(`amount`): [`Call`](../type-aliases/Call.md)
 
-Defined in: [src/staking/staking.ts:309](https://github.com/keep-starknet-strange/x/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/staking/staking.ts#L309)
+Defined in: [src/staking/staking.ts:364](https://github.com/keep-starknet-strange/x/blob/5e54d8974744c392df7cac56b636788dfe6ae268/src/staking/staking.ts#L364)
 
 **`Internal`**
 
 Build an exit-intent Call without executing.
 
-Used by [TxBuilder](TxBuilder.md) — not part of the public API.
+ Used by [TxBuilder](TxBuilder.md) — not part of the public API.
 
 #### Parameters
 
@@ -406,13 +447,13 @@ Used by [TxBuilder](TxBuilder.md) — not part of the public API.
 
 [`Call`](../type-aliases/Call.md)
 
----
+***
 
 ### exitIntent()
 
 > **exitIntent**(`wallet`, `amount`, `options?`): `Promise`\<[`Tx`](Tx.md)\>
 
-Defined in: [src/staking/staking.ts:348](https://github.com/keep-starknet-strange/x/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/staking/staking.ts#L348)
+Defined in: [src/staking/staking.ts:404](https://github.com/keep-starknet-strange/x/blob/5e54d8974744c392df7cac56b636788dfe6ae268/src/staking/staking.ts#L404)
 
 Initiate an exit from the delegation pool.
 
@@ -477,19 +518,19 @@ const completeTx = await staking.exit(wallet);
 await completeTx.wait();
 ```
 
----
+***
 
 ### populateExit()
 
 > **populateExit**(`walletAddress`): [`Call`](../type-aliases/Call.md)
 
-Defined in: [src/staking/staking.ts:374](https://github.com/keep-starknet-strange/x/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/staking/staking.ts#L374)
+Defined in: [src/staking/staking.ts:431](https://github.com/keep-starknet-strange/x/blob/5e54d8974744c392df7cac56b636788dfe6ae268/src/staking/staking.ts#L431)
 
 **`Internal`**
 
 Build an exit-pool Call without executing.
 
-Used by [TxBuilder](TxBuilder.md) — not part of the public API.
+ Used by [TxBuilder](TxBuilder.md) — not part of the public API.
 
 #### Parameters
 
@@ -501,13 +542,13 @@ Used by [TxBuilder](TxBuilder.md) — not part of the public API.
 
 [`Call`](../type-aliases/Call.md)
 
----
+***
 
 ### exit()
 
 > **exit**(`wallet`, `options?`): `Promise`\<[`Tx`](Tx.md)\>
 
-Defined in: [src/staking/staking.ts:400](https://github.com/keep-starknet-strange/x/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/staking/staking.ts#L400)
+Defined in: [src/staking/staking.ts:457](https://github.com/keep-starknet-strange/x/blob/5e54d8974744c392df7cac56b636788dfe6ae268/src/staking/staking.ts#L457)
 
 Complete the exit from the delegation pool.
 
@@ -548,13 +589,13 @@ if (position?.unpoolTime && new Date() >= position.unpoolTime) {
 }
 ```
 
----
+***
 
 ### fromPool()
 
 > `static` **fromPool**(`poolAddress`, `provider`, `config`): `Promise`\<`Staking`\>
 
-Defined in: [src/staking/staking.ts:471](https://github.com/keep-starknet-strange/x/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/staking/staking.ts#L471)
+Defined in: [src/staking/staking.ts:528](https://github.com/keep-starknet-strange/x/blob/5e54d8974744c392df7cac56b636788dfe6ae268/src/staking/staking.ts#L528)
 
 Create a Staking instance from a known pool contract address.
 
@@ -593,16 +634,20 @@ Error if the pool doesn't exist or token cannot be resolved
 #### Example
 
 ```ts
-const staking = await Staking.fromPool(poolAddress, provider, config.staking);
+const staking = await Staking.fromPool(
+  poolAddress,
+  provider,
+  config.staking
+);
 ```
 
----
+***
 
 ### fromStaker()
 
 > `static` **fromStaker**(`stakerAddress`, `token`, `provider`, `config`): `Promise`\<`Staking`\>
 
-Defined in: [src/staking/staking.ts:547](https://github.com/keep-starknet-strange/x/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/staking/staking.ts#L547)
+Defined in: [src/staking/staking.ts:604](https://github.com/keep-starknet-strange/x/blob/5e54d8974744c392df7cac56b636788dfe6ae268/src/staking/staking.ts#L604)
 
 Create a Staking instance from a validator's (staker's) address.
 
@@ -657,13 +702,13 @@ const staking = await Staking.fromStaker(
 );
 ```
 
----
+***
 
 ### activeTokens()
 
 > `static` **activeTokens**(`provider`, `config`): `Promise`\<[`Token`](../interfaces/Token.md)[]\>
 
-Defined in: [src/staking/staking.ts:595](https://github.com/keep-starknet-strange/x/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/staking/staking.ts#L595)
+Defined in: [src/staking/staking.ts:652](https://github.com/keep-starknet-strange/x/blob/5e54d8974744c392df7cac56b636788dfe6ae268/src/staking/staking.ts#L652)
 
 Get all tokens that are currently enabled for staking.
 
@@ -694,16 +739,16 @@ Array of tokens that can be staked
 
 ```ts
 const tokens = await Staking.activeTokens(provider, config.staking);
-console.log(`Stakeable tokens: ${tokens.map((t) => t.symbol).join(", ")}`);
+console.log(`Stakeable tokens: ${tokens.map(t => t.symbol).join(', ')}`);
 ```
 
----
+***
 
 ### getStakerPools()
 
 > `static` **getStakerPools**(`provider`, `stakerAddress`, `config`): `Promise`\<[`Pool`](../interfaces/Pool.md)[]\>
 
-Defined in: [src/staking/staking.ts:636](https://github.com/keep-starknet-strange/x/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/staking/staking.ts#L636)
+Defined in: [src/staking/staking.ts:693](https://github.com/keep-starknet-strange/x/blob/5e54d8974744c392df7cac56b636788dfe6ae268/src/staking/staking.ts#L693)
 
 Get all delegation pools managed by a specific validator.
 
@@ -740,14 +785,8 @@ Array of pools managed by the validator
 #### Example
 
 ```ts
-const pools = await Staking.getStakerPools(
-  provider,
-  validatorAddress,
-  config.staking
-);
+const pools = await Staking.getStakerPools(provider, validatorAddress, config.staking);
 for (const pool of pools) {
-  console.log(
-    `${pool.token.symbol} pool: ${pool.amount.toFormatted()} delegated`
-  );
+  console.log(`${pool.token.symbol} pool: ${pool.amount.toFormatted()} delegated`);
 }
 ```

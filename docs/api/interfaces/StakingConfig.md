@@ -1,17 +1,19 @@
-[**x**](../README.md)
+[**starkzap**](../README.md)
 
----
+***
 
-[x](../globals.md) / StakingConfig
+[starkzap](../globals.md) / StakingConfig
 
 # Interface: StakingConfig
 
-Defined in: [src/types/config.ts:146](https://github.com/keep-starknet-strange/x/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/types/config.ts#L146)
+Defined in: [src/types/config.ts:148](https://github.com/keep-starknet-strange/x/blob/5e54d8974744c392df7cac56b636788dfe6ae268/src/types/config.ts#L148)
 
 Configuration for the Staking module.
 
-Required for using staking functionality such as entering/exiting pools,
-querying validator pools, and retrieving active staking tokens.
+Optional override for the core staking contract.
+
+If omitted, the SDK uses the built-in chain-aware preset
+for the configured `chainId`.
 
 ## Example
 
@@ -20,8 +22,7 @@ const sdk = new StarkSDK({
   rpcUrl: "https://starknet-mainnet.infura.io/v3/YOUR_KEY",
   chainId: ChainId.MAINNET,
   staking: {
-    contract:
-      "0x03745ab04a431fc02871a139be6b93d9260b0ff3e779ad9c8b377183b23109f1",
+    contract: "0x03745ab04a431fc02871a139be6b93d9260b0ff3e779ad9c8b377183b23109f1",
   },
 });
 ```
@@ -32,6 +33,6 @@ const sdk = new StarkSDK({
 
 > **contract**: [`Address`](../type-aliases/Address.md)
 
-Defined in: [src/types/config.ts:148](https://github.com/keep-starknet-strange/x/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/types/config.ts#L148)
+Defined in: [src/types/config.ts:150](https://github.com/keep-starknet-strange/x/blob/5e54d8974744c392df7cac56b636788dfe6ae268/src/types/config.ts#L150)
 
-Address of the core staking contract
+Address of the core staking contract (override default preset)
