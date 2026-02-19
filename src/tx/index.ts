@@ -7,12 +7,15 @@ import type {
   TxReceipt,
   TxUnsubscribe,
   TxWatchCallback,
+  TxWatchOptions,
   WaitOptions,
   ExplorerConfig,
 } from "@/types";
 import { ChainId } from "@/types";
+import { assertSafeHttpUrl } from "@/utils";
 
 const DEFAULT_POLL_INTERVAL_MS = 5_000;
+const DEFAULT_WATCH_TIMEOUT_MS = 10 * 60_000;
 
 /**
  * Represents a submitted Starknet transaction.
@@ -101,12 +104,33 @@ export class Tx {
    * unsubscribe();
    * ```
    */
-  watch(callback: TxWatchCallback): TxUnsubscribe {
+  watch(
+    callback: TxWatchCallback,
+    options: TxWatchOptions = {}
+  ): TxUnsubscribe {
     let stopped = false;
     let lastFinality: string | null = null;
+    const pollIntervalMs = options.pollIntervalMs ?? DEFAULT_POLL_INTERVAL_MS;
+    const timeoutMs = options.timeoutMs ?? DEFAULT_WATCH_TIMEOUT_MS;
+    if (!Number.isFinite(pollIntervalMs) || pollIntervalMs <= 0) {
+      throw new Error("tx.watch pollIntervalMs must be a positive number");
+    }
+    if (!Number.isFinite(timeoutMs) || timeoutMs < 0) {
+      throw new Error("tx.watch timeoutMs must be >= 0");
+    }
+    const startedAt = Date.now();
 
     const poll = async () => {
       while (!stopped) {
+        if (timeoutMs > 0 && Date.now() - startedAt >= timeoutMs) {
+          const err = new Error(
+            `Transaction watch timed out after ${timeoutMs}ms for ${this.hash}`
+          );
+          options.onError?.(err);
+          stopped = true;
+          return;
+        }
+
         try {
           const result = await this.provider.getTransactionStatus(this.hash);
           const finality = result.finality_status;
@@ -121,11 +145,15 @@ export class Tx {
             stopped = true;
             return;
           }
-        } catch {
-          // Ignore polling errors, retry
+        } catch (error) {
+          options.onError?.(
+            error instanceof Error
+              ? error
+              : new Error("Failed to poll transaction status")
+          );
         }
 
-        await sleep(DEFAULT_POLL_INTERVAL_MS);
+        await sleep(pollIntervalMs);
       }
     };
 
@@ -169,8 +197,15 @@ function buildExplorerUrl(
   chainId: ChainId,
   config?: ExplorerConfig
 ): string {
+  const encodedHash = encodeURIComponent(hash);
+
   if (config?.baseUrl) {
-    return `${config.baseUrl}/tx/${hash}`;
+    const baseUrl = assertSafeHttpUrl(config.baseUrl, "explorer.baseUrl");
+    const normalizedBaseUrl = new URL(baseUrl.toString());
+    if (!normalizedBaseUrl.pathname.endsWith("/")) {
+      normalizedBaseUrl.pathname = `${normalizedBaseUrl.pathname}/`;
+    }
+    return new URL(`tx/${encodedHash}`, normalizedBaseUrl).toString();
   }
 
   const isMainnet = chainId.isMainnet();
@@ -178,12 +213,12 @@ function buildExplorerUrl(
 
   if (explorerProvider === "starkscan") {
     const subdomain = isMainnet ? "" : "sepolia.";
-    return `https://${subdomain}starkscan.co/tx/${hash}`;
+    return `https://${subdomain}starkscan.co/tx/${encodedHash}`;
   }
 
   // Default: voyager
   const subdomain = isMainnet ? "" : "sepolia.";
-  return `https://${subdomain}voyager.online/tx/${hash}`;
+  return `https://${subdomain}voyager.online/tx/${encodedHash}`;
 }
 
 function isFinalStatus(finality: string, execution?: string): boolean {

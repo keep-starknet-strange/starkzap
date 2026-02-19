@@ -46,6 +46,19 @@ describe("Tx", () => {
       expect(tx.explorerUrl).toBe("https://my-explorer.com/tx/0x123abc");
     });
 
+    it("should preserve custom base URL path prefix", () => {
+      const provider = new RpcProvider({
+        nodeUrl: "https://starknet-sepolia.example.com",
+      });
+      const hash = "0x123abc";
+
+      const tx = new Tx(hash, provider, SEPOLIA, {
+        baseUrl: "https://my-explorer.com/app",
+      });
+
+      expect(tx.explorerUrl).toBe("https://my-explorer.com/app/tx/0x123abc");
+    });
+
     it("should default to voyager when no explorer config", () => {
       const provider = new RpcProvider({
         nodeUrl: "https://starknet-sepolia.example.com",
