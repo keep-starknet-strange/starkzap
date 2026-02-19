@@ -32,6 +32,7 @@ vi.mock("@cartridge/controller", () => {
         },
       },
     ]),
+    estimateInvokeFee: vi.fn().mockResolvedValue({}),
   };
 
   class MockController {
@@ -69,6 +70,7 @@ vi.mock("starknet", async (importOriginal) => {
 
   class MockRpcProvider {
     channel = { nodeUrl: "https://test.rpc" };
+    getChainId = vi.fn().mockResolvedValue(ChainId.SEPOLIA.toFelt252());
     getClassHashAt = vi.fn().mockResolvedValue("0xclasshash");
   }
 
@@ -165,6 +167,13 @@ describe("CartridgeWallet", () => {
       const tx = await wallet.deploy();
       expect(tx.hash).toBe("0xdeploy");
       await expect(wallet.isDeployed()).resolves.toBe(false);
+    });
+
+    it("should reject unsupported deploy options", async () => {
+      const wallet = await CartridgeWallet.create();
+      await expect(wallet.deploy({ feeMode: "sponsored" })).rejects.toThrow(
+        "does not support DeployOptions overrides"
+      );
     });
   });
 

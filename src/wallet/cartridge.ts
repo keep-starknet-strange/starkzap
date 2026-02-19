@@ -4,7 +4,6 @@ import {
   type Account,
   type Call,
   type PaymasterTimeBounds,
-  type EstimateFeeResponseOverhead,
   type TypedData,
   type Signature,
 } from "starknet";
@@ -30,6 +29,11 @@ import {
 } from "@/wallet/utils";
 import { BaseWallet } from "@/wallet/base";
 import { assertSafeHttpUrl } from "@/utils";
+
+const NEGATIVE_DEPLOYMENT_CACHE_TTL_MS = 3_000;
+const MAX_CONTROLLER_WAIT_MS = 10_000;
+const INITIAL_CONTROLLER_POLL_MS = 100;
+const MAX_CONTROLLER_POLL_MS = 1_000;
 
 /**
  * Options for connecting with Cartridge Controller.
@@ -69,7 +73,7 @@ export interface CartridgeWalletOptions {
  */
 export class CartridgeWallet extends BaseWallet {
   private readonly controller: Controller;
-  private readonly walletAccount: CartridgeWalletAccount;
+  private readonly walletAccount: Account;
   private readonly provider: RpcProvider;
   private readonly chainId: ChainId;
   private readonly classHash: string;
@@ -77,10 +81,11 @@ export class CartridgeWallet extends BaseWallet {
   private readonly defaultFeeMode: FeeMode;
   private readonly defaultTimeBounds: PaymasterTimeBounds | undefined;
   private deployedCache: boolean | null = null;
+  private deployedCacheExpiresAt = 0;
 
   private constructor(
     controller: Controller,
-    walletAccount: CartridgeWalletAccount,
+    walletAccount: Account,
     provider: RpcProvider,
     chainId: ChainId,
     classHash: string,
@@ -139,13 +144,16 @@ export class CartridgeWallet extends BaseWallet {
 
     const controller = new Controller(controllerOptions);
 
-    const maxWaitMs = 10000;
-    const pollIntervalMs = 100;
     let waited = 0;
-
-    while (!controller.isReady() && waited < maxWaitMs) {
-      await new Promise((resolve) => setTimeout(resolve, pollIntervalMs));
-      waited += pollIntervalMs;
+    let pollIntervalMs = INITIAL_CONTROLLER_POLL_MS;
+    while (!controller.isReady() && waited < MAX_CONTROLLER_WAIT_MS) {
+      const sleepMs = Math.min(
+        pollIntervalMs,
+        MAX_CONTROLLER_WAIT_MS - waited
+      );
+      await new Promise((resolve) => setTimeout(resolve, sleepMs));
+      waited += sleepMs;
+      pollIntervalMs = Math.min(pollIntervalMs * 2, MAX_CONTROLLER_POLL_MS);
     }
 
     if (!controller.isReady()) {
@@ -154,13 +162,14 @@ export class CartridgeWallet extends BaseWallet {
       );
     }
 
-    const walletAccount = await controller.connect();
+    const connectedAccount = await controller.connect();
 
-    if (!isCartridgeWalletAccount(walletAccount)) {
+    if (!isCartridgeWalletAccount(connectedAccount)) {
       throw new Error(
         "Cartridge connection failed. Make sure popups are allowed and try again."
       );
     }
+    const walletAccount = connectedAccount as unknown as Account;
 
     const nodeUrl = assertSafeHttpUrl(
       options.rpcUrl ?? controller.rpcUrl(),
@@ -190,21 +199,43 @@ export class CartridgeWallet extends BaseWallet {
   }
 
   async isDeployed(): Promise<boolean> {
+    const now = Date.now();
     if (this.deployedCache === true) {
       return true;
     }
+    if (this.deployedCache === false && now < this.deployedCacheExpiresAt) {
+      return false;
+    }
+
     const deployed = await checkDeployed(this.provider, this.address);
     if (deployed) {
       this.deployedCache = true;
+      this.deployedCacheExpiresAt = Number.POSITIVE_INFINITY;
+    } else {
+      this.deployedCache = false;
+      this.deployedCacheExpiresAt = now + NEGATIVE_DEPLOYMENT_CACHE_TTL_MS;
     }
     return deployed;
+  }
+
+  private clearDeploymentCache(): void {
+    this.deployedCache = null;
+    this.deployedCacheExpiresAt = 0;
   }
 
   async ensureReady(options: EnsureReadyOptions = {}): Promise<void> {
     return ensureWalletReady(this, options);
   }
 
-  async deploy(_options: DeployOptions = {}): Promise<Tx> {
+  async deploy(options: DeployOptions = {}): Promise<Tx> {
+    if (options.feeMode !== undefined || options.timeBounds !== undefined) {
+      throw new Error(
+        "CartridgeWallet.deploy() does not support DeployOptions overrides; deployment mode is controlled by Cartridge Controller."
+      );
+    }
+
+    this.clearDeploymentCache();
+
     // Cartridge Controller handles deployment internally
     const result = await (
       this.controller as unknown as ControllerWithKeychain
@@ -267,7 +298,7 @@ export class CartridgeWallet extends BaseWallet {
   }
 
   getAccount(): Account {
-    return this.walletAccount as unknown as Account;
+    return this.walletAccount;
   }
 
   getProvider(): RpcProvider {
@@ -298,6 +329,8 @@ export class CartridgeWallet extends BaseWallet {
   }
 
   async disconnect(): Promise<void> {
+    this.clearCaches();
+    this.clearDeploymentCache();
     await this.controller.disconnect();
   }
 
@@ -307,24 +340,6 @@ export class CartridgeWallet extends BaseWallet {
   async username(): Promise<string | undefined> {
     return this.controller.username();
   }
-}
-
-interface CartridgeWalletAccount {
-  address: string;
-  execute: (calls: Call[]) => Promise<{
-    transaction_hash: string;
-  }>;
-  executePaymasterTransaction: (
-    calls: Call[],
-    details: ReturnType<typeof sponsoredDetails>
-  ) => Promise<{
-    transaction_hash: string;
-  }>;
-  signMessage: (typedData: TypedData) => Promise<Signature>;
-  simulateTransaction: (
-    invocations: Array<{ type: "INVOKE"; payload: Call[] }>
-  ) => Promise<unknown[]>;
-  estimateInvokeFee: (calls: Call[]) => Promise<EstimateFeeResponseOverhead>;
 }
 
 type ControllerWithKeychain = {
@@ -337,14 +352,27 @@ type ControllerWithKeychain = {
   };
 };
 
+type CartridgeAccountLike = {
+  address: string;
+  execute: (...args: unknown[]) => Promise<{ transaction_hash: string }>;
+  executePaymasterTransaction: (
+    ...args: unknown[]
+  ) => Promise<{ transaction_hash: string }>;
+  signMessage: (...args: unknown[]) => Promise<Signature>;
+  simulateTransaction: (...args: unknown[]) => unknown;
+  estimateInvokeFee: (...args: unknown[]) => unknown;
+};
+
 function isCartridgeWalletAccount(
   value: unknown
-): value is CartridgeWalletAccount {
+): value is CartridgeAccountLike {
   if (!value || typeof value !== "object") {
     return false;
   }
 
-  const account = value as Partial<CartridgeWalletAccount>;
+  const account = value as Partial<CartridgeAccountLike> & {
+    address?: unknown;
+  };
   return (
     typeof account.address === "string" &&
     typeof account.execute === "function" &&

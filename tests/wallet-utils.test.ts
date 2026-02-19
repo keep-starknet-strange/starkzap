@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
 import type { RpcProvider } from "starknet";
-import { checkDeployed } from "@/wallet/utils";
+import { checkDeployed, ensureWalletReady } from "@/wallet/utils";
 import { fromAddress } from "@/types";
 
 describe("wallet utils", () => {
@@ -39,6 +39,41 @@ describe("wallet utils", () => {
       await expect(
         checkDeployed(provider as unknown as RpcProvider, address)
       ).rejects.toThrow("ECONNREFUSED");
+    });
+  });
+
+  describe("ensureWalletReady", () => {
+    it("does not redeploy an already deployed account with deploy: always", async () => {
+      const deploy = vi.fn();
+      const isDeployed = vi.fn().mockResolvedValue(true);
+
+      await ensureWalletReady(
+        {
+          isDeployed,
+          deploy,
+        },
+        { deploy: "always" }
+      );
+
+      expect(isDeployed).toHaveBeenCalledTimes(1);
+      expect(deploy).not.toHaveBeenCalled();
+    });
+
+    it("deploys undeployed accounts in if_needed mode", async () => {
+      const wait = vi.fn().mockResolvedValue(undefined);
+      const deploy = vi.fn().mockResolvedValue({ wait });
+      const isDeployed = vi.fn().mockResolvedValue(false);
+
+      await ensureWalletReady(
+        {
+          isDeployed,
+          deploy,
+        },
+        { deploy: "if_needed" }
+      );
+
+      expect(deploy).toHaveBeenCalledTimes(1);
+      expect(wait).toHaveBeenCalledTimes(1);
     });
   });
 });

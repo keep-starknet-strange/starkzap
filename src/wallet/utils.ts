@@ -75,7 +75,7 @@ export async function ensureWalletReady(
     onProgress?.({ step: "CHECK_DEPLOYED" });
     const deployed = await wallet.isDeployed();
 
-    if (deployed && deploy !== "always") {
+    if (deployed) {
       onProgress?.({ step: "READY" });
       return;
     }
