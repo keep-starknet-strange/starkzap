@@ -88,6 +88,7 @@
     "vitest": "^4.0.17"
   },
   "dependencies": {
+    "@cartridge/controller": "^0.13.7",
     "starknet": "^9.2.1"
   }
 }

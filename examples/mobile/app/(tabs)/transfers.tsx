@@ -1,4 +1,4 @@
-import { useCallback, useState, useMemo } from "react";
+import { useCallback, useState, useMemo, useEffect, useRef } from "react";
 import {
   StyleSheet,
   ScrollView,
@@ -6,22 +6,101 @@ import {
   TouchableOpacity,
   View,
   Modal,
-  FlatList,
   TextInput,
   ActivityIndicator,
+  Image,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { router } from "expo-router";
+import * as Clipboard from "expo-clipboard";
+import * as Haptics from "expo-haptics";
+import Ionicons from "@expo/vector-icons/Ionicons";
+import { usePrivy } from "@privy-io/expo";
 
 import { ThemedText } from "@/components/themed-text";
-import { AmountInput } from "@/components/AmountInput";
 import { LogsFAB } from "@/components/LogsFAB";
+import { useThemeColor } from "@/hooks/use-theme-color";
 import { useWalletStore, NETWORKS } from "@/stores/wallet";
-import { useBalancesStore, getTokensForNetwork } from "@/stores/balances";
+import {
+  useBalancesStore,
+  getTokensForNetwork,
+  getStrkToken,
+  getUsdcToken,
+  getWbtcToken,
+} from "@/stores/balances";
 import {
   showTransactionToast,
   updateTransactionToast,
+  showCopiedToast,
 } from "@/components/Toast";
 import { Amount, fromAddress, type Token, type ChainId } from "starkzap";
+
+const WBTC_LOGO_FALLBACK =
+  "https://altcoinsbox.com/wp-content/uploads/2023/01/wbtc-wrapped-bitcoin-logo.png";
+const SEPOLIA_USD_RATES = { USDC: 1, STRK: 0.05 } as const;
+
+function formatBalanceNumber(amount: Amount): string {
+  const formatted = amount.toFormatted(true);
+  const partWithNumber = formatted.split(/\s+/).find((p) => /\d/.test(p));
+  return partWithNumber ?? "—";
+}
+
+function parseBalanceToNumber(amount: Amount | null): number {
+  if (!amount) return 0;
+  const s = formatBalanceNumber(amount);
+  return parseFloat(s.replace(/,/g, "")) || 0;
+}
+
+function cropAddress(addr: string): string {
+  if (addr.length <= 10) return addr;
+  return `${addr.slice(0, 5)}...${addr.slice(-5)}`;
+}
+
+function TinyTokenLogo({ token }: { token: Token }) {
+  const [imageError, setImageError] = useState(false);
+  const primaryColor = useThemeColor({}, "primary");
+  const borderColor = useThemeColor({}, "border");
+  const useFallback = !token.metadata?.logoUrl || imageError;
+  if (token.symbol === "WBTC" && useFallback) {
+    return (
+      <Image
+        source={{ uri: WBTC_LOGO_FALLBACK }}
+        style={tokenLogoStyles.tinyLogo}
+        onError={() => setImageError(true)}
+      />
+    );
+  }
+  if (useFallback) {
+    return (
+      <View
+        style={[
+          tokenLogoStyles.tinyLogo,
+          tokenLogoStyles.tinyLogoPlaceholder,
+          { backgroundColor: borderColor },
+        ]}
+      >
+        <ThemedText
+          style={[tokenLogoStyles.tinyLogoText, { color: primaryColor }]}
+        >
+          {token.symbol.charAt(0)}
+        </ThemedText>
+      </View>
+    );
+  }
+  return (
+    <Image
+      source={{ uri: token.metadata!.logoUrl!.toString() }}
+      style={tokenLogoStyles.tinyLogo}
+      onError={() => setImageError(true)}
+    />
+  );
+}
+
+const tokenLogoStyles = StyleSheet.create({
+  tinyLogo: { width: 20, height: 20, borderRadius: 10 },
+  tinyLogoPlaceholder: { justifyContent: "center", alignItems: "center" },
+  tinyLogoText: { fontSize: 10, fontWeight: "600" },
+});
 
 /** Get explorer URL for a transaction hash */
 function getExplorerUrl(txHash: string, chainId: ChainId): string {
@@ -46,44 +125,74 @@ const createEmptyTransfer = (): TransferItem => ({
   toAddress: "",
 });
 
+function createDefaultTransfer(defaultToken: Token): TransferItem {
+  return {
+    ...createEmptyTransfer(),
+    token: defaultToken,
+  };
+}
+
 export default function TransfersScreen() {
-  const { wallet, chainId, addLog, paymasterNodeUrl, preferSponsored } =
-    useWalletStore();
+  const {
+    wallet,
+    chainId,
+    addLog,
+    paymasterNodeUrl,
+    preferSponsored,
+    walletType,
+    disconnect,
+    resetNetworkConfig,
+  } = useWalletStore();
+  const { logout } = usePrivy();
   const {
     getBalance,
     fetchBalances,
     isLoading: isLoadingBalances,
+    clearBalances,
   } = useBalancesStore();
 
   const allTokens = getTokensForNetwork(chainId);
+  const strkToken = getStrkToken(chainId);
+  const wbtcToken = getWbtcToken(chainId);
+  const usdcToken = getUsdcToken(chainId);
+  const primaryTokens = useMemo(() => {
+    const eth = allTokens.find((t) => t.symbol === "ETH");
+    return [strkToken, wbtcToken, usdcToken, eth].filter(
+      (t): t is Token => t != null
+    );
+  }, [allTokens, strkToken, wbtcToken, usdcToken]);
+
   const networkName =
     NETWORKS.find((n) => n.chainId.toLiteral() === chainId.toLiteral())?.name ??
     "Custom";
 
-  // Transfer state
   const [transfers, setTransfers] = useState<TransferItem[]>([
     createEmptyTransfer(),
   ]);
+  const hasSetDefaultToken = useRef(false);
+  useEffect(() => {
+    if (hasSetDefaultToken.current || !strkToken) return;
+    hasSetDefaultToken.current = true;
+    setTransfers((prev) =>
+      prev.length > 0 && !prev[0]?.token
+        ? [{ ...prev[0], token: strkToken }]
+        : prev
+    );
+  }, [strkToken]);
+
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [useSponsored, setUseSponsored] = useState(
     preferSponsored && Boolean(paymasterNodeUrl)
   );
 
+  const borderColor = useThemeColor({}, "border");
+  const primaryColor = useThemeColor({}, "primary");
+  const textSecondary = useThemeColor({}, "textSecondary");
+  const cardBg = useThemeColor({}, "card");
+
   // Token picker modal state
   const [showTokenPicker, setShowTokenPicker] = useState(false);
   const [activeTransferId, setActiveTransferId] = useState<string | null>(null);
-  const [tokenSearchQuery, setTokenSearchQuery] = useState("");
-
-  // Filter tokens by search
-  const filteredTokens = useMemo(
-    () =>
-      allTokens.filter(
-        (token) =>
-          token.symbol.toLowerCase().includes(tokenSearchQuery.toLowerCase()) ||
-          token.name.toLowerCase().includes(tokenSearchQuery.toLowerCase())
-      ),
-    [allTokens, tokenSearchQuery]
-  );
 
   const handleRefresh = useCallback(async () => {
     if (wallet) {
@@ -91,9 +200,36 @@ export default function TransfersScreen() {
     }
   }, [wallet, chainId, fetchBalances]);
 
+  const handleDisconnect = useCallback(async () => {
+    clearBalances();
+    if (walletType === "privy") {
+      await logout();
+    }
+    disconnect();
+    resetNetworkConfig();
+    router.replace("/");
+  }, [clearBalances, disconnect, resetNetworkConfig, walletType, logout]);
+
+  const handleCopyAddress = useCallback(async () => {
+    if (wallet) {
+      await Clipboard.setStringAsync(wallet.address);
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      showCopiedToast();
+    }
+  }, [wallet]);
+
+  const strkBalance = getBalance(strkToken);
+  const usdcBalance = getBalance(usdcToken);
+  const isSepolia =
+    chainId.isSepolia?.() ?? chainId.toLiteral?.() === "SN_SEPOLIA";
+  const totalUsd =
+    isSepolia && (strkBalance || usdcBalance)
+      ? parseBalanceToNumber(usdcBalance) * SEPOLIA_USD_RATES.USDC +
+        parseBalanceToNumber(strkBalance) * SEPOLIA_USD_RATES.STRK
+      : null;
+
   const handleOpenTokenPicker = useCallback((transferId: string) => {
     setActiveTransferId(transferId);
-    setTokenSearchQuery("");
     setShowTokenPicker(true);
   }, []);
 
@@ -131,22 +267,24 @@ export default function TransfersScreen() {
   );
 
   const handleAddTransfer = useCallback(() => {
-    setTransfers((prev) => [...prev, createEmptyTransfer()]);
-  }, []);
+    setTransfers((prev) => [...prev, createDefaultTransfer(strkToken)]);
+  }, [strkToken]);
 
-  const handleRemoveTransfer = useCallback((transferId: string) => {
-    setTransfers((prev) => {
-      // Keep at least one transfer
-      if (prev.length <= 1) {
-        return [createEmptyTransfer()];
-      }
-      return prev.filter((t) => t.id !== transferId);
-    });
-  }, []);
+  const handleRemoveTransfer = useCallback(
+    (transferId: string) => {
+      setTransfers((prev) => {
+        if (prev.length <= 1) {
+          return [createDefaultTransfer(strkToken)];
+        }
+        return prev.filter((t) => t.id !== transferId);
+      });
+    },
+    [strkToken]
+  );
 
   const handleClearAll = useCallback(() => {
-    setTransfers([createEmptyTransfer()]);
-  }, []);
+    setTransfers([createDefaultTransfer(strkToken)]);
+  }, [strkToken]);
 
   // Validate transfers
   const validTransfers = useMemo(() => {
@@ -160,7 +298,19 @@ export default function TransfersScreen() {
     );
   }, [transfers]);
 
-  const canSubmit = validTransfers.length > 0 && !isSubmitting;
+  const anyTransferExceedsBalance = useMemo(() => {
+    return transfers.some((t) => {
+      if (!t.token || !t.amount) return false;
+      const balance = getBalance(t.token);
+      if (!balance) return false;
+      const balanceNum = parseFloat(balance.toUnit());
+      const enteredNum = parseFloat(t.amount) || 0;
+      return enteredNum > 0 && enteredNum > balanceNum;
+    });
+  }, [transfers, getBalance]);
+
+  const canSubmit =
+    validTransfers.length > 0 && !isSubmitting && !anyTransferExceedsBalance;
   const canUseSponsored = Boolean(paymasterNodeUrl);
 
   const handleSubmit = useCallback(async () => {
@@ -253,95 +403,359 @@ export default function TransfersScreen() {
     return null;
   }
 
+  const contentPaddingTop = 0;
+
   return (
     <SafeAreaView style={styles.container} edges={["top"]}>
-      <View style={styles.header}>
-        <ThemedText type="title">Transfers</ThemedText>
-        <View style={styles.networkBadge}>
-          <ThemedText style={styles.networkBadgeText}>{networkName}</ThemedText>
-        </View>
-      </View>
-
       <ScrollView
         style={styles.scrollView}
-        contentContainerStyle={styles.content}
+        contentContainerStyle={[
+          styles.content,
+          { paddingTop: contentPaddingTop },
+        ]}
+        showsVerticalScrollIndicator={true}
         refreshControl={
           <RefreshControl
             refreshing={isLoadingBalances}
             onRefresh={handleRefresh}
-            tintColor="#0a7ea4"
+            tintColor={primaryColor}
           />
         }
       >
-        <ThemedText style={styles.sectionTitle}>
-          Transfers ({transfers.length})
-        </ThemedText>
+        <View style={styles.header}>
+          <View style={styles.headerTitle}>
+            <ThemedText type="title">Transfers</ThemedText>
+          </View>
+          <View style={styles.headerRight}>
+            <View
+              style={[styles.networkPill, { backgroundColor: borderColor }]}
+            >
+              <ThemedText
+                style={[styles.networkPillText, { color: primaryColor }]}
+              >
+                {networkName}
+              </ThemedText>
+            </View>
+            <TouchableOpacity onPress={handleDisconnect} hitSlop={8}>
+              <ThemedText type="link" style={styles.disconnectLink}>
+                Disconnect
+              </ThemedText>
+            </TouchableOpacity>
+          </View>
+        </View>
 
         {transfers.map((transfer, index) => (
-          <View key={transfer.id} style={styles.transferCard}>
-            <View style={styles.transferHeader}>
-              <ThemedText style={styles.transferIndex}>#{index + 1}</ThemedText>
-              {transfers.length > 1 && (
+          <View
+            key={transfer.id}
+            style={[
+              styles.transferCard,
+              { backgroundColor: cardBg, borderColor },
+            ]}
+          >
+            {/* Same top as Balance card: Total (USD), amount, address, refresh (no transfer button) */}
+            {index === 0 && (
+              <>
+                <View style={styles.usdTotalHeaderRow}>
+                  <ThemedText
+                    style={[styles.usdTotalLabel, { color: textSecondary }]}
+                  >
+                    Total (USD)
+                  </ThemedText>
+                </View>
+                <View style={styles.usdTotalAmountWrap}>
+                  {isLoadingBalances ? (
+                    <ActivityIndicator size="small" color={primaryColor} />
+                  ) : totalUsd != null ? (
+                    <ThemedText style={styles.usdTotalAmount}>
+                      $
+                      {totalUsd.toLocaleString("default", {
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2,
+                      })}
+                    </ThemedText>
+                  ) : (
+                    <ThemedText
+                      style={[styles.usdTotalAmount, { color: textSecondary }]}
+                    >
+                      —
+                    </ThemedText>
+                  )}
+                </View>
+                <View style={styles.addressCopyRow}>
+                  <TouchableOpacity
+                    style={[
+                      styles.addressCopyBtn,
+                      { backgroundColor: borderColor },
+                    ]}
+                    onPress={handleCopyAddress}
+                    activeOpacity={0.88}
+                  >
+                    <ThemedText
+                      style={[
+                        styles.addressCopyBtnText,
+                        { color: textSecondary },
+                      ]}
+                    >
+                      {wallet ? cropAddress(wallet.address) : ""}
+                    </ThemedText>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    onPress={handleRefresh}
+                    hitSlop={6}
+                    style={[
+                      styles.refreshBtn,
+                      { backgroundColor: borderColor },
+                    ]}
+                    disabled={isLoadingBalances}
+                    activeOpacity={0.88}
+                  >
+                    {isLoadingBalances ? (
+                      <ActivityIndicator
+                        size="small"
+                        color={primaryColor}
+                        style={styles.refreshBtnSpinner}
+                      />
+                    ) : (
+                      <Ionicons name="refresh" size={12} color={primaryColor} />
+                    )}
+                  </TouchableOpacity>
+                </View>
+                <View
+                  style={[
+                    styles.balanceCardDivider,
+                    { backgroundColor: borderColor },
+                  ]}
+                />
+              </>
+            )}
+
+            {transfers.length > 1 && index > 0 && (
+              <View style={styles.transferHeader}>
+                <ThemedText
+                  style={[styles.transferIndex, { color: textSecondary }]}
+                >
+                  Transfer #{index + 1}
+                </ThemedText>
                 <TouchableOpacity
                   onPress={() => handleRemoveTransfer(transfer.id)}
-                  style={styles.removeButton}
+                  style={[styles.removeButton, { borderColor }]}
                 >
                   <ThemedText style={styles.removeButtonText}>
                     Remove
                   </ThemedText>
                 </TouchableOpacity>
+              </View>
+            )}
+
+            {/* One field: Token dropdown (logo + name) + Amount input + MAX */}
+            <View style={styles.fieldContainer}>
+              <View style={styles.usdTotalHeaderRow}>
+                <ThemedText
+                  style={[styles.usdTotalLabel, { color: textSecondary }]}
+                >
+                  Transfer
+                </ThemedText>
+              </View>
+              <View
+                style={[
+                  styles.amountTokenRow,
+                  {
+                    backgroundColor: "transparent",
+                    borderWidth: 1,
+                    borderColor,
+                  },
+                ]}
+              >
+                <TouchableOpacity
+                  style={styles.amountTokenDropdown}
+                  onPress={() => handleOpenTokenPicker(transfer.id)}
+                  activeOpacity={0.88}
+                >
+                  {transfer.token ? (
+                    <>
+                      <TinyTokenLogo token={transfer.token} />
+                      <View style={styles.amountTokenDropdownLabels}>
+                        <ThemedText
+                          style={[
+                            styles.amountTokenSymbol,
+                            { color: primaryColor },
+                          ]}
+                        >
+                          {transfer.token.symbol}
+                        </ThemedText>
+                      </View>
+                    </>
+                  ) : (
+                    <ThemedText
+                      style={[
+                        styles.placeholderTextSmall,
+                        { color: textSecondary },
+                      ]}
+                    >
+                      Select token
+                    </ThemedText>
+                  )}
+                  <ThemedText
+                    style={[styles.chevronSmall, { color: textSecondary }]}
+                  >
+                    ▼
+                  </ThemedText>
+                </TouchableOpacity>
+                <View style={styles.amountInputMaxWrap}>
+                  {(() => {
+                    const balance = transfer.token
+                      ? getBalance(transfer.token)
+                      : null;
+                    const balanceNum = balance
+                      ? parseFloat(balance.toUnit())
+                      : 0;
+                    const enteredNum = parseFloat(transfer.amount) || 0;
+                    const exceedsBalance =
+                      !!transfer.token &&
+                      enteredNum > 0 &&
+                      enteredNum > balanceNum;
+                    return (
+                      <TextInput
+                        style={[
+                          styles.amountInput,
+                          { color: exceedsBalance ? "#e53935" : primaryColor },
+                        ]}
+                        value={transfer.amount}
+                        onChangeText={(amount) =>
+                          handleUpdateAmount(transfer.id, amount)
+                        }
+                        placeholder="0.0"
+                        placeholderTextColor={textSecondary}
+                        keyboardType="decimal-pad"
+                        editable={!!transfer.token}
+                      />
+                    );
+                  })()}
+                  {transfer.token && getBalance(transfer.token) && (
+                    <TouchableOpacity
+                      style={[
+                        styles.maxButton,
+                        { backgroundColor: borderColor },
+                      ]}
+                      onPress={() =>
+                        handleUpdateAmount(
+                          transfer.id,
+                          getBalance(transfer.token)!.toUnit()
+                        )
+                      }
+                      activeOpacity={0.88}
+                    >
+                      <ThemedText
+                        style={[styles.maxButtonText, { color: primaryColor }]}
+                      >
+                        MAX
+                      </ThemedText>
+                    </TouchableOpacity>
+                  )}
+                </View>
+              </View>
+              {/* Sponsored + switch and Balance on one line below the dropdown, right-aligned */}
+              <View style={styles.balanceSponsoredRow}>
+                {index === 0 && (
+                  <View style={styles.sponsoredInline}>
+                    <ThemedText
+                      style={[styles.usdTotalLabel, { color: textSecondary }]}
+                    >
+                      Sponsored
+                    </ThemedText>
+                    <View
+                      style={[
+                        styles.sponsoredSwitchWrapperCompact,
+                        (!canUseSponsored || isSubmitting) &&
+                          styles.sponsoredSwitchDisabled,
+                      ]}
+                      pointerEvents={
+                        !canUseSponsored || isSubmitting ? "none" : "auto"
+                      }
+                    >
+                      <TouchableOpacity
+                        style={[
+                          styles.sponsoredSwitchSegmentCompact,
+                          !useSponsored &&
+                            styles.sponsoredSwitchSegmentSelected,
+                        ]}
+                        onPress={() => setUseSponsored(false)}
+                        disabled={!canUseSponsored || isSubmitting}
+                        activeOpacity={0.88}
+                      >
+                        <ThemedText
+                          style={[
+                            styles.sponsoredSwitchTextCompact,
+                            !useSponsored && styles.sponsoredSwitchTextSelected,
+                          ]}
+                        >
+                          Off
+                        </ThemedText>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={[
+                          styles.sponsoredSwitchSegmentCompact,
+                          useSponsored && styles.sponsoredSwitchSegmentSelected,
+                        ]}
+                        onPress={() => setUseSponsored(true)}
+                        disabled={!canUseSponsored || isSubmitting}
+                        activeOpacity={0.88}
+                      >
+                        <ThemedText
+                          style={[
+                            styles.sponsoredSwitchTextCompact,
+                            useSponsored && styles.sponsoredSwitchTextSelected,
+                          ]}
+                        >
+                          On
+                        </ThemedText>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                )}
+                {transfer.token && getBalance(transfer.token) != null && (
+                  <ThemedText
+                    style={[
+                      styles.balanceLabelInline,
+                      { color: textSecondary },
+                    ]}
+                  >
+                    Balance: {getBalance(transfer.token)!.toFormatted(true)}
+                  </ThemedText>
+                )}
+              </View>
+              {index === 0 && !canUseSponsored && (
+                <ThemedText
+                  style={[
+                    styles.sponsoredHintCompact,
+                    { color: textSecondary },
+                  ]}
+                >
+                  Paymaster not configured
+                </ThemedText>
               )}
             </View>
 
-            {/* Token Selector */}
             <View style={styles.fieldContainer}>
-              <ThemedText style={styles.fieldLabel}>Token</ThemedText>
-              <TouchableOpacity
-                style={styles.tokenSelector}
-                onPress={() => handleOpenTokenPicker(transfer.id)}
-              >
-                {transfer.token ? (
-                  <View style={styles.selectedToken}>
-                    <ThemedText style={styles.tokenSymbol}>
-                      {transfer.token.symbol}
-                    </ThemedText>
-                    <ThemedText style={styles.tokenName}>
-                      {transfer.token.name}
-                    </ThemedText>
-                  </View>
-                ) : (
-                  <ThemedText style={styles.placeholderText}>
-                    Select a token
-                  </ThemedText>
-                )}
-                <ThemedText style={styles.chevron}>›</ThemedText>
-              </TouchableOpacity>
-            </View>
-
-            {/* Amount Input */}
-            {transfer.token && (
-              <AmountInput
-                value={transfer.amount}
-                onChangeText={(amount) =>
-                  handleUpdateAmount(transfer.id, amount)
-                }
-                token={transfer.token}
-                balance={getBalance(transfer.token)}
-                label="Amount"
-              />
-            )}
-
-            {/* Destination Address */}
-            <View style={styles.fieldContainer}>
-              <ThemedText style={styles.fieldLabel}>To Address</ThemedText>
+              <ThemedText style={[styles.cardLabel, { color: textSecondary }]}>
+                To Address
+              </ThemedText>
               <TextInput
-                style={styles.addressInput}
+                style={[
+                  styles.addressInput,
+                  {
+                    backgroundColor: "transparent",
+                    borderWidth: 1,
+                    borderColor,
+                    color: primaryColor,
+                  },
+                ]}
                 value={transfer.toAddress}
                 onChangeText={(address) =>
                   handleUpdateAddress(transfer.id, address)
                 }
                 placeholder="0x..."
-                placeholderTextColor="#888"
+                placeholderTextColor={textSecondary}
                 autoCapitalize="none"
                 autoCorrect={false}
               />
@@ -349,47 +763,45 @@ export default function TransfersScreen() {
           </View>
         ))}
 
-        {/* Add Transfer Button */}
         <TouchableOpacity
-          style={styles.addTransferButton}
+          style={[styles.addTransferPlaceholder, { borderColor }]}
           onPress={handleAddTransfer}
+          activeOpacity={0.7}
         >
-          <ThemedText style={styles.addTransferButtonText}>
-            + Add Another Transfer
+          <ThemedText
+            style={[
+              styles.addTransferPlaceholderText,
+              { color: textSecondary },
+            ]}
+          >
+            ＋ Add another transfer
           </ThemedText>
         </TouchableOpacity>
 
-        {/* Submit Button */}
-        <View style={styles.sponsoredRow}>
-          <TouchableOpacity
-            style={[
-              styles.sponsoredToggle,
-              useSponsored && styles.sponsoredToggleActive,
-              !canUseSponsored && styles.buttonDisabled,
-            ]}
-            onPress={() => setUseSponsored((v) => !v)}
-            disabled={!canUseSponsored || isSubmitting}
-          >
-            <ThemedText style={styles.sponsoredToggleText}>
-              {useSponsored ? "Sponsored: ON" : "Sponsored: OFF"}
-            </ThemedText>
-          </TouchableOpacity>
-          {!canUseSponsored && (
-            <ThemedText style={styles.sponsoredHint}>
-              Paymaster not configured
-            </ThemedText>
-          )}
-        </View>
-
         <TouchableOpacity
-          style={[styles.submitButton, !canSubmit && styles.buttonDisabled]}
+          style={[
+            styles.submitButton,
+            canSubmit
+              ? { backgroundColor: "#000" }
+              : { backgroundColor: borderColor },
+            !canSubmit && styles.buttonDisabled,
+          ]}
           onPress={handleSubmit}
           disabled={!canSubmit}
+          activeOpacity={0.85}
         >
           {isSubmitting ? (
-            <ActivityIndicator size="small" color="#fff" />
+            <ActivityIndicator
+              size="small"
+              color={canSubmit ? "#fff" : primaryColor}
+            />
           ) : (
-            <ThemedText style={styles.submitButtonText}>
+            <ThemedText
+              style={[
+                styles.submitButtonText,
+                { color: canSubmit ? "#fff" : primaryColor },
+              ]}
+            >
               {validTransfers.length > 0
                 ? `Submit ${validTransfers.length} Transfer${validTransfers.length > 1 ? "s" : ""}`
                 : "Complete All Fields"}
@@ -399,76 +811,88 @@ export default function TransfersScreen() {
 
         {transfers.length > 1 && (
           <TouchableOpacity style={styles.clearButton} onPress={handleClearAll}>
-            <ThemedText style={styles.clearButtonText}>Clear All</ThemedText>
+            <ThemedText
+              style={[styles.clearButtonText, { color: textSecondary }]}
+            >
+              Clear All
+            </ThemedText>
           </TouchableOpacity>
         )}
 
-        <ThemedText style={styles.hint}>
+        <ThemedText style={[styles.hint, { color: textSecondary }]}>
           Pull down to refresh balances
         </ThemedText>
       </ScrollView>
 
-      {/* Token Picker Modal */}
+      {/* Token Picker Modal: ETH, STRK, USDC with logos (match Balance tab) */}
       <Modal
         visible={showTokenPicker}
         animationType="slide"
         presentationStyle="pageSheet"
         onRequestClose={() => setShowTokenPicker(false)}
       >
-        <SafeAreaView style={styles.modalContainer}>
-          <View style={styles.modalHeader}>
+        <SafeAreaView
+          style={[styles.modalContainer, { backgroundColor: cardBg }]}
+        >
+          <View
+            style={[styles.modalHeader, { borderBottomColor: borderColor }]}
+          >
             <ThemedText type="title">Select Token</ThemedText>
             <TouchableOpacity
-              style={styles.modalCloseButton}
+              style={[
+                styles.modalCloseButton,
+                { backgroundColor: borderColor },
+              ]}
               onPress={() => setShowTokenPicker(false)}
+              activeOpacity={0.88}
             >
-              <ThemedText style={styles.modalCloseText}>Close</ThemedText>
+              <ThemedText
+                style={[styles.modalCloseText, { color: primaryColor }]}
+              >
+                Close
+              </ThemedText>
             </TouchableOpacity>
           </View>
 
-          <View style={styles.searchContainer}>
-            <TextInput
-              style={styles.searchInput}
-              placeholder="Search tokens..."
-              placeholderTextColor="#888"
-              value={tokenSearchQuery}
-              onChangeText={setTokenSearchQuery}
-              autoCapitalize="none"
-              autoCorrect={false}
-            />
-          </View>
-
-          <FlatList
-            data={filteredTokens}
-            keyExtractor={(token) => token.address}
-            contentContainerStyle={styles.tokenList}
-            renderItem={({ item: token }) => {
+          <View style={[styles.tokenPickerList, { borderColor }]}>
+            {primaryTokens.map((token, idx) => {
               const balance = getBalance(token);
               return (
-                <TouchableOpacity
-                  style={styles.tokenCard}
-                  onPress={() => handleSelectToken(token)}
-                >
-                  <View style={styles.tokenInfo}>
-                    <ThemedText style={styles.tokenCardSymbol}>
-                      {token.symbol}
-                    </ThemedText>
-                    <ThemedText style={styles.tokenCardName}>
-                      {token.name}
-                    </ThemedText>
-                  </View>
-                  {balance && (
-                    <ThemedText style={styles.tokenBalance}>
-                      {balance.toFormatted(true)}
-                    </ThemedText>
+                <View key={token.address}>
+                  {idx > 0 && (
+                    <View
+                      style={[
+                        styles.tokenPickerDivider,
+                        { backgroundColor: borderColor },
+                      ]}
+                    />
                   )}
-                </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.tokenPickerRow}
+                    onPress={() => handleSelectToken(token)}
+                    activeOpacity={0.88}
+                  >
+                    <View style={styles.tokenPickerLeft}>
+                      <TinyTokenLogo token={token} />
+                      <View style={styles.tokenPickerStack}>
+                        <ThemedText style={styles.tokenPickerSymbol}>
+                          {token.symbol}
+                        </ThemedText>
+                        <ThemedText
+                          style={[
+                            styles.tokenPickerAmount,
+                            { color: textSecondary },
+                          ]}
+                        >
+                          {balance ? balance.toFormatted(true) : "—"}
+                        </ThemedText>
+                      </View>
+                    </View>
+                  </TouchableOpacity>
+                </View>
               );
-            }}
-            ListEmptyComponent={
-              <ThemedText style={styles.emptyText}>No tokens found</ThemedText>
-            }
-          />
+            })}
+          </View>
         </SafeAreaView>
       </Modal>
 
@@ -481,185 +905,377 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  header: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingHorizontal: 16,
-    paddingTop: 8,
-    paddingBottom: 12,
-  },
-  networkBadge: {
-    backgroundColor: "#0a7ea4",
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 12,
-  },
-  networkBadgeText: {
-    color: "#fff",
-    fontSize: 12,
-    fontWeight: "600",
-  },
   scrollView: {
     flex: 1,
   },
   content: {
-    padding: 16,
+    paddingHorizontal: 20,
+    paddingTop: 4,
     paddingBottom: 120,
+    alignItems: "flex-start",
+    alignSelf: "stretch",
   },
-  sectionTitle: {
-    fontSize: 14,
-    opacity: 0.6,
-    marginBottom: 12,
-    textTransform: "uppercase",
-    letterSpacing: 1,
+  header: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 6,
+    width: "100%",
+  },
+  headerTitle: {
+    flex: 0,
+  },
+  headerRight: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    flex: 0,
+  },
+  networkPill: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+  },
+  networkPillText: {
+    fontSize: 11,
+    fontWeight: "600",
+  },
+  disconnectLink: {
+    fontSize: 13,
   },
   transferCard: {
-    backgroundColor: "rgba(128, 128, 128, 0.1)",
+    borderWidth: 1,
     borderRadius: 12,
     padding: 16,
-    marginBottom: 16,
+    paddingTop: 8,
+    marginBottom: 12,
+    alignSelf: "stretch",
+    alignItems: "center",
+  },
+  usdTotalHeaderRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    width: "100%",
+    marginBottom: 8,
+  },
+  usdTotalLabel: {
+    fontSize: 11,
+    textTransform: "uppercase",
+    letterSpacing: 0.4,
+    lineHeight: 14,
+  },
+  usdTotalAmountWrap: {
+    height: 34,
+    alignSelf: "stretch",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  usdTotalAmount: {
+    fontSize: 28,
+    fontWeight: "600",
+    lineHeight: 34,
+  },
+  addressCopyRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    marginTop: 4,
+  },
+  addressCopyBtn: {
+    height: 24,
+    paddingHorizontal: 6,
+    borderRadius: 4,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  addressCopyBtnText: {
+    fontSize: 10,
+  },
+  refreshBtn: {
+    height: 24,
+    paddingHorizontal: 6,
+    borderRadius: 4,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  refreshBtnSpinner: {
+    margin: 0,
+  },
+  balanceCardDivider: {
+    height: 1,
+    width: "100%",
+    marginVertical: 12,
   },
   transferHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: 16,
+    alignSelf: "stretch",
+    width: "100%",
+    marginBottom: 12,
   },
   transferIndex: {
-    fontSize: 16,
+    fontSize: 11,
     fontWeight: "600",
-    opacity: 0.5,
+    textTransform: "uppercase",
+    letterSpacing: 0.4,
   },
   removeButton: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 4,
   },
   removeButtonText: {
-    color: "#dc3545",
-    fontSize: 14,
+    color: "#dc2626",
+    fontSize: 11,
+    fontWeight: "600",
   },
   fieldContainer: {
-    marginBottom: 16,
+    marginBottom: 12,
+    alignSelf: "stretch",
+    width: "100%",
   },
-  fieldLabel: {
-    fontSize: 14,
-    opacity: 0.7,
+  cardLabel: {
+    fontSize: 11,
+    textTransform: "uppercase",
+    letterSpacing: 0.4,
     marginBottom: 8,
   },
-  tokenSelector: {
+  amountLabelRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 8,
+  },
+  balanceLabel: {
+    fontSize: 11,
+  },
+  balanceLabelBelow: {
+    fontSize: 11,
+    marginTop: 6,
+    alignSelf: "flex-end",
+  },
+  balanceSponsoredRow: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    backgroundColor: "rgba(0, 0, 0, 0.2)",
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: "rgba(128, 128, 128, 0.3)",
-    padding: 12,
+    marginTop: 6,
   },
-  selectedToken: {
+  balanceLabelInline: {
+    fontSize: 11,
+  },
+  amountTokenRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    alignSelf: "stretch",
+    width: "100%",
+    borderRadius: 6,
+    paddingVertical: 2,
+    paddingHorizontal: 6,
+    gap: 6,
+    minHeight: 32,
+  },
+  amountTokenDropdown: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingVertical: 2,
+    paddingRight: 2,
+    flexShrink: 0,
+  },
+  amountTokenDropdownLabels: {
+    minWidth: 0,
+  },
+  amountTokenSymbol: {
+    fontSize: 12,
+    fontWeight: "700",
+  },
+  amountInputMaxWrap: {
     flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    minWidth: 0,
   },
-  tokenSymbol: {
-    fontSize: 16,
+  amountInput: {
+    flex: 1,
+    paddingVertical: 5,
+    paddingHorizontal: 6,
+    fontSize: 14,
+    minWidth: 0,
+  },
+  maxButton: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+  },
+  maxButtonText: {
+    fontSize: 10,
     fontWeight: "600",
   },
-  tokenName: {
-    fontSize: 12,
-    opacity: 0.6,
-    marginTop: 2,
-  },
-  placeholderText: {
-    color: "#888",
-    fontSize: 16,
-  },
-  chevron: {
-    fontSize: 20,
-    opacity: 0.5,
-    marginLeft: 8,
+  tokenSelectorSmall: {
+    flexDirection: "row",
+    alignItems: "center",
+    borderRadius: 6,
+    paddingVertical: 6,
+    paddingHorizontal: 8,
+    gap: 8,
+    minHeight: 32,
   },
   addressInput: {
-    backgroundColor: "rgba(0, 0, 0, 0.2)",
-    borderRadius: 8,
+    borderRadius: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    fontSize: 13,
     borderWidth: 1,
-    borderColor: "rgba(128, 128, 128, 0.3)",
-    padding: 12,
-    fontSize: 14,
-    color: "#fff",
-    fontFamily: "monospace",
   },
-  addTransferButton: {
-    padding: 16,
-    backgroundColor: "rgba(10, 126, 164, 0.1)",
+  tokenSymbolSmall: {
+    fontSize: 13,
+    fontWeight: "700",
+    flex: 1,
+  },
+  placeholderTextSmall: {
+    fontSize: 12,
+    flex: 1,
+  },
+  chevronSmall: {
+    fontSize: 10,
+  },
+  tokenPickerList: {
+    margin: 16,
+    borderWidth: 1,
     borderRadius: 12,
-    borderWidth: 2,
-    borderColor: "rgba(10, 126, 164, 0.3)",
-    borderStyle: "dashed",
+    overflow: "hidden",
+  },
+  tokenPickerDivider: {
+    height: 1,
+    width: "100%",
+  },
+  tokenPickerRow: {
+    flexDirection: "row",
     alignItems: "center",
-    marginBottom: 16,
-  },
-  addTransferButtonText: {
-    color: "#0a7ea4",
-    fontSize: 16,
-    fontWeight: "600",
-  },
-  sponsoredRow: {
-    marginBottom: 12,
-  },
-  sponsoredToggle: {
-    backgroundColor: "rgba(128, 128, 128, 0.2)",
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: "rgba(128, 128, 128, 0.3)",
+    justifyContent: "space-between",
     paddingVertical: 10,
     paddingHorizontal: 12,
+  },
+  tokenPickerLeft: {
+    flexDirection: "row",
     alignItems: "center",
+    gap: 10,
+    flex: 1,
   },
-  sponsoredToggleActive: {
-    backgroundColor: "rgba(10, 126, 164, 0.2)",
-    borderColor: "rgba(10, 126, 164, 0.6)",
+  tokenPickerStack: {
+    gap: 2,
   },
-  sponsoredToggleText: {
-    fontSize: 14,
+  tokenPickerSymbol: {
+    fontSize: 15,
+    fontWeight: "700",
+  },
+  tokenPickerAmount: {
+    fontSize: 13,
+  },
+  addTransferPlaceholder: {
+    alignSelf: "stretch",
+    marginBottom: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderStyle: "dashed",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  addTransferPlaceholderText: {
+    fontSize: 11,
+    fontWeight: "500",
+  },
+  sponsoredInline: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  sponsoredRowCompact: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginBottom: 6,
+    alignSelf: "stretch",
+  },
+  sponsoredLabelCompact: {
+    fontSize: 10,
+    fontWeight: "400",
+    textTransform: "uppercase",
+    letterSpacing: 0.3,
+  },
+  sponsoredSwitchWrapperCompact: {
+    flexDirection: "row",
+    alignItems: "stretch",
+    backgroundColor: "#fff",
+    borderRadius: 3,
+    borderWidth: 1,
+    borderColor: "#e5e7e5",
+    padding: 0.5,
+  },
+  sponsoredSwitchDisabled: {
+    opacity: 0.5,
+  },
+  sponsoredSwitchSegmentCompact: {
+    paddingVertical: 0,
+    paddingHorizontal: 6,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 2,
+    minWidth: 28,
+    minHeight: 14,
+  },
+  sponsoredSwitchSegmentSelected: {
+    backgroundColor: "#e2e8f0",
+  },
+  sponsoredSwitchTextCompact: {
+    fontSize: 6,
     fontWeight: "600",
+    color: "#000",
   },
-  sponsoredHint: {
-    marginTop: 6,
-    fontSize: 12,
-    opacity: 0.6,
+  sponsoredSwitchTextSelected: {
+    color: "#374151",
+  },
+  sponsoredHintCompact: {
+    marginTop: 2,
+    marginBottom: 6,
+    fontSize: 9,
   },
   submitButton: {
-    backgroundColor: "#0a7ea4",
-    padding: 16,
-    borderRadius: 8,
+    alignSelf: "stretch",
+    borderRadius: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
     alignItems: "center",
-    marginBottom: 12,
+    marginBottom: 8,
   },
   submitButtonText: {
-    color: "#fff",
-    fontSize: 16,
+    fontSize: 11,
     fontWeight: "600",
   },
   buttonDisabled: {
-    opacity: 0.5,
+    opacity: 0.6,
   },
   clearButton: {
-    padding: 12,
+    paddingVertical: 8,
     alignItems: "center",
   },
   clearButtonText: {
-    color: "#888",
-    fontSize: 14,
+    fontSize: 11,
   },
   hint: {
     textAlign: "center",
-    fontSize: 12,
-    opacity: 0.4,
-    marginTop: 16,
+    fontSize: 9,
+    marginTop: 12,
+    paddingHorizontal: 8,
   },
   modalContainer: {
     flex: 1,
-    backgroundColor: "#151718",
   },
   modalHeader: {
     flexDirection: "row",
@@ -668,63 +1284,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: "rgba(128, 128, 128, 0.2)",
   },
   modalCloseButton: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    backgroundColor: "#0a7ea4",
-    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 6,
   },
   modalCloseText: {
-    color: "#fff",
     fontWeight: "600",
-  },
-  searchContainer: {
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-  },
-  searchInput: {
-    backgroundColor: "rgba(0, 0, 0, 0.2)",
-    borderWidth: 1,
-    borderColor: "rgba(128, 128, 128, 0.3)",
-    borderRadius: 8,
-    padding: 12,
-    fontSize: 16,
-    color: "#fff",
-  },
-  tokenList: {
-    padding: 16,
-    paddingBottom: 40,
-  },
-  tokenCard: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    padding: 16,
-    backgroundColor: "rgba(128, 128, 128, 0.1)",
-    borderRadius: 12,
-    marginBottom: 12,
-  },
-  tokenInfo: {
-    flex: 1,
-  },
-  tokenCardSymbol: {
-    fontSize: 18,
-    fontWeight: "600",
-  },
-  tokenCardName: {
-    fontSize: 14,
-    opacity: 0.6,
-    marginTop: 2,
-  },
-  tokenBalance: {
-    fontSize: 14,
-    opacity: 0.7,
-  },
-  emptyText: {
-    textAlign: "center",
-    opacity: 0.5,
-    paddingVertical: 20,
+    fontSize: 11,
   },
 });

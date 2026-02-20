@@ -90,64 +90,55 @@ export function StakingPosition({
 
   return (
     <ThemedView style={styles.container}>
-      <ThemedText type="subtitle" style={styles.title}>
-        Position
-      </ThemedText>
-
-      <View style={styles.row}>
-        <ThemedText style={styles.label}>Staked</ThemedText>
-        <ThemedText style={styles.value}>
-          {position.staked.toFormatted(true)}
-        </ThemedText>
-      </View>
-
-      <View style={styles.row}>
-        <ThemedText style={styles.label}>Unclaimed Rewards</ThemedText>
-        <ThemedText style={[styles.value, hasRewards && styles.rewardsValue]}>
-          {position.rewards.toFormatted(true)}
-        </ThemedText>
-      </View>
-
-      <View style={styles.row}>
-        <ThemedText style={styles.label}>Total Position</ThemedText>
-        <ThemedText style={styles.value}>
-          {position.total.toFormatted(true)}
-        </ThemedText>
-      </View>
-
-      <View style={styles.row}>
-        <ThemedText style={styles.label}>Commission</ThemedText>
-        <ThemedText style={styles.value}>
-          {position.commissionPercent}%
-        </ThemedText>
-      </View>
-
-      {hasUnpooling && (
-        <View style={styles.row}>
-          <ThemedText style={styles.label}>Unpooling</ThemedText>
-          <ThemedText style={styles.value}>
-            {position.unpooling.toFormatted(true)}
+      <View style={styles.oneLineRow}>
+        <View style={styles.statChip}>
+          <ThemedText style={styles.statLabel}>Staked</ThemedText>
+          <ThemedText style={styles.statValue}>
+            {position.staked.toFormatted(true)}
           </ThemedText>
         </View>
-      )}
-
-      {unpoolStatus && (
-        <View style={styles.row}>
-          <ThemedText style={styles.label}>Unpool Time</ThemedText>
-          <View style={styles.unpoolTimeValue}>
+        <View style={styles.statChip}>
+          <ThemedText style={styles.statLabel}>Rewards</ThemedText>
+          <ThemedText
+            style={[styles.statValue, hasRewards && styles.rewardsValue]}
+          >
+            {position.rewards.toFormatted(true)}
+          </ThemedText>
+        </View>
+        <View style={styles.statChip}>
+          <ThemedText style={styles.statLabel}>Total</ThemedText>
+          <ThemedText style={styles.statValue}>
+            {position.total.toFormatted(true)}
+          </ThemedText>
+        </View>
+        <View style={styles.statChip}>
+          <ThemedText style={styles.statLabel}>Commission</ThemedText>
+          <ThemedText style={styles.statValue}>
+            {position.commissionPercent}%
+          </ThemedText>
+        </View>
+        {hasUnpooling && (
+          <View style={styles.statChip}>
+            <ThemedText style={styles.statLabel}>Unpooling</ThemedText>
+            <ThemedText style={styles.statValue}>
+              {position.unpooling.toFormatted(true)}
+            </ThemedText>
+          </View>
+        )}
+        {unpoolStatus && (
+          <View style={styles.statChip}>
+            <ThemedText style={styles.statLabel}>Unpool</ThemedText>
             <ThemedText
-              style={[styles.value, unpoolStatus.isReady && styles.readyValue]}
+              style={[
+                styles.statValue,
+                unpoolStatus.isReady && styles.readyValue,
+              ]}
             >
               {unpoolStatus.text}
             </ThemedText>
-            {unpoolStatus.isReady && position.unpoolTime && (
-              <ThemedText style={styles.timestampText}>
-                {position.unpoolTime.toLocaleString()}
-              </ThemedText>
-            )}
           </View>
-        </View>
-      )}
+        )}
+      </View>
 
       <View style={styles.actions}>
         {hasRewards && onClaimRewards && (
@@ -157,9 +148,9 @@ export function StakingPosition({
             disabled={isClaimingRewards}
           >
             {isClaimingRewards ? (
-              <ActivityIndicator color="#fff" size="small" />
+              <ActivityIndicator color="#111827" size="small" />
             ) : (
-              <ThemedText style={styles.buttonText}>Claim Rewards</ThemedText>
+              <ThemedText style={styles.whiteButtonText}>Claim</ThemedText>
             )}
           </TouchableOpacity>
         )}
@@ -169,11 +160,11 @@ export function StakingPosition({
             style={[styles.button, styles.addStakeButton]}
             onPress={onAddStake}
           >
-            <ThemedText style={styles.buttonText}>Add Stake</ThemedText>
+            <ThemedText style={styles.whiteButtonText}>Add Stake</ThemedText>
           </TouchableOpacity>
         )}
 
-        {/* Show Exit button if ready to unstake, otherwise show Exit Intent */}
+        {/* Show Exit only when ready to unstake (cooldown passed); otherwise show Exit Intent when there is a stake */}
         {canExit && onExit ? (
           <TouchableOpacity
             style={[styles.button, styles.exitButton]}
@@ -186,23 +177,21 @@ export function StakingPosition({
               <ThemedText style={styles.buttonText}>Exit</ThemedText>
             )}
           </TouchableOpacity>
-        ) : (
-          hasStake &&
-          !hasUnpooling &&
-          onExitIntent && (
-            <TouchableOpacity
-              style={[styles.button, styles.exitIntentButton]}
-              onPress={onExitIntent}
-              disabled={isExiting}
-            >
-              {isExiting ? (
-                <ActivityIndicator color="#fff" size="small" />
-              ) : (
-                <ThemedText style={styles.buttonText}>Exit Intent</ThemedText>
-              )}
-            </TouchableOpacity>
-          )
-        )}
+        ) : null}
+
+        {!canExit && hasStake && !hasUnpooling && onExitIntent ? (
+          <TouchableOpacity
+            style={[styles.button, styles.exitIntentButton]}
+            onPress={onExitIntent}
+            disabled={isExiting}
+          >
+            {isExiting ? (
+              <ActivityIndicator color="#fff" size="small" />
+            ) : (
+              <ThemedText style={styles.buttonText}>Exit Intent</ThemedText>
+            )}
+          </TouchableOpacity>
+        ) : null}
       </View>
     </ThemedView>
   );
@@ -210,34 +199,36 @@ export function StakingPosition({
 
 const styles = StyleSheet.create({
   container: {
-    padding: 16,
+    padding: 10,
     backgroundColor: "rgba(128, 128, 128, 0.1)",
-    borderRadius: 12,
-    marginBottom: 16,
-  },
-  title: {
-    marginBottom: 12,
+    borderRadius: 10,
+    marginBottom: 0,
   },
   loading: {
     textAlign: "center",
     opacity: 0.5,
     paddingVertical: 20,
   },
-  row: {
+  oneLineRow: {
     flexDirection: "row",
-    justifyContent: "space-between",
+    flexWrap: "wrap",
     alignItems: "center",
-    paddingVertical: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: "rgba(128, 128, 128, 0.1)",
+    gap: 10,
+    marginBottom: 10,
   },
-  label: {
-    fontSize: 14,
+  statChip: {
+    flexDirection: "row",
+    alignItems: "baseline",
+    gap: 4,
+  },
+  statLabel: {
+    fontSize: 10,
     opacity: 0.7,
+    textTransform: "uppercase",
   },
-  value: {
-    fontSize: 14,
-    fontWeight: "500",
+  statValue: {
+    fontSize: 11,
+    fontWeight: "600",
   },
   rewardsValue: {
     color: "#28a745",
@@ -246,42 +237,48 @@ const styles = StyleSheet.create({
     color: "#28a745",
     fontWeight: "600",
   },
-  unpoolTimeValue: {
-    alignItems: "flex-end",
-  },
-  timestampText: {
-    fontSize: 12,
-    opacity: 0.6,
-    marginTop: 2,
-  },
   actions: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 8,
-    marginTop: 16,
-  },
-  button: {
-    flex: 1,
-    minWidth: "45%",
-    padding: 12,
-    borderRadius: 8,
+    gap: 6,
+    marginTop: 0,
+    minHeight: 32,
     alignItems: "center",
   },
+  button: {
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    borderRadius: 6,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: "rgba(128, 128, 128, 0.25)",
+    flexShrink: 0,
+  },
   claimButton: {
-    backgroundColor: "#28a745",
+    backgroundColor: "#fff",
+    borderColor: "rgba(0, 0, 0, 0.12)",
   },
   addStakeButton: {
-    backgroundColor: "#0a7ea4",
+    backgroundColor: "#fff",
+    borderColor: "rgba(0, 0, 0, 0.12)",
   },
   exitIntentButton: {
-    backgroundColor: "#f0ad4e",
+    backgroundColor: "#000",
+    borderColor: "#000",
   },
   exitButton: {
-    backgroundColor: "#dc3545",
+    backgroundColor: "#000",
+    borderColor: "#000",
   },
   buttonText: {
     color: "#fff",
-    fontSize: 14,
+    fontSize: 11,
+    fontWeight: "600",
+  },
+  whiteButtonText: {
+    color: "#111827",
+    fontSize: 11,
     fontWeight: "600",
   },
 });

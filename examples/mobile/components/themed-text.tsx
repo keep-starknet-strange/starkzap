@@ -15,7 +15,12 @@ export function ThemedText({
   type = "default",
   ...rest
 }: ThemedTextProps) {
-  const color = useThemeColor({ light: lightColor, dark: darkColor }, "text");
+  const textColor = useThemeColor(
+    { light: lightColor, dark: darkColor },
+    "text"
+  );
+  const primaryColor = useThemeColor({}, "primary");
+  const color = type === "link" ? primaryColor : textColor;
 
   return (
     <Text
@@ -44,17 +49,16 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
   title: {
-    fontSize: 32,
-    fontWeight: "bold",
-    lineHeight: 32,
+    fontSize: 24,
+    fontWeight: "600",
+    letterSpacing: -0.5,
   },
   subtitle: {
-    fontSize: 20,
-    fontWeight: "bold",
+    fontSize: 17,
+    fontWeight: "600",
   },
   link: {
-    lineHeight: 30,
-    fontSize: 16,
-    color: "#0a7ea4",
+    lineHeight: 24,
+    fontSize: 14,
   },
 });

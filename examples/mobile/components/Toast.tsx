@@ -1,4 +1,5 @@
 import React from "react";
+import { View, Text, StyleSheet } from "react-native";
 import Toast, { ToastConfig } from "react-native-toast-message";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { TransactionToast } from "./TransactionToast";
@@ -66,6 +67,17 @@ export function showErrorToast(title: string, message: string) {
   });
 }
 
+/**
+ * Show a minimal "Address copied" toast (e.g. after copying address to clipboard).
+ */
+export function showCopiedToast() {
+  Toast.show({
+    type: "copied",
+    visibilityTime: 1500,
+    position: "top",
+  });
+}
+
 const toastConfig: ToastConfig = {
   transaction: ({ props }) => (
     <TransactionToast
@@ -76,7 +88,27 @@ const toastConfig: ToastConfig = {
       pending={props.pending}
     />
   ),
+  copied: () => (
+    <View style={copiedToastStyles.pill}>
+      <Text style={copiedToastStyles.text}>Address copied</Text>
+    </View>
+  ),
 };
+
+const copiedToastStyles = StyleSheet.create({
+  pill: {
+    backgroundColor: "rgba(0,0,0,0.72)",
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 20,
+    alignSelf: "center",
+  },
+  text: {
+    color: "#fff",
+    fontSize: 13,
+    fontWeight: "500",
+  },
+});
 
 /**
  * Toast container component to be rendered at the app root.
@@ -85,6 +117,11 @@ export function AppToast() {
   const insets = useSafeAreaInsets();
 
   return (
-    <Toast position="top" topOffset={insets.top + 10} config={toastConfig} />
+    <Toast
+      position="top"
+      topOffset={insets.top + 10}
+      bottomOffset={insets.bottom + 24}
+      config={toastConfig}
+    />
   );
 }

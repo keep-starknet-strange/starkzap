@@ -25,9 +25,9 @@ Starkzap supports Starknet's native staking protocol. Validators run pools where
 Staking works out of the box when using a supported chain preset:
 
 ```typescript
-import { StarkSDK } from "starkzap";
+import { StarkZap } from "starkzap";
 
-const sdk = new StarkSDK({
+const sdk = new StarkZap({
   network: "mainnet",
 });
 ```
@@ -35,9 +35,9 @@ const sdk = new StarkSDK({
 Optional override:
 
 ```typescript
-import { StarkSDK, fromAddress } from "starkzap";
+import { StarkZap, fromAddress } from "starkzap";
 
-const sdk = new StarkSDK({
+const sdk = new StarkZap({
   network: "mainnet",
   staking: {
     contract: fromAddress(

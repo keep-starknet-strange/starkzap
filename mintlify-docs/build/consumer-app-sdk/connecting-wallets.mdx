@@ -47,9 +47,9 @@ The simplest approach — sign transactions locally using a private key (like st
 </Info>
 
 ```typescript
-import { StarkSDK, StarkSigner, OpenZeppelinPreset } from "starkzap";
+import { StarkZap, StarkSigner, OpenZeppelinPreset } from "starkzap";
 
-const sdk = new StarkSDK({ network: "sepolia" });
+const sdk = new StarkZap({ network: "sepolia" });
 const signer = new StarkSigner("0xYOUR_PRIVATE_KEY");
 
 // Default account type: OpenZeppelin
@@ -87,7 +87,7 @@ const wallet = await sdk.connectWallet({
 **Option A: Provide your backend URL (recommended for mobile/web clients)**
 
 ```typescript
-import { StarkSDK, PrivySigner, ArgentXV050Preset } from "starkzap";
+import { StarkZap, PrivySigner, ArgentXV050Preset } from "starkzap";
 
 const accessToken = await privy.getAccessToken();
 const walletRes = await fetch("https://your-backend.com/api/wallet/starknet", {
@@ -146,9 +146,9 @@ const signer = new PrivySigner({
 </Info>
 
 ```typescript
-import { StarkSDK } from "starkzap";
+import { StarkZap } from "starkzap";
 
-const sdk = new StarkSDK({ network: "mainnet" });
+const sdk = new StarkZap({ network: "mainnet" });
 
 const wallet = await sdk.connectCartridge({
   policies: [
@@ -292,9 +292,9 @@ await wallet.ensureReady({
 The onboarding API simplifies wallet connection by handling strategy selection, signer construction, and account readiness:
 
 ```typescript
-import { StarkSDK, OnboardStrategy } from "starkzap";
+import { StarkZap, OnboardStrategy } from "starkzap";
 
-const sdk = new StarkSDK({ network: "sepolia" });
+const sdk = new StarkZap({ network: "sepolia" });
 const accessToken = await privy.getAccessToken();
 
 const onboard = await sdk.onboard({

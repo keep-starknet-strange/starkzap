@@ -13,10 +13,10 @@ icon: wrench
 **Solution:** Remove the custom override to use chain-aware defaults, or set the correct contract for your network:
 
 ```typescript
-import { StarkSDK } from "starkzap";
+import { StarkZap } from "starkzap";
 
 // Recommended: use built-in chain-aware staking preset
-const sdk = new StarkSDK({ network: "mainnet" });
+const sdk = new StarkZap({ network: "mainnet" });
 ```
 
 ### Transaction Submits but Explorer URL is Missing
@@ -26,7 +26,7 @@ const sdk = new StarkSDK({ network: "mainnet" });
 **Solution:** Configure the `explorer` in your SDK config:
 
 ```typescript
-const sdk = new StarkSDK({
+const sdk = new StarkZap({
   network: "mainnet",
   explorer: { provider: "starkscan" }, // or "voyager"
 });

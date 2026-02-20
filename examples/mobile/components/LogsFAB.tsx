@@ -1,11 +1,16 @@
 import { StyleSheet, TouchableOpacity } from "react-native";
 import { router } from "expo-router";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useThemeColor } from "@/hooks/use-theme-color";
 import { ThemedText } from "./themed-text";
 
 export function LogsFAB() {
+  const primaryColor = useThemeColor({}, "primary");
+  const insets = useSafeAreaInsets();
+  const rightInset = Math.max(28, insets.right);
   return (
     <TouchableOpacity
-      style={styles.fab}
+      style={[styles.fab, { backgroundColor: primaryColor, right: rightInset }]}
       onPress={() => router.push("/logs")}
       activeOpacity={0.8}
     >
@@ -18,8 +23,6 @@ const styles = StyleSheet.create({
   fab: {
     position: "absolute",
     bottom: 100,
-    right: 20,
-    backgroundColor: "#0a7ea4",
     paddingHorizontal: 16,
     paddingVertical: 10,
     borderRadius: 20,

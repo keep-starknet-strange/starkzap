@@ -6,7 +6,7 @@ icon: cog
 
 ## Overview
 
-The `StarkSDK` accepts configuration through a single options object. You can use network presets for simplicity, or provide explicit RPC URLs and chain IDs for custom setups.
+The `StarkZap` accepts configuration through a single options object. You can use network presets for simplicity, or provide explicit RPC URLs and chain IDs for custom setups.
 
 <Info>
   **New to blockchain?** An **RPC** (Remote Procedure Call) is like an API endpoint for the blockchain—it's how your app communicates with the network. A **network** is like an environment (production, staging, development). See the [Glossary](/build/consumer-app-sdk/glossary) for more web2-friendly explanations.
@@ -21,16 +21,16 @@ The `StarkSDK` accepts configuration through a single options object. You can us
     - **devnet** = Local development (your own test blockchain)
 
     ```typescript
-    import { StarkSDK } from "starkzap";
+    import { StarkZap } from "starkzap";
 
     // Mainnet
-    const sdk = new StarkSDK({ network: "mainnet" });
+    const sdk = new StarkZap({ network: "mainnet" });
 
     // Sepolia testnet
-    const sdk = new StarkSDK({ network: "sepolia" });
+    const sdk = new StarkZap({ network: "sepolia" });
 
     // Local devnet (starknet-devnet-rs)
-    const sdk = new StarkSDK({ network: "devnet" });
+    const sdk = new StarkZap({ network: "devnet" });
     ```
 
     ### Available Presets
@@ -46,9 +46,9 @@ The `StarkSDK` accepts configuration through a single options object. You can us
     You can also pass a custom `NetworkPreset` object:
 
     ```typescript
-    import { StarkSDK, networks } from "starkzap";
+    import { StarkZap, networks } from "starkzap";
 
-    const sdk = new StarkSDK({ network: networks.mainnet });
+    const sdk = new StarkZap({ network: networks.mainnet });
     ```
   </Accordion>
 
@@ -60,9 +60,9 @@ The `StarkSDK` accepts configuration through a single options object. You can us
     </Info>
 
     ```typescript
-    import { StarkSDK, ChainId } from "starkzap";
+    import { StarkZap, ChainId } from "starkzap";
 
-    const sdk = new StarkSDK({
+    const sdk = new StarkZap({
       rpcUrl: "https://starknet-mainnet.infura.io/v3/YOUR_KEY",
       chainId: ChainId.MAINNET,
     });
@@ -85,9 +85,9 @@ The `StarkSDK` accepts configuration through a single options object. You can us
     Staking works out of the box using chain-aware staking contract presets:
 
     ```typescript
-    import { StarkSDK } from "starkzap";
+    import { StarkZap } from "starkzap";
 
-    const sdk = new StarkSDK({
+    const sdk = new StarkZap({
       network: "mainnet",
     });
     ```
@@ -95,9 +95,9 @@ The `StarkSDK` accepts configuration through a single options object. You can us
     If needed, you can override the default preset:
 
     ```typescript
-    import { StarkSDK, fromAddress } from "starkzap";
+    import { StarkZap, fromAddress } from "starkzap";
 
-    const sdk = new StarkSDK({
+    const sdk = new StarkZap({
       network: "mainnet",
       staking: {
         contract: fromAddress(
@@ -120,9 +120,9 @@ Here's an example with all optional features configured:
 ### Using Network Preset
 
 ```typescript
-import { StarkSDK, fromAddress } from "starkzap";
+import { StarkZap, fromAddress } from "starkzap";
 
-const sdk = new StarkSDK({
+const sdk = new StarkZap({
   // Network configuration
   network: "mainnet",
   
@@ -138,9 +138,9 @@ const sdk = new StarkSDK({
 ### Using Custom RPC
 
 ```typescript
-import { StarkSDK, ChainId, fromAddress } from "starkzap";
+import { StarkZap, ChainId, fromAddress } from "starkzap";
 
-const sdk = new StarkSDK({
+const sdk = new StarkZap({
   // Custom RPC configuration
   rpcUrl: "https://starknet-mainnet.infura.io/v3/YOUR_KEY",
   chainId: ChainId.MAINNET,
