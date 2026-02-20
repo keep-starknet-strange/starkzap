@@ -16,7 +16,10 @@ import Animated, {
   useSharedValue,
   withTiming,
 } from "react-native-reanimated";
-import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
+import {
+  SafeAreaView,
+  useSafeAreaInsets,
+} from "react-native-safe-area-context";
 import { Redirect } from "expo-router";
 import { usePrivy, useLoginWithEmail, useLoginWithOAuth } from "@privy-io/expo";
 
@@ -76,7 +79,8 @@ function Step1Content({
   const primaryColor = useThemeColor({}, "primary");
   const textSecondary = useThemeColor({}, "textSecondary");
 
-  const openPrivyDocs = () => Linking.openURL("https://docs.privy.io/guide/expo/authentication/oauth");
+  const openPrivyDocs = () =>
+    Linking.openURL("https://docs.privy.io/guide/expo/authentication/oauth");
 
   return (
     <View style={stepStyles.step}>
@@ -92,14 +96,22 @@ function Step1Content({
 
       <View style={stepStyles.networkRowWrap}>
         <View style={stepStyles.networkTopRight}>
-          <View style={[stepStyles.networkRowTiny, stepStyles.networkRowTinySmall, { borderColor }]}>
+          <View
+            style={[
+              stepStyles.networkRowTiny,
+              stepStyles.networkRowTinySmall,
+              { borderColor },
+            ]}
+          >
             {NETWORKS.map((network, index) => (
               <TouchableOpacity
                 key={network.name}
                 style={[
                   stepStyles.networkPillTiny,
                   stepStyles.networkPillTinySmall,
-                  selectedNetworkIndex === index && { backgroundColor: borderColor },
+                  selectedNetworkIndex === index && {
+                    backgroundColor: borderColor,
+                  },
                 ]}
                 onPress={() => selectNetwork(index)}
                 activeOpacity={0.88}
@@ -108,7 +120,12 @@ function Step1Content({
                   style={[
                     stepStyles.networkPillTextTiny,
                     stepStyles.networkPillTextTinySmall,
-                    { color: selectedNetworkIndex === index ? primaryColor : textSecondary },
+                    {
+                      color:
+                        selectedNetworkIndex === index
+                          ? primaryColor
+                          : textSecondary,
+                    },
                   ]}
                 >
                   {network.name}
@@ -130,7 +147,12 @@ function Step1Content({
             }}
             activeOpacity={0.88}
           >
-            <Ionicons name="mail-outline" size={18} color={primaryColor} style={stepStyles.oauthBtnIcon} />
+            <Ionicons
+              name="mail-outline"
+              size={18}
+              color={primaryColor}
+              style={stepStyles.oauthBtnIcon}
+            />
             <ThemedText style={stepStyles.oauthBtnText}>Email</ThemedText>
           </TouchableOpacity>
           {OAUTH_BUTTONS.map(({ provider, label, icon, iosOnly }) => {
@@ -146,8 +168,15 @@ function Step1Content({
                 }}
                 activeOpacity={0.88}
               >
-                <Ionicons name={icon} size={18} color={primaryColor} style={stepStyles.oauthBtnIcon} />
-                <ThemedText style={stepStyles.oauthBtnText}>{label} *</ThemedText>
+                <Ionicons
+                  name={icon}
+                  size={18}
+                  color={primaryColor}
+                  style={stepStyles.oauthBtnIcon}
+                />
+                <ThemedText style={stepStyles.oauthBtnText}>
+                  {label} *
+                </ThemedText>
               </TouchableOpacity>
             );
           })}
@@ -158,18 +187,48 @@ function Step1Content({
         <ThemedText style={[stepStyles.oauthLabel, { color: textSecondary }]}>
           Or{" "}
         </ThemedText>
-        <TouchableOpacity onPress={() => { setConnectionMethod("privatekey"); onNext(); }} hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}>
-          <ThemedText style={[stepStyles.oauthLabel, { color: textSecondary, textDecorationLine: "underline" }]}>
+        <TouchableOpacity
+          onPress={() => {
+            setConnectionMethod("privatekey");
+            onNext();
+          }}
+          hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}
+        >
+          <ThemedText
+            style={[
+              stepStyles.oauthLabel,
+              { color: textSecondary, textDecorationLine: "underline" },
+            ]}
+          >
             Create/Import Account
           </ThemedText>
         </TouchableOpacity>
       </View>
 
       {privyAvailable && (
-        <View style={[stepStyles.oauthDisclaimer, stepStyles.oauthDisclaimerCompact]}>
-          <ThemedText style={[stepStyles.oauthDisclaimerText, stepStyles.oauthDisclaimerTextSmall, stepStyles.oauthDisclaimerNoParagraph, { color: textSecondary }]}>
+        <View
+          style={[
+            stepStyles.oauthDisclaimer,
+            stepStyles.oauthDisclaimerCompact,
+          ]}
+        >
+          <ThemedText
+            style={[
+              stepStyles.oauthDisclaimerText,
+              stepStyles.oauthDisclaimerTextSmall,
+              stepStyles.oauthDisclaimerNoParagraph,
+              { color: textSecondary },
+            ]}
+          >
             *Refer to{" "}
-            <ThemedText type="link" style={[stepStyles.oauthDisclaimerLink, stepStyles.oauthDisclaimerLinkSmall]} onPress={openPrivyDocs}>
+            <ThemedText
+              type="link"
+              style={[
+                stepStyles.oauthDisclaimerLink,
+                stepStyles.oauthDisclaimerLinkSmall,
+              ]}
+              onPress={openPrivyDocs}
+            >
               Privy docs
             </ThemedText>{" "}
             for complete configuration.
@@ -245,23 +304,28 @@ function Step2Privy({
     loginState.status === "submitting-code";
   const oauthLoading = oauthState.status === "loading";
 
-  const openPrivyDocs = () => Linking.openURL("https://docs.privy.io/guide/expo/authentication/oauth");
+  const openPrivyDocs = () =>
+    Linking.openURL("https://docs.privy.io/guide/expo/authentication/oauth");
 
   return (
     <View style={stepStyles.step}>
       {!isReady && (
-          <ThemedText style={[stepStyles.muted, { color: textSecondary }]}>
-            Initializing…
-          </ThemedText>
-        )}
+        <ThemedText style={[stepStyles.muted, { color: textSecondary }]}>
+          Initializing…
+        </ThemedText>
+      )}
 
-        {isReady && !user && !showEmailForm && (
-          <>
-            <ThemedText style={[stepStyles.oauthLabel, { color: textSecondary }]}>
-              Sign in with
-            </ThemedText>
+      {isReady && !user && !showEmailForm && (
+        <>
+          <ThemedText style={[stepStyles.oauthLabel, { color: textSecondary }]}>
+            Sign in with
+          </ThemedText>
           {oauthLoading && (
-            <ActivityIndicator size="small" color={primaryColor} style={stepStyles.oauthLoader} />
+            <ActivityIndicator
+              size="small"
+              color={primaryColor}
+              style={stepStyles.oauthLoader}
+            />
           )}
           <TouchableOpacity
             style={[stepStyles.oauthBtn, { borderColor }]}
@@ -269,7 +333,12 @@ function Step2Privy({
             disabled={oauthLoading}
             activeOpacity={0.88}
           >
-            <Ionicons name="mail-outline" size={18} color={primaryColor} style={stepStyles.oauthBtnIcon} />
+            <Ionicons
+              name="mail-outline"
+              size={18}
+              color={primaryColor}
+              style={stepStyles.oauthBtnIcon}
+            />
             <ThemedText style={stepStyles.oauthBtnText}>Email</ThemedText>
           </TouchableOpacity>
           {OAUTH_BUTTONS.map(({ provider, label, icon, iosOnly }) => {
@@ -282,28 +351,45 @@ function Step2Privy({
                 disabled={oauthLoading}
                 activeOpacity={0.88}
               >
-                <Ionicons name={icon} size={18} color={primaryColor} style={stepStyles.oauthBtnIcon} />
-                <ThemedText style={stepStyles.oauthBtnText}>{label} *</ThemedText>
+                <Ionicons
+                  name={icon}
+                  size={18}
+                  color={primaryColor}
+                  style={stepStyles.oauthBtnIcon}
+                />
+                <ThemedText style={stepStyles.oauthBtnText}>
+                  {label} *
+                </ThemedText>
               </TouchableOpacity>
             );
           })}
           <View style={stepStyles.oauthDisclaimer}>
-            <ThemedText style={[stepStyles.oauthDisclaimerText, { color: textSecondary }]}>
+            <ThemedText
+              style={[stepStyles.oauthDisclaimerText, { color: textSecondary }]}
+            >
               Not implemented for the demo. Refer to{" "}
             </ThemedText>
-            <TouchableOpacity onPress={openPrivyDocs} hitSlop={{ top: 6, bottom: 6, left: 4, right: 4 }}>
+            <TouchableOpacity
+              onPress={openPrivyDocs}
+              hitSlop={{ top: 6, bottom: 6, left: 4, right: 4 }}
+            >
               <ThemedText type="link" style={stepStyles.oauthDisclaimerLink}>
                 Privy docs
               </ThemedText>
             </TouchableOpacity>
           </View>
-          </>
-        )}
+        </>
+      )}
 
-        {isReady && !user && showEmailForm && showEmail && (
+      {isReady && !user && showEmailForm && showEmail && (
         <>
           <TextInput
-            style={[stepStyles.input, stepStyles.inputSmall, stepStyles.inputFullWidth, { borderColor, color: textColor }]}
+            style={[
+              stepStyles.input,
+              stepStyles.inputSmall,
+              stepStyles.inputFullWidth,
+              { borderColor, color: textColor },
+            ]}
             placeholder="Email"
             placeholderTextColor={textSecondary}
             value={email}
@@ -315,15 +401,27 @@ function Step2Privy({
             <ThemedText style={stepStyles.errorText}>Login failed</ThemedText>
           )}
           <TouchableOpacity
-            style={[stepStyles.primaryButton, stepStyles.primaryButtonSmall, stepStyles.primaryButtonFullWidth, { backgroundColor: "#000" }]}
+            style={[
+              stepStyles.primaryButton,
+              stepStyles.primaryButtonSmall,
+              stepStyles.primaryButtonFullWidth,
+              { backgroundColor: "#000" },
+            ]}
             onPress={() => email.includes("@") && sendCode({ email })}
-            disabled={!email.includes("@") || loginState.status === "sending-code"}
+            disabled={
+              !email.includes("@") || loginState.status === "sending-code"
+            }
             activeOpacity={0.85}
           >
             {loginState.status === "sending-code" ? (
               <ActivityIndicator color="#fff" size="small" />
             ) : (
-              <ThemedText style={[stepStyles.primaryButtonText, stepStyles.primaryButtonTextSmall]}>
+              <ThemedText
+                style={[
+                  stepStyles.primaryButtonText,
+                  stepStyles.primaryButtonTextSmall,
+                ]}
+              >
                 Send code
               </ThemedText>
             )}
@@ -346,9 +444,15 @@ function Step2Privy({
             maxLength={6}
           />
           <TouchableOpacity
-            style={[stepStyles.primaryButton, stepStyles.primaryButtonFullWidth, { backgroundColor: primaryColor }]}
+            style={[
+              stepStyles.primaryButton,
+              stepStyles.primaryButtonFullWidth,
+              { backgroundColor: primaryColor },
+            ]}
             onPress={() => otp.length === 6 && loginWithCode({ code: otp })}
-            disabled={otp.length !== 6 || loginState.status === "submitting-code"}
+            disabled={
+              otp.length !== 6 || loginState.status === "submitting-code"
+            }
             activeOpacity={0.85}
           >
             {loginState.status === "submitting-code" ? (
@@ -365,28 +469,31 @@ function Step2Privy({
       {isReady && user && (
         <>
           <View style={stepStyles.privyConnectRow}>
-          {isLoadingWallet ? (
-            <ActivityIndicator
-              color={primaryColor}
-              style={{ marginVertical: 12 }}
-            />
-          ) : (
+            {isLoadingWallet ? (
+              <ActivityIndicator
+                color={primaryColor}
+                style={{ marginVertical: 12 }}
+              />
+            ) : (
+              <TouchableOpacity
+                style={stepStyles.privyConnectButton}
+                onPress={fetchStarknetWallet}
+                activeOpacity={0.85}
+              >
+                <ThemedText style={stepStyles.privyConnectButtonText}>
+                  Connect Starknet
+                </ThemedText>
+              </TouchableOpacity>
+            )}
             <TouchableOpacity
-              style={stepStyles.privyConnectButton}
-              onPress={fetchStarknetWallet}
-              activeOpacity={0.85}
+              onPress={handlePrivyLogout}
+              style={stepStyles.privyLogoutTopRight}
             >
-              <ThemedText style={stepStyles.privyConnectButtonText}>
-                Connect Starknet
-              </ThemedText>
+              <ThemedText type="link">Log out</ThemedText>
             </TouchableOpacity>
-          )}
-          <TouchableOpacity onPress={handlePrivyLogout} style={stepStyles.privyLogoutTopRight}>
-            <ThemedText type="link">Log out</ThemedText>
-          </TouchableOpacity>
           </View>
         </>
-        )}
+      )}
 
       <TouchableOpacity onPress={onBack} style={stepStyles.backRowBottom}>
         <ThemedText type="link">← Back</ThemedText>
@@ -442,7 +549,8 @@ function Step2PrivateKeyChoice({
     { label: "Ready", value: ARGENT_PRESET },
     ...OTHER_PRESETS.map((p) => ({ label: p, value: p })),
   ];
-  const createPresetLabel = createPreset === ARGENT_PRESET ? "Ready" : createPreset;
+  const createPresetLabel =
+    createPreset === ARGENT_PRESET ? "Ready" : createPreset;
 
   const handleGenerateKey = useCallback(async () => {
     if (!onKeyGenerated) return;
@@ -460,7 +568,13 @@ function Step2PrivateKeyChoice({
 
   return (
     <View style={stepStyles.step}>
-      <ThemedText style={[stepStyles.oauthLabel, stepStyles.stepLabelLeft, { color: textSecondary }]}>
+      <ThemedText
+        style={[
+          stepStyles.oauthLabel,
+          stepStyles.stepLabelLeft,
+          { color: textSecondary },
+        ]}
+      >
         Private key
       </ThemedText>
       <TouchableOpacity
@@ -468,7 +582,12 @@ function Step2PrivateKeyChoice({
         onPress={onImport}
         activeOpacity={0.88}
       >
-        <Ionicons name="key-outline" size={18} color={primaryColor} style={stepStyles.oauthBtnIcon} />
+        <Ionicons
+          name="key-outline"
+          size={18}
+          color={primaryColor}
+          style={stepStyles.oauthBtnIcon}
+        />
         <ThemedText style={stepStyles.oauthBtnText}>Import</ThemedText>
       </TouchableOpacity>
       <TouchableOpacity
@@ -495,18 +614,38 @@ function Step2PrivateKeyChoice({
 
       {showCreateCard && (
         <View style={stepStyles.createCardExpand}>
-          <ThemedText style={[stepStyles.sleekLabel, stepStyles.stepLabelLeft, { color: textSecondary }]}>
+          <ThemedText
+            style={[
+              stepStyles.sleekLabel,
+              stepStyles.stepLabelLeft,
+              { color: textSecondary },
+            ]}
+          >
             Account type
           </ThemedText>
           <View style={stepStyles.createCardRow}>
-            <View style={[stepStyles.dropdownInlineContainerSmall, stepStyles.dropdownInlineContainerInRow, { borderColor }]}>
+            <View
+              style={[
+                stepStyles.dropdownInlineContainerSmall,
+                stepStyles.dropdownInlineContainerInRow,
+                { borderColor },
+              ]}
+            >
               <TouchableOpacity
-                style={[stepStyles.dropdownTrigger, stepStyles.dropdownTriggerInRow, { borderColor: "transparent" }]}
+                style={[
+                  stepStyles.dropdownTrigger,
+                  stepStyles.dropdownTriggerInRow,
+                  { borderColor: "transparent" },
+                ]}
                 onPress={() => setShowPresetDropdown((v) => !v)}
                 activeOpacity={0.88}
               >
                 <ThemedText
-                  style={[stepStyles.dropdownTriggerTextSmall, stepStyles.dropdownTriggerLabel, { color: primaryColor }]}
+                  style={[
+                    stepStyles.dropdownTriggerTextSmall,
+                    stepStyles.dropdownTriggerLabel,
+                    { color: primaryColor },
+                  ]}
                   numberOfLines={1}
                 >
                   {createPresetLabel}
@@ -534,13 +673,22 @@ function Step2PrivateKeyChoice({
                       <ThemedText
                         style={[
                           stepStyles.dropdownOptionTextSmall,
-                          { color: createPreset === value ? primaryColor : textSecondary },
+                          {
+                            color:
+                              createPreset === value
+                                ? primaryColor
+                                : textSecondary,
+                          },
                         ]}
                       >
                         {label}
                       </ThemedText>
                       {createPreset === value && (
-                        <Ionicons name="checkmark" size={16} color={primaryColor} />
+                        <Ionicons
+                          name="checkmark"
+                          size={16}
+                          color={primaryColor}
+                        />
                       )}
                     </TouchableOpacity>
                   ))}
@@ -548,7 +696,12 @@ function Step2PrivateKeyChoice({
               )}
             </View>
             <TouchableOpacity
-              style={[stepStyles.primaryButton, stepStyles.primaryButtonSmall, stepStyles.primaryButtonInRow, { backgroundColor: "#000" }]}
+              style={[
+                stepStyles.primaryButton,
+                stepStyles.primaryButtonSmall,
+                stepStyles.primaryButtonInRow,
+                { backgroundColor: "#000" },
+              ]}
               onPress={handleGenerateKey}
               disabled={isGenerating}
               activeOpacity={0.85}
@@ -556,7 +709,12 @@ function Step2PrivateKeyChoice({
               {isGenerating ? (
                 <ActivityIndicator color="#fff" size="small" />
               ) : (
-                <ThemedText style={[stepStyles.primaryButtonText, stepStyles.primaryButtonTextTiny]}>
+                <ThemedText
+                  style={[
+                    stepStyles.primaryButtonText,
+                    stepStyles.primaryButtonTextTiny,
+                  ]}
+                >
                   Generate
                 </ThemedText>
               )}
@@ -608,7 +766,8 @@ function Step2PrivateKey({
     { label: "Ready", value: ARGENT_PRESET },
     ...OTHER_PRESETS.map((p) => ({ label: p, value: p })),
   ];
-  const selectedLabel = selectedPreset === ARGENT_PRESET ? "Ready" : selectedPreset;
+  const selectedLabel =
+    selectedPreset === ARGENT_PRESET ? "Ready" : selectedPreset;
 
   const handleCopyPrivateKey = useCallback(async () => {
     if (privateKey.trim()) {
@@ -619,12 +778,23 @@ function Step2PrivateKey({
 
   return (
     <View style={stepStyles.step}>
-      <ThemedText style={[stepStyles.sleekLabel, stepStyles.stepLabelLeft, { color: textSecondary }]}>
+      <ThemedText
+        style={[
+          stepStyles.sleekLabel,
+          stepStyles.stepLabelLeft,
+          { color: textSecondary },
+        ]}
+      >
         Private key
       </ThemedText>
       <View style={[stepStyles.privateKeyRow, { borderColor }]}>
         <TextInput
-          style={[stepStyles.input, stepStyles.inputSmall, stepStyles.privateKeyInput, { color: textColor }]}
+          style={[
+            stepStyles.input,
+            stepStyles.inputSmall,
+            stepStyles.privateKeyInput,
+            { color: textColor },
+          ]}
           placeholder="Paste key"
           placeholderTextColor={textSecondary}
           value={privateKey}
@@ -657,10 +827,18 @@ function Step2PrivateKey({
         </TouchableOpacity>
       </View>
       <ThemedText style={stepStyles.privateKeyWarning}>
-        Save your private key. If you lose it, you will lose access to this account.
+        Save your private key. If you lose it, you will lose access to this
+        account.
       </ThemedText>
 
-      <ThemedText style={[stepStyles.sleekLabel, stepStyles.sleekLabelSpaced, stepStyles.stepLabelLeft, { color: textSecondary }]}>
+      <ThemedText
+        style={[
+          stepStyles.sleekLabel,
+          stepStyles.sleekLabelSpaced,
+          stepStyles.stepLabelLeft,
+          { color: textSecondary },
+        ]}
+      >
         Account Type
       </ThemedText>
       <View style={[stepStyles.dropdownInlineContainerSmall, { borderColor }]}>
@@ -669,7 +847,12 @@ function Step2PrivateKey({
           onPress={() => setShowPresetDropdown((v) => !v)}
           activeOpacity={0.88}
         >
-          <ThemedText style={[stepStyles.dropdownTriggerTextSmall, { color: primaryColor }]}>
+          <ThemedText
+            style={[
+              stepStyles.dropdownTriggerTextSmall,
+              { color: primaryColor },
+            ]}
+          >
             {selectedLabel}
           </ThemedText>
           <View style={stepStyles.dropdownTriggerIcon}>
@@ -695,7 +878,10 @@ function Step2PrivateKey({
                 <ThemedText
                   style={[
                     stepStyles.dropdownOptionTextSmall,
-                    { color: selectedPreset === value ? primaryColor : textSecondary },
+                    {
+                      color:
+                        selectedPreset === value ? primaryColor : textSecondary,
+                    },
                   ]}
                 >
                   {label}
@@ -711,7 +897,14 @@ function Step2PrivateKey({
 
       {paymasterNodeUrl ? (
         <>
-          <ThemedText style={[stepStyles.sleekLabel, stepStyles.sleekLabelSpaced, stepStyles.stepLabelLeft, { color: textSecondary }]}>
+          <ThemedText
+            style={[
+              stepStyles.sleekLabel,
+              stepStyles.sleekLabelSpaced,
+              stepStyles.stepLabelLeft,
+              { color: textSecondary },
+            ]}
+          >
             Gas Fees Management
           </ThemedText>
           <View style={[stepStyles.networkRowSmall, { borderColor }]}>
@@ -754,7 +947,12 @@ function Step2PrivateKey({
       ) : null}
 
       <TouchableOpacity
-        style={[stepStyles.primaryButton, stepStyles.primaryButtonSmall, stepStyles.primaryButtonFullWidth, { backgroundColor: "#000" }]}
+        style={[
+          stepStyles.primaryButton,
+          stepStyles.primaryButtonSmall,
+          stepStyles.primaryButtonFullWidth,
+          { backgroundColor: "#000" },
+        ]}
         onPress={connect}
         disabled={isConnecting}
         activeOpacity={0.85}
@@ -762,7 +960,14 @@ function Step2PrivateKey({
         {isConnecting ? (
           <ActivityIndicator color="#fff" size="small" />
         ) : (
-          <ThemedText style={[stepStyles.primaryButtonText, stepStyles.primaryButtonTextSmall]}>Connect</ThemedText>
+          <ThemedText
+            style={[
+              stepStyles.primaryButtonText,
+              stepStyles.primaryButtonTextSmall,
+            ]}
+          >
+            Connect
+          </ThemedText>
         )}
       </TouchableOpacity>
 
@@ -1369,8 +1574,9 @@ function LandingWithPrivy() {
   const fetchStarknetWallet = useCallback(async () => {
     if (!user || wallet || !isConfigured || isLoadingWallet) return;
     setIsLoadingWallet(true);
-    const emailAccount = (user as { linked_accounts?: { type: string; address?: string }[] })
-      ?.linked_accounts?.find((a) => a.type === "email");
+    const emailAccount = (
+      user as { linked_accounts?: { type: string; address?: string }[] }
+    )?.linked_accounts?.find((a) => a.type === "email");
     const userEmail = emailAccount?.address || "";
 
     try {
@@ -1442,7 +1648,10 @@ function LandingWithPrivy() {
   }, [selectedNetworkIndex, confirmNetworkConfig]);
 
   const slideCount = connectionMethod === "privatekey" ? 3 : 2;
-  const handleBack = useCallback(() => setLoginStep((s) => (s > 0 ? s - 1 : 0)), []);
+  const handleBack = useCallback(
+    () => setLoginStep((s) => (s > 0 ? s - 1 : 0)),
+    []
+  );
   const handleBackToChoice = useCallback(() => setLoginStep(1), []);
   const _handleChangeNetwork = useCallback(() => {
     resetNetworkConfig();
@@ -1467,7 +1676,12 @@ function LandingWithPrivy() {
         behavior={Platform.OS === "ios" ? "padding" : undefined}
         keyboardVerticalOffset={0}
       >
-        <View style={[styles.contentCenter, { paddingLeft: horizontalPadding, paddingRight: horizontalPadding }]}>
+        <View
+          style={[
+            styles.contentCenter,
+            { paddingLeft: horizontalPadding, paddingRight: horizontalPadding },
+          ]}
+        >
           <View style={styles.contentBox}>
             <View style={styles.header}>
               <ThemedText type="title">Starknet SDK</ThemedText>
@@ -1492,81 +1706,119 @@ function LandingWithPrivy() {
               </View>
             ) : (
               <View style={styles.slider}>
-              <Animated.View style={[styles.slideRow, { width: slideRowWidth }, slideStyle]}>
-                <View style={[styles.slidePage, { width: contentWidth, marginRight: SLIDE_GAP }]}>
-                  <View style={styles.cardWrapper}>
-                    <View style={[styles.card, styles.cardInSlide, { backgroundColor: cardBg }]}>
-                      <Step1Content
-                        selectedNetworkIndex={selectedNetworkIndex}
-                        selectNetwork={selectNetwork}
-                        connectionMethod={connectionMethod}
-                        setConnectionMethod={setConnectionMethod}
-                        onNext={() => setLoginStep(1)}
-                        privyAvailable={true}
-                        setShowEmailForm={setShowEmailForm}
-                      />
-                    </View>
-                  </View>
-                </View>
-                <View style={[styles.slidePage, { width: contentWidth, marginRight: SLIDE_GAP }]}>
-                  <View style={styles.cardWrapper}>
-                    <View style={[styles.card, styles.cardInSlide, { backgroundColor: cardBg }]}>
-                    {connectionMethod === "privy" ? (
-                      <Step2Privy
-                        email={email}
-                        setEmail={setEmail}
-                        otp={otp}
-                        setOtp={setOtp}
-                        loginState={loginState}
-                        sendCode={sendCode}
-                        loginWithCode={loginWithCode}
-                        oauthLogin={oauthLogin as (opts: { provider: OAuthProvider }) => Promise<unknown>}
-                        oauthState={oauthState}
-                        isReady={isReady}
-                        user={user}
-                        isLoadingWallet={isLoadingWallet}
-                        fetchStarknetWallet={fetchStarknetWallet}
-                        handlePrivyLogout={handlePrivyLogout}
-                        onBack={handleBack}
-                        showEmailForm={showEmailForm}
-                        setShowEmailForm={setShowEmailForm}
-                      />
-                    ) : (
-                      <Step2PrivateKeyChoice
-                        onBack={handleBack}
-                        onImport={() => setLoginStep(2)}
-                        onKeyGenerated={(key, preset) => {
-                          setPrivateKey(key);
-                          setSelectedPreset(preset);
-                          setLoginStep(2);
-                        }}
-                      />
-                    )}
-                    </View>
-                  </View>
-                </View>
-                {slideCount === 3 && (
-                  <View style={[styles.slidePage, { width: contentWidth }]}>
+                <Animated.View
+                  style={[
+                    styles.slideRow,
+                    { width: slideRowWidth },
+                    slideStyle,
+                  ]}
+                >
+                  <View
+                    style={[
+                      styles.slidePage,
+                      { width: contentWidth, marginRight: SLIDE_GAP },
+                    ]}
+                  >
                     <View style={styles.cardWrapper}>
-                      <View style={[styles.card, styles.cardInSlide, { backgroundColor: cardBg }]}>
-                        <Step2PrivateKey
-                          selectedPreset={selectedPreset}
-                          setSelectedPreset={setSelectedPreset}
-                          preferSponsored={preferSponsored}
-                          setPreferSponsored={setPreferSponsored}
-                          paymasterNodeUrl={paymasterNodeUrl}
-                          privateKey={privateKey}
-                          setPrivateKey={setPrivateKey}
-                          connect={connect}
-                          isConnecting={isConnecting}
-                          onBack={handleBackToChoice}
+                      <View
+                        style={[
+                          styles.card,
+                          styles.cardInSlide,
+                          { backgroundColor: cardBg },
+                        ]}
+                      >
+                        <Step1Content
+                          selectedNetworkIndex={selectedNetworkIndex}
+                          selectNetwork={selectNetwork}
+                          connectionMethod={connectionMethod}
+                          setConnectionMethod={setConnectionMethod}
+                          onNext={() => setLoginStep(1)}
+                          privyAvailable={true}
+                          setShowEmailForm={setShowEmailForm}
                         />
                       </View>
                     </View>
                   </View>
-                )}
-              </Animated.View>
-            </View>
+                  <View
+                    style={[
+                      styles.slidePage,
+                      { width: contentWidth, marginRight: SLIDE_GAP },
+                    ]}
+                  >
+                    <View style={styles.cardWrapper}>
+                      <View
+                        style={[
+                          styles.card,
+                          styles.cardInSlide,
+                          { backgroundColor: cardBg },
+                        ]}
+                      >
+                        {connectionMethod === "privy" ? (
+                          <Step2Privy
+                            email={email}
+                            setEmail={setEmail}
+                            otp={otp}
+                            setOtp={setOtp}
+                            loginState={loginState}
+                            sendCode={sendCode}
+                            loginWithCode={loginWithCode}
+                            oauthLogin={
+                              oauthLogin as (opts: {
+                                provider: OAuthProvider;
+                              }) => Promise<unknown>
+                            }
+                            oauthState={oauthState}
+                            isReady={isReady}
+                            user={user}
+                            isLoadingWallet={isLoadingWallet}
+                            fetchStarknetWallet={fetchStarknetWallet}
+                            handlePrivyLogout={handlePrivyLogout}
+                            onBack={handleBack}
+                            showEmailForm={showEmailForm}
+                            setShowEmailForm={setShowEmailForm}
+                          />
+                        ) : (
+                          <Step2PrivateKeyChoice
+                            onBack={handleBack}
+                            onImport={() => setLoginStep(2)}
+                            onKeyGenerated={(key, preset) => {
+                              setPrivateKey(key);
+                              setSelectedPreset(preset);
+                              setLoginStep(2);
+                            }}
+                          />
+                        )}
+                      </View>
+                    </View>
+                  </View>
+                  {slideCount === 3 && (
+                    <View style={[styles.slidePage, { width: contentWidth }]}>
+                      <View style={styles.cardWrapper}>
+                        <View
+                          style={[
+                            styles.card,
+                            styles.cardInSlide,
+                            { backgroundColor: cardBg },
+                          ]}
+                        >
+                          <Step2PrivateKey
+                            selectedPreset={selectedPreset}
+                            setSelectedPreset={setSelectedPreset}
+                            preferSponsored={preferSponsored}
+                            setPreferSponsored={setPreferSponsored}
+                            paymasterNodeUrl={paymasterNodeUrl}
+                            privateKey={privateKey}
+                            setPrivateKey={setPrivateKey}
+                            connect={connect}
+                            isConnecting={isConnecting}
+                            onBack={handleBackToChoice}
+                          />
+                        </View>
+                      </View>
+                    </View>
+                  )}
+                </Animated.View>
+              </View>
             )}
           </View>
         </View>
@@ -1683,7 +1935,10 @@ function LandingNoPrivy() {
     setLoginStep(1);
   }, [selectedNetworkIndex, confirmNetworkConfig]);
 
-  const handleBack = useCallback(() => setLoginStep((s) => (s > 0 ? s - 1 : 0)), []);
+  const handleBack = useCallback(
+    () => setLoginStep((s) => (s > 0 ? s - 1 : 0)),
+    []
+  );
   const handleBackToChoice = useCallback(() => setLoginStep(1), []);
   const _handleChangeNetwork = useCallback(() => {
     resetNetworkConfig();
@@ -1706,7 +1961,12 @@ function LandingNoPrivy() {
         behavior={Platform.OS === "ios" ? "padding" : undefined}
         keyboardVerticalOffset={0}
       >
-        <View style={[styles.contentCenter, { paddingLeft: horizontalPadding, paddingRight: horizontalPadding }]}>
+        <View
+          style={[
+            styles.contentCenter,
+            { paddingLeft: horizontalPadding, paddingRight: horizontalPadding },
+          ]}
+        >
           <View style={styles.contentBox}>
             <View style={styles.header}>
               <ThemedText type="title">Starknet SDK</ThemedText>
@@ -1730,56 +1990,90 @@ function LandingNoPrivy() {
               </View>
             ) : (
               <View style={styles.slider}>
-              <Animated.View style={[styles.slideRow, { width: 3 * slideSlotWidth }, slideStyle]}>
-                <View style={[styles.slidePage, { width: contentWidth, marginRight: SLIDE_GAP }]}>
-                  <View style={styles.cardWrapper}>
-                    <View style={[styles.card, styles.cardInSlide, { backgroundColor: cardBg }]}>
-                      <Step1Content
-                        selectedNetworkIndex={selectedNetworkIndex}
-                        selectNetwork={selectNetwork}
-                        connectionMethod="privatekey"
-                        setConnectionMethod={() => {}}
-                        onNext={() => setLoginStep(1)}
-                        privyAvailable={false}
-                      />
+                <Animated.View
+                  style={[
+                    styles.slideRow,
+                    { width: 3 * slideSlotWidth },
+                    slideStyle,
+                  ]}
+                >
+                  <View
+                    style={[
+                      styles.slidePage,
+                      { width: contentWidth, marginRight: SLIDE_GAP },
+                    ]}
+                  >
+                    <View style={styles.cardWrapper}>
+                      <View
+                        style={[
+                          styles.card,
+                          styles.cardInSlide,
+                          { backgroundColor: cardBg },
+                        ]}
+                      >
+                        <Step1Content
+                          selectedNetworkIndex={selectedNetworkIndex}
+                          selectNetwork={selectNetwork}
+                          connectionMethod="privatekey"
+                          setConnectionMethod={() => {}}
+                          onNext={() => setLoginStep(1)}
+                          privyAvailable={false}
+                        />
+                      </View>
                     </View>
                   </View>
-                </View>
-                <View style={[styles.slidePage, { width: contentWidth, marginRight: SLIDE_GAP }]}>
-                  <View style={styles.cardWrapper}>
-                    <View style={[styles.card, styles.cardInSlide, { backgroundColor: cardBg }]}>
-                      <Step2PrivateKeyChoice
-                        onBack={handleBack}
-                        onImport={() => setLoginStep(2)}
-                        onKeyGenerated={(key, preset) => {
-                          setPrivateKey(key);
-                          setSelectedPreset(preset);
-                          setLoginStep(2);
-                        }}
-                      />
+                  <View
+                    style={[
+                      styles.slidePage,
+                      { width: contentWidth, marginRight: SLIDE_GAP },
+                    ]}
+                  >
+                    <View style={styles.cardWrapper}>
+                      <View
+                        style={[
+                          styles.card,
+                          styles.cardInSlide,
+                          { backgroundColor: cardBg },
+                        ]}
+                      >
+                        <Step2PrivateKeyChoice
+                          onBack={handleBack}
+                          onImport={() => setLoginStep(2)}
+                          onKeyGenerated={(key, preset) => {
+                            setPrivateKey(key);
+                            setSelectedPreset(preset);
+                            setLoginStep(2);
+                          }}
+                        />
+                      </View>
                     </View>
                   </View>
-                </View>
-                <View style={[styles.slidePage, { width: contentWidth }]}>
-                  <View style={styles.cardWrapper}>
-                    <View style={[styles.card, styles.cardInSlide, { backgroundColor: cardBg }]}>
-                      <Step2PrivateKey
-                        selectedPreset={selectedPreset}
-                        setSelectedPreset={setSelectedPreset}
-                        preferSponsored={preferSponsored}
-                        setPreferSponsored={setPreferSponsored}
-                        paymasterNodeUrl={paymasterNodeUrl}
-                        privateKey={privateKey}
-                        setPrivateKey={setPrivateKey}
-                        connect={connect}
-                        isConnecting={isConnecting}
-                        onBack={handleBackToChoice}
-                      />
+                  <View style={[styles.slidePage, { width: contentWidth }]}>
+                    <View style={styles.cardWrapper}>
+                      <View
+                        style={[
+                          styles.card,
+                          styles.cardInSlide,
+                          { backgroundColor: cardBg },
+                        ]}
+                      >
+                        <Step2PrivateKey
+                          selectedPreset={selectedPreset}
+                          setSelectedPreset={setSelectedPreset}
+                          preferSponsored={preferSponsored}
+                          setPreferSponsored={setPreferSponsored}
+                          paymasterNodeUrl={paymasterNodeUrl}
+                          privateKey={privateKey}
+                          setPrivateKey={setPrivateKey}
+                          connect={connect}
+                          isConnecting={isConnecting}
+                          onBack={handleBackToChoice}
+                        />
+                      </View>
                     </View>
                   </View>
-                </View>
-              </Animated.View>
-            </View>
+                </Animated.View>
+              </View>
             )}
           </View>
         </View>

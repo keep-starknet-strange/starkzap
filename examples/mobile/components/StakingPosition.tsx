@@ -99,7 +99,9 @@ export function StakingPosition({
         </View>
         <View style={styles.statChip}>
           <ThemedText style={styles.statLabel}>Rewards</ThemedText>
-          <ThemedText style={[styles.statValue, hasRewards && styles.rewardsValue]}>
+          <ThemedText
+            style={[styles.statValue, hasRewards && styles.rewardsValue]}
+          >
             {position.rewards.toFormatted(true)}
           </ThemedText>
         </View>
@@ -126,7 +128,12 @@ export function StakingPosition({
         {unpoolStatus && (
           <View style={styles.statChip}>
             <ThemedText style={styles.statLabel}>Unpool</ThemedText>
-            <ThemedText style={[styles.statValue, unpoolStatus.isReady && styles.readyValue]}>
+            <ThemedText
+              style={[
+                styles.statValue,
+                unpoolStatus.isReady && styles.readyValue,
+              ]}
+            >
               {unpoolStatus.text}
             </ThemedText>
           </View>

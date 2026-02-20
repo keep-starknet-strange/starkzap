@@ -8,7 +8,10 @@ import {
   ActivityIndicator,
   Image,
 } from "react-native";
-import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
+import {
+  SafeAreaView,
+  useSafeAreaInsets,
+} from "react-native-safe-area-context";
 import { router } from "expo-router";
 import * as Clipboard from "expo-clipboard";
 import * as Haptics from "expo-haptics";
@@ -33,7 +36,8 @@ import {
 import type { Token, Amount } from "x";
 
 // Fallback logo when WBTC has no logo or image fails to load
-const WBTC_LOGO_FALLBACK = "https://altcoinsbox.com/wp-content/uploads/2023/01/wbtc-wrapped-bitcoin-logo.png";
+const WBTC_LOGO_FALLBACK =
+  "https://altcoinsbox.com/wp-content/uploads/2023/01/wbtc-wrapped-bitcoin-logo.png";
 
 // Sepolia demo conversion rates (hardcoded)
 const SEPOLIA_USD_RATES = { USDC: 1, STRK: 0.05, WBTC: 97000 } as const;
@@ -76,7 +80,13 @@ function TinyTokenLogo({ token }: { token: Token }) {
   }
   if (useFallback) {
     return (
-      <View style={[styles.tinyLogo, styles.tinyLogoPlaceholder, { backgroundColor: borderColor }]}>
+      <View
+        style={[
+          styles.tinyLogo,
+          styles.tinyLogoPlaceholder,
+          { backgroundColor: borderColor },
+        ]}
+      >
         <ThemedText style={[styles.tinyLogoText, { color: primaryColor }]}>
           {token.symbol.charAt(0)}
         </ThemedText>
@@ -124,8 +134,8 @@ export default function BalancesScreen() {
   }, [allTokens]);
 
   const networkName =
-    NETWORKS.find((n) => n.chainId.toLiteral() === chainId.toLiteral())
-      ?.name ?? "Custom";
+    NETWORKS.find((n) => n.chainId.toLiteral() === chainId.toLiteral())?.name ??
+    "Custom";
 
   const [showMoreTokens, setShowMoreTokens] = useState(false);
 
@@ -161,7 +171,9 @@ export default function BalancesScreen() {
     // Open browser after a short delay so "Address copied" toast is visible first (browser would cover it otherwise)
     const url = `${SEPOLIA_FAUCET_URL}?${FAUCET_ADDRESS_PARAM}=${encodeURIComponent(wallet.address)}`;
     setTimeout(() => {
-      void WebBrowser.openBrowserAsync(url, { presentationStyle: WebBrowser.WebBrowserPresentationStyle.PAGE_SHEET });
+      void WebBrowser.openBrowserAsync(url, {
+        presentationStyle: WebBrowser.WebBrowserPresentationStyle.PAGE_SHEET,
+      });
     }, 700);
   }, [wallet]);
 
@@ -185,7 +197,8 @@ export default function BalancesScreen() {
   const wbtcBalance = getBalance(wbtcToken);
   const usdcBalance = getBalance(usdcToken);
 
-  const isSepolia = chainId.isSepolia?.() ?? chainId.toLiteral?.() === "SN_SEPOLIA";
+  const isSepolia =
+    chainId.isSepolia?.() ?? chainId.toLiteral?.() === "SN_SEPOLIA";
   const totalUsd =
     isSepolia && (strkBalance || wbtcBalance || usdcBalance)
       ? parseBalanceToNumber(usdcBalance) * SEPOLIA_USD_RATES.USDC +
@@ -199,7 +212,10 @@ export default function BalancesScreen() {
     <SafeAreaView style={styles.container} edges={["top"]}>
       <ScrollView
         style={styles.scroll}
-        contentContainerStyle={[styles.content, { paddingTop: contentPaddingTop }]}
+        contentContainerStyle={[
+          styles.content,
+          { paddingTop: contentPaddingTop },
+        ]}
         showsVerticalScrollIndicator={true}
         refreshControl={
           <RefreshControl
@@ -214,8 +230,12 @@ export default function BalancesScreen() {
             <ThemedText type="title">Balances</ThemedText>
           </View>
           <View style={styles.headerRight}>
-            <View style={[styles.networkPill, { backgroundColor: borderColor }]}>
-              <ThemedText style={[styles.networkPillText, { color: primaryColor }]}>
+            <View
+              style={[styles.networkPill, { backgroundColor: borderColor }]}
+            >
+              <ThemedText
+                style={[styles.networkPillText, { color: primaryColor }]}
+              >
                 {networkName}
               </ThemedText>
             </View>
@@ -228,9 +248,13 @@ export default function BalancesScreen() {
         </View>
 
         {/* Single balance card: centered content */}
-        <View style={[styles.balanceCard, { backgroundColor: cardBg, borderColor }]}>
+        <View
+          style={[styles.balanceCard, { backgroundColor: cardBg, borderColor }]}
+        >
           <View style={styles.usdTotalHeaderRow}>
-            <ThemedText style={[styles.usdTotalLabel, { color: textSecondary }]}>
+            <ThemedText
+              style={[styles.usdTotalLabel, { color: textSecondary }]}
+            >
               Total (USD)
             </ThemedText>
           </View>
@@ -239,10 +263,18 @@ export default function BalancesScreen() {
               <ActivityIndicator size="small" color={primaryColor} />
             ) : totalUsd != null ? (
               <ThemedText style={styles.usdTotalAmount}>
-                ${totalUsd.toLocaleString("default", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                $
+                {totalUsd.toLocaleString("default", {
+                  minimumFractionDigits: 2,
+                  maximumFractionDigits: 2,
+                })}
               </ThemedText>
             ) : (
-              <ThemedText style={[styles.usdTotalAmount, { color: textSecondary }]}>—</ThemedText>
+              <ThemedText
+                style={[styles.usdTotalAmount, { color: textSecondary }]}
+              >
+                —
+              </ThemedText>
             )}
           </View>
           <View style={styles.addressCopyRow}>
@@ -251,7 +283,9 @@ export default function BalancesScreen() {
               onPress={handleCopyAddress}
               activeOpacity={0.88}
             >
-              <ThemedText style={[styles.addressCopyBtnText, { color: textSecondary }]}>
+              <ThemedText
+                style={[styles.addressCopyBtnText, { color: textSecondary }]}
+              >
                 {cropAddress(wallet.address)}
               </ThemedText>
             </TouchableOpacity>
@@ -263,7 +297,11 @@ export default function BalancesScreen() {
               activeOpacity={0.88}
             >
               {isLoading ? (
-                <ActivityIndicator size="small" color={primaryColor} style={styles.refreshBtnSpinner} />
+                <ActivityIndicator
+                  size="small"
+                  color={primaryColor}
+                  style={styles.refreshBtnSpinner}
+                />
               ) : (
                 <Ionicons name="refresh" size={12} color={primaryColor} />
               )}
@@ -275,13 +313,24 @@ export default function BalancesScreen() {
                 style={[styles.refreshBtn, { backgroundColor: borderColor }]}
                 activeOpacity={0.88}
               >
-                <IconSymbol name="arrow.left.arrow.right" size={12} color={primaryColor} />
+                <IconSymbol
+                  name="arrow.left.arrow.right"
+                  size={12}
+                  color={primaryColor}
+                />
               </TouchableOpacity>
             )}
           </View>
-          <View style={[styles.balanceCardDivider, { backgroundColor: borderColor }]} />
+          <View
+            style={[
+              styles.balanceCardDivider,
+              { backgroundColor: borderColor },
+            ]}
+          />
           <View style={styles.usdTotalHeaderRow}>
-            <ThemedText style={[styles.usdTotalLabel, { color: textSecondary }]}>
+            <ThemedText
+              style={[styles.usdTotalLabel, { color: textSecondary }]}
+            >
               Token
             </ThemedText>
           </View>
@@ -291,22 +340,41 @@ export default function BalancesScreen() {
                 <View style={styles.tokenBalanceLeft}>
                   <TinyTokenLogo token={strkToken} />
                   <View style={styles.tokenBalanceStack}>
-                    <ThemedText style={styles.tokenCurrencyBold}>STRK</ThemedText>
+                    <ThemedText style={styles.tokenCurrencyBold}>
+                      STRK
+                    </ThemedText>
                     <View style={styles.tokenAmountRow}>
-                      <ThemedText style={[styles.tokenAmountGrey, { color: textSecondary }]}>
+                      <ThemedText
+                        style={[
+                          styles.tokenAmountGrey,
+                          { color: textSecondary },
+                        ]}
+                      >
                         {isLoading && !balances.has(strkToken.address)
                           ? "…"
                           : strkBalance
                             ? formatBalanceNumber(strkBalance)
                             : "—"}
                       </ThemedText>
-                      {isSepolia && !(isLoading && !balances.has(strkToken.address)) && (!strkBalance || parseBalanceToNumber(strkBalance) === 0) && (
-                        <TouchableOpacity onPress={handleClaimStrk} hitSlop={6} style={styles.claimStrkLinkWrap}>
-                          <ThemedText style={[styles.claimStrkLink, { color: textSecondary }]}>
-                            Claim test STRK
-                          </ThemedText>
-                        </TouchableOpacity>
-                      )}
+                      {isSepolia &&
+                        !(isLoading && !balances.has(strkToken.address)) &&
+                        (!strkBalance ||
+                          parseBalanceToNumber(strkBalance) === 0) && (
+                          <TouchableOpacity
+                            onPress={handleClaimStrk}
+                            hitSlop={6}
+                            style={styles.claimStrkLinkWrap}
+                          >
+                            <ThemedText
+                              style={[
+                                styles.claimStrkLink,
+                                { color: textSecondary },
+                              ]}
+                            >
+                              Claim test STRK
+                            </ThemedText>
+                          </TouchableOpacity>
+                        )}
                     </View>
                   </View>
                 </View>
@@ -318,18 +386,29 @@ export default function BalancesScreen() {
                         ? `$${(parseBalanceToNumber(strkBalance) * SEPOLIA_USD_RATES.STRK).toLocaleString("default", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
                         : "—"}
                   </ThemedText>
-                  <ThemedText style={[styles.tokenRateGrey, { color: textSecondary }]}>
+                  <ThemedText
+                    style={[styles.tokenRateGrey, { color: textSecondary }]}
+                  >
                     * {SEPOLIA_USD_RATES.STRK} USD
                   </ThemedText>
                 </View>
               </View>
-            <View style={[styles.primaryDivider, { backgroundColor: borderColor }]} />
+              <View
+                style={[
+                  styles.primaryDivider,
+                  { backgroundColor: borderColor },
+                ]}
+              />
               <View style={styles.tokenBalanceRow}>
                 <View style={styles.tokenBalanceLeft}>
                   <TinyTokenLogo token={wbtcToken} />
                   <View style={styles.tokenBalanceStack}>
-                    <ThemedText style={styles.tokenCurrencyBold}>wBTC</ThemedText>
-                    <ThemedText style={[styles.tokenAmountGrey, { color: textSecondary }]}>
+                    <ThemedText style={styles.tokenCurrencyBold}>
+                      wBTC
+                    </ThemedText>
+                    <ThemedText
+                      style={[styles.tokenAmountGrey, { color: textSecondary }]}
+                    >
                       {isLoading && !balances.has(wbtcToken.address)
                         ? "…"
                         : wbtcBalance
@@ -346,18 +425,29 @@ export default function BalancesScreen() {
                         ? `$${(parseBalanceToNumber(wbtcBalance) * SEPOLIA_USD_RATES.WBTC).toLocaleString("default", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
                         : "—"}
                   </ThemedText>
-                  <ThemedText style={[styles.tokenRateGrey, { color: textSecondary }]}>
+                  <ThemedText
+                    style={[styles.tokenRateGrey, { color: textSecondary }]}
+                  >
                     * {SEPOLIA_USD_RATES.WBTC.toLocaleString()} USD
                   </ThemedText>
                 </View>
               </View>
-            <View style={[styles.primaryDivider, { backgroundColor: borderColor }]} />
+              <View
+                style={[
+                  styles.primaryDivider,
+                  { backgroundColor: borderColor },
+                ]}
+              />
               <View style={styles.tokenBalanceRow}>
                 <View style={styles.tokenBalanceLeft}>
                   <TinyTokenLogo token={usdcToken} />
                   <View style={styles.tokenBalanceStack}>
-                    <ThemedText style={styles.tokenCurrencyBold}>USDC</ThemedText>
-                    <ThemedText style={[styles.tokenAmountGrey, { color: textSecondary }]}>
+                    <ThemedText style={styles.tokenCurrencyBold}>
+                      USDC
+                    </ThemedText>
+                    <ThemedText
+                      style={[styles.tokenAmountGrey, { color: textSecondary }]}
+                    >
                       {isLoading && !balances.has(usdcToken.address)
                         ? "…"
                         : usdcBalance
@@ -374,30 +464,47 @@ export default function BalancesScreen() {
                         ? `$${(parseBalanceToNumber(usdcBalance) * SEPOLIA_USD_RATES.USDC).toLocaleString("default", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
                         : "—"}
                   </ThemedText>
-                  <ThemedText style={[styles.tokenRateGrey, { color: textSecondary }]}>
+                  <ThemedText
+                    style={[styles.tokenRateGrey, { color: textSecondary }]}
+                  >
                     * {SEPOLIA_USD_RATES.USDC} USD
                   </ThemedText>
                 </View>
               </View>
-          </View>
+            </View>
           </View>
 
           {/* See more tokens: inside card, below USDC, above rates note */}
-          <View style={[styles.seeMoreWrap, styles.seeMoreWrapInCard, { borderColor }]}>
+          <View
+            style={[
+              styles.seeMoreWrap,
+              styles.seeMoreWrapInCard,
+              { borderColor },
+            ]}
+          >
             <TouchableOpacity
               style={styles.seeMoreRow}
               onPress={() => setShowMoreTokens((v) => !v)}
               activeOpacity={0.88}
             >
-              <ThemedText style={[styles.seeMoreLabel, { color: textSecondary }]}>
+              <ThemedText
+                style={[styles.seeMoreLabel, { color: textSecondary }]}
+              >
                 {showMoreTokens ? "Hide" : "See more tokens"}
               </ThemedText>
-              <ThemedText style={[styles.seeMoreChevron, { color: textSecondary }]}>
+              <ThemedText
+                style={[styles.seeMoreChevron, { color: textSecondary }]}
+              >
                 {showMoreTokens ? "▲" : "▼"}
               </ThemedText>
             </TouchableOpacity>
             {showMoreTokens && moreTokens.length > 0 && (
-              <View style={[styles.moreTokensInner, { borderTopColor: borderColor }]}>
+              <View
+                style={[
+                  styles.moreTokensInner,
+                  { borderTopColor: borderColor },
+                ]}
+              >
                 {moreTokens.map((token) => {
                   const balance = getBalance(token);
                   const loading = isLoading && !balances.has(token.address);
@@ -405,7 +512,12 @@ export default function BalancesScreen() {
                     <View key={token.address} style={styles.moreTokenRow}>
                       <View style={styles.moreTokenLeft}>
                         <TinyTokenLogo token={token} />
-                        <ThemedText style={[styles.moreTokenSymbol, { color: textSecondary }]}>
+                        <ThemedText
+                          style={[
+                            styles.moreTokenSymbol,
+                            { color: textSecondary },
+                          ]}
+                        >
                           {token.symbol}
                         </ThemedText>
                       </View>
@@ -424,15 +536,26 @@ export default function BalancesScreen() {
           </View>
 
           <ThemedText style={[styles.usdRatesNote, { color: textSecondary }]}>
-            Rates (Sepolia): 1 USDC = 1 USD, 1 STRK = 0.05 USD.{"\n"}Hardcoded for demo.
+            Rates (Sepolia): 1 USDC = 1 USD, 1 STRK = 0.05 USD.{"\n"}Hardcoded
+            for demo.
           </ThemedText>
         </View>
 
         {isDeployed === false && (
-          <View style={[styles.deployCard, { backgroundColor: cardBg, borderColor }]}>
-            <ThemedText style={[styles.deployCardMessage, { color: textSecondary }]}>
+          <View
+            style={[
+              styles.deployCard,
+              { backgroundColor: cardBg, borderColor },
+            ]}
+          >
+            <ThemedText
+              style={[styles.deployCardMessage, { color: textSecondary }]}
+            >
               Deployment requires STRK token.{" "}
-              <ThemedText style={[styles.claimStrkLink, { color: textSecondary }]} onPress={handleClaimStrk}>
+              <ThemedText
+                style={[styles.claimStrkLink, { color: textSecondary }]}
+                onPress={handleClaimStrk}
+              >
                 Claim test STRK
               </ThemedText>
               , and deploy account before accessing other features.
@@ -441,7 +564,10 @@ export default function BalancesScreen() {
               Account not deployed
             </ThemedText>
             <TouchableOpacity
-              style={[styles.deployBtnSmall, isConnecting && styles.deployBtnDisabled]}
+              style={[
+                styles.deployBtnSmall,
+                isConnecting && styles.deployBtnDisabled,
+              ]}
               onPress={() => void deploy()}
               disabled={isConnecting}
               activeOpacity={0.85}
@@ -449,7 +575,9 @@ export default function BalancesScreen() {
               {isConnecting ? (
                 <ActivityIndicator size="small" color="#fff" />
               ) : (
-                <ThemedText style={styles.deployBtnSmallText}>Deploy account</ThemedText>
+                <ThemedText style={styles.deployBtnSmallText}>
+                  Deploy account
+                </ThemedText>
               )}
             </TouchableOpacity>
           </View>

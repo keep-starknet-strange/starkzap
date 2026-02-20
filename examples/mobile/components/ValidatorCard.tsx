@@ -1,4 +1,10 @@
-import { StyleSheet, View, Image, TouchableOpacity, type ViewStyle } from "react-native";
+import {
+  StyleSheet,
+  View,
+  Image,
+  TouchableOpacity,
+  type ViewStyle,
+} from "react-native";
 import { ThemedText } from "./themed-text";
 import type { Validator } from "starkzap";
 
@@ -21,7 +27,11 @@ export function ValidatorCard({
   if (compact) {
     return (
       <TouchableOpacity
-        style={[styles.containerCompact, isSelected && styles.containerSelected, containerStyle]}
+        style={[
+          styles.containerCompact,
+          isSelected && styles.containerSelected,
+          containerStyle,
+        ]}
         onPress={onSelect}
         activeOpacity={0.7}
       >
@@ -53,7 +63,11 @@ export function ValidatorCard({
 
   return (
     <TouchableOpacity
-      style={[styles.container, isSelected && styles.containerSelected, containerStyle]}
+      style={[
+        styles.container,
+        isSelected && styles.containerSelected,
+        containerStyle,
+      ]}
       onPress={onSelect}
       activeOpacity={0.7}
     >

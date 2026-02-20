@@ -35,7 +35,8 @@ import {
 } from "@/components/Toast";
 import { Amount, fromAddress, type Token, type ChainId } from "starkzap";
 
-const WBTC_LOGO_FALLBACK = "https://altcoinsbox.com/wp-content/uploads/2023/01/wbtc-wrapped-bitcoin-logo.png";
+const WBTC_LOGO_FALLBACK =
+  "https://altcoinsbox.com/wp-content/uploads/2023/01/wbtc-wrapped-bitcoin-logo.png";
 const SEPOLIA_USD_RATES = { USDC: 1, STRK: 0.05 } as const;
 
 function formatBalanceNumber(amount: Amount): string {
@@ -71,8 +72,16 @@ function TinyTokenLogo({ token }: { token: Token }) {
   }
   if (useFallback) {
     return (
-      <View style={[tokenLogoStyles.tinyLogo, tokenLogoStyles.tinyLogoPlaceholder, { backgroundColor: borderColor }]}>
-        <ThemedText style={[tokenLogoStyles.tinyLogoText, { color: primaryColor }]}>
+      <View
+        style={[
+          tokenLogoStyles.tinyLogo,
+          tokenLogoStyles.tinyLogoPlaceholder,
+          { backgroundColor: borderColor },
+        ]}
+      >
+        <ThemedText
+          style={[tokenLogoStyles.tinyLogoText, { color: primaryColor }]}
+        >
           {token.symbol.charAt(0)}
         </ThemedText>
       </View>
@@ -124,8 +133,16 @@ function createDefaultTransfer(defaultToken: Token): TransferItem {
 }
 
 export default function TransfersScreen() {
-  const { wallet, chainId, addLog, paymasterNodeUrl, preferSponsored, walletType, disconnect, resetNetworkConfig } =
-    useWalletStore();
+  const {
+    wallet,
+    chainId,
+    addLog,
+    paymasterNodeUrl,
+    preferSponsored,
+    walletType,
+    disconnect,
+    resetNetworkConfig,
+  } = useWalletStore();
   const { logout } = usePrivy();
   const {
     getBalance,
@@ -140,7 +157,9 @@ export default function TransfersScreen() {
   const usdcToken = getUsdcToken(chainId);
   const primaryTokens = useMemo(() => {
     const eth = allTokens.find((t) => t.symbol === "ETH");
-    return [strkToken, wbtcToken, usdcToken, eth].filter((t): t is Token => t != null);
+    return [strkToken, wbtcToken, usdcToken, eth].filter(
+      (t): t is Token => t != null
+    );
   }, [allTokens, strkToken, wbtcToken, usdcToken]);
 
   const networkName =
@@ -390,7 +409,10 @@ export default function TransfersScreen() {
     <SafeAreaView style={styles.container} edges={["top"]}>
       <ScrollView
         style={styles.scrollView}
-        contentContainerStyle={[styles.content, { paddingTop: contentPaddingTop }]}
+        contentContainerStyle={[
+          styles.content,
+          { paddingTop: contentPaddingTop },
+        ]}
         showsVerticalScrollIndicator={true}
         refreshControl={
           <RefreshControl
@@ -405,8 +427,12 @@ export default function TransfersScreen() {
             <ThemedText type="title">Transfers</ThemedText>
           </View>
           <View style={styles.headerRight}>
-            <View style={[styles.networkPill, { backgroundColor: borderColor }]}>
-              <ThemedText style={[styles.networkPillText, { color: primaryColor }]}>
+            <View
+              style={[styles.networkPill, { backgroundColor: borderColor }]}
+            >
+              <ThemedText
+                style={[styles.networkPillText, { color: primaryColor }]}
+              >
                 {networkName}
               </ThemedText>
             </View>
@@ -421,13 +447,18 @@ export default function TransfersScreen() {
         {transfers.map((transfer, index) => (
           <View
             key={transfer.id}
-            style={[styles.transferCard, { backgroundColor: cardBg, borderColor }]}
+            style={[
+              styles.transferCard,
+              { backgroundColor: cardBg, borderColor },
+            ]}
           >
             {/* Same top as Balance card: Total (USD), amount, address, refresh (no transfer button) */}
             {index === 0 && (
               <>
                 <View style={styles.usdTotalHeaderRow}>
-                  <ThemedText style={[styles.usdTotalLabel, { color: textSecondary }]}>
+                  <ThemedText
+                    style={[styles.usdTotalLabel, { color: textSecondary }]}
+                  >
                     Total (USD)
                   </ThemedText>
                 </View>
@@ -443,25 +474,38 @@ export default function TransfersScreen() {
                       })}
                     </ThemedText>
                   ) : (
-                    <ThemedText style={[styles.usdTotalAmount, { color: textSecondary }]}>
+                    <ThemedText
+                      style={[styles.usdTotalAmount, { color: textSecondary }]}
+                    >
                       —
                     </ThemedText>
                   )}
                 </View>
                 <View style={styles.addressCopyRow}>
                   <TouchableOpacity
-                    style={[styles.addressCopyBtn, { backgroundColor: borderColor }]}
+                    style={[
+                      styles.addressCopyBtn,
+                      { backgroundColor: borderColor },
+                    ]}
                     onPress={handleCopyAddress}
                     activeOpacity={0.88}
                   >
-                    <ThemedText style={[styles.addressCopyBtnText, { color: textSecondary }]}>
+                    <ThemedText
+                      style={[
+                        styles.addressCopyBtnText,
+                        { color: textSecondary },
+                      ]}
+                    >
                       {wallet ? cropAddress(wallet.address) : ""}
                     </ThemedText>
                   </TouchableOpacity>
                   <TouchableOpacity
                     onPress={handleRefresh}
                     hitSlop={6}
-                    style={[styles.refreshBtn, { backgroundColor: borderColor }]}
+                    style={[
+                      styles.refreshBtn,
+                      { backgroundColor: borderColor },
+                    ]}
                     disabled={isLoadingBalances}
                     activeOpacity={0.88}
                   >
@@ -476,20 +520,29 @@ export default function TransfersScreen() {
                     )}
                   </TouchableOpacity>
                 </View>
-                <View style={[styles.balanceCardDivider, { backgroundColor: borderColor }]} />
+                <View
+                  style={[
+                    styles.balanceCardDivider,
+                    { backgroundColor: borderColor },
+                  ]}
+                />
               </>
             )}
 
             {transfers.length > 1 && index > 0 && (
               <View style={styles.transferHeader}>
-                <ThemedText style={[styles.transferIndex, { color: textSecondary }]}>
+                <ThemedText
+                  style={[styles.transferIndex, { color: textSecondary }]}
+                >
                   Transfer #{index + 1}
                 </ThemedText>
                 <TouchableOpacity
                   onPress={() => handleRemoveTransfer(transfer.id)}
                   style={[styles.removeButton, { borderColor }]}
                 >
-                  <ThemedText style={styles.removeButtonText}>Remove</ThemedText>
+                  <ThemedText style={styles.removeButtonText}>
+                    Remove
+                  </ThemedText>
                 </TouchableOpacity>
               </View>
             )}
@@ -497,14 +550,20 @@ export default function TransfersScreen() {
             {/* One field: Token dropdown (logo + name) + Amount input + MAX */}
             <View style={styles.fieldContainer}>
               <View style={styles.usdTotalHeaderRow}>
-                <ThemedText style={[styles.usdTotalLabel, { color: textSecondary }]}>
+                <ThemedText
+                  style={[styles.usdTotalLabel, { color: textSecondary }]}
+                >
                   Transfer
                 </ThemedText>
               </View>
               <View
                 style={[
                   styles.amountTokenRow,
-                  { backgroundColor: "transparent", borderWidth: 1, borderColor },
+                  {
+                    backgroundColor: "transparent",
+                    borderWidth: 1,
+                    borderColor,
+                  },
                 ]}
               >
                 <TouchableOpacity
@@ -516,49 +575,79 @@ export default function TransfersScreen() {
                     <>
                       <TinyTokenLogo token={transfer.token} />
                       <View style={styles.amountTokenDropdownLabels}>
-                        <ThemedText style={[styles.amountTokenSymbol, { color: primaryColor }]}>
+                        <ThemedText
+                          style={[
+                            styles.amountTokenSymbol,
+                            { color: primaryColor },
+                          ]}
+                        >
                           {transfer.token.symbol}
                         </ThemedText>
                       </View>
                     </>
                   ) : (
-                    <ThemedText style={[styles.placeholderTextSmall, { color: textSecondary }]}>
+                    <ThemedText
+                      style={[
+                        styles.placeholderTextSmall,
+                        { color: textSecondary },
+                      ]}
+                    >
                       Select token
                     </ThemedText>
                   )}
-                  <ThemedText style={[styles.chevronSmall, { color: textSecondary }]}>▼</ThemedText>
+                  <ThemedText
+                    style={[styles.chevronSmall, { color: textSecondary }]}
+                  >
+                    ▼
+                  </ThemedText>
                 </TouchableOpacity>
                 <View style={styles.amountInputMaxWrap}>
                   {(() => {
-                    const balance = transfer.token ? getBalance(transfer.token) : null;
-                    const balanceNum = balance ? parseFloat(balance.toUnit()) : 0;
+                    const balance = transfer.token
+                      ? getBalance(transfer.token)
+                      : null;
+                    const balanceNum = balance
+                      ? parseFloat(balance.toUnit())
+                      : 0;
                     const enteredNum = parseFloat(transfer.amount) || 0;
                     const exceedsBalance =
-                      !!transfer.token && enteredNum > 0 && enteredNum > balanceNum;
+                      !!transfer.token &&
+                      enteredNum > 0 &&
+                      enteredNum > balanceNum;
                     return (
-                  <TextInput
-                    style={[
-                      styles.amountInput,
-                      { color: exceedsBalance ? "#e53935" : primaryColor },
-                    ]}
-                    value={transfer.amount}
-                    onChangeText={(amount) => handleUpdateAmount(transfer.id, amount)}
-                    placeholder="0.0"
-                    placeholderTextColor={textSecondary}
-                    keyboardType="decimal-pad"
-                    editable={!!transfer.token}
-                  />
+                      <TextInput
+                        style={[
+                          styles.amountInput,
+                          { color: exceedsBalance ? "#e53935" : primaryColor },
+                        ]}
+                        value={transfer.amount}
+                        onChangeText={(amount) =>
+                          handleUpdateAmount(transfer.id, amount)
+                        }
+                        placeholder="0.0"
+                        placeholderTextColor={textSecondary}
+                        keyboardType="decimal-pad"
+                        editable={!!transfer.token}
+                      />
                     );
                   })()}
                   {transfer.token && getBalance(transfer.token) && (
                     <TouchableOpacity
-                      style={[styles.maxButton, { backgroundColor: borderColor }]}
+                      style={[
+                        styles.maxButton,
+                        { backgroundColor: borderColor },
+                      ]}
                       onPress={() =>
-                        handleUpdateAmount(transfer.id, getBalance(transfer.token)!.toUnit())
+                        handleUpdateAmount(
+                          transfer.id,
+                          getBalance(transfer.token)!.toUnit()
+                        )
                       }
                       activeOpacity={0.88}
                     >
-                      <ThemedText style={[styles.maxButtonText, { color: primaryColor }]}>
+                      <ThemedText
+                        style={[styles.maxButtonText, { color: primaryColor }]}
+                      >
                         MAX
                       </ThemedText>
                     </TouchableOpacity>
@@ -569,20 +658,26 @@ export default function TransfersScreen() {
               <View style={styles.balanceSponsoredRow}>
                 {index === 0 && (
                   <View style={styles.sponsoredInline}>
-                    <ThemedText style={[styles.usdTotalLabel, { color: textSecondary }]}>
+                    <ThemedText
+                      style={[styles.usdTotalLabel, { color: textSecondary }]}
+                    >
                       Sponsored
                     </ThemedText>
                     <View
                       style={[
                         styles.sponsoredSwitchWrapperCompact,
-                        (!canUseSponsored || isSubmitting) && styles.sponsoredSwitchDisabled,
+                        (!canUseSponsored || isSubmitting) &&
+                          styles.sponsoredSwitchDisabled,
                       ]}
-                      pointerEvents={!canUseSponsored || isSubmitting ? "none" : "auto"}
+                      pointerEvents={
+                        !canUseSponsored || isSubmitting ? "none" : "auto"
+                      }
                     >
                       <TouchableOpacity
                         style={[
                           styles.sponsoredSwitchSegmentCompact,
-                          !useSponsored && styles.sponsoredSwitchSegmentSelected,
+                          !useSponsored &&
+                            styles.sponsoredSwitchSegmentSelected,
                         ]}
                         onPress={() => setUseSponsored(false)}
                         disabled={!canUseSponsored || isSubmitting}
@@ -619,13 +714,23 @@ export default function TransfersScreen() {
                   </View>
                 )}
                 {transfer.token && getBalance(transfer.token) != null && (
-                  <ThemedText style={[styles.balanceLabelInline, { color: textSecondary }]}>
+                  <ThemedText
+                    style={[
+                      styles.balanceLabelInline,
+                      { color: textSecondary },
+                    ]}
+                  >
                     Balance: {getBalance(transfer.token)!.toFormatted(true)}
                   </ThemedText>
                 )}
               </View>
               {index === 0 && !canUseSponsored && (
-                <ThemedText style={[styles.sponsoredHintCompact, { color: textSecondary }]}>
+                <ThemedText
+                  style={[
+                    styles.sponsoredHintCompact,
+                    { color: textSecondary },
+                  ]}
+                >
                   Paymaster not configured
                 </ThemedText>
               )}
@@ -638,10 +743,17 @@ export default function TransfersScreen() {
               <TextInput
                 style={[
                   styles.addressInput,
-                  { backgroundColor: "transparent", borderWidth: 1, borderColor, color: primaryColor },
+                  {
+                    backgroundColor: "transparent",
+                    borderWidth: 1,
+                    borderColor,
+                    color: primaryColor,
+                  },
                 ]}
                 value={transfer.toAddress}
-                onChangeText={(address) => handleUpdateAddress(transfer.id, address)}
+                onChangeText={(address) =>
+                  handleUpdateAddress(transfer.id, address)
+                }
                 placeholder="0x..."
                 placeholderTextColor={textSecondary}
                 autoCapitalize="none"
@@ -656,7 +768,12 @@ export default function TransfersScreen() {
           onPress={handleAddTransfer}
           activeOpacity={0.7}
         >
-          <ThemedText style={[styles.addTransferPlaceholderText, { color: textSecondary }]}>
+          <ThemedText
+            style={[
+              styles.addTransferPlaceholderText,
+              { color: textSecondary },
+            ]}
+          >
             ＋ Add another transfer
           </ThemedText>
         </TouchableOpacity>
@@ -664,7 +781,9 @@ export default function TransfersScreen() {
         <TouchableOpacity
           style={[
             styles.submitButton,
-            canSubmit ? { backgroundColor: "#000" } : { backgroundColor: borderColor },
+            canSubmit
+              ? { backgroundColor: "#000" }
+              : { backgroundColor: borderColor },
             !canSubmit && styles.buttonDisabled,
           ]}
           onPress={handleSubmit}
@@ -672,7 +791,10 @@ export default function TransfersScreen() {
           activeOpacity={0.85}
         >
           {isSubmitting ? (
-            <ActivityIndicator size="small" color={canSubmit ? "#fff" : primaryColor} />
+            <ActivityIndicator
+              size="small"
+              color={canSubmit ? "#fff" : primaryColor}
+            />
           ) : (
             <ThemedText
               style={[
@@ -689,7 +811,9 @@ export default function TransfersScreen() {
 
         {transfers.length > 1 && (
           <TouchableOpacity style={styles.clearButton} onPress={handleClearAll}>
-            <ThemedText style={[styles.clearButtonText, { color: textSecondary }]}>
+            <ThemedText
+              style={[styles.clearButtonText, { color: textSecondary }]}
+            >
               Clear All
             </ThemedText>
           </TouchableOpacity>
@@ -707,15 +831,24 @@ export default function TransfersScreen() {
         presentationStyle="pageSheet"
         onRequestClose={() => setShowTokenPicker(false)}
       >
-        <SafeAreaView style={[styles.modalContainer, { backgroundColor: cardBg }]}>
-          <View style={[styles.modalHeader, { borderBottomColor: borderColor }]}>
+        <SafeAreaView
+          style={[styles.modalContainer, { backgroundColor: cardBg }]}
+        >
+          <View
+            style={[styles.modalHeader, { borderBottomColor: borderColor }]}
+          >
             <ThemedText type="title">Select Token</ThemedText>
             <TouchableOpacity
-              style={[styles.modalCloseButton, { backgroundColor: borderColor }]}
+              style={[
+                styles.modalCloseButton,
+                { backgroundColor: borderColor },
+              ]}
               onPress={() => setShowTokenPicker(false)}
               activeOpacity={0.88}
             >
-              <ThemedText style={[styles.modalCloseText, { color: primaryColor }]}>
+              <ThemedText
+                style={[styles.modalCloseText, { color: primaryColor }]}
+              >
                 Close
               </ThemedText>
             </TouchableOpacity>
@@ -726,7 +859,14 @@ export default function TransfersScreen() {
               const balance = getBalance(token);
               return (
                 <View key={token.address}>
-                  {idx > 0 && <View style={[styles.tokenPickerDivider, { backgroundColor: borderColor }]} />}
+                  {idx > 0 && (
+                    <View
+                      style={[
+                        styles.tokenPickerDivider,
+                        { backgroundColor: borderColor },
+                      ]}
+                    />
+                  )}
                   <TouchableOpacity
                     style={styles.tokenPickerRow}
                     onPress={() => handleSelectToken(token)}
@@ -738,7 +878,12 @@ export default function TransfersScreen() {
                         <ThemedText style={styles.tokenPickerSymbol}>
                           {token.symbol}
                         </ThemedText>
-                        <ThemedText style={[styles.tokenPickerAmount, { color: textSecondary }]}>
+                        <ThemedText
+                          style={[
+                            styles.tokenPickerAmount,
+                            { color: textSecondary },
+                          ]}
+                        >
                           {balance ? balance.toFormatted(true) : "—"}
                         </ThemedText>
                       </View>

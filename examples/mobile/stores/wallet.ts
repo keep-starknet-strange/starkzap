@@ -43,7 +43,9 @@ function isInsufficientBalanceDeployError(err: unknown): boolean {
   const s = String(err);
   return (
     /exceed balance\s*\(0\)/i.test(s) ||
-    (/Account validation failed/i.test(s) && /Resources bounds/i.test(s) && /balance/i.test(s))
+    (/Account validation failed/i.test(s) &&
+      /Resources bounds/i.test(s) &&
+      /balance/i.test(s))
   );
 }
 
@@ -490,20 +492,16 @@ export const useWalletStore = create<WalletState>((set, get) => ({
             : "Please fund your account with STRK and try again.")
         : errStr;
 
-      Alert.alert(
-        "Deployment Failed",
-        message,
-        [
-          {
-            text: "Copy",
-            onPress: async () => {
-              await Clipboard.setStringAsync(errStr);
-              showCopiedToast();
-            },
+      Alert.alert("Deployment Failed", message, [
+        {
+          text: "Copy",
+          onPress: async () => {
+            await Clipboard.setStringAsync(errStr);
+            showCopiedToast();
           },
-          { text: "OK" },
-        ]
-      );
+        },
+        { text: "OK" },
+      ]);
     } finally {
       set({ isConnecting: false });
     }

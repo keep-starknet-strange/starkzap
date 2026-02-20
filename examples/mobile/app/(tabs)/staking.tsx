@@ -24,7 +24,12 @@ import { StakingPosition } from "@/components/StakingPosition";
 import { LogsFAB } from "@/components/LogsFAB";
 import { useThemeColor } from "@/hooks/use-theme-color";
 import { useWalletStore, NETWORKS } from "@/stores/wallet";
-import { useBalancesStore, getStrkToken, getUsdcToken, getWbtcToken } from "@/stores/balances";
+import {
+  useBalancesStore,
+  getStrkToken,
+  getUsdcToken,
+  getWbtcToken,
+} from "@/stores/balances";
 import { showCopiedToast } from "@/components/Toast";
 import type { Amount, Token } from "x";
 
@@ -34,8 +39,16 @@ function TinyTokenLogo({ token }: { token: Token }) {
   const borderColor = useThemeColor({}, "border");
   if (!token.metadata?.logoUrl || imageError) {
     return (
-      <View style={[stakingTokenLogoStyles.tinyLogo, stakingTokenLogoStyles.tinyLogoPlaceholder, { backgroundColor: borderColor }]}>
-        <ThemedText style={[stakingTokenLogoStyles.tinyLogoText, { color: primaryColor }]}>
+      <View
+        style={[
+          stakingTokenLogoStyles.tinyLogo,
+          stakingTokenLogoStyles.tinyLogoPlaceholder,
+          { backgroundColor: borderColor },
+        ]}
+      >
+        <ThemedText
+          style={[stakingTokenLogoStyles.tinyLogoText, { color: primaryColor }]}
+        >
           {token.symbol.charAt(0)}
         </ThemedText>
       </View>
@@ -82,9 +95,22 @@ import {
 import type { Validator, Pool } from "starkzap";
 
 export default function StakingScreen() {
-  const { wallet, sdk, chainId, addLog, walletType, disconnect, resetNetworkConfig } = useWalletStore();
+  const {
+    wallet,
+    sdk,
+    chainId,
+    addLog,
+    walletType,
+    disconnect,
+    resetNetworkConfig,
+  } = useWalletStore();
   const { logout } = usePrivy();
-  const { getBalance, fetchBalances, clearBalances, isLoading: isLoadingBalances } = useBalancesStore();
+  const {
+    getBalance,
+    fetchBalances,
+    clearBalances,
+    isLoading: isLoadingBalances,
+  } = useBalancesStore();
   const borderColor = useThemeColor({}, "border");
   const primaryColor = useThemeColor({}, "primary");
   const textSecondary = useThemeColor({}, "textSecondary");
@@ -137,7 +163,9 @@ export default function StakingScreen() {
     null
   );
   const [stakeAmount, setStakeAmount] = useState("");
-  const [stakeAmountByKey, setStakeAmountByKey] = useState<Record<string, string>>({});
+  const [stakeAmountByKey, setStakeAmountByKey] = useState<
+    Record<string, string>
+  >({});
   const [exitAmount, setExitAmount] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
 
@@ -348,7 +376,10 @@ export default function StakingScreen() {
     <SafeAreaView style={styles.container} edges={["top"]}>
       <ScrollView
         style={styles.scrollView}
-        contentContainerStyle={[styles.content, { paddingTop: contentPaddingTop }]}
+        contentContainerStyle={[
+          styles.content,
+          { paddingTop: contentPaddingTop },
+        ]}
         refreshControl={
           <RefreshControl
             refreshing={isLoadingBalances || isLoadingAny}
@@ -362,8 +393,12 @@ export default function StakingScreen() {
             <ThemedText type="title">Staking</ThemedText>
           </View>
           <View style={styles.headerRight}>
-            <View style={[styles.networkPill, { backgroundColor: borderColor }]}>
-              <ThemedText style={[styles.networkPillText, { color: primaryColor }]}>
+            <View
+              style={[styles.networkPill, { backgroundColor: borderColor }]}
+            >
+              <ThemedText
+                style={[styles.networkPillText, { color: primaryColor }]}
+              >
                 {networkName}
               </ThemedText>
             </View>
@@ -376,9 +411,16 @@ export default function StakingScreen() {
         </View>
 
         {/* Single card: Total (USD) + Get started or Your Positions + Add Position at bottom */}
-        <View style={[styles.stakingTopCard, { backgroundColor: cardBg, borderColor }]}>
+        <View
+          style={[
+            styles.stakingTopCard,
+            { backgroundColor: cardBg, borderColor },
+          ]}
+        >
           <View style={styles.usdTotalHeaderRow}>
-            <ThemedText style={[styles.usdTotalLabel, { color: textSecondary }]}>
+            <ThemedText
+              style={[styles.usdTotalLabel, { color: textSecondary }]}
+            >
               Total (USD)
             </ThemedText>
           </View>
@@ -394,7 +436,9 @@ export default function StakingScreen() {
                 })}
               </ThemedText>
             ) : (
-              <ThemedText style={[styles.usdTotalAmount, { color: textSecondary }]}>
+              <ThemedText
+                style={[styles.usdTotalAmount, { color: textSecondary }]}
+              >
                 —
               </ThemedText>
             )}
@@ -405,7 +449,9 @@ export default function StakingScreen() {
               onPress={handleCopyAddress}
               activeOpacity={0.88}
             >
-              <ThemedText style={[styles.addressCopyBtnText, { color: textSecondary }]}>
+              <ThemedText
+                style={[styles.addressCopyBtnText, { color: textSecondary }]}
+              >
                 {wallet ? cropAddress(wallet.address) : ""}
               </ThemedText>
             </TouchableOpacity>
@@ -427,13 +473,24 @@ export default function StakingScreen() {
               )}
             </TouchableOpacity>
           </View>
-          <View style={[styles.balanceCardDivider, { backgroundColor: borderColor }]} />
+          <View
+            style={[
+              styles.balanceCardDivider,
+              { backgroundColor: borderColor },
+            ]}
+          />
 
           {positionsList.length === 0 ? (
             /* Get started - no positions */
             <View style={styles.stakingCardSection}>
               <View style={styles.usdTotalHeaderRow}>
-                <ThemedText style={[styles.usdTotalLabel, styles.getStartedTitle, { color: textSecondary }]}>
+                <ThemedText
+                  style={[
+                    styles.usdTotalLabel,
+                    styles.getStartedTitle,
+                    { color: textSecondary },
+                  ]}
+                >
                   Get Started
                 </ThemedText>
               </View>
@@ -442,166 +499,247 @@ export default function StakingScreen() {
                 onPress={() => setShowValidatorPicker(true)}
                 activeOpacity={0.88}
               >
-                <ThemedText style={[styles.addValidatorButtonText, { color: primaryColor }]}>
+                <ThemedText
+                  style={[
+                    styles.addValidatorButtonText,
+                    { color: primaryColor },
+                  ]}
+                >
                   + Select Validator & Token
                 </ThemedText>
               </TouchableOpacity>
             </View>
           ) : (
             <>
-            <View style={styles.positionsListWrap}>
-              {/* Your Positions - same formatting as Total (USD) */}
-              <View style={styles.usdTotalHeaderRow}>
-                <ThemedText style={[styles.usdTotalLabel, { color: textSecondary }]}>
-                  Your Positions
-                </ThemedText>
-              </View>
-              {positionsList.map((positionData) => {
-                const hasOpenPosition =
-                  positionData.position && !positionData.position.staked.isZero();
-                return (
-                <View key={positionData.key} style={[styles.positionRow, { backgroundColor: borderColor }]}>
-                  {/* When open position: validator only. Otherwise: validator | token + amount + MAX */}
-                  {hasOpenPosition ? (
-                    <View style={styles.positionValidatorWrapStandalone}>
-                      <ValidatorCard
-                        validator={positionData.validator}
-                        isSelected={false}
-                        compact
-                        containerStyle={{ backgroundColor: cardBg, borderColor }}
-                      />
-                    </View>
-                  ) : (
-                    <View style={styles.positionRowOneLine}>
-                      <View style={styles.positionValidatorWrap}>
-                        <ValidatorCard
-                          validator={positionData.validator}
-                          isSelected={false}
-                          compact
-                          containerStyle={{ backgroundColor: cardBg, borderColor }}
-                        />
-                      </View>
-                      <View
-                        style={[
-                          styles.amountTokenRowInline,
-                          { backgroundColor: inputBg, borderWidth: 1, borderColor },
-                        ]}
-                      >
-                        <View style={styles.stakeTokenDisplay}>
-                          <TinyTokenLogo token={positionData.token} />
-                          <ThemedText style={[styles.amountTokenSymbol, { color: primaryColor }]}>
-                            {positionData.token.symbol}
-                          </ThemedText>
-                        </View>
-                        <View style={styles.amountInputMaxWrap}>
-                          <TextInput
-                            style={[styles.amountInput, { color: primaryColor }]}
-                            value={stakeAmountByKey[positionData.key] ?? ""}
-                            onChangeText={(amount) => setStakeAmountForKey(positionData.key, amount)}
-                            placeholder="0.0"
-                            placeholderTextColor={textSecondary}
-                            keyboardType="decimal-pad"
-                          />
-                          {getBalance(positionData.token) && (
-                            <TouchableOpacity
-                              style={[styles.maxButton, { backgroundColor: borderColor }]}
-                              onPress={() =>
-                                setStakeAmountForKey(
-                                  positionData.key,
-                                  getBalance(positionData.token)!.toUnit()
-                                )
-                              }
-                              activeOpacity={0.88}
-                            >
-                              <ThemedText style={[styles.maxButtonText, { color: primaryColor }]}>
-                                MAX
-                              </ThemedText>
-                            </TouchableOpacity>
-                          )}
-                        </View>
-                      </View>
-                    </View>
-                  )}
-                  {hasOpenPosition && (
-                    <StakingPosition
-                      position={positionData.position}
-                      isLoading={positionData.isLoading}
-                      onClaimRewards={() => handleClaimRewards(positionData.key)}
-                      onAddStake={
-                        positionData.isMember
-                          ? () => handleOpenAddStakeModal(positionData.key)
-                          : undefined
-                      }
-                      onExitIntent={() =>
-                        handleOpenExitIntentModal(positionData.key, positionData)
-                      }
-                      onExit={() => handleExit(positionData.key)}
-                      isClaimingRewards={isClaimingRewards}
-                      isExiting={isExiting}
-                    />
-                  )}
-                  {!hasOpenPosition && (
-                    <View style={styles.stakeAndCloseRow}>
-                      {!positionData.isMember && !positionData.isLoading && (() => {
-                        const stakeDisabled =
-                          !(stakeAmountByKey[positionData.key] ?? "").trim() || isStaking;
-                        return (
-                          <TouchableOpacity
-                            style={[
-                              styles.stakeButton,
-                              styles.stakeButtonInRow,
-                              stakeDisabled
-                                ? { backgroundColor: "#fff" }
-                                : { backgroundColor: "#000" },
-                            ]}
-                            onPress={() =>
-                              handleStake(positionData.key, stakeAmountByKey[positionData.key] ?? "")
-                            }
-                            disabled={stakeDisabled}
-                            activeOpacity={0.88}
-                          >
-                            <ThemedText
-                              style={[
-                                styles.stakeButtonTextLikeAddValidator,
-                                stakeDisabled ? { color: primaryColor } : { color: "#fff" },
-                              ]}
-                            >
-                              {isStaking ? "Processing..." : stakeDisabled ? "Select token first" : `Stake ${positionData.token.symbol}`}
-                            </ThemedText>
-                          </TouchableOpacity>
-                        );
-                      })()}
-                      {positionData.isMember &&
-                        !positionData.position &&
-                        !positionData.isLoading && (
-                          <TouchableOpacity
-                            style={[styles.stakeButton, styles.stakeButtonInRow]}
-                            onPress={() => handleOpenAddStakeModal(positionData.key)}
-                            activeOpacity={0.88}
-                          >
-                            <ThemedText style={[styles.stakeButtonTextLikeAddValidator, { color: "#fff" }]}>
-                              Add {positionData.token.symbol} Stake
-                            </ThemedText>
-                          </TouchableOpacity>
-                        )}
-                      <TouchableOpacity
-                        style={styles.positionCloseButton}
-                        onPress={() => handleRemovePosition(positionData.key)}
-                        activeOpacity={0.88}
-                      >
-                        <ThemedText style={styles.positionCloseButtonText}>Close</ThemedText>
-                      </TouchableOpacity>
-                    </View>
-                  )}
+              <View style={styles.positionsListWrap}>
+                {/* Your Positions - same formatting as Total (USD) */}
+                <View style={styles.usdTotalHeaderRow}>
+                  <ThemedText
+                    style={[styles.usdTotalLabel, { color: textSecondary }]}
+                  >
+                    Your Positions
+                  </ThemedText>
                 </View>
-              );
-              })}
-              <View style={[styles.balanceCardDivider, { backgroundColor: borderColor }]} />
-            </View>
+                {positionsList.map((positionData) => {
+                  const hasOpenPosition =
+                    positionData.position &&
+                    !positionData.position.staked.isZero();
+                  return (
+                    <View
+                      key={positionData.key}
+                      style={[
+                        styles.positionRow,
+                        { backgroundColor: borderColor },
+                      ]}
+                    >
+                      {/* When open position: validator only. Otherwise: validator | token + amount + MAX */}
+                      {hasOpenPosition ? (
+                        <View style={styles.positionValidatorWrapStandalone}>
+                          <ValidatorCard
+                            validator={positionData.validator}
+                            isSelected={false}
+                            compact
+                            containerStyle={{
+                              backgroundColor: cardBg,
+                              borderColor,
+                            }}
+                          />
+                        </View>
+                      ) : (
+                        <View style={styles.positionRowOneLine}>
+                          <View style={styles.positionValidatorWrap}>
+                            <ValidatorCard
+                              validator={positionData.validator}
+                              isSelected={false}
+                              compact
+                              containerStyle={{
+                                backgroundColor: cardBg,
+                                borderColor,
+                              }}
+                            />
+                          </View>
+                          <View
+                            style={[
+                              styles.amountTokenRowInline,
+                              {
+                                backgroundColor: inputBg,
+                                borderWidth: 1,
+                                borderColor,
+                              },
+                            ]}
+                          >
+                            <View style={styles.stakeTokenDisplay}>
+                              <TinyTokenLogo token={positionData.token} />
+                              <ThemedText
+                                style={[
+                                  styles.amountTokenSymbol,
+                                  { color: primaryColor },
+                                ]}
+                              >
+                                {positionData.token.symbol}
+                              </ThemedText>
+                            </View>
+                            <View style={styles.amountInputMaxWrap}>
+                              <TextInput
+                                style={[
+                                  styles.amountInput,
+                                  { color: primaryColor },
+                                ]}
+                                value={stakeAmountByKey[positionData.key] ?? ""}
+                                onChangeText={(amount) =>
+                                  setStakeAmountForKey(positionData.key, amount)
+                                }
+                                placeholder="0.0"
+                                placeholderTextColor={textSecondary}
+                                keyboardType="decimal-pad"
+                              />
+                              {getBalance(positionData.token) && (
+                                <TouchableOpacity
+                                  style={[
+                                    styles.maxButton,
+                                    { backgroundColor: borderColor },
+                                  ]}
+                                  onPress={() =>
+                                    setStakeAmountForKey(
+                                      positionData.key,
+                                      getBalance(positionData.token)!.toUnit()
+                                    )
+                                  }
+                                  activeOpacity={0.88}
+                                >
+                                  <ThemedText
+                                    style={[
+                                      styles.maxButtonText,
+                                      { color: primaryColor },
+                                    ]}
+                                  >
+                                    MAX
+                                  </ThemedText>
+                                </TouchableOpacity>
+                              )}
+                            </View>
+                          </View>
+                        </View>
+                      )}
+                      {hasOpenPosition && (
+                        <StakingPosition
+                          position={positionData.position}
+                          isLoading={positionData.isLoading}
+                          onClaimRewards={() =>
+                            handleClaimRewards(positionData.key)
+                          }
+                          onAddStake={
+                            positionData.isMember
+                              ? () => handleOpenAddStakeModal(positionData.key)
+                              : undefined
+                          }
+                          onExitIntent={() =>
+                            handleOpenExitIntentModal(
+                              positionData.key,
+                              positionData
+                            )
+                          }
+                          onExit={() => handleExit(positionData.key)}
+                          isClaimingRewards={isClaimingRewards}
+                          isExiting={isExiting}
+                        />
+                      )}
+                      {!hasOpenPosition && (
+                        <View style={styles.stakeAndCloseRow}>
+                          {!positionData.isMember &&
+                            !positionData.isLoading &&
+                            (() => {
+                              const stakeDisabled =
+                                !(
+                                  stakeAmountByKey[positionData.key] ?? ""
+                                ).trim() || isStaking;
+                              return (
+                                <TouchableOpacity
+                                  style={[
+                                    styles.stakeButton,
+                                    styles.stakeButtonInRow,
+                                    stakeDisabled
+                                      ? { backgroundColor: "#fff" }
+                                      : { backgroundColor: "#000" },
+                                  ]}
+                                  onPress={() =>
+                                    handleStake(
+                                      positionData.key,
+                                      stakeAmountByKey[positionData.key] ?? ""
+                                    )
+                                  }
+                                  disabled={stakeDisabled}
+                                  activeOpacity={0.88}
+                                >
+                                  <ThemedText
+                                    style={[
+                                      styles.stakeButtonTextLikeAddValidator,
+                                      stakeDisabled
+                                        ? { color: primaryColor }
+                                        : { color: "#fff" },
+                                    ]}
+                                  >
+                                    {isStaking
+                                      ? "Processing..."
+                                      : stakeDisabled
+                                        ? "Select token first"
+                                        : `Stake ${positionData.token.symbol}`}
+                                  </ThemedText>
+                                </TouchableOpacity>
+                              );
+                            })()}
+                          {positionData.isMember &&
+                            !positionData.position &&
+                            !positionData.isLoading && (
+                              <TouchableOpacity
+                                style={[
+                                  styles.stakeButton,
+                                  styles.stakeButtonInRow,
+                                ]}
+                                onPress={() =>
+                                  handleOpenAddStakeModal(positionData.key)
+                                }
+                                activeOpacity={0.88}
+                              >
+                                <ThemedText
+                                  style={[
+                                    styles.stakeButtonTextLikeAddValidator,
+                                    { color: "#fff" },
+                                  ]}
+                                >
+                                  Add {positionData.token.symbol} Stake
+                                </ThemedText>
+                              </TouchableOpacity>
+                            )}
+                          <TouchableOpacity
+                            style={styles.positionCloseButton}
+                            onPress={() =>
+                              handleRemovePosition(positionData.key)
+                            }
+                            activeOpacity={0.88}
+                          >
+                            <ThemedText style={styles.positionCloseButtonText}>
+                              Close
+                            </ThemedText>
+                          </TouchableOpacity>
+                        </View>
+                      )}
+                    </View>
+                  );
+                })}
+                <View
+                  style={[
+                    styles.balanceCardDivider,
+                    { backgroundColor: borderColor },
+                  ]}
+                />
+              </View>
               {/* Add Position at bottom of card - same formatting as Total (USD) */}
               <View style={styles.stakingCardSection}>
                 <View style={styles.usdTotalHeaderRow}>
-                  <ThemedText style={[styles.usdTotalLabel, { color: textSecondary }]}>
+                  <ThemedText
+                    style={[styles.usdTotalLabel, { color: textSecondary }]}
+                  >
                     Add Position
                   </ThemedText>
                 </View>
@@ -610,7 +748,12 @@ export default function StakingScreen() {
                   onPress={() => setShowValidatorPicker(true)}
                   activeOpacity={0.88}
                 >
-                  <ThemedText style={[styles.addValidatorButtonText, { color: primaryColor }]}>
+                  <ThemedText
+                    style={[
+                      styles.addValidatorButtonText,
+                      { color: primaryColor },
+                    ]}
+                  >
                     + Select Validator & Token
                   </ThemedText>
                 </TouchableOpacity>
@@ -631,21 +774,35 @@ export default function StakingScreen() {
         presentationStyle="pageSheet"
         onRequestClose={() => setShowValidatorPicker(false)}
       >
-        <SafeAreaView style={[styles.modalContainer, { backgroundColor: cardBg }]}>
-          <View style={[styles.modalHeader, { borderBottomColor: borderColor }]}>
+        <SafeAreaView
+          style={[styles.modalContainer, { backgroundColor: cardBg }]}
+        >
+          <View
+            style={[styles.modalHeader, { borderBottomColor: borderColor }]}
+          >
             <ThemedText type="title">Select Validator</ThemedText>
             <TouchableOpacity
-              style={[styles.modalCloseButton, { backgroundColor: borderColor }]}
+              style={[
+                styles.modalCloseButton,
+                { backgroundColor: borderColor },
+              ]}
               onPress={() => setShowValidatorPicker(false)}
               activeOpacity={0.88}
             >
-              <ThemedText style={[styles.modalCloseText, { color: primaryColor }]}>Close</ThemedText>
+              <ThemedText
+                style={[styles.modalCloseText, { color: primaryColor }]}
+              >
+                Close
+              </ThemedText>
             </TouchableOpacity>
           </View>
 
           <View style={styles.searchContainer}>
             <TextInput
-              style={[styles.searchInput, { backgroundColor: borderColor, color: primaryColor }]}
+              style={[
+                styles.searchInput,
+                { backgroundColor: borderColor, color: primaryColor },
+              ]}
               placeholder="Search validators..."
               placeholderTextColor={textSecondary}
               value={searchQuery}
@@ -682,21 +839,34 @@ export default function StakingScreen() {
         presentationStyle="pageSheet"
         onRequestClose={handleClosePoolPicker}
       >
-        <SafeAreaView style={[styles.modalContainer, { backgroundColor: cardBg }]}>
-          <View style={[styles.modalHeader, { borderBottomColor: borderColor }]}>
+        <SafeAreaView
+          style={[styles.modalContainer, { backgroundColor: cardBg }]}
+        >
+          <View
+            style={[styles.modalHeader, { borderBottomColor: borderColor }]}
+          >
             <ThemedText type="title">Select Token</ThemedText>
             <TouchableOpacity
-              style={[styles.modalCloseButton, { backgroundColor: borderColor }]}
+              style={[
+                styles.modalCloseButton,
+                { backgroundColor: borderColor },
+              ]}
               onPress={handleClosePoolPicker}
               activeOpacity={0.88}
             >
-              <ThemedText style={[styles.modalCloseText, { color: primaryColor }]}>Close</ThemedText>
+              <ThemedText
+                style={[styles.modalCloseText, { color: primaryColor }]}
+              >
+                Close
+              </ThemedText>
             </TouchableOpacity>
           </View>
 
           <View style={styles.modalContent}>
             {selectedValidator && (
-              <ThemedText style={[styles.modalSubtitle, { color: textSecondary }]}>
+              <ThemedText
+                style={[styles.modalSubtitle, { color: textSecondary }]}
+              >
                 Choose which token to stake with {selectedValidator.name}
               </ThemedText>
             )}
@@ -704,7 +874,9 @@ export default function StakingScreen() {
             {isLoadingPools ? (
               <View style={styles.loadingContainer}>
                 <ActivityIndicator size="large" color={primaryColor} />
-                <ThemedText style={[styles.loadingText, { color: textSecondary }]}>
+                <ThemedText
+                  style={[styles.loadingText, { color: textSecondary }]}
+                >
                   Loading available tokens...
                 </ThemedText>
               </View>
@@ -715,10 +887,14 @@ export default function StakingScreen() {
             ) : (
               <>
                 <View style={[styles.poolColumnHeader, { borderColor }]}>
-                  <ThemedText style={[styles.poolColumnLabel, { color: textSecondary }]}>
+                  <ThemedText
+                    style={[styles.poolColumnLabel, { color: textSecondary }]}
+                  >
                     Token
                   </ThemedText>
-                  <ThemedText style={[styles.poolColumnLabel, { color: textSecondary }]}>
+                  <ThemedText
+                    style={[styles.poolColumnLabel, { color: textSecondary }]}
+                  >
                     Staked
                   </ThemedText>
                 </View>
@@ -727,23 +903,38 @@ export default function StakingScreen() {
                   keyExtractor={(pool) => pool.poolContract}
                   renderItem={({ item: pool }) => (
                     <TouchableOpacity
-                      style={[styles.poolCard, { backgroundColor: inputBg, borderColor }]}
+                      style={[
+                        styles.poolCard,
+                        { backgroundColor: inputBg, borderColor },
+                      ]}
                       onPress={() => handleSelectPool(pool)}
                       activeOpacity={0.88}
                     >
                       <View style={styles.poolRowLeft}>
                         <TinyTokenLogo token={pool.token} />
                         <View style={styles.poolTokenStack}>
-                          <ThemedText style={[styles.poolTokenSymbol, { color: primaryColor }]}>
+                          <ThemedText
+                            style={[
+                              styles.poolTokenSymbol,
+                              { color: primaryColor },
+                            ]}
+                          >
                             {pool.token.symbol}
                           </ThemedText>
-                          <ThemedText style={[styles.poolTokenName, { color: textSecondary }]}>
+                          <ThemedText
+                            style={[
+                              styles.poolTokenName,
+                              { color: textSecondary },
+                            ]}
+                          >
                             {pool.token.name}
                           </ThemedText>
                         </View>
                       </View>
                       <View style={styles.poolRowRight}>
-                        <ThemedText style={[styles.poolAmount, { color: primaryColor }]}>
+                        <ThemedText
+                          style={[styles.poolAmount, { color: primaryColor }]}
+                        >
                           {(() => {
                             const n = parseFloat(pool.amount.toUnit());
                             return Number.isNaN(n)
@@ -771,24 +962,37 @@ export default function StakingScreen() {
         presentationStyle="pageSheet"
         onRequestClose={() => setShowAddStakeModal(false)}
       >
-        <SafeAreaView style={[styles.modalContainer, { backgroundColor: cardBg }]}>
-          <View style={[styles.modalHeader, { borderBottomColor: borderColor }]}>
+        <SafeAreaView
+          style={[styles.modalContainer, { backgroundColor: cardBg }]}
+        >
+          <View
+            style={[styles.modalHeader, { borderBottomColor: borderColor }]}
+          >
             <ThemedText type="title">
               Add {activePosition?.token?.symbol ?? ""}
             </ThemedText>
             <TouchableOpacity
-              style={[styles.modalCloseButton, { backgroundColor: borderColor }]}
+              style={[
+                styles.modalCloseButton,
+                { backgroundColor: borderColor },
+              ]}
               onPress={() => setShowAddStakeModal(false)}
               activeOpacity={0.88}
             >
-              <ThemedText style={[styles.modalCloseText, { color: primaryColor }]}>Close</ThemedText>
+              <ThemedText
+                style={[styles.modalCloseText, { color: primaryColor }]}
+              >
+                Close
+              </ThemedText>
             </TouchableOpacity>
           </View>
 
           <View style={styles.modalContent}>
             {activePosition?.token && (
               <>
-                <ThemedText style={[styles.modalSubtitle, { color: textSecondary }]}>
+                <ThemedText
+                  style={[styles.modalSubtitle, { color: textSecondary }]}
+                >
                   Add more {activePosition.token.symbol} to your stake with{" "}
                   {activePosition.validator.name}
                 </ThemedText>
@@ -806,7 +1010,12 @@ export default function StakingScreen() {
                 >
                   <View style={styles.stakeTokenDisplay}>
                     <TinyTokenLogo token={activePosition.token} />
-                    <ThemedText style={[styles.amountTokenSymbol, { color: primaryColor }]}>
+                    <ThemedText
+                      style={[
+                        styles.amountTokenSymbol,
+                        { color: primaryColor },
+                      ]}
+                    >
                       {activePosition.token.symbol}
                     </ThemedText>
                   </View>
@@ -821,13 +1030,23 @@ export default function StakingScreen() {
                     />
                     {getBalance(activePosition.token) && (
                       <TouchableOpacity
-                        style={[styles.maxButton, { backgroundColor: borderColor }]}
+                        style={[
+                          styles.maxButton,
+                          { backgroundColor: borderColor },
+                        ]}
                         onPress={() =>
-                          setStakeAmount(getBalance(activePosition.token)!.toUnit())
+                          setStakeAmount(
+                            getBalance(activePosition.token)!.toUnit()
+                          )
                         }
                         activeOpacity={0.88}
                       >
-                        <ThemedText style={[styles.maxButtonText, { color: primaryColor }]}>
+                        <ThemedText
+                          style={[
+                            styles.maxButtonText,
+                            { color: primaryColor },
+                          ]}
+                        >
                           MAX
                         </ThemedText>
                       </TouchableOpacity>
@@ -860,22 +1079,35 @@ export default function StakingScreen() {
         presentationStyle="pageSheet"
         onRequestClose={() => setShowExitIntentModal(false)}
       >
-        <SafeAreaView style={[styles.modalContainer, { backgroundColor: cardBg }]}>
-          <View style={[styles.modalHeader, { borderBottomColor: borderColor }]}>
+        <SafeAreaView
+          style={[styles.modalContainer, { backgroundColor: cardBg }]}
+        >
+          <View
+            style={[styles.modalHeader, { borderBottomColor: borderColor }]}
+          >
             <ThemedText type="title">Exit Intent</ThemedText>
             <TouchableOpacity
-              style={[styles.modalCloseButton, { backgroundColor: borderColor }]}
+              style={[
+                styles.modalCloseButton,
+                { backgroundColor: borderColor },
+              ]}
               onPress={() => setShowExitIntentModal(false)}
               activeOpacity={0.88}
             >
-              <ThemedText style={[styles.modalCloseText, { color: primaryColor }]}>Close</ThemedText>
+              <ThemedText
+                style={[styles.modalCloseText, { color: primaryColor }]}
+              >
+                Close
+              </ThemedText>
             </TouchableOpacity>
           </View>
 
           <View style={styles.modalContent}>
             {activePosition?.token && (
               <>
-                <ThemedText style={[styles.modalSubtitle, { color: textSecondary }]}>
+                <ThemedText
+                  style={[styles.modalSubtitle, { color: textSecondary }]}
+                >
                   Initiate unstaking {activePosition.token.symbol} from{" "}
                   {activePosition.validator.name}. After the cooldown period,
                   you can complete the exit to receive your tokens.
@@ -894,7 +1126,12 @@ export default function StakingScreen() {
                 >
                   <View style={styles.stakeTokenDisplay}>
                     <TinyTokenLogo token={activePosition.token} />
-                    <ThemedText style={[styles.amountTokenSymbol, { color: primaryColor }]}>
+                    <ThemedText
+                      style={[
+                        styles.amountTokenSymbol,
+                        { color: primaryColor },
+                      ]}
+                    >
                       {activePosition.token.symbol}
                     </ThemedText>
                   </View>
@@ -909,13 +1146,23 @@ export default function StakingScreen() {
                     />
                     {activePosition.position?.staked && (
                       <TouchableOpacity
-                        style={[styles.maxButton, { backgroundColor: borderColor }]}
+                        style={[
+                          styles.maxButton,
+                          { backgroundColor: borderColor },
+                        ]}
                         onPress={() =>
-                          setExitAmount(activePosition.position!.staked.toUnit())
+                          setExitAmount(
+                            activePosition.position!.staked.toUnit()
+                          )
                         }
                         activeOpacity={0.88}
                       >
-                        <ThemedText style={[styles.maxButtonText, { color: primaryColor }]}>
+                        <ThemedText
+                          style={[
+                            styles.maxButtonText,
+                            { color: primaryColor },
+                          ]}
+                        >
                           MAX
                         </ThemedText>
                       </TouchableOpacity>
