@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   StyleSheet,
   ScrollView,
@@ -9,16 +9,71 @@ import {
   FlatList,
   TextInput,
   ActivityIndicator,
+  Image,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { router } from "expo-router";
+import { usePrivy } from "@privy-io/expo";
+import * as Clipboard from "expo-clipboard";
+import * as Haptics from "expo-haptics";
+import Ionicons from "@expo/vector-icons/Ionicons";
 
 import { ThemedText } from "@/components/themed-text";
 import { ValidatorCard } from "@/components/ValidatorCard";
 import { StakingPosition } from "@/components/StakingPosition";
-import { AmountInput } from "@/components/AmountInput";
 import { LogsFAB } from "@/components/LogsFAB";
+import { useThemeColor } from "@/hooks/use-theme-color";
 import { useWalletStore, NETWORKS } from "@/stores/wallet";
-import { useBalancesStore } from "@/stores/balances";
+import { useBalancesStore, getStrkToken, getUsdcToken, getWbtcToken } from "@/stores/balances";
+import { showCopiedToast } from "@/components/Toast";
+import type { Amount, Token } from "x";
+
+function TinyTokenLogo({ token }: { token: Token }) {
+  const [imageError, setImageError] = useState(false);
+  const primaryColor = useThemeColor({}, "primary");
+  const borderColor = useThemeColor({}, "border");
+  if (!token.metadata?.logoUrl || imageError) {
+    return (
+      <View style={[stakingTokenLogoStyles.tinyLogo, stakingTokenLogoStyles.tinyLogoPlaceholder, { backgroundColor: borderColor }]}>
+        <ThemedText style={[stakingTokenLogoStyles.tinyLogoText, { color: primaryColor }]}>
+          {token.symbol.charAt(0)}
+        </ThemedText>
+      </View>
+    );
+  }
+  return (
+    <Image
+      source={{ uri: token.metadata.logoUrl.toString() }}
+      style={stakingTokenLogoStyles.tinyLogo}
+      onError={() => setImageError(true)}
+    />
+  );
+}
+
+const stakingTokenLogoStyles = StyleSheet.create({
+  tinyLogo: { width: 20, height: 20, borderRadius: 10 },
+  tinyLogoPlaceholder: { justifyContent: "center", alignItems: "center" },
+  tinyLogoText: { fontSize: 10, fontWeight: "600" },
+});
+
+const SEPOLIA_USD_RATES = { USDC: 1, STRK: 0.05, WBTC: 97000 } as const;
+
+function formatBalanceNumber(amount: Amount): string {
+  const formatted = amount.toFormatted(true);
+  const partWithNumber = formatted.split(/\s+/).find((p) => /\d/.test(p));
+  return partWithNumber ?? "—";
+}
+
+function parseBalanceToNumber(amount: Amount | null): number {
+  if (!amount) return 0;
+  const s = formatBalanceNumber(amount);
+  return parseFloat(s.replace(/,/g, "")) || 0;
+}
+
+function cropAddress(addr: string): string {
+  if (addr.length <= 10) return addr;
+  return `${addr.slice(0, 5)}...${addr.slice(-5)}`;
+}
 import {
   useStakingStore,
   getValidatorsForNetwork,
@@ -27,8 +82,29 @@ import {
 import type { Validator, Pool } from "starkzap";
 
 export default function StakingScreen() {
-  const { wallet, sdk, chainId, addLog } = useWalletStore();
-  const { getBalance, fetchBalances } = useBalancesStore();
+  const { wallet, sdk, chainId, addLog, walletType, disconnect, resetNetworkConfig } = useWalletStore();
+  const { logout } = usePrivy();
+  const { getBalance, fetchBalances, clearBalances, isLoading: isLoadingBalances } = useBalancesStore();
+  const borderColor = useThemeColor({}, "border");
+  const primaryColor = useThemeColor({}, "primary");
+  const textSecondary = useThemeColor({}, "textSecondary");
+  const cardBg = useThemeColor({}, "card");
+  const inputBg = useThemeColor({}, "background");
+
+  const strkToken = getStrkToken(chainId);
+  const usdcToken = getUsdcToken(chainId);
+  const wbtcToken = getWbtcToken(chainId);
+  const strkBalance = getBalance(strkToken);
+  const usdcBalance = getBalance(usdcToken);
+  const wbtcBalance = getBalance(wbtcToken);
+  const isSepolia =
+    chainId.isSepolia?.() ?? chainId.toLiteral?.() === "SN_SEPOLIA";
+  const totalUsd =
+    isSepolia && (strkBalance || wbtcBalance || usdcBalance)
+      ? parseBalanceToNumber(usdcBalance) * SEPOLIA_USD_RATES.USDC +
+        parseBalanceToNumber(strkBalance) * SEPOLIA_USD_RATES.STRK +
+        parseBalanceToNumber(wbtcBalance) * SEPOLIA_USD_RATES.WBTC
+      : null;
   const {
     positions,
     validatorPools,
@@ -54,7 +130,6 @@ export default function StakingScreen() {
   const [showPoolPicker, setShowPoolPicker] = useState(false);
   const [showAddStakeModal, setShowAddStakeModal] = useState(false);
   const [showExitIntentModal, setShowExitIntentModal] = useState(false);
-  const [showStakeModal, setShowStakeModal] = useState(false);
   const [selectedValidatorKey, setSelectedValidatorKey] = useState<
     string | null
   >(null);
@@ -62,8 +137,13 @@ export default function StakingScreen() {
     null
   );
   const [stakeAmount, setStakeAmount] = useState("");
+  const [stakeAmountByKey, setStakeAmountByKey] = useState<Record<string, string>>({});
   const [exitAmount, setExitAmount] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
+
+  const setStakeAmountForKey = useCallback((key: string, value: string) => {
+    setStakeAmountByKey((prev) => ({ ...prev, [key]: value }));
+  }, []);
 
   const validators = getValidatorsForNetwork(chainId);
   const validatorEntries = Object.entries(validators);
@@ -88,12 +168,37 @@ export default function StakingScreen() {
     validator.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
+  useEffect(() => {
+    if (wallet) {
+      fetchBalances(wallet, chainId);
+      loadAllPositions(wallet);
+    }
+  }, [wallet, chainId, fetchBalances, loadAllPositions]);
+
   const handleRefresh = useCallback(async () => {
     if (wallet) {
       await fetchBalances(wallet, chainId);
       await loadAllPositions(wallet);
     }
   }, [wallet, chainId, fetchBalances, loadAllPositions]);
+
+  const handleDisconnect = useCallback(async () => {
+    clearBalances();
+    if (walletType === "privy") {
+      await logout();
+    }
+    disconnect();
+    resetNetworkConfig();
+    router.replace("/");
+  }, [clearBalances, disconnect, resetNetworkConfig, walletType, logout]);
+
+  const handleCopyAddress = useCallback(async () => {
+    if (wallet) {
+      await Clipboard.setStringAsync(wallet.address);
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      showCopiedToast();
+    }
+  }, [wallet]);
 
   const handleSelectValidator = useCallback(
     async (key: string, validator: Validator) => {
@@ -145,15 +250,6 @@ export default function StakingScreen() {
     setSelectedValidator(null);
   }, [clearValidatorPools]);
 
-  const handleOpenStakeModal = useCallback(
-    (key: string) => {
-      setActivePosition(key);
-      setStakeAmount("");
-      setShowStakeModal(true);
-    },
-    [setActivePosition]
-  );
-
   const handleOpenAddStakeModal = useCallback(
     (key: string) => {
       setActivePosition(key);
@@ -174,22 +270,20 @@ export default function StakingScreen() {
     [setActivePosition]
   );
 
-  const handleStake = useCallback(async () => {
-    if (!wallet || !stakeAmount || !activePositionKey) return;
+  const handleStake = useCallback(
+    async (positionKey: string, amount: string) => {
+      if (!wallet || !amount?.trim()) return;
 
-    await stake(activePositionKey, wallet, stakeAmount, addLog);
-    setStakeAmount("");
-    setShowStakeModal(false);
-    await fetchBalances(wallet, chainId);
-  }, [
-    wallet,
-    stakeAmount,
-    activePositionKey,
-    chainId,
-    addLog,
-    stake,
-    fetchBalances,
-  ]);
+      await stake(positionKey, wallet, amount.trim(), addLog);
+      setStakeAmountByKey((prev) => {
+        const next = { ...prev };
+        delete next[positionKey];
+        return next;
+      });
+      await fetchBalances(wallet, chainId);
+    },
+    [wallet, addLog, stake, fetchBalances]
+  );
 
   const handleAddStake = useCallback(async () => {
     if (!wallet || !stakeAmount || !activePositionKey) return;
@@ -232,113 +326,300 @@ export default function StakingScreen() {
     [wallet, chainId, addLog, exit, fetchBalances]
   );
 
+  const handleRemovePosition = useCallback(
+    (key: string) => {
+      setStakeAmountByKey((prev) => {
+        const next = { ...prev };
+        delete next[key];
+        return next;
+      });
+      removePosition(key);
+    },
+    [removePosition]
+  );
+
   if (!wallet) {
     return null;
   }
 
+  const contentPaddingTop = 0;
+
   return (
     <SafeAreaView style={styles.container} edges={["top"]}>
-      <View style={styles.header}>
-        <ThemedText type="title">Staking</ThemedText>
-        <View style={styles.networkBadge}>
-          <ThemedText style={styles.networkBadgeText}>{networkName}</ThemedText>
-        </View>
-      </View>
-
       <ScrollView
         style={styles.scrollView}
-        contentContainerStyle={styles.content}
+        contentContainerStyle={[styles.content, { paddingTop: contentPaddingTop }]}
         refreshControl={
           <RefreshControl
-            refreshing={isLoadingAny}
+            refreshing={isLoadingBalances || isLoadingAny}
             onRefresh={handleRefresh}
-            tintColor="#0a7ea4"
+            tintColor={primaryColor}
           />
         }
       >
-        {/* Positions List */}
-        {positionsList.length > 0 && (
-          <>
-            <ThemedText style={styles.sectionTitle}>Your Positions</ThemedText>
-            {positionsList.map((positionData) => (
-              <View key={positionData.key} style={styles.positionWrapper}>
-                <ValidatorCard
-                  validator={positionData.validator}
-                  isSelected={false}
+        <View style={styles.header}>
+          <View style={styles.headerTitle}>
+            <ThemedText type="title">Staking</ThemedText>
+          </View>
+          <View style={styles.headerRight}>
+            <View style={[styles.networkPill, { backgroundColor: borderColor }]}>
+              <ThemedText style={[styles.networkPillText, { color: primaryColor }]}>
+                {networkName}
+              </ThemedText>
+            </View>
+            <TouchableOpacity onPress={handleDisconnect} hitSlop={8}>
+              <ThemedText type="link" style={styles.disconnectLink}>
+                Disconnect
+              </ThemedText>
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        {/* Single card: Total (USD) + Get started or Your Positions + Add Position at bottom */}
+        <View style={[styles.stakingTopCard, { backgroundColor: cardBg, borderColor }]}>
+          <View style={styles.usdTotalHeaderRow}>
+            <ThemedText style={[styles.usdTotalLabel, { color: textSecondary }]}>
+              Total (USD)
+            </ThemedText>
+          </View>
+          <View style={styles.usdTotalAmountWrap}>
+            {isLoadingBalances ? (
+              <ActivityIndicator size="small" color={primaryColor} />
+            ) : totalUsd != null ? (
+              <ThemedText style={styles.usdTotalAmount}>
+                $
+                {totalUsd.toLocaleString("default", {
+                  minimumFractionDigits: 2,
+                  maximumFractionDigits: 2,
+                })}
+              </ThemedText>
+            ) : (
+              <ThemedText style={[styles.usdTotalAmount, { color: textSecondary }]}>
+                —
+              </ThemedText>
+            )}
+          </View>
+          <View style={styles.addressCopyRow}>
+            <TouchableOpacity
+              style={[styles.addressCopyBtn, { backgroundColor: borderColor }]}
+              onPress={handleCopyAddress}
+              activeOpacity={0.88}
+            >
+              <ThemedText style={[styles.addressCopyBtnText, { color: textSecondary }]}>
+                {wallet ? cropAddress(wallet.address) : ""}
+              </ThemedText>
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={handleRefresh}
+              hitSlop={6}
+              style={[styles.refreshBtn, { backgroundColor: borderColor }]}
+              disabled={isLoadingBalances}
+              activeOpacity={0.88}
+            >
+              {isLoadingBalances ? (
+                <ActivityIndicator
+                  size="small"
+                  color={primaryColor}
+                  style={styles.refreshBtnSpinner}
                 />
-                <View style={styles.tokenBadge}>
-                  <ThemedText style={styles.tokenBadgeText}>
-                    {positionData.token.symbol}
+              ) : (
+                <Ionicons name="refresh" size={12} color={primaryColor} />
+              )}
+            </TouchableOpacity>
+          </View>
+          <View style={[styles.balanceCardDivider, { backgroundColor: borderColor }]} />
+
+          {positionsList.length === 0 ? (
+            /* Get started - no positions */
+            <View style={styles.stakingCardSection}>
+              <View style={styles.usdTotalHeaderRow}>
+                <ThemedText style={[styles.usdTotalLabel, styles.getStartedTitle, { color: textSecondary }]}>
+                  Get Started
+                </ThemedText>
+              </View>
+              <TouchableOpacity
+                style={[styles.addValidatorButton, { borderColor }]}
+                onPress={() => setShowValidatorPicker(true)}
+                activeOpacity={0.88}
+              >
+                <ThemedText style={[styles.addValidatorButtonText, { color: primaryColor }]}>
+                  + Select Validator & Token
+                </ThemedText>
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <>
+            <View style={styles.positionsListWrap}>
+              {/* Your Positions - same formatting as Total (USD) */}
+              <View style={styles.usdTotalHeaderRow}>
+                <ThemedText style={[styles.usdTotalLabel, { color: textSecondary }]}>
+                  Your Positions
+                </ThemedText>
+              </View>
+              {positionsList.map((positionData) => {
+                const hasOpenPosition =
+                  positionData.position && !positionData.position.staked.isZero();
+                return (
+                <View key={positionData.key} style={[styles.positionRow, { backgroundColor: borderColor }]}>
+                  {/* When open position: validator only. Otherwise: validator | token + amount + MAX */}
+                  {hasOpenPosition ? (
+                    <View style={styles.positionValidatorWrapStandalone}>
+                      <ValidatorCard
+                        validator={positionData.validator}
+                        isSelected={false}
+                        compact
+                        containerStyle={{ backgroundColor: cardBg, borderColor }}
+                      />
+                    </View>
+                  ) : (
+                    <View style={styles.positionRowOneLine}>
+                      <View style={styles.positionValidatorWrap}>
+                        <ValidatorCard
+                          validator={positionData.validator}
+                          isSelected={false}
+                          compact
+                          containerStyle={{ backgroundColor: cardBg, borderColor }}
+                        />
+                      </View>
+                      <View
+                        style={[
+                          styles.amountTokenRowInline,
+                          { backgroundColor: inputBg, borderWidth: 1, borderColor },
+                        ]}
+                      >
+                        <View style={styles.stakeTokenDisplay}>
+                          <TinyTokenLogo token={positionData.token} />
+                          <ThemedText style={[styles.amountTokenSymbol, { color: primaryColor }]}>
+                            {positionData.token.symbol}
+                          </ThemedText>
+                        </View>
+                        <View style={styles.amountInputMaxWrap}>
+                          <TextInput
+                            style={[styles.amountInput, { color: primaryColor }]}
+                            value={stakeAmountByKey[positionData.key] ?? ""}
+                            onChangeText={(amount) => setStakeAmountForKey(positionData.key, amount)}
+                            placeholder="0.0"
+                            placeholderTextColor={textSecondary}
+                            keyboardType="decimal-pad"
+                          />
+                          {getBalance(positionData.token) && (
+                            <TouchableOpacity
+                              style={[styles.maxButton, { backgroundColor: borderColor }]}
+                              onPress={() =>
+                                setStakeAmountForKey(
+                                  positionData.key,
+                                  getBalance(positionData.token)!.toUnit()
+                                )
+                              }
+                              activeOpacity={0.88}
+                            >
+                              <ThemedText style={[styles.maxButtonText, { color: primaryColor }]}>
+                                MAX
+                              </ThemedText>
+                            </TouchableOpacity>
+                          )}
+                        </View>
+                      </View>
+                    </View>
+                  )}
+                  {hasOpenPosition && (
+                    <StakingPosition
+                      position={positionData.position}
+                      isLoading={positionData.isLoading}
+                      onClaimRewards={() => handleClaimRewards(positionData.key)}
+                      onAddStake={
+                        positionData.isMember
+                          ? () => handleOpenAddStakeModal(positionData.key)
+                          : undefined
+                      }
+                      onExitIntent={() =>
+                        handleOpenExitIntentModal(positionData.key, positionData)
+                      }
+                      onExit={() => handleExit(positionData.key)}
+                      isClaimingRewards={isClaimingRewards}
+                      isExiting={isExiting}
+                    />
+                  )}
+                  {!hasOpenPosition && (
+                    <View style={styles.stakeAndCloseRow}>
+                      {!positionData.isMember && !positionData.isLoading && (() => {
+                        const stakeDisabled =
+                          !(stakeAmountByKey[positionData.key] ?? "").trim() || isStaking;
+                        return (
+                          <TouchableOpacity
+                            style={[
+                              styles.stakeButton,
+                              styles.stakeButtonInRow,
+                              stakeDisabled
+                                ? { backgroundColor: "#fff" }
+                                : { backgroundColor: "#000" },
+                            ]}
+                            onPress={() =>
+                              handleStake(positionData.key, stakeAmountByKey[positionData.key] ?? "")
+                            }
+                            disabled={stakeDisabled}
+                            activeOpacity={0.88}
+                          >
+                            <ThemedText
+                              style={[
+                                styles.stakeButtonTextLikeAddValidator,
+                                stakeDisabled ? { color: primaryColor } : { color: "#fff" },
+                              ]}
+                            >
+                              {isStaking ? "Processing..." : stakeDisabled ? "Select token first" : `Stake ${positionData.token.symbol}`}
+                            </ThemedText>
+                          </TouchableOpacity>
+                        );
+                      })()}
+                      {positionData.isMember &&
+                        !positionData.position &&
+                        !positionData.isLoading && (
+                          <TouchableOpacity
+                            style={[styles.stakeButton, styles.stakeButtonInRow]}
+                            onPress={() => handleOpenAddStakeModal(positionData.key)}
+                            activeOpacity={0.88}
+                          >
+                            <ThemedText style={[styles.stakeButtonTextLikeAddValidator, { color: "#fff" }]}>
+                              Add {positionData.token.symbol} Stake
+                            </ThemedText>
+                          </TouchableOpacity>
+                        )}
+                      <TouchableOpacity
+                        style={styles.positionCloseButton}
+                        onPress={() => handleRemovePosition(positionData.key)}
+                        activeOpacity={0.88}
+                      >
+                        <ThemedText style={styles.positionCloseButtonText}>Close</ThemedText>
+                      </TouchableOpacity>
+                    </View>
+                  )}
+                </View>
+              );
+              })}
+              <View style={[styles.balanceCardDivider, { backgroundColor: borderColor }]} />
+            </View>
+              {/* Add Position at bottom of card - same formatting as Total (USD) */}
+              <View style={styles.stakingCardSection}>
+                <View style={styles.usdTotalHeaderRow}>
+                  <ThemedText style={[styles.usdTotalLabel, { color: textSecondary }]}>
+                    Add Position
                   </ThemedText>
                 </View>
-                <StakingPosition
-                  position={positionData.position}
-                  isLoading={positionData.isLoading}
-                  onClaimRewards={() => handleClaimRewards(positionData.key)}
-                  onAddStake={
-                    positionData.isMember
-                      ? () => handleOpenAddStakeModal(positionData.key)
-                      : undefined
-                  }
-                  onExitIntent={() =>
-                    handleOpenExitIntentModal(positionData.key, positionData)
-                  }
-                  onExit={() => handleExit(positionData.key)}
-                  isClaimingRewards={isClaimingRewards}
-                  isExiting={isExiting}
-                />
-                {/* Show stake button if not a member yet */}
-                {!positionData.isMember && !positionData.isLoading && (
-                  <TouchableOpacity
-                    style={styles.stakeButton}
-                    onPress={() => handleOpenStakeModal(positionData.key)}
-                  >
-                    <ThemedText style={styles.stakeButtonText}>
-                      Stake {positionData.token.symbol}
-                    </ThemedText>
-                  </TouchableOpacity>
-                )}
-                {/* Fallback: Show add stake button for members if position is null */}
-                {positionData.isMember &&
-                  !positionData.position &&
-                  !positionData.isLoading && (
-                    <TouchableOpacity
-                      style={styles.stakeButton}
-                      onPress={() => handleOpenAddStakeModal(positionData.key)}
-                    >
-                      <ThemedText style={styles.stakeButtonText}>
-                        Add {positionData.token.symbol} Stake
-                      </ThemedText>
-                    </TouchableOpacity>
-                  )}
-                {/* Remove button */}
                 <TouchableOpacity
-                  style={styles.removeButton}
-                  onPress={() => removePosition(positionData.key)}
+                  style={[styles.addValidatorButton, { borderColor }]}
+                  onPress={() => setShowValidatorPicker(true)}
+                  activeOpacity={0.88}
                 >
-                  <ThemedText style={styles.removeButtonText}>
-                    Remove
+                  <ThemedText style={[styles.addValidatorButtonText, { color: primaryColor }]}>
+                    + Select Validator & Token
                   </ThemedText>
                 </TouchableOpacity>
               </View>
-            ))}
-          </>
-        )}
+            </>
+          )}
+        </View>
 
-        {/* Add Position Button */}
-        <ThemedText style={styles.sectionTitle}>
-          {positionsList.length > 0 ? "Add Position" : "Get Started"}
-        </ThemedText>
-        <TouchableOpacity
-          style={styles.addValidatorButton}
-          onPress={() => setShowValidatorPicker(true)}
-        >
-          <ThemedText style={styles.addValidatorButtonText}>
-            + Select Validator & Token
-          </ThemedText>
-        </TouchableOpacity>
-
-        <ThemedText style={styles.hint}>
+        <ThemedText style={[styles.hint, { color: textSecondary }]}>
           Pull down to refresh positions
         </ThemedText>
       </ScrollView>
@@ -350,22 +631,23 @@ export default function StakingScreen() {
         presentationStyle="pageSheet"
         onRequestClose={() => setShowValidatorPicker(false)}
       >
-        <SafeAreaView style={styles.modalContainer}>
-          <View style={styles.modalHeader}>
+        <SafeAreaView style={[styles.modalContainer, { backgroundColor: cardBg }]}>
+          <View style={[styles.modalHeader, { borderBottomColor: borderColor }]}>
             <ThemedText type="title">Select Validator</ThemedText>
             <TouchableOpacity
-              style={styles.modalCloseButton}
+              style={[styles.modalCloseButton, { backgroundColor: borderColor }]}
               onPress={() => setShowValidatorPicker(false)}
+              activeOpacity={0.88}
             >
-              <ThemedText style={styles.modalCloseText}>Close</ThemedText>
+              <ThemedText style={[styles.modalCloseText, { color: primaryColor }]}>Close</ThemedText>
             </TouchableOpacity>
           </View>
 
           <View style={styles.searchContainer}>
             <TextInput
-              style={styles.searchInput}
+              style={[styles.searchInput, { backgroundColor: borderColor, color: primaryColor }]}
               placeholder="Search validators..."
-              placeholderTextColor="#888"
+              placeholderTextColor={textSecondary}
               value={searchQuery}
               onChangeText={setSearchQuery}
               autoCapitalize="none"
@@ -385,7 +667,7 @@ export default function StakingScreen() {
               />
             )}
             ListEmptyComponent={
-              <ThemedText style={styles.emptyText}>
+              <ThemedText style={[styles.emptyText, { color: textSecondary }]}>
                 No validators found
               </ThemedText>
             }
@@ -400,113 +682,82 @@ export default function StakingScreen() {
         presentationStyle="pageSheet"
         onRequestClose={handleClosePoolPicker}
       >
-        <SafeAreaView style={styles.modalContainer}>
-          <View style={styles.modalHeader}>
+        <SafeAreaView style={[styles.modalContainer, { backgroundColor: cardBg }]}>
+          <View style={[styles.modalHeader, { borderBottomColor: borderColor }]}>
             <ThemedText type="title">Select Token</ThemedText>
             <TouchableOpacity
-              style={styles.modalCloseButton}
+              style={[styles.modalCloseButton, { backgroundColor: borderColor }]}
               onPress={handleClosePoolPicker}
+              activeOpacity={0.88}
             >
-              <ThemedText style={styles.modalCloseText}>Close</ThemedText>
+              <ThemedText style={[styles.modalCloseText, { color: primaryColor }]}>Close</ThemedText>
             </TouchableOpacity>
           </View>
 
           <View style={styles.modalContent}>
             {selectedValidator && (
-              <ThemedText style={styles.modalSubtitle}>
+              <ThemedText style={[styles.modalSubtitle, { color: textSecondary }]}>
                 Choose which token to stake with {selectedValidator.name}
               </ThemedText>
             )}
 
             {isLoadingPools ? (
               <View style={styles.loadingContainer}>
-                <ActivityIndicator size="large" color="#0a7ea4" />
-                <ThemedText style={styles.loadingText}>
+                <ActivityIndicator size="large" color={primaryColor} />
+                <ThemedText style={[styles.loadingText, { color: textSecondary }]}>
                   Loading available tokens...
                 </ThemedText>
               </View>
             ) : !validatorPools?.pools?.length ? (
-              <ThemedText style={styles.emptyText}>
+              <ThemedText style={[styles.emptyText, { color: textSecondary }]}>
                 No staking pools available for this validator
               </ThemedText>
             ) : (
-              <FlatList
-                data={validatorPools?.pools ?? []}
-                keyExtractor={(pool) => pool.poolContract}
-                renderItem={({ item: pool }) => (
-                  <TouchableOpacity
-                    style={styles.poolCard}
-                    onPress={() => handleSelectPool(pool)}
-                  >
-                    <View style={styles.poolInfo}>
-                      <ThemedText style={styles.poolTokenSymbol}>
-                        {pool.token.symbol}
-                      </ThemedText>
-                      <ThemedText style={styles.poolTokenName}>
-                        {pool.token.name}
-                      </ThemedText>
-                    </View>
-                    <View style={styles.poolStats}>
-                      <ThemedText style={styles.poolAmount}>
-                        {pool.amount.toFormatted(true)} staked
-                      </ThemedText>
-                    </View>
-                  </TouchableOpacity>
-                )}
-              />
-            )}
-          </View>
-        </SafeAreaView>
-      </Modal>
-
-      {/* Stake Modal (for new positions) */}
-      <Modal
-        visible={showStakeModal}
-        animationType="slide"
-        presentationStyle="pageSheet"
-        onRequestClose={() => setShowStakeModal(false)}
-      >
-        <SafeAreaView style={styles.modalContainer}>
-          <View style={styles.modalHeader}>
-            <ThemedText type="title">
-              Stake {activePosition?.token?.symbol ?? ""}
-            </ThemedText>
-            <TouchableOpacity
-              style={styles.modalCloseButton}
-              onPress={() => setShowStakeModal(false)}
-            >
-              <ThemedText style={styles.modalCloseText}>Close</ThemedText>
-            </TouchableOpacity>
-          </View>
-
-          <View style={styles.modalContent}>
-            {activePosition?.token && (
               <>
-                <ThemedText style={styles.modalSubtitle}>
-                  Stake {activePosition.token.symbol} with{" "}
-                  {activePosition.validator.name}
-                </ThemedText>
-
-                <AmountInput
-                  value={stakeAmount}
-                  onChangeText={setStakeAmount}
-                  token={activePosition.token}
-                  balance={getBalance(activePosition.token)}
-                  label="Amount to stake"
-                />
-
-                <TouchableOpacity
-                  style={[
-                    styles.primaryButton,
-                    (!stakeAmount || isStaking) && styles.buttonDisabled,
-                  ]}
-                  onPress={handleStake}
-                  disabled={!stakeAmount || isStaking}
-                >
-                  <ThemedText style={styles.primaryButtonText}>
-                    {isStaking ? "Processing..." : "Stake"}
+                <View style={[styles.poolColumnHeader, { borderColor }]}>
+                  <ThemedText style={[styles.poolColumnLabel, { color: textSecondary }]}>
+                    Token
                   </ThemedText>
-                </TouchableOpacity>
+                  <ThemedText style={[styles.poolColumnLabel, { color: textSecondary }]}>
+                    Staked
+                  </ThemedText>
+                </View>
+                <FlatList
+                  data={validatorPools?.pools ?? []}
+                  keyExtractor={(pool) => pool.poolContract}
+                  renderItem={({ item: pool }) => (
+                    <TouchableOpacity
+                      style={[styles.poolCard, { backgroundColor: inputBg, borderColor }]}
+                      onPress={() => handleSelectPool(pool)}
+                      activeOpacity={0.88}
+                    >
+                      <View style={styles.poolRowLeft}>
+                        <TinyTokenLogo token={pool.token} />
+                        <View style={styles.poolTokenStack}>
+                          <ThemedText style={[styles.poolTokenSymbol, { color: primaryColor }]}>
+                            {pool.token.symbol}
+                          </ThemedText>
+                          <ThemedText style={[styles.poolTokenName, { color: textSecondary }]}>
+                            {pool.token.name}
+                          </ThemedText>
+                        </View>
+                      </View>
+                      <View style={styles.poolRowRight}>
+                        <ThemedText style={[styles.poolAmount, { color: primaryColor }]}>
+                          {(() => {
+                            const n = parseFloat(pool.amount.toUnit());
+                            return Number.isNaN(n)
+                              ? "—"
+                              : Math.round(n).toLocaleString("default", {
+                                  maximumFractionDigits: 0,
+                                  minimumFractionDigits: 0,
+                                });
+                          })()}
+                        </ThemedText>
+                      </View>
+                    </TouchableOpacity>
+                  )}
+                />
               </>
             )}
           </View>
@@ -520,44 +771,79 @@ export default function StakingScreen() {
         presentationStyle="pageSheet"
         onRequestClose={() => setShowAddStakeModal(false)}
       >
-        <SafeAreaView style={styles.modalContainer}>
-          <View style={styles.modalHeader}>
+        <SafeAreaView style={[styles.modalContainer, { backgroundColor: cardBg }]}>
+          <View style={[styles.modalHeader, { borderBottomColor: borderColor }]}>
             <ThemedText type="title">
               Add {activePosition?.token?.symbol ?? ""}
             </ThemedText>
             <TouchableOpacity
-              style={styles.modalCloseButton}
+              style={[styles.modalCloseButton, { backgroundColor: borderColor }]}
               onPress={() => setShowAddStakeModal(false)}
+              activeOpacity={0.88}
             >
-              <ThemedText style={styles.modalCloseText}>Close</ThemedText>
+              <ThemedText style={[styles.modalCloseText, { color: primaryColor }]}>Close</ThemedText>
             </TouchableOpacity>
           </View>
 
           <View style={styles.modalContent}>
             {activePosition?.token && (
               <>
-                <ThemedText style={styles.modalSubtitle}>
+                <ThemedText style={[styles.modalSubtitle, { color: textSecondary }]}>
                   Add more {activePosition.token.symbol} to your stake with{" "}
                   {activePosition.validator.name}
                 </ThemedText>
 
-                <AmountInput
-                  value={stakeAmount}
-                  onChangeText={setStakeAmount}
-                  token={activePosition.token}
-                  balance={getBalance(activePosition.token)}
-                  label="Amount to add"
-                />
+                <View
+                  style={[
+                    styles.amountTokenRow,
+                    {
+                      backgroundColor: "transparent",
+                      borderWidth: 1,
+                      borderColor,
+                      borderRadius: 6,
+                    },
+                  ]}
+                >
+                  <View style={styles.stakeTokenDisplay}>
+                    <TinyTokenLogo token={activePosition.token} />
+                    <ThemedText style={[styles.amountTokenSymbol, { color: primaryColor }]}>
+                      {activePosition.token.symbol}
+                    </ThemedText>
+                  </View>
+                  <View style={styles.amountInputMaxWrap}>
+                    <TextInput
+                      style={[styles.amountInput, { color: primaryColor }]}
+                      value={stakeAmount}
+                      onChangeText={setStakeAmount}
+                      placeholder="0.0"
+                      placeholderTextColor={textSecondary}
+                      keyboardType="decimal-pad"
+                    />
+                    {getBalance(activePosition.token) && (
+                      <TouchableOpacity
+                        style={[styles.maxButton, { backgroundColor: borderColor }]}
+                        onPress={() =>
+                          setStakeAmount(getBalance(activePosition.token)!.toUnit())
+                        }
+                        activeOpacity={0.88}
+                      >
+                        <ThemedText style={[styles.maxButtonText, { color: primaryColor }]}>
+                          MAX
+                        </ThemedText>
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                </View>
 
                 <TouchableOpacity
                   style={[
-                    styles.primaryButton,
+                    styles.addStakeModalButton,
                     (!stakeAmount || isStaking) && styles.buttonDisabled,
                   ]}
                   onPress={handleAddStake}
                   disabled={!stakeAmount || isStaking}
                 >
-                  <ThemedText style={styles.primaryButtonText}>
+                  <ThemedText style={styles.addStakeModalButtonText}>
                     {isStaking ? "Processing..." : "Add Stake"}
                   </ThemedText>
                 </TouchableOpacity>
@@ -574,43 +860,78 @@ export default function StakingScreen() {
         presentationStyle="pageSheet"
         onRequestClose={() => setShowExitIntentModal(false)}
       >
-        <SafeAreaView style={styles.modalContainer}>
-          <View style={styles.modalHeader}>
+        <SafeAreaView style={[styles.modalContainer, { backgroundColor: cardBg }]}>
+          <View style={[styles.modalHeader, { borderBottomColor: borderColor }]}>
             <ThemedText type="title">Exit Intent</ThemedText>
             <TouchableOpacity
-              style={styles.modalCloseButton}
+              style={[styles.modalCloseButton, { backgroundColor: borderColor }]}
               onPress={() => setShowExitIntentModal(false)}
+              activeOpacity={0.88}
             >
-              <ThemedText style={styles.modalCloseText}>Close</ThemedText>
+              <ThemedText style={[styles.modalCloseText, { color: primaryColor }]}>Close</ThemedText>
             </TouchableOpacity>
           </View>
 
           <View style={styles.modalContent}>
             {activePosition?.token && (
               <>
-                <ThemedText style={styles.modalSubtitle}>
+                <ThemedText style={[styles.modalSubtitle, { color: textSecondary }]}>
                   Initiate unstaking {activePosition.token.symbol} from{" "}
                   {activePosition.validator.name}. After the cooldown period,
                   you can complete the exit to receive your tokens.
                 </ThemedText>
 
-                <AmountInput
-                  value={exitAmount}
-                  onChangeText={setExitAmount}
-                  token={activePosition.token}
-                  balance={activePosition.position?.staked}
-                  label="Amount to unstake"
-                />
+                <View
+                  style={[
+                    styles.amountTokenRow,
+                    {
+                      backgroundColor: "transparent",
+                      borderWidth: 1,
+                      borderColor,
+                      borderRadius: 6,
+                    },
+                  ]}
+                >
+                  <View style={styles.stakeTokenDisplay}>
+                    <TinyTokenLogo token={activePosition.token} />
+                    <ThemedText style={[styles.amountTokenSymbol, { color: primaryColor }]}>
+                      {activePosition.token.symbol}
+                    </ThemedText>
+                  </View>
+                  <View style={styles.amountInputMaxWrap}>
+                    <TextInput
+                      style={[styles.amountInput, { color: primaryColor }]}
+                      value={exitAmount}
+                      onChangeText={setExitAmount}
+                      placeholder="0.0"
+                      placeholderTextColor={textSecondary}
+                      keyboardType="decimal-pad"
+                    />
+                    {activePosition.position?.staked && (
+                      <TouchableOpacity
+                        style={[styles.maxButton, { backgroundColor: borderColor }]}
+                        onPress={() =>
+                          setExitAmount(activePosition.position!.staked.toUnit())
+                        }
+                        activeOpacity={0.88}
+                      >
+                        <ThemedText style={[styles.maxButtonText, { color: primaryColor }]}>
+                          MAX
+                        </ThemedText>
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                </View>
 
                 <TouchableOpacity
                   style={[
-                    styles.exitButton,
+                    styles.addStakeModalButton,
                     (!exitAmount || isExiting) && styles.buttonDisabled,
                   ]}
                   onPress={handleExitIntent}
                   disabled={!exitAmount || isExiting}
                 >
-                  <ThemedText style={styles.exitButtonText}>
+                  <ThemedText style={styles.addStakeModalButtonText}>
                     {isExiting ? "Processing..." : "Submit Exit Intent"}
                   </ThemedText>
                 </TouchableOpacity>
@@ -633,27 +954,119 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    paddingHorizontal: 16,
-    paddingTop: 8,
-    paddingBottom: 12,
+    marginBottom: 6,
+    width: "100%",
   },
-  networkBadge: {
-    backgroundColor: "#0a7ea4",
-    paddingHorizontal: 10,
+  headerTitle: {
+    flex: 0,
+  },
+  headerRight: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    flex: 0,
+  },
+  networkPill: {
+    paddingHorizontal: 8,
     paddingVertical: 4,
-    borderRadius: 12,
+    borderRadius: 6,
   },
-  networkBadgeText: {
-    color: "#fff",
-    fontSize: 12,
+  networkPillText: {
+    fontSize: 11,
     fontWeight: "600",
+  },
+  disconnectLink: {
+    fontSize: 13,
   },
   scrollView: {
     flex: 1,
   },
   content: {
-    padding: 16,
+    paddingHorizontal: 20,
+    paddingTop: 4,
     paddingBottom: 120,
+    alignItems: "flex-start",
+    alignSelf: "stretch",
+  },
+  stakingTopCard: {
+    borderWidth: 1,
+    borderRadius: 12,
+    padding: 16,
+    paddingTop: 8,
+    marginBottom: 12,
+    alignSelf: "stretch",
+    width: "100%",
+    alignItems: "stretch",
+  },
+  usdTotalHeaderRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    width: "100%",
+    marginBottom: 8,
+  },
+  usdTotalLabel: {
+    fontSize: 11,
+    textTransform: "uppercase",
+    letterSpacing: 0.4,
+    lineHeight: 14,
+  },
+  usdTotalAmountWrap: {
+    height: 34,
+    alignSelf: "stretch",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  usdTotalAmount: {
+    fontSize: 28,
+    fontWeight: "600",
+    lineHeight: 34,
+  },
+  addressCopyRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    marginTop: 4,
+  },
+  addressCopyBtn: {
+    height: 24,
+    paddingHorizontal: 6,
+    borderRadius: 4,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  addressCopyBtnText: {
+    fontSize: 10,
+  },
+  refreshBtn: {
+    height: 24,
+    paddingHorizontal: 6,
+    borderRadius: 4,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  refreshBtnSpinner: {
+    margin: 0,
+  },
+  balanceCardDivider: {
+    height: 1,
+    width: "100%",
+    marginVertical: 12,
+  },
+  stakingCardSection: {
+    alignSelf: "stretch",
+    width: "100%",
+  },
+  sectionTitleInCard: {
+    fontSize: 11,
+    fontWeight: "600",
+    textTransform: "uppercase",
+    letterSpacing: 0.4,
+    marginBottom: 8,
+  },
+  getStartedTitle: {
+    fontWeight: "400",
   },
   sectionTitle: {
     fontSize: 14,
@@ -662,59 +1075,181 @@ const styles = StyleSheet.create({
     textTransform: "uppercase",
     letterSpacing: 1,
   },
-  positionWrapper: {
-    marginBottom: 24,
+  positionsListWrap: {
+    width: "100%",
+    alignSelf: "stretch",
   },
-  tokenBadge: {
-    position: "absolute",
-    top: 8,
-    right: 8,
-    backgroundColor: "#0a7ea4",
-    paddingHorizontal: 10,
+  positionRow: {
+    width: "100%",
+    alignSelf: "stretch",
+    borderRadius: 10,
+    padding: 12,
+    marginBottom: 12,
+    overflow: "visible",
+  },
+  positionRowOneLine: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginBottom: 8,
+    width: "100%",
+    alignSelf: "stretch",
+  },
+  positionValidatorWrap: {
+    width: "40%",
+    minWidth: 0,
+    alignSelf: "stretch",
+  },
+  positionValidatorWrapStandalone: {
+    width: "100%",
+    marginBottom: 8,
+  },
+  amountTokenRowInline: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    borderRadius: 6,
     paddingVertical: 4,
-    borderRadius: 8,
-    zIndex: 1,
+    paddingHorizontal: 6,
+    gap: 6,
+    minHeight: 34,
+    minWidth: 0,
+    alignSelf: "stretch",
   },
-  tokenBadgeText: {
+  removeIconTopRight: {
+    position: "absolute",
+    top: -4,
+    right: -4,
+    zIndex: 1,
+    padding: 6,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  stakeAndCloseRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    marginTop: 10,
+    alignSelf: "stretch",
+  },
+  stakeButtonInRow: {
+    flex: 1,
+    marginTop: 0,
+    paddingVertical: 4,
+    borderRadius: 6,
+  },
+  positionCloseButtonWrap: {
+    alignItems: "center",
+    marginTop: 10,
+  },
+  positionCloseButton: {
+    backgroundColor: "#000",
+    paddingVertical: 4,
+    paddingHorizontal: 16,
+    borderRadius: 6,
+  },
+  positionCloseButtonText: {
+    color: "#fff",
+    fontSize: 11,
+    fontWeight: "600",
+  },
+  addValidatorButton: {
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderStyle: "dashed",
+    alignItems: "center",
+  },
+  addValidatorButtonText: {
+    fontSize: 12,
+    fontWeight: "400",
+  },
+  stakeAmountField: {
+    marginTop: 12,
+    marginBottom: 4,
+    alignSelf: "stretch",
+    width: "100%",
+  },
+  amountLabelRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 6,
+  },
+  cardLabel: {
+    fontSize: 11,
+    textTransform: "uppercase",
+    letterSpacing: 0.4,
+  },
+  balanceLabel: {
+    fontSize: 11,
+  },
+  amountTokenRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    alignSelf: "stretch",
+    width: "100%",
+    borderRadius: 6,
+    paddingVertical: 2,
+    paddingHorizontal: 6,
+    gap: 6,
+    minHeight: 32,
+  },
+  stakeTokenDisplay: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingVertical: 2,
+    paddingRight: 2,
+    flexShrink: 0,
+  },
+  amountTokenSymbol: {
+    fontSize: 12,
+    fontWeight: "700",
+  },
+  amountInputMaxWrap: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    minWidth: 0,
+  },
+  amountInput: {
+    flex: 1,
+    paddingVertical: 5,
+    paddingHorizontal: 6,
+    fontSize: 14,
+    minWidth: 0,
+  },
+  maxButton: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+  },
+  maxButtonText: {
+    fontSize: 10,
+    fontWeight: "600",
+  },
+  stakeButton: {
+    backgroundColor: "#000",
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    alignItems: "center",
+    marginTop: 8,
+  },
+  stakeButtonDisabled: {
+    opacity: 0.5,
+  },
+  stakeButtonText: {
     color: "#fff",
     fontSize: 12,
     fontWeight: "600",
   },
-  addValidatorButton: {
-    padding: 20,
-    backgroundColor: "rgba(10, 126, 164, 0.1)",
-    borderRadius: 12,
-    borderWidth: 2,
-    borderColor: "rgba(10, 126, 164, 0.3)",
-    borderStyle: "dashed",
-    alignItems: "center",
-    marginBottom: 16,
-  },
-  addValidatorButtonText: {
-    color: "#0a7ea4",
-    fontSize: 16,
-    fontWeight: "600",
-  },
-  stakeButton: {
-    backgroundColor: "#0a7ea4",
-    padding: 14,
-    borderRadius: 8,
-    alignItems: "center",
-    marginTop: 8,
-  },
-  stakeButtonText: {
-    color: "#fff",
-    fontSize: 16,
-    fontWeight: "600",
-  },
-  removeButton: {
-    padding: 12,
-    alignItems: "center",
-    marginTop: 8,
-  },
-  removeButtonText: {
-    color: "#888",
-    fontSize: 14,
+  stakeButtonTextLikeAddValidator: {
+    fontSize: 12,
+    fontWeight: "400",
   },
   hint: {
     textAlign: "center",
@@ -724,7 +1259,6 @@ const styles = StyleSheet.create({
   },
   modalContainer: {
     flex: 1,
-    backgroundColor: "#151718",
   },
   modalHeader: {
     flexDirection: "row",
@@ -733,17 +1267,15 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: "rgba(128, 128, 128, 0.2)",
   },
   modalCloseButton: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    backgroundColor: "#0a7ea4",
-    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 6,
   },
   modalCloseText: {
-    color: "#fff",
     fontWeight: "600",
+    fontSize: 11,
   },
   modalContent: {
     padding: 16,
@@ -762,46 +1294,66 @@ const styles = StyleSheet.create({
   loadingText: {
     opacity: 0.6,
   },
+  poolColumnHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingHorizontal: 14,
+    paddingBottom: 6,
+    marginBottom: 4,
+    borderBottomWidth: 1,
+  },
+  poolColumnLabel: {
+    fontSize: 11,
+    fontWeight: "600",
+    textTransform: "uppercase",
+    letterSpacing: 0.4,
+  },
   poolCard: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    padding: 16,
-    backgroundColor: "rgba(128, 128, 128, 0.1)",
-    borderRadius: 12,
-    marginBottom: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    borderRadius: 10,
+    marginBottom: 8,
+    borderWidth: 1,
   },
-  poolInfo: {
+  poolRowLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
     flex: 1,
+    minWidth: 0,
+  },
+  poolTokenStack: {
+    gap: 2,
   },
   poolTokenSymbol: {
-    fontSize: 18,
-    fontWeight: "600",
+    fontSize: 15,
+    fontWeight: "700",
   },
   poolTokenName: {
-    fontSize: 14,
-    opacity: 0.6,
-    marginTop: 2,
+    fontSize: 13,
+    marginTop: 0,
   },
-  poolStats: {
+  poolRowRight: {
     alignItems: "flex-end",
+    flexShrink: 0,
   },
   poolAmount: {
-    fontSize: 14,
-    opacity: 0.7,
+    fontSize: 13,
+    fontWeight: "500",
   },
   searchContainer: {
     paddingHorizontal: 16,
     paddingVertical: 12,
   },
   searchInput: {
-    backgroundColor: "rgba(0, 0, 0, 0.2)",
     borderWidth: 1,
-    borderColor: "rgba(128, 128, 128, 0.3)",
-    borderRadius: 8,
-    padding: 12,
-    fontSize: 16,
-    color: "#fff",
+    borderRadius: 6,
+    padding: 10,
+    fontSize: 14,
   },
   validatorList: {
     padding: 16,
@@ -809,8 +1361,8 @@ const styles = StyleSheet.create({
   },
   emptyText: {
     textAlign: "center",
-    opacity: 0.5,
     paddingVertical: 20,
+    fontSize: 11,
   },
   primaryButton: {
     backgroundColor: "#0a7ea4",
@@ -819,6 +1371,17 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   primaryButtonText: {
+    color: "#fff",
+    fontSize: 16,
+    fontWeight: "600",
+  },
+  addStakeModalButton: {
+    backgroundColor: "#000",
+    padding: 14,
+    borderRadius: 8,
+    alignItems: "center",
+  },
+  addStakeModalButtonText: {
     color: "#fff",
     fontSize: 16,
     fontWeight: "600",

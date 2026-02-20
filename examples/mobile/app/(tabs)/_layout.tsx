@@ -16,15 +16,17 @@ export default function TabLayout() {
     return <Redirect href="/" />;
   }
 
+  const colors = Colors[colorScheme ?? "light"];
+
   return (
     <Tabs
       screenOptions={{
-        tabBarActiveTintColor: Colors[colorScheme ?? "light"].tint,
+        tabBarActiveTintColor: colors.tint,
         headerShown: false,
         tabBarButton: HapticTab,
         tabBarStyle: {
-          backgroundColor: colorScheme === "dark" ? "#151718" : "#fff",
-          borderTopColor: "rgba(128, 128, 128, 0.2)",
+          backgroundColor: colors.background,
+          borderTopColor: colors.border,
         },
       }}
     >
@@ -38,6 +40,15 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
+        name="transfers"
+        options={{
+          title: "Transfers",
+          tabBarIcon: ({ color }) => (
+            <IconSymbol size={28} name="arrow.left.arrow.right" color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
         name="staking"
         options={{
           title: "Staking",
@@ -47,15 +58,6 @@ export default function TabLayout() {
               name="chart.line.uptrend.xyaxis"
               color={color}
             />
-          ),
-        }}
-      />
-      <Tabs.Screen
-        name="transfers"
-        options={{
-          title: "Transfers",
-          tabBarIcon: ({ color }) => (
-            <IconSymbol size={28} name="arrow.left.arrow.right" color={color} />
           ),
         }}
       />

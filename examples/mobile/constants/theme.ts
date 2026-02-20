@@ -1,29 +1,38 @@
 /**
- * Below are the colors that are used in the app. The colors are defined in the light and dark mode.
- * There are many other ways to style your app. For example, [Nativewind](https://www.nativewind.dev/), [Tamagui](https://tamagui.dev/), [unistyles](https://reactnativeunistyles.vercel.app), etc.
+ * Neutral, minimal palette for light and dark mode.
+ * Use primary for main actions; card/border for surfaces.
  */
 
 import { Platform } from "react-native";
 
-const tintColorLight = "#0a7ea4";
-const tintColorDark = "#fff";
+// Neutral slate/gray palette; single accent for primary actions
+const primaryLight = "#374151";
+const primaryDark = "#e5e7eb";
 
 export const Colors = {
   light: {
-    text: "#11181C",
-    background: "#fff",
-    tint: tintColorLight,
-    icon: "#687076",
-    tabIconDefault: "#687076",
-    tabIconSelected: tintColorLight,
+    text: "#111827",
+    textSecondary: "#6b7280",
+    background: "#ffffff",
+    card: "#f8fafc",
+    border: "#e2e8f0",
+    primary: primaryLight,
+    tint: primaryLight,
+    icon: "#64748b",
+    tabIconDefault: "#64748b",
+    tabIconSelected: primaryLight,
   },
   dark: {
-    text: "#ECEDEE",
-    background: "#151718",
-    tint: tintColorDark,
-    icon: "#9BA1A6",
-    tabIconDefault: "#9BA1A6",
-    tabIconSelected: tintColorDark,
+    text: "#f1f5f9",
+    textSecondary: "#94a3b8",
+    background: "#0f1419",
+    card: "#1a2332",
+    border: "#334155",
+    primary: primaryDark,
+    tint: primaryDark,
+    icon: "#94a3b8",
+    tabIconDefault: "#94a3b8",
+    tabIconSelected: primaryDark,
   },
 };
 

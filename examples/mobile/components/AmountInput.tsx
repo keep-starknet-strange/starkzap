@@ -1,4 +1,10 @@
-import { StyleSheet, View, TextInput, TouchableOpacity } from "react-native";
+import {
+  StyleSheet,
+  View,
+  TextInput,
+  TouchableOpacity,
+  type ViewStyle,
+} from "react-native";
 import { ThemedText } from "./themed-text";
 import type { Token, Amount } from "starkzap";
 
@@ -9,6 +15,8 @@ interface AmountInputProps {
   balance?: Amount | null;
   label?: string;
   placeholder?: string;
+  /** Optional style for the input row (e.g. transparent bg + grey border) */
+  inputRowStyle?: ViewStyle;
 }
 
 export function AmountInput({
@@ -18,6 +26,7 @@ export function AmountInput({
   balance,
   label = "Amount",
   placeholder = "0.0",
+  inputRowStyle,
 }: AmountInputProps) {
   const handleMaxPress = () => {
     if (balance) {
@@ -35,7 +44,7 @@ export function AmountInput({
           </ThemedText>
         )}
       </View>
-      <View style={styles.inputRow}>
+      <View style={[styles.inputRow, inputRowStyle]}>
         <TextInput
           style={styles.input}
           value={value}
@@ -78,9 +87,9 @@ const styles = StyleSheet.create({
   inputRow: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "rgba(0, 0, 0, 0.2)",
-    borderRadius: 8,
+    borderRadius: 6,
     borderWidth: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.2)",
     borderColor: "rgba(128, 128, 128, 0.3)",
   },
   input: {

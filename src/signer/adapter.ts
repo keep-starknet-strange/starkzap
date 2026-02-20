@@ -15,6 +15,7 @@ import {
   transaction,
   EDAMode,
 } from "starknet";
+import { BraavosPreset, BRAAVOS_IMPL_CLASS_HASH } from "@/account/presets";
 import type { SignerInterface } from "@/signer/interface";
 
 /**
@@ -132,7 +133,58 @@ export class SignerAdapter implements StarknetSignerInterface {
       paymasterData: det.paymasterData || [],
     });
 
-    return this.signer.signRaw(msgHash as string);
+    const txSig = await this.signer.signRaw(msgHash as string);
+    const txSigArray = Array.isArray(txSig) ? txSig : [txSig.r, txSig.s];
+    if (!txSigArray[0] || !txSigArray[1]) {
+      throw new Error("Invalid signature format from signer");
+    }
+
+    // Braavos Base: additional params are sent via the signature (15 elements).
+    // See Braavos docs: "When using an ACCOUNT_DEPLOY transaction... the additional deployment parameters are sent via the signature."
+    if (det.classHash === BraavosPreset.classHash) {
+      const chainIdFelt =
+        typeof det.chainId === "string"
+          ? det.chainId
+          : BigInt(det.chainId).toString(16).replace(/^/, "0x");
+      const auxData: string[] = [
+        BRAAVOS_IMPL_CLASS_HASH,
+        "0x0",
+        "0x0",
+        "0x0",
+        "0x0",
+        "0x0",
+        "0x0",
+        "0x0",
+        "0x0",
+        "0x0",
+        chainIdFelt,
+      ];
+      const auxHash = hash.computePoseidonHashOnElements(auxData);
+      const auxSig = await this.signer.signRaw(auxHash);
+      const auxSigArray = Array.isArray(auxSig) ? auxSig : [auxSig.r, auxSig.s];
+      if (!auxSigArray[0] || !auxSigArray[1]) {
+        throw new Error("Invalid aux signature format from signer");
+      }
+      return [
+        String(txSigArray[0]),
+        String(txSigArray[1]),
+        BRAAVOS_IMPL_CLASS_HASH,
+        "0x0",
+        "0x0",
+        "0x0",
+        "0x0",
+        "0x0",
+        "0x0",
+        "0x0",
+        "0x0",
+        "0x0",
+        chainIdFelt,
+        String(auxSigArray[0]),
+        String(auxSigArray[1]),
+      ];
+    }
+
+    return txSig;
   }
 
   async signDeclareTransaction(

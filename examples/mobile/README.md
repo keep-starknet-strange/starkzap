@@ -23,6 +23,10 @@ In the output, you'll find options to open the app in a
 - [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
 - [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
 
+**Privy (Expo Go):** If you use Privy and see "Native app ID `host.exp.Exponent` has not been set as an allowed app identifier", add it in the [Privy Dashboard](https://dashboard.privy.io): **Configuration → App settings → Clients** → under "Allowed app identifiers" add **`host.exp.Exponent`** for Expo Go.
+
+**Privy OAuth (Google, Apple, X):** Enable the login methods you want in the [Privy Dashboard](https://dashboard.privy.io/apps?page=login-methods&logins=socials) under **Login methods**. Configure [allowed URL schemes](https://docs.privy.io/basics/get-started/dashboard/app-clients#allowed-url-schemes) for your app so OAuth redirects work.
+
 You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
 
 ## Get a fresh project

@@ -1,4 +1,4 @@
-import { StyleSheet, View, Image, TouchableOpacity } from "react-native";
+import { StyleSheet, View, Image, TouchableOpacity, type ViewStyle } from "react-native";
 import { ThemedText } from "./themed-text";
 import type { Validator } from "starkzap";
 
@@ -6,16 +6,54 @@ interface ValidatorCardProps {
   validator: Validator;
   isSelected?: boolean;
   onSelect?: () => void;
+  containerStyle?: ViewStyle;
+  /** Compact: small logo + name, one line, no address */
+  compact?: boolean;
 }
 
 export function ValidatorCard({
   validator,
   isSelected,
   onSelect,
+  containerStyle,
+  compact,
 }: ValidatorCardProps) {
+  if (compact) {
+    return (
+      <TouchableOpacity
+        style={[styles.containerCompact, isSelected && styles.containerSelected, containerStyle]}
+        onPress={onSelect}
+        activeOpacity={0.7}
+      >
+        <View style={styles.validatorInfoCompact}>
+          {validator.logoUrl ? (
+            <Image
+              source={{ uri: validator.logoUrl.toString() }}
+              style={styles.logoCompact}
+            />
+          ) : (
+            <View style={[styles.logoCompact, styles.logoPlaceholderCompact]}>
+              <ThemedText style={styles.logoTextCompact}>
+                {validator.name.charAt(0)}
+              </ThemedText>
+            </View>
+          )}
+          <ThemedText style={styles.nameCompact} numberOfLines={1}>
+            {validator.name}
+          </ThemedText>
+        </View>
+        {isSelected && (
+          <View style={styles.checkmarkCompact}>
+            <ThemedText style={styles.checkmarkText}>✓</ThemedText>
+          </View>
+        )}
+      </TouchableOpacity>
+    );
+  }
+
   return (
     <TouchableOpacity
-      style={[styles.container, isSelected && styles.containerSelected]}
+      style={[styles.container, isSelected && styles.containerSelected, containerStyle]}
       onPress={onSelect}
       activeOpacity={0.7}
     >
@@ -111,5 +149,54 @@ const styles = StyleSheet.create({
     color: "#fff",
     fontSize: 14,
     fontWeight: "bold",
+  },
+  containerCompact: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    borderRadius: 8,
+    marginBottom: 0,
+    borderWidth: 1,
+    borderColor: "transparent",
+    flex: 1,
+    minWidth: 0,
+  },
+  validatorInfoCompact: {
+    flexDirection: "row",
+    alignItems: "center",
+    flex: 1,
+    minWidth: 0,
+  },
+  logoCompact: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    marginRight: 8,
+  },
+  logoPlaceholderCompact: {
+    backgroundColor: "#0a7ea4",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  logoTextCompact: {
+    color: "#fff",
+    fontSize: 11,
+    fontWeight: "600",
+  },
+  nameCompact: {
+    fontSize: 11,
+    fontWeight: "600",
+    flex: 1,
+    minWidth: 0,
+  },
+  checkmarkCompact: {
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: "#0a7ea4",
+    justifyContent: "center",
+    alignItems: "center",
+    marginLeft: 6,
   },
 });

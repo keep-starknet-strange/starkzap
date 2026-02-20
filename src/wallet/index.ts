@@ -266,12 +266,6 @@ export class Wallet extends BaseWallet {
     const constructorCalldata =
       this.accountProvider.getConstructorCalldata(publicKey);
 
-    const estimateFee = await this.account.estimateAccountDeployFee({
-      classHash,
-      constructorCalldata,
-      addressSalt,
-    });
-
     const multiply2x = (value: {
       max_amount: bigint;
       max_price_per_unit: bigint;
@@ -282,13 +276,35 @@ export class Wallet extends BaseWallet {
       };
     };
 
-    const { l1_gas, l2_gas, l1_data_gas } = estimateFee.resourceBounds;
-
-    const resourceBounds = {
-      l1_gas: multiply2x(l1_gas),
-      l2_gas: multiply2x(l2_gas),
-      l1_data_gas: multiply2x(l1_data_gas),
+    // Default resource bounds when estimate fails. L2 must cover Braavos deploy (~1M gas); prices meet network minimums (~47e12 for L1).
+    const DEFAULT_DEPLOY_RESOURCE_BOUNDS = {
+      l1_gas: { max_amount: 50_000n, max_price_per_unit: 50_000_000_000_000n },
+      l2_gas: {
+        max_amount: 1_100_000n,
+        max_price_per_unit: 50_000_000_000_000n,
+      },
+      l1_data_gas: {
+        max_amount: 50_000n,
+        max_price_per_unit: 50_000_000_000_000n,
+      },
     };
+
+    let resourceBounds: typeof DEFAULT_DEPLOY_RESOURCE_BOUNDS;
+    try {
+      const estimateFee = await this.account.estimateAccountDeployFee({
+        classHash,
+        constructorCalldata,
+        addressSalt: publicKey,
+      });
+      const { l1_gas, l2_gas, l1_data_gas } = estimateFee.resourceBounds;
+      resourceBounds = {
+        l1_gas: multiply2x(l1_gas),
+        l2_gas: multiply2x(l2_gas),
+        l1_data_gas: multiply2x(l1_data_gas),
+      };
+    } catch {
+      resourceBounds = DEFAULT_DEPLOY_RESOURCE_BOUNDS;
+    }
 
     const { transaction_hash } = await this.account.deployAccount(
       { classHash, constructorCalldata, addressSalt },

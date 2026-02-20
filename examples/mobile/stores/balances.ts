@@ -18,6 +18,14 @@ export function getStrkToken(chainId: ChainId): Token {
   return chainId.isSepolia() ? sepoliaTokens.STRK : mainnetTokens.STRK;
 }
 
+export function getUsdcToken(chainId: ChainId): Token {
+  return chainId.isSepolia() ? sepoliaTokens.USDC : mainnetTokens.USDC;
+}
+
+export function getWbtcToken(chainId: ChainId): Token {
+  return chainId.isSepolia() ? sepoliaTokens.WBTC : mainnetTokens.WBTC;
+}
+
 interface BalancesState {
   balances: Map<string, Amount>;
   isLoading: boolean;

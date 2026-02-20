@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { Alert } from "react-native";
+import * as Clipboard from "expo-clipboard";
 import {
   type AccountClassConfig,
   ArgentPreset,
@@ -18,6 +19,7 @@ import {
 import {
   showTransactionToast,
   updateTransactionToast,
+  showCopiedToast,
 } from "@/components/Toast";
 
 // Privy server URL - change this to your server URL
@@ -34,6 +36,15 @@ function getExplorerUrl(txHash: string, chainId: ChainId): string {
     ? "https://sepolia.voyager.online/tx"
     : "https://voyager.online/tx";
   return `${baseUrl}/${txHash}`;
+}
+
+/** True if the error indicates deployment failed due to insufficient STRK (resource bounds exceed balance) */
+function isInsufficientBalanceDeployError(err: unknown): boolean {
+  const s = String(err);
+  return (
+    /exceed balance\s*\(0\)/i.test(s) ||
+    (/Account validation failed/i.test(s) && /Resources bounds/i.test(s) && /balance/i.test(s))
+  );
 }
 
 // Network configuration type
@@ -171,7 +182,7 @@ export const useWalletStore = create<WalletState>((set, get) => ({
 
   // Initial state
   privateKey: "",
-  selectedPreset: "OpenZeppelin",
+  selectedPreset: "Argent",
 
   // Privy state
   walletType: null,
@@ -468,8 +479,31 @@ export const useWalletStore = create<WalletState>((set, get) => ({
       addLog("Account deployed successfully!");
       await checkDeploymentStatus();
     } catch (err) {
-      addLog(`Deployment failed: ${err}`);
-      Alert.alert("Deployment Failed", String(err));
+      const errStr = String(err);
+      addLog(`Deployment failed: ${errStr}`);
+
+      const isInsufficientBalance = isInsufficientBalanceDeployError(err);
+      const message = isInsufficientBalance
+        ? "Deployment requires STRK to pay for gas. Your account balance is too low.\n\n" +
+          (chainId.isSepolia()
+            ? "On Sepolia testnet, test STRK are available to claim from the Balances tab (Claim test STRK)."
+            : "Please fund your account with STRK and try again.")
+        : errStr;
+
+      Alert.alert(
+        "Deployment Failed",
+        message,
+        [
+          {
+            text: "Copy",
+            onPress: async () => {
+              await Clipboard.setStringAsync(errStr);
+              showCopiedToast();
+            },
+          },
+          { text: "OK" },
+        ]
+      );
     } finally {
       set({ isConnecting: false });
     }
