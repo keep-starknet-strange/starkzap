@@ -15,6 +15,8 @@ export default defineConfig(
       "**/dist/**",
       "node_modules/",
       "**/node_modules/**",
+      ".claude/**",
+      ".codex/**",
       "coverage/",
       "**/coverage/**",
       "docs/api/**",

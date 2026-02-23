@@ -1,4 +1,5 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
+import { RpcProvider } from "starknet";
 import { StarkSDK } from "@/sdk";
 import { StarkSigner } from "@/signer";
 import { OpenZeppelinPreset } from "@/account";
@@ -8,6 +9,16 @@ describe("Sponsorship (AVNU Paymaster)", () => {
   // Valid Stark curve private key for testing
   const privateKey =
     "0x0000000000000000000000000000000071d7bb07b9a64f6f78ac4c816aff4da9";
+
+  beforeAll(() => {
+    vi.spyOn(RpcProvider.prototype, "getChainId").mockResolvedValue(
+      devnetConfig.chainId!.toFelt252()
+    );
+  });
+
+  afterAll(() => {
+    vi.restoreAllMocks();
+  });
 
   describe("SDK configuration", () => {
     it("should allow feeMode=sponsored without explicit sponsor config", async () => {
