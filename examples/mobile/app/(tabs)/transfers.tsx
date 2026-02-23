@@ -33,7 +33,12 @@ import {
   updateTransactionToast,
   showCopiedToast,
 } from "@/components/Toast";
-import { Amount, fromAddress, type Token, type ChainId } from "@starkware-ecosystem/starkzap";
+import {
+  Amount,
+  fromAddress,
+  type Token,
+  type ChainId,
+} from "@starkware-ecosystem/starkzap";
 
 const WBTC_LOGO_FALLBACK =
   "https://altcoinsbox.com/wp-content/uploads/2023/01/wbtc-wrapped-bitcoin-logo.png";
