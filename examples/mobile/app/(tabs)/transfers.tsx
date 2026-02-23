@@ -116,23 +116,6 @@ function getExplorerUrl(txHash: string, chainId: ChainId): string {
   return `${baseUrl}/${txHash}`;
 }
 
-function getErrorMessage(error: unknown): string {
-  try {
-    if (
-      error &&
-      typeof error === "object" &&
-      "message" in error &&
-      typeof (error as { message?: unknown }).message !== "undefined"
-    ) {
-      const message = (error as { message?: unknown }).message;
-      return typeof message === "string" ? message : String(message);
-    }
-    return String(error);
-  } catch {
-    return "Unknown error";
-  }
-}
-
 interface TransferItem {
   id: string;
   token: Token | null;
@@ -408,7 +391,7 @@ export default function TransfersScreen() {
       // Refresh balances
       await fetchBalances(wallet, chainId);
     } catch (err) {
-      addLog(`Transfer failed: ${getErrorMessage(err)}`);
+      addLog(`Transfer failed: ${String(err)}`);
     } finally {
       setIsSubmitting(false);
     }
