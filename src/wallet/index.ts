@@ -294,7 +294,7 @@ export class Wallet extends BaseWallet {
       const estimateFee = await this.account.estimateAccountDeployFee({
         classHash,
         constructorCalldata,
-        addressSalt: publicKey,
+        addressSalt,
       });
       const { l1_gas, l2_gas, l1_data_gas } = estimateFee.resourceBounds;
       resourceBounds = {
