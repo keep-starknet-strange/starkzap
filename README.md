@@ -1,6 +1,14 @@
 # Starkzap — Bitcoin in your app in minutes
 
-Bring Bitcoin, stablecoins, and DeFi to any web or mobile app via Starknet in minutes. One TypeScript SDK: wallets, tokens, staking, and gasless transactions — with a clean API and great UX. Starknet’s account abstraction lets you hide blockchain complexity (no seed phrases, optional gasless flows). Works on **web** (React, Vite, etc.), **iOS & Android** (React Native, Expo), and **Node.js** backends. Built on [starknet.js](https://github.com/starknet-io/starknet.js).
+# Starkzap - Bitcoin in your app in minutes
+
+<img width="1200" height="675" alt="Twitter post - 3 (1)" src="https://github.com/user-attachments/assets/66df6de6-b0b8-4c83-8589-aeb53927451e" />
+
+</div>
+
+---
+
+Bring Bitcoin, stablecoins, and DeFi to any web or mobile app via Starknet in minutes. One TypeScript SDK: wallets, tokens, staking, and gasless transactions — with a clean API and great UX. Starknet’s account abstraction lets you hide blockchain complexity (no seed phrases, optional gasless flows). Works on **web** (React, Vite, etc.), **iOS & Android** (React Native, Expo), and **Node.js** backends.
 
 **Full documentation:** [docs.starknet.io/build/starkzap](https://docs.starknet.io/build/starkzap/overview)
 
@@ -9,15 +17,13 @@ Bring Bitcoin, stablecoins, and DeFi to any web or mobile app via Starknet in mi
 ## Installation
 
 ```bash
-npm install starkzap
+npm install @starkware-ecosystem/starkzap
 ```
 
 Peer dependencies (installed automatically with `starkzap`):
 
-- [`starknet`](https://www.npmjs.com/package/starknet) (v9+) — Starknet.js core
-- [`@cartridge/controller`](https://www.npmjs.com/package/@cartridge/controller) — Cartridge wallet (optional, only for Cartridge support)
-
-StarkZap **re-exports** from starknet: `Contract`, `RpcProvider`, and types `Call`, `PreparedTransaction`, `ExecutableUserTransaction`. Use them from `starkzap` for read-only contract calls and provider types so you don't need to import `starknet` directly in your app.
+- [`starknet`](https://www.npmjs.com/package/starknet) (v9+) — Starknet.js core (installed with `@starkware-ecosystem/starkzap`)
+- [`@cartridge/controller`](https://www.npmjs.com/package/@cartridge/controller) — optional peer, only needed for Cartridge support
 
 For specific integrations, you may need:
 
@@ -30,17 +36,24 @@ For specific integrations, you may need:
 ## Quick Start
 
 ```typescript
-import { StarkZap, StarkSigner, Amount, fromAddress, mainnetTokens } from "starkzap";
+import {
+  StarkSDK,
+  StarkSigner,
+  OnboardStrategy,
+  Amount,
+  fromAddress,
+  sepoliaTokens,
+} from "@starkware-ecosystem/starkzap";
 
-const STRK = mainnetTokens.STRK;
-const sdk = new StarkZap({ network: "sepolia" });
+const sdk = new StarkSDK({ network: "sepolia" });
 
-const wallet = await sdk.connectWallet({
+const { wallet } = await sdk.onboard({
+  strategy: OnboardStrategy.Signer,
   account: { signer: new StarkSigner("0xYOUR_PRIVATE_KEY") },
+  deploy: "if_needed",
 });
 
-await wallet.ensureReady({ deploy: "if_needed" });
-
+const STRK = sepoliaTokens.STRK;
 const balance = await wallet.balanceOf(STRK);
 console.log(balance.toFormatted()); // "150.25 STRK"
 

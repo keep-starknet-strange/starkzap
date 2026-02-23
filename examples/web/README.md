@@ -216,7 +216,7 @@ const PRIVY_SERVER_URL = "http://localhost:3001";
 
 `vite.config.ts` maps `starkzap` to the SDK source at `../../src/index.ts` and `@` to `../../src/`. This means:
 
-- `import { StarkSDK } from "starkzap"` resolves to the local SDK source, not a published npm bundle.
+- `import { StarkSDK } from "@starkware-ecosystem/starkzap"` resolves to the local SDK source, not a published npm bundle.
 - Changes to the SDK source are hot-reloaded automatically.
 - The `optimizeDeps.exclude: ["starkzap"]` setting prevents Vite from pre-bundling the SDK.
 

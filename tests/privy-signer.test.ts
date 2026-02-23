@@ -60,7 +60,7 @@ describe("PrivySigner", () => {
     );
   });
 
-  it("should reject insecure non-localhost server urls", async () => {
+  it("should allow http server urls", async () => {
     expect(
       () =>
         new PrivySigner({
@@ -68,7 +68,18 @@ describe("PrivySigner", () => {
           publicKey: "0xabc",
           serverUrl: "http://example.com/sign",
         })
-    ).toThrow("must use https://");
+    ).not.toThrow();
+  });
+
+  it("should reject non-http protocols", async () => {
+    expect(
+      () =>
+        new PrivySigner({
+          walletId: "wallet-1",
+          publicKey: "0xabc",
+          serverUrl: "ftp://example.com/sign",
+        })
+    ).toThrow("must use http:// or https://");
   });
 
   it("should enforce request timeout for serverUrl mode", async () => {

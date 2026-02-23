@@ -2,7 +2,7 @@
  * StarkZap SDK + Cartridge + game contract integration.
  * See: mintlify-docs/build/consumer-app-sdk/starkzap (Quick Start, Cartridge Controller, Examples)
  *
- * Uses only StarkZap (x): SDK, wallet, provider (wallet.getProvider()), Contract and RpcProvider re-exported from x for read-only calls.
+ * Uses only StarkZap: SDK, wallet, provider (wallet.getProvider()), Contract and RpcProvider re-exported for read-only calls.
  */
 import {
   StarkSDK,
@@ -11,9 +11,8 @@ import {
   networks,
   Contract,
   type WalletInterface,
-  type RpcProvider,
-} from "x";
-import { getChecksumAddress } from "starknet";
+} from "@starkware-ecosystem/starkzap";
+import { Contract, getChecksumAddress, type RpcProvider } from "starknet";
 
 // FOS demo game contract on Sepolia (same as https://github.com/0xsisyfos/fos)
 // Checksummed address so execute() calls match Cartridge session policies (Controller normalizes policy targets with getChecksumAddress).

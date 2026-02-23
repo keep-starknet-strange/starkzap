@@ -8,7 +8,8 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "x": "file:../.."
+    "@starkware-ecosystem/starkzap": "file:../..",
+    "starknet": "^9.2.1"
   },
   "devDependencies": {
     "@vitejs/plugin-basic-ssl": "^2.1.4",

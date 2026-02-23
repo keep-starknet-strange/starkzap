@@ -6,7 +6,7 @@ import {
   type ViewStyle,
 } from "react-native";
 import { ThemedText } from "./themed-text";
-import type { Token, Amount } from "starkzap";
+import type { Token, Amount } from "@starkware-ecosystem/starkzap";
 
 interface AmountInputProps {
   value: string;

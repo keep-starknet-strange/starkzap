@@ -27,7 +27,7 @@ Use this guide if you are:
 ## Installation
 
 ```bash
-npm install starkzap
+npm install @starkware-ecosystem/starkzap
 ```
 
 ## Runtime Compatibility
@@ -46,7 +46,7 @@ import {
   Amount,
   fromAddress,
   sepoliaTokens,
-} from "starkzap";
+} from "@starkware-ecosystem/starkzap";
 
 const sdk = new StarkSDK({ network: "sepolia" });
 
@@ -121,7 +121,7 @@ Supported strategies:
 ### Signer strategy
 
 ```ts
-import { StarkSigner, OnboardStrategy } from "starkzap";
+import { StarkSigner, OnboardStrategy } from "@starkware-ecosystem/starkzap";
 
 const onboard = await sdk.onboard({
   strategy: OnboardStrategy.Signer,
@@ -134,7 +134,7 @@ const onboard = await sdk.onboard({
 ### Cartridge strategy
 
 ```ts
-import { OnboardStrategy } from "starkzap";
+import { OnboardStrategy } from "@starkware-ecosystem/starkzap";
 
 const onboard = await sdk.onboard({
   strategy: OnboardStrategy.Cartridge,
@@ -158,7 +158,7 @@ Optional features:
 - `staking.contract` for staking methods.
 
 ```ts
-import { StarkSDK, ChainId, fromAddress } from "starkzap";
+import { StarkSDK, ChainId, fromAddress } from "@starkware-ecosystem/starkzap";
 
 const sdk = new StarkSDK({
   rpcUrl: "https://api.cartridge.gg/x/starknet/mainnet",
@@ -177,7 +177,7 @@ const sdk = new StarkSDK({
 ### 1) Local private key (server or trusted environment)
 
 ```ts
-import { StarkSigner, OpenZeppelinPreset } from "starkzap";
+import { StarkSigner, OpenZeppelinPreset } from "@starkware-ecosystem/starkzap";
 
 const wallet = await sdk.connectWallet({
   account: {
@@ -190,7 +190,7 @@ const wallet = await sdk.connectWallet({
 ### 2) Privy signer (recommended for many consumer apps)
 
 ```ts
-import { PrivySigner, ArgentXV050Preset } from "starkzap";
+import { PrivySigner, ArgentXV050Preset } from "@starkware-ecosystem/starkzap";
 
 const signer = new PrivySigner({
   walletId: "privy-wallet-id",
@@ -312,7 +312,7 @@ const position = await wallet.getPoolPosition(poolAddress);
 ### Address safety
 
 ```ts
-import { fromAddress } from "starkzap";
+import { fromAddress } from "@starkware-ecosystem/starkzap";
 
 const addr = fromAddress("0x1234");
 ```
@@ -329,7 +329,7 @@ console.log(c.toFormatted(true));
 ### Chain IDs
 
 ```ts
-import { ChainId } from "starkzap";
+import { ChainId } from "@starkware-ecosystem/starkzap";
 
 if (ChainId.MAINNET.isMainnet()) {
   // ...

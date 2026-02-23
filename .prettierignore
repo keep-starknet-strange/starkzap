@@ -7,3 +7,8 @@ node_modules
 expo-env.d.ts
 docs
 examples/flappy-bird
+.claude
+.codex
+AGENTS.md
+CLAUDE.md
+tasks

@@ -58,7 +58,7 @@ function assertV3Version(
  *
  * @example
  * ```ts
- * import { SignerAdapter, StarkSigner } from "starkzap";
+ * import { SignerAdapter, StarkSigner } from "@starkware-ecosystem/starkzap";
  * import { Account, RpcProvider } from "starknet";
  *
  * const adapter = new SignerAdapter(new StarkSigner(privateKey));

@@ -162,7 +162,7 @@ export interface StakingConfig {
  * const sdk = new StarkSDK({ network: "sepolia" });
  *
  * // Using a preset object directly
- * import { networks } from "starkzap";
+ * import { networks } from "@starkware-ecosystem/starkzap";
  * const sdk = new StarkSDK({ network: networks.mainnet });
  *
  * // Custom configuration
