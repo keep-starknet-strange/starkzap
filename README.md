@@ -39,20 +39,21 @@ For specific integrations, you may need:
 import {
   StarkSDK,
   StarkSigner,
+  OnboardStrategy,
   Amount,
   fromAddress,
   sepoliaTokens,
 } from "@starkware-ecosystem/starkzap";
 
-const STRK = mainnetTokens.STRK;
-const sdk = new StarkZap({ network: "sepolia" });
+const sdk = new StarkSDK({ network: "sepolia" });
 
-const wallet = await sdk.connectWallet({
+const { wallet } = await sdk.onboard({
+  strategy: OnboardStrategy.Signer,
   account: { signer: new StarkSigner("0xYOUR_PRIVATE_KEY") },
+  deploy: "if_needed",
 });
 
-await wallet.ensureReady({ deploy: "if_needed" });
-
+const STRK = sepoliaTokens.STRK;
 const balance = await wallet.balanceOf(STRK);
 console.log(balance.toFormatted()); // "150.25 STRK"
 
