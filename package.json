@@ -26,7 +26,7 @@
     }
   },
   "peerDependencies": {
-    "@cartridge/controller": "^0.13.7"
+    "@cartridge/controller": "^0.13.9"
   },
   "peerDependenciesMeta": {
     "@cartridge/controller": {
@@ -71,7 +71,7 @@
     "prepare": "husky"
   },
   "devDependencies": {
-    "@cartridge/controller": "^0.13.7",
+    "@cartridge/controller": "^0.13.9",
     "@eslint/js": "^9.39.2",
     "@vitest/coverage-v8": "^4.0.17",
     "bestzip": "^2.2.1",
@@ -91,7 +91,7 @@
     "vitest": "^4.0.17"
   },
   "dependencies": {
-    "@cartridge/controller": "^0.13.7",
+    "@cartridge/controller": "^0.13.9",
     "starknet": "^9.2.1"
   }
 }
