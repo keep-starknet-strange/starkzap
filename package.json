@@ -26,7 +26,7 @@
     }
   },
   "peerDependencies": {
-    "@cartridge/controller": "^0.11.3"
+    "@cartridge/controller": "^0.13.7"
   },
   "peerDependenciesMeta": {
     "@cartridge/controller": {
@@ -71,7 +71,7 @@
     "prepare": "husky"
   },
   "devDependencies": {
-    "@cartridge/controller": "^0.11.3",
+    "@cartridge/controller": "^0.13.7",
     "@eslint/js": "^9.39.2",
     "@vitest/coverage-v8": "^4.0.17",
     "bestzip": "^2.2.1",
