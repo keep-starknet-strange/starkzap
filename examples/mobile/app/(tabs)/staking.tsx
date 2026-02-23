@@ -92,7 +92,7 @@ import {
   getValidatorsForNetwork,
   type StakingPosition as StakingPositionType,
 } from "@/stores/staking";
-import type { Validator, Pool } from "starkzap";
+import type { Validator, Pool } from "@starkware-ecosystem/starkzap";
 
 export default function StakingScreen() {
   const {

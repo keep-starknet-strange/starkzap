@@ -53,7 +53,7 @@ function isWebRuntimeForCartridge(): boolean {
  *
  * @example
  * ```ts
- * import { StarkSDK, StarkSigner, ArgentPreset } from "starkzap";
+ * import { StarkSDK, StarkSigner, ArgentPreset } from "@starkware-ecosystem/starkzap";
  *
  * // Using network presets (recommended)
  * const sdk = new StarkSDK({ network: "mainnet" });
@@ -172,7 +172,7 @@ export class StarkSDK {
    *
    * @example
    * ```ts
-   * import { StarkSigner, OpenZeppelinPreset, ArgentPreset } from "starkzap";
+   * import { StarkSigner, OpenZeppelinPreset, ArgentPreset } from "@starkware-ecosystem/starkzap";
    *
    * // Default: OpenZeppelin account
    * const wallet = await sdk.connectWallet({

@@ -9,15 +9,13 @@ Bring Bitcoin, stablecoins, and DeFi to any web or mobile app via Starknet in mi
 ## Installation
 
 ```bash
-npm install starkzap
+npm install @starkware-ecosystem/starkzap
 ```
 
 Peer dependencies (installed automatically with `starkzap`):
 
-- [`starknet`](https://www.npmjs.com/package/starknet) (v9+) — Starknet.js core
-- [`@cartridge/controller`](https://www.npmjs.com/package/@cartridge/controller) — Cartridge wallet (optional, only for Cartridge support)
-
-StarkZap **re-exports** from starknet: `Contract`, `RpcProvider`, and types `Call`, `PreparedTransaction`, `ExecutableUserTransaction`. Use them from `starkzap` for read-only contract calls and provider types so you don't need to import `starknet` directly in your app.
+- [`starknet`](https://www.npmjs.com/package/starknet) (v9+) — Starknet.js core (installed with `@starkware-ecosystem/starkzap`)
+- [`@cartridge/controller`](https://www.npmjs.com/package/@cartridge/controller) — optional peer, only needed for Cartridge support
 
 For specific integrations, you may need:
 
@@ -30,7 +28,13 @@ For specific integrations, you may need:
 ## Quick Start
 
 ```typescript
-import { StarkZap, StarkSigner, Amount, fromAddress, mainnetTokens } from "starkzap";
+import {
+  StarkSDK,
+  StarkSigner,
+  Amount,
+  fromAddress,
+  sepoliaTokens,
+} from "@starkware-ecosystem/starkzap";
 
 const STRK = mainnetTokens.STRK;
 const sdk = new StarkZap({ network: "sepolia" });

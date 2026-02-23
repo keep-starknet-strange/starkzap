@@ -6,7 +6,7 @@ import {
   type ViewStyle,
 } from "react-native";
 import { ThemedText } from "./themed-text";
-import type { Validator } from "starkzap";
+import type { Validator } from "@starkware-ecosystem/starkzap";
 
 interface ValidatorCardProps {
   validator: Validator;

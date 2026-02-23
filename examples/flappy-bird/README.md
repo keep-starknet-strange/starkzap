@@ -11,7 +11,7 @@ This example **forks [nebez/floppybird](https://github.com/nebez/floppybird)** (
 
 ## Deploy to Vercel (live demo)
 
-This repo is a **fork of [keep-starknet-strange/x](https://github.com/keep-starknet-strange/x)**. This fork lives at **[github.com/0xsisyfos/x](https://github.com/0xsisyfos/x)**. The flappy-bird example depends on the parent SDK (`x`) via `file:../..`, so the **entire monorepo** must be in the repo you deploy from. Use one of these flows.
+This repo is a **fork of [keep-starknet-strange/x](https://github.com/keep-starknet-strange/x)**. The flappy-bird example depends on the parent SDK (`@starkware-ecosystem/starkzap`) via `file:../..`, so the **entire monorepo** must be in the repo you deploy from. This will be updated once the SDK is published. For now, use one of these flows.
 
 ### Option A: Deploy from this fork (recommended)
 
@@ -20,13 +20,13 @@ Deploy from **[0xsisyfos/x](https://github.com/0xsisyfos/x)**:
 1. **Commit and push** the flappy-bird example and Vercel config from your local clone of [0xsisyfos/x](https://github.com/0xsisyfos/x):
 
 ```bash
-cd /path/to/x   # monorepo root (your 0xsisyfos/x clone)
+cd /path/to/repo   # monorepo root 
 git add examples/flappy-bird
 git commit -m "Add flappy-bird example and Vercel config"
 git push origin main
 ```
 
-2. In [Vercel](https://vercel.com/new), **import** [github.com/0xsisyfos/x](https://github.com/0xsisyfos/x).
+2. In [Vercel](https://vercel.com/new), **import** [github.com/username/your-repo]
 3. Set **Root Directory** to **`examples/flappy-bird`**.
 4. In **Build & Development Settings** set **Install Command** to:  
    `cd ../.. && npm install && cd examples/flappy-bird && npm install`  
@@ -111,8 +111,8 @@ This example **automatically falls back** to **user_pays**: the first failed spo
 ## Stack
 
 - **Vite + TypeScript** — Entry and StarkZap wiring; game is vanilla JS from floppybird.
-- **StarkZap SDK (x)** — `StarkZap`, `OnboardStrategy.Cartridge`, `networks`, `wallet.execute()`, `wallet.getProvider()`, `wallet.address`, `wallet.disconnect()`, Cartridge `username()`. Config: `StarkZap({ network: "sepolia" })`; explorer from `networks.sepolia.explorerUrl`.
-- **Game contract** — Same demo contract as [FOS](https://github.com/0xsisyfos/fos) on Starknet Sepolia: `start_new_game`, `increment_score`, `end_game`, plus view functions for high score and leaderboard. Address: `0x03730b941e8d3ece030a4a0d5f1008f34fbde0976e86577a78648c8b35079464`. If transactions never appear, open the browser console and look for `[Starknet] start_new_game failed` / `increment_score failed` / `end_game failed`; the SDK now uses Cartridge's required policy format (method `name` + `entrypoint`) and a normalized contract address.
+- **Starkzap SDK (`@starkware-ecosystem/starkzap`)** — `StarkSDK`, `OnboardStrategy.Cartridge`, `networks`, `wallet.execute()`, `wallet.getProvider()`, `wallet.address`, `wallet.disconnect()`, Cartridge `username()`. Config: `new StarkSDK({ network: "sepolia" })`; explorer from `networks.sepolia.explorerUrl`.
+- **Game contract** — Demo contract on Starknet Sepolia: `start_new_game`, `increment_score`, `end_game`, plus view functions for high score and leaderboard. Address: `0x03730b941e8d3ece030a4a0d5f1008f34fbde0976e86577a78648c8b35079464`.
 
 ## What this example uses outside StarkZap
 

@@ -33,7 +33,7 @@ import {
   updateTransactionToast,
   showCopiedToast,
 } from "@/components/Toast";
-import { Amount, fromAddress, type Token, type ChainId } from "starkzap";
+import { Amount, fromAddress, type Token, type ChainId } from "@starkware-ecosystem/starkzap";
 
 const WBTC_LOGO_FALLBACK =
   "https://altcoinsbox.com/wp-content/uploads/2023/01/wbtc-wrapped-bitcoin-logo.png";
@@ -109,6 +109,23 @@ function getExplorerUrl(txHash: string, chainId: ChainId): string {
       ? "https://sepolia.voyager.online/tx"
       : "https://voyager.online/tx";
   return `${baseUrl}/${txHash}`;
+}
+
+function getErrorMessage(error: unknown): string {
+  try {
+    if (
+      error &&
+      typeof error === "object" &&
+      "message" in error &&
+      typeof (error as { message?: unknown }).message !== "undefined"
+    ) {
+      const message = (error as { message?: unknown }).message;
+      return typeof message === "string" ? message : String(message);
+    }
+    return String(error);
+  } catch {
+    return "Unknown error";
+  }
 }
 
 interface TransferItem {
@@ -341,16 +358,18 @@ export default function TransfersScreen() {
         addLog(
           `Transferring ${token.symbol} to ${transfersData.length} recipient(s)...`
         );
-
+        const wantsSponsored = useSponsored && canUseSponsored;
         const tx = await wallet.transfer(
           token,
           transfersData,
-          useSponsored && canUseSponsored ? { feeMode: "sponsored" } : undefined
+          wantsSponsored ? { feeMode: "sponsored" } : undefined
         );
 
         addLog(`Transfer tx submitted: ${tx.hash.slice(0, 10)}...`);
-        if (useSponsored && canUseSponsored) {
+        if (wantsSponsored) {
           addLog("Transaction submitted in sponsored mode");
+        } else {
+          addLog("Transaction submitted in user_pays mode");
         }
 
         // Show pending toast
@@ -384,7 +403,7 @@ export default function TransfersScreen() {
       // Refresh balances
       await fetchBalances(wallet, chainId);
     } catch (err) {
-      addLog(`Transfer failed: ${err}`);
+      addLog(`Transfer failed: ${getErrorMessage(err)}`);
     } finally {
       setIsSubmitting(false);
     }

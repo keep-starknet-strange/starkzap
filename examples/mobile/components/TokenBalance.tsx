@@ -2,7 +2,7 @@ import { useState } from "react";
 import { StyleSheet, View, Image } from "react-native";
 import { ThemedText } from "./themed-text";
 import { ThemedView } from "./themed-view";
-import type { Token, Amount } from "starkzap";
+import type { Token, Amount } from "@starkware-ecosystem/starkzap";
 
 interface TokenBalanceProps {
   token: Token;

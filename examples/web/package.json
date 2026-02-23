@@ -11,7 +11,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "starkzap": "file:../.."
+    "@starkware-ecosystem/starkzap": "file:../.."
   },
   "devDependencies": {
     "@privy-io/node": "^0.8.0",
