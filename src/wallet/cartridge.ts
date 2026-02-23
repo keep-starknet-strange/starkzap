@@ -125,9 +125,24 @@ export class CartridgeWallet extends BaseWallet {
     }
 
     if (options.policies && options.policies.length > 0) {
-      controllerOptions.policies = toSessionPolicies(
-        options.policies as Parameters<typeof toSessionPolicies>[0]
-      );
+      // Group by contract address so all methods for the same contract are in one entry.
+      // Using .map() then Object.fromEntries() with the same target would overwrite (only last method kept).
+      const byTarget = new Map<string, Array<{ name: string; entrypoint: string }>>();
+      for (const p of options.policies) {
+        const target = p.target.toLowerCase().startsWith("0x")
+          ? p.target.toLowerCase()
+          : `0x${p.target.toLowerCase()}`;
+        if (!byTarget.has(target)) byTarget.set(target, []);
+        byTarget.get(target)!.push({ name: p.method, entrypoint: p.method });
+      }
+      controllerOptions.policies = {
+        contracts: Object.fromEntries(
+          Array.from(byTarget.entries(), ([target, methods]) => [
+            target,
+            { methods },
+          ])
+        ),
+      };
     }
 
     if (options.preset) {

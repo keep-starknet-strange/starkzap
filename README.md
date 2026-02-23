@@ -10,7 +10,56 @@
 
 Bring Bitcoin, stablecoins, and DeFi to any web or mobile app via Starknet in minutes. One TypeScript SDK: wallets, tokens, staking, and gasless transactions — with a clean API and great UX. Starknet’s account abstraction lets you hide blockchain complexity (no seed phrases, optional gasless flows). Works on **web** (React, Vite, etc.), **iOS & Android** (React Native, Expo), and **Node.js** backends.
 
-**Full documentation:** [docs.starknet.io/build/starkzap](https://docs.starknet.io/build/starkzap/overview)
+- [Installation](#installation)
+- [Quick Start](#quick-start)
+- [Configuration](#configuration)
+  - [Network Presets](#network-presets)
+  - [Custom RPC](#custom-rpc)
+  - [Paymaster (Sponsored Transactions)](#paymaster-sponsored-transactions)
+  - [Explorer](#explorer)
+  - [Staking](#staking-configuration)
+- [Connecting a Wallet](#connecting-a-wallet)
+  - [With a Private Key (StarkSigner)](#with-a-private-key-starksigner)
+  - [With Privy (Server-Side Key Management)](#with-privy-server-side-key-management)
+  - [With Cartridge Controller](#with-cartridge-controller)
+  - [Custom Signer](#custom-signer)
+- [Account Presets](#account-presets)
+- [Wallet Lifecycle](#wallet-lifecycle)
+  - [Deployment](#deployment)
+  - [Ensure Ready](#ensure-ready)
+- [Executing Transactions](#executing-transactions)
+  - [Raw Contract Calls](#raw-contract-calls)
+  - [Sponsored (Gasless) Transactions](#sponsored-gasless-transactions)
+- [Transaction Tracking](#transaction-tracking)
+- [ERC20 Tokens](#erc20-tokens)
+  - [Token Presets](#token-presets)
+  - [Checking Balances](#checking-balances)
+  - [Transferring Tokens](#transferring-tokens)
+- [Working with Amounts](#working-with-amounts)
+  - [Creating Amounts](#creating-amounts)
+  - [Converting and Displaying](#converting-and-displaying)
+  - [Arithmetic](#arithmetic)
+  - [Comparisons](#comparisons)
+- [Staking & Delegation Pools](#staking--delegation-pools)
+  - [Discovering Validators and Pools](#discovering-validators-and-pools)
+  - [Entering a Pool](#entering-a-pool)
+  - [Adding to an Existing Stake](#adding-to-an-existing-stake)
+  - [Claiming Rewards](#claiming-rewards)
+  - [Exiting a Pool (Two-Step)](#exiting-a-pool-two-step)
+  - [Querying Position](#querying-position)
+- [Transaction Builder](#transaction-builder)
+  - [Basic Usage](#basic-usage)
+  - [Mixing Operations](#mixing-operations)
+  - [Preflight Simulation](#preflight-simulation)
+  - [Fee Estimation](#fee-estimation)
+- [Addresses](#addresses)
+- [Chain IDs](#chain-ids)
+- [React Native Setup](#react-native-setup)
+- [API Reference](#api-reference)
+- [Examples](#examples)
+- [Contributing](#contributing)
+- [Contributors](#contributors)
+- [License](#license)
 
 ---
 
@@ -30,6 +79,8 @@ For specific integrations, you may need:
 - **Privy** (server): `npm install @privy-io/node` — see [Privy integration](https://docs.starknet.io/build/starkzap/integrations/privy)
 - **Privy** (React Native / Expo): see the [Privy docs](https://docs.privy.io) for the Expo SDK
 - **AVNU Paymaster**: no extra package; configure a paymaster URL — see [Paymasters](https://docs.starknet.io/build/starkzap/paymasters) and [AVNU integration](https://docs.starknet.io/build/starkzap/integrations/avnu-paymaster)
+
+The package is published on npm as [`@starkware-ecosystem/starkzap`](https://www.npmjs.com/package/@starkware-ecosystem/starkzap); use `npm install @starkware-ecosystem/starkzap` and `from "@starkware-ecosystem/starkzap"` when not developing from this repo.
 
 ---
 
@@ -107,6 +158,16 @@ npm run build
 ```
 
 Token and validator presets can be regenerated with `npm run generate:tokens`, `npm run generate:tokens:sepolia`, `npm run generate:validators`, and `npm run generate:validators:sepolia`.
+
+---
+
+## Contributors
+
+Thanks to everyone who contributes to this project!
+
+<!--GAMFC--><!--GAMFC-END-->
+
+Made with [github-action-contributors](https://github.com/jaywcjlove/github-action-contributors).
 
 ---
 

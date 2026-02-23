@@ -15,32 +15,6 @@ description: "Use Cartridge Controller with network-safe session configuration"
 
 Starkzap integrates seamlessly with Cartridge Controller, making it perfect for gaming applications where you want seamless, gasless transactions.
 
-## StarkZap Integration Details
-
-When StarkZap initializes Cartridge through this SDK, it forwards your SDK network config directly to Controller:
-
-- `rpcUrl` -> `chains: [{ rpcUrl }]`
-- `chainId` -> `defaultChainId`
-
-This ensures the Controller session (and paymaster flow) is created on the same network your SDK uses.
-
-You do not need to pass chain settings again when calling `sdk.connectCartridge()` or `sdk.onboard({ strategy: "cartridge" })`. Configure network once in `new StarkSDK(...)`, and the SDK forwards it.
-
-If session chain and SDK RPC chain diverge, sponsored flows can fail with errors such as:
-
-- `"Account is not compatible with SNIP-9"`
-- other paymaster/session mismatch errors
-
-## Troubleshooting: "Account is not compatible with SNIP-9"
-
-What it means: the active account/session cannot use the paymaster path for the selected chain/account type.
-
-Options:
-
-1. Fallback to `feeMode: "user_pays"` for that operation.
-2. Use a Cartridge account/session that supports SNIP-9 on the target chain.
-3. Ensure the session chain matches your SDK chain (`rpcUrl` + `chainId`).
-
 ## Why Use Cartridge?
 
 - ✅ **Perfect for Gaming**: Specialized for gaming applications with session-based transactions
@@ -68,7 +42,7 @@ npm install @cartridge/controller
 ### 2. Initialize SDK
 
 ```typescript
-import { StarkZap, OnboardStrategy } from "starkzap";
+import { StarkSDK, OnboardStrategy } from "@starkware-ecosystem/starkzap";
 
 const sdk = new StarkZap({ network: "mainnet" });
 ```
@@ -172,7 +146,7 @@ const isAuthenticated = controller.isAuthenticated();
 ## Complete Example
 
 ```typescript
-import { StarkZap, OnboardStrategy, Amount, fromAddress, mainnetTokens } from "starkzap";
+import { StarkSDK, OnboardStrategy, Amount, fromAddress, mainnetTokens } from "@starkware-ecosystem/starkzap";
 
 const sdk = new StarkZap({ network: "mainnet" });
 
