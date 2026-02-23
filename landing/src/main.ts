@@ -1,4 +1,4 @@
-const NPM_CMD = "npm install starkzap";
+const NPM_CMD = "npm install @starkware-ecosystem/starkzap";
 
 const codeEl = document.getElementById("npm-cmd");
 const copyBtn = document.getElementById("copy-btn");

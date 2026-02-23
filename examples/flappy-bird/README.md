@@ -17,7 +17,7 @@ Flappy Bird on Starknet. This example **forks [nebez/floppybird](https://github.
 
 ## Deploy to Vercel (live demo)
 
-This repo is a **fork of [keep-starknet-strange/x](https://github.com/keep-starknet-strange/x)**. The flappy-bird example depends on the parent SDK (`x`) via `file:../..`, so the **entire monorepo** must be in the repo you deploy from. This will be updated once the SDK is published. For now, use one of these flows.
+This repo is a **fork of [keep-starknet-strange/starkzap](https://github.com/keep-starknet-strange/starkzap)**. The flappy-bird example depends on the parent SDK via `file:../..`, so the **entire monorepo** must be in the repo you deploy from. The SDK is published on npm as [`@starkware-ecosystem/starkzap`](https://www.npmjs.com/package/@starkware-ecosystem/starkzap); for a standalone clone you can use that instead of `file:../..`. Use one of these flows to deploy.
 
 ### Option A: Deploy from this fork (recommended)
 

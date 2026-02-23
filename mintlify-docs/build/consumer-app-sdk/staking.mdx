@@ -25,7 +25,7 @@ Starkzap supports Starknet's native staking protocol. Validators run pools where
 Staking works out of the box when using a supported chain preset:
 
 ```typescript
-import { StarkSDK } from "starkzap";
+import { StarkSDK } from "@starkware-ecosystem/starkzap";
 
 const sdk = new StarkSDK({
   network: "mainnet",
@@ -35,7 +35,7 @@ const sdk = new StarkSDK({
 Optional override:
 
 ```typescript
-import { StarkSDK, fromAddress } from "starkzap";
+import { StarkSDK, fromAddress } from "@starkware-ecosystem/starkzap";
 
 const sdk = new StarkSDK({
   network: "mainnet",
@@ -52,7 +52,7 @@ const sdk = new StarkSDK({
 ### Using Validator Presets
 
 ```typescript
-import { mainnetValidators, sepoliaValidators } from "starkzap";
+import { mainnetValidators, sepoliaValidators } from "@starkware-ecosystem/starkzap";
 
 // Use built-in validator presets
 for (const validator of Object.values(mainnetValidators)) {

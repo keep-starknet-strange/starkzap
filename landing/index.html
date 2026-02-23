@@ -36,9 +36,20 @@
       </figure>
 
       <section class="get-started">
-        <div class="code-block-wrap">
-          <code id="npm-cmd" class="code-block">npm install starkzap</code>
-          <button type="button" id="copy-btn" class="copy-btn" title="Copy command">Copy</button>
+        <div class="terminal">
+          <div class="terminal-header">
+            <div class="terminal-dots" aria-hidden="true">
+              <span class="terminal-dot terminal-dot-red"></span>
+              <span class="terminal-dot terminal-dot-yellow"></span>
+              <span class="terminal-dot terminal-dot-green"></span>
+            </div>
+            <span class="terminal-title">Terminal</span>
+            <button type="button" id="copy-btn" class="terminal-copy-btn" title="Copy command">Copy</button>
+          </div>
+          <div class="terminal-body">
+            <span class="terminal-prompt">$</span>
+            <code id="npm-cmd" class="terminal-cmd">npm install @starkware-ecosystem/starkzap</code>
+          </div>
         </div>
         <div class="get-started-links">
           <a

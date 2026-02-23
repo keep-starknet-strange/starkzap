@@ -69,6 +69,7 @@ Exported bundle:
 - [API Reference](#api-reference)
 - [Examples](#examples)
 - [Contributing](#contributing)
+- [Contributors](#contributors)
 - [License](#license)
 
 ---
@@ -83,6 +84,8 @@ The SDK has two dependencies:
 
 - [`starknet`](https://www.npmjs.com/package/starknet) (v9+) — Starknet.js core library
 - [`@cartridge/controller`](https://www.npmjs.com/package/@cartridge/controller) — Cartridge wallet integration
+
+The package is published on npm as [`@starkware-ecosystem/starkzap`](https://www.npmjs.com/package/@starkware-ecosystem/starkzap); use `npm install @starkware-ecosystem/starkzap` and `from "@starkware-ecosystem/starkzap"` when not developing from this repo.
 
 ---
 
@@ -1166,6 +1169,16 @@ npm run generate:tokens:sepolia    # sepolia
 npm run generate:validators        # mainnet
 npm run generate:validators:sepolia # sepolia
 ```
+
+---
+
+## Contributors
+
+Thanks to everyone who contributes to this project!
+
+<!--GAMFC--><!--GAMFC-END-->
+
+Made with [github-action-contributors](https://github.com/jaywcjlove/github-action-contributors).
 
 ---
 

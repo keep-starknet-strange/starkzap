@@ -21,7 +21,7 @@ The `StarkSDK` accepts configuration through a single options object. You can us
     - **devnet** = Local development (your own test blockchain)
 
     ```typescript
-    import { StarkSDK } from "starkzap";
+    import { StarkSDK } from "@starkware-ecosystem/starkzap";
 
     // Mainnet
     const sdk = new StarkSDK({ network: "mainnet" });
@@ -46,7 +46,7 @@ The `StarkSDK` accepts configuration through a single options object. You can us
     You can also pass a custom `NetworkPreset` object:
 
     ```typescript
-    import { StarkSDK, networks } from "starkzap";
+    import { StarkSDK, networks } from "@starkware-ecosystem/starkzap";
 
     const sdk = new StarkSDK({ network: networks.mainnet });
     ```
@@ -60,7 +60,7 @@ The `StarkSDK` accepts configuration through a single options object. You can us
     </Info>
 
     ```typescript
-    import { StarkSDK, ChainId } from "starkzap";
+    import { StarkSDK, ChainId } from "@starkware-ecosystem/starkzap";
 
     const sdk = new StarkSDK({
       rpcUrl: "https://starknet-mainnet.infura.io/v3/YOUR_KEY",
@@ -85,7 +85,7 @@ The `StarkSDK` accepts configuration through a single options object. You can us
     Staking works out of the box using chain-aware staking contract presets:
 
     ```typescript
-    import { StarkSDK } from "starkzap";
+    import { StarkSDK } from "@starkware-ecosystem/starkzap";
 
     const sdk = new StarkSDK({
       network: "mainnet",
@@ -95,7 +95,7 @@ The `StarkSDK` accepts configuration through a single options object. You can us
     If needed, you can override the default preset:
 
     ```typescript
-    import { StarkSDK, fromAddress } from "starkzap";
+    import { StarkSDK, fromAddress } from "@starkware-ecosystem/starkzap";
 
     const sdk = new StarkSDK({
       network: "mainnet",
@@ -120,7 +120,7 @@ Here's an example with all optional features configured:
 ### Using Network Preset
 
 ```typescript
-import { StarkSDK, fromAddress } from "starkzap";
+import { StarkSDK, fromAddress } from "@starkware-ecosystem/starkzap";
 
 const sdk = new StarkSDK({
   // Network configuration
@@ -138,7 +138,7 @@ const sdk = new StarkSDK({
 ### Using Custom RPC
 
 ```typescript
-import { StarkSDK, ChainId, fromAddress } from "starkzap";
+import { StarkSDK, ChainId, fromAddress } from "@starkware-ecosystem/starkzap";
 
 const sdk = new StarkSDK({
   // Custom RPC configuration
