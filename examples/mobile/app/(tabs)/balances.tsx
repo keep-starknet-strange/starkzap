@@ -18,12 +18,7 @@ import * as Haptics from "expo-haptics";
 import * as WebBrowser from "expo-web-browser";
 import { usePrivy } from "@privy-io/expo";
 
-import { ThemedText } from "@/components/themed-text";
-import { TokenBalance } from "@/components/TokenBalance";
-import { LogsFAB } from "@/components/LogsFAB";
-import { useWalletStore, NETWORKS } from "@/stores/wallet";
-import { useBalancesStore, getTokensForNetwork } from "@/stores/balances";
-import type { Token } from "@starkware-ecosystem/starkzap";
+import Ionicons from "@expo/vector-icons/Ionicons";
 
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { ThemedText } from "@/components/themed-text";
