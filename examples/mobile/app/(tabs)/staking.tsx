@@ -31,7 +31,7 @@ import {
   getWbtcToken,
 } from "@/stores/balances";
 import { showCopiedToast } from "@/components/Toast";
-import type { Amount, Token } from "x";
+import type { Amount, Token } from "starkzap";
 
 function TinyTokenLogo({ token }: { token: Token }) {
   const [imageError, setImageError] = useState(false);
@@ -92,7 +92,7 @@ import {
   getValidatorsForNetwork,
   type StakingPosition as StakingPositionType,
 } from "@/stores/staking";
-import type { Validator, Pool } from "@starkware-ecosystem/starkzap";
+import type { Validator, Pool } from "starkzap";
 
 export default function StakingScreen() {
   const {

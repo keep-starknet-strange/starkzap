@@ -10,7 +10,7 @@ export default defineConfig({
   },
   resolve: {
     alias: {
-      "@starkware-ecosystem/starkzap": path.resolve(
+      "starkzap": path.resolve(
         __dirname,
         "../../src/index.ts"
       ),
@@ -18,6 +18,6 @@ export default defineConfig({
     },
   },
   optimizeDeps: {
-    exclude: ["@starkware-ecosystem/starkzap"],
+    exclude: ["starkzap"],
   },
 });

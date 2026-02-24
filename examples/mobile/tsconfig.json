@@ -4,8 +4,8 @@
     "strict": true,
     "paths": {
       "@/*": ["./*"],
-      "@starkware-ecosystem/starkzap": ["../../src/index.ts"],
-      "@starkware-ecosystem/starkzap/polyfills": ["../../src/polyfills.ts"]
+      "starkzap": ["../../src/index.ts"],
+      "starkzap/polyfills": ["../../src/polyfills.ts"]
     }
   },
   "include": ["**/*.ts", "**/*.tsx", ".expo/types/**/*.ts", "expo-env.d.ts"]

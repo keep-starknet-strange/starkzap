@@ -33,7 +33,7 @@ import {
   getUsdcToken,
   getWbtcToken,
 } from "@/stores/balances";
-import type { Token, Amount } from "x";
+import type { Token, Amount } from "starkzap";
 
 // Fallback logo when WBTC has no logo or image fails to load
 const WBTC_LOGO_FALLBACK =

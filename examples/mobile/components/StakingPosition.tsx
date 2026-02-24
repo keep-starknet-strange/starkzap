@@ -6,7 +6,7 @@ import {
 } from "react-native";
 import { ThemedText } from "./themed-text";
 import { ThemedView } from "./themed-view";
-import type { PoolMember } from "@starkware-ecosystem/starkzap";
+import type { PoolMember } from "starkzap";
 
 interface StakingPositionProps {
   position: PoolMember | null;

@@ -13,7 +13,7 @@ icon: wrench
 **Solution:** Remove the custom override to use chain-aware defaults, or set the correct contract for your network:
 
 ```typescript
-import { StarkZap } from "@starkware-ecosystem/starkzap";
+import { StarkZap } from "starkzap";
 
 // Recommended: use built-in chain-aware staking preset
 const sdk = new StarkZap({ network: "mainnet" });
@@ -157,7 +157,7 @@ try {
 **Solution:** Ensure you're using the correct types:
 
 ```typescript
-import { Address, Amount, ChainId } from "@starkware-ecosystem/starkzap";
+import { Address, Amount, ChainId } from "starkzap";
 
 // Use fromAddress for addresses
 const addr: Address = fromAddress("0x...");
