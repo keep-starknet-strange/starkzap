@@ -4,7 +4,7 @@
  *
  * Uses only: StarkZap (via ./starknet), DOM APIs, and game assets (jQuery, buzz, main.js).
  */
-import { networks } from "@starkware-ecosystem/starkzap";
+import { networks } from "starkzap";
 import * as starknet from "./starknet";
 
 const btnConnect = document.getElementById("starknet-connect") as HTMLButtonElement;

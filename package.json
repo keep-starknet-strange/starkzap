@@ -1,5 +1,5 @@
 {
-  "name": "@starkware-ecosystem/starkzap",
+  "name": "starkzap",
   "version": "1.0.0",
   "description": "Helper sdk for easy wallet integration",
   "homepage": "https://github.com/keep-starknet-strange/x#readme",

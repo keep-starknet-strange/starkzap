@@ -15,12 +15,12 @@ Bring Bitcoin, stablecoins, and DeFi to any web or mobile app via Starknet in mi
 ## Installation
 
 ```bash
-npm install @starkware-ecosystem/starkzap
+npm install starkzap
 ```
 
 Peer dependencies (installed automatically with `starkzap`):
 
-- [`starknet`](https://www.npmjs.com/package/starknet) (v9+) — Starknet.js core (installed with `@starkware-ecosystem/starkzap`)
+- [`starknet`](https://www.npmjs.com/package/starknet) (v9+) — Starknet.js core (installed with `starkzap`)
 - [`@cartridge/controller`](https://www.npmjs.com/package/@cartridge/controller) — optional peer, only needed for Cartridge support
 
 For specific integrations, you may need:
@@ -43,7 +43,7 @@ import {
   Amount,
   fromAddress,
   sepoliaTokens,
-} from "@starkware-ecosystem/starkzap";
+} from "starkzap";
 
 const sdk = new StarkSDK({ network: "sepolia" });
 

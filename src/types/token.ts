@@ -6,7 +6,7 @@ import type { Address } from "@/types/address";
  * @example
  * ```ts
  * // Use a preset
- * import { TBTC, USDC } from "@starkware-ecosystem/starkzap";
+ * import { TBTC, USDC } from "starkzap";
  * sdk.erc20({ token: TBTC });
  *
  * // Or define custom

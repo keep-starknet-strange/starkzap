@@ -11,7 +11,7 @@ import {
   networks,
   Contract,
   type WalletInterface,
-} from "@starkware-ecosystem/starkzap";
+} from "starkzap";
 import { Contract, getChecksumAddress, type RpcProvider } from "starknet";
 
 // FOS demo game contract on Sepolia (same as https://github.com/0xsisyfos/fos)
