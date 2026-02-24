@@ -10,6 +10,8 @@ Bring Bitcoin, stablecoins, and DeFi to any web or mobile app via Starknet in mi
 
 **Full documentation:** [docs.starknet.io/build/starkzap](https://docs.starknet.io/build/starkzap/overview)
 
+**Curated list of projects using Starkzap:** [awesome-starkzap](https://github.com/keep-starknet-strange/awesome-starkzap)
+
 ---
 
 ## Installation
