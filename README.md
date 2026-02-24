@@ -29,7 +29,7 @@ For specific integrations, you may need:
 - **Privy** (React Native / Expo): see the [Privy docs](https://docs.privy.io) for the Expo SDK
 - **AVNU Paymaster**: no extra package; configure a paymaster URL — see [Paymasters](https://docs.starknet.io/build/starkzap/paymasters) and [AVNU integration](https://docs.starknet.io/build/starkzap/integrations/avnu-paymaster)
 
-The package is published on npm as [`@starkware-ecosystem/starkzap`](https://www.npmjs.com/package/@starkware-ecosystem/starkzap); use `npm install @starkware-ecosystem/starkzap` and `from "@starkware-ecosystem/starkzap"` when not developing from this repo.
+The package is published on npm as [`starkzap`](https://www.npmjs.com/package/starkzap); use `npm install starkzap` and `from "starkzap"` when not developing from this repo.
 
 ---
 
@@ -130,8 +130,6 @@ Thanks goes to these wonderful people ([emoji key](https://allcontributors.org/d
 <!-- ALL-CONTRIBUTORS-LIST:END -->
 
 This project follows the [all-contributors](https://github.com/all-contributors/all-contributors) specification. Contributions of any kind welcome!
-
-
 
 ---
 
