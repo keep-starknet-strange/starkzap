@@ -6,80 +6,56 @@
  * Exposes Starknet wallet operations as MCP tools via the x SDK.
  * Works with any MCP-compatible client: Claude, Cursor, OpenAI Agents SDK, etc.
  *
- * Tools (read-only):
- *   - x_get_balance       Check ERC20 token balance
- *   - x_get_pool_position Query staking position in a pool
- *   - x_estimate_fee      Estimate gas cost for a set of calls
- *
- * Tools (state-changing — disabled by default, opt-in via --enable-write):
- *   - x_transfer          Send tokens to one or more recipients
- *   - x_deploy_account    Deploy the account contract on-chain
- *   - x_enter_pool        Enter a staking/delegation pool
- *   - x_add_to_pool       Add more tokens to an existing stake
- *   - x_claim_rewards     Claim staking rewards from a pool
- *   - x_exit_pool_intent  Start the exit process from a pool
- *   - x_exit_pool         Complete the exit after the waiting period
- *
- * Tools (unrestricted — disabled by default, opt-in via --enable-execute):
- *   - x_execute           Execute raw contract calls
- *
- * Security:
- *   - All state-changing tools disabled unless --enable-write is passed
- *   - All addresses are validated before use
- *   - Operation amounts are bounded by --max-amount (default: 1000)
- *   - x_execute requires separate --enable-execute flag
- *   - Tool argument schemas are validated at runtime with zod
- *
  * Usage:
  *   STARKNET_PRIVATE_KEY=0x... npx @keep-starknet-strange/x-mcp --network mainnet
  */
 
+import { fileURLToPath } from "node:url";
+import path from "node:path";
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import {
   CallToolRequestSchema,
   ListToolsRequestSchema,
-  type Tool,
 } from "@modelcontextprotocol/sdk/types.js";
 import { z } from "zod";
+import { Amount, fromAddress, StarkSDK, StarkSigner } from "x";
+import type { Address, Token, Wallet } from "x";
 import {
-  StarkSDK,
-  StarkSigner,
-  Amount,
-  fromAddress,
-  mainnetTokens,
-  sepoliaTokens,
-} from "x";
-import type { Wallet } from "x";
-import type { Address, Token } from "x";
+  assertAmountWithinCap,
+  assertBatchAmountWithinCap,
+  assertPoolTokenHintMatches,
+  assertSchemaParity,
+  buildTools,
+  createTokenResolver,
+  extractPoolToken,
+  FELT_REGEX,
+  formatZodError,
+  parseCliConfig,
+  READ_ONLY_TOOLS,
+  requireResourceBounds,
+  schemas,
+  selectTools,
+  STAKING_TOOLS,
+} from "./core.js";
 
 // ---------------------------------------------------------------------------
 // CLI args
 // ---------------------------------------------------------------------------
 const cliArgs = process.argv.slice(2);
-function getArg(name: string, fallback: string): string {
-  const idx = cliArgs.indexOf(`--${name}`);
-  return idx !== -1 && cliArgs[idx + 1] ? cliArgs[idx + 1]! : fallback;
-}
-function hasFlag(name: string): boolean {
-  return cliArgs.includes(`--${name}`);
-}
 
-const VALID_NETWORKS = ["mainnet", "sepolia"] as const;
-type Network = (typeof VALID_NETWORKS)[number];
+const cliConfig = (() => {
+  try {
+    return parseCliConfig(cliArgs);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.error(`Error: ${message}`);
+    process.exit(1);
+  }
+})();
 
-const rawNetwork = getArg("network", "mainnet");
-if (!VALID_NETWORKS.includes(rawNetwork as Network)) {
-  console.error(
-    `Error: Invalid --network value "${rawNetwork}". Must be one of: ${VALID_NETWORKS.join(", ")}`
-  );
-  process.exit(1);
-}
-const network: Network = rawNetwork as Network;
-
-const enableWrite = hasFlag("enable-write");
-const enableExecute = hasFlag("enable-execute");
-const maxAmount = getArg("max-amount", "1000"); // human-readable cap per write operation
+const { network, enableWrite, enableExecute, maxAmount, maxBatchAmount } =
+  cliConfig;
 
 // ---------------------------------------------------------------------------
 // Environment
@@ -90,18 +66,23 @@ const envSchema = z.object({
   STARKNET_STAKING_CONTRACT: z.string().startsWith("0x").optional(),
 });
 
-const env = envSchema.parse(process.env);
+const env = (() => {
+  const parsed = envSchema.safeParse(process.env);
+  if (parsed.success) {
+    return parsed.data;
+  }
+  const details = parsed.error.issues
+    .map((issue) => `${issue.path.join(".") || "env"}: ${issue.message}`)
+    .join("; ");
+  console.error(`Error: invalid environment configuration: ${details}`);
+  process.exit(1);
+})();
+
+const stakingEnabled = Boolean(env.STARKNET_STAKING_CONTRACT);
 
 // ---------------------------------------------------------------------------
 // Address validation
 // ---------------------------------------------------------------------------
-const FELT_REGEX = /^0x[0-9a-fA-F]{1,64}$/;
-
-/**
- * Validates and parses a Starknet address using the x SDK's fromAddress(),
- * which delegates to starknet.js validateAndParseAddress(). Returns a
- * properly branded Address type.
- */
 function validateAddress(address: string, label: string): Address {
   if (!FELT_REGEX.test(address)) {
     throw new Error(
@@ -120,12 +101,12 @@ function validateAddress(address: string, label: string): Address {
 // ---------------------------------------------------------------------------
 // SDK + wallet singleton (lazy init)
 // ---------------------------------------------------------------------------
-let _sdk: StarkSDK | undefined;
-let _wallet: Wallet | undefined;
+let sdkSingleton: StarkSDK | undefined;
+let walletSingleton: Wallet | undefined;
 
 function getSdk(): StarkSDK {
-  if (!_sdk) {
-    _sdk = new StarkSDK({
+  if (!sdkSingleton) {
+    sdkSingleton = new StarkSDK({
       network,
       ...(env.STARKNET_RPC_URL && { rpcUrl: env.STARKNET_RPC_URL }),
       ...(env.STARKNET_STAKING_CONTRACT && {
@@ -135,466 +116,88 @@ function getSdk(): StarkSDK {
       }),
     });
   }
-  return _sdk;
+  return sdkSingleton;
 }
 
 async function getWallet(): Promise<Wallet> {
-  if (!_wallet) {
-    const sdk = getSdk();
-    _wallet = await sdk.connectWallet({
+  if (!walletSingleton) {
+    walletSingleton = await getSdk().connectWallet({
       account: {
         signer: new StarkSigner(env.STARKNET_PRIVATE_KEY),
       },
     });
   }
-  return _wallet;
+  return walletSingleton;
 }
 
 // ---------------------------------------------------------------------------
-// Token helpers
+// Tool definitions + gates
 // ---------------------------------------------------------------------------
-// mainnetTokens and sepoliaTokens are `as const satisfies Record<string, Token>`
-// so they are assignable to Record<string, Token> directly.
-const tokensByNetwork: Record<string, Record<string, Token>> = {
-  mainnet: mainnetTokens,
-  sepolia: sepoliaTokens,
-};
+const resolveToken = createTokenResolver(network);
+const allTools = buildTools(maxAmount, maxBatchAmount);
+assertSchemaParity(allTools);
 
-function resolveToken(symbolOrAddress: string): Token {
-  const tokens = tokensByNetwork[network] ?? {};
-
-  // Try by symbol (case-insensitive)
-  const upper = symbolOrAddress.toUpperCase();
-  const bySymbol = Object.values(tokens).find(
-    (t) => t.symbol.toUpperCase() === upper
-  );
-  if (bySymbol) return bySymbol;
-
-  // Try by address (only from known presets — unknown addresses are rejected for safety)
-  if (FELT_REGEX.test(symbolOrAddress)) {
-    const byAddress = Object.values(tokens).find(
-      (t) =>
-        (t.address as string).toLowerCase() === symbolOrAddress.toLowerCase()
-    );
-    if (byAddress) return byAddress;
-  }
-
-  const available = Object.values(tokens)
-    .map((t) => t.symbol)
-    .join(", ");
-  throw new Error(
-    `Unknown token: "${symbolOrAddress}". Available tokens: ${available}. ` +
-      `Only pre-verified tokens are supported for safety. ` +
-      `To add a custom token, update the x SDK token presets.`
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Runtime argument validation schemas
-// ---------------------------------------------------------------------------
-const addressSchema = z.string().regex(FELT_REGEX, "Invalid Starknet address");
-const amountSchema = z
-  .string()
-  .regex(/^\d+(\.\d+)?$/, "Amount must be a positive number");
-
-const schemas = {
-  x_get_balance: z.object({
-    token: z.string().min(1),
-  }),
-  x_transfer: z.object({
-    token: z.string().min(1),
-    transfers: z
-      .array(
-        z.object({
-          to: addressSchema,
-          amount: amountSchema,
-        })
-      )
-      .min(1)
-      .max(20, "Maximum 20 transfers per batch"),
-    sponsored: z.boolean().optional(),
-  }),
-  x_execute: z.object({
-    calls: z
-      .array(
-        z.object({
-          contractAddress: addressSchema,
-          entrypoint: z.string().min(1),
-          calldata: z.array(z.string()).optional(),
-        })
-      )
-      .min(1)
-      .max(10, "Maximum 10 calls per batch"),
-    sponsored: z.boolean().optional(),
-  }),
-  x_deploy_account: z.object({
-    sponsored: z.boolean().optional(),
-  }),
-  x_enter_pool: z.object({
-    pool: addressSchema,
-    amount: amountSchema,
-    token: z.string().optional(),
-  }),
-  x_add_to_pool: z.object({
-    pool: addressSchema,
-    amount: amountSchema,
-    token: z.string().optional(),
-  }),
-  x_claim_rewards: z.object({
-    pool: addressSchema,
-  }),
-  x_exit_pool_intent: z.object({
-    pool: addressSchema,
-    amount: amountSchema,
-    token: z.string().optional(),
-  }),
-  x_exit_pool: z.object({
-    pool: addressSchema,
-  }),
-  x_get_pool_position: z.object({
-    pool: addressSchema,
-  }),
-  x_estimate_fee: z.object({
-    calls: z
-      .array(
-        z.object({
-          contractAddress: addressSchema,
-          entrypoint: z.string().min(1),
-          calldata: z.array(z.string()).optional(),
-        })
-      )
-      .min(1),
-  }),
-} as const;
-
-// ---------------------------------------------------------------------------
-// Tool definitions
-// ---------------------------------------------------------------------------
-const allTools: Tool[] = [
-  {
-    name: "x_get_balance",
-    description:
-      "Get the wallet's ERC20 token balance. Returns human-readable and raw values.",
-    inputSchema: {
-      type: "object" as const,
-      properties: {
-        token: {
-          type: "string",
-          description:
-            "Token symbol (ETH, STRK, USDC, etc.) or contract address",
-        },
-      },
-      required: ["token"],
-    },
-  },
-  {
-    name: "x_transfer",
-    description:
-      `Transfer ERC20 tokens to one or more recipients in a single transaction. ` +
-      `Maximum ${maxAmount} tokens per individual transfer. Maximum 20 recipients per batch.`,
-    inputSchema: {
-      type: "object" as const,
-      properties: {
-        token: {
-          type: "string",
-          description: "Token symbol or contract address",
-        },
-        transfers: {
-          type: "array",
-          items: {
-            type: "object",
-            properties: {
-              to: { type: "string", description: "Recipient address (0x...)" },
-              amount: {
-                type: "string",
-                description: `Human-readable amount (e.g. "10.5"). Max ${maxAmount} per transfer.`,
-              },
-            },
-            required: ["to", "amount"],
-          },
-          description: "One or more {to, amount} transfers (max 20)",
-        },
-        sponsored: {
-          type: "boolean",
-          description: "Use paymaster for gasless tx (default: false)",
-        },
-      },
-      required: ["token", "transfers"],
-    },
-  },
-  {
-    name: "x_execute",
-    description:
-      "Execute one or more raw contract calls atomically. RESTRICTED: only available when server is started with --enable-execute flag. Maximum 10 calls per batch.",
-    inputSchema: {
-      type: "object" as const,
-      properties: {
-        calls: {
-          type: "array",
-          items: {
-            type: "object",
-            properties: {
-              contractAddress: {
-                type: "string",
-                description: "Contract address",
-              },
-              entrypoint: {
-                type: "string",
-                description: "Function name to call",
-              },
-              calldata: {
-                type: "array",
-                items: { type: "string" },
-                description: "Calldata as array of strings",
-              },
-            },
-            required: ["contractAddress", "entrypoint"],
-          },
-        },
-        sponsored: {
-          type: "boolean",
-          description: "Use paymaster for gasless tx (default: false)",
-        },
-      },
-      required: ["calls"],
-    },
-  },
-  {
-    name: "x_deploy_account",
-    description:
-      "Deploy the account contract on-chain. Must be called before the account can send transactions (unless using sponsored mode, which auto-deploys).",
-    inputSchema: {
-      type: "object" as const,
-      properties: {
-        sponsored: {
-          type: "boolean",
-          description: "Use paymaster for gasless deploy (default: false)",
-        },
-      },
-    },
-  },
-  {
-    name: "x_enter_pool",
-    description: `Enter a staking/delegation pool as a new member. Handles token approval automatically. Maximum ${maxAmount} tokens per operation.`,
-    inputSchema: {
-      type: "object" as const,
-      properties: {
-        pool: {
-          type: "string",
-          description: "Pool contract address",
-        },
-        amount: {
-          type: "string",
-          description: 'Amount of STRK to stake (e.g. "100")',
-        },
-        token: {
-          type: "string",
-          description: "Token symbol (default: STRK)",
-        },
-      },
-      required: ["pool", "amount"],
-    },
-  },
-  {
-    name: "x_add_to_pool",
-    description: `Add more tokens to an existing stake in a pool. Maximum ${maxAmount} tokens per operation.`,
-    inputSchema: {
-      type: "object" as const,
-      properties: {
-        pool: {
-          type: "string",
-          description: "Pool contract address",
-        },
-        amount: {
-          type: "string",
-          description: "Amount to add",
-        },
-        token: {
-          type: "string",
-          description: "Token symbol (default: STRK)",
-        },
-      },
-      required: ["pool", "amount"],
-    },
-  },
-  {
-    name: "x_claim_rewards",
-    description: "Claim accumulated staking rewards from a pool.",
-    inputSchema: {
-      type: "object" as const,
-      properties: {
-        pool: {
-          type: "string",
-          description: "Pool contract address",
-        },
-      },
-      required: ["pool"],
-    },
-  },
-  {
-    name: "x_exit_pool_intent",
-    description: `Start the exit process from a pool. Maximum ${maxAmount} tokens per operation. Tokens stop earning rewards immediately. Must wait for the exit window before calling x_exit_pool.`,
-    inputSchema: {
-      type: "object" as const,
-      properties: {
-        pool: {
-          type: "string",
-          description: "Pool contract address",
-        },
-        amount: {
-          type: "string",
-          description: "Amount to unstake",
-        },
-        token: {
-          type: "string",
-          description: "Token symbol (default: STRK)",
-        },
-      },
-      required: ["pool", "amount"],
-    },
-  },
-  {
-    name: "x_exit_pool",
-    description:
-      "Complete the exit from a pool after the waiting period. Returns staked tokens to the wallet.",
-    inputSchema: {
-      type: "object" as const,
-      properties: {
-        pool: {
-          type: "string",
-          description: "Pool contract address",
-        },
-      },
-      required: ["pool"],
-    },
-  },
-  {
-    name: "x_get_pool_position",
-    description:
-      "Get the wallet's staking position in a pool: staked amount, rewards, commission, exit status.",
-    inputSchema: {
-      type: "object" as const,
-      properties: {
-        pool: {
-          type: "string",
-          description: "Pool contract address",
-        },
-      },
-      required: ["pool"],
-    },
-  },
-  {
-    name: "x_estimate_fee",
-    description:
-      "Estimate the gas fee for one or more contract calls. Returns overall_fee and resource bounds (l1_gas, l2_gas, l1_data_gas).",
-    inputSchema: {
-      type: "object" as const,
-      properties: {
-        calls: {
-          type: "array",
-          items: {
-            type: "object",
-            properties: {
-              contractAddress: {
-                type: "string",
-                description: "Contract address",
-              },
-              entrypoint: {
-                type: "string",
-                description: "Function name to call",
-              },
-              calldata: {
-                type: "array",
-                items: { type: "string" },
-                description: "Calldata as array of strings",
-              },
-            },
-            required: ["contractAddress", "entrypoint"],
-          },
-        },
-      },
-      required: ["calls"],
-    },
-  },
-];
-
-// ---------------------------------------------------------------------------
-// Tool access control
-// ---------------------------------------------------------------------------
-const READ_ONLY_TOOLS = new Set([
-  "x_get_balance",
-  "x_get_pool_position",
-  "x_estimate_fee",
-]);
-
-const STAKING_TOOLS = new Set([
-  "x_enter_pool",
-  "x_add_to_pool",
-  "x_claim_rewards",
-  "x_exit_pool_intent",
-  "x_exit_pool",
-  "x_get_pool_position",
-]);
-
-const tools: Tool[] = allTools.filter((t) => {
-  if (READ_ONLY_TOOLS.has(t.name)) return true;
-  if (t.name === "x_execute") return enableExecute;
-  return enableWrite || enableExecute; // --enable-execute implies write access
+const tools = selectTools(allTools, {
+  enableWrite,
+  enableExecute,
+  stakingEnabled,
 });
 
 // ---------------------------------------------------------------------------
 // Tool handlers
 // ---------------------------------------------------------------------------
+const TX_WAIT_TIMEOUT_MS = 120_000;
 
-/** Validates a single operation amount against the configured cap. */
-function assertAmountWithinCap(
-  amount: Amount,
-  token: Token,
-  cap: string
-): void {
-  const capAmount = Amount.parse(cap, token);
-  if (amount.gt(capAmount)) {
-    throw new Error(
-      `Amount ${amount.toUnit()} ${token.symbol} exceeds the per-operation cap of ${cap}. ` +
-        `Adjust --max-amount to increase the limit.`
-    );
-  }
-}
-
-const TX_WAIT_TIMEOUT_MS = 120_000; // 2 minutes
-
-/** Wait for a tx with a timeout to avoid hanging forever. */
 async function waitWithTimeout(
   tx: { wait: () => Promise<void>; hash: string },
   timeoutMs: number = TX_WAIT_TIMEOUT_MS
 ): Promise<void> {
-  const timeout = new Promise<never>((_, reject) =>
-    setTimeout(
-      () =>
-        reject(
-          new Error(
-            `Transaction ${tx.hash} confirmation timed out after ${timeoutMs}ms`
-          )
-        ),
-      timeoutMs
-    )
-  );
-  await Promise.race([tx.wait(), timeout]);
+  let timeoutId: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<never>((_, reject) => {
+    timeoutId = setTimeout(() => {
+      reject(
+        new Error(
+          `Transaction ${tx.hash} confirmation timed out after ${timeoutMs}ms`
+        )
+      );
+    }, timeoutMs);
+  });
+
+  try {
+    await Promise.race([tx.wait(), timeout]);
+  } finally {
+    if (timeoutId) {
+      clearTimeout(timeoutId);
+    }
+  }
+}
+
+async function resolvePoolTokenForOperation(
+  wallet: Wallet,
+  poolAddress: Address,
+  tokenHint?: string
+): Promise<Token> {
+  const staking = await wallet.staking(poolAddress);
+  const poolToken = extractPoolToken(staking);
+  if (!poolToken) {
+    throw new Error(
+      "Could not resolve pool token metadata from SDK staking instance. Update the x SDK."
+    );
+  }
+  assertPoolTokenHintMatches(poolToken, tokenHint, resolveToken);
+  return poolToken;
 }
 
 async function handleTool(
   name: string,
   rawArgs: Record<string, unknown>
 ): Promise<{ content: Array<{ type: "text"; text: string }> }> {
-  // Runtime schema validation
   const schema = schemas[name as keyof typeof schemas];
   if (!schema) {
     throw new Error(`Unknown tool: ${name}`);
   }
   const args = schema.parse(rawArgs);
 
-  // Enforce write-tool gate at runtime (defense-in-depth: tool list is already
-  // filtered, but a malicious client could call tools by name directly).
   if (!READ_ONLY_TOOLS.has(name)) {
     if (name === "x_execute" && !enableExecute) {
       throw new Error(
@@ -605,28 +208,23 @@ async function handleTool(
     if (name !== "x_execute" && !enableWrite && !enableExecute) {
       throw new Error(
         `${name} is a state-changing tool and is disabled by default. ` +
-          `Start the server with --enable-write to allow write operations.`
+          "Start the server with --enable-write to allow write operations."
       );
     }
   }
 
-  // Staking tools require STARKNET_STAKING_CONTRACT to be configured.
-  if (STAKING_TOOLS.has(name) && !env.STARKNET_STAKING_CONTRACT) {
+  if (STAKING_TOOLS.has(name) && !stakingEnabled) {
     throw new Error(
-      `${name} requires the STARKNET_STAKING_CONTRACT environment variable to be set.`
+      `${name} is disabled because STARKNET_STAKING_CONTRACT is not configured.`
     );
   }
 
   const wallet = await getWallet();
-
   const ok = (data: unknown) => ({
     content: [{ type: "text" as const, text: JSON.stringify(data, null, 2) }],
   });
 
   switch (name) {
-    // -----------------------------------------------------------------------
-    // Balance (read-only)
-    // -----------------------------------------------------------------------
     case "x_get_balance": {
       const parsed = args as z.infer<typeof schemas.x_get_balance>;
       const token = resolveToken(parsed.token);
@@ -641,20 +239,24 @@ async function handleTool(
       });
     }
 
-    // -----------------------------------------------------------------------
-    // Transfer (state-changing, amount-capped)
-    // -----------------------------------------------------------------------
     case "x_transfer": {
       const parsed = args as z.infer<typeof schemas.x_transfer>;
       const token = resolveToken(parsed.token);
-      const transfers = parsed.transfers.map((t) => {
-        const amount = Amount.parse(t.amount, token);
+      const transfers = parsed.transfers.map((transfer) => {
+        const amount = Amount.parse(transfer.amount, token);
         assertAmountWithinCap(amount, token, maxAmount);
         return {
-          to: validateAddress(t.to, "recipient"),
+          to: validateAddress(transfer.to, "recipient"),
           amount,
         };
       });
+
+      assertBatchAmountWithinCap(
+        transfers.map((transfer) => transfer.amount),
+        token,
+        maxBatchAmount
+      );
+
       const feeMode = parsed.sponsored ? "sponsored" : undefined;
       const tx = await wallet.transfer(token, transfers, {
         ...(feeMode && { feeMode: feeMode as "sponsored" }),
@@ -663,23 +265,20 @@ async function handleTool(
       return ok({
         hash: tx.hash,
         explorerUrl: tx.explorerUrl,
-        transfers: transfers.map((t) => ({
-          to: t.to,
-          amount: t.amount.toUnit(),
+        transfers: transfers.map((transfer) => ({
+          to: transfer.to,
+          amount: transfer.amount.toUnit(),
           symbol: token.symbol,
         })),
       });
     }
 
-    // -----------------------------------------------------------------------
-    // Execute (state-changing, restricted)
-    // -----------------------------------------------------------------------
     case "x_execute": {
       const parsed = args as z.infer<typeof schemas.x_execute>;
-      const calls = parsed.calls.map((c) => ({
-        contractAddress: validateAddress(c.contractAddress, "contract"),
-        entrypoint: c.entrypoint,
-        calldata: c.calldata ?? [],
+      const calls = parsed.calls.map((call) => ({
+        contractAddress: validateAddress(call.contractAddress, "contract"),
+        entrypoint: call.entrypoint,
+        calldata: call.calldata ?? [],
       }));
       const feeMode = parsed.sponsored ? "sponsored" : undefined;
       const tx = await wallet.execute(calls, {
@@ -693,13 +292,9 @@ async function handleTool(
       });
     }
 
-    // -----------------------------------------------------------------------
-    // Deploy (state-changing)
-    // -----------------------------------------------------------------------
     case "x_deploy_account": {
       const parsed = args as z.infer<typeof schemas.x_deploy_account>;
-      const deployed = await wallet.isDeployed();
-      if (deployed) {
+      if (await wallet.isDeployed()) {
         return ok({
           status: "already_deployed",
           address: wallet.address,
@@ -718,112 +313,106 @@ async function handleTool(
       });
     }
 
-    // -----------------------------------------------------------------------
-    // Staking — enter pool
-    // -----------------------------------------------------------------------
     case "x_enter_pool": {
       const parsed = args as z.infer<typeof schemas.x_enter_pool>;
-      const token = resolveToken(parsed.token ?? "STRK");
-      const amount = Amount.parse(parsed.amount, token);
-      assertAmountWithinCap(amount, token, maxAmount);
-      const poolAddr = validateAddress(parsed.pool, "pool");
-      const tx = await wallet.enterPool(poolAddr, amount);
+      const poolAddress = validateAddress(parsed.pool, "pool");
+      const poolToken = await resolvePoolTokenForOperation(
+        wallet,
+        poolAddress,
+        parsed.token
+      );
+      const amount = Amount.parse(parsed.amount, poolToken);
+      assertAmountWithinCap(amount, poolToken, maxAmount);
+      const tx = await wallet.enterPool(poolAddress, amount);
       await waitWithTimeout(tx);
       return ok({
         hash: tx.hash,
         explorerUrl: tx.explorerUrl,
-        pool: poolAddr,
+        pool: poolAddress,
         amount: amount.toUnit(),
-        symbol: token.symbol,
+        symbol: poolToken.symbol,
       });
     }
 
-    // -----------------------------------------------------------------------
-    // Staking — add to pool
-    // -----------------------------------------------------------------------
     case "x_add_to_pool": {
       const parsed = args as z.infer<typeof schemas.x_add_to_pool>;
-      const token = resolveToken(parsed.token ?? "STRK");
-      const amount = Amount.parse(parsed.amount, token);
-      assertAmountWithinCap(amount, token, maxAmount);
-      const poolAddr = validateAddress(parsed.pool, "pool");
-      const tx = await wallet.addToPool(poolAddr, amount);
+      const poolAddress = validateAddress(parsed.pool, "pool");
+      const poolToken = await resolvePoolTokenForOperation(
+        wallet,
+        poolAddress,
+        parsed.token
+      );
+      const amount = Amount.parse(parsed.amount, poolToken);
+      assertAmountWithinCap(amount, poolToken, maxAmount);
+      const tx = await wallet.addToPool(poolAddress, amount);
       await waitWithTimeout(tx);
       return ok({
         hash: tx.hash,
         explorerUrl: tx.explorerUrl,
-        pool: poolAddr,
+        pool: poolAddress,
         amount: amount.toUnit(),
-        symbol: token.symbol,
+        symbol: poolToken.symbol,
       });
     }
 
-    // -----------------------------------------------------------------------
-    // Staking — claim rewards
-    // -----------------------------------------------------------------------
     case "x_claim_rewards": {
       const parsed = args as z.infer<typeof schemas.x_claim_rewards>;
-      const poolAddr = validateAddress(parsed.pool, "pool");
-      const tx = await wallet.claimPoolRewards(poolAddr);
+      const poolAddress = validateAddress(parsed.pool, "pool");
+      const tx = await wallet.claimPoolRewards(poolAddress);
       await waitWithTimeout(tx);
       return ok({
         hash: tx.hash,
         explorerUrl: tx.explorerUrl,
-        pool: poolAddr,
+        pool: poolAddress,
       });
     }
 
-    // -----------------------------------------------------------------------
-    // Staking — exit intent
-    // -----------------------------------------------------------------------
     case "x_exit_pool_intent": {
       const parsed = args as z.infer<typeof schemas.x_exit_pool_intent>;
-      const token = resolveToken(parsed.token ?? "STRK");
-      const amount = Amount.parse(parsed.amount, token);
-      assertAmountWithinCap(amount, token, maxAmount);
-      const poolAddr = validateAddress(parsed.pool, "pool");
-      const tx = await wallet.exitPoolIntent(poolAddr, amount);
+      const poolAddress = validateAddress(parsed.pool, "pool");
+      const poolToken = await resolvePoolTokenForOperation(
+        wallet,
+        poolAddress,
+        parsed.token
+      );
+      const amount = Amount.parse(parsed.amount, poolToken);
+      assertAmountWithinCap(amount, poolToken, maxAmount);
+      const tx = await wallet.exitPoolIntent(poolAddress, amount);
       await waitWithTimeout(tx);
       return ok({
         hash: tx.hash,
         explorerUrl: tx.explorerUrl,
-        pool: poolAddr,
+        pool: poolAddress,
         amount: amount.toUnit(),
-        symbol: token.symbol,
+        symbol: poolToken.symbol,
         note: "Tokens stop earning rewards now. Call x_exit_pool after the waiting period.",
       });
     }
 
-    // -----------------------------------------------------------------------
-    // Staking — exit pool (complete)
-    // -----------------------------------------------------------------------
     case "x_exit_pool": {
       const parsed = args as z.infer<typeof schemas.x_exit_pool>;
-      const poolAddr = validateAddress(parsed.pool, "pool");
-      const tx = await wallet.exitPool(poolAddr);
+      const poolAddress = validateAddress(parsed.pool, "pool");
+      const tx = await wallet.exitPool(poolAddress);
       await waitWithTimeout(tx);
       return ok({
         hash: tx.hash,
         explorerUrl: tx.explorerUrl,
-        pool: poolAddr,
+        pool: poolAddress,
       });
     }
 
-    // -----------------------------------------------------------------------
-    // Staking — get position (read-only)
-    // -----------------------------------------------------------------------
     case "x_get_pool_position": {
       const parsed = args as z.infer<typeof schemas.x_get_pool_position>;
-      const poolAddr = validateAddress(parsed.pool, "pool");
-      const position = await wallet.getPoolPosition(poolAddr);
+      const poolAddress = validateAddress(parsed.pool, "pool");
+      const position = await wallet.getPoolPosition(poolAddress);
       if (!position) {
         return ok({
-          pool: poolAddr,
+          pool: poolAddress,
           isMember: false,
         });
       }
       return ok({
-        pool: poolAddr,
+        pool: poolAddress,
         isMember: true,
         staked: position.staked.toUnit(),
         stakedFormatted: position.staked.toFormatted(),
@@ -837,19 +426,15 @@ async function handleTool(
       });
     }
 
-    // -----------------------------------------------------------------------
-    // Estimate fee (read-only)
-    // -----------------------------------------------------------------------
     case "x_estimate_fee": {
       const parsed = args as z.infer<typeof schemas.x_estimate_fee>;
-      const calls = parsed.calls.map((c) => ({
-        contractAddress: validateAddress(c.contractAddress, "contract"),
-        entrypoint: c.entrypoint,
-        calldata: c.calldata ?? [],
+      const calls = parsed.calls.map((call) => ({
+        contractAddress: validateAddress(call.contractAddress, "contract"),
+        entrypoint: call.entrypoint,
+        calldata: call.calldata ?? [],
       }));
       const fee = await wallet.estimateFee(calls);
-      // starknet.js v9 EstimateFeeResponseOverhead: { overall_fee, resourceBounds, unit }
-      const { l1_gas, l2_gas, l1_data_gas } = fee.resourceBounds;
+      const { l1_gas, l2_gas, l1_data_gas } = requireResourceBounds(fee);
       return ok({
         overall_fee: fee.overall_fee.toString(),
         unit: fee.unit,
@@ -890,30 +475,27 @@ const server = new Server(
   }
 );
 
-server.setRequestHandler(ListToolsRequestSchema, async () => ({
-  tools,
-}));
+server.setRequestHandler(ListToolsRequestSchema, async () => ({ tools }));
 
 server.setRequestHandler(CallToolRequestSchema, async (request) => {
   const { name, arguments: toolArgs } = request.params;
   try {
     return await handleTool(name, (toolArgs ?? {}) as Record<string, unknown>);
   } catch (error) {
+    if (error instanceof z.ZodError) {
+      return {
+        content: [
+          {
+            type: "text" as const,
+            text: `Validation error: ${formatZodError(error)}`,
+          },
+        ],
+        isError: true,
+      };
+    }
     const message = error instanceof Error ? error.message : String(error);
-    // Include zod validation details if available
-    const details =
-      error instanceof z.ZodError
-        ? error.issues
-            .map((i) => `${i.path.join(".")}: ${i.message}`)
-            .join("; ")
-        : undefined;
     return {
-      content: [
-        {
-          type: "text" as const,
-          text: details ? `Validation error: ${details}` : `Error: ${message}`,
-        },
-      ],
+      content: [{ type: "text" as const, text: `Error: ${message}` }],
       isError: true,
     };
   }
@@ -929,11 +511,18 @@ async function main() {
     `x-mcp server running (network: ${network}, transport: stdio, ` +
       `write: ${enableWrite || enableExecute ? "ENABLED" : "disabled"}, ` +
       `execute: ${enableExecute ? "ENABLED" : "disabled"}, ` +
-      `max-amount: ${maxAmount})`
+      `staking: ${stakingEnabled ? "ENABLED" : "disabled"}, ` +
+      `max-amount: ${maxAmount}, max-batch-amount: ${maxBatchAmount})`
   );
 }
 
-main().catch((err) => {
-  console.error("Fatal:", err);
-  process.exit(1);
-});
+const isMainModule =
+  process.argv[1] !== undefined &&
+  path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
+
+if (isMainModule) {
+  main().catch((err) => {
+    console.error("Fatal:", err);
+    process.exit(1);
+  });
+}
