@@ -145,12 +145,12 @@ Agent: "What's my STRK balance?"
 ### Transfer tokens
 
 ```text
-Agent: "Send 10 USDC to 0x04c102f8f391f07b8f86d7f6d6f8f5e24d2f2f3a8e1f1f4a9a2b3c4d5e6f701 and 5 USDC to 0x07af31d8d9d4e40c2f885bd8c16bd823b5f0b6e8b3529d8e13108d4a9f39bc2"
+Agent: "Send 10 USDC to 0x1111111111111111111111111111111111111111 and 5 USDC to 0x2222222222222222222222222222222222222222"
 → calls x_transfer {
     token: "USDC",
     transfers: [
-      { to: "0x04c102f8f391f07b8f86d7f6d6f8f5e24d2f2f3a8e1f1f4a9a2b3c4d5e6f701", amount: "10" },
-      { to: "0x07af31d8d9d4e40c2f885bd8c16bd823b5f0b6e8b3529d8e13108d4a9f39bc2", amount: "5" }
+      { to: "0x1111111111111111111111111111111111111111", amount: "10" },
+      { to: "0x2222222222222222222222222222222222222222", amount: "5" }
     ]
   }
 ← { hash: "0x...", explorerUrl: "https://voyager.online/tx/0x...", transfers: [...] }
@@ -159,9 +159,9 @@ Agent: "Send 10 USDC to 0x04c102f8f391f07b8f86d7f6d6f8f5e24d2f2f3a8e1f1f4a9a2b3c
 ### Stake STRK
 
 ```text
-Agent: "Stake 100 STRK in pool 0x0134a6a4e3ea95c4c88bb4035e3f8a343f5fbd0d66d7f1f9ba44308ec4436b9"
-→ calls x_enter_pool { pool: "0x0134a6a4e3ea95c4c88bb4035e3f8a343f5fbd0d66d7f1f9ba44308ec4436b9", amount: "100" }
-← { hash: "0x...", pool: "0x0134a6a4e3ea95c4c88bb4035e3f8a343f5fbd0d66d7f1f9ba44308ec4436b9", amount: "100", symbol: "STRK" }
+Agent: "Stake 100 STRK in pool 0x3333333333333333333333333333333333333333"
+→ calls x_enter_pool { pool: "0x3333333333333333333333333333333333333333", amount: "100" }
+← { hash: "0x...", pool: "0x3333333333333333333333333333333333333333", amount: "100", symbol: "STRK" }
 ```
 
 ## Token Resolution

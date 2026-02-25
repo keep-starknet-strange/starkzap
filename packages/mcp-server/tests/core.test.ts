@@ -36,13 +36,10 @@ const TEST_TOKEN: Token = {
 };
 
 describe("CLI parsing", () => {
-  it("treats a flag-like value as missing and falls back", () => {
-    const value = getArg(
-      ["--max-amount", "--enable-write"],
-      "max-amount",
-      "1000"
-    );
-    expect(value).toBe("1000");
+  it("fails fast when a value flag is present without a value", () => {
+    expect(() =>
+      getArg(["--max-amount", "--enable-write"], "max-amount", "1000")
+    ).toThrow(/Missing value for flag --max-amount/);
   });
 
   it("fails fast on invalid network values", () => {

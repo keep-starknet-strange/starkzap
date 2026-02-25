@@ -48,7 +48,7 @@ export function getArg(
   }
   const next = cliArgs[idx + 1];
   if (!next || next.startsWith("--")) {
-    return fallback;
+    throw new Error(`Missing value for flag --${name}`);
   }
   return next;
 }
