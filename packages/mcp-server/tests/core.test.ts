@@ -9,6 +9,7 @@ import {
   amountSchema,
   assertAmountWithinCap,
   assertBatchAmountWithinCap,
+  assertStakingPoolShape,
   assertPoolTokenHintMatches,
   assertSchemaParity,
   buildTools,
@@ -62,6 +63,8 @@ describe("CLI parsing", () => {
     expect(cli.maxAmount).toBe("10");
     expect(cli.maxBatchAmount).toBe("15");
     expect(cli.rateLimitRpm).toBe(0);
+    expect(cli.readRateLimitRpm).toBe(0);
+    expect(cli.writeRateLimitRpm).toBe(0);
     expect(cli.enableWrite).toBe(true);
   });
 
@@ -75,6 +78,19 @@ describe("CLI parsing", () => {
     expect(cli.rateLimitRpm).toBe(120);
   });
 
+  it("parses optional split read/write rate limits", () => {
+    const cli = parseCliConfig([
+      "--network",
+      "mainnet",
+      "--read-rate-limit-rpm",
+      "30",
+      "--write-rate-limit-rpm",
+      "10",
+    ]);
+    expect(cli.readRateLimitRpm).toBe(30);
+    expect(cli.writeRateLimitRpm).toBe(10);
+  });
+
   it("fails fast on unknown CLI flags", () => {
     expect(() =>
       parseCliConfig(["--network", "sepolia", "--wat", "1"])
@@ -83,6 +99,15 @@ describe("CLI parsing", () => {
 
   it("fails fast on extremely high rate-limit-rpm", () => {
     expect(() => parseCliConfig(["--rate-limit-rpm", "10001"])).toThrow(
+      /Must be <= 10000/
+    );
+  });
+
+  it("fails fast on extremely high split read/write rate limits", () => {
+    expect(() => parseCliConfig(["--read-rate-limit-rpm", "10001"])).toThrow(
+      /Must be <= 10000/
+    );
+    expect(() => parseCliConfig(["--write-rate-limit-rpm", "10001"])).toThrow(
       /Must be <= 10000/
     );
   });
@@ -312,6 +337,27 @@ describe("staking token extraction guard", () => {
     expect(
       extractPoolToken({ poolToken: { symbol: "BROKEN" } })
     ).toBeUndefined();
+  });
+
+  it("validates staking pool interface shape and pool address", () => {
+    const stakingLike = {
+      enter: () => undefined,
+      add: () => undefined,
+      claimRewards: () => undefined,
+      exitIntent: () => undefined,
+      exit: () => undefined,
+      getPosition: () => undefined,
+      poolAddress: TEST_TOKEN.address,
+    };
+    expect(() =>
+      assertStakingPoolShape(stakingLike, TEST_TOKEN.address)
+    ).not.toThrow();
+    expect(() =>
+      assertStakingPoolShape(
+        { ...stakingLike, poolAddress: "0x1" },
+        TEST_TOKEN.address
+      )
+    ).toThrow(/resolved to/);
   });
 });
 

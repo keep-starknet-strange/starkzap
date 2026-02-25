@@ -59,14 +59,16 @@ This server handles real funds. The following protections are built in:
 
 ### CLI Arguments
 
-| Argument             | Default                | Description                                                   |
-| -------------------- | ---------------------- | ------------------------------------------------------------- |
-| `--network`          | `mainnet`              | Network preset: `mainnet` or `sepolia` (validated at startup) |
-| `--max-amount`       | `1000`                 | Max tokens per individual amount-bearing operation            |
-| `--max-batch-amount` | `same as --max-amount` | Max total tokens across one `x_transfer` batch call           |
-| `--rate-limit-rpm`   | `0` (disabled)         | Global MCP tool-call rate limit per minute                    |
-| `--enable-write`     | off                    | Enable state-changing tools (transfer, stake, deploy)         |
-| `--enable-execute`   | off                    | Enable only the unrestricted `x_execute` tool                 |
+| Argument                 | Default                | Description                                                                          |
+| ------------------------ | ---------------------- | ------------------------------------------------------------------------------------ |
+| `--network`              | `mainnet`              | Network preset: `mainnet` or `sepolia` (validated at startup)                        |
+| `--max-amount`           | `1000`                 | Max tokens per individual amount-bearing operation                                   |
+| `--max-batch-amount`     | `same as --max-amount` | Max total tokens across one `x_transfer` batch call                                  |
+| `--rate-limit-rpm`       | `0` (disabled)         | Global MCP tool-call rate limit per minute                                           |
+| `--read-rate-limit-rpm`  | `0` (disabled)         | Optional read-only bucket (`x_get_balance`, `x_get_pool_position`, `x_estimate_fee`) |
+| `--write-rate-limit-rpm` | `0` (disabled)         | Optional state-changing bucket (transfer/staking/deploy/execute)                     |
+| `--enable-write`         | off                    | Enable state-changing tools (transfer, stake, deploy)                                |
+| `--enable-execute`       | off                    | Enable only the unrestricted `x_execute` tool                                        |
 
 ## MCP Client Configuration
 

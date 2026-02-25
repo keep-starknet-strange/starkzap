@@ -14,6 +14,8 @@ export interface CliConfig {
   maxAmount: string;
   maxBatchAmount: string;
   rateLimitRpm: number;
+  readRateLimitRpm: number;
+  writeRateLimitRpm: number;
 }
 
 const tokensByNetwork: Record<Network, Record<string, Token>> = {
@@ -63,6 +65,8 @@ const VALUE_FLAGS = new Set([
   "max-amount",
   "max-batch-amount",
   "rate-limit-rpm",
+  "read-rate-limit-rpm",
+  "write-rate-limit-rpm",
 ]);
 const BOOLEAN_FLAGS = new Set(["enable-write", "enable-execute"]);
 
@@ -139,6 +143,24 @@ export function parseCliConfig(cliArgs: string[]): CliConfig {
       `Invalid --rate-limit-rpm value "${rateLimitRpm}". Must be <= 10000.`
     );
   }
+  const readRateLimitRpm = parseNonNegativeInteger(
+    getArg(cliArgs, "read-rate-limit-rpm", "0"),
+    "read-rate-limit-rpm"
+  );
+  if (readRateLimitRpm > 10_000) {
+    throw new Error(
+      `Invalid --read-rate-limit-rpm value "${readRateLimitRpm}". Must be <= 10000.`
+    );
+  }
+  const writeRateLimitRpm = parseNonNegativeInteger(
+    getArg(cliArgs, "write-rate-limit-rpm", "0"),
+    "write-rate-limit-rpm"
+  );
+  if (writeRateLimitRpm > 10_000) {
+    throw new Error(
+      `Invalid --write-rate-limit-rpm value "${writeRateLimitRpm}". Must be <= 10000.`
+    );
+  }
 
   validatePositiveAmountLiteral(maxAmount, "max-amount", network);
   validatePositiveAmountLiteral(maxBatchAmount, "max-batch-amount", network);
@@ -153,6 +175,8 @@ export function parseCliConfig(cliArgs: string[]): CliConfig {
     maxAmount,
     maxBatchAmount,
     rateLimitRpm,
+    readRateLimitRpm,
+    writeRateLimitRpm,
   };
 }
 
@@ -911,6 +935,47 @@ function isTokenCandidate(value: unknown): value is Token {
     Number.isInteger(value.decimals) &&
     value.decimals >= 0
   );
+}
+
+const REQUIRED_STAKING_METHODS = [
+  "enter",
+  "add",
+  "claimRewards",
+  "exitIntent",
+  "exit",
+  "getPosition",
+] as const;
+
+export function assertStakingPoolShape(
+  staking: unknown,
+  poolAddress: Address
+): void {
+  if (!isRecord(staking)) {
+    throw new Error(
+      `Could not validate pool interface for ${poolAddress}: staking instance is not an object.`
+    );
+  }
+
+  const missingMethods = REQUIRED_STAKING_METHODS.filter((methodName) => {
+    return typeof staking[methodName] !== "function";
+  });
+  if (missingMethods.length > 0) {
+    throw new Error(
+      `Could not validate pool interface for ${poolAddress}: missing methods ${missingMethods.join(", ")}.`
+    );
+  }
+
+  const declaredPoolAddress = staking.poolAddress;
+  if (typeof declaredPoolAddress === "string") {
+    if (
+      normalizeStarknetAddress(declaredPoolAddress) !==
+      normalizeStarknetAddress(poolAddress)
+    ) {
+      throw new Error(
+        `Could not validate pool interface for ${poolAddress}: staking instance resolved to ${declaredPoolAddress}.`
+      );
+    }
+  }
 }
 
 export function extractPoolToken(staking: unknown): Token | undefined {

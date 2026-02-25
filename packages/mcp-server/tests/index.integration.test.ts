@@ -34,6 +34,13 @@ type TestingExports = {
     operation: "claim rewards" | "exit pool"
   ): Promise<void>;
   buildToolErrorText(error: unknown): string;
+  isRpcLikeError(error: unknown): boolean;
+  handleCallToolRequest(request: {
+    params: { name: string; arguments?: Record<string, unknown> | undefined };
+  }): Promise<{
+    content: Array<{ type: "text"; text: string }>;
+    isError?: boolean;
+  }>;
   setNowProvider(provider: () => number): void;
   setSdkSingleton(value: unknown): void;
   setWalletSingleton(value: Wallet | undefined): void;
@@ -122,6 +129,48 @@ describe("index integration hardening", () => {
     );
     expect(unsafe).toContain("Operation failed. Reference:");
     expect(unsafe).not.toContain("internal.rpc.local");
+  });
+
+  it("classifies structured RPC transport errors and excludes tx wait timeouts", () => {
+    expect(testing.isRpcLikeError({ code: "ETIMEDOUT" })).toBe(true);
+    expect(testing.isRpcLikeError({ status: 504 })).toBe(true);
+    expect(
+      testing.isRpcLikeError(
+        new Error("Transaction 0xabc confirmation timed out after 120000ms")
+      )
+    ).toBe(false);
+  });
+
+  it("handles MCP request path end-to-end for validation and sanitization", async () => {
+    const validationResponse = await testing.handleCallToolRequest({
+      params: {
+        name: "x_get_balance",
+        arguments: {},
+      },
+    });
+    expect(validationResponse.isError).toBe(true);
+    expect(validationResponse.content[0]?.text).toContain("Validation error:");
+
+    testing.setWalletSingleton({
+      balanceOf: vi
+        .fn()
+        .mockRejectedValue(
+          new Error("internal upstream failure on http://private-rpc.local")
+        ),
+    } as unknown as Wallet);
+    const sanitizedResponse = await testing.handleCallToolRequest({
+      params: {
+        name: "x_get_balance",
+        arguments: { token: "STRK" },
+      },
+    });
+    expect(sanitizedResponse.isError).toBe(true);
+    expect(sanitizedResponse.content[0]?.text).toContain(
+      "Operation failed. Reference:"
+    );
+    expect(sanitizedResponse.content[0]?.text).not.toContain(
+      "private-rpc.local"
+    );
   });
 
   it("allows read-only tasks to run concurrently", async () => {

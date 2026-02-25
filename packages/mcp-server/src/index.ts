@@ -23,6 +23,7 @@ import { z } from "zod";
 import { Amount, fromAddress, StarkSDK, StarkSigner } from "starkzap";
 import type { Address, Token, Wallet } from "starkzap";
 import {
+  assertStakingPoolShape,
   assertAmountWithinCap,
   assertBatchAmountWithinCap,
   assertPoolTokenHintMatches,
@@ -66,6 +67,8 @@ const {
   maxAmount,
   maxBatchAmount,
   rateLimitRpm,
+  readRateLimitRpm,
+  writeRateLimitRpm,
 } = cliConfig;
 
 // ---------------------------------------------------------------------------
@@ -296,6 +299,10 @@ function normalizeTransactionHash(hash: string): string {
   return fromAddress(hash);
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
 async function waitForTrackedTransaction(tx: {
   wait: () => Promise<void>;
   hash: string;
@@ -370,6 +377,7 @@ async function resolvePoolTokenForOperation(
       `Could not resolve staking pool metadata for ${poolAddress}. ${reason}`
     );
   }
+  assertStakingPoolShape(staking, poolAddress);
   const poolToken = extractPoolToken(staking);
   if (!poolToken) {
     throw new Error(
@@ -382,6 +390,8 @@ async function resolvePoolTokenForOperation(
 
 type BoundedPoolField = "rewards" | "unpooling";
 const requestTimestamps: number[] = [];
+const readRequestTimestamps: number[] = [];
+const writeRequestTimestamps: number[] = [];
 let requestExecutionQueue: Promise<void> = Promise.resolve();
 
 async function runSerialized<T>(task: () => Promise<T>): Promise<T> {
@@ -461,6 +471,86 @@ async function assertStablePoolAmountWithinCap(
 }
 
 function isRpcLikeError(error: unknown): boolean {
+  const rpcErrorCodes = new Set([
+    "contract_not_found",
+    "starknet_error_contract_not_found",
+    "etimedout",
+    "econnreset",
+    "econnrefused",
+    "enotfound",
+    "eai_again",
+    "network_error",
+    "rpc_error",
+    "request_timeout",
+    "gateway_timeout",
+    "-32000",
+    "-32005",
+  ]);
+  const rpcErrorNames = new Set([
+    "aborterror",
+    "fetcherror",
+    "networkerror",
+    "timeouterror",
+  ]);
+  const statusBasedRpcErrors = new Set([408, 429, 500, 502, 503, 504]);
+
+  const possibleCodes: string[] = [];
+  const possibleNames: string[] = [];
+  const possibleStatuses: number[] = [];
+  const queue: unknown[] = [error];
+  const seen = new Set<unknown>();
+  while (queue.length > 0) {
+    const current = queue.shift();
+    if (!current || seen.has(current)) {
+      continue;
+    }
+    seen.add(current);
+    if (current instanceof Error) {
+      possibleNames.push(current.name.toLowerCase());
+    }
+    if (!isRecord(current)) {
+      continue;
+    }
+
+    if (typeof current.code === "string" || typeof current.code === "number") {
+      possibleCodes.push(String(current.code).toLowerCase());
+    }
+    if (
+      typeof current.status === "number" &&
+      Number.isInteger(current.status) &&
+      current.status > 0
+    ) {
+      possibleStatuses.push(current.status);
+    }
+    if (
+      typeof current.statusCode === "number" &&
+      Number.isInteger(current.statusCode) &&
+      current.statusCode > 0
+    ) {
+      possibleStatuses.push(current.statusCode);
+    }
+    if (typeof current.name === "string") {
+      possibleNames.push(current.name.toLowerCase());
+    }
+
+    if (isRecord(current.data)) {
+      queue.push(current.data);
+    }
+    if (current.cause !== undefined) {
+      queue.push(current.cause);
+    }
+  }
+
+  if (possibleCodes.some((code) => rpcErrorCodes.has(code))) {
+    return true;
+  }
+  if (possibleNames.some((name) => rpcErrorNames.has(name))) {
+    return true;
+  }
+  if (possibleStatuses.some((status) => statusBasedRpcErrors.has(status))) {
+    return true;
+  }
+
   const normalized = summarizeError(error).toLowerCase();
   if (normalized.includes("confirmation timed out")) {
     return false;
@@ -531,6 +621,15 @@ async function handleTool(
   rawArgs: Record<string, unknown>
 ): Promise<{ content: Array<{ type: "text"; text: string }> }> {
   enforcePerMinuteRateLimit(requestTimestamps, nowMs(), rateLimitRpm);
+  if (READ_ONLY_TOOLS.has(name)) {
+    enforcePerMinuteRateLimit(readRequestTimestamps, nowMs(), readRateLimitRpm);
+  } else {
+    enforcePerMinuteRateLimit(
+      writeRequestTimestamps,
+      nowMs(),
+      writeRateLimitRpm
+    );
+  }
 
   const schema = schemas[name as keyof typeof schemas];
   if (!schema) {
@@ -917,9 +1016,14 @@ const server = new Server(
 
 server.setRequestHandler(ListToolsRequestSchema, async () => ({ tools }));
 
-server.setRequestHandler(CallToolRequestSchema, async (request) => {
+async function handleCallToolRequest(request: {
+  params: { name: string; arguments?: Record<string, unknown> | undefined };
+}): Promise<{
+  content: Array<{ type: "text"; text: string }>;
+  isError?: boolean;
+}> {
   const { name, arguments: toolArgs } = request.params;
-  return runWithToolConcurrencyPolicy(name, async () => {
+  return await runWithToolConcurrencyPolicy(name, async () => {
     try {
       return await handleTool(
         name,
@@ -944,6 +1048,14 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       };
     }
   });
+}
+
+server.setRequestHandler(CallToolRequestSchema, async (request) => {
+  return handleCallToolRequest(
+    request as {
+      params: { name: string; arguments?: Record<string, unknown> | undefined };
+    }
+  );
 });
 
 interface TestingHooks {
@@ -962,6 +1074,12 @@ interface TestingHooks {
     toolName: string,
     task: () => Promise<T>
   ): Promise<T>;
+  handleCallToolRequest(request: {
+    params: { name: string; arguments?: Record<string, unknown> | undefined };
+  }): Promise<{
+    content: Array<{ type: "text"; text: string }>;
+    isError?: boolean;
+  }>;
   assertStablePoolAmountWithinCap(
     wallet: Wallet,
     poolAddress: Address,
@@ -986,6 +1104,7 @@ const testingHooks: TestingHooks = {
   getWallet,
   runSerialized,
   runWithToolConcurrencyPolicy,
+  handleCallToolRequest,
   assertStablePoolAmountWithinCap,
   buildToolErrorText,
   isRpcLikeError,
@@ -1008,6 +1127,8 @@ const testingHooks: TestingHooks = {
     walletInitBackoffUntilMs = 0;
     requestExecutionQueue = Promise.resolve();
     requestTimestamps.splice(0, requestTimestamps.length);
+    readRequestTimestamps.splice(0, readRequestTimestamps.length);
+    writeRequestTimestamps.splice(0, writeRequestTimestamps.length);
     activeTransactionHashes.clear();
     nowProvider = () => Date.now();
   },
@@ -1024,7 +1145,7 @@ async function main() {
   const transport = new StdioServerTransport();
   await server.connect(transport);
   console.error(
-    `x-mcp server running (network: ${network}, transport: stdio, write=${enableWrite}, execute=${enableExecute}, staking=${stakingEnabled}, maxAmount=${maxAmount}, maxBatchAmount=${maxBatchAmount}, rateLimitRpm=${rateLimitRpm}, rpcTimeoutMs=${rpcTimeoutMs})`
+    `x-mcp server running (network: ${network}, transport: stdio, write=${enableWrite}, execute=${enableExecute}, staking=${stakingEnabled}, maxAmount=${maxAmount}, maxBatchAmount=${maxBatchAmount}, rateLimitRpm=${rateLimitRpm}, readRateLimitRpm=${readRateLimitRpm}, writeRateLimitRpm=${writeRateLimitRpm}, rpcTimeoutMs=${rpcTimeoutMs})`
   );
 }
 
