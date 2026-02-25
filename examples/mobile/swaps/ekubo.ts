@@ -1,12 +1,7 @@
-import {
-  EkuboSwapAdapter,
-  type Call,
-  type ChainId,
-  type Token,
-} from "starkzap";
+import { getEkuboPreset, type Call, type ChainId, type Token } from "starkzap";
 import type {
   PrepareSwapParams,
-  SwapExecutionPlan,
+  SwapExecution,
   SwapIntegration,
   SwapIntegrationContext,
   SwapIntegrationPairContext,
@@ -118,7 +113,10 @@ function serializePoolKey(poolKey: EkuboPoolKey): string[] {
   ];
 }
 
-function encodeMultihopRoute(route: EkuboRouteStep[], sourceToken: string): string[] {
+function encodeMultihopRoute(
+  route: EkuboRouteStep[],
+  sourceToken: string
+): string[] {
   let currentToken = BigInt(sourceToken);
   const encoded: string[] = [];
 
@@ -185,7 +183,9 @@ function parseEkuboQuoteResponse(payload: unknown): EkuboQuoteResponse {
       typeof split.amount_calculated !== "string" ||
       !Array.isArray(split.route)
     ) {
-      throw new Error(`Ekubo split #${splitIndex + 1} is missing required fields`);
+      throw new Error(
+        `Ekubo split #${splitIndex + 1} is missing required fields`
+      );
     }
 
     const route = split.route.map((step, stepIndex): EkuboRouteStep => {
@@ -373,7 +373,9 @@ function buildEkuboSwapCalls(params: {
   ];
 }
 
-function getRecommendedOutputToken(context: SwapIntegrationPairContext): Token | null {
+function getRecommendedOutputToken(
+  context: SwapIntegrationPairContext
+): Token | null {
   const { chainId, tokenIn, tokens } = context;
   const candidates = chainId.isSepolia()
     ? ["USDC.e", "USDC", "ETH"]
@@ -393,9 +395,39 @@ function getAvailableTokens(context: SwapIntegrationContext): Token[] {
   return dedupeAndSortTokens(context.tokens);
 }
 
-async function prepareEkuboSwap(
+function toQuoteSummary(params: {
+  quote: EkuboQuoteResponse;
+  amountInBase: bigint;
+  routeCallCount?: number;
+}): SwapExecution["quote"] {
+  return {
+    amountInBase: params.amountInBase,
+    amountOutBase: BigInt(params.quote.total_calculated),
+    routeCallCount: params.routeCallCount,
+    priceImpactBps: percentToBps(params.quote.price_impact),
+    provider: "ekubo",
+  };
+}
+
+async function getEkuboQuote(
   params: PrepareSwapParams
-): Promise<SwapExecutionPlan> {
+): Promise<SwapExecution["quote"]> {
+  const { chainId, tokenIn, tokenOut, amountIn } = params;
+  const amountInBase = amountIn.toBase();
+  const quote = await fetchEkuboQuote({
+    chainId,
+    amountInBase,
+    tokenInAddress: tokenIn.address,
+    tokenOutAddress: tokenOut.address,
+  });
+
+  return toQuoteSummary({
+    quote,
+    amountInBase,
+  });
+}
+
+async function swapEkubo(params: PrepareSwapParams): Promise<SwapExecution> {
   const { chainId, tokenIn, tokenOut, amountIn, slippageBps } = params;
   const amountInBase = amountIn.toBase();
   const quote = await fetchEkuboQuote({
@@ -405,27 +437,23 @@ async function prepareEkuboSwap(
     tokenOutAddress: tokenOut.address,
   });
 
-  const adapter = EkuboSwapAdapter.forChain(chainId);
+  const preset = getEkuboPreset(chainId);
   const swapCalls = buildEkuboSwapCalls({
     quote,
     tokenIn,
     tokenOut,
     amountInBase,
-    extensionRouter: adapter.getExtensionRouter(),
+    extensionRouter: preset.extensionRouter,
     slippageBps,
   });
 
   return {
-    plan: {
-      calls: swapCalls,
-    },
-    quote: {
+    calls: swapCalls,
+    quote: toQuoteSummary({
+      quote,
       amountInBase,
-      amountOutBase: BigInt(quote.total_calculated),
       routeCallCount: swapCalls.length,
-      priceImpactBps: percentToBps(quote.price_impact),
-      provider: "ekubo",
-    },
+    }),
   };
 }
 
@@ -438,5 +466,6 @@ export const ekuboSwapIntegration: SwapIntegration = {
   },
   getAvailableTokens,
   getRecommendedOutputToken,
-  prepareSwap: prepareEkuboSwap,
+  getQuote: getEkuboQuote,
+  swap: swapEkubo,
 };

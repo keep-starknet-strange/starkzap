@@ -26,7 +26,10 @@ import {
   getStrkToken,
   getWbtcToken,
 } from "@/stores/balances";
-import { showTransactionToast, updateTransactionToast } from "@/components/Toast";
+import {
+  showTransactionToast,
+  updateTransactionToast,
+} from "@/components/Toast";
 import { swapIntegrations } from "@/swaps";
 import type { SwapIntegration } from "@/swaps/interface";
 import { Amount, type ChainId, type Token } from "starkzap";
@@ -107,11 +110,14 @@ export default function SwapScreen() {
     clearBalances,
   } = useBalancesStore();
 
-  const allTokens = getTokensForNetwork(chainId);
-  const strkToken = getStrkToken(chainId);
-  const wbtcToken = getWbtcToken(chainId);
+  const allTokens = useMemo(() => getTokensForNetwork(chainId), [chainId]);
+  const strkToken = useMemo(() => getStrkToken(chainId), [chainId]);
+  const wbtcToken = useMemo(() => getWbtcToken(chainId), [chainId]);
   const availableIntegrations = useMemo(
-    () => swapIntegrations.filter((integration) => integration.supportsChain(chainId)),
+    () =>
+      swapIntegrations.filter((integration) =>
+        integration.supportsChain(chainId)
+      ),
     [chainId]
   );
   const [selectedIntegrationId, setSelectedIntegrationId] = useState<
@@ -144,8 +150,10 @@ export default function SwapScreen() {
   }, [availableIntegrations, selectedIntegrationId]);
   const integrationTokens = useMemo(() => {
     const tokens =
-      selectedIntegration?.getAvailableTokens?.({ chainId, tokens: allTokens }) ??
-      allTokens;
+      selectedIntegration?.getAvailableTokens?.({
+        chainId,
+        tokens: allTokens,
+      }) ?? allTokens;
 
     const uniqueByAddress = new Map<string, Token>();
     for (const token of tokens) {
@@ -183,7 +191,9 @@ export default function SwapScreen() {
     const sorted = [...integrationTokens].sort((a, b) =>
       a.symbol.localeCompare(b.symbol)
     );
-    const primaryAddresses = new Set(primaryTokens.map((token) => token.address));
+    const primaryAddresses = new Set(
+      primaryTokens.map((token) => token.address)
+    );
     return [
       ...primaryTokens,
       ...sorted.filter((token) => !primaryAddresses.has(token.address)),
@@ -196,7 +206,9 @@ export default function SwapScreen() {
 
   const [fromToken, setFromToken] = useState<Token>(strkToken);
   const [toToken, setToToken] = useState<Token>(
-    preferredOutputToken ?? primaryTokens.find((t) => t.address !== strkToken.address) ?? strkToken
+    preferredOutputToken ??
+      primaryTokens.find((t) => t.address !== strkToken.address) ??
+      strkToken
   );
   const [amount, setAmount] = useState("");
   const [quoteError, setQuoteError] = useState<string | null>(null);
@@ -209,17 +221,33 @@ export default function SwapScreen() {
   const [tokenSearch, setTokenSearch] = useState("");
 
   useEffect(() => {
-    setFromToken(strkToken);
-    if (preferredOutputToken && preferredOutputToken.address !== strkToken.address) {
-      setToToken(preferredOutputToken);
+    if (!integrationTokens.length) {
       return;
     }
 
-    const alternative = primaryTokens.find(
-      (token) => token.address !== strkToken.address
-    );
-    setToToken(alternative ?? strkToken);
-  }, [primaryTokens, strkToken, preferredOutputToken]);
+    const fallbackToToken =
+      preferredOutputToken && preferredOutputToken.address !== strkToken.address
+        ? preferredOutputToken
+        : (primaryTokens.find((token) => token.address !== strkToken.address) ??
+          strkToken);
+
+    setFromToken((current) => {
+      const currentExists = integrationTokens.some(
+        (token) => token.address === current.address
+      );
+      return currentExists ? current : strkToken;
+    });
+
+    setToToken((current) => {
+      const currentExists = integrationTokens.some(
+        (token) => token.address === current.address
+      );
+      if (currentExists && current.address !== strkToken.address) {
+        return current;
+      }
+      return fallbackToToken;
+    });
+  }, [integrationTokens, primaryTokens, strkToken, preferredOutputToken]);
 
   const borderColor = useThemeColor({}, "border");
   const primaryColor = useThemeColor({}, "primary");
@@ -362,27 +390,16 @@ export default function SwapScreen() {
     try {
       const wantsSponsored = useSponsored && canUseSponsored;
       addLog(
-        `Fetching ${selectedIntegration.label} quote for ${amount} ${fromToken.symbol} -> ${toToken.symbol}`
-      );
-      const prepared = await wallet.prepareSwap(selectedIntegration, {
-        chainId,
-        takerAddress: wallet.address,
-        tokenIn: fromToken,
-        tokenOut: toToken,
-        amountIn,
-      });
-      const routeCallCount = prepared.quote.routeCallCount;
-      const callCountLabel =
-        routeCallCount == null
-          ? "calls unknown"
-          : `${routeCallCount} call${routeCallCount === 1 ? "" : "s"}`;
-
-      addLog(
-        `Submitting ${selectedIntegration.label} swap ${amount} ${fromToken.symbol} -> ${toToken.symbol} (${callCountLabel})`
+        `Submitting ${selectedIntegration.label} swap ${amount} ${fromToken.symbol} -> ${toToken.symbol}`
       );
 
-      const tx = await wallet.executeSwapPlan(
-        prepared.plan,
+      const tx = await wallet.swap(
+        {
+          provider: selectedIntegration,
+          tokenIn: fromToken,
+          tokenOut: toToken,
+          amountIn,
+        },
         wantsSponsored ? { feeMode: "sponsored" } : undefined
       );
 
@@ -459,8 +476,12 @@ export default function SwapScreen() {
             <ThemedText type="title">Swap</ThemedText>
           </View>
           <View style={styles.headerRight}>
-            <View style={[styles.networkPill, { backgroundColor: borderColor }]}>
-              <ThemedText style={[styles.networkPillText, { color: primaryColor }]}>
+            <View
+              style={[styles.networkPill, { backgroundColor: borderColor }]}
+            >
+              <ThemedText
+                style={[styles.networkPillText, { color: primaryColor }]}
+              >
                 {networkName}
               </ThemedText>
             </View>
@@ -482,7 +503,9 @@ export default function SwapScreen() {
               onPress={handleCopyAddress}
               activeOpacity={0.88}
             >
-              <ThemedText style={[styles.addressText, { color: textSecondary }]}>
+              <ThemedText
+                style={[styles.addressText, { color: textSecondary }]}
+              >
                 {cropAddress(wallet.address)}
               </ThemedText>
             </TouchableOpacity>
@@ -539,13 +562,19 @@ export default function SwapScreen() {
               <View style={styles.tokenRowLeft}>
                 <TinyTokenLogo token={fromToken} />
                 <View style={styles.tokenTextStack}>
-                  <ThemedText style={styles.tokenSymbol}>{fromToken.symbol}</ThemedText>
-                  <ThemedText style={[styles.tokenName, { color: textSecondary }]}>
+                  <ThemedText style={styles.tokenSymbol}>
+                    {fromToken.symbol}
+                  </ThemedText>
+                  <ThemedText
+                    style={[styles.tokenName, { color: textSecondary }]}
+                  >
                     {fromToken.name}
                   </ThemedText>
                 </View>
               </View>
-              <ThemedText style={[styles.chevronText, { color: textSecondary }]}>
+              <ThemedText
+                style={[styles.chevronText, { color: textSecondary }]}
+              >
                 ▼
               </ThemedText>
             </TouchableOpacity>
@@ -574,13 +603,19 @@ export default function SwapScreen() {
               <View style={styles.tokenRowLeft}>
                 <TinyTokenLogo token={toToken} />
                 <View style={styles.tokenTextStack}>
-                  <ThemedText style={styles.tokenSymbol}>{toToken.symbol}</ThemedText>
-                  <ThemedText style={[styles.tokenName, { color: textSecondary }]}>
+                  <ThemedText style={styles.tokenSymbol}>
+                    {toToken.symbol}
+                  </ThemedText>
+                  <ThemedText
+                    style={[styles.tokenName, { color: textSecondary }]}
+                  >
                     {toToken.name}
                   </ThemedText>
                 </View>
               </View>
-              <ThemedText style={[styles.chevronText, { color: textSecondary }]}>
+              <ThemedText
+                style={[styles.chevronText, { color: textSecondary }]}
+              >
                 ▼
               </ThemedText>
             </TouchableOpacity>
@@ -608,7 +643,9 @@ export default function SwapScreen() {
                   onPress={() => handleAmountChange(fromBalance.toUnit())}
                   activeOpacity={0.88}
                 >
-                  <ThemedText style={[styles.maxButtonText, { color: primaryColor }]}>
+                  <ThemedText
+                    style={[styles.maxButtonText, { color: primaryColor }]}
+                  >
                     MAX
                   </ThemedText>
                 </TouchableOpacity>
@@ -620,13 +657,16 @@ export default function SwapScreen() {
               </ThemedText>
             )}
             {amountParseError && (
-              <ThemedText style={styles.errorText}>{amountParseError}</ThemedText>
+              <ThemedText style={styles.errorText}>
+                {amountParseError}
+              </ThemedText>
             )}
           </View>
 
           <ThemedText style={[styles.callsHint, { color: textSecondary }]}>
             Quotes and route calls are fetched from{" "}
-            {selectedIntegration?.label ?? "the selected integration"} automatically.
+            {selectedIntegration?.label ?? "the selected integration"}{" "}
+            automatically.
           </ThemedText>
 
           <View style={styles.sponsoredRow}>
@@ -636,7 +676,8 @@ export default function SwapScreen() {
             <View
               style={[
                 styles.sponsoredSwitch,
-                (!canUseSponsored || isSubmitting) && styles.sponsoredSwitchDisabled,
+                (!canUseSponsored || isSubmitting) &&
+                  styles.sponsoredSwitchDisabled,
               ]}
               pointerEvents={!canUseSponsored || isSubmitting ? "none" : "auto"}
             >
@@ -688,13 +729,17 @@ export default function SwapScreen() {
               From and To tokens must be different
             </ThemedText>
           )}
-          {quoteError && <ThemedText style={styles.errorText}>{quoteError}</ThemedText>}
+          {quoteError && (
+            <ThemedText style={styles.errorText}>{quoteError}</ThemedText>
+          )}
         </View>
 
         <TouchableOpacity
           style={[
             styles.submitButton,
-            canSubmit ? { backgroundColor: "#000" } : { backgroundColor: borderColor },
+            canSubmit
+              ? { backgroundColor: "#000" }
+              : { backgroundColor: borderColor },
             !canSubmit && styles.buttonDisabled,
           ]}
           onPress={handleSubmit}
@@ -702,7 +747,10 @@ export default function SwapScreen() {
           activeOpacity={0.85}
         >
           {isSubmitting ? (
-            <ActivityIndicator size="small" color={canSubmit ? "#fff" : primaryColor} />
+            <ActivityIndicator
+              size="small"
+              color={canSubmit ? "#fff" : primaryColor}
+            />
           ) : (
             <ThemedText
               style={[
@@ -729,25 +777,37 @@ export default function SwapScreen() {
           setShowTokenPicker(false);
         }}
       >
-        <SafeAreaView style={[styles.modalContainer, { backgroundColor: cardBg }]}>
-          <View style={[styles.modalHeader, { borderBottomColor: borderColor }]}>
+        <SafeAreaView
+          style={[styles.modalContainer, { backgroundColor: cardBg }]}
+        >
+          <View
+            style={[styles.modalHeader, { borderBottomColor: borderColor }]}
+          >
             <ThemedText type="title">Select Token</ThemedText>
             <TouchableOpacity
-              style={[styles.modalCloseButton, { backgroundColor: borderColor }]}
+              style={[
+                styles.modalCloseButton,
+                { backgroundColor: borderColor },
+              ]}
               onPress={() => {
                 setTokenSearch("");
                 setShowTokenPicker(false);
               }}
               activeOpacity={0.88}
             >
-              <ThemedText style={[styles.modalCloseText, { color: primaryColor }]}>
+              <ThemedText
+                style={[styles.modalCloseText, { color: primaryColor }]}
+              >
                 Close
               </ThemedText>
             </TouchableOpacity>
           </View>
 
           <TextInput
-            style={[styles.tokenSearchInput, { borderColor, color: primaryColor }]}
+            style={[
+              styles.tokenSearchInput,
+              { borderColor, color: primaryColor },
+            ]}
             value={tokenSearch}
             onChangeText={setTokenSearch}
             placeholder="Search symbol, name, or address"
@@ -763,7 +823,10 @@ export default function SwapScreen() {
                 <View key={token.address}>
                   {index > 0 && (
                     <View
-                      style={[styles.tokenPickerDivider, { backgroundColor: borderColor }]}
+                      style={[
+                        styles.tokenPickerDivider,
+                        { backgroundColor: borderColor },
+                      ]}
                     />
                   )}
                   <TouchableOpacity
@@ -778,7 +841,10 @@ export default function SwapScreen() {
                           {token.symbol}
                         </ThemedText>
                         <ThemedText
-                          style={[styles.tokenPickerAmount, { color: textSecondary }]}
+                          style={[
+                            styles.tokenPickerAmount,
+                            { color: textSecondary },
+                          ]}
                         >
                           {balance ? balance.toFormatted(true) : "—"}
                         </ThemedText>
@@ -790,7 +856,9 @@ export default function SwapScreen() {
             })}
             {!filteredTokenPickerTokens.length && (
               <View style={styles.tokenPickerEmpty}>
-                <ThemedText style={[styles.tokenPickerAmount, { color: textSecondary }]}>
+                <ThemedText
+                  style={[styles.tokenPickerAmount, { color: textSecondary }]}
+                >
                   No tokens match your search
                 </ThemedText>
               </View>

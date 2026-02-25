@@ -59,10 +59,8 @@ Note: this example depends on the local SDK via `"starkzap": "file:../.."`. The 
 
 The Swap tab uses provider-based helpers:
 
-- `wallet.prepareSwap(provider, params)` to fetch quote/build a normalized swap plan
-- `wallet.executeSwapPlan(prepared.plan, options?)` to execute it
-
-For one-shot execution, you can call `wallet.swapWith(provider, params, options?)`.
+- `provider.getQuote(params)` to fetch a quote
+- `wallet.swap({ ...params, provider }, options?)` to execute the swap
 
 To submit a swap, provide:
 
@@ -72,7 +70,7 @@ To submit a swap, provide:
 
 Notes:
 
-- AVNU source: uses `GET /swap/v3/quotes` + `POST /swap/v3/build` from `https://starknet.api.avnu.fi`, then executes via `wallet.executeSwapPlan(...)` (or `wallet.swapWith(...)`).
+- AVNU source: uses `GET /swap/v3/quotes` + `POST /swap/v3/build` from `https://starknet.api.avnu.fi`, then executes via `wallet.swap(...)`.
 - Ekubo source: fetches quote from `https://prod-api-quoter.ekubo.org` and builds router calls (`transfer` + `swap/multihop` + `clear_minimum` + `clear`).
 - Swap backends are pluggable through a shared TypeScript contract (`SwapProvider`) from `starkzap`, with app-level extensions in `swaps/interface.ts`.
 - Active integrations are registered in `swaps/index.ts` and rendered through one common UI.

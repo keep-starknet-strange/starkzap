@@ -1,15 +1,15 @@
 import type {
   ChainId,
-  PreparedSwapPlan,
-  SwapPrepareRequest,
+  PreparedSwap,
+  SwapRequest,
   SwapProvider,
   SwapQuote,
   Token,
 } from "starkzap";
 
 export type SwapQuoteSummary = SwapQuote;
-export type PrepareSwapParams = SwapPrepareRequest;
-export type SwapExecutionPlan = PreparedSwapPlan<SwapQuoteSummary>;
+export type PrepareSwapParams = SwapRequest;
+export type SwapExecution = PreparedSwap;
 
 export interface SwapIntegrationContext {
   chainId: ChainId;
@@ -20,8 +20,7 @@ export interface SwapIntegrationPairContext extends SwapIntegrationContext {
   tokenIn: Token;
 }
 
-export interface SwapIntegration
-  extends SwapProvider<PrepareSwapParams, SwapQuoteSummary> {
+export interface SwapIntegration extends SwapProvider {
   id: string;
   label: string;
   getAvailableTokens?: (context: SwapIntegrationContext) => Token[];
