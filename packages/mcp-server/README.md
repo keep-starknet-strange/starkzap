@@ -1,8 +1,10 @@
-# x MCP Server
+# StarkZap MCP Server (`x-mcp`)
 
 An [MCP (Model Context Protocol)](https://modelcontextprotocol.io/) server that exposes Starknet wallet operations to AI agents via the [StarkZap SDK](https://github.com/keep-starknet-strange/starkzap).
 
 Any MCP-compatible client (Claude, Cursor, OpenAI Agents SDK, etc.) can use these tools to manage wallets, transfer tokens, stake STRK, and execute contract calls on Starknet.
+
+Current package/binary names in this repo are still `@keep-starknet-strange/x-mcp` and `x-mcp`.
 
 ## Why
 
@@ -79,10 +81,10 @@ Add to your MCP config (`mcp.json` or Claude Desktop settings):
 ```json
 {
   "mcpServers": {
-    "x-wallet": {
+    "starkzap-wallet": {
       "command": "node",
       "args": [
-        "/ABSOLUTE/PATH/TO/x/packages/mcp-server/dist/index.js",
+        "/ABSOLUTE/PATH/TO/REPO/packages/mcp-server/dist/index.js",
         "--network",
         "mainnet",
         "--enable-write"
@@ -103,7 +105,7 @@ import { McpServerStdio } from "@openai/agents/mcp";
 const mcpServer = new McpServerStdio({
   command: "node",
   args: [
-    "/ABSOLUTE/PATH/TO/x/packages/mcp-server/dist/index.js",
+    "/ABSOLUTE/PATH/TO/REPO/packages/mcp-server/dist/index.js",
     "--network",
     "mainnet",
     "--enable-write",
@@ -178,7 +180,8 @@ Tools accept token symbols (`ETH`, `STRK`, `USDC`, etc.) or contract addresses. 
 - [ ] Using a **dedicated agent wallet** with limited funds (not your main wallet)
 - [ ] `STARKNET_PRIVATE_KEY` stored in a secret manager, not plaintext
 - [ ] `--max-amount` set to the lowest practical value for your use case
-- [ ] `--rate-limit-rpm` set for shared/server environments
+- [ ] `--rate-limit-rpm` set for global throttling in shared/server environments
+- [ ] `--read-rate-limit-rpm` / `--write-rate-limit-rpm` set when you need separate read/write buckets
 - [ ] `--enable-write` only passed when the agent needs to send transactions
 - [ ] `--enable-execute` is **NOT** passed unless explicitly needed
 - [ ] Running via **stdio** (local) — not exposed over HTTP without auth
@@ -210,7 +213,7 @@ STARKNET_PRIVATE_KEY=0x... node dist/index.js --network sepolia
 
 ```text
 ┌──────────────────┐     stdio      ┌──────────────────┐     RPC      ┌──────────┐
-│  MCP Client      │◄──────────────►│  x MCP Server    │◄────────────►│ Starknet │
+│  MCP Client      │◄──────────────►│ StarkZap MCP     │◄────────────►│ Starknet │
 │  (Claude/Cursor) │                │  (this package)  │              │          │
 └──────────────────┘                └───────┬──────────┘              └──────────┘
                                     │
