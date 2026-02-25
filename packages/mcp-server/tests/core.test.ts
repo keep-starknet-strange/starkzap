@@ -13,6 +13,7 @@ import {
   assertSchemaParity,
   buildTools,
   createTokenResolver,
+  enforcePerMinuteRateLimit,
   extractPoolToken,
   getArg,
   isClassHashNotFoundError,
@@ -60,7 +61,24 @@ describe("CLI parsing", () => {
     ]);
     expect(cli.maxAmount).toBe("10");
     expect(cli.maxBatchAmount).toBe("15");
+    expect(cli.rateLimitRpm).toBe(0);
     expect(cli.enableWrite).toBe(true);
+  });
+
+  it("parses optional --rate-limit-rpm", () => {
+    const cli = parseCliConfig([
+      "--network",
+      "mainnet",
+      "--rate-limit-rpm",
+      "120",
+    ]);
+    expect(cli.rateLimitRpm).toBe(120);
+  });
+
+  it("fails fast on unknown CLI flags", () => {
+    expect(() =>
+      parseCliConfig(["--network", "sepolia", "--wat", "1"])
+    ).toThrow(/Unknown flag --wat/);
   });
 });
 
@@ -162,6 +180,15 @@ describe("tool gating and parity", () => {
     expect(names.has("x_execute")).toBe(true);
     expect(names.has("x_transfer")).toBe(false);
     expect(names.has("x_enter_pool")).toBe(false);
+  });
+
+  it("includes MCP tool annotations for safety-aware clients", () => {
+    const tools = buildTools("100", "150");
+    for (const tool of tools) {
+      expect(tool.annotations).toBeDefined();
+      expect(typeof tool.annotations?.readOnlyHint).toBe("boolean");
+      expect(typeof tool.annotations?.destructiveHint).toBe("boolean");
+    }
   });
 });
 
@@ -265,6 +292,24 @@ describe("deploy error classification", () => {
         message: "Gateway timeout while contacting RPC node",
       })
     ).toBe(false);
+  });
+});
+
+describe("rate limiting", () => {
+  it("allows calls under limit and blocks calls over limit", () => {
+    const bucket: number[] = [];
+    enforcePerMinuteRateLimit(bucket, 1_000, 2);
+    enforcePerMinuteRateLimit(bucket, 2_000, 2);
+    expect(() => enforcePerMinuteRateLimit(bucket, 3_000, 2)).toThrow(
+      /Rate limit exceeded/
+    );
+  });
+
+  it("evicts stale timestamps after one minute window", () => {
+    const bucket: number[] = [];
+    enforcePerMinuteRateLimit(bucket, 1_000, 1);
+    expect(() => enforcePerMinuteRateLimit(bucket, 2_000, 1)).toThrow();
+    expect(() => enforcePerMinuteRateLimit(bucket, 62_000, 1)).not.toThrow();
   });
 });
 

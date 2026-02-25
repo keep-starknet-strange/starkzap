@@ -12,6 +12,7 @@
 
 import { fileURLToPath } from "node:url";
 import path from "node:path";
+import { randomUUID } from "node:crypto";
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import {
@@ -28,6 +29,7 @@ import {
   assertSchemaParity,
   buildTools,
   createTokenResolver,
+  enforcePerMinuteRateLimit,
   extractPoolToken,
   FELT_REGEX,
   formatZodError,
@@ -57,8 +59,14 @@ const cliConfig = (() => {
   }
 })();
 
-const { network, enableWrite, enableExecute, maxAmount, maxBatchAmount } =
-  cliConfig;
+const {
+  network,
+  enableWrite,
+  enableExecute,
+  maxAmount,
+  maxBatchAmount,
+  rateLimitRpm,
+} = cliConfig;
 
 // ---------------------------------------------------------------------------
 // Environment
@@ -211,6 +219,7 @@ async function resolvePoolTokenForOperation(
 }
 
 type BoundedPoolField = "rewards" | "unpooling";
+const requestTimestamps: number[] = [];
 
 async function assertStablePoolAmountWithinCap(
   wallet: Wallet,
@@ -246,6 +255,8 @@ async function handleTool(
   name: string,
   rawArgs: Record<string, unknown>
 ): Promise<{ content: Array<{ type: "text"; text: string }> }> {
+  enforcePerMinuteRateLimit(requestTimestamps, Date.now(), rateLimitRpm);
+
   const schema = schemas[name as keyof typeof schemas];
   if (!schema) {
     throw new Error(`Unknown tool: ${name}`);
@@ -608,7 +619,8 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       };
     }
     const message = error instanceof Error ? error.message : String(error);
-    console.error(`[x-mcp:error] ${message}`);
+    const requestId = randomUUID();
+    console.error(`[x-mcp:error][${requestId}]`, error);
     const safeMessagePrefixes = [
       "Invalid ",
       "Unknown ",
@@ -617,13 +629,14 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       "Cannot ",
       "Total ",
       "Could ",
+      "Rate ",
       "x_",
     ];
     const safeMessage = safeMessagePrefixes.some((prefix) =>
       message.startsWith(prefix)
     )
       ? message
-      : "Operation failed. Check MCP server logs for details.";
+      : `Operation failed. Reference: ${requestId}`;
     return {
       content: [{ type: "text" as const, text: `Error: ${safeMessage}` }],
       isError: true,

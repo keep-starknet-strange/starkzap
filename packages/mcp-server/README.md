@@ -35,7 +35,7 @@ This server handles real funds. The following protections are built in:
 6. **Transaction timeout.** `tx.wait()` has a 2-minute timeout to prevent the server from hanging on stuck transactions.
 7. **Token allowlist.** Only tokens in the StarkZap SDK's built-in presets are accepted. Arbitrary contract addresses for unknown tokens are rejected.
 8. **stdio transport only.** The server runs locally via stdio — no network exposure.
-9. **Early CLI validation.** Invalid `--network`/amount args are rejected immediately at startup with a clear error.
+9. **Early CLI validation.** Invalid/unknown CLI flags and malformed `--network`/amount/rate-limit values are rejected immediately at startup with a clear error.
 10. **Staking tool gating by config.** Staking tools are hidden unless `STARKNET_STAKING_CONTRACT` is configured.
 
 **Recommendations for production use:**
@@ -62,6 +62,7 @@ This server handles real funds. The following protections are built in:
 | `--network`          | `mainnet`              | Network preset: `mainnet` or `sepolia` (validated at startup) |
 | `--max-amount`       | `1000`                 | Max tokens per individual amount-bearing operation            |
 | `--max-batch-amount` | `same as --max-amount` | Max total tokens across one `x_transfer` batch call           |
+| `--rate-limit-rpm`   | `0` (disabled)         | Global MCP tool-call rate limit per minute                    |
 | `--enable-write`     | off                    | Enable state-changing tools (transfer, stake, deploy)         |
 | `--enable-execute`   | off                    | Enable only the unrestricted `x_execute` tool                 |
 
@@ -173,6 +174,7 @@ Tools accept token symbols (`ETH`, `STRK`, `USDC`, etc.) or contract addresses. 
 - [ ] Using a **dedicated agent wallet** with limited funds (not your main wallet)
 - [ ] `STARKNET_PRIVATE_KEY` stored in a secret manager, not plaintext
 - [ ] `--max-amount` set to the lowest practical value for your use case
+- [ ] `--rate-limit-rpm` set for shared/server environments
 - [ ] `--enable-write` only passed when the agent needs to send transactions
 - [ ] `--enable-execute` is **NOT** passed unless explicitly needed
 - [ ] Running via **stdio** (local) — not exposed over HTTP without auth

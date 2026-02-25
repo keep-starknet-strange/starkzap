@@ -13,6 +13,7 @@ export interface CliConfig {
   enableExecute: boolean;
   maxAmount: string;
   maxBatchAmount: string;
+  rateLimitRpm: number;
 }
 
 const tokensByNetwork: Record<Network, Record<string, Token>> = {
@@ -57,6 +58,30 @@ export function hasFlag(cliArgs: string[], name: string): boolean {
   return cliArgs.includes(`--${name}`);
 }
 
+const VALUE_FLAGS = new Set([
+  "network",
+  "max-amount",
+  "max-batch-amount",
+  "rate-limit-rpm",
+]);
+const BOOLEAN_FLAGS = new Set(["enable-write", "enable-execute"]);
+
+function validateKnownFlags(cliArgs: string[]): void {
+  for (const token of cliArgs) {
+    if (!token.startsWith("--")) {
+      continue;
+    }
+    const flag = token.slice(2);
+    if (!VALUE_FLAGS.has(flag) && !BOOLEAN_FLAGS.has(flag)) {
+      const supported = [
+        ...Array.from(VALUE_FLAGS).map((name) => `--${name} <value>`),
+        ...Array.from(BOOLEAN_FLAGS).map((name) => `--${name}`),
+      ].join(", ");
+      throw new Error(`Unknown flag --${flag}. Supported flags: ${supported}`);
+    }
+  }
+}
+
 function parseNetwork(rawValue: string): Network {
   if (!VALID_NETWORKS.includes(rawValue as Network)) {
     throw new Error(
@@ -85,10 +110,24 @@ function validatePositiveAmountLiteral(
   }
 }
 
+function parseNonNegativeInteger(value: string, argName: string): number {
+  if (!/^\d+$/.test(value)) {
+    throw new Error(
+      `Invalid --${argName} value "${value}". Must be a non-negative integer.`
+    );
+  }
+  return Number.parseInt(value, 10);
+}
+
 export function parseCliConfig(cliArgs: string[]): CliConfig {
+  validateKnownFlags(cliArgs);
   const network = parseNetwork(getArg(cliArgs, "network", "mainnet"));
   const maxAmount = getArg(cliArgs, "max-amount", "1000");
   const maxBatchAmount = getArg(cliArgs, "max-batch-amount", maxAmount);
+  const rateLimitRpm = parseNonNegativeInteger(
+    getArg(cliArgs, "rate-limit-rpm", "0"),
+    "rate-limit-rpm"
+  );
 
   validatePositiveAmountLiteral(maxAmount, "max-amount", network);
   validatePositiveAmountLiteral(maxBatchAmount, "max-batch-amount", network);
@@ -102,6 +141,7 @@ export function parseCliConfig(cliArgs: string[]): CliConfig {
     enableExecute,
     maxAmount,
     maxBatchAmount,
+    rateLimitRpm,
   };
 }
 
@@ -287,6 +327,12 @@ export function buildTools(maxAmount: string, maxBatchAmount: string): Tool[] {
       name: "x_get_balance",
       description:
         "Get the wallet's ERC20 token balance. Returns human-readable and raw values.",
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: true,
+      },
       inputSchema: {
         type: "object" as const,
         properties: {
@@ -306,6 +352,12 @@ export function buildTools(maxAmount: string, maxBatchAmount: string): Tool[] {
         `Maximum ${maxAmount} tokens per individual transfer. ` +
         `Maximum ${maxBatchAmount} tokens total per transfer batch. ` +
         `Maximum 20 recipients per batch.`,
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: true,
+        idempotentHint: false,
+        openWorldHint: true,
+      },
       inputSchema: {
         type: "object" as const,
         properties: {
@@ -343,6 +395,12 @@ export function buildTools(maxAmount: string, maxBatchAmount: string): Tool[] {
       name: "x_execute",
       description:
         "Execute one or more raw contract calls atomically. RESTRICTED: only available when server is started with --enable-execute flag. Maximum 10 calls per batch.",
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: true,
+        idempotentHint: false,
+        openWorldHint: true,
+      },
       inputSchema: {
         type: "object" as const,
         properties: {
@@ -380,6 +438,12 @@ export function buildTools(maxAmount: string, maxBatchAmount: string): Tool[] {
       name: "x_deploy_account",
       description:
         "Deploy the account contract on-chain. Must be called before the account can send transactions (unless using sponsored mode, which auto-deploys).",
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: true,
+        idempotentHint: false,
+        openWorldHint: true,
+      },
       inputSchema: {
         type: "object" as const,
         properties: {
@@ -393,6 +457,12 @@ export function buildTools(maxAmount: string, maxBatchAmount: string): Tool[] {
     {
       name: "x_enter_pool",
       description: `Enter a staking/delegation pool as a new member. Amount is parsed using the pool's canonical token decimals from chain metadata. Optional token hint must match the pool token. Maximum ${maxAmount} tokens per operation.`,
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: true,
+        idempotentHint: false,
+        openWorldHint: true,
+      },
       inputSchema: {
         type: "object" as const,
         properties: {
@@ -416,6 +486,12 @@ export function buildTools(maxAmount: string, maxBatchAmount: string): Tool[] {
     {
       name: "x_add_to_pool",
       description: `Add more tokens to an existing stake in a pool. Amount is parsed using the pool's canonical token decimals from chain metadata. Optional token hint must match the pool token. Maximum ${maxAmount} tokens per operation.`,
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: true,
+        idempotentHint: false,
+        openWorldHint: true,
+      },
       inputSchema: {
         type: "object" as const,
         properties: {
@@ -439,6 +515,12 @@ export function buildTools(maxAmount: string, maxBatchAmount: string): Tool[] {
     {
       name: "x_claim_rewards",
       description: "Claim accumulated staking rewards from a pool.",
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: true,
+        idempotentHint: false,
+        openWorldHint: true,
+      },
       inputSchema: {
         type: "object" as const,
         properties: {
@@ -453,6 +535,12 @@ export function buildTools(maxAmount: string, maxBatchAmount: string): Tool[] {
     {
       name: "x_exit_pool_intent",
       description: `Start the exit process from a pool. Amount is parsed using the pool's canonical token decimals from chain metadata. Optional token hint must match the pool token. Maximum ${maxAmount} tokens per operation. Tokens stop earning rewards immediately. Must wait for the exit window before calling x_exit_pool.`,
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: true,
+        idempotentHint: false,
+        openWorldHint: true,
+      },
       inputSchema: {
         type: "object" as const,
         properties: {
@@ -477,6 +565,12 @@ export function buildTools(maxAmount: string, maxBatchAmount: string): Tool[] {
       name: "x_exit_pool",
       description:
         "Complete the exit from a pool after the waiting period. Returns staked tokens to the wallet.",
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: true,
+        idempotentHint: false,
+        openWorldHint: true,
+      },
       inputSchema: {
         type: "object" as const,
         properties: {
@@ -492,6 +586,12 @@ export function buildTools(maxAmount: string, maxBatchAmount: string): Tool[] {
       name: "x_get_pool_position",
       description:
         "Get the wallet's staking position in a pool: staked amount, rewards, commission, exit status.",
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: true,
+      },
       inputSchema: {
         type: "object" as const,
         properties: {
@@ -507,6 +607,12 @@ export function buildTools(maxAmount: string, maxBatchAmount: string): Tool[] {
       name: "x_estimate_fee",
       description:
         "Estimate the gas fee for one or more contract calls. Returns overall_fee and resource bounds (l1_gas, l2_gas, l1_data_gas). Maximum 10 calls per estimate batch.",
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: true,
+      },
       inputSchema: {
         type: "object" as const,
         properties: {
@@ -792,6 +898,29 @@ export function isClassHashNotFoundError(error: unknown): boolean {
     }
     return normalized.includes("contract") || normalized.includes("class hash");
   });
+}
+
+export function enforcePerMinuteRateLimit(
+  bucket: number[],
+  nowMs: number,
+  maxPerMinute: number
+): void {
+  if (maxPerMinute <= 0) {
+    return;
+  }
+
+  const windowStart = nowMs - 60_000;
+  while (bucket.length > 0 && bucket[0] <= windowStart) {
+    bucket.shift();
+  }
+
+  if (bucket.length >= maxPerMinute) {
+    throw new Error(
+      `Rate limit exceeded: maximum ${maxPerMinute} tool calls per minute.`
+    );
+  }
+
+  bucket.push(nowMs);
 }
 
 function safeJson(value: unknown): string {
