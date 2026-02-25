@@ -1,0 +1,64 @@
+# Greptile configuration for StarkZap SDK + MCP server
+# https://docs.greptile.com/config
+
+version: 1
+
+review:
+  comprehensive: true
+  context_files: true
+
+  severity:
+    - critical
+    - high
+    - medium
+    - low
+
+  categories:
+    - security
+    - correctness
+    - performance
+    - maintainability
+    - best-practices
+    - error-handling
+    - type-safety
+    - documentation
+
+languages:
+  typescript:
+    strict_null_checks: true
+    no_any: true
+    no_implicit_any: true
+    require_error_handling: true
+    no_empty_catch: true
+
+context:
+  description: |
+    StarkZap is a Starknet SDK plus MCP server used for agentic wallet operations.
+    Security and correctness are critical because flows can sign transactions and move funds.
+
+  key_files:
+    - src/index.ts
+    - src/wallet/base.ts
+    - src/staking/staking.ts
+    - packages/mcp-server/src/index.ts
+    - packages/mcp-server/src/core.ts
+
+  patterns:
+    - "All external addresses must be normalized/validated before use."
+    - "State-changing MCP tools must remain opt-in; read-only by default."
+    - "Amount caps and token decimals must be enforced before transaction submission."
+    - "Internal errors should be logged, while client-facing responses remain sanitized."
+    - "Changes to public SDK APIs should include tests and preserve backwards compatibility."
+
+security:
+  no_hardcoded_secrets: true
+  no_api_keys_in_code: true
+  require_input_validation: true
+  no_eval: true
+  no_shell_injection: true
+
+pull_request:
+  auto_review: true
+  block_on_critical: true
+  inline_comments: true
+  summary_comment: true
