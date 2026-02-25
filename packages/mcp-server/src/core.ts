@@ -145,7 +145,11 @@ export const amountSchema = z
 
 const calldataItemSchema = z
   .string()
-  .max(256, "Calldata item too large (max 256 chars)");
+  .max(256, "Calldata item too large (max 256 chars)")
+  .regex(
+    /^(0x[0-9a-fA-F]{1,64}|[0-9]+)$/,
+    "Calldata must be a felt-like hex (0x...) or decimal string"
+  );
 
 const calldataSchema = z
   .array(calldataItemSchema)
@@ -516,7 +520,7 @@ export function selectTools(
     if (tool.name === "x_execute") {
       return options.enableExecute;
     }
-    return options.enableWrite || options.enableExecute;
+    return options.enableWrite;
   });
 }
 

@@ -99,6 +99,7 @@ const env = (() => {
   console.error(`Error: invalid environment configuration: ${details}`);
   process.exit(1);
 })();
+Object.freeze(env);
 
 const stakingEnabled = Boolean(env.STARKNET_STAKING_CONTRACT);
 
@@ -125,18 +126,19 @@ function validateAddress(address: string, label: string): Address {
 // ---------------------------------------------------------------------------
 let sdkSingleton: StarkSDK | undefined;
 let walletSingleton: Wallet | undefined;
+const sdkConfig = Object.freeze({
+  network,
+  ...(env.STARKNET_RPC_URL && { rpcUrl: env.STARKNET_RPC_URL }),
+  ...(env.STARKNET_STAKING_CONTRACT && {
+    staking: {
+      contract: fromAddress(env.STARKNET_STAKING_CONTRACT),
+    },
+  }),
+});
 
 function getSdk(): StarkSDK {
   if (!sdkSingleton) {
-    sdkSingleton = new StarkSDK({
-      network,
-      ...(env.STARKNET_RPC_URL && { rpcUrl: env.STARKNET_RPC_URL }),
-      ...(env.STARKNET_STAKING_CONTRACT && {
-        staking: {
-          contract: fromAddress(env.STARKNET_STAKING_CONTRACT),
-        },
-      }),
-    });
+    sdkSingleton = new StarkSDK(sdkConfig);
   }
   return sdkSingleton;
 }
@@ -227,7 +229,7 @@ async function handleTool(
           "WARNING: this gives the agent unrestricted access to execute any contract call."
       );
     }
-    if (name !== "x_execute" && !enableWrite && !enableExecute) {
+    if (name !== "x_execute" && !enableWrite) {
       throw new Error(
         `${name} is a state-changing tool and is disabled by default. ` +
           "Start the server with --enable-write to allow write operations."
@@ -279,9 +281,11 @@ async function handleTool(
         maxBatchAmount
       );
 
-      const feeMode = parsed.sponsored ? "sponsored" : undefined;
+      const feeMode: "sponsored" | undefined = parsed.sponsored
+        ? "sponsored"
+        : undefined;
       const tx = await wallet.transfer(token, transfers, {
-        ...(feeMode && { feeMode: feeMode as "sponsored" }),
+        ...(feeMode && { feeMode }),
       });
       await waitWithTimeout(tx);
       return ok({
@@ -302,9 +306,11 @@ async function handleTool(
         entrypoint: call.entrypoint,
         calldata: call.calldata ?? [],
       }));
-      const feeMode = parsed.sponsored ? "sponsored" : undefined;
+      const feeMode: "sponsored" | undefined = parsed.sponsored
+        ? "sponsored"
+        : undefined;
       const tx = await wallet.execute(calls, {
-        ...(feeMode && { feeMode: feeMode as "sponsored" }),
+        ...(feeMode && { feeMode }),
       });
       await waitWithTimeout(tx);
       return ok({
@@ -316,15 +322,22 @@ async function handleTool(
 
     case "x_deploy_account": {
       const parsed = args as z.infer<typeof schemas.x_deploy_account>;
-      if (await wallet.isDeployed()) {
+      const provider = wallet.getProvider();
+      const isDeployedOnChain = await provider
+        .getClassHashAt(wallet.address)
+        .then(() => true)
+        .catch(() => false);
+      if (isDeployedOnChain) {
         return ok({
           status: "already_deployed",
           address: wallet.address,
         });
       }
-      const feeMode = parsed.sponsored ? "sponsored" : undefined;
+      const feeMode: "sponsored" | undefined = parsed.sponsored
+        ? "sponsored"
+        : undefined;
       const tx = await wallet.deploy({
-        ...(feeMode && { feeMode: feeMode as "sponsored" }),
+        ...(feeMode && { feeMode }),
       });
       await waitWithTimeout(tx);
       return ok({
@@ -537,8 +550,22 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       };
     }
     const message = error instanceof Error ? error.message : String(error);
+    console.error(`[x-mcp:error] ${message}`);
+    const safeMessagePrefixes = [
+      "Invalid ",
+      "Unknown ",
+      "Amount ",
+      "Token ",
+      "Cannot ",
+      "x_",
+    ];
+    const safeMessage = safeMessagePrefixes.some((prefix) =>
+      message.startsWith(prefix)
+    )
+      ? message
+      : "Operation failed. Check MCP server logs for details.";
     return {
-      content: [{ type: "text" as const, text: `Error: ${message}` }],
+      content: [{ type: "text" as const, text: `Error: ${safeMessage}` }],
       isError: true,
     };
   }
@@ -550,13 +577,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 async function main() {
   const transport = new StdioServerTransport();
   await server.connect(transport);
-  console.error(
-    `x-mcp server running (network: ${network}, transport: stdio, ` +
-      `write: ${enableWrite || enableExecute ? "ENABLED" : "disabled"}, ` +
-      `execute: ${enableExecute ? "ENABLED" : "disabled"}, ` +
-      `staking: ${stakingEnabled ? "ENABLED" : "disabled"}, ` +
-      `max-amount: ${maxAmount}, max-batch-amount: ${maxBatchAmount})`
-  );
+  console.error(`x-mcp server running (network: ${network}, transport: stdio)`);
 }
 
 const isMainModule =

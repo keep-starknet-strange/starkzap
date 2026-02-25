@@ -5,6 +5,7 @@ import { Amount } from "starkzap";
 import type { Token } from "starkzap";
 import { describe, expect, it } from "vitest";
 import {
+  addressSchema,
   amountSchema,
   assertAmountWithinCap,
   assertBatchAmountWithinCap,
@@ -90,6 +91,23 @@ describe("schema hardening", () => {
     });
     expect(parsed.success).toBe(false);
   });
+
+  it("validates calldata felt-like format", () => {
+    const parsed = schemas.x_execute.safeParse({
+      calls: [
+        {
+          contractAddress: TEST_TOKEN.address,
+          entrypoint: "transfer",
+          calldata: ["not-a-felt"],
+        },
+      ],
+    });
+    expect(parsed.success).toBe(false);
+  });
+
+  it("rejects bare 0x in address schema", () => {
+    expect(addressSchema.safeParse("0x").success).toBe(false);
+  });
 });
 
 describe("tool gating and parity", () => {
@@ -109,6 +127,18 @@ describe("tool gating and parity", () => {
     const tools = buildTools("100", "150");
     expect(schemaParityMismatches(tools)).toEqual([]);
     expect(() => assertSchemaParity(tools)).not.toThrow();
+  });
+
+  it("does not expose write tools when only --enable-execute is set", () => {
+    const tools = selectTools(buildTools("100", "150"), {
+      enableWrite: false,
+      enableExecute: true,
+      stakingEnabled: true,
+    });
+    const names = new Set(tools.map((tool) => tool.name));
+    expect(names.has("x_execute")).toBe(true);
+    expect(names.has("x_transfer")).toBe(false);
+    expect(names.has("x_enter_pool")).toBe(false);
   });
 });
 
