@@ -6,7 +6,7 @@
 
 # Interface: PrivySignerConfig
 
-Defined in: [src/signer/privy.ts:11](https://github.com/keep-starknet-strange/starkzap/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/signer/privy.ts#L11)
+Defined in: [src/signer/privy.ts:11](https://github.com/keep-starknet-strange/x/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/signer/privy.ts#L11)
 
 Configuration for the Privy signer.
 
@@ -21,7 +21,7 @@ You can either provide:
 
 > **walletId**: `string`
 
-Defined in: [src/signer/privy.ts:13](https://github.com/keep-starknet-strange/starkzap/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/signer/privy.ts#L13)
+Defined in: [src/signer/privy.ts:13](https://github.com/keep-starknet-strange/x/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/signer/privy.ts#L13)
 
 Privy wallet ID
 
@@ -31,7 +31,7 @@ Privy wallet ID
 
 > **publicKey**: `string`
 
-Defined in: [src/signer/privy.ts:15](https://github.com/keep-starknet-strange/starkzap/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/signer/privy.ts#L15)
+Defined in: [src/signer/privy.ts:15](https://github.com/keep-starknet-strange/x/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/signer/privy.ts#L15)
 
 Public key returned by Privy when creating the wallet
 
@@ -41,7 +41,7 @@ Public key returned by Privy when creating the wallet
 
 > `optional` **serverUrl**: `string`
 
-Defined in: [src/signer/privy.ts:21](https://github.com/keep-starknet-strange/starkzap/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/signer/privy.ts#L21)
+Defined in: [src/signer/privy.ts:21](https://github.com/keep-starknet-strange/x/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/signer/privy.ts#L21)
 
 URL to your backend's sign endpoint.
 The signer will POST { walletId, hash } and expect { signature } back.
@@ -58,7 +58,7 @@ The signer will POST { walletId, hash } and expect { signature } back.
 
 > `optional` **rawSign**: (`walletId`, `messageHash`) => `Promise`\<`string`\>
 
-Defined in: [src/signer/privy.ts:26](https://github.com/keep-starknet-strange/starkzap/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/signer/privy.ts#L26)
+Defined in: [src/signer/privy.ts:26](https://github.com/keep-starknet-strange/x/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/signer/privy.ts#L26)
 
 Custom function to call Privy's rawSign.
 Use this for server-side signing with PrivyClient directly.

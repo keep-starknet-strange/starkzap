@@ -6,7 +6,7 @@
 
 # Class: StarkSDK
 
-Defined in: [src/sdk.ts:59](https://github.com/keep-starknet-strange/starkzap/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/sdk.ts#L59)
+Defined in: [src/sdk.ts:59](https://github.com/keep-starknet-strange/x/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/sdk.ts#L59)
 
 Main SDK class for Starknet wallet integration.
 
@@ -42,7 +42,7 @@ await tx.wait();
 
 > **new StarkSDK**(`config`): `StarkSDK`
 
-Defined in: [src/sdk.ts:63](https://github.com/keep-starknet-strange/starkzap/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/sdk.ts#L63)
+Defined in: [src/sdk.ts:63](https://github.com/keep-starknet-strange/x/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/sdk.ts#L63)
 
 #### Parameters
 
@@ -60,7 +60,7 @@ Defined in: [src/sdk.ts:63](https://github.com/keep-starknet-strange/starkzap/bl
 
 > **connectWallet**(`options`): `Promise`\<[`Wallet`](Wallet.md)\>
 
-Defined in: [src/sdk.ts:147](https://github.com/keep-starknet-strange/starkzap/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/sdk.ts#L147)
+Defined in: [src/sdk.ts:147](https://github.com/keep-starknet-strange/x/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/sdk.ts#L147)
 
 Connect a wallet using the specified signer and account configuration.
 
@@ -116,7 +116,7 @@ const wallet = await sdk.connectWallet({
 
 > **onboard**(`options`): `Promise`\<[`OnboardResult`](../interfaces/OnboardResult.md)\<[`WalletInterface`](../interfaces/WalletInterface.md)\>\>
 
-Defined in: [src/sdk.ts:187](https://github.com/keep-starknet-strange/starkzap/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/sdk.ts#L187)
+Defined in: [src/sdk.ts:187](https://github.com/keep-starknet-strange/x/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/sdk.ts#L187)
 
 High-level onboarding API for app integrations.
 
@@ -145,7 +145,7 @@ By default, onboarding calls `wallet.ensureReady({ deploy: "if_needed" })`.
 
 > **connectCartridge**(`options?`): `Promise`\<[`CartridgeWallet`](CartridgeWallet.md)\>
 
-Defined in: [src/sdk.ts:307](https://github.com/keep-starknet-strange/starkzap/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/sdk.ts#L307)
+Defined in: [src/sdk.ts:307](https://github.com/keep-starknet-strange/x/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/sdk.ts#L307)
 
 Connect using Cartridge Controller.
 
@@ -185,7 +185,7 @@ controller.openProfile();
 
 > **stakingTokens**(): `Promise`\<[`Token`](../interfaces/Token.md)[]\>
 
-Defined in: [src/sdk.ts:338](https://github.com/keep-starknet-strange/starkzap/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/sdk.ts#L338)
+Defined in: [src/sdk.ts:338](https://github.com/keep-starknet-strange/x/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/sdk.ts#L338)
 
 Get all tokens that are currently enabled for staking.
 
@@ -216,7 +216,7 @@ console.log(`Stakeable tokens: ${tokens.map((t) => t.symbol).join(", ")}`);
 
 > **getStakerPools**(`staker`): `Promise`\<[`Pool`](../interfaces/Pool.md)[]\>
 
-Defined in: [src/sdk.ts:365](https://github.com/keep-starknet-strange/starkzap/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/sdk.ts#L365)
+Defined in: [src/sdk.ts:365](https://github.com/keep-starknet-strange/x/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/sdk.ts#L365)
 
 Get all delegation pools managed by a specific validator.
 
@@ -257,7 +257,7 @@ for (const pool of pools) {
 
 > **getProvider**(): `RpcProvider`
 
-Defined in: [src/sdk.ts:380](https://github.com/keep-starknet-strange/starkzap/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/sdk.ts#L380)
+Defined in: [src/sdk.ts:380](https://github.com/keep-starknet-strange/x/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/sdk.ts#L380)
 
 Get the underlying RPC provider.
 

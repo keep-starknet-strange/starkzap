@@ -8,7 +8,7 @@
 
 > **Address** = `string` & `object`
 
-Defined in: [src/types/address.ts:9](https://github.com/keep-starknet-strange/starkzap/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/types/address.ts#L9)
+Defined in: [src/types/address.ts:9](https://github.com/keep-starknet-strange/x/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/types/address.ts#L9)
 
 Branded type for Starknet addresses.
 

@@ -6,7 +6,7 @@
 
 # Interface: ConnectWalletOptions
 
-Defined in: [src/types/wallet.ts:94](https://github.com/keep-starknet-strange/starkzap/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/types/wallet.ts#L94)
+Defined in: [src/types/wallet.ts:94](https://github.com/keep-starknet-strange/x/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/types/wallet.ts#L94)
 
 Options for `sdk.connectWallet()`.
 
@@ -36,7 +36,7 @@ await sdk.connectWallet({
 
 > **account**: [`AccountConfig`](AccountConfig.md)
 
-Defined in: [src/types/wallet.ts:96](https://github.com/keep-starknet-strange/starkzap/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/types/wallet.ts#L96)
+Defined in: [src/types/wallet.ts:96](https://github.com/keep-starknet-strange/x/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/types/wallet.ts#L96)
 
 Account configuration
 
@@ -46,7 +46,7 @@ Account configuration
 
 > `optional` **feeMode**: [`FeeMode`](../type-aliases/FeeMode.md)
 
-Defined in: [src/types/wallet.ts:98](https://github.com/keep-starknet-strange/starkzap/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/types/wallet.ts#L98)
+Defined in: [src/types/wallet.ts:98](https://github.com/keep-starknet-strange/x/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/types/wallet.ts#L98)
 
 How fees are paid (default: "user_pays")
 
@@ -56,6 +56,6 @@ How fees are paid (default: "user_pays")
 
 > `optional` **timeBounds**: [`PaymasterTimeBounds`](PaymasterTimeBounds.md)
 
-Defined in: [src/types/wallet.ts:100](https://github.com/keep-starknet-strange/starkzap/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/types/wallet.ts#L100)
+Defined in: [src/types/wallet.ts:100](https://github.com/keep-starknet-strange/x/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/types/wallet.ts#L100)
 
 Optional time bounds for paymaster transactions

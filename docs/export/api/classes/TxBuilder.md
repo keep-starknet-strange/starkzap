@@ -6,7 +6,7 @@
 
 # Class: TxBuilder
 
-Defined in: [src/tx/builder.ts:52](https://github.com/keep-starknet-strange/starkzap/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/tx/builder.ts#L52)
+Defined in: [src/tx/builder.ts:52](https://github.com/keep-starknet-strange/x/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/tx/builder.ts#L52)
 
 Fluent transaction builder for batching multiple operations into a single transaction.
 
@@ -54,7 +54,7 @@ const tx = await wallet.tx()
 
 > **new TxBuilder**(`wallet`): `TxBuilder`
 
-Defined in: [src/tx/builder.ts:57](https://github.com/keep-starknet-strange/starkzap/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/tx/builder.ts#L57)
+Defined in: [src/tx/builder.ts:57](https://github.com/keep-starknet-strange/x/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/tx/builder.ts#L57)
 
 #### Parameters
 
@@ -74,7 +74,7 @@ Defined in: [src/tx/builder.ts:57](https://github.com/keep-starknet-strange/star
 
 > **get** **length**(): `number`
 
-Defined in: [src/tx/builder.ts:71](https://github.com/keep-starknet-strange/starkzap/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/tx/builder.ts#L71)
+Defined in: [src/tx/builder.ts:71](https://github.com/keep-starknet-strange/x/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/tx/builder.ts#L71)
 
 The number of pending operations in the builder.
 
@@ -93,7 +93,7 @@ into multiple calls once resolved.
 
 > **get** **isEmpty**(): `boolean`
 
-Defined in: [src/tx/builder.ts:78](https://github.com/keep-starknet-strange/starkzap/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/tx/builder.ts#L78)
+Defined in: [src/tx/builder.ts:78](https://github.com/keep-starknet-strange/x/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/tx/builder.ts#L78)
 
 Whether the builder has no pending operations.
 
@@ -109,7 +109,7 @@ Whether the builder has no pending operations.
 
 > **get** **isSent**(): `boolean`
 
-Defined in: [src/tx/builder.ts:85](https://github.com/keep-starknet-strange/starkzap/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/tx/builder.ts#L85)
+Defined in: [src/tx/builder.ts:85](https://github.com/keep-starknet-strange/x/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/tx/builder.ts#L85)
 
 Whether `send()` has already been called successfully on this builder.
 
@@ -123,7 +123,7 @@ Whether `send()` has already been called successfully on this builder.
 
 > **add**(...`calls`): `this`
 
-Defined in: [src/tx/builder.ts:113](https://github.com/keep-starknet-strange/starkzap/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/tx/builder.ts#L113)
+Defined in: [src/tx/builder.ts:113](https://github.com/keep-starknet-strange/x/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/tx/builder.ts#L113)
 
 Add one or more raw contract calls to the transaction.
 
@@ -163,7 +163,7 @@ wallet
 
 > **approve**(`token`, `spender`, `amount`): `this`
 
-Defined in: [src/tx/builder.ts:138](https://github.com/keep-starknet-strange/starkzap/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/tx/builder.ts#L138)
+Defined in: [src/tx/builder.ts:138](https://github.com/keep-starknet-strange/x/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/tx/builder.ts#L138)
 
 Approve an address to spend ERC20 tokens on behalf of the wallet.
 
@@ -209,7 +209,7 @@ wallet
 
 > **transfer**(`token`, `transfers`): `this`
 
-Defined in: [src/tx/builder.ts:170](https://github.com/keep-starknet-strange/starkzap/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/tx/builder.ts#L170)
+Defined in: [src/tx/builder.ts:170](https://github.com/keep-starknet-strange/x/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/tx/builder.ts#L170)
 
 Transfer ERC20 tokens to one or more recipients.
 
@@ -261,7 +261,7 @@ wallet
 
 > **stake**(`poolAddress`, `amount`): `this`
 
-Defined in: [src/tx/builder.ts:212](https://github.com/keep-starknet-strange/starkzap/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/tx/builder.ts#L212)
+Defined in: [src/tx/builder.ts:212](https://github.com/keep-starknet-strange/x/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/tx/builder.ts#L212)
 
 Stake tokens in a delegation pool, automatically choosing the right
 action based on current membership status.
@@ -312,7 +312,7 @@ await tx.wait();
 
 > **enterPool**(`poolAddress`, `amount`): `this`
 
-Defined in: [src/tx/builder.ts:244](https://github.com/keep-starknet-strange/starkzap/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/tx/builder.ts#L244)
+Defined in: [src/tx/builder.ts:244](https://github.com/keep-starknet-strange/x/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/tx/builder.ts#L244)
 
 Enter a delegation pool as a new member.
 
@@ -354,7 +354,7 @@ wallet.tx().enterPool(poolAddress, Amount.parse("100", STRK)).send();
 
 > **addToPool**(`poolAddress`, `amount`): `this`
 
-Defined in: [src/tx/builder.ts:273](https://github.com/keep-starknet-strange/starkzap/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/tx/builder.ts#L273)
+Defined in: [src/tx/builder.ts:273](https://github.com/keep-starknet-strange/x/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/tx/builder.ts#L273)
 
 Add more tokens to an existing stake in a pool.
 
@@ -396,7 +396,7 @@ wallet.tx().addToPool(poolAddress, Amount.parse("50", STRK)).send();
 
 > **claimPoolRewards**(`poolAddress`): `this`
 
-Defined in: [src/tx/builder.ts:299](https://github.com/keep-starknet-strange/starkzap/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/tx/builder.ts#L299)
+Defined in: [src/tx/builder.ts:299](https://github.com/keep-starknet-strange/x/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/tx/builder.ts#L299)
 
 Claim accumulated staking rewards from a pool.
 
@@ -430,7 +430,7 @@ wallet.tx().claimPoolRewards(poolAddress).send();
 
 > **exitPoolIntent**(`poolAddress`, `amount`): `this`
 
-Defined in: [src/tx/builder.ts:329](https://github.com/keep-starknet-strange/starkzap/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/tx/builder.ts#L329)
+Defined in: [src/tx/builder.ts:329](https://github.com/keep-starknet-strange/x/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/tx/builder.ts#L329)
 
 Initiate an exit from a delegation pool.
 
@@ -473,7 +473,7 @@ wallet.tx().exitPoolIntent(poolAddress, Amount.parse("50", STRK)).send();
 
 > **exitPool**(`poolAddress`): `this`
 
-Defined in: [src/tx/builder.ts:355](https://github.com/keep-starknet-strange/starkzap/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/tx/builder.ts#L355)
+Defined in: [src/tx/builder.ts:355](https://github.com/keep-starknet-strange/x/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/tx/builder.ts#L355)
 
 Complete the exit from a delegation pool after the exit window has passed.
 
@@ -507,7 +507,7 @@ wallet.tx().exitPool(poolAddress).send();
 
 > **calls**(): `Promise`\<[`Call`](../type-aliases/Call.md)[]\>
 
-Defined in: [src/tx/builder.ts:385](https://github.com/keep-starknet-strange/starkzap/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/tx/builder.ts#L385)
+Defined in: [src/tx/builder.ts:385](https://github.com/keep-starknet-strange/x/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/tx/builder.ts#L385)
 
 Resolve all pending operations into a flat array of Calls without executing.
 
@@ -537,7 +537,7 @@ const fee = await wallet.estimateFee(calls);
 
 > **estimateFee**(): `Promise`\<`EstimateFeeResponseOverhead`\>
 
-Defined in: [src/tx/builder.ts:407](https://github.com/keep-starknet-strange/starkzap/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/tx/builder.ts#L407)
+Defined in: [src/tx/builder.ts:407](https://github.com/keep-starknet-strange/x/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/tx/builder.ts#L407)
 
 Estimate the fee for all collected calls.
 
@@ -567,7 +567,7 @@ console.log("Estimated fee:", fee.overall_fee);
 
 > **preflight**(): `Promise`\<[`PreflightResult`](../type-aliases/PreflightResult.md)\>
 
-Defined in: [src/tx/builder.ts:436](https://github.com/keep-starknet-strange/starkzap/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/tx/builder.ts#L436)
+Defined in: [src/tx/builder.ts:436](https://github.com/keep-starknet-strange/x/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/tx/builder.ts#L436)
 
 Simulate the transaction to check if it would succeed.
 
@@ -604,7 +604,7 @@ if (!result.ok) {
 
 > **send**(`options?`): `Promise`\<[`Tx`](Tx.md)\>
 
-Defined in: [src/tx/builder.ts:465](https://github.com/keep-starknet-strange/starkzap/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/tx/builder.ts#L465)
+Defined in: [src/tx/builder.ts:465](https://github.com/keep-starknet-strange/x/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/tx/builder.ts#L465)
 
 Execute all collected calls as a single atomic transaction.
 

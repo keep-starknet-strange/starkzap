@@ -6,7 +6,7 @@
 
 # Class: Amount
 
-Defined in: [src/types/amount.ts:40](https://github.com/keep-starknet-strange/starkzap/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/types/amount.ts#L40)
+Defined in: [src/types/amount.ts:40](https://github.com/keep-starknet-strange/x/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/types/amount.ts#L40)
 
 Represents a token amount with precision handling for blockchain operations.
 
@@ -45,7 +45,7 @@ console.log(ethAmount.toFormatted()); // "1.5 ETH" (locale-formatted)
 
 > `static` **parse**(`amount`, ...`args`): `Amount`
 
-Defined in: [src/types/amount.ts:91](https://github.com/keep-starknet-strange/starkzap/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/types/amount.ts#L91)
+Defined in: [src/types/amount.ts:91](https://github.com/keep-starknet-strange/x/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/types/amount.ts#L91)
 
 Creates an Amount from a human-readable unit value (e.g., "1.5" ETH).
 
@@ -104,7 +104,7 @@ Amount.parse("0.5", 8); // 0.5 with 8 decimals, no symbol
 
 > `static` **fromRaw**(`amount`, ...`args`): `Amount`
 
-Defined in: [src/types/amount.ts:156](https://github.com/keep-starknet-strange/starkzap/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/types/amount.ts#L156)
+Defined in: [src/types/amount.ts:156](https://github.com/keep-starknet-strange/x/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/types/amount.ts#L156)
 
 Creates an Amount directly from a raw value (e.g., wei, FRI, satoshis).
 
@@ -158,7 +158,7 @@ Amount.fromRaw(1000000n, 6); // 1 unit, no symbol
 
 > **toBase**(): `bigint`
 
-Defined in: [src/types/amount.ts:198](https://github.com/keep-starknet-strange/starkzap/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/types/amount.ts#L198)
+Defined in: [src/types/amount.ts:198](https://github.com/keep-starknet-strange/x/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/types/amount.ts#L198)
 
 Returns the raw base value as a bigint for use in smart contract calls.
 
@@ -187,7 +187,7 @@ await contract.transfer(recipient, rawValue);
 
 > **toUnit**(): `string`
 
-Defined in: [src/types/amount.ts:218](https://github.com/keep-starknet-strange/starkzap/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/types/amount.ts#L218)
+Defined in: [src/types/amount.ts:218](https://github.com/keep-starknet-strange/x/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/types/amount.ts#L218)
 
 Returns the human-readable unit value as a string.
 
@@ -215,7 +215,7 @@ Amount.fromRaw(100000000n, 6).toUnit(); // "100"
 
 > **toFormatted**(`compressed?`): `string`
 
-Defined in: [src/types/amount.ts:260](https://github.com/keep-starknet-strange/starkzap/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/types/amount.ts#L260)
+Defined in: [src/types/amount.ts:260](https://github.com/keep-starknet-strange/x/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/types/amount.ts#L260)
 
 Returns a locale-formatted string with the token symbol for UI display.
 
@@ -255,7 +255,7 @@ noSymbol.toFormatted(); // "100" (no symbol appended)
 
 > **getDecimals**(): `number`
 
-Defined in: [src/types/amount.ts:285](https://github.com/keep-starknet-strange/starkzap/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/types/amount.ts#L285)
+Defined in: [src/types/amount.ts:285](https://github.com/keep-starknet-strange/x/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/types/amount.ts#L285)
 
 Returns the number of decimal places for this amount.
 
@@ -283,7 +283,7 @@ console.log(usdcAmount.getDecimals()); // 6
 
 > **getSymbol**(): `string` \| `undefined`
 
-Defined in: [src/types/amount.ts:305](https://github.com/keep-starknet-strange/starkzap/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/types/amount.ts#L305)
+Defined in: [src/types/amount.ts:305](https://github.com/keep-starknet-strange/x/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/types/amount.ts#L305)
 
 Returns the token symbol for this amount, if set.
 
@@ -311,7 +311,7 @@ console.log(noSymbol.getSymbol()); // undefined
 
 > **add**(`other`): `Amount`
 
-Defined in: [src/types/amount.ts:374](https://github.com/keep-starknet-strange/starkzap/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/types/amount.ts#L374)
+Defined in: [src/types/amount.ts:374](https://github.com/keep-starknet-strange/x/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/types/amount.ts#L374)
 
 Adds another Amount to this one.
 
@@ -354,7 +354,7 @@ console.log(sum.toUnit()); // "4"
 
 > **subtract**(`other`): `Amount`
 
-Defined in: [src/types/amount.ts:402](https://github.com/keep-starknet-strange/starkzap/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/types/amount.ts#L402)
+Defined in: [src/types/amount.ts:402](https://github.com/keep-starknet-strange/x/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/types/amount.ts#L402)
 
 Subtracts another Amount from this one.
 
@@ -401,7 +401,7 @@ console.log(diff.toUnit()); // "3"
 
 > **multiply**(`multiplier`): `Amount`
 
-Defined in: [src/types/amount.ts:432](https://github.com/keep-starknet-strange/starkzap/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/types/amount.ts#L432)
+Defined in: [src/types/amount.ts:432](https://github.com/keep-starknet-strange/x/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/types/amount.ts#L432)
 
 Multiplies this Amount by a scalar value.
 
@@ -442,7 +442,7 @@ amount.multiply("1.5").toUnit(); // "15"
 
 > **divide**(`divisor`): `Amount`
 
-Defined in: [src/types/amount.ts:478](https://github.com/keep-starknet-strange/starkzap/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/types/amount.ts#L478)
+Defined in: [src/types/amount.ts:478](https://github.com/keep-starknet-strange/x/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/types/amount.ts#L478)
 
 Divides this Amount by a scalar value.
 
@@ -489,7 +489,7 @@ amount.divide(4).toUnit(); // "2.5"
 
 > **eq**(`other`): `boolean`
 
-Defined in: [src/types/amount.ts:527](https://github.com/keep-starknet-strange/starkzap/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/types/amount.ts#L527)
+Defined in: [src/types/amount.ts:527](https://github.com/keep-starknet-strange/x/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/types/amount.ts#L527)
 
 Checks if this Amount is equal to another Amount.
 
@@ -528,7 +528,7 @@ a.eq(usdc); // false (incompatible)
 
 > **gt**(`other`): `boolean`
 
-Defined in: [src/types/amount.ts:553](https://github.com/keep-starknet-strange/starkzap/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/types/amount.ts#L553)
+Defined in: [src/types/amount.ts:553](https://github.com/keep-starknet-strange/x/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/types/amount.ts#L553)
 
 Checks if this Amount is greater than another Amount.
 
@@ -566,7 +566,7 @@ a.gt(usdc); // false (incompatible)
 
 > **gte**(`other`): `boolean`
 
-Defined in: [src/types/amount.ts:578](https://github.com/keep-starknet-strange/starkzap/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/types/amount.ts#L578)
+Defined in: [src/types/amount.ts:578](https://github.com/keep-starknet-strange/x/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/types/amount.ts#L578)
 
 Checks if this Amount is greater than or equal to another Amount.
 
@@ -603,7 +603,7 @@ a.gte(usdc); // false (incompatible)
 
 > **lt**(`other`): `boolean`
 
-Defined in: [src/types/amount.ts:604](https://github.com/keep-starknet-strange/starkzap/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/types/amount.ts#L604)
+Defined in: [src/types/amount.ts:604](https://github.com/keep-starknet-strange/x/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/types/amount.ts#L604)
 
 Checks if this Amount is less than another Amount.
 
@@ -641,7 +641,7 @@ a.lt(usdc); // false (incompatible)
 
 > **lte**(`other`): `boolean`
 
-Defined in: [src/types/amount.ts:629](https://github.com/keep-starknet-strange/starkzap/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/types/amount.ts#L629)
+Defined in: [src/types/amount.ts:629](https://github.com/keep-starknet-strange/x/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/types/amount.ts#L629)
 
 Checks if this Amount is less than or equal to another Amount.
 
@@ -678,7 +678,7 @@ a.lte(usdc); // false (incompatible)
 
 > **isZero**(): `boolean`
 
-Defined in: [src/types/amount.ts:647](https://github.com/keep-starknet-strange/starkzap/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/types/amount.ts#L647)
+Defined in: [src/types/amount.ts:647](https://github.com/keep-starknet-strange/x/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/types/amount.ts#L647)
 
 Checks if this Amount is zero.
 
@@ -701,7 +701,7 @@ Amount.parse("0.1", 18, "ETH").isZero(); // false
 
 > **isPositive**(): `boolean`
 
-Defined in: [src/types/amount.ts:662](https://github.com/keep-starknet-strange/starkzap/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/types/amount.ts#L662)
+Defined in: [src/types/amount.ts:662](https://github.com/keep-starknet-strange/x/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/types/amount.ts#L662)
 
 Checks if this Amount is positive (greater than zero).
 
