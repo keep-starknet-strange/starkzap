@@ -25,6 +25,14 @@ import type {
 } from "starknet";
 import { Erc20 } from "@/erc20";
 import { Staking } from "@/staking";
+import type {
+  SwapInput,
+  SwapQuote,
+  SwapRequest,
+  SwapSource,
+  SwapProvider,
+} from "@/swap";
+import { AvnuSwapProvider } from "@/swap";
 
 const MAX_ERC20_CACHE_SIZE = 128;
 const MAX_STAKING_CACHE_SIZE = 128;
@@ -78,14 +86,23 @@ export abstract class BaseWallet implements WalletInterface {
    * Creates a new BaseWallet instance.
    * @param address - The Starknet address of this wallet
    * @param stakingConfig - Optional staking configuration for staking operations
+   * @param defaultSwapProvider - Optional default swap provider used by `quoteSwap(request)` and `swap(request)`
    */
   protected constructor(
     address: Address,
-    stakingConfig: StakingConfig | undefined
+    stakingConfig: StakingConfig | undefined,
+    defaultSwapProvider?: SwapProvider
   ) {
     this.address = address;
     this.stakingConfig = stakingConfig;
+    this.swapProviders = new Map();
+    const provider = defaultSwapProvider ?? new AvnuSwapProvider();
+    this.registerSwapProvider(provider, true);
   }
+
+  /** Registered swap providers by id. */
+  private readonly swapProviders: Map<string, SwapProvider>;
+  private defaultSwapProviderId: string | null = null;
 
   // ============================================================
   // Abstract methods - children MUST implement
@@ -157,10 +174,138 @@ export abstract class BaseWallet implements WalletInterface {
     return new TxBuilder(this);
   }
 
+  /**
+   * Fetch a quote.
+   *
+   * Set `request.provider` to a provider instance or provider id.
+   * If omitted, uses the wallet default provider.
+   */
+  async getQuote(request: SwapInput): Promise<SwapQuote> {
+    const { provider, resolvedRequest } = this.resolveSwapInput(request);
+    return await provider.getQuote(resolvedRequest);
+  }
+
+  /**
+   * Backward-compatible alias for `getQuote`.
+   */
+  async quoteSwap(request: SwapInput): Promise<SwapQuote> {
+    const { provider, resolvedRequest } = this.resolveSwapInput(request);
+    return await provider.getQuote(resolvedRequest);
+  }
+
+  /**
+   * Execute a swap.
+   *
+   * Set `request.provider` to a provider instance or provider id.
+   * If omitted, uses the wallet default provider.
+   */
+  async swap(request: SwapInput, options?: ExecuteOptions): Promise<Tx> {
+    const { provider, resolvedRequest } = this.resolveSwapInput(request);
+    const prepared = await provider.swap(resolvedRequest);
+    this.assertSwapCalls(prepared.calls, `provider "${provider.id}"`);
+    return await this.execute(prepared.calls, options);
+  }
+
+  registerSwapProvider(provider: SwapProvider, makeDefault = false): void {
+    this.swapProviders.set(provider.id, provider);
+    if (makeDefault || this.defaultSwapProviderId == null) {
+      this.defaultSwapProviderId = provider.id;
+    }
+  }
+
+  setDefaultSwapProvider(providerId: string): void {
+    if (!this.swapProviders.has(providerId)) {
+      throw new Error(
+        `Unknown swap provider "${providerId}". Registered providers: ${this.listSwapProviders().join(", ")}`
+      );
+    }
+    this.defaultSwapProviderId = providerId;
+  }
+
+  getSwapProvider(providerId: string): SwapProvider {
+    const provider = this.swapProviders.get(providerId);
+    if (!provider) {
+      throw new Error(
+        `Unknown swap provider "${providerId}". Registered providers: ${this.listSwapProviders().join(", ")}`
+      );
+    }
+    return provider;
+  }
+
+  listSwapProviders(): string[] {
+    return Array.from(this.swapProviders.keys());
+  }
+
+  getDefaultSwapProvider(): SwapProvider {
+    if (!this.defaultSwapProviderId) {
+      throw new Error("No default swap provider configured");
+    }
+    return this.getSwapProvider(this.defaultSwapProviderId);
+  }
+
   protected clearCaches(): void {
     this.erc20s.clear();
     this.stakingMap.clear();
     this.stakingInFlight.clear();
+  }
+
+  private assertSwapCalls(calls: Call[], source?: string): void {
+    if (calls.length) {
+      return;
+    }
+    if (source) {
+      throw new Error(`Swap ${source} returned no calls`);
+    }
+    throw new Error("Swap returned no calls");
+  }
+
+  private resolveSwapSource(source: SwapSource | undefined): SwapProvider {
+    if (!source) {
+      return this.getDefaultSwapProvider();
+    }
+    if (typeof source === "string") {
+      return this.getSwapProvider(source);
+    }
+    return source;
+  }
+
+  private resolveSwapInput(input: SwapInput): {
+    provider: SwapProvider;
+    resolvedRequest: SwapRequest;
+  } {
+    const provider = this.resolveSwapSource(input.provider);
+    const resolvedRequest = this.hydrateSwapRequest(input);
+    this.assertSwapContext(provider, resolvedRequest);
+    return { provider, resolvedRequest };
+  }
+
+  private hydrateSwapRequest(input: SwapInput): SwapRequest {
+    return {
+      chainId: input.chainId ?? this.getChainId(),
+      takerAddress: input.takerAddress ?? this.address,
+      tokenIn: input.tokenIn,
+      tokenOut: input.tokenOut,
+      amountIn: input.amountIn,
+      ...(input.slippageBps != null && { slippageBps: input.slippageBps }),
+    };
+  }
+
+  private assertSwapContext(
+    provider: SwapProvider,
+    request: SwapRequest
+  ): void {
+    const walletChain = this.getChainId().toLiteral();
+    const requestChain = request.chainId.toLiteral();
+    if (requestChain !== walletChain) {
+      throw new Error(
+        `Swap request chain "${requestChain}" does not match wallet chain "${walletChain}"`
+      );
+    }
+    if (!provider.supportsChain(request.chainId)) {
+      throw new Error(
+        `Swap provider "${provider.id}" does not support chain "${requestChain}"`
+      );
+    }
   }
 
   private evictOldest<K, V>(cache: Map<K, V>): void {

@@ -207,7 +207,13 @@ export class StarkSDK {
    */
   async connectWallet(options: ConnectWalletOptions): Promise<Wallet> {
     await this.ensureProviderChainMatchesConfig();
-    const { account, feeMode, timeBounds } = options;
+    const {
+      account,
+      feeMode,
+      timeBounds,
+      swapProviders,
+      defaultSwapProviderId,
+    } = options;
 
     return Wallet.create({
       account,
@@ -215,6 +221,8 @@ export class StarkSDK {
       config: this.config,
       ...(feeMode && { feeMode }),
       ...(timeBounds && { timeBounds }),
+      ...(swapProviders && { swapProviders }),
+      ...(defaultSwapProviderId && { defaultSwapProviderId }),
     });
   }
 
@@ -249,6 +257,8 @@ export class StarkSDK {
     const deploy = options.deploy ?? "if_needed";
     const feeMode = options.feeMode;
     const timeBounds = options.timeBounds;
+    const swapProviders = options.swapProviders;
+    const defaultSwapProviderId = options.defaultSwapProviderId;
     const shouldEnsureReady = deploy !== "never";
 
     if (options.strategy === "signer") {
@@ -262,6 +272,8 @@ export class StarkSDK {
         },
         ...(feeMode && { feeMode }),
         ...(timeBounds && { timeBounds }),
+        ...(swapProviders && { swapProviders }),
+        ...(defaultSwapProviderId && { defaultSwapProviderId }),
       });
 
       if (shouldEnsureReady) {
@@ -303,6 +315,8 @@ export class StarkSDK {
         },
         ...(feeMode && { feeMode }),
         ...(timeBounds && { timeBounds }),
+        ...(swapProviders && { swapProviders }),
+        ...(defaultSwapProviderId && { defaultSwapProviderId }),
       });
 
       if (shouldEnsureReady) {
@@ -327,6 +341,15 @@ export class StarkSDK {
         ...(feeMode && { feeMode }),
         ...(timeBounds && { timeBounds }),
       });
+
+      if (swapProviders?.length) {
+        for (const swapProvider of swapProviders) {
+          wallet.registerSwapProvider(swapProvider);
+        }
+      }
+      if (defaultSwapProviderId) {
+        wallet.setDefaultSwapProvider(defaultSwapProviderId);
+      }
 
       if (shouldEnsureReady) {
         await wallet.ensureReady({

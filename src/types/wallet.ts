@@ -1,5 +1,6 @@
 import type { Call, Calldata, PaymasterTimeBounds } from "starknet";
 import type { SignerInterface } from "@/signer/interface";
+import type { SwapProvider } from "@/swap/interface";
 
 // ─── Account Class Configuration ─────────────────────────────────────────────
 
@@ -98,6 +99,10 @@ export interface ConnectWalletOptions {
   feeMode?: FeeMode;
   /** Optional time bounds for paymaster transactions */
   timeBounds?: PaymasterTimeBounds;
+  /** Optional additional swap providers to register on the connected wallet */
+  swapProviders?: SwapProvider[];
+  /** Optional default swap provider id (must be registered) */
+  defaultSwapProviderId?: string;
 }
 
 // ─── Ensure Ready ────────────────────────────────────────────────────────────

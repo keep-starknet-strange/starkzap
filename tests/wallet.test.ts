@@ -2,12 +2,19 @@ import { describe, it, expect, beforeAll, vi } from "vitest";
 import { StarkSDK } from "@/sdk";
 import { StarkSigner } from "@/signer";
 import { OpenZeppelinPreset, ArgentPreset, BraavosPreset } from "@/account";
-import { ChainId } from "@/types";
+import { Amount, ChainId, fromAddress, type Token } from "@/types";
+import type { SwapProvider } from "@/swap";
 import { getTestConfig, testPrivateKeys } from "./config.js";
 
 describe("Wallet", () => {
   const { config, privateKey, network } = getTestConfig();
   let sdk: StarkSDK;
+  const testSwapToken: Token = {
+    name: "Test USDC",
+    symbol: "USDC",
+    decimals: 6,
+    address: fromAddress("0x1234"),
+  };
 
   beforeAll(() => {
     sdk = new StarkSDK(config);
@@ -121,6 +128,39 @@ describe("Wallet", () => {
       });
 
       expect(wallet.address).toBeDefined();
+    });
+
+    it("should accept additional swap providers via connectWallet options", async () => {
+      const signer = new StarkSigner(privateKey);
+      const ekuboProvider: SwapProvider = {
+        id: "ekubo",
+        supportsChain: () => true,
+        getQuote: vi.fn().mockResolvedValue({
+          amountInBase: 1_000_000n,
+          amountOutBase: 2_000_000n,
+          provider: "ekubo",
+        }),
+        swap: vi.fn(),
+      };
+
+      const wallet = await sdk.connectWallet({
+        account: { signer },
+        swapProviders: [ekuboProvider],
+        defaultSwapProviderId: "ekubo",
+      });
+
+      expect(wallet.getSwapProvider("ekubo")).toBe(ekuboProvider);
+      expect(wallet.listSwapProviders()).toContain("ekubo");
+
+      const quote = await wallet.getQuote({
+        chainId: ChainId.SEPOLIA,
+        tokenIn: testSwapToken,
+        tokenOut: testSwapToken,
+        amountIn: Amount.parse("1", testSwapToken),
+      });
+
+      expect(quote.provider).toBe("ekubo");
+      expect(ekuboProvider.getQuote).toHaveBeenCalledTimes(1);
     });
   });
 

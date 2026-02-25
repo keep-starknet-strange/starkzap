@@ -24,6 +24,9 @@ export * from "@/erc20";
 // Staking
 export * from "@/staking";
 
+// Swap
+export * from "@/swap";
+
 // Types
 export * from "@/types";
 
