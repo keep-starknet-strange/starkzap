@@ -43,9 +43,16 @@ type TestingExports = {
 let testing: TestingExports;
 
 beforeAll(async () => {
+  process.env.NODE_ENV = "test";
   process.env.STARKNET_PRIVATE_KEY = `0x${"1".padStart(64, "0")}`;
-  const imported = await import("../src/index.js");
-  testing = imported.__testing as TestingExports;
+  await import("../src/index.js");
+  const hooks = (globalThis as Record<string, unknown>).__X_MCP_TESTING__;
+  if (!hooks) {
+    throw new Error(
+      "Expected __X_MCP_TESTING__ hooks to be available in tests"
+    );
+  }
+  testing = hooks as TestingExports;
 });
 
 beforeEach(() => {
@@ -94,6 +101,14 @@ describe("index integration hardening", () => {
         5
       )
     ).rejects.toThrow(/confirmation timed out/);
+  });
+
+  it("returns actionable timeout messages with tx references", () => {
+    const text = testing.buildToolErrorText(
+      new Error("Transaction 0x123 was submitted but not confirmed")
+    );
+    expect(text).toContain("Transaction 0x123 was submitted");
+    expect(text).not.toContain("Operation failed. Reference:");
   });
 
   it("sanitizes unsafe errors and keeps allowlisted messages", () => {

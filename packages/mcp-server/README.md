@@ -44,6 +44,7 @@ This server handles real funds. The following protections are built in:
 - Set `--max-amount` to the lowest value that makes sense for your use case
 - Do NOT pass `--enable-execute` unless you understand the risk (arbitrary contract calls)
 - Store `STARKNET_PRIVATE_KEY` in a secret manager, not in plaintext config
+- If a write op times out while waiting for confirmation, reconcile with tx hash/explorer first; do not blindly retry
 
 ## Configuration
 

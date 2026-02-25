@@ -279,6 +279,16 @@ const tools = selectTools(allTools, {
 const TX_WAIT_TIMEOUT_MS = 120_000;
 const activeTransactionHashes = new Set<string>();
 
+class TransactionWaitTimeoutError extends Error {
+  constructor(
+    readonly txHash: string,
+    readonly timeoutMs: number
+  ) {
+    super(`Transaction ${txHash} confirmation timed out after ${timeoutMs}ms`);
+    this.name = "TransactionWaitTimeoutError";
+  }
+}
+
 function normalizeTransactionHash(hash: string): string {
   if (!FELT_REGEX.test(hash)) {
     throw new Error(`Invalid transaction hash returned by SDK: "${hash}"`);
@@ -295,6 +305,16 @@ async function waitForTrackedTransaction(tx: {
   activeTransactionHashes.add(normalizedHash);
   try {
     await waitWithTimeout({ wait: tx.wait, hash: normalizedHash });
+  } catch (error) {
+    if (error instanceof TransactionWaitTimeoutError) {
+      const explorerHint = tx.explorerUrl
+        ? ` Check status in explorer: ${tx.explorerUrl}.`
+        : "";
+      throw new Error(
+        `Transaction ${normalizedHash} was submitted but not confirmed within ${error.timeoutMs}ms.${explorerHint} Avoid blind retries to prevent duplicate intents.`
+      );
+    }
+    throw error;
   } finally {
     activeTransactionHashes.delete(normalizedHash);
   }
@@ -308,11 +328,7 @@ async function waitWithTimeout(
   let timeoutId: ReturnType<typeof setTimeout> | undefined;
   const timeout = new Promise<never>((_, reject) => {
     timeoutId = setTimeout(() => {
-      reject(
-        new Error(
-          `Transaction ${tx.hash} confirmation timed out after ${timeoutMs}ms`
-        )
-      );
+      reject(new TransactionWaitTimeoutError(tx.hash, timeoutMs));
     }, timeoutMs);
   });
 
@@ -446,6 +462,9 @@ async function assertStablePoolAmountWithinCap(
 
 function isRpcLikeError(error: unknown): boolean {
   const normalized = summarizeError(error).toLowerCase();
+  if (normalized.includes("confirmation timed out")) {
+    return false;
+  }
   const markers = [
     "timed out",
     "timeout",
@@ -495,6 +514,7 @@ function buildToolErrorText(error: unknown): string {
     "Total ",
     "Could ",
     "Rate ",
+    "Transaction ",
     "Address ",
     "x_",
   ];
@@ -926,6 +946,77 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
   });
 });
 
+interface TestingHooks {
+  withTimeout<T>(
+    operation: string,
+    promiseFactory: () => Promise<T>,
+    timeoutMs?: number
+  ): Promise<T>;
+  waitWithTimeout(
+    tx: { wait: () => Promise<void>; hash: string },
+    timeoutMs?: number
+  ): Promise<void>;
+  getWallet(): Promise<Wallet>;
+  runSerialized<T>(task: () => Promise<T>): Promise<T>;
+  runWithToolConcurrencyPolicy<T>(
+    toolName: string,
+    task: () => Promise<T>
+  ): Promise<T>;
+  assertStablePoolAmountWithinCap(
+    wallet: Wallet,
+    poolAddress: Address,
+    poolToken: Token,
+    field: BoundedPoolField,
+    maxCap: string,
+    operation: "claim rewards" | "exit pool"
+  ): Promise<void>;
+  buildToolErrorText(error: unknown): string;
+  isRpcLikeError(error: unknown): boolean;
+  maybeResetWalletOnRpcError(error: unknown): Promise<void>;
+  cleanupWalletAndSdkResources(): Promise<void>;
+  setNowProvider(provider: () => number): void;
+  setSdkSingleton(value: StarkSDK | undefined): void;
+  setWalletSingleton(value: Wallet | undefined): void;
+  resetState(): void;
+}
+
+const testingHooks: TestingHooks = {
+  withTimeout,
+  waitWithTimeout,
+  getWallet,
+  runSerialized,
+  runWithToolConcurrencyPolicy,
+  assertStablePoolAmountWithinCap,
+  buildToolErrorText,
+  isRpcLikeError,
+  maybeResetWalletOnRpcError,
+  cleanupWalletAndSdkResources,
+  setNowProvider(provider: () => number) {
+    nowProvider = provider;
+  },
+  setSdkSingleton(value: StarkSDK | undefined) {
+    sdkSingleton = value;
+  },
+  setWalletSingleton(value: Wallet | undefined) {
+    walletSingleton = value;
+  },
+  resetState() {
+    sdkSingleton = undefined;
+    walletSingleton = undefined;
+    walletInitPromise = undefined;
+    walletInitFailureCount = 0;
+    walletInitBackoffUntilMs = 0;
+    requestExecutionQueue = Promise.resolve();
+    requestTimestamps.splice(0, requestTimestamps.length);
+    activeTransactionHashes.clear();
+    nowProvider = () => Date.now();
+  },
+};
+
+if (process.env.NODE_ENV === "test") {
+  (globalThis as Record<string, unknown>).__X_MCP_TESTING__ = testingHooks;
+}
+
 // ---------------------------------------------------------------------------
 // Start
 // ---------------------------------------------------------------------------
@@ -969,36 +1060,3 @@ if (isMainModule) {
     process.exit(1);
   });
 }
-
-export const __testing = {
-  withTimeout,
-  waitWithTimeout,
-  getWallet,
-  runSerialized,
-  runWithToolConcurrencyPolicy,
-  assertStablePoolAmountWithinCap,
-  buildToolErrorText,
-  isRpcLikeError,
-  maybeResetWalletOnRpcError,
-  cleanupWalletAndSdkResources,
-  setNowProvider(provider: () => number) {
-    nowProvider = provider;
-  },
-  setSdkSingleton(value: StarkSDK | undefined) {
-    sdkSingleton = value;
-  },
-  setWalletSingleton(value: Wallet | undefined) {
-    walletSingleton = value;
-  },
-  resetState() {
-    sdkSingleton = undefined;
-    walletSingleton = undefined;
-    walletInitPromise = undefined;
-    walletInitFailureCount = 0;
-    walletInitBackoffUntilMs = 0;
-    requestExecutionQueue = Promise.resolve();
-    requestTimestamps.splice(0, requestTimestamps.length);
-    activeTransactionHashes.clear();
-    nowProvider = () => Date.now();
-  },
-};

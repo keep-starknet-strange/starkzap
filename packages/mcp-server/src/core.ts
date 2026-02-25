@@ -393,6 +393,8 @@ export function buildTools(maxAmount: string, maxBatchAmount: string): Tool[] {
           },
           transfers: {
             type: "array",
+            minItems: 1,
+            maxItems: 20,
             items: {
               type: "object",
               properties: {
@@ -402,6 +404,8 @@ export function buildTools(maxAmount: string, maxBatchAmount: string): Tool[] {
                 },
                 amount: {
                   type: "string",
+                  maxLength: 32,
+                  pattern: "^\\d+(\\.\\d+)?$",
                   description: `Human-readable amount (e.g. "10.5"). Max ${maxAmount} per transfer.`,
                 },
               },
@@ -432,6 +436,8 @@ export function buildTools(maxAmount: string, maxBatchAmount: string): Tool[] {
         properties: {
           calls: {
             type: "array",
+            minItems: 1,
+            maxItems: 10,
             items: {
               type: "object",
               properties: {
@@ -441,10 +447,13 @@ export function buildTools(maxAmount: string, maxBatchAmount: string): Tool[] {
                 },
                 entrypoint: {
                   type: "string",
+                  maxLength: 64,
+                  pattern: "^[a-zA-Z_][a-zA-Z0-9_]*$",
                   description: "Function name to call",
                 },
                 calldata: {
                   type: "array",
+                  maxItems: 2048,
                   items: { type: "string" },
                   description: "Calldata as array of strings",
                 },
@@ -498,6 +507,8 @@ export function buildTools(maxAmount: string, maxBatchAmount: string): Tool[] {
           },
           amount: {
             type: "string",
+            maxLength: 32,
+            pattern: "^\\d+(\\.\\d+)?$",
             description: 'Amount to stake (e.g. "100")',
           },
           token: {
@@ -527,6 +538,8 @@ export function buildTools(maxAmount: string, maxBatchAmount: string): Tool[] {
           },
           amount: {
             type: "string",
+            maxLength: 32,
+            pattern: "^\\d+(\\.\\d+)?$",
             description: "Amount to add",
           },
           token: {
@@ -576,6 +589,8 @@ export function buildTools(maxAmount: string, maxBatchAmount: string): Tool[] {
           },
           amount: {
             type: "string",
+            maxLength: 32,
+            pattern: "^\\d+(\\.\\d+)?$",
             description: "Amount to unstake",
           },
           token: {
@@ -644,6 +659,8 @@ export function buildTools(maxAmount: string, maxBatchAmount: string): Tool[] {
         properties: {
           calls: {
             type: "array",
+            minItems: 1,
+            maxItems: 10,
             items: {
               type: "object",
               properties: {
@@ -653,10 +670,13 @@ export function buildTools(maxAmount: string, maxBatchAmount: string): Tool[] {
                 },
                 entrypoint: {
                   type: "string",
+                  maxLength: 64,
+                  pattern: "^[a-zA-Z_][a-zA-Z0-9_]*$",
                   description: "Function name to call",
                 },
                 calldata: {
                   type: "array",
+                  maxItems: 2048,
                   items: { type: "string" },
                   description: "Calldata as array of strings",
                 },
@@ -715,6 +735,38 @@ function requiredKeysFromZodSchema(schema: z.AnyZodObject): string[] {
     .sort();
 }
 
+function unwrapZodType(type: z.ZodTypeAny): z.ZodTypeAny {
+  let current = type;
+  while (true) {
+    if (current instanceof z.ZodOptional || current instanceof z.ZodNullable) {
+      current = current.unwrap();
+      continue;
+    }
+    if (current instanceof z.ZodDefault) {
+      current = current._def.innerType;
+      continue;
+    }
+    if (current instanceof z.ZodEffects) {
+      current = current._def.schema;
+      continue;
+    }
+    return current;
+  }
+}
+
+function getArrayBounds(
+  type: z.ZodTypeAny
+): { min: number | null; max: number | null } | null {
+  const unwrapped = unwrapZodType(type);
+  if (!(unwrapped instanceof z.ZodArray)) {
+    return null;
+  }
+  return {
+    min: unwrapped._def.minLength?.value ?? null,
+    max: unwrapped._def.maxLength?.value ?? null,
+  };
+}
+
 export function schemaParityMismatches(tools: readonly Tool[]): string[] {
   const mismatches: string[] = [];
   const schemaEntries = Object.entries(schemas) as Array<
@@ -756,6 +808,27 @@ export function schemaParityMismatches(tools: readonly Tool[]): string[] {
       mismatches.push(
         `Tool "${name}" required mismatch: zod=[${zodRequired.join(",")}], inputSchema=[${inputRequired.join(",")}]`
       );
+    }
+
+    for (const [fieldName, fieldSchema] of Object.entries(schema.shape)) {
+      const bounds = getArrayBounds(fieldSchema as z.ZodTypeAny);
+      if (!bounds) {
+        continue;
+      }
+
+      const inputField = (inputSchema.properties ?? {})[fieldName] as
+        | { minItems?: number; maxItems?: number }
+        | undefined;
+      const inputMin =
+        typeof inputField?.minItems === "number" ? inputField.minItems : null;
+      const inputMax =
+        typeof inputField?.maxItems === "number" ? inputField.maxItems : null;
+
+      if (inputMin !== bounds.min || inputMax !== bounds.max) {
+        mismatches.push(
+          `Tool "${name}" array bounds mismatch for "${fieldName}": zod=[min:${bounds.min},max:${bounds.max}], inputSchema=[min:${inputMin},max:${inputMax}]`
+        );
+      }
     }
   }
 
