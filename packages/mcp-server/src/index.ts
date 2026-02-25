@@ -609,6 +609,8 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       "Amount ",
       "Token ",
       "Cannot ",
+      "Total ",
+      "Could ",
       "x_",
     ];
     const safeMessage = safeMessagePrefixes.some((prefix) =>
