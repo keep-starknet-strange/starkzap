@@ -1,7 +1,7 @@
 {
   "name": "Starkzap Documentation",
   "theme": "mint",
-  "favicon": "/favicon.svg",
+  "favicon": "/favicon.png",
   "colors": {
     "primary": "#6366F1",
     "light": "#818CF8",
@@ -49,7 +49,9 @@
       },
       {
         "group": "Using LLMs",
-        "pages": ["build/consumer-app-sdk/using-llms"]
+        "pages": [
+          "build/consumer-app-sdk/using-llms"
+        ]
       },
       {
         "group": "Modules",
@@ -71,7 +73,10 @@
       },
       {
         "group": "Examples",
-        "pages": ["build/consumer-app-sdk/examples"]
+        "pages": [
+          "build/consumer-app-sdk/examples",
+          "build/consumer-app-sdk/awesome-starkzap"
+        ]
       },
       {
         "group": "Reference",
@@ -89,6 +94,13 @@
     "linkedin": "https://www.linkedin.com/company/starkware"
   },
   "contextual": {
-    "options": ["copy", "view", "chatgpt", "claude", "mcp", "cursor"]
+    "options": [
+      "copy",
+      "view",
+      "chatgpt",
+      "claude",
+      "mcp",
+      "cursor"
+    ]
   }
 }
