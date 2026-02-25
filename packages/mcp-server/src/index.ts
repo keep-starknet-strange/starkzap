@@ -3,7 +3,7 @@
 /**
  * x MCP Server
  *
- * Exposes Starknet wallet operations as MCP tools via the x SDK.
+ * Exposes Starknet wallet operations as MCP tools via the StarkZap SDK.
  * Works with any MCP-compatible client: Claude, Cursor, OpenAI Agents SDK, etc.
  *
  * Usage:
@@ -19,8 +19,8 @@ import {
   ListToolsRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js";
 import { z } from "zod";
-import { Amount, fromAddress, StarkSDK, StarkSigner } from "x";
-import type { Address, Token, Wallet } from "x";
+import { Amount, fromAddress, StarkSDK, StarkSigner } from "starkzap";
+import type { Address, Token, Wallet } from "starkzap";
 import {
   assertAmountWithinCap,
   assertBatchAmountWithinCap,
@@ -60,10 +60,32 @@ const { network, enableWrite, enableExecute, maxAmount, maxBatchAmount } =
 // ---------------------------------------------------------------------------
 // Environment
 // ---------------------------------------------------------------------------
+const privateKeySchema = z
+  .string()
+  .regex(
+    /^0x[0-9a-fA-F]{64}$/,
+    "Must be a 0x-prefixed 32-byte hex private key"
+  );
+
+const contractAddressSchema = z
+  .string()
+  .regex(FELT_REGEX, "Must be a 0x-prefixed hex string (1-64 hex chars)")
+  .refine(
+    (value) => {
+      try {
+        fromAddress(value);
+        return true;
+      } catch {
+        return false;
+      }
+    },
+    { message: "Invalid Starknet contract address" }
+  );
+
 const envSchema = z.object({
-  STARKNET_PRIVATE_KEY: z.string().startsWith("0x"),
+  STARKNET_PRIVATE_KEY: privateKeySchema,
   STARKNET_RPC_URL: z.string().url().optional(),
-  STARKNET_STAKING_CONTRACT: z.string().startsWith("0x").optional(),
+  STARKNET_STAKING_CONTRACT: contractAddressSchema.optional(),
 });
 
 const env = (() => {
@@ -181,7 +203,7 @@ async function resolvePoolTokenForOperation(
   const poolToken = extractPoolToken(staking);
   if (!poolToken) {
     throw new Error(
-      "Could not resolve pool token metadata from SDK staking instance. Update the x SDK."
+      "Could not resolve pool token metadata from SDK staking instance. Update the StarkZap SDK."
     );
   }
   assertPoolTokenHintMatches(poolToken, tokenHint, resolveToken);

@@ -1,7 +1,7 @@
 {
   "name": "@keep-starknet-strange/x-mcp",
   "version": "0.1.0",
-  "description": "MCP server exposing Starknet wallet operations via the x SDK — transfer, stake, batch, deploy, and more",
+  "description": "MCP server exposing Starknet wallet operations via the StarkZap SDK — transfer, stake, batch, deploy, and more",
   "author": "0xLucqs",
   "license": "MIT",
   "type": "module",
@@ -21,14 +21,14 @@
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.26.0",
+    "starkzap": "^1.0.0",
     "zod": "^3.25.0"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
     "tsup": "^8.5.0",
     "typescript": "^5.9.0",
-    "vitest": "^4.0.17",
-    "x": "file:../../"
+    "vitest": "^4.0.17"
   },
   "engines": {
     "node": ">=18"

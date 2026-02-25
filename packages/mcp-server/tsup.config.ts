@@ -4,8 +4,8 @@ export default defineConfig({
   entry: ["src/index.ts"],
   format: ["esm"],
   dts: true,
-  // Bundle the workspace SDK to keep runtime resolution deterministic.
-  noExternal: ["x"],
+  // Bundle StarkZap SDK to keep runtime resolution deterministic for npx usage.
+  noExternal: ["starkzap"],
   target: "es2020",
   clean: true,
 });

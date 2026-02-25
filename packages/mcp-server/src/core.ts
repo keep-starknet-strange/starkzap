@@ -1,6 +1,6 @@
 import type { Tool } from "@modelcontextprotocol/sdk/types.js";
-import { Amount, mainnetTokens, sepoliaTokens } from "x";
-import type { Token } from "x";
+import { Amount, mainnetTokens, sepoliaTokens } from "starkzap";
+import type { Token } from "starkzap";
 import { z } from "zod";
 
 export const FELT_REGEX = /^0x[0-9a-fA-F]{1,64}$/;
@@ -127,7 +127,7 @@ export function createTokenResolver(network: Network) {
     throw new Error(
       `Unknown token: "${symbolOrAddress}". Available tokens: ${available}. ` +
         `Only pre-verified tokens are supported for safety. ` +
-        `To add a custom token, update the x SDK token presets.`
+        `To add a custom token, update the StarkZap SDK token presets.`
     );
   };
 }
@@ -142,6 +142,15 @@ export const amountSchema = z
   .refine((value) => Number(value) > 0, {
     message: "Amount must be greater than zero",
   });
+
+const calldataItemSchema = z
+  .string()
+  .max(256, "Calldata item too large (max 256 chars)");
+
+const calldataSchema = z
+  .array(calldataItemSchema)
+  .max(2048, "Maximum 2048 calldata items per call")
+  .optional();
 
 // NOTE: Keep this map in sync with MCP tool inputSchema in buildTools().
 // assertSchemaParity() runs at startup and in tests to prevent schema drift.
@@ -168,7 +177,7 @@ export const schemas = {
         z.object({
           contractAddress: addressSchema,
           entrypoint: z.string().min(1),
-          calldata: z.array(z.string()).optional(),
+          calldata: calldataSchema,
         })
       )
       .min(1)
@@ -208,7 +217,7 @@ export const schemas = {
         z.object({
           contractAddress: addressSchema,
           entrypoint: z.string().min(1),
-          calldata: z.array(z.string()).optional(),
+          calldata: calldataSchema,
         })
       )
       .min(1)

@@ -1,8 +1,8 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { Amount } from "x";
-import type { Token } from "x";
+import { Amount } from "starkzap";
+import type { Token } from "starkzap";
 import { describe, expect, it } from "vitest";
 import {
   amountSchema,
@@ -76,6 +76,20 @@ describe("schema hardening", () => {
     const parsed = schemas.x_estimate_fee.safeParse({ calls });
     expect(parsed.success).toBe(false);
   });
+
+  it("bounds calldata payload size", () => {
+    const oversized = "a".repeat(257);
+    const parsed = schemas.x_execute.safeParse({
+      calls: [
+        {
+          contractAddress: TEST_TOKEN.address,
+          entrypoint: "transfer",
+          calldata: [oversized],
+        },
+      ],
+    });
+    expect(parsed.success).toBe(false);
+  });
 });
 
 describe("tool gating and parity", () => {
@@ -137,17 +151,14 @@ describe("fee response guard", () => {
 });
 
 describe("package publishability", () => {
-  it("documents workspace-only dependency mode", () => {
+  it("uses published starkzap dependency", () => {
     const currentDir = path.dirname(fileURLToPath(import.meta.url));
-    const readmePath = path.resolve(currentDir, "../README.md");
-    const readme = fs.readFileSync(readmePath, "utf8");
-    expect(readme).toContain("workspace-only");
-
     const pkgPath = path.resolve(currentDir, "../package.json");
     const pkg = JSON.parse(fs.readFileSync(pkgPath, "utf8")) as {
       dependencies?: Record<string, string>;
       devDependencies?: Record<string, string>;
     };
-    expect(pkg.devDependencies?.x).toBe("file:../../");
+    expect(pkg.dependencies?.starkzap).toBeDefined();
+    expect(pkg.devDependencies?.x).toBeUndefined();
   });
 });

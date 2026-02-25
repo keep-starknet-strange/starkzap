@@ -1,6 +1,6 @@
 # x MCP Server
 
-An [MCP (Model Context Protocol)](https://modelcontextprotocol.io/) server that exposes Starknet wallet operations to AI agents via the [x SDK](https://github.com/keep-starknet-strange/x).
+An [MCP (Model Context Protocol)](https://modelcontextprotocol.io/) server that exposes Starknet wallet operations to AI agents via the [StarkZap SDK](https://github.com/keep-starknet-strange/x).
 
 Any MCP-compatible client (Claude, Cursor, OpenAI Agents SDK, etc.) can use these tools to manage wallets, transfer tokens, stake STRK, and execute contract calls on Starknet.
 
@@ -9,8 +9,6 @@ Any MCP-compatible client (Claude, Cursor, OpenAI Agents SDK, etc.) can use thes
 Following the pattern established by [Stripe](https://github.com/stripe/agent-toolkit), [Coinbase](https://github.com/coinbase/payments-mcp), and [Alchemy](https://github.com/alchemyplatform/alchemy-mcp-server): the SDK owner ships the MCP server. This keeps tool definitions in sync with the SDK and makes the tools available to any MCP client — not just one framework.
 
 ## Quick Start
-
-This package is currently **workspace-only** (depends on `x` via `file:../../`) and is not independently published yet.
 
 ```bash
 # In repo root
@@ -35,7 +33,7 @@ This server handles real funds. The following protections are built in:
 4. **Address validation.** All addresses are validated against Starknet felt252 format before use.
 5. **Runtime argument validation.** Every tool's arguments are validated with zod schemas before execution. Malformed inputs are rejected with clear error messages.
 6. **Transaction timeout.** `tx.wait()` has a 2-minute timeout to prevent the server from hanging on stuck transactions.
-7. **Token allowlist.** Only tokens in the x SDK's built-in presets are accepted. Arbitrary contract addresses for unknown tokens are rejected.
+7. **Token allowlist.** Only tokens in the StarkZap SDK's built-in presets are accepted. Arbitrary contract addresses for unknown tokens are rejected.
 8. **stdio transport only.** The server runs locally via stdio — no network exposure.
 9. **Early CLI validation.** Invalid `--network`/amount args are rejected immediately at startup with a clear error.
 10. **Staking tool gating by config.** Staking tools are hidden unless `STARKNET_STAKING_CONTRACT` is configured.
@@ -168,7 +166,7 @@ Agent: "Stake 100 STRK in pool 0xPOOL"
 
 ## Token Resolution
 
-Tools accept token symbols (`ETH`, `STRK`, `USDC`, etc.) or contract addresses. The server uses the x SDK's built-in token presets for the configured network.
+Tools accept token symbols (`ETH`, `STRK`, `USDC`, etc.) or contract addresses. The server uses the StarkZap SDK's built-in token presets for the configured network.
 
 ## Security Checklist
 
@@ -210,8 +208,8 @@ STARKNET_PRIVATE_KEY=0x... node dist/index.js --network sepolia
                                     │ imports
                                     ▼
                                    ┌──────────────────┐
-                                   │  x SDK           │
-                                   │  (workspace file:../../)           │
+                                   │  StarkZap SDK    │
+                                   │  (npm: starkzap) │
                                    └──────────────────┘
 ```
 
