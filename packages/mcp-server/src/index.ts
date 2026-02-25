@@ -358,6 +358,14 @@ async function handleTool(
     case "x_claim_rewards": {
       const parsed = args as z.infer<typeof schemas.x_claim_rewards>;
       const poolAddress = validateAddress(parsed.pool, "pool");
+      const poolToken = await resolvePoolTokenForOperation(wallet, poolAddress);
+      const position = await wallet.getPoolPosition(poolAddress);
+      if (!position) {
+        throw new Error(
+          `Cannot claim rewards: wallet is not a member of pool ${poolAddress}.`
+        );
+      }
+      assertAmountWithinCap(position.rewards, poolToken, maxAmount);
       const tx = await wallet.claimPoolRewards(poolAddress);
       await waitWithTimeout(tx);
       return ok({
@@ -392,6 +400,19 @@ async function handleTool(
     case "x_exit_pool": {
       const parsed = args as z.infer<typeof schemas.x_exit_pool>;
       const poolAddress = validateAddress(parsed.pool, "pool");
+      const poolToken = await resolvePoolTokenForOperation(wallet, poolAddress);
+      const position = await wallet.getPoolPosition(poolAddress);
+      if (!position) {
+        throw new Error(
+          `Cannot exit pool: wallet is not a member of pool ${poolAddress}.`
+        );
+      }
+      if (position.unpooling.isZero()) {
+        throw new Error(
+          `Cannot exit pool: no pending unpool amount for pool ${poolAddress}.`
+        );
+      }
+      assertAmountWithinCap(position.unpooling, poolToken, maxAmount);
       const tx = await wallet.exitPool(poolAddress);
       await waitWithTimeout(tx);
       return ok({

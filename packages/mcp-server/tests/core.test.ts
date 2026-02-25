@@ -6,6 +6,7 @@ import type { Token } from "x";
 import { describe, expect, it } from "vitest";
 import {
   amountSchema,
+  assertAmountWithinCap,
   assertBatchAmountWithinCap,
   assertPoolTokenHintMatches,
   assertSchemaParity,
@@ -98,6 +99,13 @@ describe("tool gating and parity", () => {
 });
 
 describe("amount and token guards", () => {
+  it("rejects single amounts above max-amount", () => {
+    const amount = Amount.parse("11", TEST_TOKEN);
+    expect(() => assertAmountWithinCap(amount, TEST_TOKEN, "10")).toThrow(
+      /per-operation cap/
+    );
+  });
+
   it("rejects transfer batches above max-batch-amount", () => {
     const amounts = [
       Amount.parse("6", TEST_TOKEN),
