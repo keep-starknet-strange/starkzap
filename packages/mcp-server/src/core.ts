@@ -1,6 +1,6 @@
 import type { Tool } from "@modelcontextprotocol/sdk/types.js";
-import { Amount, mainnetTokens, sepoliaTokens } from "starkzap";
-import type { Token } from "starkzap";
+import { Amount, fromAddress, mainnetTokens, sepoliaTokens } from "starkzap";
+import type { Address, Token } from "starkzap";
 import { z } from "zod";
 
 export const FELT_REGEX = /^0x[0-9a-fA-F]{1,64}$/;
@@ -19,6 +19,10 @@ const tokensByNetwork: Record<Network, Record<string, Token>> = {
   mainnet: mainnetTokens,
   sepolia: sepoliaTokens,
 };
+
+export function normalizeStarknetAddress(address: string): string {
+  return fromAddress(address).toLowerCase();
+}
 
 function getReferenceToken(network: Network): Token {
   const tokens = tokensByNetwork[network];
@@ -113,8 +117,14 @@ export function createTokenResolver(network: Network) {
     }
 
     if (FELT_REGEX.test(symbolOrAddress)) {
+      let normalizedInput: string;
+      try {
+        normalizedInput = normalizeStarknetAddress(symbolOrAddress);
+      } catch {
+        throw new Error(`Invalid token address: "${symbolOrAddress}".`);
+      }
       const byAddress = Object.values(tokens).find(
-        (token) => token.address.toLowerCase() === symbolOrAddress.toLowerCase()
+        (token) => normalizeStarknetAddress(token.address) === normalizedInput
       );
       if (byAddress) {
         return byAddress;
@@ -135,6 +145,48 @@ export function createTokenResolver(network: Network) {
 export const addressSchema = z
   .string()
   .regex(FELT_REGEX, "Invalid Starknet address");
+
+export function validateAddressOrThrow(
+  address: string,
+  label: string
+): Address {
+  if (!FELT_REGEX.test(address)) {
+    throw new Error(
+      `Invalid ${label} address: "${address}". Must be a hex string starting with 0x (1-64 hex chars).`
+    );
+  }
+  try {
+    return fromAddress(address);
+  } catch (error) {
+    throw new Error(
+      `Invalid ${label} address: "${address}". ${error instanceof Error ? error.message : String(error)}`
+    );
+  }
+}
+
+export function validateAddressBatch(
+  values: string[],
+  label: string,
+  pathPrefix: string
+): Address[] {
+  const normalized: Address[] = [];
+  const errors: string[] = [];
+
+  for (const [index, value] of values.entries()) {
+    try {
+      normalized.push(validateAddressOrThrow(value, label));
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      errors.push(`${pathPrefix}[${index}]: ${message}`);
+    }
+  }
+
+  if (errors.length > 0) {
+    throw new Error(`Address validation failed: ${errors.join("; ")}`);
+  }
+
+  return normalized;
+}
 
 export const amountSchema = z
   .string()
@@ -656,7 +708,10 @@ export function assertPoolTokenHintMatches(
     return;
   }
   const hintedToken = resolveToken(tokenHint);
-  if (hintedToken.address.toLowerCase() !== poolToken.address.toLowerCase()) {
+  if (
+    normalizeStarknetAddress(hintedToken.address) !==
+    normalizeStarknetAddress(poolToken.address)
+  ) {
     throw new Error(
       `Token hint "${tokenHint}" does not match pool token ${poolToken.symbol} (${poolToken.address}).`
     );

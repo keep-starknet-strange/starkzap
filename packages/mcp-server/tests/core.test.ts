@@ -14,12 +14,15 @@ import {
   buildTools,
   createTokenResolver,
   getArg,
+  normalizeStarknetAddress,
   parseCliConfig,
   requireResourceBounds,
   schemaParityMismatches,
   schemas,
   selectTools,
   STAKING_TOOLS,
+  validateAddressBatch,
+  validateAddressOrThrow,
 } from "../src/core.js";
 
 const TEST_TOKEN: Token = {
@@ -108,6 +111,27 @@ describe("schema hardening", () => {
   it("rejects bare 0x in address schema", () => {
     expect(addressSchema.safeParse("0x").success).toBe(false);
   });
+
+  it("validates and normalizes a Starknet address", () => {
+    const normalized = validateAddressOrThrow(
+      "0x04718f5a0fc34cc1af16a1cdee98ffb20c31f5cd61d6ab07201858f4287c938d",
+      "recipient"
+    );
+    expect(normalized.startsWith("0x")).toBe(true);
+  });
+
+  it("aggregates indexed address validation errors", () => {
+    expect(() =>
+      validateAddressBatch(
+        [
+          "0x04718f5a0fc34cc1af16a1cdee98ffb20c31f5cd61d6ab07201858f4287c938d",
+          "0xINVALID",
+        ],
+        "recipient",
+        "transfers.to"
+      )
+    ).toThrow(/transfers\.to\[1\]: Invalid recipient address/);
+  });
 });
 
 describe("tool gating and parity", () => {
@@ -166,6 +190,25 @@ describe("amount and token guards", () => {
     expect(() =>
       assertPoolTokenHintMatches(poolToken, "USDC", resolveToken)
     ).toThrow(/does not match pool token/);
+  });
+
+  it("resolves tokens with non-canonical but semantically equal addresses", () => {
+    const resolveToken = createTokenResolver("sepolia");
+    const token = resolveToken("STRK");
+    const nonCanonical = `0x${token.address.slice(2).replace(/^0+/, "")}`;
+    const resolved = resolveToken(nonCanonical);
+    expect(normalizeStarknetAddress(resolved.address)).toBe(
+      normalizeStarknetAddress(token.address)
+    );
+  });
+
+  it("accepts matching staking token hints with non-canonical formatting", () => {
+    const resolveToken = createTokenResolver("sepolia");
+    const poolToken = resolveToken("STRK");
+    const hint = `0x${poolToken.address.slice(2).replace(/^0+/, "")}`;
+    expect(() =>
+      assertPoolTokenHintMatches(poolToken, hint, resolveToken)
+    ).not.toThrow();
   });
 });
 

@@ -37,6 +37,8 @@ import {
   schemas,
   selectTools,
   STAKING_TOOLS,
+  validateAddressBatch,
+  validateAddressOrThrow,
 } from "./core.js";
 
 // ---------------------------------------------------------------------------
@@ -104,28 +106,11 @@ Object.freeze(env);
 const stakingEnabled = Boolean(env.STARKNET_STAKING_CONTRACT);
 
 // ---------------------------------------------------------------------------
-// Address validation
-// ---------------------------------------------------------------------------
-function validateAddress(address: string, label: string): Address {
-  if (!FELT_REGEX.test(address)) {
-    throw new Error(
-      `Invalid ${label} address: "${address}". Must be a hex string starting with 0x (1-64 hex chars).`
-    );
-  }
-  try {
-    return fromAddress(address);
-  } catch (err) {
-    throw new Error(
-      `Invalid ${label} address: "${address}". ${err instanceof Error ? err.message : String(err)}`
-    );
-  }
-}
-
-// ---------------------------------------------------------------------------
 // SDK + wallet singleton (lazy init)
 // ---------------------------------------------------------------------------
 let sdkSingleton: StarkSDK | undefined;
 let walletSingleton: Wallet | undefined;
+let walletInitPromise: Promise<Wallet> | undefined;
 const sdkConfig = Object.freeze({
   network,
   ...(env.STARKNET_RPC_URL && { rpcUrl: env.STARKNET_RPC_URL }),
@@ -144,14 +129,26 @@ function getSdk(): StarkSDK {
 }
 
 async function getWallet(): Promise<Wallet> {
-  if (!walletSingleton) {
-    walletSingleton = await getSdk().connectWallet({
-      account: {
-        signer: new StarkSigner(env.STARKNET_PRIVATE_KEY),
-      },
-    });
+  if (walletSingleton) {
+    return walletSingleton;
   }
-  return walletSingleton;
+  if (!walletInitPromise) {
+    walletInitPromise = getSdk()
+      .connectWallet({
+        account: {
+          signer: new StarkSigner(env.STARKNET_PRIVATE_KEY),
+        },
+      })
+      .then((wallet) => {
+        walletSingleton = wallet;
+        return wallet;
+      })
+      .catch((error) => {
+        walletInitPromise = undefined;
+        throw error;
+      });
+  }
+  return walletInitPromise;
 }
 
 // ---------------------------------------------------------------------------
@@ -212,6 +209,38 @@ async function resolvePoolTokenForOperation(
   return poolToken;
 }
 
+type BoundedPoolField = "rewards" | "unpooling";
+
+async function assertStablePoolAmountWithinCap(
+  wallet: Wallet,
+  poolAddress: Address,
+  poolToken: Token,
+  field: BoundedPoolField,
+  maxCap: string,
+  operation: "claim rewards" | "exit pool"
+): Promise<void> {
+  const firstPosition = await wallet.getPoolPosition(poolAddress);
+  if (!firstPosition) {
+    throw new Error(
+      `Cannot ${operation}: wallet is not a member of pool ${poolAddress}.`
+    );
+  }
+  assertAmountWithinCap(firstPosition[field], poolToken, maxCap);
+
+  const secondPosition = await wallet.getPoolPosition(poolAddress);
+  if (!secondPosition) {
+    throw new Error(
+      `Cannot ${operation}: wallet is not a member of pool ${poolAddress}.`
+    );
+  }
+  if (!secondPosition[field].eq(firstPosition[field])) {
+    throw new Error(
+      `Cannot ${operation}: pool position changed during preflight checks. Retry.`
+    );
+  }
+  assertAmountWithinCap(secondPosition[field], poolToken, maxCap);
+}
+
 async function handleTool(
   name: string,
   rawArgs: Record<string, unknown>
@@ -266,11 +295,16 @@ async function handleTool(
     case "x_transfer": {
       const parsed = args as z.infer<typeof schemas.x_transfer>;
       const token = resolveToken(parsed.token);
-      const transfers = parsed.transfers.map((transfer) => {
+      const recipients = validateAddressBatch(
+        parsed.transfers.map((transfer) => transfer.to),
+        "recipient",
+        "transfers.to"
+      );
+      const transfers = parsed.transfers.map((transfer, index) => {
         const amount = Amount.parse(transfer.amount, token);
         assertAmountWithinCap(amount, token, maxAmount);
         return {
-          to: validateAddress(transfer.to, "recipient"),
+          to: recipients[index],
           amount,
         };
       });
@@ -301,8 +335,13 @@ async function handleTool(
 
     case "x_execute": {
       const parsed = args as z.infer<typeof schemas.x_execute>;
-      const calls = parsed.calls.map((call) => ({
-        contractAddress: validateAddress(call.contractAddress, "contract"),
+      const contractAddresses = validateAddressBatch(
+        parsed.calls.map((call) => call.contractAddress),
+        "contract",
+        "calls.contractAddress"
+      );
+      const calls = parsed.calls.map((call, index) => ({
+        contractAddress: contractAddresses[index],
         entrypoint: call.entrypoint,
         calldata: call.calldata ?? [],
       }));
@@ -350,7 +389,7 @@ async function handleTool(
 
     case "x_enter_pool": {
       const parsed = args as z.infer<typeof schemas.x_enter_pool>;
-      const poolAddress = validateAddress(parsed.pool, "pool");
+      const poolAddress = validateAddressOrThrow(parsed.pool, "pool");
       const poolToken = await resolvePoolTokenForOperation(
         wallet,
         poolAddress,
@@ -371,7 +410,7 @@ async function handleTool(
 
     case "x_add_to_pool": {
       const parsed = args as z.infer<typeof schemas.x_add_to_pool>;
-      const poolAddress = validateAddress(parsed.pool, "pool");
+      const poolAddress = validateAddressOrThrow(parsed.pool, "pool");
       const poolToken = await resolvePoolTokenForOperation(
         wallet,
         poolAddress,
@@ -392,15 +431,16 @@ async function handleTool(
 
     case "x_claim_rewards": {
       const parsed = args as z.infer<typeof schemas.x_claim_rewards>;
-      const poolAddress = validateAddress(parsed.pool, "pool");
+      const poolAddress = validateAddressOrThrow(parsed.pool, "pool");
       const poolToken = await resolvePoolTokenForOperation(wallet, poolAddress);
-      const position = await wallet.getPoolPosition(poolAddress);
-      if (!position) {
-        throw new Error(
-          `Cannot claim rewards: wallet is not a member of pool ${poolAddress}.`
-        );
-      }
-      assertAmountWithinCap(position.rewards, poolToken, maxAmount);
+      await assertStablePoolAmountWithinCap(
+        wallet,
+        poolAddress,
+        poolToken,
+        "rewards",
+        maxAmount,
+        "claim rewards"
+      );
       const tx = await wallet.claimPoolRewards(poolAddress);
       await waitWithTimeout(tx);
       return ok({
@@ -412,7 +452,7 @@ async function handleTool(
 
     case "x_exit_pool_intent": {
       const parsed = args as z.infer<typeof schemas.x_exit_pool_intent>;
-      const poolAddress = validateAddress(parsed.pool, "pool");
+      const poolAddress = validateAddressOrThrow(parsed.pool, "pool");
       const poolToken = await resolvePoolTokenForOperation(
         wallet,
         poolAddress,
@@ -434,7 +474,7 @@ async function handleTool(
 
     case "x_exit_pool": {
       const parsed = args as z.infer<typeof schemas.x_exit_pool>;
-      const poolAddress = validateAddress(parsed.pool, "pool");
+      const poolAddress = validateAddressOrThrow(parsed.pool, "pool");
       const poolToken = await resolvePoolTokenForOperation(wallet, poolAddress);
       const position = await wallet.getPoolPosition(poolAddress);
       if (!position) {
@@ -447,7 +487,14 @@ async function handleTool(
           `Cannot exit pool: no pending unpool amount for pool ${poolAddress}.`
         );
       }
-      assertAmountWithinCap(position.unpooling, poolToken, maxAmount);
+      await assertStablePoolAmountWithinCap(
+        wallet,
+        poolAddress,
+        poolToken,
+        "unpooling",
+        maxAmount,
+        "exit pool"
+      );
       const tx = await wallet.exitPool(poolAddress);
       await waitWithTimeout(tx);
       return ok({
@@ -459,7 +506,7 @@ async function handleTool(
 
     case "x_get_pool_position": {
       const parsed = args as z.infer<typeof schemas.x_get_pool_position>;
-      const poolAddress = validateAddress(parsed.pool, "pool");
+      const poolAddress = validateAddressOrThrow(parsed.pool, "pool");
       const position = await wallet.getPoolPosition(poolAddress);
       if (!position) {
         return ok({
@@ -484,8 +531,13 @@ async function handleTool(
 
     case "x_estimate_fee": {
       const parsed = args as z.infer<typeof schemas.x_estimate_fee>;
-      const calls = parsed.calls.map((call) => ({
-        contractAddress: validateAddress(call.contractAddress, "contract"),
+      const contractAddresses = validateAddressBatch(
+        parsed.calls.map((call) => call.contractAddress),
+        "contract",
+        "calls.contractAddress"
+      );
+      const calls = parsed.calls.map((call, index) => ({
+        contractAddress: contractAddresses[index],
         entrypoint: call.entrypoint,
         calldata: call.calldata ?? [],
       }));
