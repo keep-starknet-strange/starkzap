@@ -1,6 +1,6 @@
 # x MCP Server
 
-An [MCP (Model Context Protocol)](https://modelcontextprotocol.io/) server that exposes Starknet wallet operations to AI agents via the [StarkZap SDK](https://github.com/keep-starknet-strange/x).
+An [MCP (Model Context Protocol)](https://modelcontextprotocol.io/) server that exposes Starknet wallet operations to AI agents via the [StarkZap SDK](https://github.com/keep-starknet-strange/starkzap).
 
 Any MCP-compatible client (Claude, Cursor, OpenAI Agents SDK, etc.) can use these tools to manage wallets, transfer tokens, stake STRK, and execute contract calls on Starknet.
 
