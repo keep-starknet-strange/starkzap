@@ -128,6 +128,11 @@ export function parseCliConfig(cliArgs: string[]): CliConfig {
     getArg(cliArgs, "rate-limit-rpm", "0"),
     "rate-limit-rpm"
   );
+  if (rateLimitRpm > 10_000) {
+    throw new Error(
+      `Invalid --rate-limit-rpm value "${rateLimitRpm}". Must be <= 10000.`
+    );
+  }
 
   validatePositiveAmountLiteral(maxAmount, "max-amount", network);
   validatePositiveAmountLiteral(maxBatchAmount, "max-batch-amount", network);
@@ -171,9 +176,18 @@ export function createTokenResolver(network: Network) {
       }
     }
 
-    const available = Object.values(tokens)
+    const availableSymbols = Object.values(tokens)
       .map((token) => token.symbol)
-      .join(", ");
+      .sort();
+    const MAX_SYMBOLS_IN_ERROR = 8;
+    const visibleSymbols = availableSymbols.slice(0, MAX_SYMBOLS_IN_ERROR);
+    const hiddenCount = Math.max(
+      0,
+      availableSymbols.length - visibleSymbols.length
+    );
+    const available = hiddenCount
+      ? `${visibleSymbols.join(", ")} (+${hiddenCount} more)`
+      : visibleSymbols.join(", ");
     throw new Error(
       `Unknown token: "${symbolOrAddress}". Available tokens: ${available}. ` +
         `Only pre-verified tokens are supported for safety. ` +
@@ -754,12 +768,13 @@ export function assertSchemaParity(tools: readonly Tool[]): void {
 export function assertAmountWithinCap(
   amount: Amount,
   token: Token,
-  cap: string
+  cap: string | number
 ): void {
-  const capAmount = Amount.parse(cap, token);
+  const capLiteral = String(cap);
+  const capAmount = Amount.parse(capLiteral, token);
   if (amount.gt(capAmount)) {
     throw new Error(
-      `Amount ${amount.toUnit()} ${token.symbol} exceeds the per-operation cap of ${cap}. ` +
+      `Amount ${amount.toUnit()} ${token.symbol} exceeds the per-operation cap of ${capLiteral}. ` +
         `Adjust --max-amount to increase the limit.`
     );
   }
@@ -768,9 +783,10 @@ export function assertAmountWithinCap(
 export function assertBatchAmountWithinCap(
   amounts: Amount[],
   token: Token,
-  cap: string
+  cap: string | number
 ): void {
-  const capAmount = Amount.parse(cap, token);
+  const capLiteral = String(cap);
+  const capAmount = Amount.parse(capLiteral, token);
   const total = amounts.reduce(
     (accumulator, amount) => {
       return accumulator.add(amount);
@@ -780,7 +796,7 @@ export function assertBatchAmountWithinCap(
 
   if (total.gt(capAmount)) {
     throw new Error(
-      `Total batch amount ${total.toUnit()} ${token.symbol} exceeds the batch cap of ${cap}. ` +
+      `Total batch amount ${total.toUnit()} ${token.symbol} exceeds the batch cap of ${capLiteral}. ` +
         `Adjust --max-batch-amount to increase the limit.`
     );
   }
@@ -912,6 +928,12 @@ export function enforcePerMinuteRateLimit(
   const windowStart = nowMs - 60_000;
   while (bucket.length > 0 && bucket[0] <= windowStart) {
     bucket.shift();
+  }
+
+  const RATE_LIMIT_BUCKET_BUFFER = 32;
+  const maxBucketSize = maxPerMinute + RATE_LIMIT_BUCKET_BUFFER;
+  if (bucket.length > maxBucketSize) {
+    bucket.splice(0, bucket.length - maxBucketSize);
   }
 
   if (bucket.length >= maxPerMinute) {

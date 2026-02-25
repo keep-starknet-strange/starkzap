@@ -80,6 +80,12 @@ describe("CLI parsing", () => {
       parseCliConfig(["--network", "sepolia", "--wat", "1"])
     ).toThrow(/Unknown flag --wat/);
   });
+
+  it("fails fast on extremely high rate-limit-rpm", () => {
+    expect(() => parseCliConfig(["--rate-limit-rpm", "10001"])).toThrow(
+      /Must be <= 10000/
+    );
+  });
 });
 
 describe("schema hardening", () => {
@@ -236,6 +242,23 @@ describe("amount and token guards", () => {
       assertPoolTokenHintMatches(poolToken, hint, resolveToken)
     ).not.toThrow();
   });
+
+  it("accepts numeric caps in amount helpers", () => {
+    const amount = Amount.parse("9", TEST_TOKEN);
+    expect(() => assertAmountWithinCap(amount, TEST_TOKEN, 10)).not.toThrow();
+  });
+
+  it("keeps unknown token errors concise", () => {
+    const resolveToken = createTokenResolver("sepolia");
+    try {
+      resolveToken("THIS_TOKEN_DOES_NOT_EXIST");
+      throw new Error("Expected token resolution to fail");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      expect(message).toMatch(/Unknown token/);
+      expect(message.length).toBeLessThan(320);
+    }
+  });
 });
 
 describe("fee response guard", () => {
@@ -310,6 +333,12 @@ describe("rate limiting", () => {
     enforcePerMinuteRateLimit(bucket, 1_000, 1);
     expect(() => enforcePerMinuteRateLimit(bucket, 2_000, 1)).toThrow();
     expect(() => enforcePerMinuteRateLimit(bucket, 62_000, 1)).not.toThrow();
+  });
+
+  it("trims overgrown buckets before evaluating rate-limit", () => {
+    const bucket = Array.from({ length: 100 }, () => 10_000);
+    expect(() => enforcePerMinuteRateLimit(bucket, 11_000, 2)).toThrow();
+    expect(bucket.length).toBeLessThanOrEqual(34);
   });
 });
 
