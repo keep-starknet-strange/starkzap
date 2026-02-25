@@ -31,6 +31,7 @@ import {
   extractPoolToken,
   FELT_REGEX,
   formatZodError,
+  isClassHashNotFoundError,
   parseCliConfig,
   READ_ONLY_TOOLS,
   requireResourceBounds,
@@ -362,10 +363,15 @@ async function handleTool(
     case "x_deploy_account": {
       const parsed = args as z.infer<typeof schemas.x_deploy_account>;
       const provider = wallet.getProvider();
-      const isDeployedOnChain = await provider
-        .getClassHashAt(wallet.address)
-        .then(() => true)
-        .catch(() => false);
+      let isDeployedOnChain = false;
+      try {
+        await provider.getClassHashAt(wallet.address);
+        isDeployedOnChain = true;
+      } catch (error) {
+        if (!isClassHashNotFoundError(error)) {
+          throw error;
+        }
+      }
       if (isDeployedOnChain) {
         return ok({
           status: "already_deployed",

@@ -13,7 +13,9 @@ import {
   assertSchemaParity,
   buildTools,
   createTokenResolver,
+  extractPoolToken,
   getArg,
+  isClassHashNotFoundError,
   normalizeStarknetAddress,
   parseCliConfig,
   requireResourceBounds,
@@ -220,6 +222,52 @@ describe("fee response guard", () => {
         unit: "wei",
       })
     ).toThrow(/missing resourceBounds/);
+  });
+});
+
+describe("staking token extraction guard", () => {
+  it("prefers poolToken over other candidates", () => {
+    const fallbackToken = {
+      ...TEST_TOKEN,
+      symbol: "ALT",
+      address:
+        "0x0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcd" as Token["address"],
+    };
+    const stakingLike = {
+      poolToken: TEST_TOKEN,
+      tokenConfig: fallbackToken,
+      token: fallbackToken,
+    };
+    expect(extractPoolToken(stakingLike)).toEqual(TEST_TOKEN);
+  });
+
+  it("returns undefined for non-object or invalid token shapes", () => {
+    expect(extractPoolToken(null)).toBeUndefined();
+    expect(
+      extractPoolToken({ poolToken: { symbol: "BROKEN" } })
+    ).toBeUndefined();
+  });
+});
+
+describe("deploy error classification", () => {
+  it("detects contract-not-found provider codes", () => {
+    expect(isClassHashNotFoundError({ code: "CONTRACT_NOT_FOUND" })).toBe(true);
+  });
+
+  it("detects contract-not-found provider messages", () => {
+    expect(
+      isClassHashNotFoundError({
+        message: "Contract not found for the provided address",
+      })
+    ).toBe(true);
+  });
+
+  it("does not classify transient rpc errors as not-found", () => {
+    expect(
+      isClassHashNotFoundError({
+        message: "Gateway timeout while contacting RPC node",
+      })
+    ).toBe(false);
   });
 });
 

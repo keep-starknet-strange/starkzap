@@ -686,17 +686,44 @@ export function formatZodError(error: z.ZodError): string {
     .join("; ");
 }
 
-export function extractPoolToken(staking: unknown): Token | undefined {
-  const stakingWithToken = staking as {
-    token?: Token;
-    poolToken?: Token;
-    tokenConfig?: Token;
-  };
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
+function isTokenCandidate(value: unknown): value is Token {
+  if (!isRecord(value)) {
+    return false;
+  }
+
   return (
-    stakingWithToken.poolToken ??
-    stakingWithToken.tokenConfig ??
-    stakingWithToken.token
+    typeof value.name === "string" &&
+    typeof value.symbol === "string" &&
+    typeof value.address === "string" &&
+    FELT_REGEX.test(value.address) &&
+    typeof value.decimals === "number" &&
+    Number.isInteger(value.decimals) &&
+    value.decimals >= 0
   );
+}
+
+export function extractPoolToken(staking: unknown): Token | undefined {
+  if (!isRecord(staking)) {
+    return undefined;
+  }
+
+  const candidates: Array<unknown> = [
+    staking.poolToken,
+    staking.tokenConfig,
+    staking.token,
+  ];
+
+  for (const candidate of candidates) {
+    if (isTokenCandidate(candidate)) {
+      return candidate;
+    }
+  }
+
+  return undefined;
 }
 
 export function assertPoolTokenHintMatches(
@@ -716,6 +743,55 @@ export function assertPoolTokenHintMatches(
       `Token hint "${tokenHint}" does not match pool token ${poolToken.symbol} (${poolToken.address}).`
     );
   }
+}
+
+export function isClassHashNotFoundError(error: unknown): boolean {
+  const normalizedCode = (() => {
+    if (!isRecord(error) || error.code === undefined || error.code === null) {
+      return "";
+    }
+    return String(error.code).toLowerCase();
+  })();
+
+  const explicitNotFoundCodes = new Set([
+    "contract_not_found",
+    "starknet_error_contract_not_found",
+    "20",
+  ]);
+  if (explicitNotFoundCodes.has(normalizedCode)) {
+    return true;
+  }
+
+  const messages: string[] = [];
+  if (error instanceof Error) {
+    messages.push(error.message);
+  }
+  if (isRecord(error)) {
+    if (typeof error.message === "string") {
+      messages.push(error.message);
+    }
+    if (typeof error.data === "string") {
+      messages.push(error.data);
+    }
+    if (isRecord(error.data) && typeof error.data.message === "string") {
+      messages.push(error.data.message);
+    }
+    if (error.cause instanceof Error) {
+      messages.push(error.cause.message);
+    }
+  }
+
+  return messages.some((message) => {
+    const normalized = message.toLowerCase();
+    const mentionsNotFound =
+      normalized.includes("not found") ||
+      normalized.includes("is not deployed") ||
+      normalized.includes("uninitialized contract");
+    if (!mentionsNotFound) {
+      return false;
+    }
+    return normalized.includes("contract") || normalized.includes("class hash");
+  });
 }
 
 function safeJson(value: unknown): string {
