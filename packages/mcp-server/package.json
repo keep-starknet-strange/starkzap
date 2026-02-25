@@ -17,7 +17,8 @@
     "dev": "tsup src/index.ts --format esm --watch",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "check": "npm run typecheck && npm run test"
+    "check": "npm run typecheck && npm run test",
+    "prepublishOnly": "npm run check && npm view starkzap@1.0.0 version >/dev/null"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.26.0",

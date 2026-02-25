@@ -96,6 +96,12 @@ function validatePositiveAmountLiteral(
   argName: string,
   network: Network
 ): void {
+  const MAX_AMOUNT_LITERAL_CHARS = 32;
+  if (value.length > MAX_AMOUNT_LITERAL_CHARS) {
+    throw new Error(
+      `Invalid --${argName} value "${value}". Must be <= ${MAX_AMOUNT_LITERAL_CHARS} characters.`
+    );
+  }
   if (!/^\d+(\.\d+)?$/.test(value)) {
     throw new Error(
       `Invalid --${argName} value "${value}". Must be a positive number.`
@@ -181,12 +187,9 @@ export function createTokenResolver(network: Network) {
       .sort();
     const MAX_SYMBOLS_IN_ERROR = 8;
     const visibleSymbols = availableSymbols.slice(0, MAX_SYMBOLS_IN_ERROR);
-    const hiddenCount = Math.max(
-      0,
-      availableSymbols.length - visibleSymbols.length
-    );
-    const available = hiddenCount
-      ? `${visibleSymbols.join(", ")} (+${hiddenCount} more)`
+    const hasMoreSymbols = availableSymbols.length > visibleSymbols.length;
+    const available = hasMoreSymbols
+      ? `${visibleSymbols.join(", ")} and more`
       : visibleSymbols.join(", ");
     throw new Error(
       `Unknown token: "${symbolOrAddress}". Available tokens: ${available}. ` +
@@ -244,10 +247,19 @@ export function validateAddressBatch(
 
 export const amountSchema = z
   .string()
+  .max(32, "Amount string too long (max 32 chars)")
   .regex(/^\d+(\.\d+)?$/, "Amount must be a positive number")
   .refine((value) => Number(value) > 0, {
     message: "Amount must be greater than zero",
   });
+
+const entrypointSchema = z
+  .string()
+  .max(64, "Entrypoint name too long (max 64 chars)")
+  .regex(
+    /^[a-zA-Z_][a-zA-Z0-9_]*$/,
+    "Entrypoint must match Cairo identifier format"
+  );
 
 const calldataItemSchema = z
   .string()
@@ -286,7 +298,7 @@ export const schemas = {
       .array(
         z.object({
           contractAddress: addressSchema,
-          entrypoint: z.string().min(1),
+          entrypoint: entrypointSchema,
           calldata: calldataSchema,
         })
       )
@@ -326,7 +338,7 @@ export const schemas = {
       .array(
         z.object({
           contractAddress: addressSchema,
-          entrypoint: z.string().min(1),
+          entrypoint: entrypointSchema,
           calldata: calldataSchema,
         })
       )

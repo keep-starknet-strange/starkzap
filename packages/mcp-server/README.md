@@ -28,7 +28,7 @@ STARKNET_PRIVATE_KEY=0x... STARKNET_STAKING_CONTRACT=0x... node dist/index.js --
 This server handles real funds. The following protections are built in:
 
 1. **All state-changing tools are disabled by default.** Read-only tools are available without write flags. Write tools (`x_transfer`, staking, `x_deploy_account`) require `--enable-write`. The unrestricted `x_execute` tool requires its own `--enable-execute` flag.
-2. **Amount caps are enforced for both single ops and transfer batches.** All amount-bearing operations (transfers and staking) are bounded by `--max-amount` (default: 1000 tokens). Transfer batches are also bounded by `--max-batch-amount` (default: same as `--max-amount`). For state-dependent staking exits/claims, caps are best-effort preflight checks and may vary slightly with chain state at execution time.
+2. **Amount caps are enforced for both single ops and transfer batches.** All amount-bearing operations (transfers and staking) are bounded by `--max-amount` (default: 1000 tokens). Transfer batches are also bounded by `--max-batch-amount` (default: same as `--max-amount`). For state-dependent staking exits/claims, caps use multi-check preflight validation and remain best-effort with minimal residual chain-state race windows.
 3. **Batch size limits.** Maximum 20 transfers per batch, 10 calls per execute batch.
 4. **Address validation.** All addresses are validated against Starknet felt252 format before use.
 5. **Runtime argument validation.** Every tool's arguments are validated with zod schemas before execution. Malformed inputs are rejected with clear error messages.
@@ -49,11 +49,12 @@ This server handles real funds. The following protections are built in:
 
 ### Environment Variables
 
-| Variable                    | Required | Description                                      |
-| --------------------------- | -------- | ------------------------------------------------ |
-| `STARKNET_PRIVATE_KEY`      | Yes      | Stark curve private key (0x...)                  |
-| `STARKNET_RPC_URL`          | No       | Custom RPC endpoint (overrides network preset)   |
-| `STARKNET_STAKING_CONTRACT` | No       | Staking contract address (enables staking tools) |
+| Variable                    | Required | Description                                                                          |
+| --------------------------- | -------- | ------------------------------------------------------------------------------------ |
+| `STARKNET_PRIVATE_KEY`      | Yes      | Stark curve private key (0x...)                                                      |
+| `STARKNET_RPC_URL`          | No       | Custom RPC endpoint (overrides network preset; HTTPS required except localhost HTTP) |
+| `STARKNET_RPC_TIMEOUT_MS`   | No       | RPC timeout in milliseconds (default: `30000`)                                       |
+| `STARKNET_STAKING_CONTRACT` | No       | Staking contract address (enables staking tools)                                     |
 
 ### CLI Arguments
 
@@ -194,6 +195,9 @@ npm run typecheck
 
 # Tests (includes schema parity checks)
 npm run test
+
+# Release precheck (verifies pinned StarkZap version is published)
+npm view starkzap@1.0.0 version
 
 # Run locally
 STARKNET_PRIVATE_KEY=0x... node dist/index.js --network sepolia

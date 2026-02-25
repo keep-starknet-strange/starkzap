@@ -133,7 +133,9 @@ const envSchema = z.object({
 const env = (() => {
   const parsed = envSchema.safeParse(process.env);
   if (parsed.success) {
-    return parsed.data;
+    const data = parsed.data;
+    delete process.env.STARKNET_PRIVATE_KEY;
+    return data;
   }
   const details = parsed.error.issues
     .map((issue) => `${issue.path.join(".") || "env"}: ${issue.message}`)
@@ -141,10 +143,12 @@ const env = (() => {
   console.error(`Error: invalid environment configuration: ${details}`);
   process.exit(1);
 })();
+// `env` is a flat object today; shallow freeze is enough unless nested fields are added.
 Object.freeze(env);
 
 const stakingEnabled = Boolean(env.STARKNET_STAKING_CONTRACT);
 const rpcTimeoutMs = env.STARKNET_RPC_TIMEOUT_MS ?? 30_000;
+let nowProvider = () => Date.now();
 
 // ---------------------------------------------------------------------------
 // SDK + wallet singleton (lazy init)
@@ -173,6 +177,10 @@ function getSdk(): StarkSDK {
 
 function withTimeoutMessage(operation: string, timeoutMs: number): string {
   return `${operation} timed out after ${timeoutMs}ms`;
+}
+
+function nowMs(): number {
+  return nowProvider();
 }
 
 async function withTimeout<T>(
@@ -214,8 +222,8 @@ async function getWallet(): Promise<Wallet> {
   if (walletSingleton) {
     return walletSingleton;
   }
-  if (walletInitBackoffUntilMs > Date.now()) {
-    const retryInMs = walletInitBackoffUntilMs - Date.now();
+  if (walletInitBackoffUntilMs > nowMs()) {
+    const retryInMs = walletInitBackoffUntilMs - nowMs();
     throw new Error(
       `Wallet initialization temporarily throttled after recent failures. Retry in ${Math.ceil(retryInMs / 1000)}s.`
     );
@@ -242,7 +250,7 @@ async function getWallet(): Promise<Wallet> {
           30_000,
           500 * 2 ** (walletInitFailureCount - 1)
         );
-        walletInitBackoffUntilMs = Date.now() + backoffMs;
+        walletInitBackoffUntilMs = nowMs() + backoffMs;
         const reason = error instanceof Error ? error.message : String(error);
         throw new Error(
           `Wallet initialization failed. ${reason} Retry in ${Math.ceil(backoffMs / 1000)}s.`
@@ -322,24 +330,25 @@ async function resolvePoolTokenForOperation(
   poolAddress: Address,
   tokenHint?: string
 ): Promise<Token> {
+  try {
+    await withTimeout(`Pool contract existence check for ${poolAddress}`, () =>
+      wallet.getProvider().getClassHashAt(poolAddress)
+    );
+  } catch (error) {
+    if (isClassHashNotFoundError(error)) {
+      throw new Error(
+        `Invalid pool address: ${poolAddress} is not a deployed contract.`
+      );
+    }
+    throw error;
+  }
+
   let staking: unknown;
   try {
     staking = await withTimeout(`Pool metadata lookup for ${poolAddress}`, () =>
       wallet.staking(poolAddress)
     );
   } catch (error) {
-    try {
-      await withTimeout(
-        `Pool contract existence check for ${poolAddress}`,
-        () => wallet.getProvider().getClassHashAt(poolAddress)
-      );
-    } catch (classHashError) {
-      if (isClassHashNotFoundError(classHashError)) {
-        throw new Error(
-          `Invalid pool address: ${poolAddress} is not a deployed contract.`
-        );
-      }
-    }
     const reason = error instanceof Error ? error.message : String(error);
     throw new Error(
       `Could not resolve staking pool metadata for ${poolAddress}. ${reason}`
@@ -371,6 +380,16 @@ async function runSerialized<T>(task: () => Promise<T>): Promise<T> {
   } finally {
     release();
   }
+}
+
+async function runWithToolConcurrencyPolicy<T>(
+  toolName: string,
+  task: () => Promise<T>
+): Promise<T> {
+  if (READ_ONLY_TOOLS.has(toolName)) {
+    return task();
+  }
+  return runSerialized(task);
 }
 
 async function assertStablePoolAmountWithinCap(
@@ -407,13 +426,91 @@ async function assertStablePoolAmountWithinCap(
     );
   }
   assertAmountWithinCap(secondPosition[field], poolToken, maxCap);
+
+  const thirdPosition = await withTimeout(
+    `Pool position final check (${operation})`,
+    () => wallet.getPoolPosition(poolAddress)
+  );
+  if (!thirdPosition) {
+    throw new Error(
+      `Cannot ${operation}: wallet is not a member of pool ${poolAddress}.`
+    );
+  }
+  if (!thirdPosition[field].eq(secondPosition[field])) {
+    throw new Error(
+      `Cannot ${operation}: pool position changed right before submission. Retry.`
+    );
+  }
+  assertAmountWithinCap(thirdPosition[field], poolToken, maxCap);
+}
+
+function isRpcLikeError(error: unknown): boolean {
+  const normalized = summarizeError(error).toLowerCase();
+  const markers = [
+    "timed out",
+    "timeout",
+    "gateway timeout",
+    "connection refused",
+    "connection reset",
+    "network",
+    "econn",
+    "transport",
+    "rpc",
+    "failed to fetch",
+    "socket",
+  ];
+  return markers.some((marker) => normalized.includes(marker));
+}
+
+async function cleanupWalletAndSdkResources(): Promise<void> {
+  walletInitPromise = undefined;
+  if (walletSingleton) {
+    try {
+      await walletSingleton.disconnect();
+    } catch (error) {
+      console.error(`[x-mcp] wallet cleanup error: ${summarizeError(error)}`);
+    }
+  }
+  walletSingleton = undefined;
+  sdkSingleton = undefined;
+}
+
+async function maybeResetWalletOnRpcError(error: unknown): Promise<void> {
+  if (!isRpcLikeError(error)) {
+    return;
+  }
+  await cleanupWalletAndSdkResources();
+}
+
+function buildToolErrorText(error: unknown): string {
+  const message = error instanceof Error ? error.message : String(error);
+  const requestId = createErrorReference(message);
+  console.error(`[x-mcp:error][${requestId}] ${summarizeError(error)}`);
+  const safeMessagePrefixes = [
+    "Invalid ",
+    "Unknown ",
+    "Amount ",
+    "Token ",
+    "Cannot ",
+    "Total ",
+    "Could ",
+    "Rate ",
+    "Address ",
+    "x_",
+  ];
+  const safeMessage = safeMessagePrefixes.some((prefix) =>
+    message.startsWith(prefix)
+  )
+    ? message
+    : `Operation failed. Reference: ${requestId}`;
+  return `Error: ${safeMessage}`;
 }
 
 async function handleTool(
   name: string,
   rawArgs: Record<string, unknown>
 ): Promise<{ content: Array<{ type: "text"; text: string }> }> {
-  enforcePerMinuteRateLimit(requestTimestamps, Date.now(), rateLimitRpm);
+  enforcePerMinuteRateLimit(requestTimestamps, nowMs(), rateLimitRpm);
 
   const schema = schemas[name as keyof typeof schemas];
   if (!schema) {
@@ -539,10 +636,12 @@ async function handleTool(
       const parsed = args as z.infer<typeof schemas.x_deploy_account>;
       const provider = wallet.getProvider();
       let isDeployedOnChain = false;
+      let deployedClassHash: string | undefined;
       try {
-        await withTimeout("Account deployment check", () =>
+        const classHash = await withTimeout("Account deployment check", () =>
           provider.getClassHashAt(wallet.address)
         );
+        deployedClassHash = fromAddress(classHash);
         isDeployedOnChain = true;
       } catch (error) {
         if (!isClassHashNotFoundError(error)) {
@@ -550,6 +649,12 @@ async function handleTool(
         }
       }
       if (isDeployedOnChain) {
+        const expectedClassHash = fromAddress(wallet.getClassHash());
+        if (deployedClassHash !== expectedClassHash) {
+          throw new Error(
+            `Address ${wallet.address} is deployed with unexpected class hash ${deployedClassHash}. Expected ${expectedClassHash}.`
+          );
+        }
         return ok({
           status: "already_deployed",
           address: wallet.address,
@@ -730,10 +835,7 @@ async function handleTool(
         secondsUntilUnpool:
           unpoolTime === null
             ? null
-            : Math.max(
-                0,
-                Math.ceil((unpoolTime.getTime() - Date.now()) / 1000)
-              ),
+            : Math.max(0, Math.ceil((unpoolTime.getTime() - nowMs()) / 1000)),
       });
     }
 
@@ -796,8 +898,8 @@ const server = new Server(
 server.setRequestHandler(ListToolsRequestSchema, async () => ({ tools }));
 
 server.setRequestHandler(CallToolRequestSchema, async (request) => {
-  return runSerialized(async () => {
-    const { name, arguments: toolArgs } = request.params;
+  const { name, arguments: toolArgs } = request.params;
+  return runWithToolConcurrencyPolicy(name, async () => {
     try {
       return await handleTool(
         name,
@@ -815,27 +917,9 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           isError: true,
         };
       }
-      const message = error instanceof Error ? error.message : String(error);
-      const requestId = createErrorReference(message);
-      console.error(`[x-mcp:error][${requestId}] ${summarizeError(error)}`);
-      const safeMessagePrefixes = [
-        "Invalid ",
-        "Unknown ",
-        "Amount ",
-        "Token ",
-        "Cannot ",
-        "Total ",
-        "Could ",
-        "Rate ",
-        "x_",
-      ];
-      const safeMessage = safeMessagePrefixes.some((prefix) =>
-        message.startsWith(prefix)
-      )
-        ? message
-        : `Operation failed. Reference: ${requestId}`;
+      await maybeResetWalletOnRpcError(error);
       return {
-        content: [{ type: "text" as const, text: `Error: ${safeMessage}` }],
+        content: [{ type: "text" as const, text: buildToolErrorText(error) }],
         isError: true,
       };
     }
@@ -865,6 +949,7 @@ if (isMainModule) {
     );
     try {
       await server.close();
+      await cleanupWalletAndSdkResources();
     } catch (error) {
       console.error(`[x-mcp] shutdown error: ${summarizeError(error)}`);
     } finally {
@@ -884,3 +969,36 @@ if (isMainModule) {
     process.exit(1);
   });
 }
+
+export const __testing = {
+  withTimeout,
+  waitWithTimeout,
+  getWallet,
+  runSerialized,
+  runWithToolConcurrencyPolicy,
+  assertStablePoolAmountWithinCap,
+  buildToolErrorText,
+  isRpcLikeError,
+  maybeResetWalletOnRpcError,
+  cleanupWalletAndSdkResources,
+  setNowProvider(provider: () => number) {
+    nowProvider = provider;
+  },
+  setSdkSingleton(value: StarkSDK | undefined) {
+    sdkSingleton = value;
+  },
+  setWalletSingleton(value: Wallet | undefined) {
+    walletSingleton = value;
+  },
+  resetState() {
+    sdkSingleton = undefined;
+    walletSingleton = undefined;
+    walletInitPromise = undefined;
+    walletInitFailureCount = 0;
+    walletInitBackoffUntilMs = 0;
+    requestExecutionQueue = Promise.resolve();
+    requestTimestamps.splice(0, requestTimestamps.length);
+    activeTransactionHashes.clear();
+    nowProvider = () => Date.now();
+  },
+};

@@ -94,6 +94,11 @@ describe("schema hardening", () => {
     expect(parsed.success).toBe(false);
   });
 
+  it("rejects overly long amount literals", () => {
+    const parsed = amountSchema.safeParse("9".repeat(33));
+    expect(parsed.success).toBe(false);
+  });
+
   it("bounds estimate-fee calls at 10", () => {
     const calls = Array.from({ length: 11 }, () => ({
       contractAddress: TEST_TOKEN.address,
@@ -125,6 +130,19 @@ describe("schema hardening", () => {
           contractAddress: TEST_TOKEN.address,
           entrypoint: "transfer",
           calldata: ["not-a-felt"],
+        },
+      ],
+    });
+    expect(parsed.success).toBe(false);
+  });
+
+  it("validates entrypoint identifier format", () => {
+    const parsed = schemas.x_execute.safeParse({
+      calls: [
+        {
+          contractAddress: TEST_TOKEN.address,
+          entrypoint: " transfer",
+          calldata: [],
         },
       ],
     });
@@ -257,6 +275,7 @@ describe("amount and token guards", () => {
       const message = error instanceof Error ? error.message : String(error);
       expect(message).toMatch(/Unknown token/);
       expect(message.length).toBeLessThan(320);
+      expect(message).not.toContain("(+");
     }
   });
 });
