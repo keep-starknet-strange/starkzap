@@ -6,7 +6,7 @@
 
 # Class: StarkSigner
 
-Defined in: [src/signer/stark.ts:12](https://github.com/keep-starknet-strange/x/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/signer/stark.ts#L12)
+Defined in: [src/signer/stark.ts:12](https://github.com/keep-starknet-strange/starkzap/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/signer/stark.ts#L12)
 
 Standard Stark curve signer using a private key.
 
@@ -26,7 +26,7 @@ const signer = new StarkSigner("0xPRIVATE_KEY");
 
 > **new StarkSigner**(`privateKey`): `StarkSigner`
 
-Defined in: [src/signer/stark.ts:16](https://github.com/keep-starknet-strange/x/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/signer/stark.ts#L16)
+Defined in: [src/signer/stark.ts:16](https://github.com/keep-starknet-strange/starkzap/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/signer/stark.ts#L16)
 
 #### Parameters
 
@@ -44,7 +44,7 @@ Defined in: [src/signer/stark.ts:16](https://github.com/keep-starknet-strange/x/
 
 > **getPubKey**(): `Promise`\<`string`\>
 
-Defined in: [src/signer/stark.ts:21](https://github.com/keep-starknet-strange/x/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/signer/stark.ts#L21)
+Defined in: [src/signer/stark.ts:21](https://github.com/keep-starknet-strange/starkzap/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/signer/stark.ts#L21)
 
 Get the public key.
 
@@ -62,7 +62,7 @@ Get the public key.
 
 > **signRaw**(`hash`): `Promise`\<`Signature`\>
 
-Defined in: [src/signer/stark.ts:25](https://github.com/keep-starknet-strange/x/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/signer/stark.ts#L25)
+Defined in: [src/signer/stark.ts:25](https://github.com/keep-starknet-strange/starkzap/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/signer/stark.ts#L25)
 
 Sign a raw message hash.
 This is the core signing primitive - all transaction signing ultimately calls this.

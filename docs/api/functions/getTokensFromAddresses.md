@@ -8,7 +8,7 @@
 
 > **getTokensFromAddresses**(`tokenAddresses`, `provider`): `Promise`\<[`Token`](../interfaces/Token.md)[]\>
 
-Defined in: [src/erc20/token/index.ts:17](https://github.com/keep-starknet-strange/x/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/erc20/token/index.ts#L17)
+Defined in: [src/erc20/token/index.ts:17](https://github.com/keep-starknet-strange/starkzap/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/erc20/token/index.ts#L17)
 
 ## Parameters
 

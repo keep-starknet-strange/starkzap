@@ -6,7 +6,7 @@
 
 # Interface: SDKConfig
 
-Defined in: [src/types/config.ts:179](https://github.com/keep-starknet-strange/x/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/types/config.ts#L179)
+Defined in: [src/types/config.ts:179](https://github.com/keep-starknet-strange/starkzap/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/types/config.ts#L179)
 
 Main configuration for the StarkSDK.
 
@@ -42,7 +42,7 @@ const sdk = new StarkSDK({
 
 > `optional` **network**: `"devnet"` \| [`NetworkPreset`](NetworkPreset.md) \| `"mainnet"` \| `"sepolia"`
 
-Defined in: [src/types/config.ts:181](https://github.com/keep-starknet-strange/x/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/types/config.ts#L181)
+Defined in: [src/types/config.ts:181](https://github.com/keep-starknet-strange/starkzap/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/types/config.ts#L181)
 
 Use a network preset (e.g., "mainnet", "sepolia", or a NetworkPreset object)
 
@@ -52,7 +52,7 @@ Use a network preset (e.g., "mainnet", "sepolia", or a NetworkPreset object)
 
 > `optional` **rpcUrl**: `string`
 
-Defined in: [src/types/config.ts:183](https://github.com/keep-starknet-strange/x/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/types/config.ts#L183)
+Defined in: [src/types/config.ts:183](https://github.com/keep-starknet-strange/starkzap/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/types/config.ts#L183)
 
 Starknet JSON-RPC endpoint URL (overrides network preset)
 
@@ -62,7 +62,7 @@ Starknet JSON-RPC endpoint URL (overrides network preset)
 
 > `optional` **chainId**: [`ChainId`](../classes/ChainId.md)
 
-Defined in: [src/types/config.ts:185](https://github.com/keep-starknet-strange/x/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/types/config.ts#L185)
+Defined in: [src/types/config.ts:185](https://github.com/keep-starknet-strange/starkzap/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/types/config.ts#L185)
 
 Target chain (overrides network preset)
 
@@ -72,7 +72,7 @@ Target chain (overrides network preset)
 
 > `optional` **paymaster**: [`PaymasterOptions`](PaymasterOptions.md)
 
-Defined in: [src/types/config.ts:187](https://github.com/keep-starknet-strange/x/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/types/config.ts#L187)
+Defined in: [src/types/config.ts:187](https://github.com/keep-starknet-strange/starkzap/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/types/config.ts#L187)
 
 Optional: custom paymaster config (default: AVNU paymaster)
 
@@ -82,7 +82,7 @@ Optional: custom paymaster config (default: AVNU paymaster)
 
 > `optional` **explorer**: [`ExplorerConfig`](ExplorerConfig.md)
 
-Defined in: [src/types/config.ts:189](https://github.com/keep-starknet-strange/x/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/types/config.ts#L189)
+Defined in: [src/types/config.ts:189](https://github.com/keep-starknet-strange/starkzap/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/types/config.ts#L189)
 
 Optional: configures how explorer URLs are built
 
@@ -92,7 +92,7 @@ Optional: configures how explorer URLs are built
 
 > `optional` **staking**: [`StakingConfig`](StakingConfig.md)
 
-Defined in: [src/types/config.ts:201](https://github.com/keep-starknet-strange/x/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/types/config.ts#L201)
+Defined in: [src/types/config.ts:201](https://github.com/keep-starknet-strange/starkzap/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/types/config.ts#L201)
 
 Optional: configuration for the Staking module.
 

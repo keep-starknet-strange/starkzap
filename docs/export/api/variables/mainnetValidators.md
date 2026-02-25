@@ -8,7 +8,7 @@
 
 > `const` **mainnetValidators**: `object`
 
-Defined in: [src/staking/validator/presets.ts:11](https://github.com/keep-starknet-strange/x/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/staking/validator/presets.ts#L11)
+Defined in: [src/staking/validator/presets.ts:11](https://github.com/keep-starknet-strange/starkzap/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/staking/validator/presets.ts#L11)
 
 ## Type Declaration
 

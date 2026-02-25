@@ -6,7 +6,7 @@
 
 # Interface: NetworkPreset
 
-Defined in: [src/network/presets.ts:6](https://github.com/keep-starknet-strange/x/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/network/presets.ts#L6)
+Defined in: [src/network/presets.ts:6](https://github.com/keep-starknet-strange/starkzap/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/network/presets.ts#L6)
 
 Network configuration preset.
 
@@ -16,7 +16,7 @@ Network configuration preset.
 
 > **name**: `string`
 
-Defined in: [src/network/presets.ts:8](https://github.com/keep-starknet-strange/x/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/network/presets.ts#L8)
+Defined in: [src/network/presets.ts:8](https://github.com/keep-starknet-strange/starkzap/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/network/presets.ts#L8)
 
 Human-readable network name
 
@@ -26,7 +26,7 @@ Human-readable network name
 
 > **chainId**: [`ChainId`](../classes/ChainId.md)
 
-Defined in: [src/network/presets.ts:10](https://github.com/keep-starknet-strange/x/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/network/presets.ts#L10)
+Defined in: [src/network/presets.ts:10](https://github.com/keep-starknet-strange/starkzap/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/network/presets.ts#L10)
 
 Starknet chain ID
 
@@ -36,7 +36,7 @@ Starknet chain ID
 
 > **rpcUrl**: `string`
 
-Defined in: [src/network/presets.ts:12](https://github.com/keep-starknet-strange/x/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/network/presets.ts#L12)
+Defined in: [src/network/presets.ts:12](https://github.com/keep-starknet-strange/starkzap/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/network/presets.ts#L12)
 
 Default RPC URL
 
@@ -46,6 +46,6 @@ Default RPC URL
 
 > `optional` **explorerUrl**: `string`
 
-Defined in: [src/network/presets.ts:14](https://github.com/keep-starknet-strange/x/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/network/presets.ts#L14)
+Defined in: [src/network/presets.ts:14](https://github.com/keep-starknet-strange/starkzap/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/network/presets.ts#L14)
 
 Block explorer URL (optional)

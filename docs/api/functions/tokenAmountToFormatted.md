@@ -8,7 +8,7 @@
 
 > **tokenAmountToFormatted**(`compressed?`, `balance`, `decimals`, `symbol`): `string`
 
-Defined in: [src/types/amount.ts:701](https://github.com/keep-starknet-strange/x/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/types/amount.ts#L701)
+Defined in: [src/types/amount.ts:701](https://github.com/keep-starknet-strange/starkzap/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/types/amount.ts#L701)
 
 Formats a token amount for display in the UI with locale-aware number formatting.
 

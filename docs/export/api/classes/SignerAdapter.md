@@ -6,7 +6,7 @@
 
 # Class: SignerAdapter
 
-Defined in: [src/signer/adapter.ts:49](https://github.com/keep-starknet-strange/x/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/signer/adapter.ts#L49)
+Defined in: [src/signer/adapter.ts:49](https://github.com/keep-starknet-strange/starkzap/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/signer/adapter.ts#L49)
 
 Adapter that bridges the SDK's minimal [SignerInterface](../interfaces/SignerInterface.md) to the
 full `starknet.js` `SignerInterface`.
@@ -40,7 +40,7 @@ const account = new Account({ provider, address, signer: adapter });
 
 > **new SignerAdapter**(`signer`): `SignerAdapter`
 
-Defined in: [src/signer/adapter.ts:50](https://github.com/keep-starknet-strange/x/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/signer/adapter.ts#L50)
+Defined in: [src/signer/adapter.ts:50](https://github.com/keep-starknet-strange/starkzap/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/signer/adapter.ts#L50)
 
 #### Parameters
 
@@ -58,7 +58,7 @@ Defined in: [src/signer/adapter.ts:50](https://github.com/keep-starknet-strange/
 
 > **getPubKey**(): `Promise`\<`string`\>
 
-Defined in: [src/signer/adapter.ts:52](https://github.com/keep-starknet-strange/x/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/signer/adapter.ts#L52)
+Defined in: [src/signer/adapter.ts:52](https://github.com/keep-starknet-strange/starkzap/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/signer/adapter.ts#L52)
 
 Method to get the public key of the signer
 
@@ -86,7 +86,7 @@ const result = await mySigner.getPubKey();
 
 > **signMessage**(`typedData`, `accountAddress`): `Promise`\<`Signature`\>
 
-Defined in: [src/signer/adapter.ts:56](https://github.com/keep-starknet-strange/x/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/signer/adapter.ts#L56)
+Defined in: [src/signer/adapter.ts:56](https://github.com/keep-starknet-strange/starkzap/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/signer/adapter.ts#L56)
 
 Signs a JSON object for off-chain usage with the private key and returns the signature.
 This adds a message prefix so it can't be interchanged with transactions
@@ -150,7 +150,7 @@ const result = await mySigner.signMessage(
 
 > **signTransaction**(`transactions`, `details`): `Promise`\<`Signature`\>
 
-Defined in: [src/signer/adapter.ts:64](https://github.com/keep-starknet-strange/x/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/signer/adapter.ts#L64)
+Defined in: [src/signer/adapter.ts:64](https://github.com/keep-starknet-strange/starkzap/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/signer/adapter.ts#L64)
 
 Signs INVOKE transactions with the private key and returns the signature
 
@@ -219,7 +219,7 @@ const result = await mySigner.signTransaction(calls, transactionsDetail);
 
 > **signDeployAccountTransaction**(`details`): `Promise`\<`Signature`\>
 
-Defined in: [src/signer/adapter.ts:92](https://github.com/keep-starknet-strange/x/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/signer/adapter.ts#L92)
+Defined in: [src/signer/adapter.ts:92](https://github.com/keep-starknet-strange/starkzap/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/signer/adapter.ts#L92)
 
 Signs a DEPLOY_ACCOUNT transaction with the private key and returns the signature
 
@@ -279,7 +279,7 @@ const result = await mySigner.signDeployAccountTransaction(myDeployAcc);
 
 > **signDeclareTransaction**(`details`): `Promise`\<`Signature`\>
 
-Defined in: [src/signer/adapter.ts:118](https://github.com/keep-starknet-strange/x/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/signer/adapter.ts#L118)
+Defined in: [src/signer/adapter.ts:118](https://github.com/keep-starknet-strange/starkzap/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/signer/adapter.ts#L118)
 
 Signs a DECLARE transaction with the private key and returns the signature
 

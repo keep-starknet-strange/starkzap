@@ -6,7 +6,7 @@
 
 # Interface: AccountClassConfig
 
-Defined in: [src/types/wallet.ts:25](https://github.com/keep-starknet-strange/x/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/types/wallet.ts#L25)
+Defined in: [src/types/wallet.ts:25](https://github.com/keep-starknet-strange/starkzap/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/types/wallet.ts#L25)
 
 Configuration for an account contract class.
 Use presets like `OpenZeppelinPreset` or define your own.
@@ -33,7 +33,7 @@ import { OpenZeppelinPreset } from "x";
 
 > **classHash**: `string`
 
-Defined in: [src/types/wallet.ts:27](https://github.com/keep-starknet-strange/x/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/types/wallet.ts#L27)
+Defined in: [src/types/wallet.ts:27](https://github.com/keep-starknet-strange/starkzap/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/types/wallet.ts#L27)
 
 Account contract class hash
 
@@ -43,7 +43,7 @@ Account contract class hash
 
 > **buildConstructorCalldata**: (`publicKey`) => `Calldata`
 
-Defined in: [src/types/wallet.ts:29](https://github.com/keep-starknet-strange/x/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/types/wallet.ts#L29)
+Defined in: [src/types/wallet.ts:29](https://github.com/keep-starknet-strange/starkzap/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/types/wallet.ts#L29)
 
 Build constructor calldata from public key
 
@@ -63,7 +63,7 @@ Build constructor calldata from public key
 
 > `optional` **getSalt**: (`publicKey`) => `string`
 
-Defined in: [src/types/wallet.ts:36](https://github.com/keep-starknet-strange/x/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/types/wallet.ts#L36)
+Defined in: [src/types/wallet.ts:36](https://github.com/keep-starknet-strange/starkzap/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/types/wallet.ts#L36)
 
 Compute the salt for address computation.
 Default: uses public key directly (for Stark curve accounts).

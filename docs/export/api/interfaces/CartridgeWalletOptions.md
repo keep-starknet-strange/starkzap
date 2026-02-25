@@ -6,7 +6,7 @@
 
 # Interface: CartridgeWalletOptions
 
-Defined in: [src/wallet/cartridge.ts:35](https://github.com/keep-starknet-strange/x/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/wallet/cartridge.ts#L35)
+Defined in: [src/wallet/cartridge.ts:35](https://github.com/keep-starknet-strange/starkzap/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/wallet/cartridge.ts#L35)
 
 Options for connecting with Cartridge Controller.
 
@@ -16,7 +16,7 @@ Options for connecting with Cartridge Controller.
 
 > `optional` **rpcUrl**: `string`
 
-Defined in: [src/wallet/cartridge.ts:36](https://github.com/keep-starknet-strange/x/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/wallet/cartridge.ts#L36)
+Defined in: [src/wallet/cartridge.ts:36](https://github.com/keep-starknet-strange/starkzap/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/wallet/cartridge.ts#L36)
 
 ---
 
@@ -24,7 +24,7 @@ Defined in: [src/wallet/cartridge.ts:36](https://github.com/keep-starknet-strang
 
 > `optional` **chainId**: [`ChainId`](../classes/ChainId.md)
 
-Defined in: [src/wallet/cartridge.ts:37](https://github.com/keep-starknet-strange/x/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/wallet/cartridge.ts#L37)
+Defined in: [src/wallet/cartridge.ts:37](https://github.com/keep-starknet-strange/starkzap/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/wallet/cartridge.ts#L37)
 
 ---
 
@@ -32,7 +32,7 @@ Defined in: [src/wallet/cartridge.ts:37](https://github.com/keep-starknet-strang
 
 > `optional` **policies**: `object`[]
 
-Defined in: [src/wallet/cartridge.ts:38](https://github.com/keep-starknet-strange/x/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/wallet/cartridge.ts#L38)
+Defined in: [src/wallet/cartridge.ts:38](https://github.com/keep-starknet-strange/starkzap/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/wallet/cartridge.ts#L38)
 
 #### target
 
@@ -48,7 +48,7 @@ Defined in: [src/wallet/cartridge.ts:38](https://github.com/keep-starknet-strang
 
 > `optional` **preset**: `string`
 
-Defined in: [src/wallet/cartridge.ts:39](https://github.com/keep-starknet-strange/x/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/wallet/cartridge.ts#L39)
+Defined in: [src/wallet/cartridge.ts:39](https://github.com/keep-starknet-strange/starkzap/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/wallet/cartridge.ts#L39)
 
 ---
 
@@ -56,7 +56,7 @@ Defined in: [src/wallet/cartridge.ts:39](https://github.com/keep-starknet-strang
 
 > `optional` **url**: `string`
 
-Defined in: [src/wallet/cartridge.ts:40](https://github.com/keep-starknet-strange/x/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/wallet/cartridge.ts#L40)
+Defined in: [src/wallet/cartridge.ts:40](https://github.com/keep-starknet-strange/starkzap/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/wallet/cartridge.ts#L40)
 
 ---
 
@@ -64,7 +64,7 @@ Defined in: [src/wallet/cartridge.ts:40](https://github.com/keep-starknet-strang
 
 > `optional` **feeMode**: [`FeeMode`](../type-aliases/FeeMode.md)
 
-Defined in: [src/wallet/cartridge.ts:41](https://github.com/keep-starknet-strange/x/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/wallet/cartridge.ts#L41)
+Defined in: [src/wallet/cartridge.ts:41](https://github.com/keep-starknet-strange/starkzap/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/wallet/cartridge.ts#L41)
 
 ---
 
@@ -72,7 +72,7 @@ Defined in: [src/wallet/cartridge.ts:41](https://github.com/keep-starknet-strang
 
 > `optional` **timeBounds**: [`PaymasterTimeBounds`](PaymasterTimeBounds.md)
 
-Defined in: [src/wallet/cartridge.ts:42](https://github.com/keep-starknet-strange/x/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/wallet/cartridge.ts#L42)
+Defined in: [src/wallet/cartridge.ts:42](https://github.com/keep-starknet-strange/starkzap/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/wallet/cartridge.ts#L42)
 
 ---
 
@@ -80,4 +80,4 @@ Defined in: [src/wallet/cartridge.ts:42](https://github.com/keep-starknet-strang
 
 > `optional` **explorer**: [`ExplorerConfig`](ExplorerConfig.md)
 
-Defined in: [src/wallet/cartridge.ts:43](https://github.com/keep-starknet-strange/x/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/wallet/cartridge.ts#L43)
+Defined in: [src/wallet/cartridge.ts:43](https://github.com/keep-starknet-strange/starkzap/blob/a5957e5a6aebb4214574da0d6c8fb4a586de1aa2/src/wallet/cartridge.ts#L43)
