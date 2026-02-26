@@ -863,6 +863,32 @@ async function handleTool(
   });
 
   switch (name) {
+    case "x_get_account": {
+      const provider = wallet.getProvider();
+      const expectedClassHash = fromAddress(wallet.getClassHash());
+      let deployed = false;
+      let deployedClassHash: string | undefined;
+      try {
+        deployedClassHash = fromAddress(
+          await withTimeout("Account deployment check", () =>
+            provider.getClassHashAt(wallet.address)
+          )
+        );
+        deployed = true;
+      } catch (error) {
+        if (!isClassHashNotFoundError(error)) {
+          throw error;
+        }
+      }
+
+      return ok({
+        address: wallet.address,
+        deployed,
+        expectedClassHash,
+        deployedClassHash: deployedClassHash ?? null,
+      });
+    }
+
     case "x_get_balance": {
       const parsed = args as z.infer<typeof schemas.x_get_balance>;
       const token = resolveToken(parsed.token);

@@ -55,7 +55,7 @@ This server handles real funds. The following protections are built in:
 
 | Variable                             | Required | Description                                                                                     |
 | ------------------------------------ | -------- | ----------------------------------------------------------------------------------------------- |
-| `STARKNET_PRIVATE_KEY`               | Yes      | Stark curve private key (0x...)                                                                 |
+| `STARKNET_PRIVATE_KEY`               | Yes      | Stark curve private key (`0x` + exactly 64 hex chars, cryptographically valid)                  |
 | `STARKNET_RPC_URL`                   | No       | Custom RPC endpoint (overrides network preset; HTTPS required except localhost HTTP)            |
 | `STARKNET_RPC_TIMEOUT_MS`            | No       | RPC timeout in milliseconds (default: `30000`)                                                  |
 | `STARKNET_STAKING_CONTRACT`          | No       | Staking contract address (enables staking tools)                                                |
@@ -122,13 +122,14 @@ const mcpServer = new McpServerStdio({
 
 ### Wallet
 
-| Tool               | Description                                    |
-| ------------------ | ---------------------------------------------- |
-| `x_get_balance`    | Get ERC20 token balance (human-readable + raw) |
-| `x_transfer`       | Transfer tokens to one or more recipients      |
-| `x_execute`        | Execute raw contract calls atomically          |
-| `x_deploy_account` | Deploy the account contract on-chain           |
-| `x_estimate_fee`   | Estimate gas cost for contract calls           |
+| Tool               | Description                                                 |
+| ------------------ | ----------------------------------------------------------- |
+| `x_get_account`    | Get connected account address/deployment/class hash details |
+| `x_get_balance`    | Get ERC20 token balance (human-readable + raw)              |
+| `x_transfer`       | Transfer tokens to one or more recipients                   |
+| `x_execute`        | Execute raw contract calls atomically                       |
+| `x_deploy_account` | Deploy the account contract on-chain                        |
+| `x_estimate_fee`   | Estimate gas cost for contract calls                        |
 
 ### Staking
 
@@ -149,6 +150,14 @@ const mcpServer = new McpServerStdio({
 Agent: "What's my STRK balance?"
 → calls x_get_balance { token: "STRK" }
 ← { token: "STRK", balance: "150.25", formatted: "150.25 STRK", raw: "150250000000000000000", decimals: 18 }
+```
+
+### Check connected account
+
+```text
+Agent: "What account am I using?"
+→ calls x_get_account {}
+← { address: "0x...", deployed: true, expectedClassHash: "0x...", deployedClassHash: "0x..." }
 ```
 
 ### Transfer tokens
@@ -177,6 +186,24 @@ Agent: "Stake 100 STRK in pool 0x3333333333333333333333333333333333333333"
 
 Tools accept token symbols (`ETH`, `STRK`, `USDC`, etc.) or contract addresses. The server uses the StarkZap SDK's built-in token presets for the configured network.
 
+## Sepolia Write-Path Checklist
+
+Use this sequence when validating real writes (not just tests):
+
+1. Start with write enabled:
+   `STARKNET_PRIVATE_KEY=0x... node dist/index.js --network sepolia --enable-write`
+2. Call `x_get_account` first to confirm the **derived** address and class hash.
+3. Confirm fees balance with `x_get_balance` for `STRK` (and optionally `ETH`).
+4. If account is not deployed, call `x_deploy_account`.
+5. Execute a tiny self-transfer (e.g. `0.00001`) with `x_transfer`.
+
+Troubleshooting from live runs:
+
+- If startup says private key is invalid, check key length: it must be 64 hex chars after `0x` (32 bytes). If your source omits a leading zero, left-pad before use.
+- If your expected wallet address does not match, trust `x_get_account` output. The MCP uses StarkZap wallet derivation from the private key.
+- If sponsored deploy/transfer fails with paymaster errors (e.g. invalid API key), use funded user-pays mode or configure a valid paymaster setup in your environment.
+- If write tx fails with undeployed account errors, run `x_deploy_account` first, then retry transfer.
+
 ## Security Checklist
 
 - [ ] Using a **dedicated agent wallet** with limited funds (not your main wallet)
@@ -204,8 +231,8 @@ npm run typecheck
 # Tests (includes schema parity checks)
 npm run test
 
-# Release precheck (verifies pinned StarkZap version is published)
-npm view starkzap@1.0.0 version
+# Release precheck (verifies StarkZap version range is published)
+npm view starkzap@^1.0.0 version
 
 # Run locally
 STARKNET_PRIVATE_KEY=0x... node dist/index.js --network sepolia

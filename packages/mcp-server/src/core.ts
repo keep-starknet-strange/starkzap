@@ -301,6 +301,7 @@ const calldataSchema = z
 // NOTE: Keep this map in sync with MCP tool inputSchema in buildTools().
 // assertSchemaParity() runs at startup and in tests to prevent schema drift.
 export const schemas = {
+  x_get_account: z.object({}),
   x_get_balance: z.object({
     token: z.string().min(1),
   }),
@@ -373,6 +374,21 @@ export const schemas = {
 
 export function buildTools(maxAmount: string, maxBatchAmount: string): Tool[] {
   return [
+    {
+      name: "x_get_account",
+      description:
+        "Get connected account details derived from STARKNET_PRIVATE_KEY: address, deployment status, and class hashes.",
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: true,
+      },
+      inputSchema: {
+        type: "object" as const,
+        properties: {},
+      },
+    },
     {
       name: "x_get_balance",
       description:
@@ -716,6 +732,7 @@ export function buildTools(maxAmount: string, maxBatchAmount: string): Tool[] {
 }
 
 export const READ_ONLY_TOOLS = new Set([
+  "x_get_account",
   "x_get_balance",
   "x_get_pool_position",
   "x_estimate_fee",

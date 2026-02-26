@@ -201,6 +201,16 @@ describe("schema hardening", () => {
 });
 
 describe("tool gating and parity", () => {
+  it("always exposes x_get_account as a read-only tool", () => {
+    const readOnlyOnly = selectTools(buildTools("100", "150"), {
+      enableWrite: false,
+      enableExecute: false,
+      stakingEnabled: false,
+    });
+    const names = new Set(readOnlyOnly.map((tool) => tool.name));
+    expect(names.has("x_get_account")).toBe(true);
+  });
+
   it("hides staking tools when staking config is absent", () => {
     const tools = selectTools(buildTools("100", "150"), {
       enableWrite: true,
