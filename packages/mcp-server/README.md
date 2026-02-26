@@ -39,6 +39,7 @@ This server handles real funds. The following protections are built in:
 8. **stdio transport only.** The server runs locally via stdio — no network exposure.
 9. **Early CLI validation.** Invalid/unknown CLI flags and malformed `--network`/amount/rate-limit values are rejected immediately at startup with a clear error.
 10. **Staking tool gating by config.** Staking tools are hidden unless `STARKNET_STAKING_CONTRACT` is configured.
+11. **Pool class-hash validation.** Staking pool calls verify deployed contract class hash before SDK metadata resolution. You can pin expected hashes explicitly via `STARKNET_STAKING_POOL_CLASS_HASHES`.
 
 **Recommendations for production use:**
 
@@ -52,12 +53,13 @@ This server handles real funds. The following protections are built in:
 
 ### Environment Variables
 
-| Variable                    | Required | Description                                                                          |
-| --------------------------- | -------- | ------------------------------------------------------------------------------------ |
-| `STARKNET_PRIVATE_KEY`      | Yes      | Stark curve private key (0x...)                                                      |
-| `STARKNET_RPC_URL`          | No       | Custom RPC endpoint (overrides network preset; HTTPS required except localhost HTTP) |
-| `STARKNET_RPC_TIMEOUT_MS`   | No       | RPC timeout in milliseconds (default: `30000`)                                       |
-| `STARKNET_STAKING_CONTRACT` | No       | Staking contract address (enables staking tools)                                     |
+| Variable                             | Required | Description                                                                                     |
+| ------------------------------------ | -------- | ----------------------------------------------------------------------------------------------- |
+| `STARKNET_PRIVATE_KEY`               | Yes      | Stark curve private key (0x...)                                                                 |
+| `STARKNET_RPC_URL`                   | No       | Custom RPC endpoint (overrides network preset; HTTPS required except localhost HTTP)            |
+| `STARKNET_RPC_TIMEOUT_MS`            | No       | RPC timeout in milliseconds (default: `30000`)                                                  |
+| `STARKNET_STAKING_CONTRACT`          | No       | Staking contract address (enables staking tools)                                                |
+| `STARKNET_STAKING_POOL_CLASS_HASHES` | No       | Comma-separated allowlist of pool contract class hashes (0x...) for strict pool-type validation |
 
 ### CLI Arguments
 

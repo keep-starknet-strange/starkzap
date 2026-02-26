@@ -1104,6 +1104,18 @@ function safeJson(value: unknown): string {
   );
 }
 
+function isBigIntBound(
+  value: unknown
+): value is { max_amount: bigint; max_price_per_unit: bigint } {
+  if (!isRecord(value)) {
+    return false;
+  }
+  return (
+    typeof value.max_amount === "bigint" &&
+    typeof value.max_price_per_unit === "bigint"
+  );
+}
+
 export function requireResourceBounds(fee: unknown): {
   l1_gas: { max_amount: bigint; max_price_per_unit: bigint };
   l2_gas: { max_amount: bigint; max_price_per_unit: bigint };
@@ -1123,6 +1135,17 @@ export function requireResourceBounds(fee: unknown): {
       `Fee estimate response missing resourceBounds (l1_gas/l2_gas/l1_data_gas). Response: ${safeJson(fee)}`
     );
   }
+
+  if (
+    !isBigIntBound(bounds.l1_gas) ||
+    !isBigIntBound(bounds.l2_gas) ||
+    !isBigIntBound(bounds.l1_data_gas)
+  ) {
+    throw new Error(
+      `Fee estimate response has invalid resourceBounds bigint types. Response: ${safeJson(fee)}`
+    );
+  }
+
   return bounds as {
     l1_gas: { max_amount: bigint; max_price_per_unit: bigint };
     l2_gas: { max_amount: bigint; max_price_per_unit: bigint };

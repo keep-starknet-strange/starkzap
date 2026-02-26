@@ -12,6 +12,7 @@
 
 import { fileURLToPath } from "node:url";
 import path from "node:path";
+import { readFileSync } from "node:fs";
 import { createHash } from "node:crypto";
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
@@ -49,6 +50,9 @@ import {
 // CLI args
 // ---------------------------------------------------------------------------
 const cliArgs = process.argv.slice(2);
+const STARK_CURVE_ORDER = BigInt(
+  "0x0800000000000011000000000000000000000000000000000000000000000001"
+);
 
 const cliConfig = (() => {
   try {
@@ -77,7 +81,10 @@ const {
 const privateKeySchema = z
   .string()
   .regex(/^0x[0-9a-fA-F]{64}$/, "Must be a 0x-prefixed 32-byte hex private key")
-  .refine((value) => BigInt(value) !== 0n, "Private key cannot be zero");
+  .refine((value) => {
+    const key = BigInt(value);
+    return key !== 0n && key < STARK_CURVE_ORDER;
+  }, "Private key must be non-zero and less than Stark curve order");
 
 const contractAddressSchema = z
   .string()
@@ -125,6 +132,7 @@ const envSchema = z.object({
     )
     .optional(),
   STARKNET_STAKING_CONTRACT: contractAddressSchema.optional(),
+  STARKNET_STAKING_POOL_CLASS_HASHES: z.string().optional(),
   STARKNET_RPC_TIMEOUT_MS: z.coerce
     .number()
     .int()
@@ -149,9 +157,45 @@ const env = (() => {
 // `env` is a flat object today; shallow freeze is enough unless nested fields are added.
 Object.freeze(env);
 
+function parsePoolClassHashAllowlist(
+  raw: string | undefined
+): ReadonlySet<string> {
+  if (!raw) {
+    return new Set();
+  }
+  const values = raw
+    .split(",")
+    .map((value) => value.trim())
+    .filter(Boolean);
+  if (values.length === 0) {
+    return new Set();
+  }
+  const normalized = new Set<string>();
+  for (const value of values) {
+    if (!FELT_REGEX.test(value)) {
+      throw new Error(
+        `Invalid STARKNET_STAKING_POOL_CLASS_HASHES entry "${value}". Must be a felt-like hex string (0x...).`
+      );
+    }
+    normalized.add(fromAddress(value));
+  }
+  return normalized;
+}
+
+const configuredPoolClassHashes = (() => {
+  try {
+    return parsePoolClassHashAllowlist(env.STARKNET_STAKING_POOL_CLASS_HASHES);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.error(`Error: invalid environment configuration: ${message}`);
+    process.exit(1);
+  }
+})();
+
 const stakingEnabled = Boolean(env.STARKNET_STAKING_CONTRACT);
 const rpcTimeoutMs = env.STARKNET_RPC_TIMEOUT_MS ?? 30_000;
 let nowProvider = () => Date.now();
+let stakingReferenceClassHashPromise: Promise<string | undefined> | undefined;
 
 // ---------------------------------------------------------------------------
 // SDK + wallet singleton (lazy init)
@@ -214,7 +258,14 @@ function summarizeError(error: unknown): string {
       : typeof error === "string"
         ? error
         : (JSON.stringify(error) ?? String(error));
-  return raw.replace(/https?:\/\/\S+/gi, "<url>").slice(0, 1024);
+  return raw
+    .replace(/https?:\/\/[^\s)]+/gi, "<url>")
+    .replace(
+      /\b(?:localhost|::1|(?:\d{1,3}\.){3}\d{1,3})(?::\d{2,5})?\b/gi,
+      "<host>"
+    )
+    .replace(/\b(?:[a-z0-9-]+\.)+[a-z]{2,}(?::\d{2,5})?\b/gi, "<host>")
+    .slice(0, 1024);
 }
 
 function createErrorReference(message: string): string {
@@ -280,7 +331,9 @@ const tools = selectTools(allTools, {
 // Tool handlers
 // ---------------------------------------------------------------------------
 const TX_WAIT_TIMEOUT_MS = 120_000;
+const WALLET_DISCONNECT_TIMEOUT_MS = 5_000;
 const activeTransactionHashes = new Set<string>();
+const timedOutTransactionHashes = new Set<string>();
 
 class TransactionWaitTimeoutError extends Error {
   constructor(
@@ -296,7 +349,11 @@ function normalizeTransactionHash(hash: string): string {
   if (!FELT_REGEX.test(hash)) {
     throw new Error(`Invalid transaction hash returned by SDK: "${hash}"`);
   }
-  return fromAddress(hash);
+  const normalized = fromAddress(hash);
+  if (BigInt(normalized) === 0n) {
+    throw new Error(`Invalid transaction hash returned by SDK: "${hash}"`);
+  }
+  return normalized;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -307,13 +364,31 @@ async function waitForTrackedTransaction(tx: {
   wait: () => Promise<void>;
   hash: string;
   explorerUrl?: string;
-}): Promise<{ hash: string; explorerUrl?: string }> {
+}): Promise<{ hash: string; explorerUrl?: string }>;
+async function waitForTrackedTransaction(
+  tx: {
+    wait: () => Promise<void>;
+    hash: string;
+    explorerUrl?: string;
+  },
+  timeoutMs: number
+): Promise<{ hash: string; explorerUrl?: string }>;
+async function waitForTrackedTransaction(
+  tx: {
+    wait: () => Promise<void>;
+    hash: string;
+    explorerUrl?: string;
+  },
+  timeoutMs: number = TX_WAIT_TIMEOUT_MS
+): Promise<{ hash: string; explorerUrl?: string }> {
   const normalizedHash = normalizeTransactionHash(tx.hash);
   activeTransactionHashes.add(normalizedHash);
+  timedOutTransactionHashes.delete(normalizedHash);
   try {
-    await waitWithTimeout({ wait: tx.wait, hash: normalizedHash });
+    await waitWithTimeout({ wait: tx.wait, hash: normalizedHash }, timeoutMs);
   } catch (error) {
     if (error instanceof TransactionWaitTimeoutError) {
+      timedOutTransactionHashes.add(normalizedHash);
       const explorerHint = tx.explorerUrl
         ? ` Check status in explorer: ${tx.explorerUrl}.`
         : "";
@@ -325,7 +400,53 @@ async function waitForTrackedTransaction(tx: {
   } finally {
     activeTransactionHashes.delete(normalizedHash);
   }
+  timedOutTransactionHashes.delete(normalizedHash);
   return { hash: normalizedHash, explorerUrl: tx.explorerUrl };
+}
+
+async function resolveReferenceStakingClassHash(
+  wallet: Wallet
+): Promise<string | undefined> {
+  if (!env.STARKNET_STAKING_CONTRACT) {
+    return undefined;
+  }
+  if (!stakingReferenceClassHashPromise) {
+    const stakingContract = fromAddress(env.STARKNET_STAKING_CONTRACT);
+    stakingReferenceClassHashPromise = withTimeout(
+      `Staking class-hash lookup for ${stakingContract}`,
+      () => wallet.getProvider().getClassHashAt(stakingContract)
+    )
+      .then((hash) => fromAddress(hash))
+      .catch((error) => {
+        stakingReferenceClassHashPromise = undefined;
+        throw new Error(
+          `Could not validate configured staking contract class hash. ${summarizeError(error)}`
+        );
+      });
+  }
+  return stakingReferenceClassHashPromise;
+}
+
+async function assertPoolClassHashAllowed(
+  wallet: Wallet,
+  poolAddress: Address,
+  poolClassHash: string
+): Promise<void> {
+  const expected = new Set(configuredPoolClassHashes);
+  if (expected.size === 0) {
+    const referenceClassHash = await resolveReferenceStakingClassHash(wallet);
+    if (referenceClassHash) {
+      expected.add(referenceClassHash);
+    }
+  }
+  if (expected.size === 0) {
+    return;
+  }
+  if (!expected.has(poolClassHash)) {
+    throw new Error(
+      `Invalid pool class hash ${poolClassHash} for ${poolAddress}. Expected one of: ${Array.from(expected).join(", ")}.`
+    );
+  }
 }
 
 async function waitWithTimeout(
@@ -353,9 +474,13 @@ async function resolvePoolTokenForOperation(
   poolAddress: Address,
   tokenHint?: string
 ): Promise<Token> {
+  let poolClassHash: string;
   try {
-    await withTimeout(`Pool contract existence check for ${poolAddress}`, () =>
-      wallet.getProvider().getClassHashAt(poolAddress)
+    poolClassHash = fromAddress(
+      await withTimeout(
+        `Pool contract existence check for ${poolAddress}`,
+        () => wallet.getProvider().getClassHashAt(poolAddress)
+      )
     );
   } catch (error) {
     if (isClassHashNotFoundError(error)) {
@@ -365,6 +490,7 @@ async function resolvePoolTokenForOperation(
     }
     throw error;
   }
+  await assertPoolClassHashAllowed(wallet, poolAddress, poolClassHash);
 
   let staking: unknown;
   try {
@@ -393,6 +519,34 @@ const requestTimestamps: number[] = [];
 const readRequestTimestamps: number[] = [];
 const writeRequestTimestamps: number[] = [];
 let requestExecutionQueue: Promise<void> = Promise.resolve();
+let rateLimitQueue: Promise<void> = Promise.resolve();
+
+async function runRateLimitChecks(name: string): Promise<void> {
+  const previous = rateLimitQueue;
+  let release = () => {};
+  rateLimitQueue = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  await previous;
+  try {
+    enforcePerMinuteRateLimit(requestTimestamps, nowMs(), rateLimitRpm);
+    if (READ_ONLY_TOOLS.has(name)) {
+      enforcePerMinuteRateLimit(
+        readRequestTimestamps,
+        nowMs(),
+        readRateLimitRpm
+      );
+    } else {
+      enforcePerMinuteRateLimit(
+        writeRequestTimestamps,
+        nowMs(),
+        writeRateLimitRpm
+      );
+    }
+  } finally {
+    release();
+  }
+}
 
 async function runSerialized<T>(task: () => Promise<T>): Promise<T> {
   const previous = requestExecutionQueue;
@@ -426,6 +580,8 @@ async function assertStablePoolAmountWithinCap(
   maxCap: string,
   operation: "claim rewards" | "exit pool"
 ): Promise<void> {
+  // Best-effort TOCTOU mitigation: repeated reads reduce stale-state risk before
+  // submission, but an on-chain race window still exists until transaction inclusion.
   const firstPosition = await withTimeout(
     `Pool position preflight (${operation})`,
     () => wallet.getPoolPosition(poolAddress)
@@ -573,9 +729,14 @@ function isRpcLikeError(error: unknown): boolean {
 
 async function cleanupWalletAndSdkResources(): Promise<void> {
   walletInitPromise = undefined;
-  if (walletSingleton) {
+  const wallet = walletSingleton;
+  if (wallet) {
     try {
-      await walletSingleton.disconnect();
+      await withTimeout(
+        "Wallet disconnect",
+        () => wallet.disconnect(),
+        WALLET_DISCONNECT_TIMEOUT_MS
+      );
     } catch (error) {
       console.error(`[x-mcp] wallet cleanup error: ${summarizeError(error)}`);
     }
@@ -620,16 +781,7 @@ async function handleTool(
   name: string,
   rawArgs: Record<string, unknown>
 ): Promise<{ content: Array<{ type: "text"; text: string }> }> {
-  enforcePerMinuteRateLimit(requestTimestamps, nowMs(), rateLimitRpm);
-  if (READ_ONLY_TOOLS.has(name)) {
-    enforcePerMinuteRateLimit(readRequestTimestamps, nowMs(), readRateLimitRpm);
-  } else {
-    enforcePerMinuteRateLimit(
-      writeRequestTimestamps,
-      nowMs(),
-      writeRateLimitRpm
-    );
-  }
+  await runRateLimitChecks(name);
 
   const schema = schemas[name as keyof typeof schemas];
   if (!schema) {
@@ -1068,6 +1220,10 @@ interface TestingHooks {
     tx: { wait: () => Promise<void>; hash: string },
     timeoutMs?: number
   ): Promise<void>;
+  waitForTrackedTransaction(
+    tx: { wait: () => Promise<void>; hash: string; explorerUrl?: string },
+    timeoutMs?: number
+  ): Promise<{ hash: string; explorerUrl?: string }>;
   getWallet(): Promise<Wallet>;
   runSerialized<T>(task: () => Promise<T>): Promise<T>;
   runWithToolConcurrencyPolicy<T>(
@@ -1092,6 +1248,7 @@ interface TestingHooks {
   isRpcLikeError(error: unknown): boolean;
   maybeResetWalletOnRpcError(error: unknown): Promise<void>;
   cleanupWalletAndSdkResources(): Promise<void>;
+  trackedTransactions(): { active: string[]; timedOut: string[] };
   setNowProvider(provider: () => number): void;
   setSdkSingleton(value: StarkSDK | undefined): void;
   setWalletSingleton(value: Wallet | undefined): void;
@@ -1101,6 +1258,7 @@ interface TestingHooks {
 const testingHooks: TestingHooks = {
   withTimeout,
   waitWithTimeout,
+  waitForTrackedTransaction,
   getWallet,
   runSerialized,
   runWithToolConcurrencyPolicy,
@@ -1110,6 +1268,12 @@ const testingHooks: TestingHooks = {
   isRpcLikeError,
   maybeResetWalletOnRpcError,
   cleanupWalletAndSdkResources,
+  trackedTransactions() {
+    return {
+      active: Array.from(activeTransactionHashes),
+      timedOut: Array.from(timedOutTransactionHashes),
+    };
+  },
   setNowProvider(provider: () => number) {
     nowProvider = provider;
   },
@@ -1126,10 +1290,13 @@ const testingHooks: TestingHooks = {
     walletInitFailureCount = 0;
     walletInitBackoffUntilMs = 0;
     requestExecutionQueue = Promise.resolve();
+    rateLimitQueue = Promise.resolve();
     requestTimestamps.splice(0, requestTimestamps.length);
     readRequestTimestamps.splice(0, readRequestTimestamps.length);
     writeRequestTimestamps.splice(0, writeRequestTimestamps.length);
     activeTransactionHashes.clear();
+    timedOutTransactionHashes.clear();
+    stakingReferenceClassHashPromise = undefined;
     nowProvider = () => Date.now();
   },
 };
@@ -1144,8 +1311,25 @@ if (process.env.NODE_ENV === "test") {
 async function main() {
   const transport = new StdioServerTransport();
   await server.connect(transport);
+  const packageVersion = (() => {
+    const fallback = process.env.npm_package_version ?? "0.1.0";
+    try {
+      const currentDir = path.dirname(fileURLToPath(import.meta.url));
+      const packageJson = JSON.parse(
+        readFileSync(path.resolve(currentDir, "../package.json"), "utf8")
+      ) as { version?: string };
+      return packageJson.version ?? fallback;
+    } catch {
+      return fallback;
+    }
+  })();
+  const commit =
+    process.env.GIT_COMMIT_SHA ??
+    process.env.VERCEL_GIT_COMMIT_SHA ??
+    process.env.COMMIT_SHA ??
+    "unknown";
   console.error(
-    `x-mcp server running (network: ${network}, transport: stdio, write=${enableWrite}, execute=${enableExecute}, staking=${stakingEnabled}, maxAmount=${maxAmount}, maxBatchAmount=${maxBatchAmount}, rateLimitRpm=${rateLimitRpm}, readRateLimitRpm=${readRateLimitRpm}, writeRateLimitRpm=${writeRateLimitRpm}, rpcTimeoutMs=${rpcTimeoutMs})`
+    `x-mcp server running (version=${packageVersion}, commit=${commit}, network: ${network}, transport: stdio, write=${enableWrite}, execute=${enableExecute}, staking=${stakingEnabled}, maxAmount=${maxAmount}, maxBatchAmount=${maxBatchAmount}, rateLimitRpm=${rateLimitRpm}, readRateLimitRpm=${readRateLimitRpm}, writeRateLimitRpm=${writeRateLimitRpm}, rpcTimeoutMs=${rpcTimeoutMs})`
   );
 }
 
@@ -1156,8 +1340,9 @@ const isMainModule =
 if (isMainModule) {
   const shutdown = async (signal: "SIGINT" | "SIGTERM") => {
     const pending = Array.from(activeTransactionHashes);
+    const timedOut = Array.from(timedOutTransactionHashes);
     console.error(
-      `[x-mcp] ${signal} received. pendingTx=${pending.length === 0 ? "none" : pending.join(",")}`
+      `[x-mcp] ${signal} received. pendingTx=${pending.length === 0 ? "none" : pending.join(",")} timedOutTx=${timedOut.length === 0 ? "none" : timedOut.join(",")}`
     );
     try {
       await server.close();

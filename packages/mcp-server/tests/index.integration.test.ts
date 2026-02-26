@@ -1,4 +1,4 @@
-import { Amount } from "starkzap";
+import { Amount, fromAddress } from "starkzap";
 import type { Token, Wallet } from "starkzap";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -20,6 +20,10 @@ type TestingExports = {
     tx: { wait: () => Promise<void>; hash: string },
     timeoutMs?: number
   ): Promise<void>;
+  waitForTrackedTransaction(
+    tx: { wait: () => Promise<void>; hash: string; explorerUrl?: string },
+    timeoutMs?: number
+  ): Promise<{ hash: string; explorerUrl?: string }>;
   getWallet(): Promise<Wallet>;
   runWithToolConcurrencyPolicy<T>(
     toolName: string,
@@ -41,6 +45,7 @@ type TestingExports = {
     content: Array<{ type: "text"; text: string }>;
     isError?: boolean;
   }>;
+  trackedTransactions(): { active: string[]; timedOut: string[] };
   setNowProvider(provider: () => number): void;
   setSdkSingleton(value: unknown): void;
   setWalletSingleton(value: Wallet | undefined): void;
@@ -129,6 +134,12 @@ describe("index integration hardening", () => {
     );
     expect(unsafe).toContain("Operation failed. Reference:");
     expect(unsafe).not.toContain("internal.rpc.local");
+
+    const hostOnly = testing.buildToolErrorText(
+      new Error("dial tcp rpc.internal.local:8545: connection refused")
+    );
+    expect(hostOnly).toContain("Operation failed. Reference:");
+    expect(hostOnly).not.toContain("rpc.internal.local:8545");
   });
 
   it("classifies structured RPC transport errors and excludes tx wait timeouts", () => {
@@ -244,5 +255,30 @@ describe("index integration hardening", () => {
         "claim rewards"
       )
     ).rejects.toThrow(/changed right before submission/);
+  });
+
+  it("rejects zero transaction hashes from SDK", async () => {
+    await expect(
+      testing.waitForTrackedTransaction({
+        hash: "0x0",
+        wait: async () => undefined,
+      })
+    ).rejects.toThrow(/Invalid transaction hash returned by SDK/);
+  });
+
+  it("tracks timed-out tx hashes separately from active tx hashes", async () => {
+    await expect(
+      testing.waitForTrackedTransaction(
+        {
+          hash: "0x123",
+          wait: async () => new Promise(() => {}),
+        },
+        5
+      )
+    ).rejects.toThrow(/submitted but not confirmed/);
+
+    const tracked = testing.trackedTransactions();
+    expect(tracked.active).toEqual([]);
+    expect(tracked.timedOut).toEqual([fromAddress("0x123")]);
   });
 });

@@ -314,6 +314,30 @@ describe("fee response guard", () => {
       })
     ).toThrow(/missing resourceBounds/);
   });
+
+  it("throws when resource bounds fields are not bigint", () => {
+    expect(() =>
+      requireResourceBounds({
+        resourceBounds: {
+          l1_gas: { max_amount: "1", max_price_per_unit: "2" },
+          l2_gas: { max_amount: "1", max_price_per_unit: "2" },
+          l1_data_gas: { max_amount: "1", max_price_per_unit: "2" },
+        },
+      })
+    ).toThrow(/invalid resourceBounds bigint types/);
+  });
+
+  it("accepts valid bigint resource bounds", () => {
+    expect(() =>
+      requireResourceBounds({
+        resourceBounds: {
+          l1_gas: { max_amount: 1n, max_price_per_unit: 2n },
+          l2_gas: { max_amount: 3n, max_price_per_unit: 4n },
+          l1_data_gas: { max_amount: 5n, max_price_per_unit: 6n },
+        },
+      })
+    ).not.toThrow();
+  });
 });
 
 describe("staking token extraction guard", () => {
