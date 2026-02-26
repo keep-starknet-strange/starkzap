@@ -7,12 +7,10 @@
 import {
   StarkSDK,
   OnboardStrategy,
-  ChainId,
-  networks,
   Contract,
   type WalletInterface,
 } from "starkzap";
-import { Contract, getChecksumAddress, type RpcProvider } from "starknet";
+import { getChecksumAddress,type Calldata, type RpcProvider } from "starknet";
 
 // FOS demo game contract on Sepolia (same as https://github.com/0xsisyfos/fos)
 // Checksummed address so execute() calls match Cartridge session policies (Controller normalizes policy targets with getChecksumAddress).
@@ -69,7 +67,7 @@ function isSnip9IncompatibleError(err: unknown): boolean {
 
 async function executeGameCall(
   entrypoint: string,
-  calldata: unknown[] = []
+  calldata: Calldata = []
 ): Promise<void> {
   if (!wallet) return;
   const feeMode = useUserPaysForSession ? "user_pays" : "sponsored";
@@ -114,15 +112,12 @@ export function isConnected(): boolean {
 /** Connected wallet address as string (0x-prefixed hex), or undefined if disconnected. */
 export function getAddress(): string | undefined {
   if (!wallet) return undefined;
-  const addr = wallet.address;
-  return typeof addr === "string" ? addr : addr?.toString?.() ?? undefined;
+  return wallet.address.toString();
 }
 
 /** Cartridge username when connected (optional). */
 export async function getUsername(): Promise<string | undefined> {
-  if (!wallet || typeof (wallet as { username?: () => Promise<string | undefined> }).username !== "function")
-    return undefined;
-  return (wallet as { username: () => Promise<string | undefined> }).username();
+  return wallet?.username?.();
 }
 
 /**

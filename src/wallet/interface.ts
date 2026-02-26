@@ -142,6 +142,12 @@ export interface WalletInterface {
    */
   disconnect(): Promise<void>;
 
+  /**
+   * Get the display username when supported (e.g. Cartridge).
+   * Returns undefined for wallets that don't provide this.
+   */
+  username?(): Promise<string | undefined>;
+
   // ============================================================
   // ERC20 methods
   // ============================================================

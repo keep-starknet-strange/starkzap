@@ -27,9 +27,10 @@ cp .env.example .env
 Set these values in `.env`:
 
 - `EXPO_PUBLIC_PRIVY_APP_ID`: Privy app id. If empty, Privy flow is disabled.
-- `EXPO_PUBLIC_PRIVY_CLIENT_ID`: optional Privy client id for Expo provider.
 - `EXPO_PUBLIC_PRIVY_SERVER_URL`: backend URL used by the app for Privy wallet/sign endpoints.
-- `EXPO_PUBLIC_PAYMASTER_PROXY_URL`: optional paymaster proxy URL. If omitted, defaults to `${EXPO_PUBLIC_PRIVY_SERVER_URL}/api/paymaster`.
+-  optional
+- `EXPO_PUBLIC_PRIVY_CLIENT_ID`: Privy client id for Expo provider.
+- `EXPO_PUBLIC_PAYMASTER_PROXY_URL`: paymaster proxy URL. If omitted, defaults to `${EXPO_PUBLIC_PRIVY_SERVER_URL}/api/paymaster`.
 
 ## Install and run
 
