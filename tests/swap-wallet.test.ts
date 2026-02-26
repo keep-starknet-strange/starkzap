@@ -271,32 +271,6 @@ describe("BaseWallet swap abstraction", () => {
     expect(request.takerAddress).toBe(wallet.address);
   });
 
-  it("keeps quoteSwap(request) as alias", async () => {
-    const amountIn = Amount.parse("50", mockToken);
-    const quote = {
-      amountInBase: amountIn.toBase(),
-      amountOutBase: amountIn.toBase(),
-      provider: "default",
-    } as const;
-    const provider: SwapProvider = {
-      id: "default",
-      supportsChain: () => true,
-      getQuote: vi.fn().mockResolvedValue(quote),
-      swap: vi.fn(),
-    };
-    const wallet = new TestWallet(provider);
-
-    const response = await wallet.quoteSwap({
-      chainId: ChainId.SEPOLIA,
-      tokenIn: mockToken,
-      tokenOut: mockToken,
-      amountIn,
-    });
-
-    expect(provider.getQuote).toHaveBeenCalledTimes(1);
-    expect(response).toEqual(quote);
-  });
-
   it("supports swap(request, options) via default provider", async () => {
     const amountIn = Amount.parse("50", mockToken);
     const options: ExecuteOptions = { feeMode: "sponsored" };

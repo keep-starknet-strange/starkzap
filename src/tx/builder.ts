@@ -1,7 +1,12 @@
 import type { Call } from "starknet";
 import type { WalletInterface } from "@/wallet/interface";
 import type { Tx } from "@/tx";
-import type { SwapInput, SwapRequest, SwapSource, SwapProvider } from "@/swap";
+import type { SwapInput, SwapRequest, SwapProvider } from "@/swap";
+import {
+  assertSwapContext,
+  hydrateSwapRequest,
+  resolveSwapSource,
+} from "@/swap/utils";
 import type {
   Address,
   Amount,
@@ -69,52 +74,21 @@ export class TxBuilder {
     this.pending.push(tracked);
   }
 
-  private hydrateSwapRequest(input: SwapInput): SwapRequest {
-    return {
-      chainId: input.chainId ?? this.wallet.getChainId(),
-      takerAddress: input.takerAddress ?? this.wallet.address,
-      tokenIn: input.tokenIn,
-      tokenOut: input.tokenOut,
-      amountIn: input.amountIn,
-      ...(input.slippageBps != null && { slippageBps: input.slippageBps }),
-    };
-  }
-
-  private assertSwapContext(
-    provider: SwapProvider,
-    request: SwapRequest
-  ): void {
-    const walletChain = this.wallet.getChainId().toLiteral();
-    const requestChain = request.chainId.toLiteral();
-    if (requestChain !== walletChain) {
-      throw new Error(
-        `Swap request chain "${requestChain}" does not match wallet chain "${walletChain}"`
-      );
-    }
-    if (!provider.supportsChain(request.chainId)) {
-      throw new Error(
-        `Swap provider "${provider.id}" does not support chain "${requestChain}"`
-      );
-    }
-  }
-
-  private resolveSwapSource(source: SwapSource | undefined): SwapProvider {
-    if (!source) {
-      return this.wallet.getDefaultSwapProvider();
-    }
-    if (typeof source === "string") {
-      return this.wallet.getSwapProvider(source);
-    }
-    return source;
-  }
-
   private resolveSwapInput(input: SwapInput): {
     provider: SwapProvider;
-    request: SwapInput;
+    request: SwapRequest;
   } {
+    const chainId = this.wallet.getChainId();
+    const provider = resolveSwapSource(input.provider, this.wallet);
+    const request = hydrateSwapRequest(input, {
+      chainId,
+      takerAddress: this.wallet.address,
+    });
+    assertSwapContext(provider, request, chainId);
+
     return {
-      provider: this.resolveSwapSource(input.provider),
-      request: input,
+      provider,
+      request,
     };
   }
 
@@ -272,10 +246,9 @@ export class TxBuilder {
    * `chainId` and `takerAddress` are optional and default to the connected wallet.
    */
   swap(request: SwapInput): this {
-    const { provider, request: resolvedInput } = this.resolveSwapInput(request);
-    const normalizedRequest = this.hydrateSwapRequest(resolvedInput);
-    this.assertSwapContext(provider, normalizedRequest);
-    const p = provider.swap(normalizedRequest).then((prepared) => {
+    const { provider, request: resolvedRequest } =
+      this.resolveSwapInput(request);
+    const p = provider.swap(resolvedRequest).then((prepared) => {
       if (prepared.calls.length === 0) {
         throw new Error(`Swap provider "${provider.id}" returned no calls`);
       }

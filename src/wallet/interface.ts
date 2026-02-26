@@ -104,11 +104,6 @@ export interface WalletInterface {
   getQuote(request: SwapInput): Promise<SwapQuote>;
 
   /**
-   * Backward-compatible alias for `getQuote`.
-   */
-  quoteSwap(request: SwapInput): Promise<SwapQuote>;
-
-  /**
    * Execute a swap.
    *
    * Set `request.provider` to a provider instance or provider id.

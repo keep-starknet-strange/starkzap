@@ -25,14 +25,13 @@ import type {
 } from "starknet";
 import { Erc20 } from "@/erc20";
 import { Staking } from "@/staking";
-import type {
-  SwapInput,
-  SwapQuote,
-  SwapRequest,
-  SwapSource,
-  SwapProvider,
-} from "@/swap";
+import type { SwapInput, SwapQuote, SwapRequest, SwapProvider } from "@/swap";
 import { AvnuSwapProvider } from "@/swap";
+import {
+  assertSwapContext,
+  hydrateSwapRequest,
+  resolveSwapSource,
+} from "@/swap/utils";
 
 const MAX_ERC20_CACHE_SIZE = 128;
 const MAX_STAKING_CACHE_SIZE = 128;
@@ -86,7 +85,7 @@ export abstract class BaseWallet implements WalletInterface {
    * Creates a new BaseWallet instance.
    * @param address - The Starknet address of this wallet
    * @param stakingConfig - Optional staking configuration for staking operations
-   * @param defaultSwapProvider - Optional default swap provider used by `quoteSwap(request)` and `swap(request)`
+   * @param defaultSwapProvider - Optional default swap provider used by `getQuote(request)` and `swap(request)`
    */
   protected constructor(
     address: Address,
@@ -186,14 +185,6 @@ export abstract class BaseWallet implements WalletInterface {
   }
 
   /**
-   * Backward-compatible alias for `getQuote`.
-   */
-  async quoteSwap(request: SwapInput): Promise<SwapQuote> {
-    const { provider, resolvedRequest } = this.resolveSwapInput(request);
-    return await provider.getQuote(resolvedRequest);
-  }
-
-  /**
    * Execute a swap.
    *
    * Set `request.provider` to a provider instance or provider id.
@@ -259,53 +250,18 @@ export abstract class BaseWallet implements WalletInterface {
     throw new Error("Swap returned no calls");
   }
 
-  private resolveSwapSource(source: SwapSource | undefined): SwapProvider {
-    if (!source) {
-      return this.getDefaultSwapProvider();
-    }
-    if (typeof source === "string") {
-      return this.getSwapProvider(source);
-    }
-    return source;
-  }
-
   private resolveSwapInput(input: SwapInput): {
     provider: SwapProvider;
     resolvedRequest: SwapRequest;
   } {
-    const provider = this.resolveSwapSource(input.provider);
-    const resolvedRequest = this.hydrateSwapRequest(input);
-    this.assertSwapContext(provider, resolvedRequest);
+    const chainId = this.getChainId();
+    const provider = resolveSwapSource(input.provider, this);
+    const resolvedRequest = hydrateSwapRequest(input, {
+      chainId,
+      takerAddress: this.address,
+    });
+    assertSwapContext(provider, resolvedRequest, chainId);
     return { provider, resolvedRequest };
-  }
-
-  private hydrateSwapRequest(input: SwapInput): SwapRequest {
-    return {
-      chainId: input.chainId ?? this.getChainId(),
-      takerAddress: input.takerAddress ?? this.address,
-      tokenIn: input.tokenIn,
-      tokenOut: input.tokenOut,
-      amountIn: input.amountIn,
-      ...(input.slippageBps != null && { slippageBps: input.slippageBps }),
-    };
-  }
-
-  private assertSwapContext(
-    provider: SwapProvider,
-    request: SwapRequest
-  ): void {
-    const walletChain = this.getChainId().toLiteral();
-    const requestChain = request.chainId.toLiteral();
-    if (requestChain !== walletChain) {
-      throw new Error(
-        `Swap request chain "${requestChain}" does not match wallet chain "${walletChain}"`
-      );
-    }
-    if (!provider.supportsChain(request.chainId)) {
-      throw new Error(
-        `Swap provider "${provider.id}" does not support chain "${requestChain}"`
-      );
-    }
   }
 
   private evictOldest<K, V>(cache: Map<K, V>): void {
