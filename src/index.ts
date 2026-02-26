@@ -4,6 +4,8 @@ export { StarkSDK as StarkZap } from "@/sdk";
 
 // Wallet
 export { Wallet, AccountProvider, BaseWallet } from "@/wallet";
+export { BrowserWallet } from "@/wallet/browser";
+export type { BrowserWalletOptions } from "@/wallet/browser";
 export type { WalletInterface, WalletOptions } from "@/wallet";
 
 // Transaction

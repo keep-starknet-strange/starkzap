@@ -242,7 +242,8 @@ export class StarkSDK {
    * - `signer`: connect with a provided signer/account config
    * - `privy`: resolve Privy auth context, then connect via PrivySigner
    * - `cartridge`: connect via Cartridge Controller
-   *
+   * - `browser`: connect via an existing ArgentX or Braavos browser extension
+   * 
    * By default, onboarding calls `wallet.ensureReady({ deploy: "if_needed" })`.
    */
   async onboard(options: OnboardOptions): Promise<OnboardResult> {
@@ -327,6 +328,41 @@ export class StarkSDK {
         ...(feeMode && { feeMode }),
         ...(timeBounds && { timeBounds }),
       });
+
+      if (shouldEnsureReady) {
+        await wallet.ensureReady({
+          deploy,
+          ...(feeMode && { feeMode }),
+          ...(options.onProgress && { onProgress: options.onProgress }),
+        });
+      }
+
+      return {
+        wallet,
+        strategy: options.strategy,
+        deployed: await wallet.isDeployed(),
+      };
+    }
+    
+    if (options.strategy === "browser") {
+      if (!isWebRuntimeForCartridge()) {
+        throw new Error(
+          "Browser wallet strategy is only supported in web environments. " +
+            "Use signer or privy strategies on native or server runtimes."
+        );
+      }
+
+      const { BrowserWallet } = await import("./wallet/browser");
+      const wallet = await BrowserWallet.create(
+        options.walletProvider,
+        {
+          rpcUrl: options.rpcUrl ?? this.config.rpcUrl,
+          chainId: this.config.chainId,
+          ...(options.explorer && { explorer: options.explorer }),
+          ...(feeMode && { feeMode }),
+        },
+        this.config.staking
+      );
 
       if (shouldEnsureReady) {
         await wallet.ensureReady({
