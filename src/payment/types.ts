@@ -92,6 +92,21 @@ export interface PaymentConfig {
   environment?: PaymentEnvironment;
 }
 
+// ─── Receive (Modal) ──────────────────────────
+
+/** Supported receive modal platforms. */
+export type PaymentReceivePlatform = "react" | "react-native" | "vanilla";
+
+/** Input for opening the payment receive modal. */
+export interface PaymentReceiveInput {
+  /** Session token returned from `createSession()`. */
+  sessionToken: string;
+  /** Optional amount override for the receive flow. */
+  amount?: string;
+  /** Target UI platform. */
+  platform: PaymentReceivePlatform;
+}
+
 // ─── Quote types ───────────────────────────────
 
 /** A single payment option within a quote. */

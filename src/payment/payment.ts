@@ -70,6 +70,7 @@ import type {
   // Chains
   GetSupportedChainsInput,
   GetChainBalanceInput,
+  PaymentReceiveInput,
   // Auth
   CreatePaymentSessionInput,
   PaymentSessionOutput,
@@ -84,6 +85,8 @@ import type {
  * bridge routing, fee quoting, and intent-based settlement.
  */
 export class Payment {
+  private activeReceiveCleanup: (() => void) | null = null;
+
   constructor(config: PaymentConfig) {
     void Chainrails.config({
       api_key: config.apiKey,
@@ -120,6 +123,155 @@ export class Payment {
     const result = await crapi.auth.getSessionToken(input);
     await Chainrails.config({ seesion_token: result.sessionToken });
     return result;
+  }
+
+  /**
+   * Open the payment receive modal for a previously created session.
+   *
+   * - `react`: implemented via `@chainrails/react` and opens immediately.
+   * - `vanilla`: implemented via `@chainrails/vanilla` and opens immediately.
+   * - `react-native`: reserved for future implementation.
+   */
+  async receive(input: PaymentReceiveInput): Promise<void> {
+    if (input.platform === "react-native") {
+      throw new Error(
+        `payment.receive is not implemented for platform "${input.platform}" yet. Use "react" or "vanilla" for now.`
+      );
+    }
+
+    if (input.platform === "vanilla") {
+      await this.openVanillaReceiveModal(input);
+      return;
+    }
+
+    await this.openReactReceiveModal(input);
+  }
+
+  private async openReactReceiveModal(
+    input: Pick<PaymentReceiveInput, "sessionToken" | "amount">
+  ): Promise<void> {
+    if (typeof window === "undefined" || typeof document === "undefined") {
+      throw new Error(
+        'payment.receive with platform "react" requires a browser environment.'
+      );
+    }
+
+    let reactModule: {
+      createElement: (
+        component: unknown,
+        props: Record<string, unknown>
+      ) => unknown;
+    };
+    let reactDomClientModule: {
+      createRoot: (container: HTMLElement) => {
+        render: (node: unknown) => void;
+        unmount: () => void;
+      };
+    };
+    let chainrailsReactModule: {
+      PaymentModal: unknown;
+    };
+
+    try {
+      reactModule = (await import("react")) as typeof reactModule;
+      reactDomClientModule =
+        (await import("react-dom/client")) as typeof reactDomClientModule;
+      chainrailsReactModule =
+        (await import("@chainrails/react")) as typeof chainrailsReactModule;
+    } catch {
+      throw new Error(
+        'payment.receive for "react" requires "react", "react-dom", and "@chainrails/react" to be installed.'
+      );
+    }
+
+    this.activeReceiveCleanup?.();
+
+    const container = document.createElement("div");
+    container.setAttribute("data-starkzap-payment-receive", "true");
+    document.body.appendChild(container);
+
+    const root = reactDomClientModule.createRoot(container);
+
+    const close = (): void => {
+      root.unmount();
+      container.remove();
+      if (this.activeReceiveCleanup === close) {
+        this.activeReceiveCleanup = null;
+      }
+    };
+
+    this.activeReceiveCleanup = close;
+
+    root.render(
+      reactModule.createElement(chainrailsReactModule.PaymentModal, {
+        sessionToken: input.sessionToken,
+        amount: input.amount,
+        isOpen: true,
+        isPending: false,
+        open: () => undefined,
+        close,
+      })
+    );
+  }
+
+  private async openVanillaReceiveModal(
+    input: Pick<PaymentReceiveInput, "sessionToken" | "amount">
+  ): Promise<void> {
+    if (typeof window === "undefined" || typeof document === "undefined") {
+      throw new Error(
+        'payment.receive with platform "vanilla" requires a browser environment.'
+      );
+    }
+
+    let chainrailsVanillaModule: {
+      ChainrailsPaymentModalElement: {
+        tagName: string;
+      };
+    };
+
+    try {
+      chainrailsVanillaModule =
+        (await import("@chainrails/vanilla")) as typeof chainrailsVanillaModule;
+    } catch {
+      throw new Error(
+        'payment.receive for "vanilla" requires "@chainrails/vanilla" to be installed.'
+      );
+    }
+
+    this.activeReceiveCleanup?.();
+
+    const modal = document.createElement(
+      chainrailsVanillaModule.ChainrailsPaymentModalElement.tagName
+    ) as HTMLElement & {
+      setProps: (props: {
+        sessionToken: string;
+        amount?: string;
+        onCancel: () => void;
+        onSuccess: () => void;
+      }) => void;
+      open: () => void;
+      close: () => void;
+    };
+
+    const close = (): void => {
+      modal.close();
+      modal.remove();
+      if (this.activeReceiveCleanup === close) {
+        this.activeReceiveCleanup = null;
+      }
+    };
+
+    this.activeReceiveCleanup = close;
+
+    modal.setProps({
+      sessionToken: input.sessionToken,
+      amount: input.amount || "0",
+      onCancel: close,
+      onSuccess: close,
+    });
+
+    document.body.appendChild(modal);
+    modal.open();
   }
 
   // ══════════════════════════════════════════════
