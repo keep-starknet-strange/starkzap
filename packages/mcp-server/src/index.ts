@@ -418,7 +418,10 @@ async function waitForTrackedTransaction(
   activeTransactionHashes.add(normalizedHash);
   timedOutTransactionHashes.delete(normalizedHash);
   try {
-    await waitWithTimeout({ wait: tx.wait, hash: normalizedHash }, timeoutMs);
+    await waitWithTimeout(
+      { wait: () => tx.wait(), hash: normalizedHash },
+      timeoutMs
+    );
   } catch (error) {
     if (error instanceof TransactionWaitTimeoutError) {
       timedOutTransactionHashes.add(normalizedHash);

@@ -299,4 +299,17 @@ describe("index integration hardening", () => {
     expect(result.hash).toBe(fromAddress("0xabc"));
     expect(result.explorerUrl).toBeUndefined();
   });
+
+  it("keeps tx.wait context when waiting for transaction confirmation", async () => {
+    const tx = {
+      hash: "0xabc",
+      calls: 0,
+      async wait() {
+        this.calls += 1;
+      },
+    };
+
+    await testing.waitForTrackedTransaction(tx);
+    expect(tx.calls).toBe(1);
+  });
 });
