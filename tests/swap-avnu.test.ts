@@ -189,6 +189,33 @@ describe("AvnuSwapProvider", () => {
     ).rejects.toThrow("AVNU quote returned no routes for this pair/amount");
   });
 
+  it("throws when quotesPageSize is invalid", () => {
+    expect(() => new AvnuSwapProvider({ quotesPageSize: 0 })).toThrow(
+      "AVNU quotesPageSize must be a positive integer"
+    );
+    expect(() => new AvnuSwapProvider({ quotesPageSize: -1 })).toThrow(
+      "AVNU quotesPageSize must be a positive integer"
+    );
+    expect(() => new AvnuSwapProvider({ quotesPageSize: 1.5 })).toThrow(
+      "AVNU quotesPageSize must be a positive integer"
+    );
+  });
+
+  it("throws when no API base is configured for the target chain", async () => {
+    const provider = new AvnuSwapProvider({
+      apiBases: { SN_MAIN: [] },
+    });
+
+    await expect(
+      provider.getQuote({
+        chainId: ChainId.MAINNET,
+        tokenIn,
+        tokenOut,
+        amountIn: Amount.parse("1", tokenIn),
+      })
+    ).rejects.toThrow("No AVNU API base configured for chain: SN_MAIN");
+  });
+
   it("throws when AVNU build returns zero calls", async () => {
     avnuMocks.getQuotes.mockResolvedValue([makeQuote({ quoteId: "q-empty" })]);
     avnuMocks.quoteToCalls.mockResolvedValue({

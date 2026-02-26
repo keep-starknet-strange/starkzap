@@ -1,12 +1,8 @@
 import type { Call } from "starknet";
 import type { WalletInterface } from "@/wallet/interface";
 import type { Tx } from "@/tx";
-import type { SwapInput, SwapRequest, SwapProvider } from "@/swap";
-import {
-  assertSwapContext,
-  hydrateSwapRequest,
-  resolveSwapSource,
-} from "@/swap/utils";
+import type { SwapInput } from "@/swap";
+import { resolveSwapInput } from "@/swap/utils";
 import type {
   Address,
   Amount,
@@ -72,24 +68,6 @@ export class TxBuilder {
       return [];
     });
     this.pending.push(tracked);
-  }
-
-  private resolveSwapInput(input: SwapInput): {
-    provider: SwapProvider;
-    request: SwapRequest;
-  } {
-    const chainId = this.wallet.getChainId();
-    const provider = resolveSwapSource(input.provider, this.wallet);
-    const request = hydrateSwapRequest(input, {
-      chainId,
-      takerAddress: this.wallet.address,
-    });
-    assertSwapContext(provider, request, chainId);
-
-    return {
-      provider,
-      request,
-    };
   }
 
   private throwPendingErrorsIfAny(): void {
@@ -246,8 +224,11 @@ export class TxBuilder {
    * `chainId` and `takerAddress` are optional and default to the connected wallet.
    */
   swap(request: SwapInput): this {
-    const { provider, request: resolvedRequest } =
-      this.resolveSwapInput(request);
+    const { provider, request: resolvedRequest } = resolveSwapInput(request, {
+      walletChainId: this.wallet.getChainId(),
+      takerAddress: this.wallet.address,
+      providerResolver: this.wallet,
+    });
     const p = provider.swap(resolvedRequest).then((prepared) => {
       if (prepared.calls.length === 0) {
         throw new Error(`Swap provider "${provider.id}" returned no calls`);

@@ -381,6 +381,32 @@ describe("BaseWallet swap abstraction", () => {
     expect(tx).toEqual({ hash: "0xtx" });
   });
 
+  it("does not treat empty provider id as default provider", async () => {
+    const amountIn = Amount.parse("50", mockToken);
+    const defaultProvider: SwapProvider = {
+      id: "default",
+      supportsChain: () => true,
+      getQuote: vi.fn().mockResolvedValue({
+        amountInBase: amountIn.toBase(),
+        amountOutBase: amountIn.toBase(),
+      }),
+      swap: vi.fn(),
+    };
+    const wallet = new TestWallet(defaultProvider);
+
+    await expect(
+      wallet.getQuote({
+        provider: "",
+        chainId: ChainId.SEPOLIA,
+        tokenIn: mockToken,
+        tokenOut: mockToken,
+        amountIn,
+      })
+    ).rejects.toThrow('Unknown swap provider ""');
+
+    expect(defaultProvider.getQuote).not.toHaveBeenCalled();
+  });
+
   it("throws when swap request chain does not match wallet chain", async () => {
     const amountIn = Amount.parse("50", mockToken);
     const provider: SwapProvider = {

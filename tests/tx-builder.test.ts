@@ -546,6 +546,23 @@ describe("TxBuilder", () => {
         })
       ).toThrow("does not match wallet chain");
     });
+
+    it("should not treat empty provider id as default provider", () => {
+      const wallet = createMockWallet({
+        getSwapProvider: vi.fn().mockImplementation((providerId: string) => {
+          throw new Error(`Unknown swap provider "${providerId}"`);
+        }),
+      });
+
+      expect(() =>
+        new TxBuilder(wallet).swap({
+          provider: "",
+          tokenIn: mockUSDC,
+          tokenOut: mockSTRK,
+          amountIn: Amount.parse("1", mockSTRK),
+        })
+      ).toThrow('Unknown swap provider ""');
+    });
   });
 
   // ============================================================

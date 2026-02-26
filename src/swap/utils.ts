@@ -8,7 +8,7 @@ export function resolveSwapSource(
     getSwapProvider(providerId: string): SwapProvider;
   }
 ): SwapProvider {
-  if (!source) {
+  if (source == null) {
     return resolver.getDefaultSwapProvider();
   }
   if (typeof source === "string") {
@@ -48,4 +48,27 @@ export function assertSwapContext(
       `Swap provider "${provider.id}" does not support chain "${requestChain}"`
     );
   }
+}
+
+export function resolveSwapInput(
+  input: SwapInput,
+  context: {
+    walletChainId: ChainId;
+    takerAddress: Address;
+    providerResolver: {
+      getDefaultSwapProvider(): SwapProvider;
+      getSwapProvider(providerId: string): SwapProvider;
+    };
+  }
+): {
+  provider: SwapProvider;
+  request: SwapRequest;
+} {
+  const provider = resolveSwapSource(input.provider, context.providerResolver);
+  const request = hydrateSwapRequest(input, {
+    chainId: context.walletChainId,
+    takerAddress: context.takerAddress,
+  });
+  assertSwapContext(provider, request, context.walletChainId);
+  return { provider, request };
 }

@@ -30,6 +30,13 @@ export interface AvnuSwapProviderOptions {
   quotesPageSize?: number;
 }
 
+function validateQuotesPageSize(value: number): number {
+  if (!Number.isInteger(value) || value <= 0) {
+    throw new Error("AVNU quotesPageSize must be a positive integer");
+  }
+  return value;
+}
+
 function bpsToPercent(bps: bigint): number {
   if (bps < 0n || bps >= BPS_DENOMINATOR) {
     throw new Error("Invalid slippage bps");
@@ -92,7 +99,9 @@ export class AvnuSwapProvider implements SwapProvider {
         ...DEFAULT_AVNU_API_BASES.SN_SEPOLIA,
       ],
     };
-    this.quotesPageSize = options.quotesPageSize ?? DEFAULT_QUOTES_PAGE_SIZE;
+    this.quotesPageSize = validateQuotesPageSize(
+      options.quotesPageSize ?? DEFAULT_QUOTES_PAGE_SIZE
+    );
   }
 
   supportsChain(chainId: ChainId): boolean {
@@ -134,13 +143,19 @@ export class AvnuSwapProvider implements SwapProvider {
 
   private getApiBases(chainId: ChainId): string[] {
     const literal = chainId.toLiteral();
+    let apiBases: string[];
     if (literal === "SN_MAIN") {
-      return [...this.apiBases.SN_MAIN];
+      apiBases = this.apiBases.SN_MAIN;
+    } else if (literal === "SN_SEPOLIA") {
+      apiBases = this.apiBases.SN_SEPOLIA;
+    } else {
+      throw new Error(`Unsupported chain for AVNU quote: ${literal}`);
     }
-    if (literal === "SN_SEPOLIA") {
-      return [...this.apiBases.SN_SEPOLIA];
+
+    if (apiBases.length === 0) {
+      throw new Error(`No AVNU API base configured for chain: ${literal}`);
     }
-    throw new Error(`Unsupported chain for AVNU quote: ${literal}`);
+    return [...apiBases];
   }
 
   private fetchQuoteForRequest(request: SwapRequest) {

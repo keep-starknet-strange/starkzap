@@ -25,13 +25,9 @@ import type {
 } from "starknet";
 import { Erc20 } from "@/erc20";
 import { Staking } from "@/staking";
-import type { SwapInput, SwapQuote, SwapRequest, SwapProvider } from "@/swap";
+import type { SwapInput, SwapQuote, SwapProvider } from "@/swap";
 import { AvnuSwapProvider } from "@/swap";
-import {
-  assertSwapContext,
-  hydrateSwapRequest,
-  resolveSwapSource,
-} from "@/swap/utils";
+import { resolveSwapInput } from "@/swap/utils";
 
 const MAX_ERC20_CACHE_SIZE = 128;
 const MAX_STAKING_CACHE_SIZE = 128;
@@ -180,7 +176,11 @@ export abstract class BaseWallet implements WalletInterface {
    * If omitted, uses the wallet default provider.
    */
   async getQuote(request: SwapInput): Promise<SwapQuote> {
-    const { provider, resolvedRequest } = this.resolveSwapInput(request);
+    const { provider, request: resolvedRequest } = resolveSwapInput(request, {
+      walletChainId: this.getChainId(),
+      takerAddress: this.address,
+      providerResolver: this,
+    });
     return await provider.getQuote(resolvedRequest);
   }
 
@@ -191,7 +191,11 @@ export abstract class BaseWallet implements WalletInterface {
    * If omitted, uses the wallet default provider.
    */
   async swap(request: SwapInput, options?: ExecuteOptions): Promise<Tx> {
-    const { provider, resolvedRequest } = this.resolveSwapInput(request);
+    const { provider, request: resolvedRequest } = resolveSwapInput(request, {
+      walletChainId: this.getChainId(),
+      takerAddress: this.address,
+      providerResolver: this,
+    });
     const prepared = await provider.swap(resolvedRequest);
     this.assertSwapCalls(prepared.calls, `provider "${provider.id}"`);
     return await this.execute(prepared.calls, options);
@@ -248,20 +252,6 @@ export abstract class BaseWallet implements WalletInterface {
       throw new Error(`Swap ${source} returned no calls`);
     }
     throw new Error("Swap returned no calls");
-  }
-
-  private resolveSwapInput(input: SwapInput): {
-    provider: SwapProvider;
-    resolvedRequest: SwapRequest;
-  } {
-    const chainId = this.getChainId();
-    const provider = resolveSwapSource(input.provider, this);
-    const resolvedRequest = hydrateSwapRequest(input, {
-      chainId,
-      takerAddress: this.address,
-    });
-    assertSwapContext(provider, resolvedRequest, chainId);
-    return { provider, resolvedRequest };
   }
 
   private evictOldest<K, V>(cache: Map<K, V>): void {
