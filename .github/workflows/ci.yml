@@ -79,6 +79,10 @@ jobs:
       - name: Install Mobile Example Dependencies
         run: npm ci --prefix examples/mobile --ignore-scripts
 
+      - name: Build Mobile Example (iOS Bundle)
+        working-directory: examples/mobile
+        run: npx expo export --platform ios --output-dir /tmp/mobile-ios-build
+
       - name: Build Mobile Example (Android Bundle)
         working-directory: examples/mobile
         run: npx expo export --platform android --output-dir /tmp/mobile-android-build
