@@ -56,6 +56,7 @@ let testing: TestingExports;
 
 beforeAll(async () => {
   process.env.NODE_ENV = "test";
+  process.env.X_MCP_ENABLE_TEST_HOOKS = "1";
   process.env.STARKNET_PRIVATE_KEY = `0x${"1".padStart(64, "0")}`;
   await import("../src/index.js");
   const hooks = (globalThis as Record<string, unknown>).__X_MCP_TESTING__;
@@ -140,6 +141,12 @@ describe("index integration hardening", () => {
     );
     expect(hostOnly).toContain("Operation failed. Reference:");
     expect(hostOnly).not.toContain("rpc.internal.local:8545");
+
+    const ipv6Host = testing.buildToolErrorText(
+      new Error("dial tcp [2001:db8::1]:8545: i/o timeout")
+    );
+    expect(ipv6Host).toContain("Operation failed. Reference:");
+    expect(ipv6Host).not.toContain("2001:db8::1");
   });
 
   it("classifies structured RPC transport errors and excludes tx wait timeouts", () => {
@@ -280,5 +287,15 @@ describe("index integration hardening", () => {
     const tracked = testing.trackedTransactions();
     expect(tracked.active).toEqual([]);
     expect(tracked.timedOut).toEqual([fromAddress("0x123")]);
+  });
+
+  it("drops unsafe explorerUrl schemes from SDK tx results", async () => {
+    const result = await testing.waitForTrackedTransaction({
+      hash: "0xabc",
+      explorerUrl: "javascript:alert(1)",
+      wait: async () => undefined,
+    });
+    expect(result.hash).toBe(fromAddress("0xabc"));
+    expect(result.explorerUrl).toBeUndefined();
   });
 });

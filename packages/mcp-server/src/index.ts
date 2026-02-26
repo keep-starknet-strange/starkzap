@@ -84,7 +84,7 @@ const privateKeySchema = z
   .refine((value) => {
     const key = BigInt(value);
     return key !== 0n && key < STARK_CURVE_ORDER;
-  }, "Private key must be non-zero and less than Stark curve order");
+  }, "Private key must be cryptographically valid (non-zero and less than Stark curve order)");
 
 const contractAddressSchema = z
   .string()
@@ -260,6 +260,7 @@ function summarizeError(error: unknown): string {
         : (JSON.stringify(error) ?? String(error));
   return raw
     .replace(/https?:\/\/[^\s)]+/gi, "<url>")
+    .replace(/\[[\da-fA-F:]+\](?::\d{2,5})?/gi, "<host>")
     .replace(
       /\b(?:localhost|::1|(?:\d{1,3}\.){3}\d{1,3})(?::\d{2,5})?\b/gi,
       "<host>"
@@ -270,6 +271,26 @@ function summarizeError(error: unknown): string {
 
 function createErrorReference(message: string): string {
   return createHash("sha256").update(message).digest("hex").slice(0, 12);
+}
+
+function sanitizeExplorerUrl(rawUrl: string | undefined): string | undefined {
+  if (!rawUrl) {
+    return undefined;
+  }
+  try {
+    const parsed = new URL(rawUrl);
+    const protocol = parsed.protocol.toLowerCase();
+    if (protocol === "https:" || protocol === "http:") {
+      return rawUrl;
+    }
+    console.error(
+      `[x-mcp] dropping unsafe explorerUrl protocol "${protocol}" returned by SDK`
+    );
+    return undefined;
+  } catch {
+    console.error("[x-mcp] dropping malformed explorerUrl returned by SDK");
+    return undefined;
+  }
 }
 
 async function getWallet(): Promise<Wallet> {
@@ -382,6 +403,7 @@ async function waitForTrackedTransaction(
   timeoutMs: number = TX_WAIT_TIMEOUT_MS
 ): Promise<{ hash: string; explorerUrl?: string }> {
   const normalizedHash = normalizeTransactionHash(tx.hash);
+  const explorerUrl = sanitizeExplorerUrl(tx.explorerUrl);
   activeTransactionHashes.add(normalizedHash);
   timedOutTransactionHashes.delete(normalizedHash);
   try {
@@ -389,8 +411,8 @@ async function waitForTrackedTransaction(
   } catch (error) {
     if (error instanceof TransactionWaitTimeoutError) {
       timedOutTransactionHashes.add(normalizedHash);
-      const explorerHint = tx.explorerUrl
-        ? ` Check status in explorer: ${tx.explorerUrl}.`
+      const explorerHint = explorerUrl
+        ? ` Check status in explorer: ${explorerUrl}.`
         : "";
       throw new Error(
         `Transaction ${normalizedHash} was submitted but not confirmed within ${error.timeoutMs}ms.${explorerHint} Avoid blind retries to prevent duplicate intents.`
@@ -401,7 +423,7 @@ async function waitForTrackedTransaction(
     activeTransactionHashes.delete(normalizedHash);
   }
   timedOutTransactionHashes.delete(normalizedHash);
-  return { hash: normalizedHash, explorerUrl: tx.explorerUrl };
+  return { hash: normalizedHash, explorerUrl };
 }
 
 async function resolveReferenceStakingClassHash(
@@ -741,6 +763,31 @@ async function cleanupWalletAndSdkResources(): Promise<void> {
       console.error(`[x-mcp] wallet cleanup error: ${summarizeError(error)}`);
     }
   }
+
+  const sdk = sdkSingleton as unknown as Record<string, unknown> | undefined;
+  if (sdk) {
+    for (const methodName of ["dispose", "close", "disconnect"] as const) {
+      const cleanup = sdk[methodName];
+      if (typeof cleanup !== "function") {
+        continue;
+      }
+      try {
+        await withTimeout(
+          `SDK ${methodName}`,
+          async () => {
+            await Promise.resolve((cleanup as () => unknown).call(sdk));
+          },
+          WALLET_DISCONNECT_TIMEOUT_MS
+        );
+      } catch (error) {
+        console.error(
+          `[x-mcp] sdk cleanup error (${methodName}): ${summarizeError(error)}`
+        );
+      }
+      break;
+    }
+  }
+
   walletSingleton = undefined;
   sdkSingleton = undefined;
 }
@@ -1301,7 +1348,15 @@ const testingHooks: TestingHooks = {
   },
 };
 
-if (process.env.NODE_ENV === "test") {
+const testHooksEnabled =
+  process.env.NODE_ENV === "test" &&
+  process.env.X_MCP_ENABLE_TEST_HOOKS === "1";
+if (process.env.NODE_ENV === "test" && !testHooksEnabled) {
+  console.error(
+    "[x-mcp] NODE_ENV=test detected, but test hooks are disabled. Set X_MCP_ENABLE_TEST_HOOKS=1 to enable hooks."
+  );
+}
+if (testHooksEnabled) {
   (globalThis as Record<string, unknown>).__X_MCP_TESTING__ = testingHooks;
 }
 
@@ -1311,23 +1366,38 @@ if (process.env.NODE_ENV === "test") {
 async function main() {
   const transport = new StdioServerTransport();
   await server.connect(transport);
-  const packageVersion = (() => {
-    const fallback = process.env.npm_package_version ?? "0.1.0";
-    try {
-      const currentDir = path.dirname(fileURLToPath(import.meta.url));
-      const packageJson = JSON.parse(
-        readFileSync(path.resolve(currentDir, "../package.json"), "utf8")
-      ) as { version?: string };
-      return packageJson.version ?? fallback;
-    } catch {
-      return fallback;
-    }
-  })();
   const commit =
     process.env.GIT_COMMIT_SHA ??
     process.env.VERCEL_GIT_COMMIT_SHA ??
     process.env.COMMIT_SHA ??
     "unknown";
+  const packageVersion = (() => {
+    const fallback = process.env.npm_package_version;
+    try {
+      const currentDir = path.dirname(fileURLToPath(import.meta.url));
+      const packageJson = JSON.parse(
+        readFileSync(path.resolve(currentDir, "../package.json"), "utf8")
+      ) as { version?: string };
+      if (packageJson.version) {
+        return packageJson.version;
+      }
+    } catch (error) {
+      console.error(
+        `[x-mcp] package version lookup failed: ${summarizeError(error)}`
+      );
+    }
+    if (fallback) {
+      console.error(
+        "[x-mcp] package version unavailable in package.json; using npm_package_version fallback"
+      );
+      return fallback;
+    }
+    const shortCommit = commit === "unknown" ? "unknown" : commit.slice(0, 12);
+    console.error(
+      `[x-mcp] package version unavailable; using commit fallback (${shortCommit})`
+    );
+    return `unknown+${shortCommit}`;
+  })();
   console.error(
     `x-mcp server running (version=${packageVersion}, commit=${commit}, network: ${network}, transport: stdio, write=${enableWrite}, execute=${enableExecute}, staking=${stakingEnabled}, maxAmount=${maxAmount}, maxBatchAmount=${maxBatchAmount}, rateLimitRpm=${rateLimitRpm}, readRateLimitRpm=${readRateLimitRpm}, writeRateLimitRpm=${writeRateLimitRpm}, rpcTimeoutMs=${rpcTimeoutMs})`
   );
@@ -1344,13 +1414,15 @@ if (isMainModule) {
     console.error(
       `[x-mcp] ${signal} received. pendingTx=${pending.length === 0 ? "none" : pending.join(",")} timedOutTx=${timedOut.length === 0 ? "none" : timedOut.join(",")}`
     );
+    let exitCode = 0;
     try {
       await server.close();
       await cleanupWalletAndSdkResources();
     } catch (error) {
       console.error(`[x-mcp] shutdown error: ${summarizeError(error)}`);
+      exitCode = 1;
     } finally {
-      process.exit(0);
+      process.exit(exitCode);
     }
   };
 
