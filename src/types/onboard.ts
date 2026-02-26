@@ -1,4 +1,5 @@
 import type { PaymasterTimeBounds } from "starknet";
+import type { StarknetWindowObject } from "@starknet-io/get-starknet-core";
 import type {
   AccountClassConfig,
   AccountConfig,
@@ -22,6 +23,7 @@ export const OnboardStrategy = {
   Signer: "signer",
   Privy: "privy",
   Cartridge: "cartridge",
+  Browser: "browser",
 } as const;
 
 export type OnboardStrategy =
@@ -71,10 +73,38 @@ export interface OnboardCartridgeConfig {
   explorer?: ExplorerConfig;
 }
 
+/**
+ * Options for connecting with a browser extension wallet (ArgentX, Braavos).
+ *
+ * The walletProvider must be obtained by calling connect() from
+ * @starknet-io/get-starknet before passing it here. The private key
+ * never leaves the extension.
+ *
+ * @example
+ * ```ts
+ * import { connect } from "@starknet-io/get-starknet";
+ *
+ * const starknet = await connect(); // triggers extension popup
+ * if (!starknet) throw new Error("No wallet found");
+ *
+ * const { wallet } = await sdk.onboard({
+ *   strategy: "browser",
+ *   walletProvider: starknet,
+ * });
+ * ```
+ */
+export interface OnboardBrowserOptions extends OnboardBaseOptions {
+  strategy: typeof OnboardStrategy.Browser;
+  walletProvider: StarknetWindowObject;
+  rpcUrl?: string;
+  explorer?: ExplorerConfig;
+}
+
 export type OnboardOptions =
   | OnboardSignerOptions
   | OnboardPrivyOptions
-  | OnboardCartridgeOptions;
+  | OnboardCartridgeOptions
+  | OnboardBrowserOptions;
 
 export interface OnboardResult<
   TWallet extends WalletInterface = WalletInterface,

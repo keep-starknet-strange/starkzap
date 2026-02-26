@@ -26,11 +26,15 @@
     }
   },
   "peerDependencies": {
-    "@cartridge/controller": "^0.13.9"
+    "@cartridge/controller": "^0.13.9",
+    "@starknet-io/get-starknet": "^4.0.8"
   },
   "peerDependenciesMeta": {
     "@cartridge/controller": {
       "optional": true
+    },
+    "@starknet-io/get-starknet": {
+    "optional": true
     },
     "react-native-get-random-values": {
       "optional": true
