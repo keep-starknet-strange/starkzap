@@ -1726,6 +1726,8 @@ const allowUnsafeTestHooks =
 const unsafeTestHooksAcknowledged =
   process.env.STARKZAP_MCP_UNSAFE_TEST_HOOKS_ACK ===
   "I_UNDERSTAND_THIS_EXPOSES_WALLET_MUTATION";
+const unsafeHooksAllowedOnMainnet =
+  process.env.STARKZAP_MCP_ALLOW_UNSAFE_TEST_HOOKS_MAINNET === "1";
 const testHookPrivateKeyIsSafe = (() => {
   try {
     return BigInt(env.STARKNET_PRIVATE_KEY) <= 1024n;
@@ -1741,9 +1743,17 @@ if (process.env.NODE_ENV === "test" && !testHooksEnabled) {
 if (testHooksEnabled) {
   const unsafeBypassEnabled =
     allowUnsafeTestHooks && unsafeTestHooksAcknowledged;
+  const blocksUnsafeBypassForNetwork =
+    unsafeBypassEnabled &&
+    network === "mainnet" &&
+    !unsafeHooksAllowedOnMainnet;
   if (!testHookPrivateKeyIsSafe && !unsafeBypassEnabled) {
     console.error(
       "[starkzap-mcp] refusing to expose test hooks: STARKNET_PRIVATE_KEY does not look like a test key. To bypass in controlled environments only, set STARKZAP_MCP_ALLOW_UNSAFE_TEST_HOOKS=1 and STARKZAP_MCP_UNSAFE_TEST_HOOKS_ACK=I_UNDERSTAND_THIS_EXPOSES_WALLET_MUTATION."
+    );
+  } else if (blocksUnsafeBypassForNetwork) {
+    console.error(
+      "[starkzap-mcp] refusing unsafe test hooks on mainnet. Use a safe test key instead, or set STARKZAP_MCP_ALLOW_UNSAFE_TEST_HOOKS_MAINNET=1 only in isolated local test environments."
     );
   } else {
     (globalThis as Record<string, unknown>).__STARKZAP_MCP_TESTING__ =
