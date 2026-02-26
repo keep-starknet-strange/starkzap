@@ -1,6 +1,6 @@
 # Web Example
 
-Browser-based playground for the SDK. Demonstrates three wallet connection strategies (Cartridge Controller, private key, Privy), account deployment, transfers, and sponsored (gasless) transactions on Starknet Sepolia.
+Browser-based playground for the SDK. Demonstrates three wallet connection strategies (Cartridge Controller, private key, Privy), account deployment, transfers, sponsored (gasless) transactions, and provider-based token swaps on Starknet Sepolia.
 
 ## Prerequisites
 
@@ -186,6 +186,39 @@ Once connected (via any strategy), the wallet panel appears with these actions:
 | **Disconnect**     | `Disconnect`     | Clears wallet state. For Cartridge wallets, also calls `disconnect()` to end the session.                                                               | --                                                                                                             |
 
 The **Activity Log** at the bottom of the page shows timestamped events for every action: connection details, public keys, transaction hashes, explorer links, confirmation status, and errors.
+
+## Swap Demo (Provider API)
+
+The connected wallet card includes a **Swap** section with:
+
+- source selector (`AVNU` or `Ekubo`)
+- token-in and token-out selectors from SDK token presets
+- amount + slippage input
+- `Get Quote` (calls `wallet.getQuote({ provider, ... })`)
+- `Submit Swap` (calls `wallet.swap({ provider, ... }, options?)`)
+
+This example uses the simplified request shape where `provider` is part of the request object:
+
+```ts
+await wallet.getQuote({
+  provider: "avnu",
+  tokenIn,
+  tokenOut,
+  amountIn,
+  slippageBps: 100n,
+});
+
+await wallet.swap(
+  {
+    provider: "ekubo",
+    tokenIn,
+    tokenOut,
+    amountIn,
+    slippageBps: 100n,
+  },
+  { feeMode: "sponsored" }
+);
+```
 
 ## Configuration
 

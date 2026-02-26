@@ -1,4 +1,19 @@
 import { fromAddress, type Address, type ChainId } from "@/types";
+import type {
+  PreparedSwap,
+  SwapProvider,
+  SwapQuote,
+  SwapRequest,
+} from "@/swap/interface";
+import {
+  buildEkuboSwapCalls,
+  DEFAULT_EKUBO_API_BASE,
+  getEkuboErrorMessageFromPayload,
+  getEkuboQuoterChainId,
+  parseEkuboQuoteResponse,
+  toEkuboSwapQuote,
+  type EkuboQuoteResponse,
+} from "@/swap/ekubo.helpers";
 
 /**
  * Ekubo extension router configuration.
@@ -31,4 +46,103 @@ export const ekuboPresets = {
  */
 export function getEkuboPreset(chainId: ChainId): EkuboSwapConfig {
   return ekuboPresets[chainId.toLiteral()];
+}
+
+export interface EkuboSwapProviderOptions {
+  /** Optional Ekubo quoter base URL override. */
+  apiBase?: string;
+  /** Optional fetch implementation override for custom runtimes/tests. */
+  fetcher?: typeof fetch;
+}
+
+export class EkuboSwapProvider implements SwapProvider {
+  readonly id = "ekubo";
+
+  private readonly apiBase: string;
+  private readonly fetcher: typeof fetch;
+
+  constructor(options: EkuboSwapProviderOptions = {}) {
+    this.apiBase = options.apiBase ?? DEFAULT_EKUBO_API_BASE;
+    this.fetcher = options.fetcher ?? fetch;
+  }
+
+  supportsChain(chainId: ChainId): boolean {
+    try {
+      getEkuboQuoterChainId(chainId);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  async getQuote(request: SwapRequest): Promise<SwapQuote> {
+    const amountInBase = request.amountIn.toBase();
+    const quote = await this.fetchQuote({
+      chainId: request.chainId,
+      amountInBase,
+      tokenInAddress: request.tokenIn.address,
+      tokenOutAddress: request.tokenOut.address,
+    });
+
+    return toEkuboSwapQuote({ quote, amountInBase });
+  }
+
+  async swap(request: SwapRequest): Promise<PreparedSwap> {
+    const amountInBase = request.amountIn.toBase();
+    const quote = await this.fetchQuote({
+      chainId: request.chainId,
+      amountInBase,
+      tokenInAddress: request.tokenIn.address,
+      tokenOutAddress: request.tokenOut.address,
+    });
+
+    const preset = getEkuboPreset(request.chainId);
+    const calls = buildEkuboSwapCalls({
+      quote,
+      tokenIn: request.tokenIn,
+      tokenOut: request.tokenOut,
+      amountInBase,
+      extensionRouter: preset.extensionRouter,
+      ...(request.slippageBps != null && { slippageBps: request.slippageBps }),
+    });
+
+    return {
+      calls,
+      quote: toEkuboSwapQuote({
+        quote,
+        amountInBase,
+        routeCallCount: calls.length,
+      }),
+    };
+  }
+
+  private async fetchQuote(params: {
+    chainId: ChainId;
+    amountInBase: bigint;
+    tokenInAddress: string;
+    tokenOutAddress: string;
+  }): Promise<EkuboQuoteResponse> {
+    const chainId = getEkuboQuoterChainId(params.chainId);
+    const url = `${this.apiBase}/${chainId}/${params.amountInBase.toString()}/${params.tokenInAddress}/${params.tokenOutAddress}`;
+    const response = await this.fetcher(url);
+
+    let payload: unknown = null;
+    try {
+      payload = await response.json();
+    } catch {
+      if (!response.ok) {
+        throw new Error(`Ekubo quote failed (${response.status})`);
+      }
+      throw new Error("Ekubo quote returned a non-JSON response");
+    }
+
+    if (!response.ok) {
+      const responseError = getEkuboErrorMessageFromPayload(payload);
+      throw new Error(
+        responseError ?? `Ekubo quote failed (${response.status})`
+      );
+    }
+
+    return parseEkuboQuoteResponse(payload);
+  }
 }

@@ -1,8 +1,10 @@
 import {
+  Amount,
   StarkSDK,
   StarkSigner,
   OnboardStrategy,
   ChainId,
+  getPresets,
   OpenZeppelinPreset,
   ArgentPreset,
   ArgentXV050Preset,
@@ -10,8 +12,11 @@ import {
   DevnetPreset,
   type WalletInterface,
   type AccountClassConfig,
+  type SwapProvider,
+  type Token,
 } from "starkzap";
 import { ec } from "starknet";
+import { getSwapProviders } from "./swaps";
 
 // Configuration
 const RPC_URL = "https://api.cartridge.gg/x/starknet/sepolia/rpc/v0_9";
@@ -20,11 +25,22 @@ const DUMMY_POLICY = {
   target: "0x04718f5a0fc34cc1af16a1cdee98ffb20c31f5cd61d6ab07201858f4287c938d", // STRK
   method: "transfer",
 };
+const SDK_CHAIN_ID = ChainId.SEPOLIA;
+const BPS_DENOMINATOR = 10_000n;
+const DEFAULT_SLIPPAGE_BPS = 100n;
+
+const swapProviders: SwapProvider[] = getSwapProviders();
+const swapProvidersById = new Map<string, SwapProvider>(
+  swapProviders.map((provider) => [provider.id, provider])
+);
+const presetTokens = Object.values(getPresets(SDK_CHAIN_ID)).sort((a, b) =>
+  a.symbol.localeCompare(b.symbol)
+);
 
 // SDK instance
 const sdk = new StarkSDK({
   rpcUrl: RPC_URL,
-  chainId: ChainId.SEPOLIA,
+  chainId: SDK_CHAIN_ID,
 });
 
 // Current wallet
@@ -89,6 +105,31 @@ const btnCopyAddress = document.getElementById(
 ) as HTMLButtonElement;
 const walletStatusEl = document.getElementById("wallet-status")!;
 const walletTypeLabelEl = document.getElementById("wallet-type-label")!;
+const swapProviderSelect = document.getElementById(
+  "swap-provider"
+) as HTMLSelectElement;
+const swapTokenInSelect = document.getElementById(
+  "swap-token-in"
+) as HTMLSelectElement;
+const swapTokenOutSelect = document.getElementById(
+  "swap-token-out"
+) as HTMLSelectElement;
+const swapAmountInput = document.getElementById(
+  "swap-amount"
+) as HTMLInputElement;
+const swapSlippageInput = document.getElementById(
+  "swap-slippage"
+) as HTMLInputElement;
+const swapSponsoredInput = document.getElementById(
+  "swap-sponsored"
+) as HTMLInputElement;
+const btnSwapQuote = document.getElementById(
+  "btn-swap-quote"
+) as HTMLButtonElement;
+const btnSwapSubmit = document.getElementById(
+  "btn-swap-submit"
+) as HTMLButtonElement;
+const swapQuoteEl = document.getElementById("swap-quote")!;
 
 // Preset mapping
 const presets: Record<string, AccountClassConfig> = {
@@ -98,6 +139,206 @@ const presets: Record<string, AccountClassConfig> = {
   braavos: BraavosPreset,
   devnet: DevnetPreset,
 };
+
+function tokenOptionLabel(token: Token): string {
+  return `${token.symbol} (${token.name})`;
+}
+
+function getTokenByAddress(address: string): Token | null {
+  const token = presetTokens.find((item) => item.address === address);
+  return token ?? null;
+}
+
+function getPreferredSwapTokens(): { tokenIn: Token; tokenOut: Token } {
+  const fallback = presetTokens[0];
+  if (!fallback) {
+    throw new Error("No token presets available for this chain");
+  }
+
+  const tokenIn =
+    presetTokens.find((token) => token.symbol === "STRK") ?? fallback;
+  const preferredOutSymbols = SDK_CHAIN_ID.isSepolia()
+    ? ["USDC.e", "USDC", "ETH"]
+    : ["USDC", "USDT", "DAI", "ETH"];
+
+  for (const symbol of preferredOutSymbols) {
+    const tokenOut = presetTokens.find((token) => token.symbol === symbol);
+    if (tokenOut && tokenOut.address !== tokenIn.address) {
+      return { tokenIn, tokenOut };
+    }
+  }
+
+  const tokenOut =
+    presetTokens.find((token) => token.address !== tokenIn.address) ?? tokenIn;
+  return { tokenIn, tokenOut };
+}
+
+function clearSwapQuote(): void {
+  swapQuoteEl.innerHTML = "";
+  swapQuoteEl.classList.add("hidden");
+}
+
+function renderSwapQuote(params: {
+  providerId: string;
+  amountIn: Amount;
+  tokenOut: Token;
+  amountOutBase: bigint;
+  routeCallCount?: number;
+  priceImpactBps?: bigint | null;
+}): void {
+  const amountOut = Amount.fromRaw(
+    params.amountOutBase,
+    params.tokenOut.decimals,
+    params.tokenOut.symbol
+  );
+  const priceImpactText =
+    params.priceImpactBps == null
+      ? "n/a"
+      : `${(Number(params.priceImpactBps) / 100).toFixed(2)}%`;
+  const routeCalls =
+    params.routeCallCount != null ? `${params.routeCallCount}` : "n/a";
+
+  swapQuoteEl.innerHTML = `
+    <div class="quote-row"><span class="quote-label">Source</span><span class="quote-value">${params.providerId.toUpperCase()}</span></div>
+    <div class="quote-row"><span class="quote-label">Amount In</span><span class="quote-value">${params.amountIn.toFormatted(true)}</span></div>
+    <div class="quote-row"><span class="quote-label">Amount Out</span><span class="quote-value">${amountOut.toFormatted(true)}</span></div>
+    <div class="quote-row"><span class="quote-label">Price Impact</span><span class="quote-value">${priceImpactText}</span></div>
+    <div class="quote-row"><span class="quote-label">Route Calls</span><span class="quote-value">${routeCalls}</span></div>
+  `;
+  swapQuoteEl.classList.remove("hidden");
+}
+
+function updateSwapButtons(): void {
+  const isWalletConnected = wallet != null;
+  const hasProvider = swapProviderSelect.value.length > 0;
+  const hasAmount = swapAmountInput.value.trim().length > 0;
+  btnSwapQuote.disabled = !isWalletConnected || !hasProvider || !hasAmount;
+  btnSwapSubmit.disabled = !isWalletConnected || !hasProvider || !hasAmount;
+}
+
+function normalizeSwapTokenSelection(changed: "in" | "out"): void {
+  if (swapTokenInSelect.value !== swapTokenOutSelect.value) {
+    return;
+  }
+
+  const alternative = presetTokens.find(
+    (token) => token.address !== swapTokenInSelect.value
+  );
+  if (!alternative) {
+    return;
+  }
+
+  if (changed === "in") {
+    swapTokenOutSelect.value = alternative.address;
+  } else {
+    swapTokenInSelect.value = alternative.address;
+  }
+}
+
+function populateSwapProviders(): void {
+  swapProviderSelect.innerHTML = "";
+  for (const provider of swapProviders) {
+    const option = document.createElement("option");
+    option.value = provider.id;
+    option.textContent = provider.id.toUpperCase();
+    swapProviderSelect.appendChild(option);
+  }
+}
+
+function populateSwapTokens(): void {
+  swapTokenInSelect.innerHTML = "";
+  swapTokenOutSelect.innerHTML = "";
+
+  for (const token of presetTokens) {
+    const inOption = document.createElement("option");
+    inOption.value = token.address;
+    inOption.textContent = tokenOptionLabel(token);
+    swapTokenInSelect.appendChild(inOption);
+
+    const outOption = document.createElement("option");
+    outOption.value = token.address;
+    outOption.textContent = tokenOptionLabel(token);
+    swapTokenOutSelect.appendChild(outOption);
+  }
+
+  const preferred = getPreferredSwapTokens();
+  swapTokenInSelect.value = preferred.tokenIn.address;
+  swapTokenOutSelect.value = preferred.tokenOut.address;
+}
+
+function parseSlippageBps(): bigint | undefined {
+  const raw = swapSlippageInput.value.trim();
+  if (!raw) {
+    return undefined;
+  }
+
+  if (!/^\d+$/.test(raw)) {
+    throw new Error("Slippage must be an integer in basis points");
+  }
+
+  const bps = BigInt(raw);
+  if (bps >= BPS_DENOMINATOR) {
+    throw new Error("Slippage must be lower than 10000 bps");
+  }
+  return bps;
+}
+
+function buildSwapInput() {
+  const providerId = swapProviderSelect.value;
+  if (!providerId || !swapProvidersById.has(providerId)) {
+    throw new Error("Select a valid swap source");
+  }
+
+  const tokenIn = getTokenByAddress(swapTokenInSelect.value);
+  if (!tokenIn) {
+    throw new Error("Select token in");
+  }
+
+  const tokenOut = getTokenByAddress(swapTokenOutSelect.value);
+  if (!tokenOut) {
+    throw new Error("Select token out");
+  }
+
+  if (tokenIn.address === tokenOut.address) {
+    throw new Error("Token in and token out must be different");
+  }
+
+  const rawAmount = swapAmountInput.value.trim();
+  if (!rawAmount) {
+    throw new Error("Enter an amount to swap");
+  }
+
+  const amountIn = Amount.parse(rawAmount, tokenIn);
+  if (amountIn.toBase() <= 0n) {
+    throw new Error("Amount must be greater than zero");
+  }
+
+  const slippageBps = parseSlippageBps();
+  return {
+    providerId,
+    tokenIn,
+    tokenOut,
+    amountIn,
+    slippageBps,
+  };
+}
+
+function registerWalletSwapProviders(connectedWallet: WalletInterface): void {
+  let makeDefault = true;
+  for (const provider of swapProviders) {
+    connectedWallet.registerSwapProvider(provider, makeDefault);
+    makeDefault = false;
+  }
+}
+
+function initializeSwapForm(): void {
+  populateSwapProviders();
+  populateSwapTokens();
+  swapSlippageInput.value = DEFAULT_SLIPPAGE_BPS.toString();
+  swapSponsoredInput.checked = false;
+  clearSwapQuote();
+  updateSwapButtons();
+}
 
 // Logging
 function log(
@@ -122,6 +363,7 @@ function showConnected() {
   };
   walletTypeLabelEl.textContent =
     labels[walletType || ""] || "Connected Wallet";
+  updateSwapButtons();
 }
 
 function showDisconnected() {
@@ -131,6 +373,8 @@ function showDisconnected() {
   wallet = null;
   walletType = null;
   privyWalletId = null;
+  clearSwapQuote();
+  updateSwapButtons();
 }
 
 function setStatus(status: "deployed" | "not-deployed" | "checking") {
@@ -193,6 +437,7 @@ async function connectCartridge() {
     });
     wallet = onboard.wallet;
     walletType = "cartridge";
+    registerWalletSwapProviders(wallet);
 
     walletAddressEl.textContent = truncateAddress(wallet.address);
     walletAddressEl.title = wallet.address;
@@ -232,6 +477,7 @@ async function connectPrivateKey() {
     });
     wallet = onboard.wallet;
     walletType = "privatekey";
+    registerWalletSwapProviders(wallet);
 
     walletAddressEl.textContent = truncateAddress(wallet.address);
     walletAddressEl.title = wallet.address;
@@ -319,6 +565,7 @@ async function connectPrivy() {
     });
     wallet = onboard.wallet;
     walletType = "privy";
+    registerWalletSwapProviders(wallet);
 
     log(`Wallet address: ${wallet.address}`, "info");
 
@@ -432,6 +679,103 @@ async function testSponsoredTransfer() {
   }
 }
 
+async function fetchSwapQuote() {
+  if (!wallet) {
+    return;
+  }
+
+  setButtonLoading(btnSwapQuote, true);
+  clearSwapQuote();
+
+  try {
+    const { providerId, tokenIn, tokenOut, amountIn, slippageBps } =
+      buildSwapInput();
+
+    log(
+      `Fetching ${providerId.toUpperCase()} quote for ${amountIn.toUnit()} ${tokenIn.symbol} -> ${tokenOut.symbol}`,
+      "info"
+    );
+
+    const quote = await wallet.getQuote({
+      provider: providerId,
+      tokenIn,
+      tokenOut,
+      amountIn,
+      ...(slippageBps != null && { slippageBps }),
+    });
+
+    renderSwapQuote({
+      providerId: quote.provider ?? providerId,
+      amountIn,
+      tokenOut,
+      amountOutBase: quote.amountOutBase,
+      routeCallCount: quote.routeCallCount,
+      priceImpactBps: quote.priceImpactBps,
+    });
+    log(
+      `Quote received: ${Amount.fromRaw(quote.amountOutBase, tokenOut.decimals, tokenOut.symbol).toFormatted(true)}`,
+      "success"
+    );
+  } catch (err) {
+    log(`Swap quote failed: ${err}`, "error");
+  } finally {
+    setButtonLoading(btnSwapQuote, false, "Get Quote");
+    updateSwapButtons();
+  }
+}
+
+async function submitSwap() {
+  if (!wallet) {
+    return;
+  }
+
+  setButtonLoading(btnSwapSubmit, true);
+
+  try {
+    const deployed = await wallet.isDeployed();
+    if (!deployed) {
+      throw new Error("Account not deployed - deploy first");
+    }
+
+    const { providerId, tokenIn, tokenOut, amountIn, slippageBps } =
+      buildSwapInput();
+    const sponsor = swapSponsoredInput.checked;
+
+    log(
+      `Submitting ${providerId.toUpperCase()} swap ${amountIn.toUnit()} ${tokenIn.symbol} -> ${tokenOut.symbol}`,
+      "info"
+    );
+
+    const tx = await wallet.swap(
+      {
+        provider: providerId,
+        tokenIn,
+        tokenOut,
+        amountIn,
+        ...(slippageBps != null && { slippageBps }),
+      },
+      sponsor ? { feeMode: "sponsored" } : undefined
+    );
+
+    log(`Swap submitted: ${truncateAddress(tx.hash)}`, "success");
+    if (sponsor) {
+      log("Swap submitted in sponsored mode", "info");
+    }
+
+    log("Waiting for swap confirmation...", "info");
+    await tx.wait();
+    log("Swap confirmed!", "success");
+    if (tx.explorerUrl) {
+      log(`Explorer: ${tx.explorerUrl}`, "info");
+    }
+  } catch (err) {
+    log(`Swap failed: ${err}`, "error");
+  } finally {
+    setButtonLoading(btnSwapSubmit, false, "Submit Swap");
+    updateSwapButtons();
+  }
+}
+
 // Deploy account
 async function deployAccount() {
   if (!wallet) return;
@@ -504,6 +848,38 @@ btnCopyAddress.addEventListener("click", async () => {
 });
 btnTransferSponsored.addEventListener("click", testSponsoredTransfer);
 btnDisconnect.addEventListener("click", disconnect);
+btnSwapQuote.addEventListener("click", fetchSwapQuote);
+btnSwapSubmit.addEventListener("click", submitSwap);
+
+swapProviderSelect.addEventListener("change", () => {
+  clearSwapQuote();
+  updateSwapButtons();
+});
+
+swapTokenInSelect.addEventListener("change", () => {
+  normalizeSwapTokenSelection("in");
+  clearSwapQuote();
+  updateSwapButtons();
+});
+
+swapTokenOutSelect.addEventListener("change", () => {
+  normalizeSwapTokenSelection("out");
+  clearSwapQuote();
+  updateSwapButtons();
+});
+
+swapAmountInput.addEventListener("input", () => {
+  clearSwapQuote();
+  updateSwapButtons();
+});
+
+swapSlippageInput.addEventListener("input", () => {
+  clearSwapQuote();
+});
+
+swapSponsoredInput.addEventListener("change", () => {
+  updateSwapButtons();
+});
 
 // Allow Enter key to submit private key form
 privateKeyInput.addEventListener("keypress", (e) => {
@@ -527,4 +903,5 @@ btnGenerateKey.addEventListener("click", () => {
 });
 
 // Initial log
+initializeSwapForm();
 log(`SDK initialized with RPC: ${RPC_URL}`, "info");
