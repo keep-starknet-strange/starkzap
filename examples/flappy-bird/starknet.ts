@@ -12,7 +12,7 @@ import {
   Contract,
   type WalletInterface,
 } from "starkzap";
-import { Contract, getChecksumAddress, type RpcProvider } from "starknet";
+import { getChecksumAddress, type RpcProvider } from "starknet";
 
 // FOS demo game contract on Sepolia (same as https://github.com/0xsisyfos/fos)
 // Checksummed address so execute() calls match Cartridge session policies (Controller normalizes policy targets with getChecksumAddress).
