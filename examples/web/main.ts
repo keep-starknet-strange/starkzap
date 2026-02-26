@@ -47,12 +47,7 @@ const sdk = new StarkSDK({
 let wallet: WalletInterface | null = null;
 let walletType: "cartridge" | "privatekey" | "privy" | null = null;
 
-// Privy wallet info (stored for signing)
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-let privyWalletId: string | null = null;
-
 // DOM Elements
-const _connectSection = document.getElementById("connect-section")!;
 const walletSection = document.getElementById("wallet-section")!;
 const pkForm = document.getElementById("pk-form")!;
 const logContainer = document.getElementById("log")!;
@@ -372,7 +367,6 @@ function showDisconnected() {
   privyForm.classList.add("hidden");
   wallet = null;
   walletType = null;
-  privyWalletId = null;
   clearSwapQuote();
   updateSwapButtons();
 }
@@ -542,9 +536,6 @@ async function connectPrivy() {
     log(`${isNew ? "Created new" : "Found existing"} Privy wallet`, "info");
     log(`Privy address: ${walletData.address}`, "info");
     log(`Privy public key: ${walletData.publicKey}`, "info");
-
-    // Store wallet ID for debugging
-    privyWalletId = walletData.id;
 
     // Use selected account preset from Privy dropdown
     const presetKey = privyAccountPresetSelect.value;
