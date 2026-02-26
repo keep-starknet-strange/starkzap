@@ -1,19 +1,12 @@
 import type { Address, ChainId } from "@/types";
-import type {
-  SwapInput,
-  SwapProvider,
-  SwapRequest,
-  SwapSource,
-} from "@/swap/interface";
-
-interface SwapSourceResolver {
-  getDefaultSwapProvider(): SwapProvider;
-  getSwapProvider(providerId: string): SwapProvider;
-}
+import type { SwapInput, SwapProvider, SwapRequest } from "@/swap/interface";
 
 export function resolveSwapSource(
-  source: SwapSource | undefined,
-  resolver: SwapSourceResolver
+  source: SwapProvider | string | undefined,
+  resolver: {
+    getDefaultSwapProvider(): SwapProvider;
+    getSwapProvider(providerId: string): SwapProvider;
+  }
 ): SwapProvider {
   if (!source) {
     return resolver.getDefaultSwapProvider();

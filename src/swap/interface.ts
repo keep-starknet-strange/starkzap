@@ -4,7 +4,7 @@ import type { Address, Amount, ChainId, Token } from "@/types";
 /**
  * Common quote output shape for swap providers.
  */
-export interface SwapQuote {
+export type SwapQuote = {
   /** Quoted input amount in token-in base units */
   amountInBase: bigint;
   /** Quoted output amount in token-out base units */
@@ -15,12 +15,12 @@ export interface SwapQuote {
   priceImpactBps?: bigint | null;
   /** Optional protocol/source identifier that produced the quote */
   provider?: string;
-}
+};
 
 /**
  * Common swap request shape used by all providers.
  */
-export interface SwapRequest {
+export type SwapRequest = {
   /** Target chain */
   chainId: ChainId;
   /** Optional taker/executor wallet address for provider-specific routing */
@@ -33,10 +33,7 @@ export interface SwapRequest {
   amountIn: Amount;
   /** Optional slippage tolerance in basis points */
   slippageBps?: bigint;
-}
-
-/** Provider reference accepted by wallet/builder APIs. */
-export type SwapSource = SwapProvider | string;
+};
 
 /**
  * User-facing swap input accepted by wallet helpers.
@@ -49,25 +46,25 @@ export type SwapInput = Omit<SwapRequest, "chainId" | "takerAddress"> & {
   chainId?: ChainId;
   takerAddress?: Address;
   /** Optional source provider or provider id; wallet default is used when omitted. */
-  provider?: SwapSource;
+  provider?: SwapProvider | string;
 };
 
 /**
  * Prepared provider swap payload ready for wallet execution.
  */
-export interface PreparedSwap {
+export type PreparedSwap = {
   /** Swap calls ready to execute */
   calls: Call[];
   /** Quote/route metadata */
   quote: SwapQuote;
-}
+};
 
 /**
  * High-level provider contract for multi-protocol swap integrations.
  *
  * Implement this interface for each protocol (Ekubo, AVNU, etc.).
  */
-export interface SwapProvider {
+export type SwapProvider = {
   /** Stable provider identifier (e.g. `"ekubo"`) */
   readonly id: string;
   /** Chain support guard */
@@ -76,4 +73,4 @@ export interface SwapProvider {
   getQuote(request: SwapRequest): Promise<SwapQuote>;
   /** Build a prepared swap (calls + quote) from protocol-specific routing logic */
   swap(request: SwapRequest): Promise<PreparedSwap>;
-}
+};

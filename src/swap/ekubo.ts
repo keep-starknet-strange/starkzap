@@ -45,7 +45,14 @@ export const ekuboPresets = {
  * Get Ekubo preset configuration for the target chain.
  */
 export function getEkuboPreset(chainId: ChainId): EkuboSwapConfig {
-  return ekuboPresets[chainId.toLiteral()];
+  const literal = chainId.toLiteral();
+  if (literal === "SN_MAIN") {
+    return ekuboPresets.SN_MAIN;
+  }
+  if (literal === "SN_SEPOLIA") {
+    return ekuboPresets.SN_SEPOLIA;
+  }
+  throw new Error(`Unsupported chain for Ekubo config: ${literal}`);
 }
 
 export interface EkuboSwapProviderOptions {
@@ -67,34 +74,18 @@ export class EkuboSwapProvider implements SwapProvider {
   }
 
   supportsChain(chainId: ChainId): boolean {
-    try {
-      getEkuboQuoterChainId(chainId);
-      return true;
-    } catch {
-      return false;
-    }
+    const literal = chainId.toLiteral();
+    return literal === "SN_MAIN" || literal === "SN_SEPOLIA";
   }
 
   async getQuote(request: SwapRequest): Promise<SwapQuote> {
-    const amountInBase = request.amountIn.toBase();
-    const quote = await this.fetchQuote({
-      chainId: request.chainId,
-      amountInBase,
-      tokenInAddress: request.tokenIn.address,
-      tokenOutAddress: request.tokenOut.address,
-    });
+    const { quote, amountInBase } = await this.fetchQuoteForRequest(request);
 
     return toEkuboSwapQuote({ quote, amountInBase });
   }
 
   async swap(request: SwapRequest): Promise<PreparedSwap> {
-    const amountInBase = request.amountIn.toBase();
-    const quote = await this.fetchQuote({
-      chainId: request.chainId,
-      amountInBase,
-      tokenInAddress: request.tokenIn.address,
-      tokenOutAddress: request.tokenOut.address,
-    });
+    const { quote, amountInBase } = await this.fetchQuoteForRequest(request);
 
     const preset = getEkuboPreset(request.chainId);
     const calls = buildEkuboSwapCalls({
@@ -114,6 +105,19 @@ export class EkuboSwapProvider implements SwapProvider {
         routeCallCount: calls.length,
       }),
     };
+  }
+
+  private async fetchQuoteForRequest(
+    request: SwapRequest
+  ): Promise<{ quote: EkuboQuoteResponse; amountInBase: bigint }> {
+    const amountInBase = request.amountIn.toBase();
+    const quote = await this.fetchQuote({
+      chainId: request.chainId,
+      amountInBase,
+      tokenInAddress: request.tokenIn.address,
+      tokenOutAddress: request.tokenOut.address,
+    });
+    return { quote, amountInBase };
   }
 
   private async fetchQuote(params: {

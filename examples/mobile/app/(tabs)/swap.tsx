@@ -30,9 +30,13 @@ import {
   showTransactionToast,
   updateTransactionToast,
 } from "@/components/Toast";
-import { swapIntegrations } from "@/swaps";
-import type { SwapIntegration } from "@/swaps/interface";
-import { Amount, type ChainId, type Token } from "starkzap";
+import {
+  dedupeAndSortTokens,
+  getRecommendedOutputToken,
+  getSwapProviderLabel,
+  swapProviders,
+} from "@/swaps";
+import { Amount, type ChainId, type SwapProvider, type Token } from "starkzap";
 
 const WBTC_LOGO_FALLBACK =
   "https://altcoinsbox.com/wp-content/uploads/2023/01/wbtc-wrapped-bitcoin-logo.png";
@@ -114,10 +118,7 @@ export default function SwapScreen() {
   const strkToken = useMemo(() => getStrkToken(chainId), [chainId]);
   const wbtcToken = useMemo(() => getWbtcToken(chainId), [chainId]);
   const availableIntegrations = useMemo(
-    () =>
-      swapIntegrations.filter((integration) =>
-        integration.supportsChain(chainId)
-      ),
+    () => swapProviders.filter((provider) => provider.supportsChain(chainId)),
     [chainId]
   );
   const [selectedIntegrationId, setSelectedIntegrationId] = useState<
@@ -138,7 +139,7 @@ export default function SwapScreen() {
       setSelectedIntegrationId(availableIntegrations[0]!.id);
     }
   }, [availableIntegrations, selectedIntegrationId]);
-  const selectedIntegration = useMemo<SwapIntegration | null>(() => {
+  const selectedIntegration = useMemo<SwapProvider | null>(() => {
     if (!availableIntegrations.length) {
       return null;
     }
@@ -149,28 +150,16 @@ export default function SwapScreen() {
     );
   }, [availableIntegrations, selectedIntegrationId]);
   const integrationTokens = useMemo(() => {
-    const tokens =
-      selectedIntegration?.getAvailableTokens?.({
-        chainId,
-        tokens: allTokens,
-      }) ?? allTokens;
-
-    const uniqueByAddress = new Map<string, Token>();
-    for (const token of tokens) {
-      if (!uniqueByAddress.has(token.address)) {
-        uniqueByAddress.set(token.address, token);
-      }
-    }
-    return Array.from(uniqueByAddress.values());
-  }, [selectedIntegration, chainId, allTokens]);
+    return dedupeAndSortTokens(allTokens);
+  }, [allTokens]);
   const preferredOutputToken = useMemo(
     () =>
-      selectedIntegration?.getRecommendedOutputToken?.({
+      getRecommendedOutputToken({
         chainId,
         tokenIn: strkToken,
         tokens: integrationTokens,
-      }) ?? null,
-    [selectedIntegration, chainId, integrationTokens, strkToken]
+      }),
+    [chainId, integrationTokens, strkToken]
   );
   const primaryTokens = useMemo(() => {
     const eth = integrationTokens.find((t) => t.symbol === "ETH");
@@ -390,7 +379,7 @@ export default function SwapScreen() {
     try {
       const wantsSponsored = useSponsored && canUseSponsored;
       addLog(
-        `Submitting ${selectedIntegration.label} swap ${amount} ${fromToken.symbol} -> ${toToken.symbol}`
+        `Submitting ${getSwapProviderLabel(selectedIntegration)} swap ${amount} ${fromToken.symbol} -> ${toToken.symbol}`
       );
 
       const tx = await wallet.swap(
@@ -537,7 +526,7 @@ export default function SwapScreen() {
                           : { color: textSecondary },
                       ]}
                     >
-                      {integration.label}
+                      {getSwapProviderLabel(integration)}
                     </ThemedText>
                   </TouchableOpacity>
                 );
@@ -665,7 +654,9 @@ export default function SwapScreen() {
 
           <ThemedText style={[styles.callsHint, { color: textSecondary }]}>
             Quotes and route calls are fetched from{" "}
-            {selectedIntegration?.label ?? "the selected integration"}{" "}
+            {selectedIntegration
+              ? getSwapProviderLabel(selectedIntegration)
+              : "the selected integration"}{" "}
             automatically.
           </ThemedText>
 
