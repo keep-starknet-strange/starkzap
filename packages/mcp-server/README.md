@@ -30,7 +30,7 @@ STARKNET_PRIVATE_KEY=0x... STARKNET_STAKING_CONTRACT=0x... node dist/index.js --
 This server handles real funds. The following protections are built in:
 
 1. **All state-changing tools are disabled by default.** Read-only tools are available without write flags. Write tools (`starkzap_transfer`, staking, `starkzap_deploy_account`) require `--enable-write`. The unrestricted `starkzap_execute` tool requires its own `--enable-execute` flag.
-2. **Amount caps are enforced for both single ops and transfer batches.** All amount-bearing operations (transfers and staking) are bounded by `--max-amount` (default: 1000 tokens). Transfer batches are also bounded by `--max-batch-amount` (default: same as `--max-amount`). For state-dependent staking exits/claims, caps use multi-check preflight validation and remain best-effort with minimal residual chain-state race windows.
+2. **Amount caps are enforced for both single ops and transfer batches.** All amount-bearing operations (transfers and staking) are bounded by `--max-amount` (default: 1000 tokens). Transfer batches are also bounded by `--max-batch-amount` (default: same as `--max-amount`). For state-dependent staking exits/claims, caps use multi-check preflight validation and remain best-effort with a residual chain-state race window between final check and inclusion (typically 1-3 Starknet blocks). Keep `--max-amount` conservative and reconcile tx hashes before retrying.
 3. **Batch size limits.** Maximum 20 transfers per batch, 10 calls per execute batch.
 4. **Address validation.** All addresses are validated against Starknet felt252 format before use.
 5. **Runtime argument validation.** Every tool's arguments are validated with zod schemas before execution. Malformed inputs are rejected with clear error messages.
@@ -58,6 +58,7 @@ This server handles real funds. The following protections are built in:
 | `STARKNET_PRIVATE_KEY`               | Yes      | Stark curve private key (`0x` + exactly 64 hex chars, cryptographically valid)                  |
 | `STARKNET_RPC_URL`                   | No       | Custom RPC endpoint (overrides network preset; HTTPS required except localhost HTTP)            |
 | `STARKNET_RPC_TIMEOUT_MS`            | No       | RPC timeout in milliseconds (default: `30000`)                                                  |
+| `STARKNET_POOL_CACHE_TTL_MS`         | No       | Pool class-hash cache TTL in ms (default: `30000`, set `0` to disable cache)                    |
 | `STARKNET_STAKING_CONTRACT`          | No       | Staking contract address (enables staking tools)                                                |
 | `STARKNET_STAKING_POOL_CLASS_HASHES` | No       | Comma-separated allowlist of pool contract class hashes (0x...) for strict pool-type validation |
 

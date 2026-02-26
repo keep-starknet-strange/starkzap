@@ -37,6 +37,12 @@ type TestingExports = {
     maxCap: string,
     operation: "claim rewards" | "exit pool"
   ): Promise<void>;
+  assertStableExitAmountWithinCap(
+    wallet: Wallet,
+    poolAddress: string,
+    poolToken: Token,
+    maxCap: string
+  ): Promise<void>;
   buildToolErrorText(error: unknown): string;
   isRpcLikeError(error: unknown): boolean;
   handleCallToolRequest(request: {
@@ -123,6 +129,7 @@ describe("index integration hardening", () => {
     );
     expect(text).toContain("Transaction 0x123 was submitted");
     expect(text).not.toContain("Operation failed. Reference:");
+    expect(text).toMatch(/Error: Transaction 0x123/);
   });
 
   it("sanitizes unsafe errors and keeps allowlisted messages", () => {
@@ -192,6 +199,52 @@ describe("index integration hardening", () => {
     );
   });
 
+  it("fails with clear message when SDK balance shape is malformed", async () => {
+    testing.setWalletSingleton({
+      balanceOf: vi.fn().mockResolvedValue({ value: "not-an-amount" }),
+    } as unknown as Wallet);
+    const response = await testing.handleCallToolRequest({
+      params: {
+        name: "starkzap_get_balance",
+        arguments: { token: "STRK" },
+      },
+    });
+    expect(response.isError).toBe(true);
+    expect(response.content[0]?.text).toContain(
+      "Invalid balance returned by SDK"
+    );
+  });
+
+  it("fails with clear message when fee estimate overall_fee is malformed", async () => {
+    testing.setWalletSingleton({
+      estimateFee: vi.fn().mockResolvedValue({
+        overall_fee: "123",
+        unit: "wei",
+        resourceBounds: {
+          l1_gas: { max_amount: 1n, max_price_per_unit: 2n },
+          l2_gas: { max_amount: 3n, max_price_per_unit: 4n },
+          l1_data_gas: { max_amount: 5n, max_price_per_unit: 6n },
+        },
+      }),
+    } as unknown as Wallet);
+    const response = await testing.handleCallToolRequest({
+      params: {
+        name: "starkzap_estimate_fee",
+        arguments: {
+          calls: [
+            {
+              contractAddress: TEST_TOKEN.address,
+              entrypoint: "transfer",
+              calldata: [],
+            },
+          ],
+        },
+      },
+    });
+    expect(response.isError).toBe(true);
+    expect(response.content[0]?.text).toContain("Operation failed. Reference:");
+  });
+
   it("allows read-only tasks to run concurrently", async () => {
     const events: string[] = [];
     const readA = testing.runWithToolConcurrencyPolicy(
@@ -248,8 +301,12 @@ describe("index integration hardening", () => {
     let idx = 0;
     const mockWallet = {
       getPoolPosition: vi.fn(async () => ({
+        staked: Amount.parse("1", TEST_TOKEN),
         rewards: rewards[Math.min(idx++, rewards.length - 1)],
+        total: Amount.parse("1", TEST_TOKEN),
         unpooling: Amount.parse("0", TEST_TOKEN),
+        commissionPercent: 0,
+        unpoolTime: null,
       })),
     };
 
@@ -263,6 +320,42 @@ describe("index integration hardening", () => {
         "claim rewards"
       )
     ).rejects.toThrow(/changed right before submission/);
+  });
+
+  it("enforces exit cap against unpooling + rewards", async () => {
+    const rewards = [
+      Amount.parse("0.6", TEST_TOKEN),
+      Amount.parse("0.6", TEST_TOKEN),
+      Amount.parse("0.6", TEST_TOKEN),
+    ];
+    const unpooling = [
+      Amount.parse("0.6", TEST_TOKEN),
+      Amount.parse("0.6", TEST_TOKEN),
+      Amount.parse("0.6", TEST_TOKEN),
+    ];
+    let idx = 0;
+    const mockWallet = {
+      getPoolPosition: vi.fn(async () => {
+        const current = Math.min(idx++, rewards.length - 1);
+        return {
+          staked: Amount.parse("10", TEST_TOKEN),
+          rewards: rewards[current],
+          total: Amount.parse("10.6", TEST_TOKEN),
+          unpooling: unpooling[current],
+          commissionPercent: 0,
+          unpoolTime: null,
+        };
+      }),
+    };
+
+    await expect(
+      testing.assertStableExitAmountWithinCap(
+        mockWallet as unknown as Wallet,
+        TEST_TOKEN.address,
+        TEST_TOKEN,
+        "1"
+      )
+    ).rejects.toThrow(/per-operation cap/);
   });
 
   it("rejects zero transaction hashes from SDK", async () => {

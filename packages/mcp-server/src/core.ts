@@ -919,16 +919,25 @@ export function assertBatchAmountWithinCap(
 ): void {
   const capLiteral = String(cap);
   const capAmount = Amount.parse(capLiteral, token);
-  const total = amounts.reduce(
-    (accumulator, amount) => {
-      return accumulator.add(amount);
-    },
-    Amount.parse("0", token)
-  );
-
-  if (total.gt(capAmount)) {
+  const capBase = capAmount.toBase();
+  const totalBase = amounts.reduce((accumulator, amount) => {
+    return accumulator + amount.toBase();
+  }, 0n);
+  if (totalBase > capBase) {
+    let totalDisplay = `${totalBase.toString()} base units`;
+    try {
+      const totalAmount = amounts.reduce(
+        (accumulator, amount) => {
+          return accumulator.add(amount);
+        },
+        Amount.parse("0", token)
+      );
+      totalDisplay = totalAmount.toUnit();
+    } catch {
+      // Keep base-unit fallback if SDK add() overflows or throws.
+    }
     throw new Error(
-      `Total batch amount ${total.toUnit()} ${token.symbol} exceeds the batch cap of ${capLiteral}. ` +
+      `Total batch amount ${totalDisplay} ${token.symbol} exceeds the batch cap of ${capLiteral}. ` +
         `Adjust --max-batch-amount to increase the limit.`
     );
   }

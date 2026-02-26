@@ -460,6 +460,7 @@ describe("package publishability", () => {
       devDependencies?: Record<string, string>;
     };
     expect(pkg.dependencies?.starkzap).toBeDefined();
+    expect(pkg.dependencies?.starkzap?.startsWith("^")).toBe(false);
     expect(pkg.devDependencies?.x).toBeUndefined();
   });
 });

@@ -13,6 +13,7 @@
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 import { readFileSync } from "node:fs";
+import { createRequire } from "node:module";
 import { createHash } from "node:crypto";
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
@@ -45,6 +46,8 @@ import {
   validateAddressBatch,
   validateAddressOrThrow,
 } from "./core.js";
+
+const require = createRequire(import.meta.url);
 
 // ---------------------------------------------------------------------------
 // CLI args
@@ -133,6 +136,12 @@ const envSchema = z.object({
     .optional(),
   STARKNET_STAKING_CONTRACT: contractAddressSchema.optional(),
   STARKNET_STAKING_POOL_CLASS_HASHES: z.string().optional(),
+  STARKNET_POOL_CACHE_TTL_MS: z.coerce
+    .number()
+    .int()
+    .min(0)
+    .max(3_600_000)
+    .optional(),
   STARKNET_RPC_TIMEOUT_MS: z.coerce
     .number()
     .int()
@@ -197,9 +206,9 @@ const configuredPoolClassHashes = (() => {
 
 const stakingEnabled = Boolean(env.STARKNET_STAKING_CONTRACT);
 const rpcTimeoutMs = env.STARKNET_RPC_TIMEOUT_MS ?? 30_000;
+const poolClassHashCacheTtlMs = env.STARKNET_POOL_CACHE_TTL_MS ?? 30_000;
 let nowProvider = () => Date.now();
 let stakingReferenceClassHashPromise: Promise<string | undefined> | undefined;
-const POOL_CLASS_HASH_CACHE_TTL_MS = 30_000;
 const poolClassHashCache = new Map<
   Address,
   { hash: string; expiresAtMs: number }
@@ -214,6 +223,8 @@ let walletSingleton: Wallet | undefined;
 let walletInitPromise: Promise<Wallet> | undefined;
 let walletInitFailureCount = 0;
 let walletInitBackoffUntilMs = 0;
+let sdkInitFailureCount = 0;
+let sdkInitBackoffUntilMs = 0;
 const sdkConfig = Object.freeze({
   network,
   ...(env.STARKNET_RPC_URL && { rpcUrl: env.STARKNET_RPC_URL }),
@@ -225,8 +236,26 @@ const sdkConfig = Object.freeze({
 });
 
 function getSdk(): StarkSDK {
+  if (sdkInitBackoffUntilMs > nowMs()) {
+    const retryInMs = sdkInitBackoffUntilMs - nowMs();
+    throw new Error(
+      `SDK initialization temporarily throttled after recent failures. Retry in ${Math.ceil(retryInMs / 1000)}s.`
+    );
+  }
   if (!sdkSingleton) {
-    sdkSingleton = new StarkSDK(sdkConfig);
+    try {
+      sdkSingleton = new StarkSDK(sdkConfig);
+      sdkInitFailureCount = 0;
+      sdkInitBackoffUntilMs = 0;
+    } catch (error) {
+      sdkInitFailureCount = Math.min(sdkInitFailureCount + 1, 10);
+      const backoffMs = Math.min(300_000, 500 * 2 ** (sdkInitFailureCount - 1));
+      sdkInitBackoffUntilMs = nowMs() + backoffMs;
+      const reason = error instanceof Error ? error.message : String(error);
+      throw new Error(
+        `SDK initialization failed. ${reason} Retry in ${Math.ceil(backoffMs / 1000)}s.`
+      );
+    }
   }
   return sdkSingleton;
 }
@@ -261,12 +290,21 @@ async function withTimeout<T>(
 }
 
 function summarizeError(error: unknown): string {
+  const stringifySafe = (value: unknown): string => {
+    try {
+      return JSON.stringify(value, (_, current) =>
+        typeof current === "bigint" ? current.toString() : current
+      );
+    } catch {
+      return String(value);
+    }
+  };
   const raw =
     error instanceof Error
       ? `${error.name}: ${error.message}`
       : typeof error === "string"
         ? error
-        : (JSON.stringify(error) ?? String(error));
+        : stringifySafe(error);
   return raw
     .replace(/https?:\/\/[^\s)]+/gi, "<url>")
     .replace(/\[[\da-fA-F:]+\](?::\d{2,5})?/gi, "<host>")
@@ -279,7 +317,7 @@ function summarizeError(error: unknown): string {
 }
 
 function createErrorReference(message: string): string {
-  return createHash("sha256").update(message).digest("hex").slice(0, 12);
+  return createHash("sha256").update(message).digest("hex").slice(0, 16);
 }
 
 function sanitizeExplorerUrl(rawUrl: string | undefined): string | undefined {
@@ -333,7 +371,7 @@ async function getWallet(): Promise<Wallet> {
         walletInitPromise = undefined;
         walletInitFailureCount = Math.min(walletInitFailureCount + 1, 8);
         const backoffMs = Math.min(
-          30_000,
+          300_000,
           500 * 2 ** (walletInitFailureCount - 1)
         );
         walletInitBackoffUntilMs = nowMs() + backoffMs;
@@ -344,6 +382,34 @@ async function getWallet(): Promise<Wallet> {
       });
   }
   return walletInitPromise;
+}
+
+async function assertWalletAccountClassHash(
+  wallet: Wallet,
+  context: string
+): Promise<void> {
+  const provider = wallet.getProvider();
+  let deployedClassHash: string;
+  try {
+    deployedClassHash = fromAddress(
+      await withTimeout("Wallet account class-hash verification", () =>
+        provider.getClassHashAt(wallet.address)
+      )
+    );
+  } catch (error) {
+    if (isClassHashNotFoundError(error)) {
+      throw new Error(
+        `${context} succeeded but wallet account is still not deployed on-chain.`
+      );
+    }
+    throw error;
+  }
+  const expectedClassHash = fromAddress(wallet.getClassHash());
+  if (deployedClassHash !== expectedClassHash) {
+    throw new Error(
+      `${context} detected account class hash mismatch at ${wallet.address}. expected=${expectedClassHash} actual=${deployedClassHash}`
+    );
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -366,6 +432,7 @@ const TX_WAIT_TIMEOUT_MS = 120_000;
 const WALLET_DISCONNECT_TIMEOUT_MS = 5_000;
 const activeTransactionHashes = new Set<string>();
 const timedOutTransactionHashes = new Set<string>();
+let cleanupPromise: Promise<void> | undefined;
 
 class TransactionWaitTimeoutError extends Error {
   constructor(
@@ -390,6 +457,113 @@ function normalizeTransactionHash(hash: string): string {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
+}
+
+type AmountMethod =
+  | "toUnit"
+  | "toFormatted"
+  | "toBase"
+  | "getDecimals"
+  | "gt"
+  | "add"
+  | "eq"
+  | "isZero";
+
+function assertAmountMethods(
+  value: unknown,
+  label: string,
+  methods: readonly AmountMethod[]
+): asserts value is Amount {
+  if (!isRecord(value)) {
+    throw new Error(
+      `Invalid ${label} returned by SDK: expected Amount-like object.`
+    );
+  }
+  for (const method of methods) {
+    if (typeof value[method] !== "function") {
+      throw new Error(
+        `Invalid ${label} returned by SDK: missing Amount method "${method}".`
+      );
+    }
+  }
+}
+
+function parseAmountWithContext(
+  literal: string,
+  token: Token,
+  context: string
+): Amount {
+  try {
+    return Amount.parse(literal, token);
+  } catch (error) {
+    const reason = error instanceof Error ? error.message : String(error);
+    throw new Error(
+      `Invalid ${context} amount "${literal}" for ${token.symbol}. ${reason}`
+    );
+  }
+}
+
+function assertOverallFeeIsBigInt(fee: unknown): asserts fee is {
+  overall_fee: bigint;
+} {
+  if (!isRecord(fee) || typeof fee.overall_fee !== "bigint") {
+    throw new Error(
+      `Fee estimate response has invalid overall_fee type. Response: ${summarizeError(fee)}`
+    );
+  }
+}
+
+function assertPoolPositionShape(
+  position: unknown,
+  poolAddress: Address
+): asserts position is {
+  staked: Amount;
+  rewards: Amount;
+  total: Amount;
+  unpooling: Amount;
+  commissionPercent: unknown;
+  unpoolTime?: Date | null;
+} {
+  if (!isRecord(position)) {
+    throw new Error(
+      `Invalid pool position response from SDK for ${poolAddress}: expected object.`
+    );
+  }
+
+  assertAmountMethods(position.staked, "pool position staked", [
+    "toUnit",
+    "toFormatted",
+  ]);
+  assertAmountMethods(position.rewards, "pool position rewards", [
+    "toUnit",
+    "toFormatted",
+    "gt",
+    "eq",
+    "add",
+    "isZero",
+  ]);
+  assertAmountMethods(position.total, "pool position total", [
+    "toUnit",
+    "toFormatted",
+  ]);
+  assertAmountMethods(position.unpooling, "pool position unpooling", [
+    "toUnit",
+    "isZero",
+    "gt",
+    "eq",
+    "add",
+  ]);
+
+  if (
+    position.unpoolTime !== undefined &&
+    position.unpoolTime !== null &&
+    (!(position.unpoolTime instanceof Date) ||
+      Number.isNaN(position.unpoolTime.getTime()))
+  ) {
+    throw new Error(
+      `Invalid pool position response from SDK for ${poolAddress}: unpoolTime must be a valid Date or null.`
+    );
+  }
 }
 
 async function waitForTrackedTransaction(tx: {
@@ -464,6 +638,9 @@ async function resolveReferenceStakingClassHash(
 }
 
 function getCachedPoolClassHash(poolAddress: Address): string | undefined {
+  if (poolClassHashCacheTtlMs <= 0) {
+    return undefined;
+  }
   const cached = poolClassHashCache.get(poolAddress);
   if (!cached) {
     return undefined;
@@ -495,10 +672,12 @@ async function getPoolClassHashWithCache(
   )
     .then((hash) => {
       const normalized = fromAddress(hash);
-      poolClassHashCache.set(poolAddress, {
-        hash: normalized,
-        expiresAtMs: nowMs() + POOL_CLASS_HASH_CACHE_TTL_MS,
-      });
+      if (poolClassHashCacheTtlMs > 0) {
+        poolClassHashCache.set(poolAddress, {
+          hash: normalized,
+          expiresAtMs: nowMs() + poolClassHashCacheTtlMs,
+        });
+      }
       return normalized;
     })
     .finally(() => {
@@ -667,6 +846,7 @@ async function assertStablePoolAmountWithinCap(
       `Cannot ${operation}: wallet is not a member of pool ${poolAddress}.`
     );
   }
+  assertPoolPositionShape(firstPosition, poolAddress);
   assertAmountWithinCap(firstPosition[field], poolToken, maxCap);
 
   const secondPosition = await withTimeout(
@@ -678,6 +858,7 @@ async function assertStablePoolAmountWithinCap(
       `Cannot ${operation}: wallet is not a member of pool ${poolAddress}.`
     );
   }
+  assertPoolPositionShape(secondPosition, poolAddress);
   if (!secondPosition[field].eq(firstPosition[field])) {
     throw new Error(
       `Cannot ${operation}: pool position changed during preflight checks. Retry.`
@@ -694,12 +875,66 @@ async function assertStablePoolAmountWithinCap(
       `Cannot ${operation}: wallet is not a member of pool ${poolAddress}.`
     );
   }
+  assertPoolPositionShape(thirdPosition, poolAddress);
   if (!thirdPosition[field].eq(secondPosition[field])) {
     throw new Error(
       `Cannot ${operation}: pool position changed right before submission. Retry.`
     );
   }
   assertAmountWithinCap(thirdPosition[field], poolToken, maxCap);
+}
+
+async function assertStableExitAmountWithinCap(
+  wallet: Wallet,
+  poolAddress: Address,
+  poolToken: Token,
+  maxCap: string
+): Promise<void> {
+  const readPosition = async (stage: string) => {
+    const position = await withTimeout(stage, () =>
+      wallet.getPoolPosition(poolAddress)
+    );
+    if (!position) {
+      throw new Error(
+        `Cannot exit pool: wallet is not a member of pool ${poolAddress}.`
+      );
+    }
+    assertPoolPositionShape(position, poolAddress);
+    if (position.unpooling.isZero()) {
+      throw new Error(
+        `Cannot exit pool: no pending unpool amount for pool ${poolAddress}.`
+      );
+    }
+    return position;
+  };
+
+  const first = await readPosition("Pool position preflight (exit pool)");
+  const firstTotal = first.unpooling.add(first.rewards);
+  assertAmountWithinCap(firstTotal, poolToken, maxCap);
+
+  const second = await readPosition("Pool position recheck (exit pool)");
+  if (
+    !second.unpooling.eq(first.unpooling) ||
+    !second.rewards.eq(first.rewards)
+  ) {
+    throw new Error(
+      "Cannot exit pool: pool position changed during preflight checks. Retry."
+    );
+  }
+  const secondTotal = second.unpooling.add(second.rewards);
+  assertAmountWithinCap(secondTotal, poolToken, maxCap);
+
+  const third = await readPosition("Pool position final check (exit pool)");
+  if (
+    !third.unpooling.eq(second.unpooling) ||
+    !third.rewards.eq(second.rewards)
+  ) {
+    throw new Error(
+      "Cannot exit pool: pool position changed right before submission. Retry."
+    );
+  }
+  const thirdTotal = third.unpooling.add(third.rewards);
+  assertAmountWithinCap(thirdTotal, poolToken, maxCap);
 }
 
 function isRpcLikeError(error: unknown): boolean {
@@ -804,48 +1039,62 @@ function isRpcLikeError(error: unknown): boolean {
 }
 
 async function cleanupWalletAndSdkResources(): Promise<void> {
-  walletInitPromise = undefined;
-  const wallet = walletSingleton;
-  if (wallet) {
-    try {
-      await withTimeout(
-        "Wallet disconnect",
-        () => wallet.disconnect(),
-        WALLET_DISCONNECT_TIMEOUT_MS
-      );
-    } catch (error) {
-      console.error(
-        `[starkzap-mcp] wallet cleanup error: ${summarizeError(error)}`
-      );
-    }
+  if (cleanupPromise) {
+    return cleanupPromise;
   }
 
-  const sdk = sdkSingleton as unknown as Record<string, unknown> | undefined;
-  if (sdk) {
-    for (const methodName of ["dispose", "close", "disconnect"] as const) {
-      const cleanup = sdk[methodName];
-      if (typeof cleanup !== "function") {
-        continue;
-      }
+  cleanupPromise = (async () => {
+    walletInitPromise = undefined;
+    const wallet = walletSingleton;
+    if (wallet) {
       try {
         await withTimeout(
-          `SDK ${methodName}`,
-          async () => {
-            await Promise.resolve((cleanup as () => unknown).call(sdk));
-          },
+          "Wallet disconnect",
+          () => wallet.disconnect(),
           WALLET_DISCONNECT_TIMEOUT_MS
         );
       } catch (error) {
         console.error(
-          `[starkzap-mcp] sdk cleanup error (${methodName}): ${summarizeError(error)}`
+          `[starkzap-mcp] wallet cleanup error: ${summarizeError(error)}`
         );
       }
-      break;
     }
-  }
 
-  walletSingleton = undefined;
-  sdkSingleton = undefined;
+    const sdk = sdkSingleton as unknown as Record<string, unknown> | undefined;
+    if (sdk) {
+      for (const methodName of ["dispose", "close", "disconnect"] as const) {
+        const cleanup = sdk[methodName];
+        if (typeof cleanup !== "function") {
+          continue;
+        }
+        try {
+          await withTimeout(
+            `SDK ${methodName}`,
+            async () => {
+              await Promise.resolve((cleanup as () => unknown).call(sdk));
+            },
+            WALLET_DISCONNECT_TIMEOUT_MS
+          );
+        } catch (error) {
+          console.error(
+            `[starkzap-mcp] sdk cleanup error (${methodName}): ${summarizeError(error)}`
+          );
+        }
+        break;
+      }
+    }
+
+    walletSingleton = undefined;
+    sdkSingleton = undefined;
+    sdkInitFailureCount = 0;
+    sdkInitBackoffUntilMs = 0;
+  })();
+
+  try {
+    await cleanupPromise;
+  } finally {
+    cleanupPromise = undefined;
+  }
 }
 
 async function maybeResetWalletOnRpcError(error: unknown): Promise<void> {
@@ -951,6 +1200,12 @@ async function handleTool(
       const balance = await withTimeout("Token balance query", () =>
         wallet.balanceOf(token)
       );
+      assertAmountMethods(balance, "balance", [
+        "toUnit",
+        "toFormatted",
+        "toBase",
+        "getDecimals",
+      ]);
       return ok({
         token: token.symbol,
         address: token.address,
@@ -970,7 +1225,11 @@ async function handleTool(
         "transfers.to"
       );
       const transfers = parsed.transfers.map((transfer, index) => {
-        const amount = Amount.parse(transfer.amount, token);
+        const amount = parseAmountWithContext(
+          transfer.amount,
+          token,
+          `transfer[${index}]`
+        );
         assertAmountWithinCap(amount, token, maxAmount);
         return {
           to: recipients[index],
@@ -993,6 +1252,12 @@ async function handleTool(
         })
       );
       const txResult = await waitForTrackedTransaction(tx);
+      if (feeMode === "sponsored") {
+        await assertWalletAccountClassHash(
+          wallet,
+          "Sponsored transfer post-check"
+        );
+      }
       return ok({
         hash: txResult.hash,
         explorerUrl: txResult.explorerUrl,
@@ -1025,6 +1290,12 @@ async function handleTool(
         })
       );
       const txResult = await waitForTrackedTransaction(tx);
+      if (feeMode === "sponsored") {
+        await assertWalletAccountClassHash(
+          wallet,
+          "Sponsored execute post-check"
+        );
+      }
       return ok({
         hash: txResult.hash,
         explorerUrl: txResult.explorerUrl,
@@ -1069,6 +1340,7 @@ async function handleTool(
         })
       );
       const txResult = await waitForTrackedTransaction(tx);
+      await assertWalletAccountClassHash(wallet, "Deploy account post-check");
       return ok({
         status: "deployed",
         hash: txResult.hash,
@@ -1085,7 +1357,11 @@ async function handleTool(
         poolAddress,
         parsed.token
       );
-      const amount = Amount.parse(parsed.amount, poolToken);
+      const amount = parseAmountWithContext(
+        parsed.amount,
+        poolToken,
+        "enter_pool"
+      );
       assertAmountWithinCap(amount, poolToken, maxAmount);
       const tx = await withTimeout("Enter pool submission", () =>
         wallet.enterPool(poolAddress, amount)
@@ -1108,7 +1384,11 @@ async function handleTool(
         poolAddress,
         parsed.token
       );
-      const amount = Amount.parse(parsed.amount, poolToken);
+      const amount = parseAmountWithContext(
+        parsed.amount,
+        poolToken,
+        "add_to_pool"
+      );
       assertAmountWithinCap(amount, poolToken, maxAmount);
       const tx = await withTimeout("Add to pool submission", () =>
         wallet.addToPool(poolAddress, amount)
@@ -1154,7 +1434,11 @@ async function handleTool(
         poolAddress,
         parsed.token
       );
-      const amount = Amount.parse(parsed.amount, poolToken);
+      const amount = parseAmountWithContext(
+        parsed.amount,
+        poolToken,
+        "exit_pool_intent"
+      );
       assertAmountWithinCap(amount, poolToken, maxAmount);
       const tx = await withTimeout("Exit pool intent submission", () =>
         wallet.exitPoolIntent(poolAddress, amount)
@@ -1174,26 +1458,11 @@ async function handleTool(
       const parsed = args as z.infer<typeof schemas.starkzap_exit_pool>;
       const poolAddress = validateAddressOrThrow(parsed.pool, "pool");
       const poolToken = await resolvePoolTokenForOperation(wallet, poolAddress);
-      const position = await withTimeout("Pool position fetch for exit", () =>
-        wallet.getPoolPosition(poolAddress)
-      );
-      if (!position) {
-        throw new Error(
-          `Cannot exit pool: wallet is not a member of pool ${poolAddress}.`
-        );
-      }
-      if (position.unpooling.isZero()) {
-        throw new Error(
-          `Cannot exit pool: no pending unpool amount for pool ${poolAddress}.`
-        );
-      }
-      await assertStablePoolAmountWithinCap(
+      await assertStableExitAmountWithinCap(
         wallet,
         poolAddress,
         poolToken,
-        "unpooling",
-        maxAmount,
-        "exit pool"
+        maxAmount
       );
       const tx = await withTimeout("Exit pool submission", () =>
         wallet.exitPool(poolAddress)
@@ -1218,7 +1487,9 @@ async function handleTool(
           isMember: false,
         });
       }
+      assertPoolPositionShape(position, poolAddress);
       const unpoolTime = position.unpoolTime ?? null;
+      const queriedAtEpochMs = nowMs();
       return ok({
         pool: poolAddress,
         isMember: true,
@@ -1232,10 +1503,14 @@ async function handleTool(
         unpooling: position.unpooling.toUnit(),
         unpoolTime: unpoolTime?.toISOString() ?? null,
         unpoolTimeEpochMs: unpoolTime?.getTime() ?? null,
+        queriedAtEpochMs,
         secondsUntilUnpool:
           unpoolTime === null
             ? null
-            : Math.max(0, Math.ceil((unpoolTime.getTime() - nowMs()) / 1000)),
+            : Math.max(
+                0,
+                Math.ceil((unpoolTime.getTime() - queriedAtEpochMs) / 1000)
+              ),
       });
     }
 
@@ -1254,6 +1529,7 @@ async function handleTool(
       const fee = await withTimeout("Fee estimate query", () =>
         wallet.estimateFee(calls)
       );
+      assertOverallFeeIsBigInt(fee);
       const { l1_gas, l2_gas, l1_data_gas } = requireResourceBounds(fee);
       return ok({
         overall_fee: fee.overall_fee.toString(),
@@ -1373,6 +1649,12 @@ interface TestingHooks {
     maxCap: string,
     operation: "claim rewards" | "exit pool"
   ): Promise<void>;
+  assertStableExitAmountWithinCap(
+    wallet: Wallet,
+    poolAddress: Address,
+    poolToken: Token,
+    maxCap: string
+  ): Promise<void>;
   buildToolErrorText(error: unknown): string;
   isRpcLikeError(error: unknown): boolean;
   maybeResetWalletOnRpcError(error: unknown): Promise<void>;
@@ -1393,6 +1675,7 @@ const testingHooks: TestingHooks = {
   runWithToolConcurrencyPolicy,
   handleCallToolRequest,
   assertStablePoolAmountWithinCap,
+  assertStableExitAmountWithinCap,
   buildToolErrorText,
   isRpcLikeError,
   maybeResetWalletOnRpcError,
@@ -1418,6 +1701,9 @@ const testingHooks: TestingHooks = {
     walletInitPromise = undefined;
     walletInitFailureCount = 0;
     walletInitBackoffUntilMs = 0;
+    sdkInitFailureCount = 0;
+    sdkInitBackoffUntilMs = 0;
+    cleanupPromise = undefined;
     requestExecutionQueue = Promise.resolve();
     rateLimitQueue = Promise.resolve();
     requestTimestamps.splice(0, requestTimestamps.length);
@@ -1437,6 +1723,9 @@ const testHooksEnabled =
   process.env.STARKZAP_MCP_ENABLE_TEST_HOOKS === "1";
 const allowUnsafeTestHooks =
   process.env.STARKZAP_MCP_ALLOW_UNSAFE_TEST_HOOKS === "1";
+const unsafeTestHooksAcknowledged =
+  process.env.STARKZAP_MCP_UNSAFE_TEST_HOOKS_ACK ===
+  "I_UNDERSTAND_THIS_EXPOSES_WALLET_MUTATION";
 const testHookPrivateKeyIsSafe = (() => {
   try {
     return BigInt(env.STARKNET_PRIVATE_KEY) <= 1024n;
@@ -1450,9 +1739,11 @@ if (process.env.NODE_ENV === "test" && !testHooksEnabled) {
   );
 }
 if (testHooksEnabled) {
-  if (!testHookPrivateKeyIsSafe && !allowUnsafeTestHooks) {
+  const unsafeBypassEnabled =
+    allowUnsafeTestHooks && unsafeTestHooksAcknowledged;
+  if (!testHookPrivateKeyIsSafe && !unsafeBypassEnabled) {
     console.error(
-      "[starkzap-mcp] refusing to expose test hooks: STARKNET_PRIVATE_KEY does not look like a test key. Use STARKZAP_MCP_ALLOW_UNSAFE_TEST_HOOKS=1 to override."
+      "[starkzap-mcp] refusing to expose test hooks: STARKNET_PRIVATE_KEY does not look like a test key. To bypass in controlled environments only, set STARKZAP_MCP_ALLOW_UNSAFE_TEST_HOOKS=1 and STARKZAP_MCP_UNSAFE_TEST_HOOKS_ACK=I_UNDERSTAND_THIS_EXPOSES_WALLET_MUTATION."
     );
   } else {
     (globalThis as Record<string, unknown>).__STARKZAP_MCP_TESTING__ =
@@ -1463,6 +1754,23 @@ if (testHooksEnabled) {
 // ---------------------------------------------------------------------------
 // Start
 // ---------------------------------------------------------------------------
+function getSdkPackageVersion(): string {
+  try {
+    const sdkPackageJsonPath = require.resolve("starkzap/package.json");
+    const sdkPackageJson = JSON.parse(
+      readFileSync(sdkPackageJsonPath, "utf8")
+    ) as { version?: string };
+    if (typeof sdkPackageJson.version === "string" && sdkPackageJson.version) {
+      return sdkPackageJson.version;
+    }
+  } catch (error) {
+    console.error(
+      `[starkzap-mcp] failed to resolve starkzap package version: ${summarizeError(error)}`
+    );
+  }
+  return "unknown";
+}
+
 async function main() {
   const transport = new StdioServerTransport();
   await server.connect(transport);
@@ -1498,8 +1806,9 @@ async function main() {
     );
     return `unknown+${shortCommit}`;
   })();
+  const sdkVersion = getSdkPackageVersion();
   console.error(
-    `starkzap-mcp server running (version=${packageVersion}, commit=${commit}, network: ${network}, transport: stdio, write=${enableWrite}, execute=${enableExecute}, staking=${stakingEnabled}, maxAmount=${maxAmount}, maxBatchAmount=${maxBatchAmount}, rateLimitRpm=${rateLimitRpm}, readRateLimitRpm=${readRateLimitRpm}, writeRateLimitRpm=${writeRateLimitRpm}, rpcTimeoutMs=${rpcTimeoutMs})`
+    `starkzap-mcp server running (version=${packageVersion}, sdk=${sdkVersion}, commit=${commit}, network: ${network}, transport: stdio, write=${enableWrite}, execute=${enableExecute}, staking=${stakingEnabled}, maxAmount=${maxAmount}, maxBatchAmount=${maxBatchAmount}, rateLimitRpm=${rateLimitRpm}, readRateLimitRpm=${readRateLimitRpm}, writeRateLimitRpm=${writeRateLimitRpm}, rpcTimeoutMs=${rpcTimeoutMs}, poolCacheTtlMs=${poolClassHashCacheTtlMs})`
   );
 }
 
