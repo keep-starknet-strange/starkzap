@@ -112,7 +112,13 @@ function validatePositiveAmountLiteral(
     );
   }
   const referenceToken = getReferenceToken(network);
-  const parsed = Amount.parse(value, referenceToken);
+  let parsed: Amount;
+  try {
+    parsed = Amount.parse(value, referenceToken);
+  } catch (error) {
+    const reason = error instanceof Error ? error.message : String(error);
+    throw new Error(`Invalid --${argName} value "${value}". ${reason}`);
+  }
   if (parsed.isZero()) {
     throw new Error(
       `Invalid --${argName} value "${value}". Must be greater than zero.`

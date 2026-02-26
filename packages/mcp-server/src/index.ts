@@ -142,11 +142,14 @@ const envSchema = z.object({
 });
 
 const env = (() => {
-  const parsed = envSchema.safeParse(process.env);
+  const envInput = {
+    ...process.env,
+    STARKNET_PRIVATE_KEY: process.env.STARKNET_PRIVATE_KEY,
+  };
+  delete process.env.STARKNET_PRIVATE_KEY;
+  const parsed = envSchema.safeParse(envInput);
   if (parsed.success) {
-    const data = parsed.data;
-    delete process.env.STARKNET_PRIVATE_KEY;
-    return data;
+    return parsed.data;
   }
   const details = parsed.error.issues
     .map((issue) => `${issue.path.join(".") || "env"}: ${issue.message}`)
@@ -196,6 +199,12 @@ const stakingEnabled = Boolean(env.STARKNET_STAKING_CONTRACT);
 const rpcTimeoutMs = env.STARKNET_RPC_TIMEOUT_MS ?? 30_000;
 let nowProvider = () => Date.now();
 let stakingReferenceClassHashPromise: Promise<string | undefined> | undefined;
+const POOL_CLASS_HASH_CACHE_TTL_MS = 30_000;
+const poolClassHashCache = new Map<
+  Address,
+  { hash: string; expiresAtMs: number }
+>();
+const poolClassHashInFlight = new Map<Address, Promise<string>>();
 
 // ---------------------------------------------------------------------------
 // SDK + wallet singleton (lazy init)
@@ -449,6 +458,51 @@ async function resolveReferenceStakingClassHash(
   return stakingReferenceClassHashPromise;
 }
 
+function getCachedPoolClassHash(poolAddress: Address): string | undefined {
+  const cached = poolClassHashCache.get(poolAddress);
+  if (!cached) {
+    return undefined;
+  }
+  if (cached.expiresAtMs <= nowMs()) {
+    poolClassHashCache.delete(poolAddress);
+    return undefined;
+  }
+  return cached.hash;
+}
+
+async function getPoolClassHashWithCache(
+  wallet: Wallet,
+  poolAddress: Address
+): Promise<string> {
+  const cached = getCachedPoolClassHash(poolAddress);
+  if (cached) {
+    return cached;
+  }
+
+  const inFlight = poolClassHashInFlight.get(poolAddress);
+  if (inFlight) {
+    return inFlight;
+  }
+
+  const request = withTimeout(
+    `Pool contract existence check for ${poolAddress}`,
+    () => wallet.getProvider().getClassHashAt(poolAddress)
+  )
+    .then((hash) => {
+      const normalized = fromAddress(hash);
+      poolClassHashCache.set(poolAddress, {
+        hash: normalized,
+        expiresAtMs: nowMs() + POOL_CLASS_HASH_CACHE_TTL_MS,
+      });
+      return normalized;
+    })
+    .finally(() => {
+      poolClassHashInFlight.delete(poolAddress);
+    });
+  poolClassHashInFlight.set(poolAddress, request);
+  return request;
+}
+
 async function assertPoolClassHashAllowed(
   wallet: Wallet,
   poolAddress: Address,
@@ -466,7 +520,7 @@ async function assertPoolClassHashAllowed(
   }
   if (!expected.has(poolClassHash)) {
     throw new Error(
-      `Invalid pool class hash ${poolClassHash} for ${poolAddress}. Expected one of: ${Array.from(expected).join(", ")}.`
+      `Invalid pool class hash ${poolClassHash} for ${poolAddress}. Pool type is not in the configured allowlist.`
     );
   }
 }
@@ -498,12 +552,7 @@ async function resolvePoolTokenForOperation(
 ): Promise<Token> {
   let poolClassHash: string;
   try {
-    poolClassHash = fromAddress(
-      await withTimeout(
-        `Pool contract existence check for ${poolAddress}`,
-        () => wallet.getProvider().getClassHashAt(poolAddress)
-      )
-    );
+    poolClassHash = await getPoolClassHashWithCache(wallet, poolAddress);
   } catch (error) {
     if (isClassHashNotFoundError(error)) {
       throw new Error(
@@ -996,7 +1045,7 @@ async function handleTool(
         const expectedClassHash = fromAddress(wallet.getClassHash());
         if (deployedClassHash !== expectedClassHash) {
           throw new Error(
-            `Address ${wallet.address} is deployed with unexpected class hash ${deployedClassHash}. Expected ${expectedClassHash}.`
+            `Address ${wallet.address} is deployed with unexpected class hash ${deployedClassHash}. Expected ${expectedClassHash}. Use the private key that controls this deployed account, or use a different private key and deploy it first with x_deploy_account.`
           );
         }
         return ok({
@@ -1369,6 +1418,8 @@ const testingHooks: TestingHooks = {
     writeRequestTimestamps.splice(0, writeRequestTimestamps.length);
     activeTransactionHashes.clear();
     timedOutTransactionHashes.clear();
+    poolClassHashCache.clear();
+    poolClassHashInFlight.clear();
     stakingReferenceClassHashPromise = undefined;
     nowProvider = () => Date.now();
   },
@@ -1377,13 +1428,27 @@ const testingHooks: TestingHooks = {
 const testHooksEnabled =
   process.env.NODE_ENV === "test" &&
   process.env.X_MCP_ENABLE_TEST_HOOKS === "1";
+const allowUnsafeTestHooks = process.env.X_MCP_ALLOW_UNSAFE_TEST_HOOKS === "1";
+const testHookPrivateKeyIsSafe = (() => {
+  try {
+    return BigInt(env.STARKNET_PRIVATE_KEY) <= 1024n;
+  } catch {
+    return false;
+  }
+})();
 if (process.env.NODE_ENV === "test" && !testHooksEnabled) {
   console.error(
     "[x-mcp] NODE_ENV=test detected, but test hooks are disabled. Set X_MCP_ENABLE_TEST_HOOKS=1 to enable hooks."
   );
 }
 if (testHooksEnabled) {
-  (globalThis as Record<string, unknown>).__X_MCP_TESTING__ = testingHooks;
+  if (!testHookPrivateKeyIsSafe && !allowUnsafeTestHooks) {
+    console.error(
+      "[x-mcp] refusing to expose test hooks: STARKNET_PRIVATE_KEY does not look like a test key. Use X_MCP_ALLOW_UNSAFE_TEST_HOOKS=1 to override."
+    );
+  } else {
+    (globalThis as Record<string, unknown>).__X_MCP_TESTING__ = testingHooks;
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -1440,7 +1505,8 @@ if (isMainModule) {
     console.error(
       `[x-mcp] ${signal} received. pendingTx=${pending.length === 0 ? "none" : pending.join(",")} timedOutTx=${timedOut.length === 0 ? "none" : timedOut.join(",")}`
     );
-    let exitCode = 0;
+    const signalExitCode = signal === "SIGINT" ? 130 : 143;
+    let exitCode = signalExitCode;
     try {
       await server.close();
       await cleanupWalletAndSdkResources();

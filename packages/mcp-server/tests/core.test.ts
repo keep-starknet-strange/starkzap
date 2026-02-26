@@ -3,7 +3,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { Amount } from "starkzap";
 import type { Token } from "starkzap";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
   addressSchema,
   amountSchema,
@@ -95,6 +95,16 @@ describe("CLI parsing", () => {
     expect(() =>
       parseCliConfig(["--network", "sepolia", "--wat", "1"])
     ).toThrow(/Unknown flag --wat/);
+  });
+
+  it("wraps max-amount parser failures with CLI context", () => {
+    const parseSpy = vi.spyOn(Amount, "parse").mockImplementation(() => {
+      throw new Error("precision overflow");
+    });
+    expect(() =>
+      parseCliConfig(["--network", "sepolia", "--max-amount", "1.5"])
+    ).toThrow(/Invalid --max-amount value "1\.5"\. precision overflow/);
+    parseSpy.mockRestore();
   });
 
   it("fails fast on extremely high rate-limit-rpm", () => {
