@@ -1,5 +1,18 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { Amount, ChainId, fromAddress, type Token } from "@/types";
+
+const avnuMocks = vi.hoisted(() => ({
+  getQuotes: vi.fn(),
+  quoteToCalls: vi.fn(),
+}));
+
+vi.mock("@avnu/avnu-sdk", () => ({
+  BASE_URL: "https://starknet.api.avnu.fi",
+  SEPOLIA_BASE_URL: "https://sepolia.api.avnu.fi",
+  getQuotes: avnuMocks.getQuotes,
+  quoteToCalls: avnuMocks.quoteToCalls,
+}));
+
 import { AvnuSwapProvider } from "@/swap/avnu";
 
 const tokenIn: Token = {
@@ -18,18 +31,21 @@ const tokenOut: Token = {
 
 const takerAddress = fromAddress("0xabc");
 
-function jsonResponse(payload: unknown, status = 200): Response {
+function makeQuote(overrides: Record<string, unknown> = {}) {
   return {
-    ok: status >= 200 && status < 300,
-    status,
-    json: async () => payload,
-  } as unknown as Response;
+    quoteId: "q-1",
+    sellAmount: 1000000n,
+    buyAmount: 2500000n,
+    priceImpact: 0.5,
+    ...overrides,
+  };
 }
 
 describe("AvnuSwapProvider", () => {
   afterEach(() => {
     vi.restoreAllMocks();
-    vi.unstubAllGlobals();
+    avnuMocks.getQuotes.mockReset();
+    avnuMocks.quoteToCalls.mockReset();
   });
 
   it("supports mainnet and sepolia", () => {
@@ -40,17 +56,7 @@ describe("AvnuSwapProvider", () => {
   });
 
   it("fetches quotes and normalizes quote fields", async () => {
-    const fetchMock = vi.fn().mockResolvedValue(
-      jsonResponse([
-        {
-          quoteId: "q-1",
-          sellAmount: "1000000",
-          buyAmount: "2500000",
-          priceImpact: 0.5,
-        },
-      ])
-    );
-    vi.stubGlobal("fetch", fetchMock as unknown as typeof fetch);
+    avnuMocks.getQuotes.mockResolvedValue([makeQuote()]);
 
     const provider = new AvnuSwapProvider({
       apiBases: {
@@ -74,41 +80,36 @@ describe("AvnuSwapProvider", () => {
       provider: "avnu",
     });
 
-    const [url] = fetchMock.mock.calls[0]!;
-    const parsed = new URL(url as string);
-    expect(parsed.origin).toBe("https://mock-main.avnu.fi");
-    expect(parsed.pathname).toBe("/swap/v3/quotes");
-    expect(parsed.searchParams.get("sellAmount")).toBe("0xf4240");
-    expect(parsed.searchParams.get("sellTokenAddress")).toBe(tokenIn.address);
-    expect(parsed.searchParams.get("buyTokenAddress")).toBe(tokenOut.address);
-    expect(parsed.searchParams.get("takerAddress")).toBe(takerAddress);
+    expect(avnuMocks.getQuotes).toHaveBeenCalledWith(
+      {
+        sellTokenAddress: tokenIn.address,
+        buyTokenAddress: tokenOut.address,
+        sellAmount: 1000000n,
+        size: 5,
+        takerAddress,
+      },
+      { baseUrl: "https://mock-main.avnu.fi" }
+    );
   });
 
   it("builds swap calls and includes slippage", async () => {
-    const fetchMock = vi
-      .fn()
-      .mockResolvedValueOnce(
-        jsonResponse([
-          {
-            quoteId: "q-42",
-            sellAmount: "1000000",
-            buyAmount: "2200000",
-            priceImpact: 0.2,
-          },
-        ])
-      )
-      .mockResolvedValueOnce(
-        jsonResponse({
-          calls: [
-            {
-              contractAddress: "0x123",
-              entrypoint: "swap",
-              calldata: ["0x1", 2, 3n],
-            },
-          ],
-        })
-      );
-    vi.stubGlobal("fetch", fetchMock as unknown as typeof fetch);
+    avnuMocks.getQuotes.mockResolvedValue([
+      makeQuote({
+        quoteId: "q-42",
+        buyAmount: 2200000n,
+        priceImpact: 0.2,
+      }),
+    ]);
+    avnuMocks.quoteToCalls.mockResolvedValue({
+      chainId: "SN_MAIN",
+      calls: [
+        {
+          contractAddress: "0x123",
+          entrypoint: "swap",
+          calldata: ["0x1", 2, 3n],
+        },
+      ],
+    });
 
     const provider = new AvnuSwapProvider({
       apiBases: {
@@ -132,41 +133,27 @@ describe("AvnuSwapProvider", () => {
       {
         contractAddress: "0x123",
         entrypoint: "swap",
-        calldata: ["0x1", "2", "3"],
+        calldata: ["1", "2", "3"],
       },
     ]);
 
-    const [, init] = fetchMock.mock.calls[1]!;
-    expect(init).toMatchObject({
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
+    expect(avnuMocks.quoteToCalls).toHaveBeenCalledWith(
+      {
+        quoteId: "q-42",
+        slippage: 0.01,
+        executeApprove: true,
+        takerAddress,
       },
-    });
-
-    const body = JSON.parse((init as RequestInit).body as string);
-    expect(body).toEqual({
-      quoteId: "q-42",
-      includeApprove: true,
-      takerAddress,
-      slippage: 0.01,
-    });
+      { baseUrl: "https://mock-main.avnu.fi" }
+    );
   });
 
   it("falls back to second Sepolia endpoint when first has no routes", async () => {
-    const fetchMock = vi
-      .fn()
-      .mockResolvedValueOnce(jsonResponse([]))
-      .mockResolvedValueOnce(
-        jsonResponse([
-          {
-            quoteId: "q-2",
-            sellAmount: "1000000",
-            buyAmount: "1900000",
-          },
-        ])
-      );
-    vi.stubGlobal("fetch", fetchMock as unknown as typeof fetch);
+    avnuMocks.getQuotes
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([
+        makeQuote({ quoteId: "q-2", buyAmount: 1900000n }),
+      ]);
 
     const provider = new AvnuSwapProvider();
 
@@ -178,17 +165,17 @@ describe("AvnuSwapProvider", () => {
     });
 
     expect(quote.amountOutBase).toBe(1900000n);
-    expect(fetchMock).toHaveBeenCalledTimes(2);
-
-    const firstUrl = new URL(fetchMock.mock.calls[0]![0] as string);
-    const secondUrl = new URL(fetchMock.mock.calls[1]![0] as string);
-    expect(firstUrl.origin).toBe("https://sepolia.api.avnu.fi");
-    expect(secondUrl.origin).toBe("https://starknet.api.avnu.fi");
+    expect(avnuMocks.getQuotes).toHaveBeenCalledTimes(2);
+    expect(avnuMocks.getQuotes.mock.calls[0]![1]).toEqual({
+      baseUrl: "https://sepolia.api.avnu.fi",
+    });
+    expect(avnuMocks.getQuotes.mock.calls[1]![1]).toEqual({
+      baseUrl: "https://starknet.api.avnu.fi",
+    });
   });
 
   it("returns actionable error when all routes are unavailable", async () => {
-    const fetchMock = vi.fn().mockResolvedValue(jsonResponse([]));
-    vi.stubGlobal("fetch", fetchMock as unknown as typeof fetch);
+    avnuMocks.getQuotes.mockResolvedValue([]);
 
     const provider = new AvnuSwapProvider();
 
@@ -203,23 +190,11 @@ describe("AvnuSwapProvider", () => {
   });
 
   it("throws when AVNU build returns zero calls", async () => {
-    const fetchMock = vi
-      .fn()
-      .mockResolvedValueOnce(
-        jsonResponse([
-          {
-            quoteId: "q-empty",
-            sellAmount: "1000000",
-            buyAmount: "1200000",
-          },
-        ])
-      )
-      .mockResolvedValueOnce(
-        jsonResponse({
-          calls: [],
-        })
-      );
-    vi.stubGlobal("fetch", fetchMock as unknown as typeof fetch);
+    avnuMocks.getQuotes.mockResolvedValue([makeQuote({ quoteId: "q-empty" })]);
+    avnuMocks.quoteToCalls.mockResolvedValue({
+      chainId: "SN_MAIN",
+      calls: [],
+    });
 
     const provider = new AvnuSwapProvider({
       apiBases: {
