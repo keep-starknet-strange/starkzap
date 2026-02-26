@@ -1,10 +1,10 @@
-# StarkZap MCP Server (`x-mcp`)
+# StarkZap MCP Server (`starkzap-mcp`)
 
 An [MCP (Model Context Protocol)](https://modelcontextprotocol.io/) server that exposes Starknet wallet operations to AI agents via the [StarkZap SDK](https://github.com/keep-starknet-strange/starkzap).
 
 Any MCP-compatible client (Claude, Cursor, OpenAI Agents SDK, etc.) can use these tools to manage wallets, transfer tokens, stake STRK, and execute contract calls on Starknet.
 
-Current package/binary names in this repo are still `@keep-starknet-strange/x-mcp` and `x-mcp`.
+Package and binary names are `@keep-starknet-strange/starkzap-mcp` and `starkzap-mcp`.
 
 ## Why
 
@@ -29,7 +29,7 @@ STARKNET_PRIVATE_KEY=0x... STARKNET_STAKING_CONTRACT=0x... node dist/index.js --
 
 This server handles real funds. The following protections are built in:
 
-1. **All state-changing tools are disabled by default.** Read-only tools are available without write flags. Write tools (`x_transfer`, staking, `x_deploy_account`) require `--enable-write`. The unrestricted `x_execute` tool requires its own `--enable-execute` flag.
+1. **All state-changing tools are disabled by default.** Read-only tools are available without write flags. Write tools (`starkzap_transfer`, staking, `starkzap_deploy_account`) require `--enable-write`. The unrestricted `starkzap_execute` tool requires its own `--enable-execute` flag.
 2. **Amount caps are enforced for both single ops and transfer batches.** All amount-bearing operations (transfers and staking) are bounded by `--max-amount` (default: 1000 tokens). Transfer batches are also bounded by `--max-batch-amount` (default: same as `--max-amount`). For state-dependent staking exits/claims, caps use multi-check preflight validation and remain best-effort with minimal residual chain-state race windows.
 3. **Batch size limits.** Maximum 20 transfers per batch, 10 calls per execute batch.
 4. **Address validation.** All addresses are validated against Starknet felt252 format before use.
@@ -63,16 +63,16 @@ This server handles real funds. The following protections are built in:
 
 ### CLI Arguments
 
-| Argument                 | Default                | Description                                                                          |
-| ------------------------ | ---------------------- | ------------------------------------------------------------------------------------ |
-| `--network`              | `mainnet`              | Network preset: `mainnet` or `sepolia` (validated at startup)                        |
-| `--max-amount`           | `1000`                 | Max tokens per individual amount-bearing operation                                   |
-| `--max-batch-amount`     | `same as --max-amount` | Max total tokens across one `x_transfer` batch call                                  |
-| `--rate-limit-rpm`       | `0` (disabled)         | Global MCP tool-call rate limit per minute                                           |
-| `--read-rate-limit-rpm`  | `0` (disabled)         | Optional read-only bucket (`x_get_balance`, `x_get_pool_position`, `x_estimate_fee`) |
-| `--write-rate-limit-rpm` | `0` (disabled)         | Optional state-changing bucket (transfer/staking/deploy/execute)                     |
-| `--enable-write`         | off                    | Enable state-changing tools (transfer, stake, deploy)                                |
-| `--enable-execute`       | off                    | Enable only the unrestricted `x_execute` tool                                        |
+| Argument                 | Default                | Description                                                                                               |
+| ------------------------ | ---------------------- | --------------------------------------------------------------------------------------------------------- |
+| `--network`              | `mainnet`              | Network preset: `mainnet` or `sepolia` (validated at startup)                                             |
+| `--max-amount`           | `1000`                 | Max tokens per individual amount-bearing operation                                                        |
+| `--max-batch-amount`     | `same as --max-amount` | Max total tokens across one `starkzap_transfer` batch call                                                |
+| `--rate-limit-rpm`       | `0` (disabled)         | Global MCP tool-call rate limit per minute                                                                |
+| `--read-rate-limit-rpm`  | `0` (disabled)         | Optional read-only bucket (`starkzap_get_balance`, `starkzap_get_pool_position`, `starkzap_estimate_fee`) |
+| `--write-rate-limit-rpm` | `0` (disabled)         | Optional state-changing bucket (transfer/staking/deploy/execute)                                          |
+| `--enable-write`         | off                    | Enable state-changing tools (transfer, stake, deploy)                                                     |
+| `--enable-execute`       | off                    | Enable only the unrestricted `starkzap_execute` tool                                                      |
 
 ## MCP Client Configuration
 
@@ -122,25 +122,25 @@ const mcpServer = new McpServerStdio({
 
 ### Wallet
 
-| Tool               | Description                                                 |
-| ------------------ | ----------------------------------------------------------- |
-| `x_get_account`    | Get connected account address/deployment/class hash details |
-| `x_get_balance`    | Get ERC20 token balance (human-readable + raw)              |
-| `x_transfer`       | Transfer tokens to one or more recipients                   |
-| `x_execute`        | Execute raw contract calls atomically                       |
-| `x_deploy_account` | Deploy the account contract on-chain                        |
-| `x_estimate_fee`   | Estimate gas cost for contract calls                        |
+| Tool                      | Description                                                 |
+| ------------------------- | ----------------------------------------------------------- |
+| `starkzap_get_account`    | Get connected account address/deployment/class hash details |
+| `starkzap_get_balance`    | Get ERC20 token balance (human-readable + raw)              |
+| `starkzap_transfer`       | Transfer tokens to one or more recipients                   |
+| `starkzap_execute`        | Execute raw contract calls atomically                       |
+| `starkzap_deploy_account` | Deploy the account contract on-chain                        |
+| `starkzap_estimate_fee`   | Estimate gas cost for contract calls                        |
 
 ### Staking
 
-| Tool                  | Description                                                           |
-| --------------------- | --------------------------------------------------------------------- |
-| `x_enter_pool`        | Enter a staking/delegation pool (pool token is chain-derived)         |
-| `x_add_to_pool`       | Add more tokens to an existing stake (pool token is chain-derived)    |
-| `x_claim_rewards`     | Claim accumulated staking rewards                                     |
-| `x_exit_pool_intent`  | Start exit process (tokens stop earning, pool token is chain-derived) |
-| `x_exit_pool`         | Complete exit after waiting period                                    |
-| `x_get_pool_position` | Query staking position, rewards, commission                           |
+| Tool                         | Description                                                           |
+| ---------------------------- | --------------------------------------------------------------------- |
+| `starkzap_enter_pool`        | Enter a staking/delegation pool (pool token is chain-derived)         |
+| `starkzap_add_to_pool`       | Add more tokens to an existing stake (pool token is chain-derived)    |
+| `starkzap_claim_rewards`     | Claim accumulated staking rewards                                     |
+| `starkzap_exit_pool_intent`  | Start exit process (tokens stop earning, pool token is chain-derived) |
+| `starkzap_exit_pool`         | Complete exit after waiting period                                    |
+| `starkzap_get_pool_position` | Query staking position, rewards, commission                           |
 
 ## Tool Examples
 
@@ -148,7 +148,7 @@ const mcpServer = new McpServerStdio({
 
 ```text
 Agent: "What's my STRK balance?"
-→ calls x_get_balance { token: "STRK" }
+→ calls starkzap_get_balance { token: "STRK" }
 ← { token: "STRK", balance: "150.25", formatted: "150.25 STRK", raw: "150250000000000000000", decimals: 18 }
 ```
 
@@ -156,7 +156,7 @@ Agent: "What's my STRK balance?"
 
 ```text
 Agent: "What account am I using?"
-→ calls x_get_account {}
+→ calls starkzap_get_account {}
 ← { address: "0x...", deployed: true, expectedClassHash: "0x...", deployedClassHash: "0x..." }
 ```
 
@@ -164,7 +164,7 @@ Agent: "What account am I using?"
 
 ```text
 Agent: "Send 10 USDC to 0x1111111111111111111111111111111111111111 and 5 USDC to 0x2222222222222222222222222222222222222222"
-→ calls x_transfer {
+→ calls starkzap_transfer {
     token: "USDC",
     transfers: [
       { to: "0x1111111111111111111111111111111111111111", amount: "10" },
@@ -178,7 +178,7 @@ Agent: "Send 10 USDC to 0x1111111111111111111111111111111111111111 and 5 USDC to
 
 ```text
 Agent: "Stake 100 STRK in pool 0x3333333333333333333333333333333333333333"
-→ calls x_enter_pool { pool: "0x3333333333333333333333333333333333333333", amount: "100" }
+→ calls starkzap_enter_pool { pool: "0x3333333333333333333333333333333333333333", amount: "100" }
 ← { hash: "0x...", pool: "0x3333333333333333333333333333333333333333", amount: "100", symbol: "STRK" }
 ```
 
@@ -192,17 +192,17 @@ Use this sequence when validating real writes (not just tests):
 
 1. Start with write enabled:
    `STARKNET_PRIVATE_KEY=0x... node dist/index.js --network sepolia --enable-write`
-2. Call `x_get_account` first to confirm the **derived** address and class hash.
-3. Confirm fees balance with `x_get_balance` for `STRK` (and optionally `ETH`).
-4. If account is not deployed, call `x_deploy_account`.
-5. Execute a tiny self-transfer (e.g. `0.00001`) with `x_transfer`.
+2. Call `starkzap_get_account` first to confirm the **derived** address and class hash.
+3. Confirm fees balance with `starkzap_get_balance` for `STRK` (and optionally `ETH`).
+4. If account is not deployed, call `starkzap_deploy_account`.
+5. Execute a tiny self-transfer (e.g. `0.00001`) with `starkzap_transfer`.
 
 Troubleshooting from live runs:
 
 - If startup says private key is invalid, check key length: it must be 64 hex chars after `0x` (32 bytes). If your source omits a leading zero, left-pad before use.
-- If your expected wallet address does not match, trust `x_get_account` output. The MCP uses StarkZap wallet derivation from the private key.
+- If your expected wallet address does not match, trust `starkzap_get_account` output. The MCP uses StarkZap wallet derivation from the private key.
 - If sponsored deploy/transfer fails with paymaster errors (e.g. invalid API key), use funded user-pays mode or configure a valid paymaster setup in your environment.
-- If write tx fails with undeployed account errors, run `x_deploy_account` first, then retry transfer.
+- If write tx fails with undeployed account errors, run `starkzap_deploy_account` first, then retry transfer.
 
 ## Security Checklist
 

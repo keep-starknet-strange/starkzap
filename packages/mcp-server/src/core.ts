@@ -307,11 +307,11 @@ const calldataSchema = z
 // NOTE: Keep this map in sync with MCP tool inputSchema in buildTools().
 // assertSchemaParity() runs at startup and in tests to prevent schema drift.
 export const schemas = {
-  x_get_account: z.object({}),
-  x_get_balance: z.object({
+  starkzap_get_account: z.object({}),
+  starkzap_get_balance: z.object({
     token: z.string().min(1),
   }),
-  x_transfer: z.object({
+  starkzap_transfer: z.object({
     token: z.string().min(1),
     transfers: z
       .array(
@@ -324,7 +324,7 @@ export const schemas = {
       .max(20, "Maximum 20 transfers per batch"),
     sponsored: z.boolean().optional(),
   }),
-  x_execute: z.object({
+  starkzap_execute: z.object({
     calls: z
       .array(
         z.object({
@@ -337,34 +337,34 @@ export const schemas = {
       .max(10, "Maximum 10 calls per batch"),
     sponsored: z.boolean().optional(),
   }),
-  x_deploy_account: z.object({
+  starkzap_deploy_account: z.object({
     sponsored: z.boolean().optional(),
   }),
-  x_enter_pool: z.object({
+  starkzap_enter_pool: z.object({
     pool: addressSchema,
     amount: amountSchema,
     token: z.string().optional(),
   }),
-  x_add_to_pool: z.object({
+  starkzap_add_to_pool: z.object({
     pool: addressSchema,
     amount: amountSchema,
     token: z.string().optional(),
   }),
-  x_claim_rewards: z.object({
+  starkzap_claim_rewards: z.object({
     pool: addressSchema,
   }),
-  x_exit_pool_intent: z.object({
+  starkzap_exit_pool_intent: z.object({
     pool: addressSchema,
     amount: amountSchema,
     token: z.string().optional(),
   }),
-  x_exit_pool: z.object({
+  starkzap_exit_pool: z.object({
     pool: addressSchema,
   }),
-  x_get_pool_position: z.object({
+  starkzap_get_pool_position: z.object({
     pool: addressSchema,
   }),
-  x_estimate_fee: z.object({
+  starkzap_estimate_fee: z.object({
     calls: z
       .array(
         z.object({
@@ -381,7 +381,7 @@ export const schemas = {
 export function buildTools(maxAmount: string, maxBatchAmount: string): Tool[] {
   return [
     {
-      name: "x_get_account",
+      name: "starkzap_get_account",
       description:
         "Get connected account details derived from STARKNET_PRIVATE_KEY: address, deployment status, and class hashes.",
       annotations: {
@@ -396,7 +396,7 @@ export function buildTools(maxAmount: string, maxBatchAmount: string): Tool[] {
       },
     },
     {
-      name: "x_get_balance",
+      name: "starkzap_get_balance",
       description:
         "Get the wallet's ERC20 token balance. Returns human-readable and raw values.",
       annotations: {
@@ -418,7 +418,7 @@ export function buildTools(maxAmount: string, maxBatchAmount: string): Tool[] {
       },
     },
     {
-      name: "x_transfer",
+      name: "starkzap_transfer",
       description:
         `Transfer ERC20 tokens to one or more recipients in a single transaction. ` +
         `Maximum ${maxAmount} tokens per individual transfer. ` +
@@ -468,7 +468,7 @@ export function buildTools(maxAmount: string, maxBatchAmount: string): Tool[] {
       },
     },
     {
-      name: "x_execute",
+      name: "starkzap_execute",
       description:
         "Execute one or more raw contract calls atomically. RESTRICTED: only available when server is started with --enable-execute flag. Maximum 10 calls per batch.",
       annotations: {
@@ -516,7 +516,7 @@ export function buildTools(maxAmount: string, maxBatchAmount: string): Tool[] {
       },
     },
     {
-      name: "x_deploy_account",
+      name: "starkzap_deploy_account",
       description:
         "Deploy the account contract on-chain. Must be called before the account can send transactions (unless using sponsored mode, which auto-deploys).",
       annotations: {
@@ -536,7 +536,7 @@ export function buildTools(maxAmount: string, maxBatchAmount: string): Tool[] {
       },
     },
     {
-      name: "x_enter_pool",
+      name: "starkzap_enter_pool",
       description: `Enter a staking/delegation pool as a new member. Amount is parsed using the pool's canonical token decimals from chain metadata. Optional token hint must match the pool token. Maximum ${maxAmount} tokens per operation.`,
       annotations: {
         readOnlyHint: false,
@@ -567,7 +567,7 @@ export function buildTools(maxAmount: string, maxBatchAmount: string): Tool[] {
       },
     },
     {
-      name: "x_add_to_pool",
+      name: "starkzap_add_to_pool",
       description: `Add more tokens to an existing stake in a pool. Amount is parsed using the pool's canonical token decimals from chain metadata. Optional token hint must match the pool token. Maximum ${maxAmount} tokens per operation.`,
       annotations: {
         readOnlyHint: false,
@@ -598,7 +598,7 @@ export function buildTools(maxAmount: string, maxBatchAmount: string): Tool[] {
       },
     },
     {
-      name: "x_claim_rewards",
+      name: "starkzap_claim_rewards",
       description: "Claim accumulated staking rewards from a pool.",
       annotations: {
         readOnlyHint: false,
@@ -618,8 +618,8 @@ export function buildTools(maxAmount: string, maxBatchAmount: string): Tool[] {
       },
     },
     {
-      name: "x_exit_pool_intent",
-      description: `Start the exit process from a pool. Amount is parsed using the pool's canonical token decimals from chain metadata. Optional token hint must match the pool token. Maximum ${maxAmount} tokens per operation. Tokens stop earning rewards immediately. Must wait for the exit window before calling x_exit_pool.`,
+      name: "starkzap_exit_pool_intent",
+      description: `Start the exit process from a pool. Amount is parsed using the pool's canonical token decimals from chain metadata. Optional token hint must match the pool token. Maximum ${maxAmount} tokens per operation. Tokens stop earning rewards immediately. Must wait for the exit window before calling starkzap_exit_pool.`,
       annotations: {
         readOnlyHint: false,
         destructiveHint: true,
@@ -649,7 +649,7 @@ export function buildTools(maxAmount: string, maxBatchAmount: string): Tool[] {
       },
     },
     {
-      name: "x_exit_pool",
+      name: "starkzap_exit_pool",
       description:
         "Complete the exit from a pool after the waiting period. Returns staked tokens to the wallet.",
       annotations: {
@@ -670,7 +670,7 @@ export function buildTools(maxAmount: string, maxBatchAmount: string): Tool[] {
       },
     },
     {
-      name: "x_get_pool_position",
+      name: "starkzap_get_pool_position",
       description:
         "Get the wallet's staking position in a pool: staked amount, rewards, commission, exit status.",
       annotations: {
@@ -691,7 +691,7 @@ export function buildTools(maxAmount: string, maxBatchAmount: string): Tool[] {
       },
     },
     {
-      name: "x_estimate_fee",
+      name: "starkzap_estimate_fee",
       description:
         "Estimate the gas fee for one or more contract calls. Returns overall_fee and resource bounds (l1_gas, l2_gas, l1_data_gas). Maximum 10 calls per estimate batch.",
       annotations: {
@@ -738,19 +738,19 @@ export function buildTools(maxAmount: string, maxBatchAmount: string): Tool[] {
 }
 
 export const READ_ONLY_TOOLS = new Set([
-  "x_get_account",
-  "x_get_balance",
-  "x_get_pool_position",
-  "x_estimate_fee",
+  "starkzap_get_account",
+  "starkzap_get_balance",
+  "starkzap_get_pool_position",
+  "starkzap_estimate_fee",
 ]);
 
 export const STAKING_TOOLS = new Set([
-  "x_enter_pool",
-  "x_add_to_pool",
-  "x_claim_rewards",
-  "x_exit_pool_intent",
-  "x_exit_pool",
-  "x_get_pool_position",
+  "starkzap_enter_pool",
+  "starkzap_add_to_pool",
+  "starkzap_claim_rewards",
+  "starkzap_exit_pool_intent",
+  "starkzap_exit_pool",
+  "starkzap_get_pool_position",
 ]);
 
 export function selectTools(
@@ -768,7 +768,7 @@ export function selectTools(
     if (READ_ONLY_TOOLS.has(tool.name)) {
       return true;
     }
-    if (tool.name === "x_execute") {
+    if (tool.name === "starkzap_execute") {
       return options.enableExecute;
     }
     return options.enableWrite;

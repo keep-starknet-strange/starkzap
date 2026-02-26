@@ -140,13 +140,13 @@ describe("schema hardening", () => {
       entrypoint: "transfer",
       calldata: [],
     }));
-    const parsed = schemas.x_estimate_fee.safeParse({ calls });
+    const parsed = schemas.starkzap_estimate_fee.safeParse({ calls });
     expect(parsed.success).toBe(false);
   });
 
   it("bounds calldata payload size", () => {
     const oversized = "a".repeat(257);
-    const parsed = schemas.x_execute.safeParse({
+    const parsed = schemas.starkzap_execute.safeParse({
       calls: [
         {
           contractAddress: TEST_TOKEN.address,
@@ -159,7 +159,7 @@ describe("schema hardening", () => {
   });
 
   it("validates calldata felt-like format", () => {
-    const parsed = schemas.x_execute.safeParse({
+    const parsed = schemas.starkzap_execute.safeParse({
       calls: [
         {
           contractAddress: TEST_TOKEN.address,
@@ -172,7 +172,7 @@ describe("schema hardening", () => {
   });
 
   it("validates entrypoint identifier format", () => {
-    const parsed = schemas.x_execute.safeParse({
+    const parsed = schemas.starkzap_execute.safeParse({
       calls: [
         {
           contractAddress: TEST_TOKEN.address,
@@ -211,14 +211,14 @@ describe("schema hardening", () => {
 });
 
 describe("tool gating and parity", () => {
-  it("always exposes x_get_account as a read-only tool", () => {
+  it("always exposes starkzap_get_account as a read-only tool", () => {
     const readOnlyOnly = selectTools(buildTools("100", "150"), {
       enableWrite: false,
       enableExecute: false,
       stakingEnabled: false,
     });
     const names = new Set(readOnlyOnly.map((tool) => tool.name));
-    expect(names.has("x_get_account")).toBe(true);
+    expect(names.has("starkzap_get_account")).toBe(true);
   });
 
   it("hides staking tools when staking config is absent", () => {
@@ -246,9 +246,9 @@ describe("tool gating and parity", () => {
       stakingEnabled: true,
     });
     const names = new Set(tools.map((tool) => tool.name));
-    expect(names.has("x_execute")).toBe(true);
-    expect(names.has("x_transfer")).toBe(false);
-    expect(names.has("x_enter_pool")).toBe(false);
+    expect(names.has("starkzap_execute")).toBe(true);
+    expect(names.has("starkzap_transfer")).toBe(false);
+    expect(names.has("starkzap_enter_pool")).toBe(false);
   });
 
   it("includes MCP tool annotations for safety-aware clients", () => {

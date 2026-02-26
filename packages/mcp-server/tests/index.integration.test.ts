@@ -56,13 +56,14 @@ let testing: TestingExports;
 
 beforeAll(async () => {
   process.env.NODE_ENV = "test";
-  process.env.X_MCP_ENABLE_TEST_HOOKS = "1";
+  process.env.STARKZAP_MCP_ENABLE_TEST_HOOKS = "1";
   process.env.STARKNET_PRIVATE_KEY = `0x${"1".padStart(64, "0")}`;
   await import("../src/index.js");
-  const hooks = (globalThis as Record<string, unknown>).__X_MCP_TESTING__;
+  const hooks = (globalThis as Record<string, unknown>)
+    .__STARKZAP_MCP_TESTING__;
   if (!hooks) {
     throw new Error(
-      "Expected __X_MCP_TESTING__ hooks to be available in tests"
+      "Expected __STARKZAP_MCP_TESTING__ hooks to be available in tests"
     );
   }
   testing = hooks as TestingExports;
@@ -162,7 +163,7 @@ describe("index integration hardening", () => {
   it("handles MCP request path end-to-end for validation and sanitization", async () => {
     const validationResponse = await testing.handleCallToolRequest({
       params: {
-        name: "x_get_balance",
+        name: "starkzap_get_balance",
         arguments: {},
       },
     });
@@ -178,7 +179,7 @@ describe("index integration hardening", () => {
     } as unknown as Wallet);
     const sanitizedResponse = await testing.handleCallToolRequest({
       params: {
-        name: "x_get_balance",
+        name: "starkzap_get_balance",
         arguments: { token: "STRK" },
       },
     });
@@ -194,7 +195,7 @@ describe("index integration hardening", () => {
   it("allows read-only tasks to run concurrently", async () => {
     const events: string[] = [];
     const readA = testing.runWithToolConcurrencyPolicy(
-      "x_get_balance",
+      "starkzap_get_balance",
       async () => {
         events.push("A:start");
         await delay(20);
@@ -202,7 +203,7 @@ describe("index integration hardening", () => {
       }
     );
     const readB = testing.runWithToolConcurrencyPolicy(
-      "x_estimate_fee",
+      "starkzap_estimate_fee",
       async () => {
         events.push("B:start");
         await delay(5);
@@ -217,7 +218,7 @@ describe("index integration hardening", () => {
   it("serializes state-changing tasks", async () => {
     const events: string[] = [];
     const writeA = testing.runWithToolConcurrencyPolicy(
-      "x_transfer",
+      "starkzap_transfer",
       async () => {
         events.push("A:start");
         await delay(20);
@@ -226,7 +227,7 @@ describe("index integration hardening", () => {
     );
     await delay(1);
     const writeB = testing.runWithToolConcurrencyPolicy(
-      "x_transfer",
+      "starkzap_transfer",
       async () => {
         events.push("B:start");
         await delay(5);

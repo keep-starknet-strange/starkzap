@@ -1,13 +1,13 @@
 #!/usr/bin/env node
 
 /**
- * x MCP Server
+ * StarkZap MCP Server
  *
  * Exposes Starknet wallet operations as MCP tools via the StarkZap SDK.
  * Works with any MCP-compatible client: Claude, Cursor, OpenAI Agents SDK, etc.
  *
  * Usage:
- *   STARKNET_PRIVATE_KEY=0x... npx @keep-starknet-strange/x-mcp --network mainnet
+ *   STARKNET_PRIVATE_KEY=0x... npx @keep-starknet-strange/starkzap-mcp --network mainnet
  */
 
 import { fileURLToPath } from "node:url";
@@ -293,11 +293,13 @@ function sanitizeExplorerUrl(rawUrl: string | undefined): string | undefined {
       return rawUrl;
     }
     console.error(
-      `[x-mcp] dropping unsafe explorerUrl protocol "${protocol}" returned by SDK`
+      `[starkzap-mcp] dropping unsafe explorerUrl protocol "${protocol}" returned by SDK`
     );
     return undefined;
   } catch {
-    console.error("[x-mcp] dropping malformed explorerUrl returned by SDK");
+    console.error(
+      "[starkzap-mcp] dropping malformed explorerUrl returned by SDK"
+    );
     return undefined;
   }
 }
@@ -809,7 +811,9 @@ async function cleanupWalletAndSdkResources(): Promise<void> {
         WALLET_DISCONNECT_TIMEOUT_MS
       );
     } catch (error) {
-      console.error(`[x-mcp] wallet cleanup error: ${summarizeError(error)}`);
+      console.error(
+        `[starkzap-mcp] wallet cleanup error: ${summarizeError(error)}`
+      );
     }
   }
 
@@ -830,7 +834,7 @@ async function cleanupWalletAndSdkResources(): Promise<void> {
         );
       } catch (error) {
         console.error(
-          `[x-mcp] sdk cleanup error (${methodName}): ${summarizeError(error)}`
+          `[starkzap-mcp] sdk cleanup error (${methodName}): ${summarizeError(error)}`
         );
       }
       break;
@@ -851,7 +855,7 @@ async function maybeResetWalletOnRpcError(error: unknown): Promise<void> {
 function buildToolErrorText(error: unknown): string {
   const message = error instanceof Error ? error.message : String(error);
   const requestId = createErrorReference(message);
-  console.error(`[x-mcp:error][${requestId}] ${summarizeError(error)}`);
+  console.error(`[starkzap-mcp:error][${requestId}] ${summarizeError(error)}`);
   const safeMessagePrefixes = [
     "Invalid ",
     "Unknown ",
@@ -863,7 +867,7 @@ function buildToolErrorText(error: unknown): string {
     "Rate ",
     "Transaction ",
     "Address ",
-    "x_",
+    "starkzap_",
   ];
   const safeMessage = safeMessagePrefixes.some((prefix) =>
     message.startsWith(prefix)
@@ -886,13 +890,13 @@ async function handleTool(
   const args = schema.parse(rawArgs);
 
   if (!READ_ONLY_TOOLS.has(name)) {
-    if (name === "x_execute" && !enableExecute) {
+    if (name === "starkzap_execute" && !enableExecute) {
       throw new Error(
-        "x_execute is disabled. Start the server with --enable-execute to allow raw contract calls. " +
+        "starkzap_execute is disabled. Start the server with --enable-execute to allow raw contract calls. " +
           "WARNING: this gives the agent unrestricted access to execute any contract call."
       );
     }
-    if (name !== "x_execute" && !enableWrite) {
+    if (name !== "starkzap_execute" && !enableWrite) {
       throw new Error(
         `${name} is a state-changing tool and is disabled by default. ` +
           "Start the server with --enable-write to allow write operations."
@@ -912,7 +916,7 @@ async function handleTool(
   });
 
   switch (name) {
-    case "x_get_account": {
+    case "starkzap_get_account": {
       const provider = wallet.getProvider();
       const expectedClassHash = fromAddress(wallet.getClassHash());
       let deployed = false;
@@ -938,8 +942,8 @@ async function handleTool(
       });
     }
 
-    case "x_get_balance": {
-      const parsed = args as z.infer<typeof schemas.x_get_balance>;
+    case "starkzap_get_balance": {
+      const parsed = args as z.infer<typeof schemas.starkzap_get_balance>;
       const token = resolveToken(parsed.token);
       const balance = await withTimeout("Token balance query", () =>
         wallet.balanceOf(token)
@@ -954,8 +958,8 @@ async function handleTool(
       });
     }
 
-    case "x_transfer": {
-      const parsed = args as z.infer<typeof schemas.x_transfer>;
+    case "starkzap_transfer": {
+      const parsed = args as z.infer<typeof schemas.starkzap_transfer>;
       const token = resolveToken(parsed.token);
       const recipients = validateAddressBatch(
         parsed.transfers.map((transfer) => transfer.to),
@@ -997,8 +1001,8 @@ async function handleTool(
       });
     }
 
-    case "x_execute": {
-      const parsed = args as z.infer<typeof schemas.x_execute>;
+    case "starkzap_execute": {
+      const parsed = args as z.infer<typeof schemas.starkzap_execute>;
       const contractAddresses = validateAddressBatch(
         parsed.calls.map((call) => call.contractAddress),
         "contract",
@@ -1025,8 +1029,8 @@ async function handleTool(
       });
     }
 
-    case "x_deploy_account": {
-      const parsed = args as z.infer<typeof schemas.x_deploy_account>;
+    case "starkzap_deploy_account": {
+      const parsed = args as z.infer<typeof schemas.starkzap_deploy_account>;
       const provider = wallet.getProvider();
       let isDeployedOnChain = false;
       let deployedClassHash: string | undefined;
@@ -1045,7 +1049,7 @@ async function handleTool(
         const expectedClassHash = fromAddress(wallet.getClassHash());
         if (deployedClassHash !== expectedClassHash) {
           throw new Error(
-            `Address ${wallet.address} is deployed with unexpected class hash ${deployedClassHash}. Expected ${expectedClassHash}. Use the private key that controls this deployed account, or use a different private key and deploy it first with x_deploy_account.`
+            `Address ${wallet.address} is deployed with unexpected class hash ${deployedClassHash}. Expected ${expectedClassHash}. Use the private key that controls this deployed account, or use a different private key and deploy it first with starkzap_deploy_account.`
           );
         }
         return ok({
@@ -1070,8 +1074,8 @@ async function handleTool(
       });
     }
 
-    case "x_enter_pool": {
-      const parsed = args as z.infer<typeof schemas.x_enter_pool>;
+    case "starkzap_enter_pool": {
+      const parsed = args as z.infer<typeof schemas.starkzap_enter_pool>;
       const poolAddress = validateAddressOrThrow(parsed.pool, "pool");
       const poolToken = await resolvePoolTokenForOperation(
         wallet,
@@ -1093,8 +1097,8 @@ async function handleTool(
       });
     }
 
-    case "x_add_to_pool": {
-      const parsed = args as z.infer<typeof schemas.x_add_to_pool>;
+    case "starkzap_add_to_pool": {
+      const parsed = args as z.infer<typeof schemas.starkzap_add_to_pool>;
       const poolAddress = validateAddressOrThrow(parsed.pool, "pool");
       const poolToken = await resolvePoolTokenForOperation(
         wallet,
@@ -1116,8 +1120,8 @@ async function handleTool(
       });
     }
 
-    case "x_claim_rewards": {
-      const parsed = args as z.infer<typeof schemas.x_claim_rewards>;
+    case "starkzap_claim_rewards": {
+      const parsed = args as z.infer<typeof schemas.starkzap_claim_rewards>;
       const poolAddress = validateAddressOrThrow(parsed.pool, "pool");
       const poolToken = await resolvePoolTokenForOperation(wallet, poolAddress);
       await assertStablePoolAmountWithinCap(
@@ -1139,8 +1143,8 @@ async function handleTool(
       });
     }
 
-    case "x_exit_pool_intent": {
-      const parsed = args as z.infer<typeof schemas.x_exit_pool_intent>;
+    case "starkzap_exit_pool_intent": {
+      const parsed = args as z.infer<typeof schemas.starkzap_exit_pool_intent>;
       const poolAddress = validateAddressOrThrow(parsed.pool, "pool");
       const poolToken = await resolvePoolTokenForOperation(
         wallet,
@@ -1159,12 +1163,12 @@ async function handleTool(
         pool: poolAddress,
         amount: amount.toUnit(),
         symbol: poolToken.symbol,
-        note: "Tokens stop earning rewards now. Call x_exit_pool after the waiting period.",
+        note: "Tokens stop earning rewards now. Call starkzap_exit_pool after the waiting period.",
       });
     }
 
-    case "x_exit_pool": {
-      const parsed = args as z.infer<typeof schemas.x_exit_pool>;
+    case "starkzap_exit_pool": {
+      const parsed = args as z.infer<typeof schemas.starkzap_exit_pool>;
       const poolAddress = validateAddressOrThrow(parsed.pool, "pool");
       const poolToken = await resolvePoolTokenForOperation(wallet, poolAddress);
       const position = await withTimeout("Pool position fetch for exit", () =>
@@ -1199,8 +1203,8 @@ async function handleTool(
       });
     }
 
-    case "x_get_pool_position": {
-      const parsed = args as z.infer<typeof schemas.x_get_pool_position>;
+    case "starkzap_get_pool_position": {
+      const parsed = args as z.infer<typeof schemas.starkzap_get_pool_position>;
       const poolAddress = validateAddressOrThrow(parsed.pool, "pool");
       const position = await withTimeout("Pool position query", () =>
         wallet.getPoolPosition(poolAddress)
@@ -1232,8 +1236,8 @@ async function handleTool(
       });
     }
 
-    case "x_estimate_fee": {
-      const parsed = args as z.infer<typeof schemas.x_estimate_fee>;
+    case "starkzap_estimate_fee": {
+      const parsed = args as z.infer<typeof schemas.starkzap_estimate_fee>;
       const contractAddresses = validateAddressBatch(
         parsed.calls.map((call) => call.contractAddress),
         "contract",
@@ -1278,7 +1282,7 @@ async function handleTool(
 // ---------------------------------------------------------------------------
 const server = new Server(
   {
-    name: "x-mcp",
+    name: "starkzap-mcp",
     version: "0.1.0",
   },
   {
@@ -1427,8 +1431,9 @@ const testingHooks: TestingHooks = {
 
 const testHooksEnabled =
   process.env.NODE_ENV === "test" &&
-  process.env.X_MCP_ENABLE_TEST_HOOKS === "1";
-const allowUnsafeTestHooks = process.env.X_MCP_ALLOW_UNSAFE_TEST_HOOKS === "1";
+  process.env.STARKZAP_MCP_ENABLE_TEST_HOOKS === "1";
+const allowUnsafeTestHooks =
+  process.env.STARKZAP_MCP_ALLOW_UNSAFE_TEST_HOOKS === "1";
 const testHookPrivateKeyIsSafe = (() => {
   try {
     return BigInt(env.STARKNET_PRIVATE_KEY) <= 1024n;
@@ -1438,16 +1443,17 @@ const testHookPrivateKeyIsSafe = (() => {
 })();
 if (process.env.NODE_ENV === "test" && !testHooksEnabled) {
   console.error(
-    "[x-mcp] NODE_ENV=test detected, but test hooks are disabled. Set X_MCP_ENABLE_TEST_HOOKS=1 to enable hooks."
+    "[starkzap-mcp] NODE_ENV=test detected, but test hooks are disabled. Set STARKZAP_MCP_ENABLE_TEST_HOOKS=1 to enable hooks."
   );
 }
 if (testHooksEnabled) {
   if (!testHookPrivateKeyIsSafe && !allowUnsafeTestHooks) {
     console.error(
-      "[x-mcp] refusing to expose test hooks: STARKNET_PRIVATE_KEY does not look like a test key. Use X_MCP_ALLOW_UNSAFE_TEST_HOOKS=1 to override."
+      "[starkzap-mcp] refusing to expose test hooks: STARKNET_PRIVATE_KEY does not look like a test key. Use STARKZAP_MCP_ALLOW_UNSAFE_TEST_HOOKS=1 to override."
     );
   } else {
-    (globalThis as Record<string, unknown>).__X_MCP_TESTING__ = testingHooks;
+    (globalThis as Record<string, unknown>).__STARKZAP_MCP_TESTING__ =
+      testingHooks;
   }
 }
 
@@ -1474,23 +1480,23 @@ async function main() {
       }
     } catch (error) {
       console.error(
-        `[x-mcp] package version lookup failed: ${summarizeError(error)}`
+        `[starkzap-mcp] package version lookup failed: ${summarizeError(error)}`
       );
     }
     if (fallback) {
       console.error(
-        "[x-mcp] package version unavailable in package.json; using npm_package_version fallback"
+        "[starkzap-mcp] package version unavailable in package.json; using npm_package_version fallback"
       );
       return fallback;
     }
     const shortCommit = commit === "unknown" ? "unknown" : commit.slice(0, 12);
     console.error(
-      `[x-mcp] package version unavailable; using commit fallback (${shortCommit})`
+      `[starkzap-mcp] package version unavailable; using commit fallback (${shortCommit})`
     );
     return `unknown+${shortCommit}`;
   })();
   console.error(
-    `x-mcp server running (version=${packageVersion}, commit=${commit}, network: ${network}, transport: stdio, write=${enableWrite}, execute=${enableExecute}, staking=${stakingEnabled}, maxAmount=${maxAmount}, maxBatchAmount=${maxBatchAmount}, rateLimitRpm=${rateLimitRpm}, readRateLimitRpm=${readRateLimitRpm}, writeRateLimitRpm=${writeRateLimitRpm}, rpcTimeoutMs=${rpcTimeoutMs})`
+    `starkzap-mcp server running (version=${packageVersion}, commit=${commit}, network: ${network}, transport: stdio, write=${enableWrite}, execute=${enableExecute}, staking=${stakingEnabled}, maxAmount=${maxAmount}, maxBatchAmount=${maxBatchAmount}, rateLimitRpm=${rateLimitRpm}, readRateLimitRpm=${readRateLimitRpm}, writeRateLimitRpm=${writeRateLimitRpm}, rpcTimeoutMs=${rpcTimeoutMs})`
   );
 }
 
@@ -1503,7 +1509,7 @@ if (isMainModule) {
     const pending = Array.from(activeTransactionHashes);
     const timedOut = Array.from(timedOutTransactionHashes);
     console.error(
-      `[x-mcp] ${signal} received. pendingTx=${pending.length === 0 ? "none" : pending.join(",")} timedOutTx=${timedOut.length === 0 ? "none" : timedOut.join(",")}`
+      `[starkzap-mcp] ${signal} received. pendingTx=${pending.length === 0 ? "none" : pending.join(",")} timedOutTx=${timedOut.length === 0 ? "none" : timedOut.join(",")}`
     );
     const signalExitCode = signal === "SIGINT" ? 130 : 143;
     let exitCode = signalExitCode;
@@ -1511,7 +1517,7 @@ if (isMainModule) {
       await server.close();
       await cleanupWalletAndSdkResources();
     } catch (error) {
-      console.error(`[x-mcp] shutdown error: ${summarizeError(error)}`);
+      console.error(`[starkzap-mcp] shutdown error: ${summarizeError(error)}`);
       exitCode = 1;
     } finally {
       process.exit(exitCode);
