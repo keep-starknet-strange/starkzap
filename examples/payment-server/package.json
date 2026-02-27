@@ -1,0 +1,17 @@
+{
+  "type": "module",
+  "scripts": {
+    "postinstall": "cd ../.. && npm run build",
+    "start": "node server.ts"
+  },
+  "dependencies": {
+    "starkzap": "file:../..",
+    "cors": "^2.8.6",
+    "dotenv": "^17.2.3",
+    "express": "^5.2.1"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.6"
+  }
+}
