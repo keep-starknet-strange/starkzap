@@ -13,21 +13,21 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-app.get("/session-token", async (req, res) => {
-  if (!CHAINRAILS_API_KEY) {
-    return res.status(500).json({
-      error: "CHAINRAILS_API_KEY is required to generate payment sessions",
-    });
-  }
+if (!CHAINRAILS_API_KEY) {
+  throw new Error(
+    "CHAINRAILS_API_KEY is required to generate payment sessions"
+  );
+}
 
+const sdk = new StarkSDK({
+  network: "mainnet",
+  payment: {
+    apiKey: CHAINRAILS_API_KEY,
+  },
+});
+
+app.get("/session-token", async (_, res) => {
   try {
-    const sdk = new StarkSDK({
-      network: "mainnet",
-      payment: {
-        apiKey: CHAINRAILS_API_KEY,
-      },
-    });
-
     const session = await sdk.payment().createSession({
       amount: "0.1",
       recipient:
