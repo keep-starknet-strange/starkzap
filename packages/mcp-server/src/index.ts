@@ -12,7 +12,7 @@
 
 import { fileURLToPath } from "node:url";
 import path from "node:path";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { createHash } from "node:crypto";
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
@@ -312,7 +312,10 @@ function summarizeError(error: unknown): string {
       /\b(?:localhost|::1|(?:\d{1,3}\.){3}\d{1,3})(?::\d{2,5})?\b/gi,
       "<host>"
     )
-    .replace(/\b(?:[a-z0-9-]+\.)+[a-z]{2,}(?::\d{2,5})?\b/gi, "<host>")
+    .replace(
+      /(?<![\\/])\b(?:[a-z0-9-]+\.)+[a-z]{2,}(?::\d{2,5})?\b/gi,
+      "<host>"
+    )
     .slice(0, 1024);
 }
 
@@ -1765,19 +1768,52 @@ if (testHooksEnabled) {
 // Start
 // ---------------------------------------------------------------------------
 function getSdkPackageVersion(): string {
+  // Prefer runtime-resolved package metadata to avoid stale lockfile assumptions.
   try {
-    const sdkPackageJsonPath = require.resolve("starkzap/package.json");
-    const sdkPackageJson = JSON.parse(
-      readFileSync(sdkPackageJsonPath, "utf8")
-    ) as { version?: string };
-    if (typeof sdkPackageJson.version === "string" && sdkPackageJson.version) {
-      return sdkPackageJson.version;
+    const sdkEntryPath = require.resolve("starkzap");
+    let cursor = path.dirname(sdkEntryPath);
+    for (let i = 0; i < 8; i += 1) {
+      const packageJsonPath = path.join(cursor, "package.json");
+      if (existsSync(packageJsonPath)) {
+        const sdkPackageJson = JSON.parse(
+          readFileSync(packageJsonPath, "utf8")
+        ) as {
+          name?: string;
+          version?: string;
+        };
+        if (
+          sdkPackageJson.name === "starkzap" &&
+          typeof sdkPackageJson.version === "string" &&
+          sdkPackageJson.version
+        ) {
+          return sdkPackageJson.version;
+        }
+      }
+      const parent = path.dirname(cursor);
+      if (parent === cursor) {
+        break;
+      }
+      cursor = parent;
     }
-  } catch (error) {
-    console.error(
-      `[starkzap-mcp] failed to resolve starkzap package version: ${summarizeError(error)}`
-    );
+  } catch {
+    // Ignore and fall back to declared dependency version below.
   }
+
+  // Fallback to the dependency declared by this package.
+  try {
+    const currentDir = path.dirname(fileURLToPath(import.meta.url));
+    const packageJsonPath = path.resolve(currentDir, "../package.json");
+    const packageJson = JSON.parse(readFileSync(packageJsonPath, "utf8")) as {
+      dependencies?: Record<string, string>;
+    };
+    const declaredVersion = packageJson.dependencies?.starkzap;
+    if (typeof declaredVersion === "string" && declaredVersion.trim() !== "") {
+      return declaredVersion;
+    }
+  } catch {
+    // Keep unknown if package metadata cannot be read.
+  }
+
   return "unknown";
 }
 
