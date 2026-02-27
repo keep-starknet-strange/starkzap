@@ -28,7 +28,7 @@ The main output is a typed ESM library built from `src/` and exported via `src/i
 <structure>
 | Path | Purpose |
 | --- | --- |
-| `src/sdk.ts` | Main SDK orchestration (`StarkSDK`) |
+| `src/sdk.ts` | Main SDK orchestration (`StarkZap`) |
 | `src/wallet/` | Wallet implementations and shared wallet behavior |
 | `src/tx/` | Transaction wrapper and fluent builder |
 | `src/erc20/` | ERC20 helpers + token preset registry |
@@ -132,7 +132,7 @@ DO NOT modify manually:
 <troubleshooting>
 | Symptom | Likely Cause | Action |
 | --- | --- | --- |
-| `RPC chain mismatch` from `StarkSDK` | `rpcUrl` chain differs from configured `chainId`/network | Align `SDKConfig` values |
+| `RPC chain mismatch` from `StarkZap` | `rpcUrl` chain differs from configured `chainId`/network | Align `SDKConfig` values |
 | Integration tests stall/fail at setup | `starknet-devnet` startup issue or busy local port | Re-run integration tests, check local port/process conflicts |
 | Validator generation fails immediately | Missing `VOYAGER_API_KEY` | Export key and rerun generator |
 | Cartridge connect errors in tests/CLI | Cartridge flow requires browser context/popups | Use non-Cartridge path for non-web tests |

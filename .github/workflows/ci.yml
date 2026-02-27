@@ -1,0 +1,88 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    env:
+      HUSKY: "0"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Format Check
+        run: npm run -s prettier:check
+
+      - name: Lint
+        run: npm run -s lint
+
+      - name: Typecheck
+        run: npm run -s typecheck
+
+      - name: Unit Tests
+        run: npm run -s test
+
+  examples:
+    runs-on: ubuntu-latest
+    env:
+      HUSKY: "0"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            examples/web/package-lock.json
+            examples/flappy-bird/package-lock.json
+            examples/mobile/package-lock.json
+
+      - name: Install Root Dependencies
+        run: npm ci
+
+      - name: Build Root Package
+        run: npm run -s build
+
+      - name: Install Web Example Dependencies
+        run: npm ci --prefix examples/web --ignore-scripts
+
+      - name: Build Web Example
+        run: npm run -s build --prefix examples/web
+
+      - name: Install Flappy-Bird Example Dependencies
+        run: npm ci --prefix examples/flappy-bird --ignore-scripts
+
+      - name: Build Flappy-Bird Example
+        run: npm run -s build --prefix examples/flappy-bird
+
+      - name: Install Mobile Example Dependencies
+        run: npm ci --prefix examples/mobile --ignore-scripts
+
+      - name: Build Mobile Example (iOS Bundle)
+        working-directory: examples/mobile
+        run: npx expo export --platform ios --output-dir /tmp/mobile-ios-build
+
+      - name: Build Mobile Example (Android Bundle)
+        working-directory: examples/mobile
+        run: npx expo export --platform android --output-dir /tmp/mobile-android-build

@@ -1,5 +1,5 @@
 import { beforeAll, describe, expect, inject, it } from "vitest";
-import { StarkSDK } from "@/sdk";
+import { StarkZap } from "@/sdk";
 import { StarkSigner } from "@/signer";
 import { DevnetPreset } from "@/account";
 import { DevnetProvider } from "starknet-devnet";
@@ -8,11 +8,11 @@ import { testPrivateKeys } from "../config";
 
 describe("Account Deployment (Integration)", () => {
   const config = toSdkConfig(inject("testConfig"));
-  let sdk: StarkSDK;
+  let sdk: StarkZap;
   let devnetRunning: boolean;
 
   beforeAll(async () => {
-    sdk = new StarkSDK(config);
+    sdk = new StarkZap(config);
 
     const devnetProvider = new DevnetProvider({
       url: config.rpcUrl!,

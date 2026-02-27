@@ -40,7 +40,7 @@ const signer = new PrivySigner({
 });
 
 // Use with the SDK
-const sdk = new StarkSDK({ rpcUrl: '...', chainId: ChainId.SEPOLIA });
+const sdk = new StarkZap({ rpcUrl: '...', chainId: ChainId.SEPOLIA });
 const wallet = await sdk.connectWallet({
   account: { signer, accountClass: ArgentPreset }
 });

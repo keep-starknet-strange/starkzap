@@ -91,7 +91,7 @@
     "vitest": "^4.0.17"
   },
   "dependencies": {
-    "@cartridge/controller": "^0.13.9",
+    "@avnu/avnu-sdk": "^4.1.0-rc.0",
     "starknet": "^9.2.1"
   }
 }

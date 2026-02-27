@@ -1,6 +1,8 @@
 import type { Call } from "starknet";
 import type { WalletInterface } from "@/wallet/interface";
 import type { Tx } from "@/tx";
+import type { SwapInput } from "@/swap";
+import { resolveSwapInput } from "@/swap/utils";
 import type {
   Address,
   Amount,
@@ -211,6 +213,29 @@ export class TxBuilder {
     const erc20 = this.wallet.erc20(token);
     const transferArray = Array.isArray(transfers) ? transfers : [transfers];
     this.pending.push(erc20.populateTransfer(transferArray));
+    return this;
+  }
+
+  /**
+   * Add a provider-driven swap operation.
+   *
+   * Set `request.provider` to a provider instance or provider id.
+   * If omitted, uses the wallet default provider.
+   * `chainId` and `takerAddress` are optional and default to the connected wallet.
+   */
+  swap(request: SwapInput): this {
+    const { provider, request: resolvedRequest } = resolveSwapInput(request, {
+      walletChainId: this.wallet.getChainId(),
+      takerAddress: this.wallet.address,
+      providerResolver: this.wallet,
+    });
+    const p = provider.swap(resolvedRequest).then((prepared) => {
+      if (prepared.calls.length === 0) {
+        throw new Error(`Swap provider "${provider.id}" returned no calls`);
+      }
+      return prepared.calls;
+    });
+    this.queueAsyncCalls(p);
     return this;
   }
 

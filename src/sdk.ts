@@ -53,14 +53,14 @@ function isWebRuntimeForCartridge(): boolean {
  *
  * @example
  * ```ts
- * import { StarkSDK, StarkSigner, ArgentPreset } from "starkzap";
+ * import { StarkZap, StarkSigner, ArgentPreset } from "starkzap";
  *
  * // Using network presets (recommended)
- * const sdk = new StarkSDK({ network: "mainnet" });
- * const sdk = new StarkSDK({ network: "sepolia" });
+ * const sdk = new StarkZap({ network: "mainnet" });
+ * const sdk = new StarkZap({ network: "sepolia" });
  *
  * // Or with custom RPC
- * const sdk = new StarkSDK({
+ * const sdk = new StarkZap({
  *   rpcUrl: "https://my-rpc.example.com",
  *   chainId: ChainId.MAINNET,
  * });
@@ -76,7 +76,7 @@ function isWebRuntimeForCartridge(): boolean {
  * await tx.wait();
  * ```
  */
-export class StarkSDK {
+export class StarkZap {
   private readonly config: ResolvedConfig;
   private readonly provider: RpcProvider;
   private chainValidationPromise: Promise<void> | null = null;
@@ -100,7 +100,7 @@ export class StarkSDK {
     const rpcUrl = config.rpcUrl ?? networkPreset?.rpcUrl;
     if (!rpcUrl) {
       throw new Error(
-        "StarkSDK requires either 'network' or 'rpcUrl' to be specified"
+        "StarkZap requires either 'network' or 'rpcUrl' to be specified"
       );
     }
     const normalizedRpcUrl = assertSafeHttpUrl(rpcUrl, "rpcUrl").toString();
@@ -109,7 +109,7 @@ export class StarkSDK {
     const chainId = config.chainId ?? networkPreset?.chainId;
     if (!chainId) {
       throw new Error(
-        "StarkSDK requires either 'network' or 'chainId' to be specified"
+        "StarkZap requires either 'network' or 'chainId' to be specified"
       );
     }
 
@@ -207,7 +207,13 @@ export class StarkSDK {
    */
   async connectWallet(options: ConnectWalletOptions): Promise<Wallet> {
     await this.ensureProviderChainMatchesConfig();
-    const { account, feeMode, timeBounds } = options;
+    const {
+      account,
+      feeMode,
+      timeBounds,
+      swapProviders,
+      defaultSwapProviderId,
+    } = options;
 
     return Wallet.create({
       account,
@@ -215,6 +221,8 @@ export class StarkSDK {
       config: this.config,
       ...(feeMode && { feeMode }),
       ...(timeBounds && { timeBounds }),
+      ...(swapProviders && { swapProviders }),
+      ...(defaultSwapProviderId && { defaultSwapProviderId }),
     });
   }
 
@@ -249,6 +257,8 @@ export class StarkSDK {
     const deploy = options.deploy ?? "if_needed";
     const feeMode = options.feeMode;
     const timeBounds = options.timeBounds;
+    const swapProviders = options.swapProviders;
+    const defaultSwapProviderId = options.defaultSwapProviderId;
     const shouldEnsureReady = deploy !== "never";
 
     if (options.strategy === "signer") {
@@ -262,6 +272,8 @@ export class StarkSDK {
         },
         ...(feeMode && { feeMode }),
         ...(timeBounds && { timeBounds }),
+        ...(swapProviders && { swapProviders }),
+        ...(defaultSwapProviderId && { defaultSwapProviderId }),
       });
 
       if (shouldEnsureReady) {
@@ -303,6 +315,8 @@ export class StarkSDK {
         },
         ...(feeMode && { feeMode }),
         ...(timeBounds && { timeBounds }),
+        ...(swapProviders && { swapProviders }),
+        ...(defaultSwapProviderId && { defaultSwapProviderId }),
       });
 
       if (shouldEnsureReady) {
@@ -327,6 +341,15 @@ export class StarkSDK {
         ...(feeMode && { feeMode }),
         ...(timeBounds && { timeBounds }),
       });
+
+      if (swapProviders?.length) {
+        for (const swapProvider of swapProviders) {
+          wallet.registerSwapProvider(swapProvider);
+        }
+      }
+      if (defaultSwapProviderId) {
+        wallet.setDefaultSwapProvider(defaultSwapProviderId);
+      }
 
       if (shouldEnsureReady) {
         await wallet.ensureReady({

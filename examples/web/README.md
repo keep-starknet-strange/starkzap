@@ -1,6 +1,6 @@
 # Web Example
 
-Browser-based playground for the SDK. Demonstrates three wallet connection strategies (Cartridge Controller, private key, Privy), account deployment, transfers, and sponsored (gasless) transactions on Starknet Sepolia.
+Browser-based playground for the SDK. Demonstrates three wallet connection strategies (Cartridge Controller, private key, Privy), account deployment, transfers, sponsored (gasless) transactions, and provider-based token swaps on Starknet Sepolia.
 
 ## Prerequisites
 
@@ -187,6 +187,39 @@ Once connected (via any strategy), the wallet panel appears with these actions:
 
 The **Activity Log** at the bottom of the page shows timestamped events for every action: connection details, public keys, transaction hashes, explorer links, confirmation status, and errors.
 
+## Swap Demo (Provider API)
+
+The connected wallet card includes a **Swap** section with:
+
+- source selector (`AVNU` or `Ekubo`)
+- token-in and token-out selectors from SDK token presets
+- amount + slippage input
+- `Get Quote` (calls `wallet.getQuote({ provider, ... })`)
+- `Submit Swap` (calls `wallet.swap({ provider, ... }, options?)`)
+
+This example uses the simplified request shape where `provider` is part of the request object:
+
+```ts
+await wallet.getQuote({
+  provider: "avnu",
+  tokenIn,
+  tokenOut,
+  amountIn,
+  slippageBps: 100n,
+});
+
+await wallet.swap(
+  {
+    provider: "ekubo",
+    tokenIn,
+    tokenOut,
+    amountIn,
+    slippageBps: 100n,
+  },
+  { feeMode: "sponsored" }
+);
+```
+
 ## Configuration
 
 ### Network
@@ -196,7 +229,7 @@ The app connects to Starknet Sepolia by default. To change the network, edit the
 ```typescript
 const RPC_URL = "https://api.cartridge.gg/x/starknet/sepolia/rpc/v0_9";
 
-const sdk = new StarkSDK({
+const sdk = new StarkZap({
   rpcUrl: RPC_URL,
   chainId: ChainId.SEPOLIA,
 });
@@ -216,7 +249,7 @@ const PRIVY_SERVER_URL = "http://localhost:3001";
 
 `vite.config.ts` maps `starkzap` to the SDK source at `../../src/index.ts` and `@` to `../../src/`. This means:
 
-- `import { StarkSDK } from "starkzap"` resolves to the local SDK source, not a published npm bundle.
+- `import { StarkZap } from "starkzap"` resolves to the local SDK source, not a published npm bundle.
 - Changes to the SDK source are hot-reloaded automatically.
 - The `optimizeDeps.exclude: ["starkzap"]` setting prevents Vite from pre-bundling the SDK.
 

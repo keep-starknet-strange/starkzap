@@ -1,5 +1,5 @@
 import { beforeAll, describe, expect, inject, it } from "vitest";
-import { StarkSDK } from "@/sdk";
+import { StarkZap } from "@/sdk";
 import { sepoliaTokens } from "@/erc20";
 import { StarkSigner } from "@/signer";
 import { DevnetPreset } from "@/account";
@@ -10,14 +10,14 @@ import { DevnetProvider } from "starknet-devnet";
 
 describe("ERC20 (Integration)", () => {
   const config = toSdkConfig(inject("testConfig"));
-  let sdk: StarkSDK;
+  let sdk: StarkZap;
   let devnetRunning = false;
 
   const ETH = sepoliaTokens.ETH;
   const STRK = sepoliaTokens.STRK;
 
   beforeAll(async () => {
-    sdk = new StarkSDK(config);
+    sdk = new StarkZap(config);
 
     const devnetProvider = new DevnetProvider({
       url: config.rpcUrl!,

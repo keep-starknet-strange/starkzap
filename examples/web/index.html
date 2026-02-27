@@ -327,6 +327,65 @@
         min-width: 140px;
       }
 
+      .swap-card {
+        margin-top: 1.5rem;
+        padding: 1rem;
+        border: 1px solid var(--border-color);
+        border-radius: 12px;
+        background: var(--bg-tertiary);
+      }
+
+      .swap-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 0.75rem;
+      }
+
+      @media (max-width: 640px) {
+        .swap-grid {
+          grid-template-columns: 1fr;
+        }
+      }
+
+      .swap-inline {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+      }
+
+      .swap-inline input[type="checkbox"] {
+        width: auto;
+      }
+
+      .quote-box {
+        margin-top: 0.75rem;
+        border: 1px solid var(--border-color);
+        border-radius: 10px;
+        padding: 0.75rem;
+        background: rgba(10, 10, 15, 0.45);
+        font-size: 0.85rem;
+      }
+
+      .quote-row {
+        display: flex;
+        justify-content: space-between;
+        gap: 1rem;
+        margin-bottom: 0.35rem;
+      }
+
+      .quote-row:last-child {
+        margin-bottom: 0;
+      }
+
+      .quote-label {
+        color: var(--text-secondary);
+      }
+
+      .quote-value {
+        font-family: var(--font-mono);
+        color: var(--text-primary);
+      }
+
       .log-container {
         background: var(--bg-tertiary);
         border-radius: 10px;
@@ -609,6 +668,56 @@
           <button id="btn-disconnect" class="btn btn-disconnect">
             Disconnect
           </button>
+        </div>
+
+        <div class="swap-card">
+          <div class="card-title" style="margin-bottom: 0.75rem">Swap</div>
+          <div class="form-group">
+            <label for="swap-provider">Source</label>
+            <select id="swap-provider"></select>
+          </div>
+          <div class="swap-grid">
+            <div class="form-group">
+              <label for="swap-token-in">Token In</label>
+              <select id="swap-token-in"></select>
+            </div>
+            <div class="form-group">
+              <label for="swap-token-out">Token Out</label>
+              <select id="swap-token-out"></select>
+            </div>
+          </div>
+          <div class="swap-grid">
+            <div class="form-group">
+              <label for="swap-amount">Amount In</label>
+              <input id="swap-amount" type="text" placeholder="0.001" />
+            </div>
+            <div class="form-group">
+              <label for="swap-slippage">Slippage (bps)</label>
+              <input
+                id="swap-slippage"
+                type="number"
+                min="0"
+                max="9999"
+                step="1"
+                placeholder="100"
+              />
+            </div>
+          </div>
+          <div class="form-group swap-inline">
+            <input id="swap-sponsored" type="checkbox" />
+            <label for="swap-sponsored" style="margin: 0"
+              >Use sponsored fee mode</label
+            >
+          </div>
+          <div class="actions" style="margin-top: 0.75rem">
+            <button id="btn-swap-quote" class="btn btn-secondary">
+              Get Quote
+            </button>
+            <button id="btn-swap-submit" class="btn btn-primary">
+              Submit Swap
+            </button>
+          </div>
+          <div id="swap-quote" class="quote-box hidden"></div>
         </div>
       </div>
 
