@@ -64,6 +64,12 @@ beforeAll(async () => {
   process.env.NODE_ENV = "test";
   process.env.STARKZAP_MCP_ENABLE_TEST_HOOKS = "1";
   process.env.STARKNET_PRIVATE_KEY = `0x${"1".padStart(64, "0")}`;
+  process.argv = [
+    "node",
+    "index.integration.test.ts",
+    "--write-rate-limit-rpm",
+    "1",
+  ];
   await import("../src/index.js");
   const hooks = (globalThis as Record<string, unknown>)
     .__STARKZAP_MCP_TESTING__;
@@ -197,6 +203,32 @@ describe("index integration hardening", () => {
     expect(sanitizedResponse.content[0]?.text).not.toContain(
       "private-rpc.local"
     );
+  });
+
+  it("does not charge write rate limit for unknown tools", async () => {
+    const unknown = await testing.handleCallToolRequest({
+      params: { name: "starkzap_not_a_tool", arguments: {} },
+    });
+    expect(unknown.isError).toBe(true);
+    expect(unknown.content[0]?.text).toContain("Unknown tool");
+
+    const writeCall = await testing.handleCallToolRequest({
+      params: {
+        name: "starkzap_transfer",
+        arguments: {
+          token: "STRK",
+          transfers: [
+            {
+              to: "0x1",
+              amount: "0.1",
+            },
+          ],
+        },
+      },
+    });
+    expect(writeCall.isError).toBe(true);
+    expect(writeCall.content[0]?.text).toContain("disabled by default");
+    expect(writeCall.content[0]?.text).not.toContain("Rate limit exceeded");
   });
 
   it("fails with clear message when SDK balance shape is malformed", async () => {

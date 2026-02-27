@@ -1133,12 +1133,12 @@ async function handleTool(
   name: string,
   rawArgs: Record<string, unknown>
 ): Promise<{ content: Array<{ type: "text"; text: string }> }> {
-  await runRateLimitChecks(name);
-
   const schema = schemas[name as keyof typeof schemas];
   if (!schema) {
     throw new Error(`Unknown tool: ${name}`);
   }
+
+  await runRateLimitChecks(name);
   const args = schema.parse(rawArgs);
 
   if (!READ_ONLY_TOOLS.has(name)) {
