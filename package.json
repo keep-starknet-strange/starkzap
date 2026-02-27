@@ -26,10 +26,18 @@
     }
   },
   "peerDependencies": {
-    "@cartridge/controller": "^0.13.9"
+    "@cartridge/controller": "^0.13.9",
+    "react": ">=18.0.0",
+    "react-dom": ">=18.0.0"
   },
   "peerDependenciesMeta": {
     "@cartridge/controller": {
+      "optional": true
+    },
+    "react": {
+      "optional": true
+    },
+    "react-dom": {
       "optional": true
     },
     "react-native-get-random-values": {
@@ -49,7 +57,7 @@
     "access": "public"
   },
   "scripts": {
-    "build": "tsc; tsc-alias",
+    "build": "tsc; tsc-alias --resolve-full-paths --resolve-full-extension .js",
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
     "fix": "eslint . --fix",
@@ -92,7 +100,9 @@
   },
   "dependencies": {
     "@cartridge/controller": "^0.13.9",
+    "@chainrails/react": "^0.3.4",
     "@chainrails/sdk": "^0.3.3",
+    "@chainrails/vanilla": "^0.0.6",
     "starknet": "^9.2.1"
   }
 }

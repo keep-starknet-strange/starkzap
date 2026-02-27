@@ -145,62 +145,53 @@ describe("Payment", () => {
     });
   });
 
-  describe("receive", () => {
-    it("routes react platform to modal opener", async () => {
-      const openSpy = vi
-        .spyOn(
-          payment as unknown as {
-            openReactReceiveModal: (input: {
-              sessionToken: string;
-              amount?: string;
-            }) => Promise<void>;
-          },
-          "openReactReceiveModal"
-        )
-        .mockResolvedValue(undefined);
-
-      await payment.receive({
+  describe("modal", () => {
+    it("returns a simple modal handle with pay()", () => {
+      const flow = payment.modal({
+        type: "token",
         sessionToken: "tok_123",
         amount: "25.00",
         platform: "react",
       });
 
-      expect(openSpy).toHaveBeenCalledWith({
-        sessionToken: "tok_123",
-        amount: "25.00",
-      });
+      expect(flow.type).toBe("token");
+      expect(flow.platform).toBe("react");
+      expect(flow.sessionToken).toBe("tok_123");
+      expect(flow.amount).toBe("25.00");
+      expect(typeof flow.pay).toBe("function");
     });
 
-    it("routes vanilla platform to modal opener", async () => {
-      const openSpy = vi
-        .spyOn(
-          payment as unknown as {
-            openVanillaReceiveModal: (input: {
-              sessionToken: string;
-              amount?: string;
-            }) => Promise<void>;
-          },
-          "openVanillaReceiveModal"
-        )
-        .mockResolvedValue(undefined);
-
-      await payment.receive({
-        sessionToken: "tok_123",
+    it("supports session-url based modal input", () => {
+      const flow = payment.modal({
+        type: "session",
+        sessionUrl: "https://api.chainrails.io/session/abc",
         platform: "vanilla",
       });
 
-      expect(openSpy).toHaveBeenCalledWith({
-        sessionToken: "tok_123",
-      });
+      expect(flow.type).toBe("session");
+      expect(flow.platform).toBe("vanilla");
+      expect(flow.sessionUrl).toBe("https://api.chainrails.io/session/abc");
+      expect(flow.sessionToken).toBeUndefined();
     });
 
-    it("throws for unsupported platforms", async () => {
-      await expect(
-        payment.receive({
-          sessionToken: "tok_123",
-          platform: "react-native",
-        })
-      ).rejects.toThrow(/not implemented/i);
+    it("throws for unsupported platforms when pay is called", async () => {
+      const flow = payment.modal({
+        type: "token",
+        sessionToken: "tok_123",
+        platform: "react-native",
+      });
+
+      await expect(flow.pay()).rejects.toThrow(/not implemented/i);
+    });
+
+    it("throws when react is used with session URL mode", async () => {
+      const flow = payment.modal({
+        type: "session",
+        sessionUrl: "https://api.chainrails.io/session/abc",
+        platform: "react",
+      });
+
+      await expect(flow.pay()).rejects.toThrow(/requires `type: "token"`/i);
     });
   });
 
@@ -505,13 +496,25 @@ describe("Payment", () => {
 // ─── SDK integration ────────────────────────────────────────────────────────
 
 describe("StarkSDK.payment()", () => {
-  it("throws when payment config is missing", async () => {
+  it("throws when payment config is missing in non-browser runtimes", async () => {
     // Dynamically import to avoid circular issues
     const { StarkSDK } = await import("@/sdk");
 
     const sdk = new StarkSDK({ network: "mainnet" });
 
     expect(() => sdk.payment()).toThrow(/Payment is not configured/);
+  });
+
+  it("does not throw when payment config is missing in browser runtimes", async () => {
+    vi.stubGlobal("window", {});
+    vi.stubGlobal("document", { createElement: () => ({}) });
+
+    const { StarkSDK } = await import("@/sdk");
+    const sdk = new StarkSDK({ network: "mainnet" });
+
+    expect(() => sdk.payment()).not.toThrow();
+
+    vi.unstubAllGlobals();
   });
 
   it("returns a Payment instance when configured", async () => {

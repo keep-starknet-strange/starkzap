@@ -459,7 +459,7 @@ export class StarkSDK {
    * Requires `payment.apiKey` to be set in the SDK config.
    *
    * @returns A {@link Payment} instance bound to the configured API key.
-   * @throws Error if payment is not configured.
+   * @throws Error if payment is not configured in non-browser runtimes.
    *
    * @example
    * ```ts
@@ -484,6 +484,9 @@ export class StarkSDK {
    */
   payment(): Payment {
     if (!this.config.payment) {
+      if (isWebRuntimeForCartridge()) {
+        return new Payment({ apiKey: "" });
+      }
       throw new Error(
         "Payment is not configured. Provide a `payment` config with an `apiKey` when creating StarkSDK."
       );

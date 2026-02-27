@@ -92,19 +92,40 @@ export interface PaymentConfig {
   environment?: PaymentEnvironment;
 }
 
-// ─── Receive (Modal) ──────────────────────────
+// ─── Modal ───────────────────────────────────
 
-/** Supported receive modal platforms. */
-export type PaymentReceivePlatform = "react" | "react-native" | "vanilla";
+/** Supported payment modal platforms. */
+export type PaymentModalPlatform = "vanilla" | "react" | "react-native";
 
-/** Input for opening the payment receive modal. */
-export interface PaymentReceiveInput {
-  /** Session token returned from `createSession()`. */
-  sessionToken: string;
-  /** Optional amount override for the receive flow. */
+/** Open modal by session URL. */
+export interface PaymentModalSessionInput {
+  type: "session";
+  sessionUrl: string;
   amount?: string;
-  /** Target UI platform. */
-  platform: PaymentReceivePlatform;
+  platform: PaymentModalPlatform;
+}
+
+/** Open modal by session token. */
+export interface PaymentModalTokenInput {
+  type: "token";
+  sessionToken: string;
+  amount?: string;
+  platform: PaymentModalPlatform;
+}
+
+/** Input for creating a payment modal flow. */
+export type PaymentModalInput =
+  | PaymentModalSessionInput
+  | PaymentModalTokenInput;
+
+/** Returned modal handle with a one-call payment trigger. */
+export interface PaymentModalHandle {
+  type: PaymentModalInput["type"];
+  platform: PaymentModalPlatform;
+  sessionToken?: string;
+  sessionUrl?: string;
+  amount?: string;
+  pay: () => Promise<boolean>;
 }
 
 // ─── Quote types ───────────────────────────────
