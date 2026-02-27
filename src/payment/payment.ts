@@ -136,7 +136,6 @@ export class Payment {
     input: CreatePaymentSessionInput
   ): Promise<PaymentSessionOutput> {
     const result = await crapi.auth.getSessionToken(input);
-    await Chainrails.config({ seesion_token: result.sessionToken });
     return result;
   }
 
