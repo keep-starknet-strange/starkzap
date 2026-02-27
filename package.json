@@ -100,7 +100,6 @@
   },
   "dependencies": {
     "@cartridge/controller": "^0.13.9",
-    "@chainrails/react": "^0.3.4",
     "@chainrails/sdk": "^0.3.3",
     "@chainrails/vanilla": "^0.0.6",
     "starknet": "^9.2.1"

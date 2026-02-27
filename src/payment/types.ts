@@ -95,14 +95,14 @@ export interface PaymentConfig {
 // ─── Modal ───────────────────────────────────
 
 /** Supported payment modal platforms. */
-export type PaymentModalPlatform = "vanilla" | "react" | "react-native";
+export type PaymentModalPlatform = "web" | "mobile";
 
 /** Open modal by session URL. */
 export interface PaymentModalSessionInput {
   type: "session";
   sessionUrl: string;
   amount?: string;
-  platform: PaymentModalPlatform;
+  platform?: PaymentModalPlatform;
 }
 
 /** Open modal by session token. */
@@ -110,7 +110,7 @@ export interface PaymentModalTokenInput {
   type: "token";
   sessionToken: string;
   amount?: string;
-  platform: PaymentModalPlatform;
+  platform?: PaymentModalPlatform;
 }
 
 /** Input for creating a payment modal flow. */

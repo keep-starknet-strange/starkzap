@@ -8,30 +8,17 @@ import {
   ChainrailsPaymentModalElement,
   createPaymentSession,
 } from "@chainrails/vanilla";
-import { PaymentModal as ChainrailsReactPaymentModal } from "@chainrails/react";
-
-type ReactModule = {
-  createElement: (
-    component: unknown,
-    props: Record<string, unknown>
-  ) => unknown;
-};
-
-type ReactDomClientModule = {
-  createRoot: (container: HTMLElement) => {
-    render: (node: unknown) => void;
-    unmount: () => void;
-  };
-};
 
 export class PaymentModalManager {
   private activeModalCleanup: (() => void) | null = null;
 
   modal(input: PaymentModalInput): PaymentModalHandle {
+    const platform = input.platform ?? "web";
+
     const handle: PaymentModalHandle = {
       type: input.type,
-      platform: input.platform,
-      pay: () => this.pay(input),
+      platform,
+      pay: () => this.pay({ ...input, platform }),
     };
 
     if (input.type === "token") {
@@ -48,88 +35,23 @@ export class PaymentModalManager {
   }
 
   private async pay(input: PaymentModalInput): Promise<boolean> {
-    if (input.platform === "react-native") {
+    const platform = input.platform ?? "web";
+
+    if (platform === "mobile") {
       throw new Error(
-        `payment.modal is not implemented for platform "${input.platform}" yet. Use "vanilla" or "react".`
+        `payment.modal is not implemented for platform "${platform}" yet. Use "web".`
       );
     }
 
-    if (input.platform === "react") {
-      if (input.type !== "token") {
-        throw new Error(
-          'payment.modal with platform "react" requires `type: "token"` and `sessionToken`.'
-        );
-      }
-
-      this.assertBrowser(input.platform);
-      return this.payReactToken(input);
+    if (platform !== "web") {
+      throw new Error(`Unsupported payment.modal platform "${platform}".`);
     }
 
-    this.assertBrowser(input.platform);
+    this.assertBrowser(platform);
 
-    if (input.platform === "vanilla") {
-      return input.type === "session"
-        ? this.payVanillaSession(input)
-        : this.payVanillaToken(input);
-    }
-
-    throw new Error(`Unsupported payment.modal platform "${input.platform}".`);
-  }
-
-  private async payReactToken(input: PaymentModalTokenInput): Promise<boolean> {
-    let reactModule: ReactModule;
-    let reactDomClientModule: ReactDomClientModule;
-
-    try {
-      reactModule = (await import("react")) as ReactModule;
-      reactDomClientModule =
-        (await import("react-dom/client")) as ReactDomClientModule;
-    } catch {
-      throw new Error(
-        'payment.modal for "react" requires "react" and "react-dom" to be installed.'
-      );
-    }
-
-    return new Promise<boolean>((resolve) => {
-      const container = document.createElement("div");
-      container.setAttribute("data-starkzap-payment-modal", "true");
-      document.body.appendChild(container);
-
-      const root = reactDomClientModule.createRoot(container);
-      let settled = false;
-
-      const settle = (value: boolean): void => {
-        if (settled) return;
-        settled = true;
-        resolve(value);
-      };
-
-      const cleanup = (): void => {
-        root.unmount();
-        container.remove();
-        this.clearActiveModalCleanup(cleanup);
-      };
-
-      const closeWith = (value: boolean): void => {
-        cleanup();
-        settle(value);
-      };
-
-      this.setActiveModalCleanup(() => closeWith(false));
-
-      root.render(
-        reactModule.createElement(ChainrailsReactPaymentModal, {
-          sessionToken: input.sessionToken,
-          amount: input.amount,
-          isOpen: true,
-          isPending: false,
-          open: () => undefined,
-          close: () => closeWith(false),
-          onCancel: () => closeWith(false),
-          onSuccess: () => closeWith(true),
-        })
-      );
-    });
+    return input.type === "session"
+      ? this.payVanillaSession(input)
+      : this.payVanillaToken(input);
   }
 
   private async payVanillaToken(
