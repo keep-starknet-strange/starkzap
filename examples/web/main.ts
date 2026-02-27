@@ -457,6 +457,9 @@ async function connectPrivateKey() {
 
   const presetKey = accountPresetSelect.value;
   const preset = presets[presetKey];
+  if (!preset) {
+    throw new Error("Please enter a valid preset");
+  }
 
   setButtonLoading(btnConnectPk, true);
   log(`Connecting with ${presetKey} account...`, "info");
@@ -540,6 +543,9 @@ async function connectPrivy() {
     // Use selected account preset from Privy dropdown
     const presetKey = privyAccountPresetSelect.value;
     const preset = presets[presetKey];
+    if (!preset) {
+      throw new Error("Please enter a valid preset");
+    }
     log(`Using account preset: ${presetKey}`, "info");
 
     const onboard = await sdk.onboard({
