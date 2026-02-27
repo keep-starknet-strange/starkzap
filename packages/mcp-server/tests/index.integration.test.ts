@@ -393,6 +393,34 @@ describe("index integration hardening", () => {
     expect(response.content[0]?.text).toContain("commissionPercent");
   });
 
+  it("keeps pool position responses deterministic by omitting wall-clock fields", async () => {
+    const unpoolTime = new Date("2026-02-27T12:00:00.000Z");
+    testing.setWalletSingleton({
+      getPoolPosition: vi.fn().mockResolvedValue({
+        staked: Amount.parse("1", TEST_TOKEN),
+        rewards: Amount.parse("0.1", TEST_TOKEN),
+        total: Amount.parse("1.1", TEST_TOKEN),
+        unpooling: Amount.parse("0.2", TEST_TOKEN),
+        commissionPercent: 5,
+        unpoolTime,
+      }),
+    } as unknown as Wallet);
+    const response = await testing.handleCallToolRequest({
+      params: {
+        name: "starkzap_get_pool_position",
+        arguments: { pool: "0x1" },
+      },
+    });
+
+    expect(response.isError).not.toBe(true);
+    const payload = JSON.parse(response.content[0]?.text ?? "{}") as Record<
+      string,
+      unknown
+    >;
+    expect(payload.unpoolTimeEpochMs).toBe(unpoolTime.getTime());
+    expect(payload).not.toHaveProperty("secondsUntilUnpool");
+  });
+
   it("allows read-only tasks to run concurrently", async () => {
     const events: string[] = [];
     const readA = testing.runWithToolConcurrencyPolicy(

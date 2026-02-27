@@ -488,6 +488,7 @@ const tools = selectTools(allTools, {
 // ---------------------------------------------------------------------------
 const TX_WAIT_TIMEOUT_MS = 120_000;
 const WALLET_DISCONNECT_TIMEOUT_MS = 5_000;
+const RATE_LIMIT_DRAIN_TIMEOUT_MS = 1_000;
 const activeTransactionHashes = new Set<string>();
 const timedOutTransactionHashes = new Set<string>();
 let cleanupPromise: Promise<void> | undefined;
@@ -1160,6 +1161,9 @@ async function cleanupWalletAndSdkResources(): Promise<void> {
     sdkSingleton = undefined;
     sdkInitFailureCount = 0;
     sdkInitBackoffUntilMs = 0;
+    poolClassHashCache.clear();
+    poolClassHashInFlight.clear();
+    stakingReferenceClassHashPromise = undefined;
   })();
 
   try {
@@ -1562,7 +1566,6 @@ async function handleTool(
       }
       assertPoolPositionShape(position, poolAddress);
       const unpoolTime = position.unpoolTime ?? null;
-      const queriedAtEpochMs = nowMs();
       return ok({
         pool: poolAddress,
         isMember: true,
@@ -1576,13 +1579,6 @@ async function handleTool(
         unpooling: position.unpooling.toUnit(),
         unpoolTime: unpoolTime?.toISOString() ?? null,
         unpoolTimeEpochMs: unpoolTime?.getTime() ?? null,
-        secondsUntilUnpool:
-          unpoolTime === null
-            ? null
-            : Math.max(
-                0,
-                Math.ceil((unpoolTime.getTime() - queriedAtEpochMs) / 1000)
-              ),
       });
     }
 
@@ -1955,6 +1951,18 @@ if (isMainModule) {
     const signalExitCode = signal === "SIGINT" ? 130 : 143;
     let exitCode = signalExitCode;
     try {
+      try {
+        await Promise.race([
+          rateLimitQueue,
+          new Promise<void>((resolve) =>
+            setTimeout(resolve, RATE_LIMIT_DRAIN_TIMEOUT_MS)
+          ),
+        ]);
+      } catch (error) {
+        console.error(
+          `[starkzap-mcp] rate limit queue cleanup error: ${summarizeError(error)}`
+        );
+      }
       await server.close();
       await cleanupWalletAndSdkResources();
     } catch (error) {
