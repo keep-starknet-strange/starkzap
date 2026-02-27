@@ -1,0 +1,37 @@
+{
+  "name": "@keep-starknet-strange/starkzap-mcp",
+  "version": "0.1.0",
+  "description": "MCP server exposing Starknet wallet operations via the StarkZap SDK — transfer, stake, batch, deploy, and more",
+  "author": "0xLucqs",
+  "license": "MIT",
+  "type": "module",
+  "bin": {
+    "starkzap-mcp": "./dist/index.js"
+  },
+  "main": "./dist/index.js",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup src/index.ts --format esm --watch",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "check": "npm run typecheck && npm run test",
+    "prepublishOnly": "npm run check && npm pack --dry-run >/dev/null && npm view starkzap@1.0.0 version >/dev/null"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.26.0",
+    "starkzap": "1.0.0",
+    "zod": "^3.25.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "tsup": "^8.5.0",
+    "typescript": "^5.9.0",
+    "vitest": "^4.0.17"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
