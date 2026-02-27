@@ -90,6 +90,16 @@ function delay(ms: number): Promise<void> {
 }
 
 describe("index integration hardening", () => {
+  const validTransferArgs = {
+    token: "STRK",
+    transfers: [
+      {
+        to: "0x1",
+        amount: "0.1",
+      },
+    ],
+  };
+
   it("handles wallet init failure with retry backoff", async () => {
     const connectWallet = vi
       .fn()
@@ -215,20 +225,54 @@ describe("index integration hardening", () => {
     const writeCall = await testing.handleCallToolRequest({
       params: {
         name: "starkzap_transfer",
-        arguments: {
-          token: "STRK",
-          transfers: [
-            {
-              to: "0x1",
-              amount: "0.1",
-            },
-          ],
-        },
+        arguments: validTransferArgs,
       },
     });
     expect(writeCall.isError).toBe(true);
     expect(writeCall.content[0]?.text).toContain("disabled by default");
     expect(writeCall.content[0]?.text).not.toContain("Rate limit exceeded");
+  });
+
+  it("applies write rate limiting for repeated known write calls", async () => {
+    const first = await testing.handleCallToolRequest({
+      params: {
+        name: "starkzap_transfer",
+        arguments: validTransferArgs,
+      },
+    });
+    expect(first.isError).toBe(true);
+    expect(first.content[0]?.text).toContain("disabled by default");
+
+    const second = await testing.handleCallToolRequest({
+      params: {
+        name: "starkzap_transfer",
+        arguments: validTransferArgs,
+      },
+    });
+    expect(second.isError).toBe(true);
+    expect(second.content[0]?.text).toContain("Rate limit exceeded");
+  });
+
+  it("counts known write validation failures toward write rate limits", async () => {
+    const invalid = await testing.handleCallToolRequest({
+      params: {
+        name: "starkzap_transfer",
+        arguments: {
+          transfers: [{ to: "0x1", amount: "0.1" }],
+        },
+      },
+    });
+    expect(invalid.isError).toBe(true);
+    expect(invalid.content[0]?.text).toContain("Validation error:");
+
+    const followUp = await testing.handleCallToolRequest({
+      params: {
+        name: "starkzap_transfer",
+        arguments: validTransferArgs,
+      },
+    });
+    expect(followUp.isError).toBe(true);
+    expect(followUp.content[0]?.text).toContain("Rate limit exceeded");
   });
 
   it("fails with clear message when SDK balance shape is malformed", async () => {
