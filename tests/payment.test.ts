@@ -146,16 +146,15 @@ describe("Payment", () => {
   });
 
   describe("modal", () => {
-    it("returns a simple modal handle with pay()", () => {
+    it("returns a simple modal handle with pay() and defaults platform to web", () => {
       const flow = payment.modal({
         type: "token",
         sessionToken: "tok_123",
         amount: "25.00",
-        platform: "react",
       });
 
       expect(flow.type).toBe("token");
-      expect(flow.platform).toBe("react");
+      expect(flow.platform).toBe("web");
       expect(flow.sessionToken).toBe("tok_123");
       expect(flow.amount).toBe("25.00");
       expect(typeof flow.pay).toBe("function");
@@ -165,33 +164,23 @@ describe("Payment", () => {
       const flow = payment.modal({
         type: "session",
         sessionUrl: "https://api.chainrails.io/session/abc",
-        platform: "vanilla",
+        platform: "web",
       });
 
       expect(flow.type).toBe("session");
-      expect(flow.platform).toBe("vanilla");
+      expect(flow.platform).toBe("web");
       expect(flow.sessionUrl).toBe("https://api.chainrails.io/session/abc");
       expect(flow.sessionToken).toBeUndefined();
     });
 
-    it("throws for unsupported platforms when pay is called", async () => {
+    it("throws for mobile platform when pay is called", async () => {
       const flow = payment.modal({
         type: "token",
         sessionToken: "tok_123",
-        platform: "react-native",
+        platform: "mobile",
       });
 
       await expect(flow.pay()).rejects.toThrow(/not implemented/i);
-    });
-
-    it("throws when react is used with session URL mode", async () => {
-      const flow = payment.modal({
-        type: "session",
-        sessionUrl: "https://api.chainrails.io/session/abc",
-        platform: "react",
-      });
-
-      await expect(flow.pay()).rejects.toThrow(/requires `type: "token"`/i);
     });
   });
 

@@ -147,12 +147,20 @@ export class Payment {
    * - `false` on cancel/close
    */
   modal(input: PaymentModalInput): PaymentModalHandle {
+    const platform = input.platform ?? "web";
+
     const handle: PaymentModalHandle = {
       type: input.type,
-      platform: input.platform,
+      platform,
       pay: async () => {
+        if (platform === "mobile") {
+          throw new Error(
+            `payment.modal is not implemented for platform "${platform}" yet. Use "web".`
+          );
+        }
+
         const modalManager = await this.getModalManager();
-        return modalManager.modal(input).pay();
+        return modalManager.modal({ ...input, platform }).pay();
       },
     };
 
