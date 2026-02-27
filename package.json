@@ -2,6 +2,9 @@
   "name": "starkzap",
   "version": "1.0.0",
   "description": "Helper sdk for easy wallet integration",
+  "workspaces": [
+    "packages/*"
+  ],
   "homepage": "https://github.com/keep-starknet-strange/x#readme",
   "bugs": {
     "url": "https://github.com/keep-starknet-strange/x/issues"
@@ -50,7 +53,9 @@
   },
   "scripts": {
     "build": "tsc; tsc-alias",
+    "build:all": "npm run build --workspace @starkzap/native",
     "typecheck": "tsc --noEmit",
+    "typecheck:all": "npm run typecheck --workspace @starkzap/native",
     "lint": "eslint .",
     "fix": "eslint . --fix",
     "prettier": "prettier --write .",
