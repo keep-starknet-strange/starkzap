@@ -924,7 +924,7 @@ export function assertBatchAmountWithinCap(
     return accumulator + amount.toBase();
   }, 0n);
   if (totalBase > capBase) {
-    let totalDisplay = `${totalBase.toString()} base units`;
+    let totalDisplay: string;
     try {
       const totalAmount = amounts.reduce(
         (accumulator, amount) => {
@@ -933,8 +933,11 @@ export function assertBatchAmountWithinCap(
         Amount.parse("0", token)
       );
       totalDisplay = totalAmount.toUnit();
-    } catch {
-      // Keep base-unit fallback if SDK add() overflows or throws.
+    } catch (error) {
+      const reason = error instanceof Error ? error.message : String(error);
+      throw new Error(
+        `Total batch amount overflow detected while formatting aggregate amount. ${reason}`
+      );
     }
     throw new Error(
       `Total batch amount ${totalDisplay} ${token.symbol} exceeds the batch cap of ${capLiteral}. ` +

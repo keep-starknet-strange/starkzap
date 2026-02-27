@@ -355,6 +355,14 @@ function sanitizeExplorerUrl(rawUrl: string | undefined): string | undefined {
   }
 }
 
+function sanitizeTokenSymbol(symbol: string): string {
+  const sanitized = symbol.replace(/[^A-Za-z0-9 _-]/g, "").trim();
+  if (!sanitized) {
+    return "UNKNOWN";
+  }
+  return sanitized.slice(0, 32);
+}
+
 async function getWallet(): Promise<Wallet> {
   if (walletSingleton) {
     return walletSingleton;
@@ -705,7 +713,9 @@ async function getPoolClassHashWithCache(
       return normalized;
     })
     .finally(() => {
-      poolClassHashInFlight.delete(poolAddress);
+      if (poolClassHashInFlight.get(poolAddress) === request) {
+        poolClassHashInFlight.delete(poolAddress);
+      }
     });
   poolClassHashInFlight.set(poolAddress, request);
   return request;
@@ -845,6 +855,7 @@ async function runWithToolConcurrencyPolicy<T>(
   toolName: string,
   task: () => Promise<T>
 ): Promise<T> {
+  // Read-only tools intentionally bypass the global write lock.
   if (READ_ONLY_TOOLS.has(toolName)) {
     return task();
   }
@@ -1230,8 +1241,9 @@ async function handleTool(
         "toBase",
         "getDecimals",
       ]);
+      const symbol = sanitizeTokenSymbol(token.symbol);
       return ok({
-        token: token.symbol,
+        token: symbol,
         address: token.address,
         balance: balance.toUnit(),
         formatted: balance.toFormatted(),
@@ -1288,7 +1300,7 @@ async function handleTool(
         transfers: transfers.map((transfer) => ({
           to: transfer.to,
           amount: transfer.amount.toUnit(),
-          symbol: token.symbol,
+          symbol: sanitizeTokenSymbol(token.symbol),
         })),
       });
     }
@@ -1396,7 +1408,7 @@ async function handleTool(
         explorerUrl: txResult.explorerUrl,
         pool: poolAddress,
         amount: amount.toUnit(),
-        symbol: poolToken.symbol,
+        symbol: sanitizeTokenSymbol(poolToken.symbol),
       });
     }
 
@@ -1423,7 +1435,7 @@ async function handleTool(
         explorerUrl: txResult.explorerUrl,
         pool: poolAddress,
         amount: amount.toUnit(),
-        symbol: poolToken.symbol,
+        symbol: sanitizeTokenSymbol(poolToken.symbol),
       });
     }
 
@@ -1473,7 +1485,7 @@ async function handleTool(
         explorerUrl: txResult.explorerUrl,
         pool: poolAddress,
         amount: amount.toUnit(),
-        symbol: poolToken.symbol,
+        symbol: sanitizeTokenSymbol(poolToken.symbol),
         note: "Tokens stop earning rewards now. Call starkzap_exit_pool after the waiting period.",
       });
     }
@@ -1527,7 +1539,6 @@ async function handleTool(
         unpooling: position.unpooling.toUnit(),
         unpoolTime: unpoolTime?.toISOString() ?? null,
         unpoolTimeEpochMs: unpoolTime?.getTime() ?? null,
-        queriedAtEpochMs,
         secondsUntilUnpool:
           unpoolTime === null
             ? null
