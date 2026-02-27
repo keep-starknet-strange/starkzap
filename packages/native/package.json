@@ -12,17 +12,14 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
     },
-    "./install": {
-      "types": "./dist/polyfills/install.d.ts",
-      "import": "./dist/polyfills/install.js"
-    },
     "./polyfills": {
       "types": "./dist/polyfills/index.d.ts",
       "import": "./dist/polyfills/index.js"
     }
   },
   "files": [
-    "dist"
+    "dist",
+    "scripts/check-optional-peers.cjs"
   ],
   "sideEffects": [
     "./dist/polyfills/install.js"
@@ -31,6 +28,7 @@
     "access": "public"
   },
   "scripts": {
+    "postinstall": "node scripts/check-optional-peers.cjs",
     "build": "npm run build --prefix ../.. && tsc && tsc-alias",
     "typecheck": "npm run build --prefix ../.. && tsc --noEmit"
   },

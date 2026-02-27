@@ -33,7 +33,12 @@ import {
   updateTransactionToast,
   showCopiedToast,
 } from "@/components/Toast";
-import { Amount, fromAddress, type Token, type ChainId } from "starkzap";
+import {
+  Amount,
+  fromAddress,
+  type Token,
+  type ChainId,
+} from "@starkzap/native";
 
 const WBTC_LOGO_FALLBACK =
   "https://altcoinsbox.com/wp-content/uploads/2023/01/wbtc-wrapped-bitcoin-logo.png";
@@ -633,27 +638,32 @@ export default function TransfersScreen() {
                       />
                     );
                   })()}
-                  {transfer.token && getBalance(transfer.token) && (
-                    <TouchableOpacity
-                      style={[
-                        styles.maxButton,
-                        { backgroundColor: borderColor },
-                      ]}
-                      onPress={() =>
-                        handleUpdateAmount(
-                          transfer.id,
-                          getBalance(transfer.token)!.toUnit()
-                        )
-                      }
-                      activeOpacity={0.88}
-                    >
-                      <ThemedText
-                        style={[styles.maxButtonText, { color: primaryColor }]}
+                  {(() => {
+                    const token = transfer.token;
+                    const balance = token ? getBalance(token) : null;
+                    if (!token || !balance) return null;
+                    return (
+                      <TouchableOpacity
+                        style={[
+                          styles.maxButton,
+                          { backgroundColor: borderColor },
+                        ]}
+                        onPress={() =>
+                          handleUpdateAmount(transfer.id, balance.toUnit())
+                        }
+                        activeOpacity={0.88}
                       >
-                        MAX
-                      </ThemedText>
-                    </TouchableOpacity>
-                  )}
+                        <ThemedText
+                          style={[
+                            styles.maxButtonText,
+                            { color: primaryColor },
+                          ]}
+                        >
+                          MAX
+                        </ThemedText>
+                      </TouchableOpacity>
+                    );
+                  })()}
                 </View>
               </View>
               {/* Sponsored + switch and Balance on one line below the dropdown, right-aligned */}
