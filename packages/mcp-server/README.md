@@ -57,6 +57,8 @@ This server handles real funds. The following protections are built in:
 | ------------------------------------ | -------- | ----------------------------------------------------------------------------------------------- |
 | `STARKNET_PRIVATE_KEY`               | Yes      | Stark curve private key (`0x` + exactly 64 hex chars, cryptographically valid)                  |
 | `STARKNET_RPC_URL`                   | No       | Custom RPC endpoint (overrides network preset; HTTPS required except localhost HTTP)            |
+| `STARKNET_PAYMASTER_URL`             | No       | Custom paymaster endpoint for sponsored tx (HTTPS required except localhost HTTP)               |
+| `AVNU_PAYMASTER_API_KEY`             | No       | API key sent as `x-paymaster-api-key` for sponsored tx on AVNU paymaster                        |
 | `STARKNET_RPC_TIMEOUT_MS`            | No       | RPC timeout in milliseconds (default: `30000`)                                                  |
 | `STARKNET_POOL_CACHE_TTL_MS`         | No       | Pool class-hash cache TTL in ms (default: `30000`, set `0` to disable cache)                    |
 | `STARKNET_STAKING_CONTRACT`          | No       | Staking contract address (enables staking tools)                                                |
@@ -93,7 +95,9 @@ Add to your MCP config (`mcp.json` or Claude Desktop settings):
         "--enable-write"
       ],
       "env": {
-        "STARKNET_PRIVATE_KEY": "0xYOUR_PRIVATE_KEY"
+        "STARKNET_PRIVATE_KEY": "0xYOUR_PRIVATE_KEY",
+        "STARKNET_PAYMASTER_URL": "https://sepolia.paymaster.avnu.fi",
+        "AVNU_PAYMASTER_API_KEY": "YOUR_AVNU_API_KEY"
       }
     }
   }
@@ -115,6 +119,8 @@ const mcpServer = new McpServerStdio({
   ],
   env: {
     STARKNET_PRIVATE_KEY: "0x...",
+    STARKNET_PAYMASTER_URL: "https://sepolia.paymaster.avnu.fi",
+    AVNU_PAYMASTER_API_KEY: "YOUR_AVNU_API_KEY",
   },
 });
 ```
@@ -197,6 +203,7 @@ Use this sequence when validating real writes (not just tests):
 3. Confirm fees balance with `starkzap_get_balance` for `STRK` (and optionally `ETH`).
 4. If account is not deployed, call `starkzap_deploy_account`.
 5. Execute a tiny self-transfer (e.g. `0.00001`) with `starkzap_transfer`.
+6. If validating sponsored writes, set `STARKNET_PAYMASTER_URL` and `AVNU_PAYMASTER_API_KEY` before startup.
 
 Troubleshooting from live runs:
 

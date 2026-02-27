@@ -55,6 +55,7 @@ type TestingExports = {
   setNowProvider(provider: () => number): void;
   setSdkSingleton(value: unknown): void;
   setWalletSingleton(value: Wallet | undefined): void;
+  getSdkConfig(): Record<string, unknown>;
   resetState(): void;
 };
 
@@ -66,6 +67,8 @@ beforeAll(async () => {
   process.env.STARKNET_PRIVATE_KEY = `0x${"1".padStart(64, "0")}`;
   process.env.STARKNET_STAKING_CONTRACT =
     "0x03745ab04a431fc02871a139be6b93d9260b0ff3e779ad9c8b377183b23109f1";
+  process.env.STARKNET_PAYMASTER_URL = "https://sepolia.paymaster.avnu.fi";
+  process.env.AVNU_PAYMASTER_API_KEY = "test-avnu-key";
   process.argv = [
     "node",
     "index.integration.test.ts",
@@ -124,6 +127,18 @@ describe("index integration hardening", () => {
     testing.setNowProvider(() => 2_000);
     await expect(testing.getWallet()).resolves.toBeDefined();
     expect(connectWallet).toHaveBeenCalledTimes(2);
+  });
+
+  it("wires paymaster URL and API key into SDK config", () => {
+    const sdkConfig = testing.getSdkConfig() as {
+      paymaster?: { nodeUrl?: string; headers?: Record<string, string> };
+    };
+    expect(sdkConfig.paymaster?.nodeUrl).toBe(
+      "https://sepolia.paymaster.avnu.fi"
+    );
+    expect(sdkConfig.paymaster?.headers?.["x-paymaster-api-key"]).toBe(
+      "test-avnu-key"
+    );
   });
 
   it("times out hanging RPC promises", async () => {

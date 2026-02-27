@@ -136,6 +136,20 @@ const envSchema = z.object({
     .optional(),
   STARKNET_STAKING_CONTRACT: contractAddressSchema.optional(),
   STARKNET_STAKING_POOL_CLASS_HASHES: z.string().optional(),
+  STARKNET_PAYMASTER_URL: z
+    .string()
+    .url()
+    .refine(
+      (value) => isSecureRpcUrl(value),
+      "Paymaster URL must use HTTPS (HTTP is only allowed for localhost)"
+    )
+    .optional(),
+  AVNU_PAYMASTER_API_KEY: z
+    .string()
+    .trim()
+    .min(1, "AVNU paymaster API key cannot be empty")
+    .max(256, "AVNU paymaster API key is too long")
+    .optional(),
   STARKNET_POOL_CACHE_TTL_MS: z.coerce
     .number()
     .int()
@@ -154,8 +168,10 @@ const env = (() => {
   const envInput = {
     ...process.env,
     STARKNET_PRIVATE_KEY: process.env.STARKNET_PRIVATE_KEY,
+    AVNU_PAYMASTER_API_KEY: process.env.AVNU_PAYMASTER_API_KEY,
   };
   delete process.env.STARKNET_PRIVATE_KEY;
+  delete process.env.AVNU_PAYMASTER_API_KEY;
   const parsed = envSchema.safeParse(envInput);
   if (parsed.success) {
     return parsed.data;
@@ -204,6 +220,25 @@ const configuredPoolClassHashes = (() => {
   }
 })();
 
+function buildPaymasterConfig():
+  | { nodeUrl?: string; headers?: Record<string, string> }
+  | undefined {
+  const headers: Record<string, string> = {};
+  if (env.AVNU_PAYMASTER_API_KEY) {
+    headers["x-paymaster-api-key"] = env.AVNU_PAYMASTER_API_KEY;
+  }
+
+  const nodeUrl = env.STARKNET_PAYMASTER_URL;
+  if (!nodeUrl && Object.keys(headers).length === 0) {
+    return undefined;
+  }
+
+  return {
+    ...(nodeUrl && { nodeUrl }),
+    ...(Object.keys(headers).length > 0 && { headers }),
+  };
+}
+
 const stakingEnabled = Boolean(env.STARKNET_STAKING_CONTRACT);
 const rpcTimeoutMs = env.STARKNET_RPC_TIMEOUT_MS ?? 30_000;
 const poolClassHashCacheTtlMs = env.STARKNET_POOL_CACHE_TTL_MS ?? 30_000;
@@ -225,9 +260,11 @@ let walletInitFailureCount = 0;
 let walletInitBackoffUntilMs = 0;
 let sdkInitFailureCount = 0;
 let sdkInitBackoffUntilMs = 0;
+const paymasterConfig = buildPaymasterConfig();
 const sdkConfig = Object.freeze({
   network,
   ...(env.STARKNET_RPC_URL && { rpcUrl: env.STARKNET_RPC_URL }),
+  ...(paymasterConfig && { paymaster: paymasterConfig }),
   ...(env.STARKNET_STAKING_CONTRACT && {
     staking: {
       contract: fromAddress(env.STARKNET_STAKING_CONTRACT),
@@ -1702,6 +1739,7 @@ interface TestingHooks {
   setNowProvider(provider: () => number): void;
   setSdkSingleton(value: StarkSDK | undefined): void;
   setWalletSingleton(value: Wallet | undefined): void;
+  getSdkConfig(): Record<string, unknown>;
   resetState(): void;
 }
 
@@ -1733,6 +1771,9 @@ const testingHooks: TestingHooks = {
   },
   setWalletSingleton(value: Wallet | undefined) {
     walletSingleton = value;
+  },
+  getSdkConfig() {
+    return { ...sdkConfig };
   },
   resetState() {
     sdkSingleton = undefined;
