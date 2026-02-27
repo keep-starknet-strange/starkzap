@@ -327,16 +327,26 @@ function sanitizeExplorerUrl(rawUrl: string | undefined): string | undefined {
   if (!rawUrl) {
     return undefined;
   }
+  if (rawUrl.length > 512) {
+    console.error("[starkzap-mcp] dropping excessively long explorerUrl");
+    return undefined;
+  }
   try {
     const parsed = new URL(rawUrl);
     const protocol = parsed.protocol.toLowerCase();
-    if (protocol === "https:" || protocol === "http:") {
-      return rawUrl;
+    if (protocol !== "https:" && protocol !== "http:") {
+      console.error(
+        `[starkzap-mcp] dropping unsafe explorerUrl protocol "${protocol}" returned by SDK`
+      );
+      return undefined;
     }
-    console.error(
-      `[starkzap-mcp] dropping unsafe explorerUrl protocol "${protocol}" returned by SDK`
-    );
-    return undefined;
+    if (parsed.username || parsed.password) {
+      console.error(
+        "[starkzap-mcp] dropping explorerUrl containing credentials"
+      );
+      return undefined;
+    }
+    return rawUrl;
   } catch {
     console.error(
       "[starkzap-mcp] dropping malformed explorerUrl returned by SDK"
@@ -524,7 +534,7 @@ function assertPoolPositionShape(
   rewards: Amount;
   total: Amount;
   unpooling: Amount;
-  commissionPercent: unknown;
+  commissionPercent: number;
   unpoolTime?: Date | null;
 } {
   if (!isRecord(position)) {
@@ -565,6 +575,17 @@ function assertPoolPositionShape(
   ) {
     throw new Error(
       `Invalid pool position response from SDK for ${poolAddress}: unpoolTime must be a valid Date or null.`
+    );
+  }
+
+  if (
+    typeof position.commissionPercent !== "number" ||
+    !Number.isFinite(position.commissionPercent) ||
+    position.commissionPercent < 0 ||
+    position.commissionPercent > 100
+  ) {
+    throw new Error(
+      `Invalid pool position response from SDK for ${poolAddress}: commissionPercent must be a finite number between 0 and 100.`
     );
   }
 }
@@ -1534,9 +1555,13 @@ async function handleTool(
       );
       assertOverallFeeIsBigInt(fee);
       const { l1_gas, l2_gas, l1_data_gas } = requireResourceBounds(fee);
+      const unit =
+        typeof fee.unit === "string" && fee.unit.length > 0
+          ? fee.unit
+          : "unknown";
       return ok({
         overall_fee: fee.overall_fee.toString(),
-        unit: fee.unit,
+        unit,
         resource_bounds: {
           l1_gas: {
             max_amount: l1_gas.max_amount.toString(),
@@ -1746,17 +1771,23 @@ if (process.env.NODE_ENV === "test" && !testHooksEnabled) {
 if (testHooksEnabled) {
   const unsafeBypassEnabled =
     allowUnsafeTestHooks && unsafeTestHooksAcknowledged;
-  const blocksUnsafeBypassForNetwork =
+  const rpcUrlLooksLikeMainnet =
+    typeof env.STARKNET_RPC_URL === "string" &&
+    /mainnet/i.test(env.STARKNET_RPC_URL) &&
+    !/(localhost|127\.0\.0\.1|\[::1\])/i.test(env.STARKNET_RPC_URL);
+  const hasProductionLikeIndicators =
+    network === "mainnet" || rpcUrlLooksLikeMainnet;
+  const blocksUnsafeBypassForEnvironment =
     unsafeBypassEnabled &&
-    network === "mainnet" &&
+    hasProductionLikeIndicators &&
     !unsafeHooksAllowedOnMainnet;
   if (!testHookPrivateKeyIsSafe && !unsafeBypassEnabled) {
     console.error(
       "[starkzap-mcp] refusing to expose test hooks: STARKNET_PRIVATE_KEY does not look like a test key. To bypass in controlled environments only, set STARKZAP_MCP_ALLOW_UNSAFE_TEST_HOOKS=1 and STARKZAP_MCP_UNSAFE_TEST_HOOKS_ACK=I_UNDERSTAND_THIS_EXPOSES_WALLET_MUTATION."
     );
-  } else if (blocksUnsafeBypassForNetwork) {
+  } else if (blocksUnsafeBypassForEnvironment) {
     console.error(
-      "[starkzap-mcp] refusing unsafe test hooks on mainnet. Use a safe test key instead, or set STARKZAP_MCP_ALLOW_UNSAFE_TEST_HOOKS_MAINNET=1 only in isolated local test environments."
+      "[starkzap-mcp] refusing unsafe test hooks in production-like environments. Use a safe test key instead, or set STARKZAP_MCP_ALLOW_UNSAFE_TEST_HOOKS_MAINNET=1 only in isolated local test environments."
     );
   } else {
     (globalThis as Record<string, unknown>).__STARKZAP_MCP_TESTING__ =

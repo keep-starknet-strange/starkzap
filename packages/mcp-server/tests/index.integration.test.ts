@@ -64,6 +64,8 @@ beforeAll(async () => {
   process.env.NODE_ENV = "test";
   process.env.STARKZAP_MCP_ENABLE_TEST_HOOKS = "1";
   process.env.STARKNET_PRIVATE_KEY = `0x${"1".padStart(64, "0")}`;
+  process.env.STARKNET_STAKING_CONTRACT =
+    "0x03745ab04a431fc02871a139be6b93d9260b0ff3e779ad9c8b377183b23109f1";
   process.argv = [
     "node",
     "index.integration.test.ts",
@@ -321,6 +323,61 @@ describe("index integration hardening", () => {
     expect(response.content[0]?.text).toContain("Operation failed. Reference:");
   });
 
+  it("normalizes missing fee unit to unknown", async () => {
+    testing.setWalletSingleton({
+      estimateFee: vi.fn().mockResolvedValue({
+        overall_fee: 123n,
+        resourceBounds: {
+          l1_gas: { max_amount: 1n, max_price_per_unit: 2n },
+          l2_gas: { max_amount: 3n, max_price_per_unit: 4n },
+          l1_data_gas: { max_amount: 5n, max_price_per_unit: 6n },
+        },
+      }),
+    } as unknown as Wallet);
+    const response = await testing.handleCallToolRequest({
+      params: {
+        name: "starkzap_estimate_fee",
+        arguments: {
+          calls: [
+            {
+              contractAddress: TEST_TOKEN.address,
+              entrypoint: "transfer",
+              calldata: [],
+            },
+          ],
+        },
+      },
+    });
+
+    expect(response.isError).not.toBe(true);
+    const payload = JSON.parse(response.content[0]?.text ?? "{}") as {
+      unit?: string;
+    };
+    expect(payload.unit).toBe("unknown");
+  });
+
+  it("rejects malformed commission percent in pool position responses", async () => {
+    testing.setWalletSingleton({
+      getPoolPosition: vi.fn().mockResolvedValue({
+        staked: Amount.parse("1", TEST_TOKEN),
+        rewards: Amount.parse("0", TEST_TOKEN),
+        total: Amount.parse("1", TEST_TOKEN),
+        unpooling: Amount.parse("0", TEST_TOKEN),
+        commissionPercent: "invalid",
+        unpoolTime: null,
+      }),
+    } as unknown as Wallet);
+    const response = await testing.handleCallToolRequest({
+      params: {
+        name: "starkzap_get_pool_position",
+        arguments: { pool: "0x1" },
+      },
+    });
+
+    expect(response.isError).toBe(true);
+    expect(response.content[0]?.text).toContain("commissionPercent");
+  });
+
   it("allows read-only tasks to run concurrently", async () => {
     const events: string[] = [];
     const readA = testing.runWithToolConcurrencyPolicy(
@@ -467,6 +524,22 @@ describe("index integration hardening", () => {
     });
     expect(result.hash).toBe(fromAddress("0xabc"));
     expect(result.explorerUrl).toBeUndefined();
+  });
+
+  it("drops explorerUrl values with credentials or excessive length", async () => {
+    const withCredentials = await testing.waitForTrackedTransaction({
+      hash: "0xabc1",
+      explorerUrl: "https://user:pass@sepolia.voyager.online/tx/0xabc1",
+      wait: async () => undefined,
+    });
+    expect(withCredentials.explorerUrl).toBeUndefined();
+
+    const tooLong = await testing.waitForTrackedTransaction({
+      hash: "0xabc2",
+      explorerUrl: `https://sepolia.voyager.online/tx/${"a".repeat(600)}`,
+      wait: async () => undefined,
+    });
+    expect(tooLong.explorerUrl).toBeUndefined();
   });
 
   it("keeps tx.wait context when waiting for transaction confirmation", async () => {

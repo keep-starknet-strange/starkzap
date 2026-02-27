@@ -203,6 +203,7 @@ Troubleshooting from live runs:
 - If startup says private key is invalid, check key length: it must be 64 hex chars after `0x` (32 bytes). If your source omits a leading zero, left-pad before use.
 - If your expected wallet address does not match, trust `starkzap_get_account` output. The MCP uses StarkZap wallet derivation from the private key.
 - If sponsored deploy/transfer fails with paymaster errors (e.g. invalid API key), use funded user-pays mode or configure a valid paymaster setup in your environment.
+- In sponsored mode, account class-hash validation runs after tx confirmation as a safety audit check. This detects unexpected account classes but cannot prevent a misbehaving paymaster from submitting the first tx.
 - If write tx fails with undeployed account errors, run `starkzap_deploy_account` first, then retry transfer.
 
 ## Security Checklist
