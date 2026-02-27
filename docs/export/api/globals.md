@@ -7,7 +7,7 @@
 ## Classes
 
 - [Erc20](classes/Erc20.md)
-- [StarkSDK](classes/StarkSDK.md)
+- [StarkZap](classes/StarkZap.md)
 - [SignerAdapter](classes/SignerAdapter.md)
 - [PrivySigner](classes/PrivySigner.md)
 - [StarkSigner](classes/StarkSigner.md)

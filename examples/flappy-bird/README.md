@@ -111,7 +111,7 @@ This example **automatically falls back** to **user_pays**: the first failed spo
 ## Stack
 
 - **Vite + TypeScript** — Entry and StarkZap wiring; game is vanilla JS from floppybird.
-- **Starkzap SDK (`starkzap`)** — `StarkSDK`, `OnboardStrategy.Cartridge`, `networks`, `wallet.execute()`, `wallet.getProvider()`, `wallet.address`, `wallet.disconnect()`, Cartridge `username()`. Config: `new StarkSDK({ network: "sepolia" })`; explorer from `networks.sepolia.explorerUrl`.
+- **Starkzap SDK (`starkzap`)** — `StarkZap`, `OnboardStrategy.Cartridge`, `networks`, `wallet.execute()`, `wallet.getProvider()`, `wallet.address`, `wallet.disconnect()`, Cartridge `username()`. Config: `new StarkZap({ network: "sepolia" })`; explorer from `networks.sepolia.explorerUrl`.
 - **Game contract** — Demo contract on Starknet Sepolia: `start_new_game`, `increment_score`, `end_game`, plus view functions for high score and leaderboard. Address: `0x03730b941e8d3ece030a4a0d5f1008f34fbde0976e86577a78648c8b35079464`.
 
 ## What this example uses outside StarkZap

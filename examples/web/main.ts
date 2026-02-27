@@ -1,6 +1,6 @@
 import {
   Amount,
-  StarkSDK,
+  StarkZap,
   StarkSigner,
   OnboardStrategy,
   ChainId,
@@ -38,7 +38,7 @@ const presetTokens = Object.values(getPresets(SDK_CHAIN_ID)).sort((a, b) =>
 );
 
 // SDK instance
-const sdk = new StarkSDK({
+const sdk = new StarkZap({
   rpcUrl: RPC_URL,
   chainId: SDK_CHAIN_ID,
 });

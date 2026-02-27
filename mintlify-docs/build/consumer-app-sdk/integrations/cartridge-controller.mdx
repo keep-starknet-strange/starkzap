@@ -24,7 +24,7 @@ When StarkZap initializes Cartridge through this SDK, it forwards your SDK netwo
 
 This ensures the Controller session (and paymaster flow) is created on the same network your SDK uses.
 
-You do not need to pass chain settings again when calling `sdk.connectCartridge()` or `sdk.onboard({ strategy: "cartridge" })`. Configure network once in `new StarkSDK(...)`, and the SDK forwards it.
+You do not need to pass chain settings again when calling `sdk.connectCartridge()` or `sdk.onboard({ strategy: "cartridge" })`. Configure network once in `new StarkZap(...)`, and the SDK forwards it.
 
 If session chain and SDK RPC chain diverge, sponsored flows can fail with errors such as:
 

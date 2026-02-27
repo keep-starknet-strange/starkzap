@@ -18,7 +18,7 @@ for the configured `chainId`.
 ## Example
 
 ```ts
-const sdk = new StarkSDK({
+const sdk = new StarkZap({
   rpcUrl: "https://starknet-mainnet.infura.io/v3/YOUR_KEY",
   chainId: ChainId.MAINNET,
   staking: {

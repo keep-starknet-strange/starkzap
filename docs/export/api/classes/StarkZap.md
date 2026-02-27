@@ -2,9 +2,9 @@
 
 ***
 
-[starkzap](../globals.md) / StarkSDK
+[starkzap](../globals.md) / StarkZap
 
-# Class: StarkSDK
+# Class: StarkZap
 
 Defined in: [src/sdk.ts:79](https://github.com/keep-starknet-strange/x/blob/5e54d8974744c392df7cac56b636788dfe6ae268/src/sdk.ts#L79)
 
@@ -13,14 +13,14 @@ Main SDK class for Starknet wallet integration.
 ## Example
 
 ```ts
-import { StarkSDK, StarkSigner, ArgentPreset } from "starkzap";
+import { StarkZap, StarkSigner, ArgentPreset } from "starkzap";
 
 // Using network presets (recommended)
-const sdk = new StarkSDK({ network: "mainnet" });
-const sdk = new StarkSDK({ network: "sepolia" });
+const sdk = new StarkZap({ network: "mainnet" });
+const sdk = new StarkZap({ network: "sepolia" });
 
 // Or with custom RPC
-const sdk = new StarkSDK({
+const sdk = new StarkZap({
   rpcUrl: "https://my-rpc.example.com",
   chainId: ChainId.MAINNET,
 });
@@ -40,7 +40,7 @@ await tx.wait();
 
 ### Constructor
 
-> **new StarkSDK**(`config`): `StarkSDK`
+> **new StarkZap**(`config`): `StarkZap`
 
 Defined in: [src/sdk.ts:84](https://github.com/keep-starknet-strange/x/blob/5e54d8974744c392df7cac56b636788dfe6ae268/src/sdk.ts#L84)
 
@@ -52,7 +52,7 @@ Defined in: [src/sdk.ts:84](https://github.com/keep-starknet-strange/x/blob/5e54
 
 #### Returns
 
-`StarkSDK`
+`StarkZap`
 
 ## Methods
 

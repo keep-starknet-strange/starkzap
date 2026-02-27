@@ -10,7 +10,7 @@ import {
   type Token,
   type ChainId,
   type WalletInterface,
-  type StarkSDK,
+  type StarkZap,
 } from "starkzap";
 import {
   showTransactionToast,
@@ -70,7 +70,7 @@ interface StakingState {
   isExiting: boolean;
 
   // Actions
-  fetchValidatorPools: (validator: Validator, sdk: StarkSDK) => Promise<Pool[]>;
+  fetchValidatorPools: (validator: Validator, sdk: StarkZap) => Promise<Pool[]>;
   addPosition: (
     validatorKey: string,
     validator: Validator,

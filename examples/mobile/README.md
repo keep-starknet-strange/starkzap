@@ -51,7 +51,7 @@ Note: this example depends on the local SDK via `"starkzap": "file:../.."`. The 
 
 - `entrypoint.js`: loads required polyfills before Expo startup.
 - `metro.config.js`: resolves `starkzap` to local SDK source for development.
-- `stores/wallet.ts`: creates `StarkSDK`, configures paymaster, and handles signer/Privy onboarding.
+- `stores/wallet.ts`: creates `StarkZap`, configures paymaster, and handles signer/Privy onboarding.
 - `app/index.tsx`: connection screen and network setup flow.
 - `app/(tabs)/*`: balances, transfers, swap, and staking screens.
 

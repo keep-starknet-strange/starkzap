@@ -229,7 +229,7 @@ The app connects to Starknet Sepolia by default. To change the network, edit the
 ```typescript
 const RPC_URL = "https://api.cartridge.gg/x/starknet/sepolia/rpc/v0_9";
 
-const sdk = new StarkSDK({
+const sdk = new StarkZap({
   rpcUrl: RPC_URL,
   chainId: ChainId.SEPOLIA,
 });
@@ -249,7 +249,7 @@ const PRIVY_SERVER_URL = "http://localhost:3001";
 
 `vite.config.ts` maps `starkzap` to the SDK source at `../../src/index.ts` and `@` to `../../src/`. This means:
 
-- `import { StarkSDK } from "starkzap"` resolves to the local SDK source, not a published npm bundle.
+- `import { StarkZap } from "starkzap"` resolves to the local SDK source, not a published npm bundle.
 - Changes to the SDK source are hot-reloaded automatically.
 - The `optimizeDeps.exclude: ["starkzap"]` setting prevents Vite from pre-bundling the SDK.
 

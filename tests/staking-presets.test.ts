@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { StarkSDK } from "@/sdk";
+import { StarkZap } from "@/sdk";
 import { getStakingPreset } from "@/staking";
 import { ChainId, fromAddress } from "@/types";
 
@@ -23,7 +23,7 @@ describe("staking presets", () => {
   });
 
   it("should use staking preset by default in sdk config", () => {
-    const sdk = new StarkSDK({ network: "sepolia" });
+    const sdk = new StarkZap({ network: "sepolia" });
     const resolved = (
       sdk as unknown as { config: { staking: { contract: string } } }
     ).config;
@@ -38,7 +38,7 @@ describe("staking presets", () => {
     const customContract = fromAddress(
       "0x0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
     );
-    const sdk = new StarkSDK({
+    const sdk = new StarkZap({
       network: "sepolia",
       staking: { contract: customContract },
     });

@@ -17,7 +17,7 @@ Use this guide if you are:
 
 ## What You Get in This SDK
 
-- `StarkSDK` orchestration layer for provider/network/config.
+- `StarkZap` orchestration layer for provider/network/config.
 - Wallet abstraction (`WalletInterface`) with interchangeable backends.
 - Signer support for:
   - Local Stark private key (`StarkSigner`)
@@ -44,7 +44,7 @@ npm install starkzap
 
 ```ts
 import {
-  StarkSDK,
+  StarkZap,
   OnboardStrategy,
   accountPresets,
   Amount,
@@ -52,7 +52,7 @@ import {
   sepoliaTokens,
 } from "starkzap";
 
-const sdk = new StarkSDK({ network: "sepolia" });
+const sdk = new StarkZap({ network: "sepolia" });
 
 // Example: user is already logged in with Privy in your app
 const accessToken = await privy.getAccessToken();
@@ -150,7 +150,7 @@ const onboard = await sdk.onboard({
 
 ## Configuration Model
 
-`StarkSDK` accepts either:
+`StarkZap` accepts either:
 
 - `network` preset (`"mainnet"`, `"sepolia"`, `"devnet"`), or
 - explicit `rpcUrl` + `chainId`.
@@ -162,9 +162,9 @@ Optional features:
 - `staking.contract` for staking methods.
 
 ```ts
-import { StarkSDK, ChainId, fromAddress } from "starkzap";
+import { StarkZap, ChainId, fromAddress } from "starkzap";
 
-const sdk = new StarkSDK({
+const sdk = new StarkZap({
   rpcUrl: "https://api.cartridge.gg/x/starknet/mainnet",
   chainId: ChainId.MAINNET,
   paymaster: { nodeUrl: "https://your-paymaster.example" },
@@ -355,7 +355,7 @@ if (ChainId.MAINNET.isMainnet()) {
 
 ### "staking.contract is not defined"
 
-Add `staking.contract` to `StarkSDK` config before calling staking APIs.
+Add `staking.contract` to `StarkZap` config before calling staking APIs.
 
 ### Transaction submits but URL is missing
 

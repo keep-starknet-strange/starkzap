@@ -53,14 +53,14 @@ function isWebRuntimeForCartridge(): boolean {
  *
  * @example
  * ```ts
- * import { StarkSDK, StarkSigner, ArgentPreset } from "starkzap";
+ * import { StarkZap, StarkSigner, ArgentPreset } from "starkzap";
  *
  * // Using network presets (recommended)
- * const sdk = new StarkSDK({ network: "mainnet" });
- * const sdk = new StarkSDK({ network: "sepolia" });
+ * const sdk = new StarkZap({ network: "mainnet" });
+ * const sdk = new StarkZap({ network: "sepolia" });
  *
  * // Or with custom RPC
- * const sdk = new StarkSDK({
+ * const sdk = new StarkZap({
  *   rpcUrl: "https://my-rpc.example.com",
  *   chainId: ChainId.MAINNET,
  * });
@@ -76,7 +76,7 @@ function isWebRuntimeForCartridge(): boolean {
  * await tx.wait();
  * ```
  */
-export class StarkSDK {
+export class StarkZap {
   private readonly config: ResolvedConfig;
   private readonly provider: RpcProvider;
   private chainValidationPromise: Promise<void> | null = null;
@@ -100,7 +100,7 @@ export class StarkSDK {
     const rpcUrl = config.rpcUrl ?? networkPreset?.rpcUrl;
     if (!rpcUrl) {
       throw new Error(
-        "StarkSDK requires either 'network' or 'rpcUrl' to be specified"
+        "StarkZap requires either 'network' or 'rpcUrl' to be specified"
       );
     }
     const normalizedRpcUrl = assertSafeHttpUrl(rpcUrl, "rpcUrl").toString();
@@ -109,7 +109,7 @@ export class StarkSDK {
     const chainId = config.chainId ?? networkPreset?.chainId;
     if (!chainId) {
       throw new Error(
-        "StarkSDK requires either 'network' or 'chainId' to be specified"
+        "StarkZap requires either 'network' or 'chainId' to be specified"
       );
     }
 

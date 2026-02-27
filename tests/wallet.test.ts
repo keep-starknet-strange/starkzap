@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, vi } from "vitest";
-import { StarkSDK } from "@/sdk";
+import { StarkZap } from "@/sdk";
 import { StarkSigner } from "@/signer";
 import { OpenZeppelinPreset, ArgentPreset, BraavosPreset } from "@/account";
 import { Amount, ChainId, fromAddress, type Token } from "@/types";
@@ -8,7 +8,7 @@ import { getTestConfig, testPrivateKeys } from "./config.js";
 
 describe("Wallet", () => {
   const { config, privateKey, network } = getTestConfig();
-  let sdk: StarkSDK;
+  let sdk: StarkZap;
   const testSwapToken: Token = {
     name: "Test USDC",
     symbol: "USDC",
@@ -17,7 +17,7 @@ describe("Wallet", () => {
   };
 
   beforeAll(() => {
-    sdk = new StarkSDK(config);
+    sdk = new StarkZap(config);
     vi.spyOn(sdk.getProvider(), "getChainId").mockResolvedValue(
       config.chainId!.toFelt252()
     );
@@ -300,7 +300,7 @@ describe("Wallet", () => {
     });
 
     it("should return ok for sponsored mode when paymaster is configured", async () => {
-      const paymasterSdk = new StarkSDK({
+      const paymasterSdk = new StarkZap({
         ...config,
         paymaster: { nodeUrl: "https://paymaster.example.com" },
       });
@@ -366,7 +366,7 @@ describe("Wallet", () => {
 
   describe("chain validation", () => {
     it("should reject connectWallet when provider chain mismatches config", async () => {
-      const sdk = new StarkSDK(config);
+      const sdk = new StarkZap(config);
       const mismatchChain = config.chainId?.isMainnet()
         ? ChainId.SEPOLIA
         : ChainId.MAINNET;
@@ -383,12 +383,12 @@ describe("Wallet", () => {
   });
 });
 
-describe("StarkSDK", () => {
+describe("StarkZap", () => {
   const { config } = getTestConfig();
 
   describe("getProvider", () => {
     it("should return the RPC provider", () => {
-      const sdk = new StarkSDK(config);
+      const sdk = new StarkZap(config);
       const provider = sdk.getProvider();
 
       expect(provider).toBeDefined();
@@ -398,7 +398,7 @@ describe("StarkSDK", () => {
 
   describe("callContract", () => {
     it("should call provider.callContract", async () => {
-      const sdk = new StarkSDK(config);
+      const sdk = new StarkZap(config);
       const call = {
         contractAddress: "0x123",
         entrypoint: "total_supply",
@@ -415,7 +415,7 @@ describe("StarkSDK", () => {
 
   describe("connectCartridge", () => {
     it("should reject in react-native-like runtime", async () => {
-      const sdk = new StarkSDK(config);
+      const sdk = new StarkZap(config);
       vi.spyOn(sdk.getProvider(), "getChainId").mockResolvedValue(
         config.chainId!.toFelt252()
       );
