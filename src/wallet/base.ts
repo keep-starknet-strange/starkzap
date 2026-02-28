@@ -28,6 +28,9 @@ import { Staking } from "@/staking";
 import type { SwapInput, SwapQuote, SwapProvider } from "@/swap";
 import { AvnuSwapProvider } from "@/swap";
 import { resolveSwapInput } from "@/swap/utils";
+import type { BridgeInput, BridgeQuote, BridgeProvider } from "@/bridge";
+import { starkgateBridge } from "@/bridge/starkgate";
+import { resolveBridgeInput } from "@/bridge/utils";
 
 const MAX_ERC20_CACHE_SIZE = 128;
 const MAX_STAKING_CACHE_SIZE = 128;
@@ -82,22 +85,33 @@ export abstract class BaseWallet implements WalletInterface {
    * @param address - The Starknet address of this wallet
    * @param stakingConfig - Optional staking configuration for staking operations
    * @param defaultSwapProvider - Optional default swap provider used by `getQuote(request)` and `swap(request)`
+   * @param defaultBridgeProvider - Optional default bridge provider used by `getBridgeQuote(request)` and `bridge(request)`
    */
   protected constructor(
     address: Address,
     stakingConfig: StakingConfig | undefined,
-    defaultSwapProvider?: SwapProvider
+    defaultSwapProvider?: SwapProvider,
+    defaultBridgeProvider?: BridgeProvider
   ) {
     this.address = address;
     this.stakingConfig = stakingConfig;
     this.swapProviders = new Map();
     const provider = defaultSwapProvider ?? new AvnuSwapProvider();
     this.registerSwapProvider(provider, true);
+
+    // Initialize bridge providers
+    this.bridgeProviders = new Map();
+    const bridge = defaultBridgeProvider ?? starkgateBridge;
+    this.registerBridgeProvider(bridge, true);
   }
 
   /** Registered swap providers by id. */
   private readonly swapProviders: Map<string, SwapProvider>;
   private defaultSwapProviderId: string | null = null;
+
+  /** Registered bridge providers by id. */
+  private readonly bridgeProviders: Map<string, BridgeProvider>;
+  private defaultBridgeProviderId: string | null = null;
 
   // ============================================================
   // Abstract methods - children MUST implement
@@ -236,6 +250,89 @@ export abstract class BaseWallet implements WalletInterface {
       throw new Error("No default swap provider configured");
     }
     return this.getSwapProvider(this.defaultSwapProviderId);
+  }
+
+  // ============================================================
+  // Bridge methods
+  // ============================================================
+
+  /**
+   * Fetch a bridge quote.
+   *
+   * Set `request.provider` to a provider instance or provider id.
+   * If omitted, uses the wallet default provider.
+   */
+  async getBridgeQuote(request: BridgeInput): Promise<BridgeQuote> {
+    const { provider, request: resolvedRequest } = resolveBridgeInput(request, {
+      walletChainId: this.getChainId(),
+      walletAddress: this.address,
+      providerResolver: this,
+    });
+    return await provider.getQuote(resolvedRequest);
+  }
+
+  /**
+   * Execute a bridge transaction.
+   *
+   * Set `request.provider` to a provider instance or provider id.
+   * If omitted, uses the wallet default provider.
+   */
+  async bridge(request: BridgeInput, options?: ExecuteOptions): Promise<Tx> {
+    const { provider, request: resolvedRequest } = resolveBridgeInput(request, {
+      walletChainId: this.getChainId(),
+      walletAddress: this.address,
+      providerResolver: this,
+    });
+    const prepared = await provider.bridge(resolvedRequest);
+    this.assertBridgeCalls(prepared.calls, `provider "${provider.id}"`);
+    return await this.execute(prepared.calls, options);
+  }
+
+  registerBridgeProvider(provider: BridgeProvider, makeDefault = false): void {
+    this.bridgeProviders.set(provider.id, provider);
+    if (makeDefault || this.defaultBridgeProviderId == null) {
+      this.defaultBridgeProviderId = provider.id;
+    }
+  }
+
+  setDefaultBridgeProvider(providerId: string): void {
+    if (!this.bridgeProviders.has(providerId)) {
+      throw new Error(
+        `Unknown bridge provider "${providerId}". Registered providers: ${this.listBridgeProviders().join(", ")}`
+      );
+    }
+    this.defaultBridgeProviderId = providerId;
+  }
+
+  getBridgeProvider(providerId: string): BridgeProvider {
+    const provider = this.bridgeProviders.get(providerId);
+    if (!provider) {
+      throw new Error(
+        `Unknown bridge provider "${providerId}". Registered providers: ${this.listBridgeProviders().join(", ")}`
+      );
+    }
+    return provider;
+  }
+
+  listBridgeProviders(): string[] {
+    return Array.from(this.bridgeProviders.keys());
+  }
+
+  getDefaultBridgeProvider(): BridgeProvider {
+    if (!this.defaultBridgeProviderId) {
+      throw new Error("No default bridge provider configured");
+    }
+    return this.getBridgeProvider(this.defaultBridgeProviderId);
+  }
+
+  private assertBridgeCalls(calls: Call[], source?: string): void {
+    if (calls.length) {
+      return;
+    }
+    if (source) {
+      throw new Error(`Bridge ${source} returned no calls`);
+    }
+    throw new Error("Bridge returned no calls");
   }
 
   protected clearCaches(): void {
