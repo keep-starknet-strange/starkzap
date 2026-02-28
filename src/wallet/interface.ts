@@ -11,6 +11,7 @@ import type { TxBuilder } from "@/tx/builder";
 import type { Erc20 } from "@/erc20";
 import type { Staking } from "@/staking";
 import type { SwapInput, SwapQuote, SwapProvider } from "@/swap";
+import type { BridgeInput, BridgeQuote, BridgeProvider } from "@/bridge";
 import type {
   Address,
   Amount,
@@ -135,6 +136,47 @@ export interface WalletInterface {
    * List registered swap provider ids.
    */
   listSwapProviders(): string[];
+
+  /**
+   * Fetch a bridge quote.
+   *
+   * Set `request.provider` to a provider instance or provider id.
+   * If omitted, uses the wallet default provider.
+   */
+  getBridgeQuote(request: BridgeInput): Promise<BridgeQuote>;
+
+  /**
+   * Execute a bridge transaction.
+   *
+   * Set `request.provider` to a provider instance or provider id.
+   * If omitted, uses the wallet default provider.
+   */
+  bridge(request: BridgeInput, options?: ExecuteOptions): Promise<Tx>;
+
+  /**
+   * Register or replace a bridge provider on this wallet.
+   */
+  registerBridgeProvider(provider: BridgeProvider, makeDefault?: boolean): void;
+
+  /**
+   * Set the default bridge provider by id.
+   */
+  setDefaultBridgeProvider(providerId: string): void;
+
+  /**
+   * Resolve a registered bridge provider by id.
+   */
+  getBridgeProvider(providerId: string): BridgeProvider;
+
+  /**
+   * Resolve the wallet default bridge provider.
+   */
+  getDefaultBridgeProvider(): BridgeProvider;
+
+  /**
+   * List registered bridge provider ids.
+   */
+  listBridgeProviders(): string[];
 
   /**
    * Sign a typed data message (EIP-712 style).
