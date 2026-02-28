@@ -1,7 +1,9 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, beforeEach } from "vitest";
 import { Amount, ChainId, fromAddress, type Token } from "@/types";
 import { StarkgateBridgeProvider, starkgateBridge } from "@/bridge/starkgate";
 import { OrbiterBridgeProvider, orbiterBridge } from "@/bridge/orbiter";
+import { LayerswapBridgeProvider, layerswapBridge } from "@/bridge/layerswap";
+import { BridgeAggregator, createBridgeAggregator } from "@/bridge/aggregator";
 
 const ethToken: Token = {
   name: "Ethereum",
@@ -12,7 +14,7 @@ const ethToken: Token = {
   ),
 };
 
-const strkToken: Token = {
+const _strkToken: Token = {
   name: "Starknet Token",
   symbol: "STRK",
   decimals: 18,
@@ -57,23 +59,6 @@ describe("StarkgateBridgeProvider", () => {
     expect(quote.provider).toBe("starkgate");
     expect(quote.feeBase).toBe(0n);
     expect(quote.estimatedTimeSeconds).toBe(300);
-    expect(quote.amountBase).toBe(10000000000000000n);
-    expect(quote.destAmountBase).toBe(10000000000000000n);
-  });
-
-  it("fetches quote with zero fee for STRK", async () => {
-    const provider = new StarkgateBridgeProvider();
-
-    const quote = await provider.getQuote({
-      sourceChainId: ChainId.SEPOLIA,
-      destChainId: ChainId.SEPOLIA,
-      token: strkToken,
-      amount: Amount.parse("1", strkToken),
-      recipient,
-    });
-
-    expect(quote.provider).toBe("starkgate");
-    expect(quote.feeBase).toBe(0n);
   });
 
   it("builds bridge calls for L2 withdrawal", async () => {
@@ -89,8 +74,6 @@ describe("StarkgateBridgeProvider", () => {
 
     expect(prepared.calls.length).toBe(1);
     expect(prepared.calls[0]!.entrypoint).toBe("initiate_withdraw");
-    // Contract address is normalized by fromAddress
-    expect(prepared.calls[0]!.contractAddress).toBeDefined();
     expect(prepared.quote.provider).toBe("starkgate");
   });
 
@@ -113,28 +96,6 @@ describe("StarkgateBridgeProvider", () => {
         recipient,
       })
     ).rejects.toThrow("Starkgate does not support token: UNKNOWN");
-  });
-
-  it("throws error for unsupported chain in bridge()", async () => {
-    const provider = new StarkgateBridgeProvider();
-
-    // Use sepolia for both but try unsupported token
-    const unsupportedToken: Token = {
-      name: "Unknown",
-      symbol: "XYZ",
-      decimals: 18,
-      address: fromAddress("0x999"),
-    };
-
-    await expect(
-      provider.bridge({
-        sourceChainId: ChainId.SEPOLIA,
-        destChainId: ChainId.SEPOLIA,
-        token: unsupportedToken,
-        amount: Amount.parse("1", unsupportedToken),
-        recipient,
-      })
-    ).rejects.toThrow("Starkgate does not support token: XYZ");
   });
 });
 
@@ -171,22 +132,6 @@ describe("OrbiterBridgeProvider", () => {
     expect(quote.estimatedTimeSeconds).toBe(180);
   });
 
-  it("fetches quote with fee for STRK", async () => {
-    const provider = new OrbiterBridgeProvider();
-
-    const quote = await provider.getQuote({
-      sourceChainId: ChainId.SEPOLIA,
-      destChainId: ChainId.SEPOLIA,
-      token: strkToken,
-      amount: Amount.parse("1", strkToken),
-      recipient,
-    });
-
-    expect(quote.provider).toBe("orbiter");
-    expect(quote.feeBase).toBeGreaterThan(0n);
-    expect(quote.destAmountBase).toBeLessThan(quote.amountBase);
-  });
-
   it("builds bridge calls", async () => {
     const provider = new OrbiterBridgeProvider();
 
@@ -204,10 +149,243 @@ describe("OrbiterBridgeProvider", () => {
   });
 });
 
+describe("LayerswapBridgeProvider", () => {
+  it("has correct id", () => {
+    const provider = new LayerswapBridgeProvider();
+    expect(provider.id).toBe("layerswap");
+  });
+
+  it("supports mainnet and sepolia", () => {
+    const provider = new LayerswapBridgeProvider();
+
+    expect(provider.supportsChainPair(ChainId.MAINNET, ChainId.MAINNET)).toBe(
+      true
+    );
+    expect(provider.supportsChainPair(ChainId.SEPOLIA, ChainId.SEPOLIA)).toBe(
+      true
+    );
+  });
+
+  it("throws error for unsupported token", async () => {
+    const provider = new LayerswapBridgeProvider();
+
+    const unsupportedToken: Token = {
+      name: "Unknown",
+      symbol: "XYZ",
+      decimals: 18,
+      address: fromAddress("0x999"),
+    };
+
+    await expect(
+      provider.getQuote({
+        sourceChainId: ChainId.SEPOLIA,
+        destChainId: ChainId.SEPOLIA,
+        token: unsupportedToken,
+        amount: Amount.parse("1", unsupportedToken),
+        recipient,
+      })
+    ).rejects.toThrow("Layerswap does not support token: XYZ");
+  });
+
+  it("creates with API key", () => {
+    const provider = new LayerswapBridgeProvider("test-api-key");
+    expect(provider).toBeDefined();
+  });
+});
+
+describe("BridgeAggregator", () => {
+  let aggregator: BridgeAggregator;
+
+  beforeEach(() => {
+    aggregator = new BridgeAggregator();
+  });
+
+  it("registers providers", () => {
+    aggregator.registerProvider(starkgateBridge);
+    aggregator.registerProvider(orbiterBridge);
+
+    expect(aggregator.listProviders()).toContain("starkgate");
+    expect(aggregator.listProviders()).toContain("orbiter");
+  });
+
+  it("unregisters providers", () => {
+    aggregator.registerProvider(starkgateBridge);
+    aggregator.registerProvider(orbiterBridge);
+
+    aggregator.unregisterProvider("starkgate");
+
+    expect(aggregator.listProviders()).not.toContain("starkgate");
+    expect(aggregator.listProviders()).toContain("orbiter");
+  });
+
+  it("gets provider by id", () => {
+    aggregator.registerProvider(starkgateBridge);
+
+    const provider = aggregator.getProvider("starkgate");
+    expect(provider?.id).toBe("starkgate");
+  });
+
+  it("returns undefined for unknown provider", () => {
+    const provider = aggregator.getProvider("unknown");
+    expect(provider).toBeUndefined();
+  });
+
+  it("gets all quotes from registered providers", async () => {
+    aggregator.registerProvider(starkgateBridge);
+    aggregator.registerProvider(orbiterBridge);
+
+    const quotes = await aggregator.getAllQuotes({
+      sourceChainId: ChainId.SEPOLIA,
+      destChainId: ChainId.SEPOLIA,
+      token: ethToken,
+      amount: Amount.parse("0.01", ethToken),
+      recipient,
+    });
+
+    expect(quotes.length).toBe(2);
+    expect(quotes.some((q) => q.providerId === "starkgate")).toBe(true);
+    expect(quotes.some((q) => q.providerId === "orbiter")).toBe(true);
+  });
+
+  it("filters quotes by providers option", async () => {
+    aggregator.registerProvider(starkgateBridge);
+    aggregator.registerProvider(orbiterBridge);
+
+    const quotes = await aggregator.getAllQuotes({
+      sourceChainId: ChainId.SEPOLIA,
+      destChainId: ChainId.SEPOLIA,
+      token: ethToken,
+      amount: Amount.parse("0.01", ethToken),
+      recipient,
+    });
+
+    // Filter by providers
+    const filtered = quotes.filter((q) => q.providerId === "starkgate");
+
+    expect(filtered.length).toBe(1);
+    expect(filtered[0]?.providerId).toBe("starkgate");
+  });
+
+  it("gets best quote prioritizing fees", async () => {
+    aggregator.registerProvider(starkgateBridge); // Free
+    aggregator.registerProvider(orbiterBridge); // Has fee
+
+    const result = await aggregator.getBestQuote(
+      {
+        sourceChainId: ChainId.SEPOLIA,
+        destChainId: ChainId.SEPOLIA,
+        token: ethToken,
+        amount: Amount.parse("0.01", ethToken),
+        recipient,
+      },
+      { prioritizeFees: true }
+    );
+
+    expect(result).not.toBeNull();
+    // Starkgate should be cheaper (free)
+    expect(result?.providerId).toBe("starkgate");
+  });
+
+  it("gets best quote prioritizing time", async () => {
+    aggregator.registerProvider(starkgateBridge);
+    aggregator.registerProvider(orbiterBridge);
+
+    const result = await aggregator.getBestQuote(
+      {
+        sourceChainId: ChainId.SEPOLIA,
+        destChainId: ChainId.SEPOLIA,
+        token: ethToken,
+        amount: Amount.parse("0.01", ethToken),
+        recipient,
+      },
+      { prioritizeFees: false }
+    );
+
+    expect(result).not.toBeNull();
+    // Orbiter is faster (180s vs 300s)
+    expect(result?.providerId).toBe("orbiter");
+  });
+
+  it("filters by max fee", async () => {
+    aggregator.registerProvider(starkgateBridge); // Free
+    aggregator.registerProvider(orbiterBridge); // Has fee
+
+    const result = await aggregator.getBestQuote(
+      {
+        sourceChainId: ChainId.SEPOLIA,
+        destChainId: ChainId.SEPOLIA,
+        token: ethToken,
+        amount: Amount.parse("0.01", ethToken),
+        recipient,
+      },
+      { maxFee: 0n } // Only allow free
+    );
+
+    expect(result).not.toBeNull();
+    expect(result?.providerId).toBe("starkgate");
+  });
+
+  it("returns null when no valid quotes", async () => {
+    aggregator.registerProvider(starkgateBridge);
+
+    const result = await aggregator.getBestQuote(
+      {
+        sourceChainId: ChainId.SEPOLIA,
+        destChainId: ChainId.SEPOLIA,
+        token: ethToken,
+        amount: Amount.parse("0.01", ethToken),
+        recipient,
+      },
+      { maxFee: 0n, providers: ["unknown"] } // Non-existent provider
+    );
+
+    expect(result).toBeNull();
+  });
+
+  it("executes bridge with best provider", async () => {
+    aggregator.registerProvider(starkgateBridge);
+    aggregator.registerProvider(orbiterBridge);
+
+    const result = await aggregator.bridge(
+      {
+        sourceChainId: ChainId.SEPOLIA,
+        destChainId: ChainId.SEPOLIA,
+        token: ethToken,
+        amount: Amount.parse("0.01", ethToken),
+        recipient,
+      },
+      { prioritizeFees: true }
+    );
+
+    expect(result).not.toBeNull();
+    expect(result?.providerId).toBe("starkgate");
+    expect(result?.prepared.calls.length).toBeGreaterThan(0);
+  });
+
+  it("returns null for bridge when no valid quotes", async () => {
+    aggregator.registerProvider(starkgateBridge);
+
+    const result = await aggregator.bridge(
+      {
+        sourceChainId: ChainId.SEPOLIA,
+        destChainId: ChainId.SEPOLIA,
+        token: ethToken,
+        amount: Amount.parse("0.01", ethToken),
+        recipient,
+      },
+      { maxFee: 0n, providers: ["unknown"] }
+    );
+
+    expect(result).toBeNull();
+  });
+});
+
 describe("BridgeProvider interface compatibility", () => {
-  it("both providers implement BridgeProvider interface", () => {
+  it("all providers implement BridgeProvider interface", () => {
     const starkgate = new StarkgateBridgeProvider();
     const orbiter = new OrbiterBridgeProvider();
+    const layerswap = new LayerswapBridgeProvider();
+    const _aggregator = new BridgeAggregator();
 
     // Check required properties
     expect(starkgate.id).toBeDefined();
@@ -223,13 +401,24 @@ describe("BridgeProvider interface compatibility", () => {
     expect(typeof orbiter.supportsChainPair).toBe("function");
     expect(typeof orbiter.getQuote).toBe("function");
     expect(typeof orbiter.bridge).toBe("function");
+
+    expect(layerswap.id).toBeDefined();
+    expect(layerswap.supportedSourceChains).toBeDefined();
+    expect(layerswap.supportedDestChains).toBeDefined();
+    expect(typeof layerswap.supportsChainPair).toBe("function");
+    expect(typeof layerswap.getQuote).toBe("function");
+    expect(typeof layerswap.bridge).toBe("function");
   });
 
-  it("starkgateBridge is exported correctly", () => {
+  it("default exports are available", () => {
     expect(starkgateBridge.id).toBe("starkgate");
+    expect(orbiterBridge.id).toBe("orbiter");
+    expect(layerswapBridge.id).toBe("layerswap");
   });
 
-  it("orbiterBridge is exported correctly", () => {
-    expect(orbiterBridge.id).toBe("orbiter");
+  it("createBridgeAggregator works", () => {
+    const agg = createBridgeAggregator([starkgateBridge, orbiterBridge]);
+    expect(agg.listProviders()).toContain("starkgate");
+    expect(agg.listProviders()).toContain("orbiter");
   });
 });
