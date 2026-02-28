@@ -26,6 +26,9 @@ export * from "@/staking";
 // Swap
 export * from "@/swap";
 
+// Bridge
+export * from "@/bridge";
+
 // Types
 export * from "@/types";
 
