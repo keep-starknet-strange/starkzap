@@ -258,3 +258,8 @@ export interface BuyNFTParams {
 export interface BuyNFTParamsExtended extends BuyNFTParams {
   customAddress?: string;
 }
+
+/**
+ * Active marketplace type (element or flex).
+ */
+export type ActiveMarketplace = "element" | "flex";

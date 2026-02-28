@@ -1,4 +1,4 @@
-import type { AccountInterface, ProviderInterface, RpcProvider, Call } from "starknet";
+import type { AccountInterface, Call } from "starknet";
 import type {
   MarketplaceType,
   CreateListingParams,
@@ -7,47 +7,70 @@ import type {
 import { NFTContract } from "./contract";
 
 /**
- * Known marketplace contract addresses on Starknet Mainnet.
+ * Active marketplace configuration.
  */
-export const MARKETPLACE_ADDRESSES: Record<MarketplaceType, string> = {
-  aspect: "0x02a92f0f860bf7c63fb9ef42cff4137006b309e0e6e1484e42d0b5511959414d",
-  unframed: "0x051734077ba7baf5765896c56ce10b389d80cdcee8622e23c0556fb49e82df1b",
-  flex: "0x04c0a5193d58f74fbace4b74d843654f0370d6a0ed16d3f6f6e5f93a4007e6a3",
-  element: "0x02a4f62d4c1ad1e86da4eb30d2e8f4e7c3a9a6f2e1d3c4b5a6f7e8d9c0b1a2",
-  custom: "0x0",
+export const MARKETPLACE_CONFIG: Record<MarketplaceType, { address: string; active: boolean }> = {
+  aspect: { address: "0x02a92f0f860bf7c63fb9ef42cff4137006b309e0e6e1484e42d0b5511959414d", active: false },
+  unframed: { address: "0x051734077ba7baf5765896c56ce10b389d80cdcee8622e23c0556fb49e82df1b", active: false },
+  flex: { address: "0x1c0c00f578944fc4cf22ebaf25c81bb25c9a2c1e3f69fb0e7e5d7341a46bddc", active: true },
+  element: { address: "0x5816ab449ee30b9286ef7bea5f9faa38b87a3b9c7f225d14b4001c9273b6deb", active: true },
+  custom: { address: "0x0", active: true },
 };
 
 /**
+ * Get active marketplace from environment or default to element.
+ */
+export function getActiveMarketplace(): MarketplaceType {
+  const env = process.env.ACTIVE_MARKETPLACE as MarketplaceType | undefined;
+  if (env && MARKETPLACE_CONFIG[env]?.active) {
+    return env;
+  }
+  return "element";
+}
+
+/**
  * NFT Marketplace Helpers.
- * Supports Aspect, Unframed, Flex, Element marketplaces.
+ * Supports Element and Flex marketplaces.
  */
 export class NFTMarketplace {
   private account: AccountInterface;
+  private defaultMarketplace: MarketplaceType;
 
-  constructor(account: AccountInterface) {
+  constructor(account: AccountInterface, defaultMarketplace?: MarketplaceType) {
     this.account = account;
+    this.defaultMarketplace = defaultMarketplace || getActiveMarketplace();
   }
 
   /**
-   * Get marketplace contract address.
+   * Get marketplace contract address with validation.
    */
-  private getMarketplaceAddress(marketplace: MarketplaceType, customAddress?: string): string {
-    if (marketplace === "custom" && customAddress) {
+  private getMarketplaceAddress(marketplace?: MarketplaceType, customAddress?: string): string {
+    const market = marketplace || this.defaultMarketplace;
+    
+    if (market === "custom" && customAddress) {
       return customAddress;
     }
-    return MARKETPLACE_ADDRESSES[marketplace];
+
+    const config = MARKETPLACE_CONFIG[market];
+    if (!config || !config.active) {
+      throw new Error(`Marketplace '${market}' is not active. Use 'element' or 'flex'.`);
+    }
+    
+    return config.address;
   }
 
   /**
    * Approve NFT for marketplace (setApprovalForAll).
    */
   async approveForMarketplace(
-    marketplace: MarketplaceType,
-    collection: string,
+    marketplace?: MarketplaceType,
+    collection?: string,
     customAddress?: string
   ) {
-    const operator = this.getMarketplaceAddress(marketplace, customAddress);
-    const nft = new NFTContract(collection as any, this.account as unknown as RpcProvider);
+    const market = marketplace || this.defaultMarketplace;
+    const coll = collection || "";
+    const operator = this.getMarketplaceAddress(market, customAddress);
+    const nft = new NFTContract(coll as any, this.account as any);
     const call = nft.buildSetApprovalForAllCall(operator as any, true);
     return this.account.execute([call]);
   }
@@ -57,15 +80,30 @@ export class NFTMarketplace {
    */
   async createListing(params: CreateListingParams) {
     const { collection, tokenId, price, marketplace, customAddress } = params;
-    const marketplaceAddress = this.getMarketplaceAddress(marketplace, customAddress);
+    const market = marketplace || this.defaultMarketplace;
+    const marketplaceAddress = this.getMarketplaceAddress(market, customAddress);
 
     // Approve marketplace first if needed
-    await this.approveForMarketplace(marketplace, collection, customAddress);
+    await this.approveForMarketplace(market, collection, customAddress);
 
     let call: Call;
 
-    switch (marketplace) {
-      case "aspect":
+    switch (market) {
+      case "element":
+        // Element: create_order(collection, token_id, price)
+        call = {
+          contractAddress: marketplaceAddress,
+          entrypoint: "create_order",
+          calldata: [
+            collection,
+            typeof tokenId === "bigint" ? tokenId.toString() : tokenId,
+            price.toString(),
+          ],
+        };
+        break;
+
+      case "flex":
+        // Flex: list(token_id, price)
         call = {
           contractAddress: marketplaceAddress,
           entrypoint: "list",
@@ -76,22 +114,10 @@ export class NFTMarketplace {
         };
         break;
 
-      case "unframed":
-        call = {
-          contractAddress: marketplaceAddress,
-          entrypoint: "create_listing",
-          calldata: [
-            collection,
-            typeof tokenId === "bigint" ? tokenId.toString() : tokenId,
-            price.toString(),
-          ],
-        };
-        break;
-
       default:
         call = {
           contractAddress: marketplaceAddress,
-          entrypoint: "create_listing",
+          entrypoint: "create_order",
           calldata: [
             collection,
             typeof tokenId === "bigint" ? tokenId.toString() : tokenId,
@@ -108,23 +134,26 @@ export class NFTMarketplace {
    */
   async buyNFT(params: BuyNFTParams) {
     const { collection, tokenId, price, marketplace, customAddress } = params;
-    const marketplaceAddress = this.getMarketplaceAddress(marketplace, customAddress);
+    const market = marketplace || this.defaultMarketplace;
+    const marketplaceAddress = this.getMarketplaceAddress(market, customAddress);
 
     let call: Call;
 
-    switch (marketplace) {
-      case "aspect":
+    switch (market) {
+      case "element":
+        // Element: fulfill_order(order_id)
         call = {
           contractAddress: marketplaceAddress,
-          entrypoint: "buy",
+          entrypoint: "fulfill_order",
           calldata: [collection, typeof tokenId === "bigint" ? tokenId.toString() : tokenId],
         };
         break;
 
-      case "unframed":
+      case "flex":
+        // Flex: buy(listing_id)
         call = {
           contractAddress: marketplaceAddress,
-          entrypoint: "fulfill_listing",
+          entrypoint: "buy",
           calldata: [collection, typeof tokenId === "bigint" ? tokenId.toString() : tokenId],
         };
         break;
@@ -132,7 +161,7 @@ export class NFTMarketplace {
       default:
         call = {
           contractAddress: marketplaceAddress,
-          entrypoint: "buy",
+          entrypoint: "fulfill_order",
           calldata: [
             collection,
             typeof tokenId === "bigint" ? tokenId.toString() : tokenId,
@@ -158,19 +187,27 @@ export class NFTMarketplace {
     let call: Call;
 
     switch (marketplace) {
-      case "aspect":
+      case "element":
         call = {
           contractAddress: marketplaceAddress,
-          entrypoint: "cancel_listing",
+          entrypoint: "cancel_order",
           calldata: [listingId],
+        };
+        break;
+
+      case "flex":
+        call = {
+          contractAddress: marketplaceAddress,
+          entrypoint: "delist",
+          calldata: [collection, listingId],
         };
         break;
 
       default:
         call = {
           contractAddress: marketplaceAddress,
-          entrypoint: "cancel",
-          calldata: [collection, listingId],
+          entrypoint: "cancel_order",
+          calldata: [listingId],
         };
     }
 

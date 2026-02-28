@@ -135,3 +135,46 @@ describe("NFT Types", () => {
     expect(tokenId).toBe("0x7b");
   });
 });
+
+import { MARKETPLACE_CONFIG, getActiveMarketplace, NFTMarketplace } from "@/nft/marketplace";
+
+describe("NFT Marketplace - Configuration", () => {
+  it("has element as active", () => {
+    expect(MARKETPLACE_CONFIG.element.active).toBe(true);
+  });
+
+  it("has flex as active", () => {
+    expect(MARKETPLACE_CONFIG.flex.active).toBe(true);
+  });
+
+  it("has aspect as inactive", () => {
+    expect(MARKETPLACE_CONFIG.aspect.active).toBe(false);
+  });
+
+  it("has unframed as inactive", () => {
+    expect(MARKETPLACE_CONFIG.unframed.active).toBe(false);
+  });
+
+  it("returns correct element address", () => {
+    expect(MARKETPLACE_CONFIG.element.address).toBe("0x5816ab449ee30b9286ef7bea5f9faa38b87a3b9c7f225d14b4001c9273b6deb");
+  });
+
+  it("returns correct flex address", () => {
+    expect(MARKETPLACE_CONFIG.flex.address).toBe("0x1c0c00f578944fc4cf22ebaf25c81bb25c9a2c1e3f69fb0e7e5d7341a46bddc");
+  });
+
+  it("getActiveMarketplace defaults to element", () => {
+    delete process.env.ACTIVE_MARKETPLACE;
+    expect(getActiveMarketplace()).toBe("element");
+  });
+
+  it("getActiveMarketplace uses env when set to flex", () => {
+    process.env.ACTIVE_MARKETPLACE = "flex";
+    expect(getActiveMarketplace()).toBe("flex");
+  });
+
+  it("getActiveMarketplace falls back to element for inactive marketplace", () => {
+    process.env.ACTIVE_MARKETPLACE = "aspect";
+    expect(getActiveMarketplace()).toBe("element");
+  });
+});
