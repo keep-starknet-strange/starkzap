@@ -29,6 +29,9 @@ export * from "@/swap";
 // Bridge
 export * from "@/bridge";
 
+// NFT
+export * from "@/nft";
+
 // Types
 export * from "@/types";
 
