@@ -196,3 +196,21 @@ export async function fetchNFTMetadata(
 
   return response.json();
 }
+
+/**
+ * Build batch transfer calls for multiple NFTs from the same collection.
+ *
+ * @param tokenAddress - NFT collection contract address
+ * @param transfers - Array of transfers (to + tokenId)
+ * @returns Array of Call objects
+ */
+export function buildBatchTransferCalls(
+  tokenAddress: string,
+  transfers: Array<{ to: string; tokenId: TokenId }>
+): Call[] {
+  return transfers.map((t) => ({
+    contractAddress: tokenAddress,
+    entrypoint: "transferFrom",
+    calldata: CallData.compile(["0", t.to, ...toCairoTokenId(t.tokenId)]),
+  }));
+}
