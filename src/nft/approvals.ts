@@ -1,5 +1,6 @@
 import type { AccountInterface, ProviderInterface, RpcProvider, Call } from "starknet";
 import type { ApprovalItem } from "./types";
+import type { Address } from "@/types";
 import { NFTContract } from "./contract";
 
 /**
@@ -18,10 +19,10 @@ export class NFTApprovals {
   async setApprovalForAllBatch(
     approvals: ApprovalItem[],
     _options: { usePaymaster?: boolean } = {}
-  ): Promise<any> {
+  ): Promise<unknown> {
     const calls: Call[] = approvals.map(({ collection, operator, approved }) => {
-      const nft = new NFTContract(collection as any, this.provider as RpcProvider);
-      return nft.buildSetApprovalForAllCall(operator as any, approved);
+      const nft = new NFTContract(collection as Address, this.provider as RpcProvider);
+      return nft.buildSetApprovalForAllCall(operator as Address, approved);
     });
 
     // Execute as multicall - need Account for execute, not just provider

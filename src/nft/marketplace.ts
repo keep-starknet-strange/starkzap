@@ -1,4 +1,6 @@
+import type { Address } from "@/types";
 import type { AccountInterface, Call } from "starknet";
+
 import type {
   MarketplaceType,
   CreateListingParams,
@@ -70,8 +72,9 @@ export class NFTMarketplace {
     const market = marketplace || this.defaultMarketplace;
     const coll = collection || "";
     const operator = this.getMarketplaceAddress(market, customAddress);
-    const nft = new NFTContract(coll as any, this.account as any);
-    const call = nft.buildSetApprovalForAllCall(operator as any, true);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const nft = new NFTContract(coll as Address, this.account as unknown as any);
+    const call = nft.buildSetApprovalForAllCall(operator as Address, true);
     return this.account.execute([call]);
   }
 

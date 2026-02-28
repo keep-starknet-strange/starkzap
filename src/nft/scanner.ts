@@ -1,5 +1,6 @@
-import type { AccountInterface, ProviderInterface, RpcProvider } from "starknet";
+import type { AccountInterface, RpcProvider } from "starknet";
 import type { OwnedNFT, GetOwnedNFTsOptions } from "./types";
+import type { Address } from "@/types";
 import { NFTContract } from "./contract";
 
 /**
@@ -14,10 +15,11 @@ const VOYAGER_API_KEY = process.env.VOYAGER_API_KEY;
  * Fallback: on-chain (balanceOf)
  */
 export class NFTScanner {
-  private provider: ProviderInterface;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  private provider: any;
 
   constructor(provider: RpcProvider | AccountInterface) {
-    this.provider = provider as ProviderInterface;
+    this.provider = provider;
   }
 
   /**
@@ -30,7 +32,7 @@ export class NFTScanner {
     const {
       collection,
       limit = 50,
-      nftScanApiKey, // deprecated, kept for compatibility
+      nftScanApiKey,
       testnet = false,
       showAttribute = true,
     } = options;
@@ -91,6 +93,7 @@ export class NFTScanner {
     const json = await res.json();
     const items = json?.results || json?.data || [];
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     return items.map((item: any) => ({
       collection: item.contract_address || item.collection,
       tokenId: item.token_id || item.tokenId,
@@ -128,6 +131,7 @@ export class NFTScanner {
     const json = await res.json();
     const items = json?.data?.content || [];
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     return items.map((item: any) => ({
       collection: item.contract_address,
       tokenId: item.token_id,
@@ -150,10 +154,10 @@ export class NFTScanner {
       return [];
     }
 
-    const nft = new NFTContract(collection as any, this.provider as RpcProvider);
+    const nft = new NFTContract(collection as Address, this.provider);
 
     try {
-      const balanceResult = await nft.balanceOf(userAddress as any);
+      const balanceResult = await nft.balanceOf(userAddress as Address);
       const balance = balanceResult.balance;
 
       if (balance === 0n) {

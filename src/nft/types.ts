@@ -154,7 +154,7 @@ export interface OwnedNFT {
   /** Image URL. */
   image?: string;
   /** Full metadata. */
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
 }
 
 /**
@@ -263,3 +263,25 @@ export interface BuyNFTParamsExtended extends BuyNFTParams {
  * Active marketplace type (element or flex).
  */
 export type ActiveMarketplace = "element" | "flex";
+
+// API Response types for NFT scanners
+export interface VoyagerNFTResponse {
+  contract_address?: string;
+  collection?: string;
+  token_id?: string | number;
+  tokenId?: string | number;
+  name?: string;
+  image_url?: string;
+  image?: string;
+  metadata?: Record<string, unknown>;
+}
+
+export interface NFTScanNFTResponse {
+  contract_address: string;
+  token_id: string | number;
+  name?: string;
+  image_url?: string;
+  metadata_json?: Record<string, unknown>;
+}
+
+export type NFTApiResponse = VoyagerNFTResponse | NFTScanNFTResponse;

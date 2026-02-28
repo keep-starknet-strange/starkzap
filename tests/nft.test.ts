@@ -136,7 +136,7 @@ describe("NFT Types", () => {
   });
 });
 
-import { MARKETPLACE_CONFIG, getActiveMarketplace, NFTMarketplace } from "@/nft/marketplace";
+import { MARKETPLACE_CONFIG, getActiveMarketplace } from "@/nft/marketplace";
 
 describe("NFT Marketplace - Configuration", () => {
   it("has element as active", () => {
