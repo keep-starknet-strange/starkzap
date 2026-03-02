@@ -99,6 +99,7 @@
     "vitest": "^4.0.17"
   },
   "dependencies": {
+    "@avnu/avnu-sdk": "^4.1.0-rc.0",
     "@cartridge/controller": "^0.13.9",
     "@chainrails/sdk": "^0.3.3",
     "@chainrails/vanilla": "^0.0.6",

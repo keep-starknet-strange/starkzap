@@ -41,7 +41,7 @@ The package is published on npm as [`starkzap`](https://www.npmjs.com/package/st
 
 ```typescript
 import {
-  StarkSDK,
+  StarkZap,
   StarkSigner,
   OnboardStrategy,
   Amount,
@@ -49,7 +49,7 @@ import {
   sepoliaTokens,
 } from "starkzap";
 
-const sdk = new StarkSDK({ network: "sepolia" });
+const sdk = new StarkZap({ network: "sepolia" });
 
 const { wallet } = await sdk.onboard({
   strategy: OnboardStrategy.Signer,

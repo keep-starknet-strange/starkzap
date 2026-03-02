@@ -114,7 +114,7 @@ app.post("/api/wallet/sign", async (req, res) => {
 **Solution:**
 1. Fallback to `feeMode: "user_pays"` for that action
 2. Use a Cartridge account/session that supports SNIP-9 on the target chain
-3. Ensure SDK and Cartridge session chain match (`rpcUrl` + `chainId` from your `StarkSDK` config)
+3. Ensure SDK and Cartridge session chain match (`rpcUrl` + `chainId` from your `StarkZap` config)
 
 ### Amount Arithmetic Errors
 

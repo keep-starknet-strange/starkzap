@@ -12,7 +12,7 @@ Defined in: [src/staking/presets.ts:9](https://github.com/keep-starknet-strange/
 
 Core staking contract presets per supported chain.
 
-These defaults are used by `StarkSDK` when `staking.contract`
+These defaults are used by `StarkZap` when `staking.contract`
 is not explicitly provided in the SDK config.
 
 ## Type Declaration

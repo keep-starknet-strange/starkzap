@@ -8,7 +8,7 @@ React Native + Expo app showing how to integrate `starkzap` in a mobile client.
 - Connect with a local private key via `sdk.onboard({ strategy: OnboardStrategy.Signer })`.
 - Connect with Privy via `sdk.onboard({ strategy: OnboardStrategy.Privy })`.
 - Check account deployment status and deploy when needed.
-- Read balances, send transfers, and use staking flows.
+- Read balances, send transfers, execute Ekubo swaps, and use staking flows.
 - Use sponsored transactions when a paymaster proxy is configured.
 
 ## Prerequisites
@@ -51,9 +51,32 @@ Note: this example depends on the local SDK via `"starkzap": "file:../.."`. The 
 
 - `entrypoint.js`: loads required polyfills before Expo startup.
 - `metro.config.js`: resolves `starkzap` to local SDK source for development.
-- `stores/wallet.ts`: creates `StarkSDK`, configures paymaster, and handles signer/Privy onboarding.
+- `stores/wallet.ts`: creates `StarkZap`, configures paymaster, and handles signer/Privy onboarding.
 - `app/index.tsx`: connection screen and network setup flow.
-- `app/(tabs)/*`: balances, transfers, and staking screens.
+- `app/(tabs)/*`: balances, transfers, swap, and staking screens.
+
+## Swap flow in this example
+
+The Swap tab uses provider-based helpers:
+
+- `provider.getQuote(params)` to fetch a quote
+- `wallet.swap({ ...params, provider }, options?)` to execute the swap
+
+To submit a swap, provide:
+
+- Input token (`From`)
+- Output token (`To`)
+- Input amount (`Amount In`)
+
+Notes:
+
+- AVNU source: uses `GET /swap/v3/quotes` + `POST /swap/v3/build` from `https://starknet.api.avnu.fi`, then executes via `wallet.swap(...)`.
+- Ekubo source: fetches quote from `https://prod-api-quoter.ekubo.org` and builds router calls (`transfer` + `swap/multihop` + `clear_minimum` + `clear`).
+- Swap backends are pluggable through a shared TypeScript contract (`SwapProvider`) from `starkzap`, with app-level extensions in `swaps/interface.ts`.
+- Active integrations are registered in `swaps/index.ts` and rendered through one common UI.
+- Token selection is sourced from preset token lists for the active network, with in-modal search.
+- On Sepolia, the Swap tab defaults to `USDC.e` instead of `USDC` because `USDC` routes are often unavailable on Ekubo testnet.
+- On low-liquidity pairs, the quote API can return an error such as `Insufficient liquidity in the routes ...`.
 
 ## Backend for Privy and paymaster (optional but recommended)
 

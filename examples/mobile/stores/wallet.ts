@@ -10,7 +10,7 @@ import {
   OpenZeppelinPreset,
   OnboardStrategy,
   type StakingConfig,
-  StarkSDK,
+  StarkZap,
   StarkSigner,
   type WalletInterface,
   type ChainIdLiteral,
@@ -86,7 +86,7 @@ interface WalletState {
   // SDK configuration
   rpcUrl: string;
   chainId: ChainId;
-  sdk: StarkSDK | null;
+  sdk: StarkZap | null;
   paymasterNodeUrl: string | null;
   isConfigured: boolean;
   selectedNetworkIndex: number | null; // null means custom
@@ -263,7 +263,7 @@ export const useWalletStore = create<WalletState>((set, get) => ({
 
     const paymasterNodeUrl = PAYMASTER_PROXY_URL.trim() || null;
 
-    const newSdk = new StarkSDK({
+    const newSdk = new StarkZap({
       rpcUrl,
       chainId,
       ...(paymasterNodeUrl && {

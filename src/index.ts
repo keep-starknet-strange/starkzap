@@ -1,6 +1,5 @@
-// Main SDK (StarkZap is the public name; StarkSDK kept for backward compatibility)
-export { StarkSDK } from "@/sdk";
-export { StarkSDK as StarkZap } from "@/sdk";
+// Main SDK
+export { StarkZap } from "@/sdk";
 
 // Wallet
 export { Wallet, AccountProvider, BaseWallet } from "@/wallet";
@@ -26,6 +25,8 @@ export * from "@/staking";
 
 // Payment (ChainRails cross-chain payments)
 export * from "@/payment";
+// Swap
+export * from "@/swap";
 
 // Types
 export * from "@/types";

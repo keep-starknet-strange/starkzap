@@ -26,6 +26,7 @@ import type {
   ChainId,
   StakingConfig,
 } from "@/types";
+import type { SwapProvider } from "@/swap";
 import {
   checkDeployed,
   ensureWalletReady,
@@ -66,6 +67,10 @@ export interface WalletOptions {
   feeMode?: FeeMode;
   /** Default time bounds for paymaster transactions */
   timeBounds?: PaymasterTimeBounds;
+  /** Optional additional swap providers to register on this wallet */
+  swapProviders?: SwapProvider[];
+  /** Optional default swap provider id (must be registered) */
+  defaultSwapProviderId?: string;
 }
 
 /**
@@ -154,6 +159,8 @@ export class Wallet extends BaseWallet {
       accountAddress: providedAddress,
       feeMode = "user_pays",
       timeBounds,
+      swapProviders,
+      defaultSwapProviderId,
     } = options;
 
     // Build or use provided AccountProvider
@@ -188,7 +195,7 @@ export class Wallet extends BaseWallet {
       );
     }
 
-    return new Wallet({
+    const wallet = new Wallet({
       address,
       accountProvider,
       account,
@@ -199,6 +206,17 @@ export class Wallet extends BaseWallet {
       ...(timeBounds && { defaultTimeBounds: timeBounds }),
       stakingConfig: options.config.staking,
     });
+
+    if (swapProviders?.length) {
+      for (const swapProvider of swapProviders) {
+        wallet.registerSwapProvider(swapProvider);
+      }
+    }
+    if (defaultSwapProviderId) {
+      wallet.setDefaultSwapProvider(defaultSwapProviderId);
+    }
+
+    return wallet;
   }
 
   async isDeployed(): Promise<boolean> {

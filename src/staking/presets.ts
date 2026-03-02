@@ -3,7 +3,7 @@ import { fromAddress, type ChainId, type StakingConfig } from "@/types";
 /**
  * Core staking contract presets per supported chain.
  *
- * These defaults are used by `StarkSDK` when `staking.contract`
+ * These defaults are used by `StarkZap` when `staking.contract`
  * is not explicitly provided in the SDK config.
  */
 export const stakingPresets = {
