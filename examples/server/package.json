@@ -1,12 +1,15 @@
 {
+  "type": "module",
   "scripts": {
-    "postinstall": "cd ../.. && npm run build"
+    "postinstall": "cd ../.. && npm run build",
+    "start": "node server.ts"
   },
   "dependencies": {
     "@privy-io/node": "^0.8.0",
     "cors": "^2.8.6",
     "dotenv": "^17.2.3",
-    "express": "^5.2.1"
+    "express": "^5.2.1",
+    "starkzap": "file:../.."
   },
   "devDependencies": {
     "@types/cors": "^2.8.19",
