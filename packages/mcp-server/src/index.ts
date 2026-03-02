@@ -587,6 +587,13 @@ function assertOverallFeeIsBigInt(fee: unknown): asserts fee is {
   }
 }
 
+function requireFeeUnit(unit: unknown): string {
+  if (typeof unit !== "string" || unit.trim().length === 0) {
+    throw new Error(`Invalid fee.unit type from SDK: ${String(unit)}`);
+  }
+  return unit;
+}
+
 function assertPoolPositionShape(
   position: unknown,
   poolAddress: Address
@@ -1048,6 +1055,46 @@ async function assertStableExitAmountWithinCap(
   }
   const thirdTotal = third.unpooling.add(third.rewards);
   assertAmountWithinCap(thirdTotal, poolToken, maxCap);
+}
+
+interface TestHookExposureConfig {
+  testHooksEnabled: boolean;
+  testHookMarkerAcknowledged: boolean;
+  allowUnsafeTestHooks: boolean;
+  unsafeTestHooksAcknowledged: boolean;
+  hasProductionLikeIndicators: boolean;
+  deprecatedMainnetBypassEnabled: boolean;
+}
+
+function evaluateTestHooksExposureConfig(config: TestHookExposureConfig): {
+  exposeHooks: boolean;
+  reason: string;
+} {
+  if (!config.testHooksEnabled) {
+    return { exposeHooks: false, reason: "test-hooks-disabled" };
+  }
+  if (config.deprecatedMainnetBypassEnabled) {
+    throw new Error(
+      "STARKZAP_MCP_ALLOW_UNSAFE_TEST_HOOKS_MAINNET is no longer supported."
+    );
+  }
+  if (config.hasProductionLikeIndicators && config.allowUnsafeTestHooks) {
+    throw new Error(
+      "Unsafe test-hook bypass flags are forbidden in production-like environments."
+    );
+  }
+  const unsafeBypassEnabled =
+    config.allowUnsafeTestHooks && config.unsafeTestHooksAcknowledged;
+  if (!config.testHookMarkerAcknowledged && !unsafeBypassEnabled) {
+    return { exposeHooks: false, reason: "missing-test-key-marker" };
+  }
+  if (config.allowUnsafeTestHooks && !config.unsafeTestHooksAcknowledged) {
+    return { exposeHooks: false, reason: "missing-unsafe-bypass-ack" };
+  }
+  return {
+    exposeHooks: true,
+    reason: unsafeBypassEnabled ? "unsafe-bypass" : "safe-marker",
+  };
 }
 
 function isRpcLikeError(error: unknown): boolean {
@@ -1587,6 +1634,8 @@ async function handleTool(
         poolToken,
         maxAmount
       );
+      // StarkZap SDK exit path submits `exit_delegation_pool_action(walletAddress)`
+      // (no amount parameter), so this cap check is necessarily snapshot-based.
       const tx = await withTimeout("Exit pool submission", () =>
         wallet.exitPool(poolAddress)
       );
@@ -1595,7 +1644,7 @@ async function handleTool(
         hash: txResult.hash,
         explorerUrl: txResult.explorerUrl,
         pool: poolAddress,
-        note: "Preflight cap check validated observed unpooling + rewards snapshot before submission. Final realized withdrawal can differ if chain state changes before inclusion.",
+        note: "Preflight cap check validated observed unpooling + rewards snapshot before submission. The SDK exit call does not take an amount parameter; final settlement is computed on-chain and can differ if state changes before inclusion.",
       });
     }
 
@@ -1613,6 +1662,17 @@ async function handleTool(
       }
       assertPoolPositionShape(position, poolAddress);
       const unpoolTime = position.unpoolTime ?? null;
+      const commissionPercent = position.commissionPercent;
+      if (
+        typeof commissionPercent !== "number" ||
+        !Number.isFinite(commissionPercent) ||
+        commissionPercent < 0 ||
+        commissionPercent > 100
+      ) {
+        throw new Error(
+          `Invalid commissionPercent in position: ${String(commissionPercent)}`
+        );
+      }
       return ok({
         pool: poolAddress,
         isMember: true,
@@ -1622,7 +1682,7 @@ async function handleTool(
         rewardsFormatted: position.rewards.toFormatted(),
         total: position.total.toUnit(),
         totalFormatted: position.total.toFormatted(),
-        commissionPercent: position.commissionPercent,
+        commissionPercent,
         unpooling: position.unpooling.toUnit(),
         unpoolTime: unpoolTime?.toISOString() ?? null,
         unpoolTimeEpochMs: unpoolTime?.getTime() ?? null,
@@ -1646,10 +1706,7 @@ async function handleTool(
       );
       assertOverallFeeIsBigInt(fee);
       const { l1_gas, l2_gas, l1_data_gas } = requireResourceBounds(fee);
-      const unit =
-        typeof fee.unit === "string" && fee.unit.length > 0
-          ? fee.unit
-          : "unknown";
+      const unit = requireFeeUnit(fee.unit);
       return ok({
         overall_fee: fee.overall_fee.toString(),
         unit,
@@ -1777,6 +1834,10 @@ interface TestingHooks {
   buildToolErrorText(error: unknown): string;
   isSecureRpcUrl(rawUrl: string): boolean;
   isRpcLikeError(error: unknown): boolean;
+  evaluateTestHooksExposureConfig(config: TestHookExposureConfig): {
+    exposeHooks: boolean;
+    reason: string;
+  };
   maybeResetWalletOnRpcError(error: unknown): Promise<void>;
   cleanupWalletAndSdkResources(): Promise<void>;
   trackedTransactions(): { active: string[]; timedOut: string[] };
@@ -1800,6 +1861,7 @@ const testingHooks: TestingHooks = {
   buildToolErrorText,
   isSecureRpcUrl,
   isRpcLikeError,
+  evaluateTestHooksExposureConfig,
   maybeResetWalletOnRpcError,
   cleanupWalletAndSdkResources,
   trackedTransactions() {
@@ -1851,7 +1913,7 @@ const allowUnsafeTestHooks =
 const unsafeTestHooksAcknowledged =
   process.env.STARKZAP_MCP_UNSAFE_TEST_HOOKS_ACK ===
   "I_UNDERSTAND_THIS_EXPOSES_WALLET_MUTATION";
-const unsafeHooksAllowedOnMainnet =
+const deprecatedMainnetBypassEnabled =
   process.env.STARKZAP_MCP_ALLOW_UNSAFE_TEST_HOOKS_MAINNET === "1";
 const testHookMarkerAcknowledged =
   process.env.STARKZAP_MCP_TEST_KEY_MARKER ===
@@ -1862,25 +1924,23 @@ if (process.env.NODE_ENV === "test" && !testHooksEnabled) {
   );
 }
 if (testHooksEnabled) {
-  const unsafeBypassEnabled =
-    allowUnsafeTestHooks && unsafeTestHooksAcknowledged;
   const rpcUrlLooksLikeMainnet =
     typeof env.STARKNET_RPC_URL === "string" &&
     /mainnet/i.test(env.STARKNET_RPC_URL) &&
     !/(localhost|127\.0\.0\.1|\[::1\])/i.test(env.STARKNET_RPC_URL);
   const hasProductionLikeIndicators =
     network === "mainnet" || rpcUrlLooksLikeMainnet;
-  const blocksUnsafeBypassForEnvironment =
-    unsafeBypassEnabled &&
-    hasProductionLikeIndicators &&
-    !unsafeHooksAllowedOnMainnet;
-  if (!testHookMarkerAcknowledged && !unsafeBypassEnabled) {
+  const evaluation = evaluateTestHooksExposureConfig({
+    testHooksEnabled,
+    testHookMarkerAcknowledged,
+    allowUnsafeTestHooks,
+    unsafeTestHooksAcknowledged,
+    hasProductionLikeIndicators,
+    deprecatedMainnetBypassEnabled,
+  });
+  if (!evaluation.exposeHooks) {
     console.error(
       "[starkzap-mcp] refusing to expose test hooks: missing STARKZAP_MCP_TEST_KEY_MARKER=TEST_KEY_DO_NOT_USE_IN_PRODUCTION. To bypass in controlled environments only, set STARKZAP_MCP_ALLOW_UNSAFE_TEST_HOOKS=1 and STARKZAP_MCP_UNSAFE_TEST_HOOKS_ACK=I_UNDERSTAND_THIS_EXPOSES_WALLET_MUTATION."
-    );
-  } else if (blocksUnsafeBypassForEnvironment) {
-    console.error(
-      "[starkzap-mcp] refusing unsafe test hooks in production-like environments. Use a safe test key instead, or set STARKZAP_MCP_ALLOW_UNSAFE_TEST_HOOKS_MAINNET=1 only in isolated local test environments."
     );
   } else {
     (globalThis as Record<string, unknown>).__STARKZAP_MCP_TESTING__ =

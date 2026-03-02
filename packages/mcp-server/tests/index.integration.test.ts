@@ -46,6 +46,14 @@ type TestingExports = {
   buildToolErrorText(error: unknown): string;
   isSecureRpcUrl(rawUrl: string): boolean;
   isRpcLikeError(error: unknown): boolean;
+  evaluateTestHooksExposureConfig(config: {
+    testHooksEnabled: boolean;
+    testHookMarkerAcknowledged: boolean;
+    allowUnsafeTestHooks: boolean;
+    unsafeTestHooksAcknowledged: boolean;
+    hasProductionLikeIndicators: boolean;
+    deprecatedMainnetBypassEnabled: boolean;
+  }): { exposeHooks: boolean; reason: string };
   handleCallToolRequest(request: {
     params: { name: string; arguments?: Record<string, unknown> | undefined };
   }): Promise<{
@@ -147,6 +155,41 @@ describe("index integration hardening", () => {
   it("scrubs sensitive env vars from process.env after startup parse", () => {
     expect(process.env.STARKNET_PRIVATE_KEY).toBeUndefined();
     expect(process.env.AVNU_PAYMASTER_API_KEY).toBeUndefined();
+  });
+
+  it("enforces test-hook exposure safety gates", () => {
+    expect(
+      testing.evaluateTestHooksExposureConfig({
+        testHooksEnabled: true,
+        testHookMarkerAcknowledged: false,
+        allowUnsafeTestHooks: false,
+        unsafeTestHooksAcknowledged: false,
+        hasProductionLikeIndicators: false,
+        deprecatedMainnetBypassEnabled: false,
+      })
+    ).toEqual({ exposeHooks: false, reason: "missing-test-key-marker" });
+
+    expect(() =>
+      testing.evaluateTestHooksExposureConfig({
+        testHooksEnabled: true,
+        testHookMarkerAcknowledged: true,
+        allowUnsafeTestHooks: true,
+        unsafeTestHooksAcknowledged: true,
+        hasProductionLikeIndicators: true,
+        deprecatedMainnetBypassEnabled: false,
+      })
+    ).toThrow(/forbidden in production-like environments/);
+
+    expect(() =>
+      testing.evaluateTestHooksExposureConfig({
+        testHooksEnabled: true,
+        testHookMarkerAcknowledged: true,
+        allowUnsafeTestHooks: false,
+        unsafeTestHooksAcknowledged: false,
+        hasProductionLikeIndicators: false,
+        deprecatedMainnetBypassEnabled: true,
+      })
+    ).toThrow(/no longer supported/);
   });
 
   it("times out hanging RPC promises", async () => {
@@ -367,7 +410,7 @@ describe("index integration hardening", () => {
     expect(response.content[0]?.text).toContain("Operation failed. Reference:");
   });
 
-  it("normalizes missing fee unit to unknown", async () => {
+  it("rejects malformed fee unit responses from SDK", async () => {
     testing.setWalletSingleton({
       estimateFee: vi.fn().mockResolvedValue({
         overall_fee: 123n,
@@ -393,11 +436,8 @@ describe("index integration hardening", () => {
       },
     });
 
-    expect(response.isError).not.toBe(true);
-    const payload = JSON.parse(response.content[0]?.text ?? "{}") as {
-      unit?: string;
-    };
-    expect(payload.unit).toBe("unknown");
+    expect(response.isError).toBe(true);
+    expect(response.content[0]?.text).toContain("Operation failed. Reference:");
   });
 
   it("rejects malformed commission percent in pool position responses", async () => {
