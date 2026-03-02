@@ -1,7 +1,38 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { CartridgeWallet } from "@/wallet/cartridge";
 import { ChainId } from "@/types";
-import Controller, { toSessionPolicies } from "@cartridge/controller";
+
+const { MockController, mockToSessionPolicies } = vi.hoisted(() => {
+  class ControllerMock {
+    static options: unknown[] = [];
+
+    constructor(options?: unknown) {
+      ControllerMock.options.push(options);
+    }
+
+    probe = vi.fn().mockResolvedValue(null);
+    async connect(): Promise<unknown> {
+      return undefined;
+    }
+    disconnect = vi.fn().mockResolvedValue(undefined);
+    openProfile = vi.fn();
+    openSettings = vi.fn();
+    username = vi.fn().mockResolvedValue("testuser");
+    rpcUrl = vi.fn().mockReturnValue("https://api.cartridge.gg/x/test");
+    isReady = vi.fn().mockReturnValue(true);
+    keychain = {
+      deploy: vi.fn().mockResolvedValue({
+        code: "SUCCESS",
+        transaction_hash: "0xdeploy",
+      }),
+    };
+  }
+
+  return {
+    MockController: ControllerMock,
+    mockToSessionPolicies: vi.fn((policies: unknown) => policies),
+  };
+});
 
 // Mock the @cartridge/controller module
 vi.mock("@cartridge/controller", () => {
@@ -34,33 +65,13 @@ vi.mock("@cartridge/controller", () => {
     ]),
     estimateInvokeFee: vi.fn().mockResolvedValue({}),
   };
-
-  class MockController {
-    static options: unknown[] = [];
-
-    constructor(options?: unknown) {
-      MockController.options.push(options);
-    }
-
-    probe = vi.fn().mockResolvedValue(null);
-    connect = vi.fn().mockResolvedValue(mockWalletAccount);
-    disconnect = vi.fn().mockResolvedValue(undefined);
-    openProfile = vi.fn();
-    openSettings = vi.fn();
-    username = vi.fn().mockResolvedValue("testuser");
-    rpcUrl = vi.fn().mockReturnValue("https://api.cartridge.gg/x/test");
-    isReady = vi.fn().mockReturnValue(true);
-    keychain = {
-      deploy: vi.fn().mockResolvedValue({
-        code: "SUCCESS",
-        transaction_hash: "0xdeploy",
-      }),
-    };
-  }
+  MockController.prototype.connect = vi
+    .fn()
+    .mockResolvedValue(mockWalletAccount);
 
   return {
     default: MockController,
-    toSessionPolicies: vi.fn((policies) => policies),
+    toSessionPolicies: mockToSessionPolicies,
   };
 });
 
@@ -83,7 +94,7 @@ vi.mock("starknet", async (importOriginal) => {
 describe("CartridgeWallet", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    (Controller as unknown as { options: unknown[] }).options = [];
+    MockController.options = [];
   });
 
   describe("create", () => {
@@ -98,8 +109,11 @@ describe("CartridgeWallet", () => {
       );
 
       const options = (
-        Controller as unknown as { options: Array<Record<string, unknown>> }
+        MockController as { options: Array<Record<string, unknown>> }
       ).options[0];
+      if (!options) {
+        throw new Error("Expected controller options to be recorded");
+      }
       expect(options.chains).toEqual([
         { rpcUrl: "https://api.cartridge.gg/x/starknet/sepolia" },
       ]);
@@ -112,8 +126,11 @@ describe("CartridgeWallet", () => {
       });
 
       const options = (
-        Controller as unknown as { options: Array<Record<string, unknown>> }
+        MockController as { options: Array<Record<string, unknown>> }
       ).options[0];
+      if (!options) {
+        throw new Error("Expected controller options to be recorded");
+      }
       expect(options.defaultChainId).toBe(ChainId.SEPOLIA.toFelt252());
     });
 
@@ -124,7 +141,7 @@ describe("CartridgeWallet", () => {
       });
 
       expect(wallet.address).toBeDefined();
-      expect(toSessionPolicies).toHaveBeenCalledWith(policies);
+      expect(mockToSessionPolicies).toHaveBeenCalledWith(policies);
     });
 
     it("should work with no options", async () => {
@@ -286,7 +303,15 @@ describe("CartridgeWallet", () => {
     it("should return ok for deployed account", async () => {
       const wallet = await CartridgeWallet.create();
 
-      const result = await wallet.preflight({ kind: "transfer" });
+      const result = await wallet.preflight({
+        calls: [
+          {
+            contractAddress: "0x123",
+            entrypoint: "transfer",
+            calldata: [],
+          },
+        ],
+      });
 
       expect(result.ok).toBe(true);
     });
@@ -304,7 +329,9 @@ describe("CartridgeWallet", () => {
   describe("getController", () => {
     it("should return the Cartridge Controller", async () => {
       const wallet = await CartridgeWallet.create();
-      const controller = wallet.getController();
+      const controller = wallet.getController() as {
+        openProfile?: unknown;
+      };
 
       expect(controller).toBeDefined();
       expect(typeof controller.openProfile).toBe("function");
@@ -323,7 +350,9 @@ describe("CartridgeWallet", () => {
   describe("disconnect", () => {
     it("should disconnect from controller", async () => {
       const wallet = await CartridgeWallet.create();
-      const controller = wallet.getController();
+      const controller = wallet.getController() as {
+        disconnect: ReturnType<typeof vi.fn>;
+      };
 
       await wallet.disconnect();
 

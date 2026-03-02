@@ -6,7 +6,7 @@ import {
   type Amount,
   type ChainId,
   type WalletInterface,
-} from "starkzap";
+} from "@starkzap/native";
 
 export function getTokensForNetwork(chainId: ChainId): Token[] {
   return chainId.isSepolia()
