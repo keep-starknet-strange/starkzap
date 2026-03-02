@@ -4,14 +4,14 @@ import type {
   OnboardResult,
   SDKConfig,
 } from "starkzap";
-import { StarkSDK as CoreStarkSDK } from "starkzap";
+import { StarkZap as CoreStarkZap } from "starkzap";
 import type {
   ConnectCartridgeOptions,
   OnboardOptions,
   NativeOnboardCartridgeConfig,
 } from "@/types/onboard";
 
-export class StarkSDK extends CoreStarkSDK {
+export class StarkZap extends CoreStarkZap {
   constructor(config: SDKConfig) {
     super(config);
   }
@@ -65,5 +65,3 @@ export class StarkSDK extends CoreStarkSDK {
     };
   }
 }
-
-export { StarkSDK as StarkZap };
