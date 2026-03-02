@@ -52,32 +52,18 @@ jobs:
         with:
           node-version-file: .nvmrc
           cache: npm
-          cache-dependency-path: |
-            package-lock.json
-            examples/web/package-lock.json
-            examples/flappy-bird/package-lock.json
-            examples/mobile/package-lock.json
 
-      - name: Install Root Dependencies
+      - name: Install (workspaces)
         run: npm ci
 
-      - name: Build Root Package
-        run: npm run -s build
-
-      - name: Install Web Example Dependencies
-        run: npm ci --prefix examples/web --ignore-scripts
+      - name: Build SDK + Native Package
+        run: npm run -s build:all
 
       - name: Build Web Example
-        run: npm run -s build --prefix examples/web
-
-      - name: Install Flappy-Bird Example Dependencies
-        run: npm ci --prefix examples/flappy-bird --ignore-scripts
+        run: npm run -s build --workspace examples/web
 
       - name: Build Flappy-Bird Example
-        run: npm run -s build --prefix examples/flappy-bird
-
-      - name: Install Mobile Example Dependencies
-        run: npm ci --prefix examples/mobile --ignore-scripts
+        run: npm run -s build --workspace examples/flappy-bird
 
       - name: Build Mobile Example (iOS Bundle)
         working-directory: examples/mobile
