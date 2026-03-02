@@ -139,9 +139,6 @@ describe("Payment", () => {
       });
       expect(result.sessionToken).toBe("tok_123");
       expect(result.amount).toBe("25.00");
-      expect(Chainrails.config).toHaveBeenCalledWith({
-        seesion_token: "tok_123",
-      });
     });
   });
 

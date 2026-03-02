@@ -7,7 +7,6 @@ node_modules
 expo-env.d.ts
 docs
 examples/flappy-bird
-examples/infinite-flappy-bird
 .claude
 .codex
 AGENTS.md
