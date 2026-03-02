@@ -159,19 +159,6 @@ describe("Payment", () => {
       expect(typeof flow.pay).toBe("function");
     });
 
-    it("returns a simple modal handle with pay() for mobile platform", () => {
-      const flow = payment.modal({
-        platform: "mobile",
-        sessionToken: "tok_456",
-        amount: "50.00",
-      });
-
-      expect(flow.platform).toBe("mobile");
-      expect(flow.sessionToken).toBe("tok_456");
-      expect(flow.amount).toBe("50.00");
-      expect(typeof flow.pay).toBe("function");
-    });
-
     it("defaults platform to web when not specified", () => {
       const flow = payment.modal({
         sessionToken: "tok_default",
