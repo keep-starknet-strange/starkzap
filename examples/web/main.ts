@@ -524,7 +524,7 @@ async function connectPrivy() {
 
     // Register user or get existing wallet
     log("Registering/fetching user...", "info");
-    const registerRes = await fetch(`${PRIVY_SERVER_URL}/api/user/register`, {
+    const registerRes = await fetch(`${PRIVY_SERVER_URL}/api/wallet/starknet`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email }),
