@@ -9,7 +9,13 @@ Browser-based playground for the SDK. Demonstrates three wallet connection strat
 
 ## Quick Start
 
-From the repository root:
+From the monorepo root, install and build the SDK first. Then run the example:
+
+```bash
+# From repo root
+npm install
+npm run build
+```
 
 ```bash
 cd examples/web

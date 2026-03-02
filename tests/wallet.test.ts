@@ -391,4 +391,33 @@ describe("StarkSDK", () => {
       }
     });
   });
+
+  describe("connectCartridgeReactNative", () => {
+    const rnOptions = {
+      redirectUrl: "myapp://session",
+      openUrl: () => {},
+      storage: {
+        get: () => Promise.resolve(null),
+        set: () => Promise.resolve(),
+        delete: () => Promise.resolve(),
+      },
+    };
+
+    it("should reject when not in React Native runtime", async () => {
+      const sdk = new StarkSDK(config);
+      vi.spyOn(sdk.getProvider(), "getChainId").mockResolvedValue(
+        config.chainId!.toFelt252()
+      );
+      await expect(
+        sdk.connectCartridgeReactNative({
+          ...rnOptions,
+          rpcUrl: config.rpcUrl!,
+          chainId: config.chainId!,
+          policies: [{ target: "0x0", method: "transfer" }],
+        })
+      ).rejects.toThrow(
+        "Cartridge React Native is only supported in React Native"
+      );
+    });
+  });
 });

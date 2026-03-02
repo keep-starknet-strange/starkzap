@@ -58,10 +58,11 @@ From the monorepo root, install and build the SDK first. Then run the example:
 
 ```bash
 # From repo root
-cd /path/to/starkzap
 npm install
 npm run build
+```
 
+```bash
 # Then run the example
 cd examples/flappy-bird
 npm install

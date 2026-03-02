@@ -34,6 +34,14 @@ Set these values in `.env`:
 
 ## Install and run
 
+From the monorepo root, install and build the SDK first. Then run the example:
+
+```bash
+# From repo root
+npm install
+npm run build
+```
+
 ```bash
 cd examples/mobile
 npm install
