@@ -1,5 +1,5 @@
 ---
-name: reclaim-zkp
+name: zktls
 description: Integrate Reclaim Protocol to import User Data from any platform using ZKP verification into an existing app. Collects credentials, installs SDK, wires up verification flow and proof parsing into a target file.
 user_invocable: true
 allowed-tools: [Read, Edit, Write, Glob, Grep, Bash]
@@ -11,7 +11,7 @@ Integrate Reclaim Protocol's JS SDK into the user's existing application. This s
 
 ## Invocation
 
-When the user invokes `/reclaim-zkp`, follow this workflow:
+When the user invokes `/zktls`, follow this workflow:
 
 ### Step 1: Collect Everything Upfront
 
