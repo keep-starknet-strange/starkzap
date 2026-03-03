@@ -1,5 +1,5 @@
-import { BridgeProtocol } from "@/bridge/bridge-protocol";
-import { ExternalChain } from "@/bridge/external-chain";
+import { Protocol } from "@/types/bridge/protocol";
+import { ExternalChain } from "@/types/bridge/external-chain";
 
 export interface BridgeTokenBaseParams {
   id: string;
@@ -12,7 +12,7 @@ export interface BridgeTokenBaseParams {
 
 export interface BridgeTokenParams extends BridgeTokenBaseParams {
   chain: ExternalChain;
-  protocol: BridgeProtocol;
+  protocol: Protocol;
 }
 
 export abstract class BridgeToken {
@@ -23,7 +23,7 @@ export abstract class BridgeToken {
   readonly decimals: number;
   readonly l2TokenAddress: string;
   readonly chain: ExternalChain;
-  readonly protocol: BridgeProtocol;
+  readonly protocol: Protocol;
 
   protected constructor(params: BridgeTokenParams) {
     this.id = params.id;
@@ -40,10 +40,10 @@ export abstract class BridgeToken {
 }
 
 export type EthereumBridgeProtocol =
-  | BridgeProtocol.CANONICAL
-  | BridgeProtocol.CCTP
-  | BridgeProtocol.OFT
-  | BridgeProtocol.OFT_MIGRATED;
+  | Protocol.CANONICAL
+  | Protocol.CCTP
+  | Protocol.OFT
+  | Protocol.OFT_MIGRATED;
 
 export interface EthereumBridgeTokenParams extends BridgeTokenBaseParams {
   protocol: EthereumBridgeProtocol;
@@ -71,7 +71,7 @@ export class EthereumBridgeToken extends BridgeToken {
 }
 
 export interface SolanaBridgeTokenParams extends BridgeTokenBaseParams {
-  protocol: BridgeProtocol.HYPERLANE;
+  protocol: Protocol.HYPERLANE;
   solanaTokenAddress: string;
   solanaDecimals: number;
 }
@@ -91,7 +91,7 @@ export class SolanaBridgeToken extends BridgeToken {
 }
 
 export interface BitcoinRunesBridgeTokenParams extends BridgeTokenBaseParams {
-  protocol: BridgeProtocol.BITCOIN_RUNES;
+  protocol: Protocol.BITCOIN_RUNES;
   bitcoinRuneId: string;
   runesBridgeAddress: string;
 }

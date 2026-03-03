@@ -8,3 +8,4 @@ export * from "@/types/onboard";
 export * from "@/types/token";
 export * from "@/types/tx";
 export * from "@/types/pool";
+export * from "@/types/bridge";

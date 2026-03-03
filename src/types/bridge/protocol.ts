@@ -1,4 +1,4 @@
-export enum BridgeProtocol {
+export enum Protocol {
   CANONICAL = "canonical",
   CCTP = "cctp",
   OFT = "oft",

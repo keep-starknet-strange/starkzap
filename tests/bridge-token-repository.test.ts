@@ -1,13 +1,12 @@
 import { describe, expect, it, vi } from "vitest";
+import { BridgeTokenRepository, BRIDGE_TOKEN_CACHE_TTL_MS } from "@/bridge";
 import {
-  BridgeProtocol,
-  ExternalChain,
-  BridgeTokenRepository,
-  BRIDGE_TOKEN_CACHE_TTL_MS,
-  EthereumBridgeToken,
-  SolanaBridgeToken,
   BitcoinRunesBridgeToken,
-} from "@/bridge";
+  EthereumBridgeToken,
+  ExternalChain,
+  Protocol,
+  SolanaBridgeToken,
+} from "@/types";
 
 function mockApiResponse() {
   return {
@@ -82,15 +81,15 @@ describe("BridgeTokenRepository", () => {
     expect(tokens).toHaveLength(4);
 
     expect(tokens[0]).toBeInstanceOf(EthereumBridgeToken);
-    expect(tokens[0]?.protocol).toBe(BridgeProtocol.CANONICAL);
+    expect(tokens[0]?.protocol).toBe(Protocol.CANONICAL);
     expect(tokens[0]?.chain).toBe(ExternalChain.ETHEREUM);
 
     expect(tokens[2]).toBeInstanceOf(SolanaBridgeToken);
-    expect(tokens[2]?.protocol).toBe(BridgeProtocol.HYPERLANE);
+    expect(tokens[2]?.protocol).toBe(Protocol.HYPERLANE);
     expect(tokens[2]?.chain).toBe(ExternalChain.SOLANA);
 
     expect(tokens[3]).toBeInstanceOf(BitcoinRunesBridgeToken);
-    expect(tokens[3]?.protocol).toBe(BridgeProtocol.BITCOIN_RUNES);
+    expect(tokens[3]?.protocol).toBe(Protocol.BITCOIN_RUNES);
     expect(tokens[3]?.chain).toBe(ExternalChain.BITCOIN_RUNES);
   });
 

@@ -1,13 +1,13 @@
 import { assertSafeHttpUrl } from "@/utils";
-import { BridgeProtocol } from "@/bridge/bridge-protocol";
-import { ExternalChain } from "@/bridge/external-chain";
+import { Protocol } from "@/types/bridge/protocol";
+import { ExternalChain } from "@/types/bridge/external-chain";
 import {
   type BridgeToken,
   BitcoinRunesBridgeToken,
   EthereumBridgeToken,
   type EthereumBridgeProtocol,
   SolanaBridgeToken,
-} from "@/bridge/token";
+} from "@/types/bridge/bridge-token";
 
 export type BridgeTokenApiEnv = "mainnet" | "testnet";
 
@@ -105,20 +105,20 @@ function parseChain(chain: string): ExternalChain {
   }
 }
 
-function parseProtocol(protocol: string): BridgeProtocol {
+function parseProtocol(protocol: string): Protocol {
   switch (protocol.toLowerCase().replace(/_/g, "-")) {
-    case BridgeProtocol.CANONICAL:
-      return BridgeProtocol.CANONICAL;
-    case BridgeProtocol.CCTP:
-      return BridgeProtocol.CCTP;
-    case BridgeProtocol.OFT:
-      return BridgeProtocol.OFT;
-    case BridgeProtocol.OFT_MIGRATED:
-      return BridgeProtocol.OFT_MIGRATED;
-    case BridgeProtocol.HYPERLANE:
-      return BridgeProtocol.HYPERLANE;
-    case BridgeProtocol.BITCOIN_RUNES:
-      return BridgeProtocol.BITCOIN_RUNES;
+    case Protocol.CANONICAL:
+      return Protocol.CANONICAL;
+    case Protocol.CCTP:
+      return Protocol.CCTP;
+    case Protocol.OFT:
+      return Protocol.OFT;
+    case Protocol.OFT_MIGRATED:
+      return Protocol.OFT_MIGRATED;
+    case Protocol.HYPERLANE:
+      return Protocol.HYPERLANE;
+    case Protocol.BITCOIN_RUNES:
+      return Protocol.BITCOIN_RUNES;
     default:
       throw new Error(`Unsupported protocol "${protocol}"`);
   }
@@ -140,10 +140,10 @@ function parseToken(token: BridgeTokenApiRecord): BridgeToken {
 
   if (chain === ExternalChain.ETHEREUM) {
     if (
-      protocol !== BridgeProtocol.CANONICAL &&
-      protocol !== BridgeProtocol.CCTP &&
-      protocol !== BridgeProtocol.OFT &&
-      protocol !== BridgeProtocol.OFT_MIGRATED
+      protocol !== Protocol.CANONICAL &&
+      protocol !== Protocol.CCTP &&
+      protocol !== Protocol.OFT &&
+      protocol !== Protocol.OFT_MIGRATED
     ) {
       throw new Error(
         `Invalid protocol "${protocol}" for chain "${ExternalChain.ETHEREUM}"`
@@ -161,7 +161,7 @@ function parseToken(token: BridgeTokenApiRecord): BridgeToken {
   }
 
   if (chain === ExternalChain.SOLANA) {
-    if (protocol !== BridgeProtocol.HYPERLANE) {
+    if (protocol !== Protocol.HYPERLANE) {
       throw new Error(
         `Invalid protocol "${protocol}" for chain "${ExternalChain.SOLANA}"`
       );
@@ -169,13 +169,13 @@ function parseToken(token: BridgeTokenApiRecord): BridgeToken {
 
     return new SolanaBridgeToken({
       ...base,
-      protocol: BridgeProtocol.HYPERLANE,
+      protocol: Protocol.HYPERLANE,
       solanaTokenAddress: requiredString(token, "l1_token_address"),
       solanaDecimals: base.decimals,
     });
   }
 
-  if (protocol !== BridgeProtocol.BITCOIN_RUNES) {
+  if (protocol !== Protocol.BITCOIN_RUNES) {
     throw new Error(
       `Invalid protocol "${protocol}" for chain "${ExternalChain.BITCOIN_RUNES}"`
     );
@@ -183,7 +183,7 @@ function parseToken(token: BridgeTokenApiRecord): BridgeToken {
 
   return new BitcoinRunesBridgeToken({
     ...base,
-    protocol: BridgeProtocol.BITCOIN_RUNES,
+    protocol: Protocol.BITCOIN_RUNES,
     bitcoinRuneId: requiredString(token, "bitcoin_runes_id"),
     runesBridgeAddress: requiredString(token, "l2_token_bridge"),
   });
