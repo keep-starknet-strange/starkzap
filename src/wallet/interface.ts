@@ -10,6 +10,7 @@ import type { Tx } from "@/tx";
 import type { TxBuilder } from "@/tx/builder";
 import type { Erc20 } from "@/erc20";
 import type { Staking } from "@/staking";
+import type { SwapInput, SwapQuote, SwapProvider } from "@/swap";
 import type {
   Address,
   Amount,
@@ -93,6 +94,47 @@ export interface WalletInterface {
    * ```
    */
   tx(): TxBuilder;
+
+  /**
+   * Fetch a quote.
+   *
+   * Set `request.provider` to a provider instance or provider id.
+   * If omitted, uses the wallet default provider.
+   */
+  getQuote(request: SwapInput): Promise<SwapQuote>;
+
+  /**
+   * Execute a swap.
+   *
+   * Set `request.provider` to a provider instance or provider id.
+   * If omitted, uses the wallet default provider.
+   */
+  swap(request: SwapInput, options?: ExecuteOptions): Promise<Tx>;
+
+  /**
+   * Register or replace a swap provider on this wallet.
+   */
+  registerSwapProvider(provider: SwapProvider, makeDefault?: boolean): void;
+
+  /**
+   * Set the default swap provider by id.
+   */
+  setDefaultSwapProvider(providerId: string): void;
+
+  /**
+   * Resolve a registered provider by id.
+   */
+  getSwapProvider(providerId: string): SwapProvider;
+
+  /**
+   * Resolve the wallet default swap provider.
+   */
+  getDefaultSwapProvider(): SwapProvider;
+
+  /**
+   * List registered swap provider ids.
+   */
+  listSwapProviders(): string[];
 
   /**
    * Sign a typed data message (EIP-712 style).

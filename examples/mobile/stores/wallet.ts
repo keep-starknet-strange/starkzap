@@ -10,12 +10,12 @@ import {
   OpenZeppelinPreset,
   OnboardStrategy,
   type StakingConfig,
-  StarkSDK,
+  StarkZap,
   StarkSigner,
   type WalletInterface,
   type ChainIdLiteral,
   ChainId,
-} from "starkzap";
+} from "@starkzap/native";
 import {
   showTransactionToast,
   updateTransactionToast,
@@ -86,7 +86,7 @@ interface WalletState {
   // SDK configuration
   rpcUrl: string;
   chainId: ChainId;
-  sdk: StarkSDK | null;
+  sdk: StarkZap | null;
   paymasterNodeUrl: string | null;
   isConfigured: boolean;
   selectedNetworkIndex: number | null; // null means custom
@@ -246,24 +246,18 @@ export const useWalletStore = create<WalletState>((set, get) => ({
         contract: fromAddress(
           "0x00ca1702e64c81d9a07b86bd2c540188d92a2c73cf5cc0e508d949015e7e84a7"
         ),
-        mintingCurveContract: fromAddress(
-          "0x00ca1705e74233131dbcdee7f1b8d2926bf262168c7df339004b3f46015b6984"
-        ),
       };
     } else if (chainId.isSepolia()) {
       stakingConfig = {
         contract: fromAddress(
           "0x03745ab04a431fc02871a139be6b93d9260b0ff3e779ad9c8b377183b23109f1"
         ),
-        mintingCurveContract: fromAddress(
-          "0x06043928ca93cff6d6f39378ba391d7152eea707bdd624c1b2074e71af2abaca"
-        ),
       };
     }
 
     const paymasterNodeUrl = PAYMASTER_PROXY_URL.trim() || null;
 
-    const newSdk = new StarkSDK({
+    const newSdk = new StarkZap({
       rpcUrl,
       chainId,
       ...(paymasterNodeUrl && {

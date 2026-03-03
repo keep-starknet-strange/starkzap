@@ -44,6 +44,15 @@ export default function TabLayout() {
         options={{
           title: "Transfers",
           tabBarIcon: ({ color }) => (
+            <IconSymbol size={28} name="paperplane.fill" color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="swap"
+        options={{
+          title: "Swap",
+          tabBarIcon: ({ color }) => (
             <IconSymbol size={28} name="arrow.left.arrow.right" color={color} />
           ),
         }}

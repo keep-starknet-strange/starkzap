@@ -466,7 +466,7 @@ function Step2Privy({
         </>
       )}
 
-      {isReady && user && (
+      {isReady && !!user && (
         <>
           <View style={stepStyles.privyConnectRow}>
             {isLoadingWallet ? (

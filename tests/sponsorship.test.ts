@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
 import { RpcProvider } from "starknet";
-import { StarkSDK } from "@/sdk";
+import { StarkZap } from "@/sdk";
 import { StarkSigner } from "@/signer";
 import { OpenZeppelinPreset } from "@/account";
 import { devnetConfig } from "./config";
@@ -23,7 +23,7 @@ describe("Sponsorship (AVNU Paymaster)", () => {
   describe("SDK configuration", () => {
     it("should allow feeMode=sponsored without explicit sponsor config", async () => {
       // AVNU paymaster is built into starknet.js, no config needed
-      const sdk = new StarkSDK({
+      const sdk = new StarkZap({
         rpcUrl: devnetConfig.rpcUrl,
         chainId: devnetConfig.chainId,
       });
@@ -41,7 +41,7 @@ describe("Sponsorship (AVNU Paymaster)", () => {
     });
 
     it("should accept custom paymaster config", async () => {
-      const sdk = new StarkSDK({
+      const sdk = new StarkZap({
         rpcUrl: devnetConfig.rpcUrl,
         chainId: devnetConfig.chainId,
         paymaster: {
@@ -62,7 +62,7 @@ describe("Sponsorship (AVNU Paymaster)", () => {
 
   describe("Execute options", () => {
     it("should support feeMode override per operation", async () => {
-      const sdk = new StarkSDK({
+      const sdk = new StarkZap({
         rpcUrl: devnetConfig.rpcUrl,
         chainId: devnetConfig.chainId,
       });
@@ -95,7 +95,7 @@ describe("Sponsorship (AVNU Paymaster)", () => {
     });
 
     it("should support timeBounds for sponsored transactions", async () => {
-      const sdk = new StarkSDK({
+      const sdk = new StarkZap({
         rpcUrl: devnetConfig.rpcUrl,
         chainId: devnetConfig.chainId,
       });

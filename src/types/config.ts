@@ -136,7 +136,7 @@ export interface ExplorerConfig {
  *
  * @example
  * ```ts
- * const sdk = new StarkSDK({
+ * const sdk = new StarkZap({
  *   rpcUrl: "https://starknet-mainnet.infura.io/v3/YOUR_KEY",
  *   chainId: ChainId.MAINNET,
  *   staking: {
@@ -151,28 +151,28 @@ export interface StakingConfig {
 }
 
 /**
- * Main configuration for the StarkSDK.
+ * Main configuration for the StarkZap.
  *
  * You can configure using a network preset or custom rpcUrl/chainId.
  *
  * @example
  * ```ts
  * // Using a network preset (recommended)
- * const sdk = new StarkSDK({ network: "mainnet" });
- * const sdk = new StarkSDK({ network: "sepolia" });
+ * const sdk = new StarkZap({ network: "mainnet" });
+ * const sdk = new StarkZap({ network: "sepolia" });
  *
  * // Using a preset object directly
  * import { networks } from "starkzap";
- * const sdk = new StarkSDK({ network: networks.mainnet });
+ * const sdk = new StarkZap({ network: networks.mainnet });
  *
  * // Custom configuration
- * const sdk = new StarkSDK({
+ * const sdk = new StarkZap({
  *   rpcUrl: "https://my-rpc.example.com",
  *   chainId: ChainId.MAINNET,
  * });
  *
  * // With custom paymaster endpoint
- * const sdk = new StarkSDK({
+ * const sdk = new StarkZap({
  *   network: "sepolia",
  *   paymaster: { nodeUrl: "https://custom-paymaster.example.com" },
  * });

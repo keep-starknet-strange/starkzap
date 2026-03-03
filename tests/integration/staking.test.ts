@@ -1,5 +1,5 @@
 import { beforeAll, describe, expect, inject, it } from "vitest";
-import { StarkSDK } from "@/sdk";
+import { StarkZap } from "@/sdk";
 import { sepoliaTokens } from "@/erc20";
 import { StarkSigner } from "@/signer";
 import { DevnetPreset } from "@/account";
@@ -32,14 +32,14 @@ describe("Staking Lifecycle (Integration)", () => {
   };
   const validatorUnderTest = fromAddress(testPresets.VALIDATOR_UNDER_TEST);
 
-  let sdk: StarkSDK;
+  let sdk: StarkZap;
   let devnetRunning = false;
   let stakingAvailable = false;
 
   const STRK = sepoliaTokens.STRK;
 
   beforeAll(async () => {
-    sdk = new StarkSDK(config);
+    sdk = new StarkZap(config);
 
     const devnetProvider = new DevnetProvider({
       url: config.rpcUrl!,

@@ -8,6 +8,7 @@ node_modules/
 
 # Build output
 dist/
+**/dist/
 
 # IDE
 .idea/
@@ -31,3 +32,4 @@ coverage/
 .env
 *.pem
 wallets.json
+tasks/

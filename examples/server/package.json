@@ -1,5 +1,8 @@
 {
+  "name": "starkzap-example-server",
+  "private": true,
   "scripts": {
+    "start": "node --import tsx server.ts",
     "postinstall": "cd ../.. && npm run build"
   },
   "dependencies": {

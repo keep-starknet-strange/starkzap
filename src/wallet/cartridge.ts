@@ -1,4 +1,3 @@
-import Controller, { toSessionPolicies } from "@cartridge/controller";
 import {
   RpcProvider,
   type Account,
@@ -34,6 +33,60 @@ const NEGATIVE_DEPLOYMENT_CACHE_TTL_MS = 3_000;
 const MAX_CONTROLLER_WAIT_MS = 10_000;
 const INITIAL_CONTROLLER_POLL_MS = 100;
 const MAX_CONTROLLER_POLL_MS = 1_000;
+
+type CartridgePolicy = { target: string; method: string };
+
+type CartridgeControllerLike = {
+  isReady(): boolean;
+  connect(): Promise<unknown>;
+  disconnect(): Promise<void>;
+  rpcUrl(): string;
+  username(): Promise<string | undefined>;
+  keychain?: {
+    deploy?: () => Promise<{
+      code?: string;
+      message?: string;
+      transaction_hash?: string;
+    }>;
+  };
+};
+
+type CartridgeControllerModule = {
+  default: new (options?: Record<string, unknown>) => CartridgeControllerLike;
+  toSessionPolicies: (policies: CartridgePolicy[]) => unknown;
+};
+
+function cartridgeDependencyError(extra?: string): Error {
+  return new Error(
+    "Cartridge integration requires '@cartridge/controller'. Install it in your app dependencies to use connectCartridge()." +
+      (extra ? ` ${extra}` : "")
+  );
+}
+
+async function loadCartridgeControllerModule(): Promise<CartridgeControllerModule> {
+  let imported: unknown;
+  try {
+    imported = await import("@cartridge/controller");
+  } catch (error) {
+    const details =
+      error instanceof Error && error.message
+        ? `Original error: ${error.message}`
+        : undefined;
+    throw cartridgeDependencyError(details);
+  }
+
+  const mod = imported as Partial<CartridgeControllerModule>;
+  if (
+    typeof mod.default !== "function" ||
+    typeof mod.toSessionPolicies !== "function"
+  ) {
+    throw cartridgeDependencyError(
+      "Loaded module does not expose expected exports."
+    );
+  }
+
+  return mod as CartridgeControllerModule;
+}
 
 /**
  * Options for connecting with Cartridge Controller.
@@ -72,7 +125,7 @@ export interface CartridgeWalletOptions {
  * ```
  */
 export class CartridgeWallet extends BaseWallet {
-  private readonly controller: Controller;
+  private readonly controller: CartridgeControllerLike;
   private readonly walletAccount: Account;
   private readonly provider: RpcProvider;
   private readonly chainId: ChainId;
@@ -84,7 +137,7 @@ export class CartridgeWallet extends BaseWallet {
   private deployedCacheExpiresAt = 0;
 
   private constructor(
-    controller: Controller,
+    controller: CartridgeControllerLike,
     walletAccount: Account,
     provider: RpcProvider,
     chainId: ChainId,
@@ -110,6 +163,8 @@ export class CartridgeWallet extends BaseWallet {
     options: CartridgeWalletOptions = {},
     stakingConfig?: StakingConfig | undefined
   ): Promise<CartridgeWallet> {
+    const { default: Controller, toSessionPolicies } =
+      await loadCartridgeControllerModule();
     const controllerOptions: Record<string, unknown> = {};
 
     if (options.chainId) {
@@ -125,9 +180,7 @@ export class CartridgeWallet extends BaseWallet {
     }
 
     if (options.policies && options.policies.length > 0) {
-      controllerOptions.policies = toSessionPolicies(
-        options.policies as Parameters<typeof toSessionPolicies>[0]
-      );
+      controllerOptions.policies = toSessionPolicies(options.policies);
     }
 
     if (options.preset) {
@@ -233,9 +286,7 @@ export class CartridgeWallet extends BaseWallet {
     this.clearDeploymentCache();
 
     // Cartridge Controller handles deployment internally
-    const result = await (
-      this.controller as unknown as ControllerWithKeychain
-    ).keychain?.deploy?.();
+    const result = await this.controller.keychain?.deploy?.();
     if (!result || result.code !== "SUCCESS" || !result.transaction_hash) {
       throw new Error(result?.message ?? "Cartridge deployment failed");
     }
@@ -320,7 +371,7 @@ export class CartridgeWallet extends BaseWallet {
   /**
    * Get the Cartridge Controller instance for Cartridge-specific features.
    */
-  getController(): Controller {
+  getController(): unknown {
     return this.controller;
   }
 
@@ -337,16 +388,6 @@ export class CartridgeWallet extends BaseWallet {
     return this.controller.username();
   }
 }
-
-type ControllerWithKeychain = {
-  keychain?: {
-    deploy?: () => Promise<{
-      code?: string;
-      message?: string;
-      transaction_hash?: string;
-    }>;
-  };
-};
 
 type CartridgeAccountLike = {
   address: string;

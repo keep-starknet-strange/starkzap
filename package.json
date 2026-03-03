@@ -2,6 +2,10 @@
   "name": "starkzap",
   "version": "1.0.0",
   "description": "Helper sdk for easy wallet integration",
+  "workspaces": [
+    "packages/*",
+    "examples/*"
+  ],
   "homepage": "https://github.com/keep-starknet-strange/x#readme",
   "bugs": {
     "url": "https://github.com/keep-starknet-strange/x/issues"
@@ -50,7 +54,9 @@
   },
   "scripts": {
     "build": "tsc; tsc-alias",
+    "build:all": "npm run build --workspace @starkzap/native",
     "typecheck": "tsc --noEmit",
+    "typecheck:all": "npm run typecheck --workspace @starkzap/native",
     "lint": "eslint .",
     "fix": "eslint . --fix",
     "prettier": "prettier --write .",
@@ -68,6 +74,7 @@
     "docs:api": "typedoc --options typedoc.json",
     "docs:export": "npm run docs:api && node scripts/docs-export.mjs",
     "docs:check": "npm run docs:api",
+    "example:server": "npm run start --workspace starkzap-example-server",
     "prepare": "husky"
   },
   "devDependencies": {
@@ -91,7 +98,7 @@
     "vitest": "^4.0.17"
   },
   "dependencies": {
-    "@cartridge/controller": "^0.13.9",
+    "@avnu/avnu-sdk": "^4.1.0-rc.0",
     "starknet": "^9.2.1"
   }
 }
