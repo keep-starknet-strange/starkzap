@@ -28,6 +28,11 @@ import { Staking } from "@/staking";
 import type { SwapInput, SwapQuote, SwapProvider } from "@/swap";
 import { AvnuSwapProvider } from "@/swap";
 import { resolveSwapInput } from "@/swap/utils";
+import {
+  LendingClient,
+  type LendingProvider,
+  VesuLendingProvider,
+} from "@/lending";
 
 const MAX_ERC20_CACHE_SIZE = 128;
 const MAX_STAKING_CACHE_SIZE = 128;
@@ -86,18 +91,30 @@ export abstract class BaseWallet implements WalletInterface {
   protected constructor(
     address: Address,
     stakingConfig: StakingConfig | undefined,
-    defaultSwapProvider?: SwapProvider
+    defaultSwapProvider?: SwapProvider,
+    defaultLendingProvider?: LendingProvider
   ) {
     this.address = address;
     this.stakingConfig = stakingConfig;
     this.swapProviders = new Map();
     const provider = defaultSwapProvider ?? new AvnuSwapProvider();
     this.registerSwapProvider(provider, true);
+    this.lendingClient = new LendingClient(
+      {
+        address: this.address,
+        getChainId: () => this.getChainId(),
+        getProvider: () => this.getProvider(),
+        execute: (calls, options) => this.execute(calls, options),
+        preflight: (options) => this.preflight(options),
+      },
+      defaultLendingProvider ?? new VesuLendingProvider()
+    );
   }
 
   /** Registered swap providers by id. */
   private readonly swapProviders: Map<string, SwapProvider>;
   private defaultSwapProviderId: string | null = null;
+  private readonly lendingClient: LendingClient;
 
   // ============================================================
   // Abstract methods - children MUST implement
@@ -167,6 +184,13 @@ export abstract class BaseWallet implements WalletInterface {
    */
   tx(): TxBuilder {
     return new TxBuilder(this);
+  }
+
+  /**
+   * Access lending helpers and protocol connectors (Vesu, etc.).
+   */
+  lending(): LendingClient {
+    return this.lendingClient;
   }
 
   /**

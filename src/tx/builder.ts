@@ -4,6 +4,12 @@ import type { Tx } from "@/tx";
 import type { SwapInput } from "@/swap";
 import { resolveSwapInput } from "@/swap/utils";
 import type {
+  LendingBorrowRequest,
+  LendingDepositRequest,
+  LendingRepayRequest,
+  LendingWithdrawRequest,
+} from "@/lending";
+import type {
   Address,
   Amount,
   ExecuteOptions,
@@ -235,6 +241,74 @@ export class TxBuilder {
       }
       return prepared.calls;
     });
+    this.queueAsyncCalls(p);
+    return this;
+  }
+
+  /**
+   * Add a lending deposit operation.
+   */
+  lendDeposit(request: LendingDepositRequest): this {
+    const p = this.wallet
+      .lending()
+      .prepareDeposit(request)
+      .then((prepared) => {
+        if (prepared.calls.length === 0) {
+          throw new Error('Lending action "deposit" returned no calls');
+        }
+        return prepared.calls;
+      });
+    this.queueAsyncCalls(p);
+    return this;
+  }
+
+  /**
+   * Add a lending withdraw operation.
+   */
+  lendWithdraw(request: LendingWithdrawRequest): this {
+    const p = this.wallet
+      .lending()
+      .prepareWithdraw(request)
+      .then((prepared) => {
+        if (prepared.calls.length === 0) {
+          throw new Error('Lending action "withdraw" returned no calls');
+        }
+        return prepared.calls;
+      });
+    this.queueAsyncCalls(p);
+    return this;
+  }
+
+  /**
+   * Add a lending borrow operation.
+   */
+  lendBorrow(request: LendingBorrowRequest): this {
+    const p = this.wallet
+      .lending()
+      .prepareBorrow(request)
+      .then((prepared) => {
+        if (prepared.calls.length === 0) {
+          throw new Error('Lending action "borrow" returned no calls');
+        }
+        return prepared.calls;
+      });
+    this.queueAsyncCalls(p);
+    return this;
+  }
+
+  /**
+   * Add a lending repay operation.
+   */
+  lendRepay(request: LendingRepayRequest): this {
+    const p = this.wallet
+      .lending()
+      .prepareRepay(request)
+      .then((prepared) => {
+        if (prepared.calls.length === 0) {
+          throw new Error('Lending action "repay" returned no calls');
+        }
+        return prepared.calls;
+      });
     this.queueAsyncCalls(p);
     return this;
   }
