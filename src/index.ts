@@ -36,6 +36,9 @@ export * from "@/confidential";
 // Lending
 export * from "@/lending";
 
+// Bridge
+export * from "@/bridge";
+
 // Types
 export * from "@/types";
 
