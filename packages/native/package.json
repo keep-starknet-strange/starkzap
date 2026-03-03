@@ -30,7 +30,8 @@
   },
   "scripts": {
     "build": "npm run build --prefix ../.. && tsc && tsc-alias",
-    "typecheck": "npm run build --prefix ../.. && tsc --noEmit"
+    "typecheck": "npm run build --prefix ../.. && tsc --noEmit",
+    "test": "npm run build --prefix ../.. && vitest run --config vitest.config.mjs"
   },
   "dependencies": {
     "starkzap": "file:../.."
