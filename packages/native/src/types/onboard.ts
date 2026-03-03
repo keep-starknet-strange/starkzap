@@ -1,7 +1,8 @@
 import type {
-  ConnectCartridgeBaseOptions,
+  FeeMode,
   OnboardOptions as CoreOnboardOptions,
 } from "starkzap";
+import type { PaymasterTimeBounds } from "starknet";
 
 type CoreCartridgeOnboardOptions = Extract<
   CoreOnboardOptions,
@@ -13,8 +14,11 @@ type CoreNonCartridgeOnboardOptions = Exclude<
   CoreCartridgeOnboardOptions
 >;
 
-export interface NativeOnboardCartridgeConfig {
+type CoreCartridgeConfig = NonNullable<CoreCartridgeOnboardOptions["cartridge"]>;
+
+export interface NativeOnboardCartridgeConfig extends CoreCartridgeConfig {
   redirectUrl?: string;
+  forceNewSession?: boolean;
 }
 
 export interface OnboardCartridgeOptions extends Omit<
@@ -29,5 +33,7 @@ export type OnboardOptions =
   | CoreNonCartridgeOnboardOptions
   | OnboardCartridgeOptions;
 
-export type ConnectCartridgeOptions = NativeOnboardCartridgeConfig &
-  ConnectCartridgeBaseOptions;
+export interface ConnectCartridgeOptions extends NativeOnboardCartridgeConfig {
+  feeMode?: FeeMode;
+  timeBounds?: PaymasterTimeBounds;
+}

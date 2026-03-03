@@ -15,6 +15,15 @@ description: "Use Cartridge Controller with network-safe session configuration"
 
 Starkzap integrates seamlessly with Cartridge Controller, making it perfect for gaming applications where you want seamless, gasless transactions.
 
+## Web vs Native Runtime
+
+Starkzap supports two Cartridge integration paths:
+
+- **Web** (`starkzap`): uses `@cartridge/controller` browser controller flow.
+- **React Native** (`@starkzap/native`): uses a **native adapter** backed by controller.c browser-based sessions.
+
+For React Native, Starkzap does **not** use `@cartridge/controller/session` (the web WASM session manager path). Native apps must register a Cartridge adapter once at app startup.
+
 ## StarkZap Integration Details
 
 When StarkZap initializes Cartridge through this SDK, it forwards your SDK network config directly to Controller:
@@ -57,12 +66,20 @@ Options:
 
 ## Setup
 
-### 1. Install Cartridge Controller
+### 1. Install Cartridge Controller (Web)
 
-The Cartridge Controller is included as a peer dependency of Starkzap:
+For browser apps using `starkzap`, install the web controller package:
 
 ```bash
 npm install @cartridge/controller
+```
+
+For React Native with `@starkzap/native`, use a native controller.c adapter and register it once:
+
+```typescript
+import { registerCartridgeNativeAdapter } from "@starkzap/native";
+
+registerCartridgeNativeAdapter(myControllerCAdapter);
 ```
 
 ### 2. Initialize SDK
@@ -99,6 +116,31 @@ const onboard = await sdk.onboard({
 
 const wallet = onboard.wallet;
 ```
+
+### React Native (controller.c adapter)
+
+In React Native, keep the same onboarding API. Register the adapter once, then call `onboard` normally:
+
+```typescript
+import { StarkZap, OnboardStrategy } from "@starkzap/native";
+
+const sdk = new StarkZap({ network: "sepolia" });
+
+const { wallet } = await sdk.onboard({
+  strategy: OnboardStrategy.Cartridge,
+  deploy: "never",
+  cartridge: {
+    policies: [{ target: "0xCONTRACT", method: "transfer" }],
+    // Optional native-only options:
+    // redirectUrl: "myapp://cartridge/callback",
+    // forceNewSession: true,
+  },
+});
+```
+
+<Warning>
+  Native Cartridge support in this release is sponsored-session first. `deploy()` and `feeMode: "user_pays"` are intentionally unsupported for the native Cartridge wallet path.
+</Warning>
 
 ### Using Policies
 

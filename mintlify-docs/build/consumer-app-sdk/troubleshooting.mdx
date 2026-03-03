@@ -100,10 +100,22 @@ app.post("/api/wallet/sign", async (req, res) => {
 **Problem:** Cartridge wallet connection doesn't work or popup doesn't appear.
 
 **Solution:**
-1. Ensure `@cartridge/controller` is installed
-2. Check that you're calling `connectCartridge` in a browser environment
-3. Verify network configuration matches Cartridge's supported networks
-4. Check browser console for Cartridge-specific errors
+1. Ensure you're using the correct runtime path:
+   - Web: `starkzap` + `@cartridge/controller`
+   - React Native: `@starkzap/native` + `registerCartridgeNativeAdapter(...)`
+2. Verify network configuration matches Cartridge's supported networks
+3. For React Native, verify your redirect URL and deep-link scheme configuration
+4. Check runtime logs for Cartridge-specific errors (browser console on web, device logs on RN)
+
+### Native Cartridge Adapter Not Registered
+
+**Problem:** Native Cartridge flow throws an error like:  
+`Cartridge native adapter is not registered...`
+
+**Solution:**
+1. Import and run `registerCartridgeNativeAdapter(adapter)` once at app startup
+2. Ensure it runs before calling `sdk.connectCartridge()` or `sdk.onboard({ strategy: "cartridge" })`
+3. If you hot-reload often, guard registration so it only happens once
 
 ### "Account is not compatible with SNIP-9"
 
