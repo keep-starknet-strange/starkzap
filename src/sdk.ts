@@ -28,17 +28,20 @@ interface ResolvedConfig extends Omit<SDKConfig, "rpcUrl" | "chainId"> {
   chainId: ChainId;
 }
 
-export interface ConnectCartridgeOptions extends OnboardCartridgeConfig {
+export interface ConnectCartridgeBaseOptions {
   feeMode?: FeeMode;
   timeBounds?: PaymasterTimeBounds;
 }
+
+export type ConnectCartridgeOptions = OnboardCartridgeConfig &
+  ConnectCartridgeBaseOptions;
 
 export interface CartridgeWalletInterface extends WalletInterface {
   getController(): unknown;
   username(): Promise<string | undefined>;
 }
 
-function isWebRuntimeForCartridge(): boolean {
+function isWebRuntime(): boolean {
   const hasDom =
     typeof window !== "undefined" &&
     typeof document !== "undefined" &&
@@ -396,19 +399,23 @@ export class StarkZap {
   async connectCartridge(
     options: ConnectCartridgeOptions = {}
   ): Promise<CartridgeWalletInterface> {
-    if (!isWebRuntimeForCartridge()) {
+    await this.ensureProviderChainMatchesConfig();
+    const explorer = options.explorer ?? this.config.explorer;
+
+    if (!isWebRuntime()) {
       throw new Error(
         "Cartridge is only supported in web environments. Use signer/privy strategies on native or server runtimes."
       );
     }
 
-    await this.ensureProviderChainMatchesConfig();
-
     const { CartridgeWallet } = await import("./wallet/cartridge");
-    const explorer = options.explorer ?? this.config.explorer;
     const wallet = await CartridgeWallet.create(
       {
-        ...options,
+        ...(options.policies && { policies: options.policies }),
+        ...(options.preset && { preset: options.preset }),
+        ...(options.url && { url: options.url }),
+        ...(options.feeMode && { feeMode: options.feeMode }),
+        ...(options.timeBounds && { timeBounds: options.timeBounds }),
         rpcUrl: this.config.rpcUrl,
         chainId: this.config.chainId,
         ...(explorer && { explorer }),
@@ -507,7 +514,7 @@ export class StarkZap {
    */
   payment(): Payment {
     if (!this.config.payment) {
-      if (isWebRuntimeForCartridge()) {
+      if (isWebRuntime()) {
         return new Payment({ apiKey: "" });
       }
       throw new Error(

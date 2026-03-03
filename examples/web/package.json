@@ -11,6 +11,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@cartridge/controller": "^0.13.9",
     "starkzap": "file:../.."
   },
   "devDependencies": {

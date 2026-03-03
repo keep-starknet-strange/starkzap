@@ -1,0 +1,54 @@
+{
+  "name": "@starkzap/native",
+  "version": "1.0.0",
+  "description": "React Native companion package for Starkzap",
+  "license": "MIT",
+  "author": "0xLucqs",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./polyfills": {
+      "types": "./dist/polyfills/index.d.ts",
+      "import": "./dist/polyfills/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "scripts/check-optional-peers.cjs"
+  ],
+  "sideEffects": [
+    "./dist/polyfills/install.js"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "postinstall": "node scripts/check-optional-peers.cjs",
+    "build": "npm run build --prefix ../.. && tsc && tsc-alias",
+    "typecheck": "npm run build --prefix ../.. && tsc --noEmit"
+  },
+  "dependencies": {
+    "starkzap": "^1.0.0"
+  },
+  "peerDependencies": {
+    "@ethersproject/shims": "^5.7.0",
+    "fast-text-encoding": "^1.0.6",
+    "react-native-get-random-values": "^1.11.0"
+  },
+  "peerDependenciesMeta": {
+    "@ethersproject/shims": {
+      "optional": true
+    },
+    "fast-text-encoding": {
+      "optional": true
+    },
+    "react-native-get-random-values": {
+      "optional": true
+    }
+  }
+}

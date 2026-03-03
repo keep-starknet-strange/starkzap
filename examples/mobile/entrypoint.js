@@ -1,7 +1,5 @@
-// Import required polyfills first
-import "fast-text-encoding";
-import "react-native-get-random-values";
-import "@ethersproject/shims";
+// Install Starkzap Native polyfills first
+import "@starkzap/native/polyfills";
 
 // Register the Expo app
 import "expo-router/entry";

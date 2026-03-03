@@ -1,5 +1,9 @@
 // Main SDK
 export { StarkZap } from "@/sdk";
+export type {
+  ConnectCartridgeBaseOptions,
+  CartridgeWalletInterface,
+} from "@/sdk";
 
 // Wallet
 export { Wallet, AccountProvider, BaseWallet } from "@/wallet";
