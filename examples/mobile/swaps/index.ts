@@ -4,7 +4,7 @@ import {
   type ChainId,
   type SwapProvider,
   type Token,
-} from "starkzap";
+} from "@starkzap/native";
 
 const SEPOLIA_OUTPUT_CANDIDATES = ["USDC.e", "USDC", "ETH"] as const;
 const MAINNET_OUTPUT_CANDIDATES = ["USDC", "USDT", "DAI", "ETH"] as const;

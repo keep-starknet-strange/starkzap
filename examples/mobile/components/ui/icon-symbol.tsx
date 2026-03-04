@@ -1,13 +1,20 @@
-// Fallback for using MaterialIcons on Android and web.
+// Fallback for using Material Icons on Android and web.
 
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
+import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
 import { SymbolWeight, SymbolViewProps } from "expo-symbols";
 import { ComponentProps } from "react";
 import { OpaqueColorValue, type StyleProp, type TextStyle } from "react-native";
 
+type MaterialIconName = ComponentProps<typeof MaterialIcons>["name"];
+type MaterialCommunityIconName = ComponentProps<
+  typeof MaterialCommunityIcons
+>["name"];
+
 type IconMapping = Record<
   SymbolViewProps["name"],
-  ComponentProps<typeof MaterialIcons>["name"]
+  | { family: "material"; name: MaterialIconName }
+  | { family: "material-community"; name: MaterialCommunityIconName }
 >;
 type IconSymbolName = keyof typeof MAPPING;
 
@@ -17,13 +24,20 @@ type IconSymbolName = keyof typeof MAPPING;
  * - see SF Symbols in the [SF Symbols](https://developer.apple.com/sf-symbols/) app.
  */
 const MAPPING = {
-  "house.fill": "home",
-  "paperplane.fill": "send",
-  "chevron.left.forwardslash.chevron.right": "code",
-  "chevron.right": "chevron-right",
-  "wallet.bifold.fill": "account-balance-wallet",
-  "chart.line.uptrend.xyaxis": "trending-up",
-  "arrow.left.arrow.right": "swap-horiz",
+  "house.fill": { family: "material", name: "home" },
+  "paperplane.fill": { family: "material", name: "send" },
+  "chevron.left.forwardslash.chevron.right": {
+    family: "material",
+    name: "code",
+  },
+  "chevron.right": { family: "material", name: "chevron-right" },
+  "wallet.bifold.fill": { family: "material", name: "account-balance-wallet" },
+  "chart.line.uptrend.xyaxis": { family: "material", name: "trending-up" },
+  "arrow.left.arrow.right": { family: "material", name: "swap-horiz" },
+  "point.3.connected.trianglepath.dotted": {
+    family: "material-community",
+    name: "bridge",
+  },
 } as IconMapping;
 
 /**
@@ -43,12 +57,20 @@ export function IconSymbol({
   style?: StyleProp<TextStyle>;
   weight?: SymbolWeight;
 }) {
+  const icon = MAPPING[name];
+
+  if (icon.family === "material-community") {
+    return (
+      <MaterialCommunityIcons
+        color={color}
+        size={size}
+        name={icon.name}
+        style={style}
+      />
+    );
+  }
+
   return (
-    <MaterialIcons
-      color={color}
-      size={size}
-      name={MAPPING[name]}
-      style={style}
-    />
+    <MaterialIcons color={color} size={size} name={icon.name} style={style} />
   );
 }
