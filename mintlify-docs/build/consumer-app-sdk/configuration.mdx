@@ -111,6 +111,35 @@ The `StarkZap` accepts configuration through a single options object. You can us
       **Ready to implement staking?** See the [Staking & Delegation Guide](/build/consumer-app-sdk/staking) for complete instructions on how users can stake tokens, claim rewards, and manage their positions.
     </Info>
   </Accordion>
+
+  <Accordion title="Payments">
+
+    Enable **cross-chain, multi-token payment acceptance** powered by [Chainrails](https://chainrails.io). This allows users to pay from any blockchain (Ethereum, Base, Arbitrum, etc.) and you receive funds on Starknet.
+
+    **What you can do:**
+    - 💳 **Accept payments from any chain** — Users can pay with ETH, USDC, USDT, and more from 11+ blockchains
+    - 🌉 **Automatic bridging** — Chainrails handles the entire cross-chain transfer
+    - 💰 **Receive on Starknet** — Get settled directly in your preferred token
+    - 🎨 **Beautiful payment modal** — Embedded UI for seamless user experience
+
+    First, get your API key from the [Chainrails Dashboard](https://dashboard.chainrails.io):
+
+    ```typescript
+    import { StarkZap } from "starkzap";
+
+    const sdk = new StarkZap({
+      network: "mainnet",
+      payment: {
+        apiKey: "cr_live_...",      // Your Chainrails API key
+        environment: "production",  // Optional: "staging" for testing
+      },
+    });
+    ```
+
+    <Info>
+      **Ready to implement payments?** See the [Cross-Chain Payments Guide](/build/consumer-app-sdk/payment) for complete instructions on sessions, quotes, intents, and the payment modal.
+    </Info>
+  </Accordion>
 </AccordionGroup>
 
 ## Complete Configuration Example
@@ -170,10 +199,16 @@ interface SDKConfig {
   // Optional features
   paymaster?: { nodeUrl: string; apiKey?: string };
   staking?: StakingConfig;
+  payment?: PaymentConfig;
 }
 
 interface StakingConfig {
   contract: Address; // optional override
+}
+
+interface PaymentConfig {
+  apiKey: string;
+  environment?: "production" | "staging";
 }
 ```
 
@@ -185,5 +220,6 @@ interface StakingConfig {
 
 - Set up [Paymasters](/build/consumer-app-sdk/paymasters) for gasless transactions
 - Enable [Staking & Delegation](/build/consumer-app-sdk/staking) so users can earn passive income
+- Add [Cross-Chain Payments](/build/consumer-app-sdk/payment) to accept payments from any blockchain
 - Learn about [Connecting Wallets](/build/consumer-app-sdk/connecting-wallets) with different signers
 - Configure [Account Presets](/build/consumer-app-sdk/connecting-wallets#account-presets) for your use case
