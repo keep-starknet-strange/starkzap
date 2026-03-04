@@ -20,7 +20,8 @@ import { vesuPresets, type VesuChainConfig } from "@/lending/vesu/presets";
 type VesuChain = "SN_MAIN" | "SN_SEPOLIA";
 
 interface VesuMarketApiItem {
-  pool?: { id?: string };
+  protocolVersion?: string;
+  pool?: { id?: string; isDeprecated?: boolean };
   address?: string;
   name?: string;
   symbol?: string;
@@ -115,6 +116,7 @@ export class VesuLendingProvider implements LendingProvider {
     }
 
     return (payload.data ?? [])
+      .filter((entry) => this.isSupportedMarket(entry))
       .map((entry) => this.toMarket(entry))
       .filter((market): market is LendingMarket => market != null);
   }
@@ -202,6 +204,9 @@ export class VesuLendingProvider implements LendingProvider {
     const debtDenomination = request.debtDenomination ?? "assets";
     const calls: Call[] = [];
 
+    assertAssetsDenomination("borrow", "collateral", collateralDenomination);
+    assertAssetsDenomination("borrow", "debt", debtDenomination);
+
     if (collateralAmount > 0n && collateralDenomination === "assets") {
       calls.push(
         this.buildApproveCall(
@@ -245,6 +250,9 @@ export class VesuLendingProvider implements LendingProvider {
     const debtAmount = request.amount.toBase();
     const user = request.user ?? context.walletAddress;
     const debtDenomination = request.debtDenomination ?? "assets";
+
+    assertAssetsDenomination("repay", "collateral", collateralDenomination);
+    assertAssetsDenomination("repay", "debt", debtDenomination);
 
     const calls: Call[] = [];
     if (debtAmount > 0n) {
@@ -322,8 +330,10 @@ export class VesuLendingProvider implements LendingProvider {
     return {
       collateralShares: parseU256(positionResult, 0, "collateral_shares"),
       nominalDebt: parseU256(positionResult, 2, "nominal_debt"),
-      collateralValue: parseU256(positionResult, 4, "collateral_value"),
-      debtValue: parseU256(positionResult, 6, "debt_value"),
+      collateralAmount: parseU256(positionResult, 4, "collateral_amount"),
+      debtAmount: parseU256(positionResult, 6, "debt_amount"),
+      collateralValue: health.collateralValue,
+      debtValue: health.debtValue,
       isCollateralized: health.isCollateralized,
     };
   }
@@ -417,7 +427,7 @@ export class VesuLendingProvider implements LendingProvider {
       calldata: CallData.compile([poolAddress, assetAddress]),
     });
     const candidate = result[0];
-    if (!candidate) {
+    if (candidate == null || BigInt(String(candidate)) === 0n) {
       throw new Error("Unable to resolve Vesu vToken for asset");
     }
     const resolved = fromAddress(candidate);
@@ -454,6 +464,14 @@ export class VesuLendingProvider implements LendingProvider {
     return config;
   }
 
+  private isSupportedMarket(entry: VesuMarketApiItem): boolean {
+    const protocolVersion = entry.protocolVersion?.toLowerCase();
+    if (protocolVersion && protocolVersion !== "v2") {
+      return false;
+    }
+    return entry.pool?.isDeprecated !== true;
+  }
+
   private toMarket(entry: VesuMarketApiItem): LendingMarket | null {
     if (
       !entry.pool?.id ||
@@ -482,6 +500,19 @@ export class VesuLendingProvider implements LendingProvider {
         : {}),
     };
   }
+}
+
+function assertAssetsDenomination(
+  action: "borrow" | "repay",
+  side: "collateral" | "debt",
+  denomination: LendingAmountDenomination
+): void {
+  if (denomination === "assets") {
+    return;
+  }
+  throw new Error(
+    `Vesu ${action} currently supports only "assets" denomination for ${side}; received "${denomination}"`
+  );
 }
 
 function encodeAmount(

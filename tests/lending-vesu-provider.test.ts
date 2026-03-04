@@ -117,6 +117,43 @@ describe("VesuLendingProvider", () => {
     expect(callContract).not.toHaveBeenCalled();
   });
 
+  it("rejects native denomination in borrow", async () => {
+    const callContract = vi.fn();
+    const provider = new VesuLendingProvider();
+    const context = createContext(callContract);
+
+    await expect(
+      provider.prepareBorrow(context, {
+        poolAddress: fromAddress("0x999"),
+        collateralToken,
+        debtToken,
+        collateralAmount: Amount.parse("1", collateralToken),
+        amount: Amount.parse("1", debtToken),
+        collateralDenomination: "native",
+      })
+    ).rejects.toThrow(
+      'Vesu borrow currently supports only "assets" denomination for collateral'
+    );
+  });
+
+  it("rejects native denomination in repay", async () => {
+    const callContract = vi.fn();
+    const provider = new VesuLendingProvider();
+    const context = createContext(callContract);
+
+    await expect(
+      provider.prepareRepay(context, {
+        poolAddress: fromAddress("0x999"),
+        collateralToken,
+        debtToken,
+        amount: Amount.parse("1", debtToken),
+        debtDenomination: "native",
+      })
+    ).rejects.toThrow(
+      'Vesu repay currently supports only "assets" denomination for debt'
+    );
+  });
+
   it("builds repay-only-collateral-withdraw without approve when debt amount is zero", async () => {
     const callContract = vi.fn();
     const provider = new VesuLendingProvider();
@@ -141,8 +178,8 @@ describe("VesuLendingProvider", () => {
     const positionResult = [
       ...toU256Words(900n),
       ...toU256Words(90n),
-      ...toU256Words(9000n),
-      ...toU256Words(3000n),
+      ...toU256Words(9100n),
+      ...toU256Words(3100n),
     ];
     const healthResult = ["1", ...toU256Words(9000n), ...toU256Words(3000n)];
     const callContract = vi
@@ -159,6 +196,8 @@ describe("VesuLendingProvider", () => {
 
     expect(position.collateralShares).toBe(900n);
     expect(position.nominalDebt).toBe(90n);
+    expect(position.collateralAmount).toBe(9100n);
+    expect(position.debtAmount).toBe(3100n);
     expect(position.collateralValue).toBe(9000n);
     expect(position.debtValue).toBe(3000n);
     expect(position.isCollateralized).toBe(true);
@@ -187,6 +226,27 @@ describe("VesuLendingProvider", () => {
       json: async () => ({
         data: [
           {
+            protocolVersion: "v1",
+            pool: { id: "0x998", isDeprecated: true },
+            address: debtToken.address,
+            name: "USD Coin",
+            symbol: "USDC",
+            decimals: 6,
+            vToken: { address: "0x1111", symbol: "vUSDC-old" },
+            stats: { canBeBorrowed: true },
+          },
+          {
+            protocolVersion: "v2",
+            pool: { id: "0x997", isDeprecated: true },
+            address: debtToken.address,
+            name: "USD Coin",
+            symbol: "USDC",
+            decimals: 6,
+            vToken: { address: "0x2222", symbol: "vUSDC-deprecated" },
+            stats: { canBeBorrowed: true },
+          },
+          {
+            protocolVersion: "v2",
             pool: { id: "0x999" },
             address: debtToken.address,
             name: "USD Coin",
@@ -212,5 +272,18 @@ describe("VesuLendingProvider", () => {
       canBeBorrowed: true,
     });
     expect(fetcher).toHaveBeenCalledWith("https://api.vesu.xyz/markets");
+  });
+
+  it("throws when vToken lookup returns zero address", async () => {
+    const callContract = vi.fn().mockResolvedValue(["0x0"]);
+    const provider = new VesuLendingProvider();
+    const context = createContext(callContract);
+
+    await expect(
+      provider.prepareDeposit(context, {
+        token: debtToken,
+        amount: Amount.parse("1", debtToken),
+      })
+    ).rejects.toThrow("Unable to resolve Vesu vToken for asset");
   });
 });

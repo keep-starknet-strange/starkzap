@@ -25,7 +25,13 @@ export interface LendingMarket {
 export interface LendingPosition {
   collateralShares: bigint;
   nominalDebt: bigint;
+  /** Collateral amount in collateral asset base units. */
+  collateralAmount?: bigint;
+  /** Debt amount in debt asset base units. */
+  debtAmount?: bigint;
+  /** Collateral USD value from protocol collateralization check [SCALE]. */
   collateralValue: bigint;
+  /** Debt USD value from protocol collateralization check [SCALE]. */
   debtValue: bigint;
   isCollateralized: boolean;
 }
