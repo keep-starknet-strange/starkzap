@@ -1,20 +1,21 @@
 ---
-title: Cross-Chain Payments
-description: "Accept cross-chain, multi-token payments powered by Chainrails — enable users to pay from any chain and receive funds on Starknet"
-icon: arrow-left-right
+title: Cross-Chain/Fiat Payments
+description: "Enable users to pay from any chain, token or fiat currency and receive funds on Starknet"
+icon: credit-card
 ---
 
 ## Overview
 
-Starkzap's Payment module enables **cross-chain, multi-token payment acceptance** for your applications. Powered by [Chainrails](https://chainrails.io), it handles the complexity of bridging tokens across different blockchains so you can focus on building your product.
+Starkzap's Payment module enables cross-chain, multi-token, and fiat payment acceptance for your applications. Powered by [Chainrails](https://chainrails.io), it handles the complexity of bridging tokens across different blockchains so you can focus on building your product.
 
-**What users can do:**
+**What you get with Chainrails:**
 - 💳 **Pay from any chain** — Ethereum, Base, Arbitrum, Avalanche, BSC, and more
 - 🪙 **Use any token** — USDC, USDT, ETH, STRK, and other popular tokens
-- 🌉 **Automatic bridging** — Chainrails finds the best route and handles the cross-chain transfer
+- 💵 **Pay with fiat** — Credit cards, Apple Pay, direct bank transfer, and more
+- 🌉 **Automatic bridging** — Chainrails finds the best route across multiple liquidity sources and handles the cross-chain transfer through that path
 - 💰 **Receive on Starknet** — Get settled directly in your preferred token on Starknet
 
-**Real-world analogy:** Think of it like a global payment gateway. Just as Stripe lets users pay with any card and you receive money in your bank, Chainrails lets users pay from any blockchain and you receive tokens on Starknet — all automatically.
+**Real-world analogy:** Think of it like a global payment gateway. Just as Stripe lets users pay with any card and you receive money in your bank, Chainrails lets users pay from any blockchain or fiat source and you receive tokens on Starknet — all automatically.
 
 <Info>
   The Payment module is **optional** and only activates when you provide payment configuration. Your app works fine without it.
@@ -106,9 +107,9 @@ import { PaymentBridges } from "starkzap";
 
 PaymentBridges.ACROSS   // Across Protocol
 PaymentBridges.CCTP     // Circle's CCTP
-PaymentBridges.GATEWAY  // Gateway.fm
+PaymentBridges.GATEWAY  // Circle Gateway
 PaymentBridges.RHINOFI  // RhinoFi
-PaymentBridges.STARKGATE // Starkgate
+// and more..
 ```
 
 ### Payment Intents
@@ -119,15 +120,12 @@ A **Payment Intent** represents a concrete payment flow:
 2. **FUNDED** — Deposit detected on source chain
 3. **INITIATED** — Cross-chain bridge transfer started
 4. **COMPLETED** — Funds settled on destination chain
-5. **EXPIRED** — TTL exceeded without funding
+5. **EXPIRED** — Expiration timestamp reached without payment
+6. **REFUNDED** — Payment refunded back to sender
 
 ### Sessions
 
-A **Session** binds a recipient + token + amount together. This simplifies the payment flow — payers only need to choose their source chain and token.
-
-## Payment Sessions
-
-Create a payment session to simplify the payer experience. Instead of specifying all payment details, payers just scan a QR code or open a link.
+**Sessions** generates unique tokens that can be used to trigger the payment modal without needing to specify all payment details upfront.
 
 ### Creating a Session
 
@@ -138,20 +136,17 @@ const session = await payment.createSession({
   destinationChain: "STARKNET",
   amount: "100.00",
 });
-
-console.log(session.sessionToken);   // "tok_..."
-console.log(session.amount);         // "100.00"
 ```
 
 **Parameters:**
 - `recipient` (required) — Wallet address to receive funds on destination chain
 - `token` (required) — Token symbol (e.g., "USDC", "ETH")
 - `destinationChain` (required) — Chain to receive funds on
-- `amount` (required) — Payment amount (string)
+- `amount` (required) — Payment amount (string). Set to 0 for user-defined amount.
 
 ### Payment Modal
 
-The **Payment Modal** provides a beautiful, embedded UI for completing cross-chain payments. Users can select their preferred source chain and token.
+The **Payment Modal** provides a beautiful, embedded UI for completing cross-chain payments. It handles the entire flow — from selecting source chain and token, to bridging, to settlement, and can be integrated in minutes.
 
 ```typescript
 // Create a modal handle
@@ -178,10 +173,6 @@ if (success) {
 4. User completes the cross-chain transfer
 5. Modal closes and returns `true` on success, `false` on cancel
 
-<Info>
-  The payment modal handles the entire cross-chain swap flow — users pay in their preferred token on any supported chain, and you receive the settlement token on your target chain.
-</Info>
-
 ## Quotes
 
 Quotes tell you how much a cross-chain payment will cost in terms of fees and final amount.
@@ -207,7 +198,7 @@ console.log(quotes[0].paymentOptions);   // [{ token: "USDC", fee: "..." }]
 
 ### Get Best Quote
 
-Get the single **best quote** across all bridges:
+Get the single **best quote** for a specific route across all bridges:
 
 ```typescript
 const bestQuote = await payment.getBestQuote({
@@ -301,17 +292,13 @@ const intents = await payment.getIntentsForSender("0xsender...");
 const result = await payment.listIntents({
   page: 1,
   limit: 10,
-  status: "PENDING",  // Optional: filter by status
+  status: "COMPLETED",  // Optional: filter by status
 });
-
-console.log(result.data);   // Array of intents
-console.log(result.total);  // Total count
-console.log(result.page);   // Current page
 ```
 
 ### Triggering Processing
 
-Once an intent is funded, trigger processing to settle it:
+Once an intent is funded, Chainrails indexers automatically picks it up for processing. In rare cases where the intent is missed, you can trigger processing manually:
 
 ```typescript
 const result = await payment.triggerProcessing(
@@ -322,6 +309,8 @@ console.log(result.txHash);  // Bridge transaction hash
 ```
 
 ### Intent Status Lifecycle
+
+Track an Intent Lifecycle:
 
 ```typescript
 // Update intent status
@@ -342,7 +331,7 @@ if (intent.intent_status === "PENDING") {
 
 ## Router
 
-Find optimal routes and supported bridges for cross-chain transfers.
+Obtain extensive details about supported bridges, their available routes, and the optimal route for a given transfer intent.
 
 ### Get Optimal Route
 
@@ -355,10 +344,6 @@ const route = await payment.getOptimalRoute({
   amount: "1000",
   recipient: "0xrecipient...",
 });
-
-console.log(route.bridges);      // Available bridges
-console.log(route.fees);         // Fee breakdown
-console.log(route.estimatedTime); // Transfer time
 ```
 
 ### Get Supported Bridges
@@ -369,7 +354,7 @@ const bridges = await payment.getSupportedBridges({
   destinationChain: "STARKNET",
 });
 
-console.log(bridges);  // ["ACROSS", "STARKGATE", ...]
+console.log(bridges);  // ["ACROSS", "RHINOFI", ...]
 ```
 
 ### Get All Supported Bridges
@@ -386,9 +371,9 @@ const routes = await payment.getSupportedRoutes("ACROSS");
 console.log(routes);  // All routes supported by Across
 ```
 
-## Chains & Balances
+## Chains
 
-Query supported chains and token balances.
+Query supported chains:
 
 ### Get Supported Chains
 
@@ -405,18 +390,6 @@ const mainnetChains = await payment.getSupportedChains({
 const testnetChains = await payment.getSupportedChains({
   network: "testnet",
 });
-```
-
-### Get Token Balance
-
-```typescript
-const balance = await payment.getBalance({
-  address: "0x123...",
-  chain: "ETHEREUM",
-  token: "USDC",
-});
-
-console.log(balance);  // "10000000" (raw, accounting for decimals)
 ```
 
 ## Client Information
@@ -511,55 +484,8 @@ async function handleCheckout() {
 }
 ```
 
-## Error Handling
-
-The Payment module throws errors when things go wrong:
-
-```typescript
-try {
-  const session = await payment.createSession({
-    recipient: "0xinvalid",
-    token: "INVALID",
-    destinationChain: "INVALID",
-    amount: "100",
-  });
-} catch (error) {
-  if (error.message.includes("API key")) {
-    console.log("Check your Chainrails API key");
-  } else if (error.message.includes("network")) {
-    console.log("Network error, try again");
-  } else {
-    console.log("Unknown error:", error.message);
-  }
-}
-```
-
-## TypeScript Support
-
-Full TypeScript support with comprehensive types:
-
-```typescript
-import type {
-  PaymentConfig,
-  PaymentSessionOutput,
-  PaymentIntent,
-  PaymentQuote,
-  PaymentChain,
-  PaymentTokenSymbol,
-  PaymentBridge,
-  PaymentIntentStatus,
-} from "starkzap";
-
-// All types are exported for advanced use cases
-const config: PaymentConfig = {
-  apiKey: "cr_live_...",
-  environment: "production",
-};
-```
-
 ## Related Resources
 
 - [Chainrails Dashboard](https://dashboard.chainrails.io) — Manage your API keys and view payments
-- [Chainrails Documentation](https://docs.chainrails.io) — Full API reference
-- [Payment Examples](/build/consumer-app-sdk/examples) — Example applications
-- [Configuration Guide](/build/consumer-app-sdk/configuration) — SDK configuration options
+- [Configuration Guide](/build/consumer-app-sdk/configuration#payments) — SDK configuration options
+- [Chainrails Documentation](https://docs.chainrails.io) — Full API reference and integration guides

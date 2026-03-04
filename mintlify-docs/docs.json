@@ -58,7 +58,8 @@
           "build/consumer-app-sdk/erc20",
           "build/consumer-app-sdk/staking",
           "build/consumer-app-sdk/transactions",
-          "build/consumer-app-sdk/tx-builder"
+          "build/consumer-app-sdk/tx-builder",
+          "build/consumer-app-sdk/payment"
         ]
       },
       {
@@ -66,7 +67,8 @@
         "pages": [
           "build/consumer-app-sdk/integrations/avnu-paymaster",
           "build/consumer-app-sdk/integrations/privy",
-          "build/consumer-app-sdk/integrations/cartridge-controller"
+          "build/consumer-app-sdk/integrations/cartridge-controller",
+          "build/consumer-app-sdk/integrations/chainrails"
         ]
       },
       {

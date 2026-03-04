@@ -1,0 +1,176 @@
+---
+title: Chainrails
+description: "Accept payments/deposits from any chain, in any token or currency — instantly."
+---
+
+## Overview
+[Chainrails](https://chainrails.io) is a cross-chain payment infrastructure that enables you to accept payments and deposits from any blockchain or fiat currency, with seamless settlement on Starknet. 
+
+Starkzap integrates seamlessly with Chainrails to provide a powerful payment solution for your Starknet applications. By enabling the Chainrails integration, you can:
+- Accept payments from 11+ blockchains (Ethereum, Base, Arbitrum, etc.)
+- Accept multiple tokens (ETH, BNB, STRK, USDC, USDT, and more) while settling in your preferred token on Starknet.
+- Allow users to pay with fiat currencies (USD, EUR, INR, NGN etc.)
+
+## Configuration
+To get started, simply add your Chainrails API key to the `payment` section of the SDK configuration:
+
+```typescript
+import { StarkZap } from "starkzap";
+const sdk = new StarkZap({
+  network: "mainnet",
+  payment: {
+    apiKey: "cr_live_...",  // Your Chainrails API key, never hardcode in production
+  },
+});
+```
+
+<Info>
+**Don't have a Chainrails account?** Sign up for free at the [Chainrails Dashboard](https://dashboard.chainrails.io) to get your API key, configure webhooks etc.
+</Info>
+
+## How It Works
+Every Chainrails transaction follows three simple steps from setup to completion:
+
+### Request a Quote
+Define the parameters for the transaction (the intent) — amount, source chain, source token, destination chain, recipient, and refund address. This tells Chainrails what the user wants to send and where it’s going.
+
+### Generate an Intent Address
+Once the quote is confirmed, Chainrails creates a unique intent address for that transaction. Think of this as a one-time deposit address that tracks and processes the transfer logic automatically.
+​
+### Fund the Intent
+The user then funds this intent address directly from their wallet. Once funded, Chainrails takes care of the rest — executing the cross-chain transfer, routing liquidity, and confirming settlement.
+
+The SDK abstracts most of these steps, so you can integrate this entire flow in just a few lines of code. Here's a quick end-to-end example:
+
+```typescript
+import { StarkZap, PaymentChains, PaymentTokenSymbols } from "starkzap";
+
+// Initialize SDK
+const sdk = new StarkZap({
+  network: "mainnet",
+  payment: {
+    apiKey: process.env.CHAINRAILS_API_KEY!,
+  },
+});
+
+const payment = sdk.payment();
+
+// 1. Create a payment session for a specific amount
+async function createPaymentSession(recipient: string, amount: string) {
+  const session = await payment.createSession({
+    recipient,
+    token: PaymentTokenSymbols.USDC,
+    destinationChain: PaymentChains.STARKNET,
+    amount,
+  });
+  
+  return session;
+}
+
+// 2. Create a payment modal
+async function openPaymentModal(sessionToken: string, amount: string) {
+  const modal = payment.modal({
+    sessionToken,
+    amount,
+    platform: "web",
+  });
+  
+  const success = await modal.pay();
+  return success;
+}
+
+// 3. Check payment status
+async function checkPaymentStatus(intentId: string) {
+  const intent = await payment.getIntent(intentId);
+  return intent.intent_status;
+}
+
+// Usage in your checkout
+async function handleCheckout() {
+  const recipient = "0xYourWallet...";
+  const amount = "25.00";
+  
+  // Create session
+  const session = await createPaymentSession(recipient, amount);
+  
+  // Open modal
+  const success = await openPaymentModal(session.sessionToken, amount);
+  
+  if (success) {
+    console.log("Payment successful!");
+    // Check status after a short delay
+    setTimeout(async () => {
+      const status = await checkPaymentStatus(session.sessionToken);
+      console.log("Intent status:", status);
+    }, 5000);
+  } else {
+    console.log("Payment cancelled");
+  }
+}
+```
+
+To dive deeper into the technical details, see the [Cross-Chain Payments Guide](/build/consumer-app-sdk/payment) for complete instructions on sessions, quotes, intents, and the payment modal.
+
+## Chainrails Paymaster
+The Chainrails Paymaster enables you to sponsor protocol fees (bridging and swap fees) associated with a Chainrails transaction on behalf of your users, creating a seamless and frictionless payment experience for your application.
+
+Here’s how to enable and use the Paymaster in your application:
+
+### Step 1: Access the Dashboard
+
+Navigate to the [Chainrails Dashboard](https://dashboard.chainrails.io) and go to the **Billing** section.
+
+### Step 2: Choose Your Billing Plan
+
+Chainrails offers three billing options to suit different use cases:
+
+<Tabs>
+<Tab title="Free Plan">
+**Best for:** Use cases that's fine with users paying their own fees
+
+- Users pay their own protocol fees
+- No additional costs to you
+- Easy to get started
+
+</Tab>
+<Tab title="Pay As You Go (PAYG)">
+**Best for:** Growing applications with variable transaction volumes
+
+- You pay protocol fees as transactions occur
+- Only pay for what you use
+- Requires manual balance management
+- Real-time usage tracking in the Dashboard
+
+<Warning>
+Keep your paymaster balance funded to prevent transaction failures.
+</Warning>
+
+</Tab>
+<Tab title="Monthly Subscription">
+**Best for:** High-volume applications with predictable usage
+
+- Fixed monthly fee with included transaction quota
+- No manual paymaster management required
+- Automatic overage handling
+- Never worry about insufficient balance
+- Best value for consistent usage
+
+<Info>
+Transactions beyond your monthly quota incur additional fees. View pricing details in the Dashboard.
+</Info>
+
+</Tab>
+</Tabs>
+
+### Step 3: Enable the Paymaster
+
+Once you select either **PAYG** or **Monthly Subscription**, the Paymaster is automatically enabled for your account and all transactions using your API key will have protocol fees covered.
+
+<Info>
+**Note:** The Chainrails Paymaster only covers protocol fees (bridging and swap fees). Users are still responsible for any on-chain gas fees with regards to the "Pay with wallet" flow. For a fully gasless experience, consider implementing the AVNU paymaster or a similar solution for EVM networks.
+</Info>
+
+## Related Resources
+- [Chainrails Dashboard](https://dashboard.chainrails.io) — Manage your API keys, billing, and analytics
+- [Chainrails Documentation](https://docs.chainrails.io) — Full API reference and integration guides
+- [More examples](https://github.com/horuslabsio/chainrails-demo) — Example applications using Chainrails and the Payment module
