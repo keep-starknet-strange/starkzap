@@ -96,6 +96,45 @@ describe("VesuLendingProvider", () => {
     expect(callContract).not.toHaveBeenCalled();
   });
 
+  it("builds borrow with collateral + debt deltas", async () => {
+    const callContract = vi.fn();
+    const provider = new VesuLendingProvider();
+    const context = createContext(callContract);
+
+    const prepared = await provider.prepareBorrow(context, {
+      poolAddress: fromAddress("0x999"),
+      collateralToken,
+      debtToken,
+      collateralAmount: Amount.parse("600", collateralToken),
+      amount: Amount.parse("11", debtToken),
+    });
+
+    expect(prepared.calls).toHaveLength(1);
+    expect(prepared.calls[0]!.entrypoint).toBe("modify_position");
+    expect(prepared.calls[0]!.contractAddress).toBe(fromAddress("0x999"));
+    expect(callContract).not.toHaveBeenCalled();
+  });
+
+  it("builds repay-only-collateral-withdraw without approve when debt amount is zero", async () => {
+    const callContract = vi.fn();
+    const provider = new VesuLendingProvider();
+    const context = createContext(callContract);
+
+    const prepared = await provider.prepareRepay(context, {
+      poolAddress: fromAddress("0x999"),
+      collateralToken,
+      debtToken,
+      amount: Amount.parse("0", debtToken),
+      collateralAmount: Amount.parse("1", collateralToken),
+      withdrawCollateral: true,
+    });
+
+    expect(prepared.calls).toHaveLength(1);
+    expect(prepared.calls[0]!.entrypoint).toBe("modify_position");
+    expect(prepared.calls[0]!.contractAddress).toBe(fromAddress("0x999"));
+    expect(callContract).not.toHaveBeenCalled();
+  });
+
   it("parses position + health responses", async () => {
     const positionResult = [
       ...toU256Words(900n),

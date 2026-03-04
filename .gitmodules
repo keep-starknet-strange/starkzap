@@ -1,0 +1,3 @@
+[submodule "external/vesu-v2"]
+	path = external/vesu-v2
+	url = https://github.com/vesuxyz/vesu-v2.git

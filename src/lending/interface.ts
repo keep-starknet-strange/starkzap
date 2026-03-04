@@ -77,6 +77,8 @@ export interface LendingBorrowRequest extends LendingRequestBase {
   debtToken: Token;
   amount: Amount;
   user?: Address;
+  collateralAmount?: Amount;
+  collateralDenomination?: LendingAmountDenomination;
   debtDenomination?: LendingAmountDenomination;
 }
 
@@ -85,6 +87,9 @@ export interface LendingRepayRequest extends LendingRequestBase {
   debtToken: Token;
   amount: Amount;
   user?: Address;
+  collateralAmount?: Amount;
+  collateralDenomination?: LendingAmountDenomination;
+  withdrawCollateral?: boolean;
   debtDenomination?: LendingAmountDenomination;
 }
 

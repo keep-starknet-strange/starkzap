@@ -72,6 +72,7 @@ export function hydrateBorrowRequest(
   return {
     ...stripProvider(request),
     user: request.user ?? walletAddress,
+    collateralDenomination: request.collateralDenomination ?? "assets",
     debtDenomination: request.debtDenomination ?? "assets",
   };
 }
@@ -83,6 +84,8 @@ export function hydrateRepayRequest(
   return {
     ...stripProvider(request),
     user: request.user ?? walletAddress,
+    collateralDenomination: request.collateralDenomination ?? "assets",
+    withdrawCollateral: request.withdrawCollateral ?? false,
     debtDenomination: request.debtDenomination ?? "assets",
   };
 }

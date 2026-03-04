@@ -195,6 +195,8 @@ export class VesuLendingProvider implements LendingProvider {
   ): Promise<PreparedLendingAction> {
     const config = this.requireChainConfig(context.chainId);
     const poolAddress = this.resolvePoolAddress(request.poolAddress, config);
+    const collateralAmount = request.collateralAmount?.toBase() ?? 0n;
+    const collateralDenomination = request.collateralDenomination ?? "assets";
     const debtAmount = request.amount.toBase();
     const user = request.user ?? context.walletAddress;
     const debtDenomination = request.debtDenomination ?? "assets";
@@ -208,7 +210,10 @@ export class VesuLendingProvider implements LendingProvider {
           collateralAsset: request.collateralToken.address,
           debtAsset: request.debtToken.address,
           user,
-          collateral: { denomination: "assets", value: 0n },
+          collateral: {
+            denomination: collateralDenomination,
+            value: collateralAmount,
+          },
           debt: { denomination: debtDenomination, value: debtAmount },
         }),
       ],
@@ -221,28 +226,45 @@ export class VesuLendingProvider implements LendingProvider {
   ): Promise<PreparedLendingAction> {
     const config = this.requireChainConfig(context.chainId);
     const poolAddress = this.resolvePoolAddress(request.poolAddress, config);
+    const collateralAmount = request.collateralAmount?.toBase() ?? 0n;
+    const collateralDenomination = request.collateralDenomination ?? "assets";
+    const withdrawCollateral = request.withdrawCollateral ?? false;
     const debtAmount = request.amount.toBase();
     const user = request.user ?? context.walletAddress;
     const debtDenomination = request.debtDenomination ?? "assets";
 
-    return {
-      providerId: this.id,
-      action: "repay",
-      calls: [
+    const calls: Call[] = [];
+    if (debtAmount > 0n) {
+      calls.push(
         this.buildApproveCall(
           request.debtToken.address,
           poolAddress,
           debtAmount
-        ),
-        this.buildModifyPositionCall({
-          poolAddress,
-          collateralAsset: request.collateralToken.address,
-          debtAsset: request.debtToken.address,
-          user,
-          collateral: { denomination: "assets", value: 0n },
-          debt: { denomination: debtDenomination, value: -debtAmount },
-        }),
-      ],
+        )
+      );
+    }
+
+    const collateralDelta = withdrawCollateral
+      ? -collateralAmount
+      : collateralAmount;
+    calls.push(
+      this.buildModifyPositionCall({
+        poolAddress,
+        collateralAsset: request.collateralToken.address,
+        debtAsset: request.debtToken.address,
+        user,
+        collateral: {
+          denomination: collateralDenomination,
+          value: collateralDelta,
+        },
+        debt: { denomination: debtDenomination, value: -debtAmount },
+      })
+    );
+
+    return {
+      providerId: this.id,
+      action: "repay",
+      calls,
     };
   }
 
