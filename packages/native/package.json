@@ -10,11 +10,15 @@
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
-      "import": "./dist/index.js"
+      "react-native": "./dist/index.js",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
     },
     "./polyfills": {
       "types": "./dist/polyfills/index.d.ts",
-      "import": "./dist/polyfills/index.js"
+      "react-native": "./dist/polyfills/index.js",
+      "import": "./dist/polyfills/index.js",
+      "default": "./dist/polyfills/index.js"
     }
   },
   "files": [

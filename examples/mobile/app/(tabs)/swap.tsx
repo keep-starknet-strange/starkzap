@@ -36,7 +36,12 @@ import {
   getSwapProviderLabel,
   swapProviders,
 } from "@/swaps";
-import { Amount, type ChainId, type SwapProvider, type Token } from "starkzap";
+import {
+  Amount,
+  type ChainId,
+  type SwapProvider,
+  type Token,
+} from "@starkzap/native";
 
 const WBTC_LOGO_FALLBACK =
   "https://altcoinsbox.com/wp-content/uploads/2023/01/wbtc-wrapped-bitcoin-logo.png";

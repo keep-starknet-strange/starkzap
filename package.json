@@ -3,8 +3,7 @@
   "version": "1.0.0",
   "description": "Helper sdk for easy wallet integration",
   "workspaces": [
-    "packages/*",
-    "examples/*"
+    "packages/*"
   ],
   "homepage": "https://github.com/keep-starknet-strange/x#readme",
   "bugs": {

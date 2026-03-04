@@ -4,34 +4,35 @@ const path = require("path");
 const workspaceRoot = path.resolve(__dirname, "../..");
 const config = getDefaultConfig(__dirname);
 
-// Monorepo resolution (workspace packages + hoisted deps)
+// Monorepo resolution: watch workspace root for symlinked local packages,
+// resolve from both local and root node_modules.
 config.watchFolders = [workspaceRoot];
 config.resolver.nodeModulesPaths = [
   path.resolve(__dirname, "node_modules"),
   path.resolve(workspaceRoot, "node_modules"),
 ];
 
-const defaultResolveRequest = config.resolver.resolveRequest;
-
-// Keep known package-exports compatibility overrides only.
 config.resolver.resolveRequest = (context, moduleName, platform) => {
   if (moduleName === "isows" || moduleName.startsWith("zustand")) {
-    const nextContext = { ...context, unstable_enablePackageExports: false };
-    const resolver = defaultResolveRequest ?? nextContext.resolveRequest;
-    return resolver(nextContext, moduleName, platform);
+    return context.resolveRequest(
+      { ...context, unstable_enablePackageExports: false },
+      moduleName,
+      platform
+    );
   }
 
   if (moduleName.startsWith("@privy-io/")) {
-    const nextContext = { ...context, unstable_enablePackageExports: true };
-    const resolver = defaultResolveRequest ?? nextContext.resolveRequest;
-    return resolver(nextContext, moduleName, platform);
+    return context.resolveRequest(
+      { ...context, unstable_enablePackageExports: true },
+      moduleName,
+      platform
+    );
   }
 
-  const resolver = defaultResolveRequest ?? context.resolveRequest;
-  return resolver(context, moduleName, platform);
+  return context.resolveRequest(context, moduleName, platform);
 };
 
-// Privy requires browser conditions and package exports handling
-config.resolver.unstable_conditionNames = ["browser", "require", "import"];
+// Privy transitive deps (jose) need "browser" to get browser-safe builds.
+config.resolver.unstable_conditionNames = ["browser"];
 
 module.exports = config;
