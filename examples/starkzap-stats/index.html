@@ -1,0 +1,779 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Starkzap Stats</title>
+    <link rel="icon" type="image/png" href="https://starkzap.io/logo.png" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500&family=Space+Grotesk:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <script
+      defer
+      src="https://cdn.jsdelivr.net/npm/chart.js@4.5.1/dist/chart.umd.min.js"
+    ></script>
+    <style>
+      :root {
+        --bg-dark: #050508;
+        --bg-gradient-end: #0a0a0f;
+        --accent: #f97316;
+        --accent-glow: rgba(249, 115, 22, 0.4);
+        --accent-soft: rgba(249, 115, 22, 0.15);
+        --text-primary: #f0f0f5;
+        --text-secondary: #a1a1aa;
+        --card-text: #84573d;
+        --radius: 16px;
+        --radius-sm: 10px;
+      }
+
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+
+      body {
+        font-family: "Space Grotesk", system-ui, sans-serif;
+        background: var(--bg-dark);
+        background-image:
+          radial-gradient(
+            ellipse 80% 50% at 50% -20%,
+            var(--accent-soft),
+            transparent
+          ),
+          linear-gradient(
+            180deg,
+            var(--bg-dark) 0%,
+            var(--bg-gradient-end) 100%
+          );
+        color: var(--text-primary);
+        min-height: 100vh;
+        line-height: 1.6;
+        position: relative;
+      }
+
+      .bg-logos {
+        position: fixed;
+        inset: 0;
+        pointer-events: none;
+        z-index: 0;
+        overflow: hidden;
+      }
+
+      .bg-logo {
+        position: absolute;
+        filter: blur(8px);
+        opacity: 0.3;
+        object-fit: contain;
+      }
+
+      .bg-logo-tl {
+        top: -5%;
+        left: -5%;
+        width: 280px;
+        height: 280px;
+        transform: rotate(-15deg);
+      }
+
+      .bg-logo-tr {
+        top: -8%;
+        right: -6%;
+        width: 220px;
+        height: 220px;
+        transform: rotate(11deg);
+      }
+
+      .bg-logo-bl {
+        bottom: -10%;
+        left: -4%;
+        width: 240px;
+        height: 240px;
+        transform: rotate(8deg);
+      }
+
+      .bg-logo-br {
+        bottom: -6%;
+        right: -8%;
+        width: 320px;
+        height: 320px;
+        transform: rotate(-10deg);
+      }
+
+      .page {
+        position: relative;
+        z-index: 1;
+        width: min(1120px, 94vw);
+        margin: 0 auto;
+        padding: 3rem 0 4rem;
+      }
+
+      .hero {
+        text-align: center;
+        margin-bottom: 1.15rem;
+      }
+
+      .hero-title {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.65rem;
+        flex-wrap: wrap;
+        font-size: clamp(1.35rem, 3.2vw, 2rem);
+        font-weight: 400;
+        letter-spacing: -0.02em;
+        line-height: 1.35;
+      }
+
+      .hero-logo-and-name {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+      }
+
+      .hero-logo {
+        display: block;
+        width: 68px;
+        height: 68px;
+        flex-shrink: 0;
+        mix-blend-mode: lighten;
+      }
+
+      .hero-accent {
+        font-size: 1.25em;
+        font-weight: 700;
+        color: var(--accent);
+        text-shadow: 0 0 24px var(--accent-glow);
+      }
+
+      .hero-subtitle {
+        width: 100%;
+        text-align: center;
+        font-family: "Inter", system-ui, sans-serif;
+        color: var(--text-secondary);
+      }
+
+      .meta {
+        display: flex;
+        justify-content: center;
+        flex-wrap: wrap;
+        gap: 0.55rem;
+        margin-top: 0.95rem;
+      }
+
+      .chip {
+        font-family: "Inter", system-ui, sans-serif;
+        font-size: 0.85rem;
+        color: var(--text-secondary);
+        border-radius: 999px;
+        padding: 0.28rem 0.66rem;
+        background: #ffffff05;
+        border: 1px solid transparent;
+        box-shadow:
+          inset 0 1px #ffffff1a,
+          inset 0 -1px #00000014;
+      }
+
+      .panel {
+        position: relative;
+        overflow: hidden;
+        background: #ffffff03;
+        backdrop-filter: blur(16px);
+        -webkit-backdrop-filter: blur(16px);
+        border: 1px solid transparent;
+        border-radius: var(--radius);
+        padding: 1rem;
+        transition:
+          box-shadow 0.2s ease,
+          transform 0.2s ease;
+        box-shadow:
+          inset 0 1px #ffffff24,
+          inset 0 -1px #0000001f,
+          inset 1px 0 #ffffff0f,
+          inset -1px 0 #0000000f;
+      }
+
+      .panel:hover {
+        box-shadow:
+          0 0 32px #ffffff0f,
+          inset 0 1px #ffffff2e,
+          inset 0 -1px #0000001a,
+          inset 1px 0 #ffffff14,
+          inset -1px 0 #0000000f;
+        transform: translateY(-2px);
+      }
+
+      .toolbar {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 0.6rem;
+        flex-wrap: wrap;
+        margin-bottom: 0.9rem;
+      }
+
+      .toolbar-title {
+        font-size: 1rem;
+        font-weight: 500;
+      }
+
+      .refresh-btn {
+        font-family: "Space Grotesk", system-ui, sans-serif;
+        font-size: 0.84rem;
+        font-weight: 500;
+        padding: 0.42rem 0.74rem;
+        background: var(--accent-soft);
+        color: var(--accent);
+        border: 1px solid transparent;
+        border-radius: 6px;
+        cursor: pointer;
+        transition:
+          background 0.2s,
+          border-color 0.2s;
+      }
+
+      .refresh-btn:hover {
+        background: #f9731640;
+        border-color: var(--accent);
+      }
+
+      .status {
+        font-family: "Inter", system-ui, sans-serif;
+        font-size: 0.9rem;
+        min-height: 1.2em;
+        color: var(--text-secondary);
+      }
+
+      .status.ok {
+        color: #22c55e;
+      }
+
+      .status.error {
+        color: #f87171;
+      }
+
+      .kpis {
+        display: grid;
+        gap: 1rem;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        margin: 0.95rem 0 1rem;
+      }
+
+      .kpi-title {
+        font-size: 0.88rem;
+        font-weight: 500;
+        color: var(--accent);
+        margin-bottom: 0.35rem;
+      }
+
+      .kpi-value {
+        font-size: clamp(1.45rem, 2.4vw, 2rem);
+        font-weight: 600;
+        line-height: 1;
+      }
+
+      .kpi-note {
+        margin-top: 0.35rem;
+        color: var(--text-secondary);
+        font-family: "Inter", system-ui, sans-serif;
+        font-size: 0.86rem;
+      }
+
+      .charts {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 1rem;
+      }
+
+      .chart-title {
+        font-size: 1.06rem;
+        color: var(--accent);
+        font-weight: 500;
+      }
+
+      .chart-caption {
+        color: var(--card-text);
+        font-family: "Inter", system-ui, sans-serif;
+        font-size: 0.86rem;
+        margin: 0.22rem 0 0.65rem;
+      }
+
+      .chart-wrap {
+        height: 280px;
+      }
+
+      .footer {
+        margin-top: 1rem;
+        text-align: center;
+        color: var(--text-secondary);
+        font-family: "Inter", system-ui, sans-serif;
+        font-size: 0.87rem;
+      }
+
+      .footer a {
+        color: var(--accent);
+        text-decoration: none;
+      }
+
+      .footer a:hover {
+        opacity: 0.85;
+      }
+
+      @media (max-width: 980px) {
+        .kpis {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+
+        .charts {
+          grid-template-columns: 1fr;
+        }
+      }
+
+      @media (max-width: 600px) {
+        .page {
+          width: min(1120px, 92vw);
+          padding: 2rem 0 2.5rem;
+        }
+
+        .hero-logo {
+          width: 56px;
+          height: 56px;
+        }
+
+        .kpis {
+          grid-template-columns: 1fr;
+        }
+
+        .chart-wrap {
+          height: 250px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="bg-logos" aria-hidden="true">
+      <img
+        src="https://starkzap.io/logo.png"
+        alt=""
+        class="bg-logo bg-logo-tl"
+      />
+      <img
+        src="https://starkzap.io/logo.png"
+        alt=""
+        class="bg-logo bg-logo-tr"
+      />
+      <img
+        src="https://starkzap.io/logo.png"
+        alt=""
+        class="bg-logo bg-logo-bl"
+      />
+      <img
+        src="https://starkzap.io/logo.png"
+        alt=""
+        class="bg-logo bg-logo-br"
+      />
+    </div>
+
+    <main class="page">
+      <section class="hero">
+        <h1 class="hero-title">
+          <span class="hero-logo-and-name">
+            <img
+              src="https://starkzap.io/logo.png"
+              alt=""
+              class="hero-logo"
+              width="68"
+              height="68"
+            />
+            <span class="hero-accent">Starkzap</span>
+          </span>
+          <span class="hero-subtitle"
+            >Starkzap Stats: daily, weekly, monthly, and cumulative npm
+            downloads</span
+          >
+        </h1>
+
+        <div class="meta">
+          <span class="chip">Package: starkzap</span>
+          <span class="chip" id="range-chip">Range: --</span>
+          <span class="chip" id="updated-chip">Updated: --</span>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="toolbar">
+          <p class="toolbar-title">Automatic range: 01.02.2026 to today</p>
+          <button class="refresh-btn" id="refresh-btn" type="button">
+            Refresh now
+          </button>
+        </div>
+        <p class="status" id="status">Loading npm data...</p>
+      </section>
+
+      <section class="kpis">
+        <article class="panel kpi">
+          <p class="kpi-title">Cumulative</p>
+          <p class="kpi-value" id="kpi-total">--</p>
+          <p class="kpi-note" id="kpi-total-note">Across full range</p>
+        </article>
+        <article class="panel kpi">
+          <p class="kpi-title">Latest Day</p>
+          <p class="kpi-value" id="kpi-latest">--</p>
+          <p class="kpi-note" id="kpi-latest-note">--</p>
+        </article>
+        <article class="panel kpi">
+          <p class="kpi-title">Last 7 Days</p>
+          <p class="kpi-value" id="kpi-7d">--</p>
+          <p class="kpi-note" id="kpi-7d-note">Rolling weekly total</p>
+        </article>
+        <article class="panel kpi">
+          <p class="kpi-title">Last 30 Days</p>
+          <p class="kpi-value" id="kpi-30d">--</p>
+          <p class="kpi-note" id="kpi-30d-note">Rolling monthly total</p>
+        </article>
+      </section>
+
+      <section class="charts">
+        <article class="panel">
+          <h2 class="chart-title">Daily Downloads</h2>
+          <p class="chart-caption">Day-by-day records returned by npm.</p>
+          <div class="chart-wrap"><canvas id="daily-chart"></canvas></div>
+        </article>
+        <article class="panel">
+          <h2 class="chart-title">Weekly Downloads</h2>
+          <p class="chart-caption">ISO week aggregation from daily records.</p>
+          <div class="chart-wrap"><canvas id="weekly-chart"></canvas></div>
+        </article>
+        <article class="panel">
+          <h2 class="chart-title">Monthly Downloads</h2>
+          <p class="chart-caption">Calendar month totals.</p>
+          <div class="chart-wrap"><canvas id="monthly-chart"></canvas></div>
+        </article>
+        <article class="panel">
+          <h2 class="chart-title">Cumulative Downloads</h2>
+          <p class="chart-caption">Running total since 01.02.2026.</p>
+          <div class="chart-wrap"><canvas id="cumulative-chart"></canvas></div>
+        </article>
+      </section>
+
+      <p class="footer">
+        Reference view:
+        <a
+          href="https://npm-stat.com/charts.html?package=starkzap&from=2026-02-01"
+          target="_blank"
+          rel="noreferrer noopener"
+          >npm-stat chart</a
+        >
+      </p>
+    </main>
+
+    <script>
+      const PACKAGE_NAME = "starkzap";
+      const START_DATE = "2026-02-01";
+      const FORMATTER = new Intl.NumberFormat(undefined);
+      const COMPACT_FORMATTER = new Intl.NumberFormat(undefined, {
+        notation: "compact",
+        maximumFractionDigits: 1,
+      });
+      const HUMAN_DATE = new Intl.DateTimeFormat(undefined, {
+        month: "short",
+        day: "numeric",
+        year: "numeric",
+        timeZone: "UTC",
+      });
+      const MONTH_LABEL = new Intl.DateTimeFormat(undefined, {
+        month: "short",
+        year: "numeric",
+        timeZone: "UTC",
+      });
+      const charts = new Map();
+
+      const refs = {
+        status: document.getElementById("status"),
+        rangeChip: document.getElementById("range-chip"),
+        updatedChip: document.getElementById("updated-chip"),
+        refreshBtn: document.getElementById("refresh-btn"),
+        kpiTotal: document.getElementById("kpi-total"),
+        kpiTotalNote: document.getElementById("kpi-total-note"),
+        kpiLatest: document.getElementById("kpi-latest"),
+        kpiLatestNote: document.getElementById("kpi-latest-note"),
+        kpi7d: document.getElementById("kpi-7d"),
+        kpi7dNote: document.getElementById("kpi-7d-note"),
+        kpi30d: document.getElementById("kpi-30d"),
+        kpi30dNote: document.getElementById("kpi-30d-note"),
+      };
+
+      refs.refreshBtn.addEventListener("click", () => {
+        void loadDashboard();
+      });
+
+      void loadDashboard();
+
+      async function loadDashboard() {
+        const to = getTodayLocalIso();
+        setStatus("Loading Starkzap downloads from npm...", "loading");
+
+        try {
+          const rows = await fetchDailyDownloads(START_DATE, to);
+          if (!rows.length) {
+            resetPanels();
+            refs.rangeChip.textContent = `Range: ${START_DATE} to ${to}`;
+            refs.updatedChip.textContent = "Updated: --";
+            setStatus("No downloads found in this range.", "error");
+            return;
+          }
+
+          const weekly = aggregateSeries(rows, (entry) =>
+            getIsoWeekKey(entry.day)
+          );
+          const monthly = aggregateSeries(rows, (entry) =>
+            entry.day.slice(0, 7)
+          );
+          const cumulative = buildCumulativeSeries(rows);
+
+          updateKpis(rows);
+          renderCharts(rows, weekly, monthly, cumulative);
+          refs.rangeChip.textContent = `Range: ${START_DATE} to ${to}`;
+          refs.updatedChip.textContent = `Updated: ${new Date().toLocaleString()}`;
+          setStatus(`Loaded ${rows.length} daily records.`, "ok");
+        } catch (error) {
+          console.error(error);
+          setStatus(`Failed to load npm data: ${error.message}`, "error");
+        }
+      }
+
+      async function fetchDailyDownloads(from, to) {
+        const url = `https://api.npmjs.org/downloads/range/${from}:${to}/${PACKAGE_NAME}`;
+        const response = await fetch(url, { cache: "no-store" });
+        if (!response.ok) {
+          throw new Error(`API returned ${response.status}`);
+        }
+
+        const payload = await response.json();
+        if (!payload || !Array.isArray(payload.downloads)) {
+          throw new Error("Unexpected API response shape");
+        }
+
+        return payload.downloads
+          .map((entry) => ({
+            day: entry.day,
+            downloads: Number(entry.downloads) || 0,
+          }))
+          .sort((a, b) => a.day.localeCompare(b.day));
+      }
+
+      function aggregateSeries(rows, getKey) {
+        const totals = new Map();
+        for (const row of rows) {
+          const key = getKey(row);
+          totals.set(key, (totals.get(key) || 0) + row.downloads);
+        }
+
+        return [...totals.entries()]
+          .map(([key, value]) => ({ key, value }))
+          .sort((a, b) => a.key.localeCompare(b.key));
+      }
+
+      function buildCumulativeSeries(rows) {
+        let running = 0;
+        return rows.map((row) => {
+          running += row.downloads;
+          return { day: row.day, value: running };
+        });
+      }
+
+      function updateKpis(rows) {
+        const total = rows.reduce((sum, row) => sum + row.downloads, 0);
+        const latest = rows[rows.length - 1];
+        const sum7d = rows
+          .slice(-7)
+          .reduce((sum, row) => sum + row.downloads, 0);
+        const sum30d = rows
+          .slice(-30)
+          .reduce((sum, row) => sum + row.downloads, 0);
+        const avgDay = rows.length ? Math.round(total / rows.length) : 0;
+
+        refs.kpiTotal.textContent = formatNum(total);
+        refs.kpiTotalNote.textContent = `Average/day: ${formatNum(avgDay)}`;
+        refs.kpiLatest.textContent = formatNum(latest.downloads);
+        refs.kpiLatestNote.textContent = `Date: ${toHumanDate(latest.day)}`;
+        refs.kpi7d.textContent = formatNum(sum7d);
+        refs.kpi7dNote.textContent = `${formatNum(Math.round(sum7d / Math.min(7, rows.length)))} per day avg`;
+        refs.kpi30d.textContent = formatNum(sum30d);
+        refs.kpi30dNote.textContent = `${formatNum(Math.round(sum30d / Math.min(30, rows.length)))} per day avg`;
+      }
+
+      function resetPanels() {
+        refs.kpiTotal.textContent = "--";
+        refs.kpiTotalNote.textContent = "Across full range";
+        refs.kpiLatest.textContent = "--";
+        refs.kpiLatestNote.textContent = "--";
+        refs.kpi7d.textContent = "--";
+        refs.kpi7dNote.textContent = "Rolling weekly total";
+        refs.kpi30d.textContent = "--";
+        refs.kpi30dNote.textContent = "Rolling monthly total";
+
+        for (const chart of charts.values()) {
+          chart.destroy();
+        }
+        charts.clear();
+      }
+
+      function renderCharts(rows, weekly, monthly, cumulative) {
+        renderChart("daily-chart", {
+          type: "bar",
+          labels: rows.map((row) => row.day),
+          values: rows.map((row) => row.downloads),
+          label: "Daily downloads",
+          borderColor: "#f97316",
+          backgroundColor: "rgba(249, 115, 22, 0.26)",
+        });
+
+        renderChart("weekly-chart", {
+          type: "bar",
+          labels: weekly.map((row) => toWeekLabel(row.key)),
+          values: weekly.map((row) => row.value),
+          label: "Weekly downloads",
+          borderColor: "#22c55e",
+          backgroundColor: "rgba(34, 197, 94, 0.25)",
+        });
+
+        renderChart("monthly-chart", {
+          type: "bar",
+          labels: monthly.map((row) => toMonthLabel(row.key)),
+          values: monthly.map((row) => row.value),
+          label: "Monthly downloads",
+          borderColor: "#fb923c",
+          backgroundColor: "rgba(251, 146, 60, 0.26)",
+        });
+
+        renderChart("cumulative-chart", {
+          type: "line",
+          labels: cumulative.map((row) => row.day),
+          values: cumulative.map((row) => row.value),
+          label: "Cumulative downloads",
+          borderColor: "#f97316",
+          backgroundColor: "rgba(249, 115, 22, 0.2)",
+        });
+      }
+
+      function renderChart(canvasId, config) {
+        const canvas = document.getElementById(canvasId);
+        if (!canvas) return;
+
+        const existing = charts.get(canvasId);
+        if (existing) {
+          existing.destroy();
+        }
+
+        const chart = new Chart(canvas, {
+          type: config.type,
+          data: {
+            labels: config.labels,
+            datasets: [
+              {
+                label: config.label,
+                data: config.values,
+                borderColor: config.borderColor,
+                backgroundColor: config.backgroundColor,
+                borderWidth: 2,
+                borderRadius: config.type === "bar" ? 4 : 0,
+                fill: config.type === "line",
+                tension: 0.18,
+                pointRadius: config.type === "line" ? 0 : 2,
+              },
+            ],
+          },
+          options: {
+            maintainAspectRatio: false,
+            responsive: true,
+            plugins: {
+              legend: { display: false },
+              tooltip: {
+                callbacks: {
+                  title: (items) => toHumanDate(items[0].label),
+                  label: (item) => `${config.label}: ${formatNum(item.raw)}`,
+                },
+              },
+            },
+            scales: {
+              x: {
+                grid: { display: false },
+                ticks: {
+                  autoSkip: true,
+                  maxTicksLimit: 8,
+                  color: "#a1a1aa",
+                },
+              },
+              y: {
+                beginAtZero: true,
+                grid: { color: "rgba(255,255,255,0.08)" },
+                ticks: {
+                  color: "#a1a1aa",
+                  callback: (value) => COMPACT_FORMATTER.format(value),
+                },
+              },
+            },
+          },
+        });
+
+        charts.set(canvasId, chart);
+      }
+
+      function getIsoWeekKey(dayString) {
+        const date = toUtcDate(dayString);
+        const day = (date.getUTCDay() + 6) % 7;
+        const thursday = new Date(date);
+        thursday.setUTCDate(date.getUTCDate() - day + 3);
+
+        const firstThursday = new Date(
+          Date.UTC(thursday.getUTCFullYear(), 0, 4)
+        );
+        const firstDay = (firstThursday.getUTCDay() + 6) % 7;
+        firstThursday.setUTCDate(firstThursday.getUTCDate() - firstDay + 3);
+
+        const week = 1 + Math.round((thursday - firstThursday) / 604800000);
+        return `${thursday.getUTCFullYear()}-W${String(week).padStart(2, "0")}`;
+      }
+
+      function toUtcDate(dayString) {
+        const [year, month, day] = dayString.split("-").map(Number);
+        return new Date(Date.UTC(year, month - 1, day));
+      }
+
+      function toHumanDate(dayString) {
+        if (!dayString || !dayString.includes("-")) return dayString;
+        return HUMAN_DATE.format(toUtcDate(dayString));
+      }
+
+      function toWeekLabel(weekKey) {
+        const [year, week] = weekKey.split("-W");
+        return `W${week} ${year}`;
+      }
+
+      function toMonthLabel(monthKey) {
+        const [year, month] = monthKey.split("-").map(Number);
+        return MONTH_LABEL.format(new Date(Date.UTC(year, month - 1, 1)));
+      }
+
+      function formatNum(value) {
+        return FORMATTER.format(Number(value) || 0);
+      }
+
+      function getTodayLocalIso() {
+        const now = new Date();
+        const year = now.getFullYear();
+        const month = String(now.getMonth() + 1).padStart(2, "0");
+        const day = String(now.getDate()).padStart(2, "0");
+        return `${year}-${month}-${day}`;
+      }
+
+      function setStatus(text, tone) {
+        refs.status.className = `status ${tone}`;
+        refs.status.textContent = text;
+      }
+    </script>
+  </body>
+</html>
