@@ -16,32 +16,45 @@ export default function Home() {
 
   async function pay() {
     setLoading(true);
-    const response = await fetch(
-      `${process.env.NEXT_PUBLIC_API_URL}/api/create-session`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          destinationChain: PaymentChains.STARKNET,
-          token: PaymentTokenSymbols.USDC,
-          recipient:
-            "0x0075597a61229d143Ffba493C9f8A8057ecCeeA7BFDDBFD8Aaf79AC8935205c0",
-          amount: "0.99",
-        }),
+    try {
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL}/api/create-session`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            destinationChain: PaymentChains.STARKNET,
+            token: PaymentTokenSymbols.USDC,
+            recipient:
+              "0x0075597a61229d143Ffba493C9f8A8057ecCeeA7BFDDBFD8Aaf79AC8935205c0",
+            amount: "0.99",
+          }),
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
       }
-    );
-    const data = await response.json();
 
-    const paid = await payment
-      .modal({
-        sessionToken: data.sessionToken,
-        amount: "0.99",
-      })
-      .pay();
+      const data = await response.json();
 
-    console.log(paid ? "Payment Successful" : "Payment Failed");
+      if (!data.sessionToken) {
+        throw new Error("Session token not found in response");
+      }
 
-    setLoading(false);
+      const paid = await payment
+        .modal({
+          sessionToken: data.sessionToken,
+          amount: "0.99",
+        })
+        .pay();
+
+      console.log(paid ? "Payment Successful" : "Payment Failed");
+    } catch (error) {
+      console.error("Payment failed:", error);
+    } finally {
+      setLoading(false);
+    }
   }
 
   return (

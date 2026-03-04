@@ -13,8 +13,6 @@ export async function POST(request: NextRequest) {
     }
 
     const sdk = new StarkZap({
-
-    const sdk = new StarkZap({
       network: "mainnet",
       payment: {
         apiKey: process.env.CHAINRAILS_API_KEY || "",
