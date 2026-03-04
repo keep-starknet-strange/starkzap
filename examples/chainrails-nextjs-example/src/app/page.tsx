@@ -8,6 +8,7 @@ import NGFlagIcon from "../icons/NGFlag";
 
 export default function Home() {
   const [loading, setLoading] = useState(false);
+  const [paymentMethod, setPaymentMethod] = useState("credit-card");
   // Initialize SDK and payment modal
   const sdk = new StarkZap({
     network: "mainnet",
@@ -133,11 +134,10 @@ export default function Home() {
                     </div>
                     <select
                       id="select-city-input-3"
+                      defaultValue="Ikeja"
                       className="block w-full rounded-lg border border-gray-500 bg-gray-50 p-2.5 text-sm text-gray-900 focus:border-primary-500 focus:ring-primary-500"
                     >
-                      <option value="Ikeja" selected>
-                        Ikeja
-                      </option>
+                      <option value="Ikeja">Ikeja</option>
                       <option value="Lagos Island">Lagos Island</option>
                       <option value="Surulere">Surulere</option>
                       <option value="Badagry">Badagry</option>
@@ -189,9 +189,10 @@ export default function Home() {
                           aria-describedby="credit-card-text"
                           type="radio"
                           name="payment-method"
-                          value=""
+                          value="credit-card"
                           className="h-4 w-4 border-gray-500 bg-white text-primary-600 focus:ring-2 focus:ring-primary-600"
-                          checked
+                          checked={paymentMethod === "credit-card"}
+                          onChange={() => setPaymentMethod("credit-card")}
                         />
                       </div>
 
@@ -220,8 +221,10 @@ export default function Home() {
                           aria-describedby="pay-on-delivery-text"
                           type="radio"
                           name="payment-method"
-                          value=""
+                          value="pay-on-delivery"
                           className="h-4 w-4 border-gray-500 bg-white text-primary-600 focus:ring-2 focus:ring-primary-600"
+                          checked={paymentMethod === "pay-on-delivery"}
+                          onChange={() => setPaymentMethod("pay-on-delivery")}
                         />
                       </div>
 

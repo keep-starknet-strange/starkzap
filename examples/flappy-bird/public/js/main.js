@@ -543,7 +543,6 @@ function showScore()
       soundSwoosh.stop();
       soundSwoosh.play();
       $("#actions").transition({ y: '0px', opacity: 1}, 600, 'ease');
-      if (canUseSaveMe)
 
       //also animate in the MEDAL! WOO!
       if(wonmedal)
