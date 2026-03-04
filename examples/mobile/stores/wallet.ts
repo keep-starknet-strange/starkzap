@@ -6,9 +6,11 @@ import {
   ArgentPreset,
   BraavosPreset,
   DevnetPreset,
+  ExternalChain,
   fromAddress,
   OpenZeppelinPreset,
   OnboardStrategy,
+  type BridgeToken,
   type StakingConfig,
   StarkZap,
   StarkSigner,
@@ -82,6 +84,8 @@ export const PRESETS: Record<string, AccountClassConfig> = {
   Devnet: DevnetPreset,
 };
 
+export type BridgeChainFilter = ExternalChain | "all";
+
 interface WalletState {
   // SDK configuration
   rpcUrl: string;
@@ -118,6 +122,13 @@ interface WalletState {
   // Logs
   logs: string[];
 
+  // Bridge state
+  bridgeChain: BridgeChainFilter;
+  bridgeTokens: BridgeToken[];
+  bridgeIsLoading: boolean;
+  bridgeError: string | null;
+  bridgeLastUpdated: Date | null;
+
   // Network configuration actions
   selectNetwork: (index: number) => void;
   selectCustomNetwork: () => void;
@@ -125,6 +136,9 @@ interface WalletState {
   setCustomChainId: (chainId: ChainIdLiteral) => void;
   confirmNetworkConfig: () => void;
   resetNetworkConfig: () => void;
+  setBridgeChain: (chain: BridgeChainFilter) => void;
+  fetchBridgeTokens: () => Promise<void>;
+  refreshBridgeTokens: () => Promise<void>;
 
   // Actions
   setPrivateKey: (key: string) => void;
@@ -199,6 +213,12 @@ export const useWalletStore = create<WalletState>((set, get) => ({
   isConnecting: false,
   isCheckingStatus: false,
   logs: [],
+  bridgeEnv: defaultNetwork.chainId.isMainnet() ? "mainnet" : "testnet",
+  bridgeChain: "all",
+  bridgeTokens: [],
+  bridgeIsLoading: false,
+  bridgeError: null,
+  bridgeLastUpdated: null,
 
   // Network configuration actions
   selectNetwork: (index) => {
@@ -208,6 +228,9 @@ export const useWalletStore = create<WalletState>((set, get) => ({
         selectedNetworkIndex: index,
         rpcUrl: network.rpcUrl,
         chainId: network.chainId,
+        bridgeTokens: [],
+        bridgeError: null,
+        bridgeLastUpdated: null,
       });
     }
   },
@@ -271,6 +294,9 @@ export const useWalletStore = create<WalletState>((set, get) => ({
       rpcUrl,
       chainId,
       isConfigured: true,
+      bridgeTokens: [],
+      bridgeError: null,
+      bridgeLastUpdated: null,
       logs: [
         `SDK configured with ${selectedNetworkIndex !== null ? NETWORKS[selectedNetworkIndex].name : "Custom Network"}`,
       ],
@@ -298,8 +324,50 @@ export const useWalletStore = create<WalletState>((set, get) => ({
       selectedNetworkIndex: DEFAULT_NETWORK_INDEX,
       rpcUrl: defaultNetwork.rpcUrl,
       chainId: defaultNetwork.chainId,
+      bridgeChain: "all",
+      bridgeTokens: [],
+      bridgeIsLoading: false,
+      bridgeError: null,
+      bridgeLastUpdated: null,
     });
     addLog("Network configuration reset");
+  },
+
+  setBridgeChain: (bridgeChain) =>
+    set((state) =>
+      state.bridgeChain === bridgeChain ? state : { bridgeChain }
+    ),
+
+  fetchBridgeTokens: async () => {
+    const { sdk, bridgeChain } = get();
+
+    if (!sdk) {
+      return;
+    }
+
+    set({ bridgeIsLoading: true, bridgeError: null });
+
+    try {
+      const bridgeTokens = await sdk.getBridgingTokens(
+        bridgeChain !== "all" ? bridgeChain : undefined
+      );
+
+      set({
+        bridgeTokens,
+        bridgeIsLoading: false,
+        bridgeError: null,
+        bridgeLastUpdated: new Date(),
+      });
+    } catch (error) {
+      set({
+        bridgeIsLoading: false,
+        bridgeError: error instanceof Error ? error.message : String(error),
+      });
+    }
+  },
+
+  refreshBridgeTokens: async () => {
+    await get().fetchBridgeTokens();
   },
 
   // Actions

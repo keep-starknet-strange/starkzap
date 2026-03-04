@@ -30,9 +30,6 @@ export * from "@/staking";
 // Swap
 export * from "@/swap";
 
-// Bridge
-export * from "@/bridge";
-
 // Connect
 export * from "@/connect";
 
