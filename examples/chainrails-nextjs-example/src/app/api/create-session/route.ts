@@ -5,6 +5,15 @@ export async function POST(request: NextRequest) {
   try {
     const { destinationChain, token, amount, recipient } = await request.json();
 
+    if (!amount || !recipient) {
+      return NextResponse.json(
+        { error: "Missing required fields: amount and recipient" },
+        { status: 400 }
+      );
+    }
+
+    const sdk = new StarkZap({
+
     const sdk = new StarkZap({
       network: "mainnet",
       payment: {
