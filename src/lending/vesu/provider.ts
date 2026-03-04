@@ -200,23 +200,36 @@ export class VesuLendingProvider implements LendingProvider {
     const debtAmount = request.amount.toBase();
     const user = request.user ?? context.walletAddress;
     const debtDenomination = request.debtDenomination ?? "assets";
+    const calls: Call[] = [];
+
+    if (collateralAmount > 0n && collateralDenomination === "assets") {
+      calls.push(
+        this.buildApproveCall(
+          request.collateralToken.address,
+          poolAddress,
+          collateralAmount
+        )
+      );
+    }
+
+    calls.push(
+      this.buildModifyPositionCall({
+        poolAddress,
+        collateralAsset: request.collateralToken.address,
+        debtAsset: request.debtToken.address,
+        user,
+        collateral: {
+          denomination: collateralDenomination,
+          value: collateralAmount,
+        },
+        debt: { denomination: debtDenomination, value: debtAmount },
+      })
+    );
 
     return {
       providerId: this.id,
       action: "borrow",
-      calls: [
-        this.buildModifyPositionCall({
-          poolAddress,
-          collateralAsset: request.collateralToken.address,
-          debtAsset: request.debtToken.address,
-          user,
-          collateral: {
-            denomination: collateralDenomination,
-            value: collateralAmount,
-          },
-          debt: { denomination: debtDenomination, value: debtAmount },
-        }),
-      ],
+      calls,
     };
   }
 
@@ -247,6 +260,20 @@ export class VesuLendingProvider implements LendingProvider {
     const collateralDelta = withdrawCollateral
       ? -collateralAmount
       : collateralAmount;
+    if (
+      !withdrawCollateral &&
+      collateralAmount > 0n &&
+      collateralDenomination === "assets"
+    ) {
+      calls.push(
+        this.buildApproveCall(
+          request.collateralToken.address,
+          poolAddress,
+          collateralAmount
+        )
+      );
+    }
+
     calls.push(
       this.buildModifyPositionCall({
         poolAddress,

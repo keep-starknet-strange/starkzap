@@ -109,9 +109,11 @@ describe("VesuLendingProvider", () => {
       amount: Amount.parse("11", debtToken),
     });
 
-    expect(prepared.calls).toHaveLength(1);
-    expect(prepared.calls[0]!.entrypoint).toBe("modify_position");
-    expect(prepared.calls[0]!.contractAddress).toBe(fromAddress("0x999"));
+    expect(prepared.calls).toHaveLength(2);
+    expect(prepared.calls[0]!.entrypoint).toBe("approve");
+    expect(prepared.calls[0]!.contractAddress).toBe(collateralToken.address);
+    expect(prepared.calls[1]!.entrypoint).toBe("modify_position");
+    expect(prepared.calls[1]!.contractAddress).toBe(fromAddress("0x999"));
     expect(callContract).not.toHaveBeenCalled();
   });
 
