@@ -3,9 +3,8 @@ import { Protocol } from "@/types/bridge/protocol";
 import { ExternalChain } from "@/types/bridge/external-chain";
 import {
   type BridgeToken,
-  BitcoinRunesBridgeToken,
-  EthereumBridgeToken,
   type EthereumBridgeProtocol,
+  EthereumBridgeToken,
   SolanaBridgeToken,
 } from "@/types/bridge/bridge-token";
 
@@ -98,8 +97,6 @@ function parseChain(chain: string): ExternalChain {
       return ExternalChain.ETHEREUM;
     case ExternalChain.SOLANA:
       return ExternalChain.SOLANA;
-    case ExternalChain.BITCOIN_RUNES:
-      return ExternalChain.BITCOIN_RUNES;
     default:
       throw new Error(`Unsupported chain "${chain}"`);
   }
@@ -117,12 +114,12 @@ function parseProtocol(protocol: string): Protocol {
       return Protocol.OFT_MIGRATED;
     case Protocol.HYPERLANE:
       return Protocol.HYPERLANE;
-    case Protocol.BITCOIN_RUNES:
-      return Protocol.BITCOIN_RUNES;
     default:
       throw new Error(`Unsupported protocol "${protocol}"`);
   }
 }
+
+const isNonNull = <T>(value: T | null): value is T => value !== null;
 
 function parseToken(token: BridgeTokenApiRecord): BridgeToken {
   const chain = parseChain(requiredString(token, "chain"));
@@ -175,18 +172,7 @@ function parseToken(token: BridgeTokenApiRecord): BridgeToken {
     });
   }
 
-  if (protocol !== Protocol.BITCOIN_RUNES) {
-    throw new Error(
-      `Invalid protocol "${protocol}" for chain "${ExternalChain.BITCOIN_RUNES}"`
-    );
-  }
-
-  return new BitcoinRunesBridgeToken({
-    ...base,
-    protocol: Protocol.BITCOIN_RUNES,
-    bitcoinRuneId: requiredString(token, "bitcoin_runes_id"),
-    runesBridgeAddress: requiredString(token, "l2_token_bridge"),
-  });
+  throw new Error(`Chain "${chain} not supported"`);
 }
 
 function extractTokenRecords(payload: unknown): BridgeTokenApiRecord[] {
@@ -295,7 +281,16 @@ export class BridgeTokenRepository {
     }
 
     const payload: unknown = await response.json();
-    const tokens = extractTokenRecords(payload).map(parseToken);
+    const tokens = extractTokenRecords(payload)
+      .map((token) => {
+        try {
+          return parseToken(token);
+        } catch (e) {
+          console.warn(`Ignoring token ${token.symbol} due to`, e);
+          return null;
+        }
+      })
+      .filter(isNonNull);
 
     this.cache.set(key, {
       tokens,

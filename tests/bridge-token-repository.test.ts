@@ -1,7 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
-import { BridgeTokenRepository, BRIDGE_TOKEN_CACHE_TTL_MS } from "@/bridge";
+import { BRIDGE_TOKEN_CACHE_TTL_MS, BridgeTokenRepository } from "@/bridge";
 import {
-  BitcoinRunesBridgeToken,
   EthereumBridgeToken,
   ExternalChain,
   Protocol,
@@ -78,7 +77,7 @@ describe("BridgeTokenRepository", () => {
     });
     const tokens = await repository.getTokens();
 
-    expect(tokens).toHaveLength(4);
+    expect(tokens).toHaveLength(3);
 
     expect(tokens[0]).toBeInstanceOf(EthereumBridgeToken);
     expect(tokens[0]?.protocol).toBe(Protocol.CANONICAL);
@@ -87,10 +86,6 @@ describe("BridgeTokenRepository", () => {
     expect(tokens[2]).toBeInstanceOf(SolanaBridgeToken);
     expect(tokens[2]?.protocol).toBe(Protocol.HYPERLANE);
     expect(tokens[2]?.chain).toBe(ExternalChain.SOLANA);
-
-    expect(tokens[3]).toBeInstanceOf(BitcoinRunesBridgeToken);
-    expect(tokens[3]?.protocol).toBe(Protocol.BITCOIN_RUNES);
-    expect(tokens[3]?.chain).toBe(ExternalChain.BITCOIN_RUNES);
   });
 
   it("should send optional env and chain query params when provided", async () => {

@@ -89,23 +89,3 @@ export class SolanaBridgeToken extends BridgeToken {
     this.solanaDecimals = params.solanaDecimals;
   }
 }
-
-export interface BitcoinRunesBridgeTokenParams extends BridgeTokenBaseParams {
-  protocol: Protocol.BITCOIN_RUNES;
-  bitcoinRuneId: string;
-  runesBridgeAddress: string;
-}
-
-export class BitcoinRunesBridgeToken extends BridgeToken {
-  readonly bitcoinRuneId: string;
-  readonly runesBridgeAddress: string;
-
-  constructor(params: BitcoinRunesBridgeTokenParams) {
-    super({
-      ...params,
-      chain: ExternalChain.BITCOIN_RUNES,
-    });
-    this.bitcoinRuneId = params.bitcoinRuneId;
-    this.runesBridgeAddress = params.runesBridgeAddress;
-  }
-}
