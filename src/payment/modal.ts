@@ -66,8 +66,8 @@ export class PaymentModalManager {
       };
 
       const closeWith = (value: boolean): void => {
-        cleanup();
         settle(value);
+        cleanup();
       };
 
       this.setActiveModalCleanup(() => closeWith(false));

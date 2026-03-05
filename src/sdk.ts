@@ -486,7 +486,7 @@ export class StarkZap {
   /**
    * Get the Payment module for cross-chain payment acceptance.
    *
-   * Requires `payment.apiKey` to be set in the SDK config.
+   * Requires `payment.apiKey` to be set in the SDK config unless when used on the browser.
    *
    * @returns A {@link Payment} instance bound to the configured API key.
    * @throws Error if payment is not configured in non-browser runtimes.

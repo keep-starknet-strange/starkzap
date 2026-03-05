@@ -146,7 +146,7 @@ export default function Home() {
 
                   <div>
                     <label
-                      htmlFor="phone-input-3"
+                      htmlFor="phone-input"
                       className="mb-2 block text-sm font-medium text-gray-900"
                     >
                       Phone Number*
@@ -253,14 +253,16 @@ export default function Home() {
                           aria-describedby="paypal-text"
                           type="radio"
                           name="payment-method"
-                          value=""
+                          value="paypal"
+                          checked={paymentMethod === "paypal"}
+                          onChange={() => setPaymentMethod("paypal")}
                           className="h-4 w-4 border-gray-500 bg-white text-primary-600 focus:ring-2 focus:ring-primary-600"
                         />
                       </div>
 
                       <div className="ms-4 text-sm">
                         <label
-                          htmlFor="paypal-2"
+                          htmlFor="paypal"
                           className="font-medium leading-none text-gray-900"
                         >
                           Paypal account
