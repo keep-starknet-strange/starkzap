@@ -68,29 +68,30 @@ export class VesuLendingProvider implements LendingProvider {
 
     const chainConfigs: Partial<Record<VesuChain, VesuChainConfig>> = {
       SN_MAIN: { ...vesuPresets.SN_MAIN },
+      SN_SEPOLIA: { ...vesuPresets.SN_SEPOLIA },
     };
     for (const literal of ["SN_MAIN", "SN_SEPOLIA"] as const) {
+      const base = chainConfigs[literal];
       const override = options.chainConfigs?.[literal];
-      if (!override) {
+      if (!base && !override) {
         continue;
       }
-      const base = chainConfigs[literal];
-      const poolFactoryRaw = override.poolFactory ?? base?.poolFactory;
-      if (!poolFactoryRaw) {
-        throw new Error(
-          `Missing poolFactory for Vesu chain "${literal}". Provide chainConfigs.${literal}.poolFactory`
-        );
-      }
       chainConfigs[literal] = {
-        poolFactory: fromAddress(poolFactoryRaw),
-        ...(override.defaultPool != null || base?.defaultPool != null
+        ...(override?.poolFactory != null || base?.poolFactory != null
           ? {
-              defaultPool: fromAddress(
-                override.defaultPool ?? (base?.defaultPool as Address)
+              poolFactory: fromAddress(
+                override?.poolFactory ?? (base?.poolFactory as Address)
               ),
             }
           : {}),
-        ...(override.marketsApiUrl !== undefined
+        ...(override?.defaultPool != null || base?.defaultPool != null
+          ? {
+              defaultPool: fromAddress(
+                override?.defaultPool ?? (base?.defaultPool as Address)
+              ),
+            }
+          : {}),
+        ...(override?.marketsApiUrl !== undefined
           ? override.marketsApiUrl
             ? { marketsApiUrl: override.marketsApiUrl }
             : {}
@@ -605,6 +606,11 @@ export class VesuLendingProvider implements LendingProvider {
     }
 
     const poolFactory = this.requireChainConfig(context.chainId).poolFactory;
+    if (!poolFactory) {
+      throw new Error(
+        `Vesu chain "${context.chainId.toLiteral()}" has no poolFactory configured. Required for deposit/withdraw vToken resolution.`
+      );
+    }
     const result = await context.provider.callContract({
       contractAddress: poolFactory,
       entrypoint: "v_token_for_asset",
@@ -642,7 +648,7 @@ export class VesuLendingProvider implements LendingProvider {
     const config = this.getChainConfig(chainId);
     if (!config) {
       throw new Error(
-        `Vesu provider does not support chain "${chainId.toLiteral()}". Configure chainConfigs with a poolFactory to enable it.`
+        `Vesu provider does not support chain "${chainId.toLiteral()}". Configure chainConfigs to enable it.`
       );
     }
     return config;

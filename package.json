@@ -67,6 +67,7 @@
     "test:integration": "vitest run --project integration",
     "test:integration:watch": "vitest --project integration",
     "test:all": "vitest run",
+    "test:live:vesu:sepolia": "RUN_LIVE_VESU_SEPOLIA_TESTS=1 vitest run --project unit tests/lending-vesu-sepolia-live.test.ts",
     "generate:tokens": "npx tsx scripts/generate-token-presets.ts --network mainnet",
     "generate:tokens:sepolia": "npx tsx scripts/generate-token-presets.ts --network sepolia",
     "generate:validators": "npx tsx scripts/generate-validator-presets.ts --network mainnet",

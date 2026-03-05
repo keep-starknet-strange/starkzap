@@ -1,7 +1,7 @@
 import { fromAddress, type Address } from "@/types";
 
 export interface VesuChainConfig {
-  poolFactory: Address;
+  poolFactory?: Address;
   defaultPool?: Address;
   marketsApiUrl?: string;
 }
@@ -22,4 +22,11 @@ export const vesuPresets = {
     ),
     marketsApiUrl: "https://api.vesu.xyz/markets",
   },
-} as const satisfies Record<"SN_MAIN", VesuChainConfig>;
+  // Testnet pool shared by Vesu team for integration testing.
+  // Pool name on-chain: "WBTC Prime Sepolia"
+  SN_SEPOLIA: {
+    defaultPool: fromAddress(
+      "0x06227c13372b8c7b7f38ad1cfe05b5cf515b4e5c596dd05fe8437ab9747b2093"
+    ),
+  },
+} as const satisfies Record<"SN_MAIN" | "SN_SEPOLIA", VesuChainConfig>;

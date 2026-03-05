@@ -30,10 +30,11 @@ function toU256Words(value: bigint): [string, string] {
 }
 
 function createContext(
-  callContract: ReturnType<typeof vi.fn>
+  callContract: ReturnType<typeof vi.fn>,
+  chainId: ChainId = ChainId.MAINNET
 ): LendingProviderContext {
   return {
-    chainId: ChainId.MAINNET,
+    chainId,
     provider: {
       callContract,
     } as unknown as RpcProvider,
@@ -46,11 +47,27 @@ describe("VesuLendingProvider", () => {
     vi.restoreAllMocks();
   });
 
-  it("supports mainnet by default and requires config for sepolia", () => {
+  it("supports mainnet and sepolia by default", () => {
     const provider = new VesuLendingProvider();
 
     expect(provider.supportsChain(ChainId.MAINNET)).toBe(true);
-    expect(provider.supportsChain(ChainId.SEPOLIA)).toBe(false);
+    expect(provider.supportsChain(ChainId.SEPOLIA)).toBe(true);
+  });
+
+  it("throws on deposit when chain has no poolFactory configured", async () => {
+    const callContract = vi.fn();
+    const provider = new VesuLendingProvider();
+    const context = createContext(callContract, ChainId.SEPOLIA);
+
+    await expect(
+      provider.prepareDeposit(context, {
+        token: debtToken,
+        amount: Amount.parse("1", debtToken),
+      })
+    ).rejects.toThrow(
+      'Vesu chain "SN_SEPOLIA" has no poolFactory configured. Required for deposit/withdraw vToken resolution.'
+    );
+    expect(callContract).not.toHaveBeenCalled();
   });
 
   it("builds deposit calls using vToken lookup", async () => {
