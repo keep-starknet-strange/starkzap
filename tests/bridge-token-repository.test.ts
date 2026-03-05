@@ -8,59 +8,93 @@ import {
 } from "@/types";
 
 function mockApiResponse() {
-  return {
-    tokens: [
-      {
-        id: "lords",
-        chain: "ethereum",
-        protocol: "canonical",
-        name: "Ethereum",
-        symbol: "ETH",
-        decimals: 18,
-        l2_token_address:
-          "0x049d36570d4e46f48e99674bd3fcc84644ddd6b96f7c741b1562b82f9e004dc7",
-        l1_token_address: "0x0000000000000000000000000000000000000000",
-        l1_bridge_address: "0x1111111111111111111111111111111111111111",
-      },
-      {
-        id: "usdc",
-        chain: "ethereum",
-        protocol: "cctp",
-        name: "USDC",
-        symbol: "USDC",
-        decimals: 6,
-        l2_token_address:
-          "0x053c91253bc9682c04929ca02ed00b3e423f6710d2ee7e0d5ebb06f3ecf368a8",
-        l1_token_address: "0x2222222222222222222222222222222222222222",
-        l1_bridge_address: "0x3333333333333333333333333333333333333333",
-      },
-      {
-        id: "sol",
-        chain: "solana",
-        protocol: "hyperlane",
-        name: "Solana",
-        symbol: "SOL",
-        decimals: 9,
-        l2_token_address:
-          "0x0437d8f4f4e3eb7022f4b96f4f58f949bc2ad2f0b6f7eb02d4f9a5f8f4d3f001",
-        solana_token_address: "So11111111111111111111111111111111111111112",
-        l1_token_address: "So11111111111111111111111111111111111111112",
-      },
-      {
-        id: "dog",
-        chain: "bitcoin-runes",
-        protocol: "bitcoin-runes",
-        name: "Rune",
-        symbol: "RUNE",
-        decimals: 8,
-        l2_token_address:
-          "0x01e6545cab7ba4ac866768ba5e1bd540893762286ed3fea7f9c02bfa147e135b",
-        bitcoin_runes_id: "840000:1",
-        l2_token_bridge:
-          "0x07d421b9ca8aa32df259965cda8acb93f7599f69209a41872ae84638b2a20f2a",
-      },
-    ],
-  };
+  return [
+    {
+      id: "lords",
+      chain: "ethereum",
+      protocol: "canonical",
+      name: "Ethereum",
+      symbol: "ETH",
+      decimals: 18,
+      l2_token_address:
+        "0x049d36570d4e46f48e99674bd3fcc84644ddd6b96f7c741b1562b82f9e004dc7",
+      l1_token_address: "0x0000000000000000000000000000000000000000",
+      l1_bridge_address: "0x1111111111111111111111111111111111111111",
+      l2_bridge_address:
+        "0x073314940630fd6dcda0d772d4c972c4e0a9946bef9dabf4ef84eda8ef542b82",
+    },
+    {
+      id: "usdc",
+      chain: "ethereum",
+      protocol: "cctp",
+      name: "USDC",
+      symbol: "USDC",
+      decimals: 6,
+      l2_token_address:
+        "0x053c91253bc9682c04929ca02ed00b3e423f6710d2ee7e0d5ebb06f3ecf368a8",
+      l1_token_address: "0x2222222222222222222222222222222222222222",
+      l1_bridge_address: "0x3333333333333333333333333333333333333333",
+      l2_bridge_address:
+        "0x057ffe876468962e9a25d37e257f920e9c12f8f4ba0e2597b1f501a4bf88c470",
+    },
+    {
+      id: "sol",
+      chain: "solana",
+      protocol: "hyperlane",
+      name: "Solana",
+      symbol: "SOL",
+      decimals: 9,
+      l2_token_address:
+        "0x0437d8f4f4e3eb7022f4b96f4f58f949bc2ad2f0b6f7eb02d4f9a5f8f4d3f001",
+      l1_token_address: "0x4444444444444444444444444444444444444444",
+      l1_bridge_address: "0x5555555555555555555555555555555555555555",
+      l2_bridge_address:
+        "0x06a8f05b3860ab846b6e8bfc3160b7bb3a0bae41fd3fcfab65a896f0570e3e32",
+    },
+    {
+      id: "dog",
+      chain: "bitcoin-runes",
+      protocol: "bitcoin-runes",
+      name: "Rune",
+      symbol: "RUNE",
+      decimals: 8,
+      l2_token_address:
+        "0x01e6545cab7ba4ac866768ba5e1bd540893762286ed3fea7f9c02bfa147e135b",
+      bitcoin_runes_id: "840000:1",
+      l2_token_bridge:
+        "0x07d421b9ca8aa32df259965cda8acb93f7599f69209a41872ae84638b2a20f2a",
+    },
+    {
+      id: "hidden-token",
+      chain: "ethereum",
+      protocol: "canonical",
+      name: "Hidden",
+      symbol: "HID",
+      decimals: 18,
+      hidden: true,
+      l2_token_address:
+        "0x01d36570d4e46f48e99674bd3fcc84644ddd6b96f7c741b1562b82f9e004dc7",
+      l1_token_address: "0x0000000000000000000000000000000000000000",
+      l1_bridge_address: "0x1111111111111111111111111111111111111111",
+      l2_bridge_address:
+        "0x073314940630fd6dcda0d772d4c972c4e0a9946bef9dabf4ef84eda8ef542b82",
+    },
+    {
+      id: "deprecated-token",
+      chain: "ethereum",
+      protocol: "canonical",
+      name: "Deprecated",
+      symbol: "DEP",
+      decimals: 18,
+      deprecated: true,
+      l2_token_address:
+        "0x02d36570d4e46f48e99674bd3fcc84644ddd6b96f7c741b1562b82f9e004dc7",
+      l1_token_address: "0x0000000000000000000000000000000000000000",
+      l1_bridge_address: "0x1111111111111111111111111111111111111111",
+      l2_bridge_address:
+        "0x073314940630fd6dcda0d772d4c972c4e0a9946bef9dabf4ef84eda8ef542b82",
+    },
+  ];
 }
 
 describe("BridgeTokenRepository", () => {
@@ -137,5 +171,22 @@ describe("BridgeTokenRepository", () => {
     now = BRIDGE_TOKEN_CACHE_TTL_MS;
     await repository.getTokens({ env: "mainnet" });
     expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("should filter out hidden and deprecated tokens", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      statusText: "OK",
+      json: async () => mockApiResponse(),
+    });
+
+    const repository = new BridgeTokenRepository({
+      fetchFn: fetchMock as unknown as typeof fetch,
+    });
+    const tokens = await repository.getTokens();
+
+    expect(tokens.some((token) => token.id === "hidden-token")).toBe(false);
+    expect(tokens.some((token) => token.id === "deprecated-token")).toBe(false);
   });
 });

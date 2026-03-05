@@ -1,12 +1,12 @@
 import { assertSafeHttpUrl } from "@/utils";
-import { Protocol } from "@/types/bridge/protocol";
+import { Protocol, type EthereumBridgeProtocol } from "@/types/bridge/protocol";
 import { ExternalChain } from "@/types/bridge/external-chain";
 import {
   type BridgeToken,
-  type EthereumBridgeProtocol,
   EthereumBridgeToken,
   SolanaBridgeToken,
 } from "@/types/bridge/bridge-token";
+import { fromAddress, fromEthereumAddress } from "@/types";
 
 export type BridgeTokenApiEnv = "mainnet" | "testnet";
 
@@ -28,29 +28,28 @@ interface CacheEntry {
 }
 
 interface BridgeTokenApiRecord {
-  id?: unknown;
-  chain?: unknown;
-  protocol?: unknown;
-  name?: unknown;
-  symbol?: unknown;
-  coingecko_id?: unknown;
-  decimals?: unknown;
-  l1_token_address?: unknown;
-  l2_token_address?: unknown;
-  l1_bridge_address?: unknown;
-  l2_fee_token_address?: unknown;
-  bitcoin_runes_id?: unknown;
-  l2_token_bridge?: unknown;
+  id?: string;
+  chain?: string;
+  protocol?: string;
+  name?: string;
+  symbol?: string;
+  coingecko_id?: string;
+  symbol_hex?: string;
+  deprecated?: boolean;
+  hidden?: boolean;
+  decimals?: number;
+  l1_token_address?: string;
+  l2_token_address?: string;
+  l1_bridge_address?: string;
+  l2_bridge_address?: string;
+  l2_fee_token_address?: string;
+  bitcoin_runes_id?: string;
 }
 
 const DEFAULT_ENV: BridgeTokenApiEnv = "mainnet";
 export const STARKGATE_TOKENS_API_URL =
   "https://starkgate.starknet.io/tokens/api/tokens";
 export const BRIDGE_TOKEN_CACHE_TTL_MS = 60 * 60 * 1000;
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null;
-}
 
 function requiredString(
   token: BridgeTokenApiRecord,
@@ -125,16 +124,6 @@ function parseToken(token: BridgeTokenApiRecord): BridgeToken {
   const chain = parseChain(requiredString(token, "chain"));
   const protocol = parseProtocol(requiredString(token, "protocol"));
 
-  const coingeckoId = optionalString(token, "coingecko_id");
-  const base = {
-    id: requiredString(token, "id"),
-    name: requiredString(token, "name"),
-    symbol: requiredString(token, "symbol"),
-    decimals: requiredNumber(token, "decimals"),
-    l2TokenAddress: requiredString(token, "l2_token_address"),
-    ...(coingeckoId ? { coingeckoId } : {}),
-  };
-
   if (chain === ExternalChain.ETHEREUM) {
     if (
       protocol !== Protocol.CANONICAL &&
@@ -146,14 +135,19 @@ function parseToken(token: BridgeTokenApiRecord): BridgeToken {
         `Invalid protocol "${protocol}" for chain "${ExternalChain.ETHEREUM}"`
       );
     }
+    const coingeckoId = optionalString(token, "coingecko_id");
 
-    const l2FeeTokenAddress = optionalString(token, "l2_fee_token_address");
     return new EthereumBridgeToken({
-      ...base,
+      id: requiredString(token, "id"),
+      name: requiredString(token, "name"),
+      symbol: requiredString(token, "symbol"),
+      decimals: requiredNumber(token, "decimals"),
       protocol: protocol as EthereumBridgeProtocol,
-      l1TokenAddress: requiredString(token, "l1_token_address"),
-      l1BridgeAddress: requiredString(token, "l1_bridge_address"),
-      ...(l2FeeTokenAddress ? { l2FeeTokenAddress } : {}),
+      address: fromEthereumAddress(requiredString(token, "l1_token_address")),
+      l1Bridge: fromEthereumAddress(requiredString(token, "l1_bridge_address")),
+      starknetAddress: fromAddress(requiredString(token, "l2_token_address")),
+      starknetBridge: fromAddress(requiredString(token, "l2_bridge_address")),
+      ...(coingeckoId ? { coingeckoId } : {}),
     });
   }
 
@@ -165,26 +159,19 @@ function parseToken(token: BridgeTokenApiRecord): BridgeToken {
     }
 
     return new SolanaBridgeToken({
-      ...base,
+      id: requiredString(token, "id"),
+      name: requiredString(token, "name"),
+      symbol: requiredString(token, "symbol"),
+      decimals: requiredNumber(token, "decimals"),
       protocol: Protocol.HYPERLANE,
-      solanaTokenAddress: requiredString(token, "l1_token_address"),
-      solanaDecimals: base.decimals,
+      address: requiredString(token, "l1_token_address"),
+      l1Bridge: requiredString(token, "l1_bridge_address"),
+      starknetAddress: fromAddress(requiredString(token, "l2_token_address")),
+      starknetBridge: fromAddress(requiredString(token, "l2_bridge_address")),
     });
   }
 
   throw new Error(`Chain "${chain} not supported"`);
-}
-
-function extractTokenRecords(payload: unknown): BridgeTokenApiRecord[] {
-  if (Array.isArray(payload)) {
-    return payload.filter(isRecord);
-  }
-
-  if (isRecord(payload) && Array.isArray(payload.tokens)) {
-    return payload.tokens.filter(isRecord);
-  }
-
-  throw new Error("Unexpected bridge token API response shape");
 }
 
 function buildCacheKey(query: BridgeTokenQuery): string {
@@ -280,8 +267,11 @@ export class BridgeTokenRepository {
       );
     }
 
-    const payload: unknown = await response.json();
-    const tokens = extractTokenRecords(payload)
+    const payload: BridgeTokenApiRecord[] = await response.json();
+    const tokens = payload
+      .filter((token) => {
+        return !token.hidden && !token.deprecated;
+      })
       .map((token) => {
         try {
           return parseToken(token);
