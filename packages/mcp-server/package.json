@@ -1,5 +1,5 @@
 {
-  "name": "@keep-starknet-strange/starkzap-mcp",
+  "name": "starkzap-mcp",
   "version": "0.1.0",
   "description": "MCP server exposing Starknet wallet operations via the StarkZap SDK — transfer, stake, batch, deploy, and more",
   "author": "0xLucqs",
