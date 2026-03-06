@@ -825,6 +825,27 @@ export class Amount {
 }
 
 /**
+ * Validate that an Amount is compatible with a token's decimals/symbol metadata.
+ *
+ * @throws Error if decimals differ, or if symbol is set and mismatched.
+ */
+export function assertAmountMatchesToken(amount: Amount, token: Token): void {
+  const amountDecimals = amount.getDecimals();
+  if (amountDecimals !== token.decimals) {
+    throw new Error(
+      `Amount decimals mismatch: expected ${token.decimals} (${token.symbol}), got ${amountDecimals}`
+    );
+  }
+
+  const amountSymbol = amount.getSymbol();
+  if (amountSymbol !== undefined && amountSymbol !== token.symbol) {
+    throw new Error(
+      `Amount symbol mismatch: expected "${token.symbol}", got "${amountSymbol}"`
+    );
+  }
+}
+
+/**
  * Formats a token amount for display in the UI with locale-aware number formatting.
  *
  * This standalone function is useful when you have raw balance data and want to

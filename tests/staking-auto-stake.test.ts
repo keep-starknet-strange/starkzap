@@ -51,7 +51,7 @@ describe("staking auto stake", () => {
     } as unknown as WalletInterface;
 
     const stakingLike = {
-      assertAmountMatchesToken: vi.fn(),
+      token: mockToken,
       isMember: vi.fn().mockResolvedValue(false),
       populateEnter: vi.fn().mockReturnValue(enterCalls),
       populateAdd: vi.fn().mockReturnValue(addCalls),
@@ -85,7 +85,7 @@ describe("staking auto stake", () => {
     } as unknown as WalletInterface;
 
     const stakingLike = {
-      assertAmountMatchesToken: vi.fn(),
+      token: mockToken,
       isMember: vi.fn().mockResolvedValue(true),
       populateEnter: vi.fn().mockReturnValue(enterCalls),
       populateAdd: vi.fn().mockReturnValue(addCalls),
