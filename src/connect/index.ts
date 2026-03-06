@@ -1,59 +1,30 @@
-import { connectEvmWallet } from "@/connect/evm";
-import { connectSolanaWallet } from "@/connect/solana";
-import type { ConnectedWallet } from "@/connect/types";
-import { describeValue } from "@/connect/utils";
+import { BridgeToken, ExternalChain } from "@/types";
+import type { ConnectedEthereumWallet } from "@/connect/evm";
+import type { ConnectedSolanaWallet } from "@/connect/solana";
+import type { ConnectEthereumWalletOptions } from "@/connect/evm";
+import type { ConnectSolanaWalletOptions } from "@/connect/solana";
+import type { AddressFor } from "@/bridge/types/generics";
 
-export * from "@/connect/types";
-export { connectEvmWallet } from "@/connect/evm";
-export { connectSolanaWallet } from "@/connect/solana";
+export * from "@/connect/evm";
+export * from "@/connect/solana";
 
-export type ProviderNamespace = "eip155" | "solana" | "bip122";
+export type ConnectExternalWalletOptions =
+  | ConnectEthereumWalletOptions
+  | ConnectSolanaWalletOptions;
 
-const SUPPORTED_PROVIDER_NAMESPACES: readonly ProviderNamespace[] = [
-  "eip155",
-  "solana",
-];
+export type WalletForOptions<O extends ConnectExternalWalletOptions> =
+  O extends ConnectEthereumWalletOptions
+    ? ConnectedEthereumWallet
+    : O extends ConnectSolanaWalletOptions
+      ? ConnectedSolanaWallet
+      : never;
 
-function normalizeProviderNamespace(providerType: unknown): ProviderNamespace {
-  const namespace =
-    typeof providerType === "string"
-      ? providerType
-      : typeof providerType === "object" &&
-          providerType !== null &&
-          "namespace" in providerType
-        ? providerType.namespace
-        : undefined;
-
-  if (
-    namespace === "eip155" ||
-    namespace === "solana" ||
-    namespace === "bip122"
-  ) {
-    return namespace;
-  }
-
-  throw new Error(
-    `Unsupported providerType namespace ${describeValue(namespace)}. Supported namespaces: ${SUPPORTED_PROVIDER_NAMESPACES.join(", ")}.`
-  );
+export interface ExternalWalletRegistry {
+  [ExternalChain.ETHEREUM]?: ConnectedEthereumWallet;
+  [ExternalChain.SOLANA]?: ConnectedSolanaWallet;
 }
 
-export function connectWallet(
-  provider: unknown,
-  providerType: unknown,
-  address: string,
-  chainId: unknown
-): ConnectedWallet {
-  const namespace = normalizeProviderNamespace(providerType);
-
-  if (namespace === "eip155") {
-    return connectEvmWallet(provider, address, chainId);
-  }
-
-  if (namespace === "solana") {
-    return connectSolanaWallet(provider, address, chainId);
-  }
-
-  throw new Error(
-    `Unsupported provider namespace ${describeValue(namespace)}.`
-  );
+export interface ConnectedExternalWallet<T extends BridgeToken> {
+  readonly chain: ExternalChain;
+  readonly address: AddressFor<T>;
 }

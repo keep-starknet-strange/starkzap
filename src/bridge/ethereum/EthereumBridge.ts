@@ -1,8 +1,9 @@
-import type { BridgeInterface } from "@/bridge/BridgeInterface";
+import type { BridgeInterface } from "@/bridge/types/BridgeInterface";
 import {
   type Address,
   Amount,
   type EthereumAddress,
+  EthereumBridgeToken,
   fromEthereumAddress,
 } from "@/types";
 import type { EthereumTokenInterface } from "@/bridge/ethereum/EthereumToken";
@@ -12,17 +13,13 @@ import {
   ContractTransactionReceipt,
   type ContractTransactionResponse,
   isError,
-  TransactionResponse,
 } from "ethers";
 import {
   StarkzapTransactionError,
   TransactionErrorCause,
 } from "@/types/errors";
 
-export abstract class EthereumBridge implements BridgeInterface<
-  EthereumAddress,
-  TransactionResponse
-> {
+export abstract class EthereumBridge implements BridgeInterface<EthereumBridgeToken> {
   public static readonly ALLOWANCE_CACHE_TTL = 60_000;
   private allowanceCache: {
     current: Amount | null;

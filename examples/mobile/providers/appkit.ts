@@ -1,8 +1,14 @@
 import "@walletconnect/react-native-compat";
 
-import { createAppKit, type Storage } from "@reown/appkit-react-native";
+import {
+  createAppKit,
+  solana,
+  type AppKitNetwork,
+  type Storage,
+} from "@reown/appkit-react-native";
 import { EthersAdapter } from "@reown/appkit-ethers-react-native";
-import { sepolia } from "viem/chains";
+import { SolanaAdapter } from "@reown/appkit-solana-react-native";
+import { sepolia, mainnet } from "viem/chains";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { safeJsonParse, safeJsonStringify } from "@walletconnect/safe-json";
 
@@ -35,15 +41,32 @@ const storage: Storage = {
   },
 };
 
+const solanaDevnet: AppKitNetwork = {
+  id: "EtWTRABZaYq6iMfeYKouRu166VU2xqa1",
+  name: "Solana Devnet",
+  chainNamespace: "solana",
+  caipNetworkId: "solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1",
+  nativeCurrency: solana.nativeCurrency,
+  rpcUrls: {
+    default: { http: ["https://api.devnet.solana.com"] },
+  },
+  blockExplorers: {
+    default: {
+      name: "Solana Devnet Explorer",
+      url: "https://explorer.solana.com/?cluster=devnet",
+    },
+  },
+};
+
 const REOWN_PROJECT_ID = process.env.EXPO_PUBLIC_REOWN_PROJECT_ID || "";
 
 const ethersAdapter = new EthersAdapter();
+const solanaAdapter = new SolanaAdapter();
 
 export const appKit = createAppKit({
   projectId: REOWN_PROJECT_ID!,
-  networks: [sepolia],
-  defaultNetwork: sepolia,
-  adapters: [ethersAdapter],
+  networks: [mainnet, sepolia, solana, solanaDevnet],
+  adapters: [ethersAdapter, solanaAdapter],
   storage,
   metadata: {
     name: "Starkzap",

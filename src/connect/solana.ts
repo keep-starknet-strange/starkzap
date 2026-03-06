@@ -1,25 +1,24 @@
-import type {
-  SolanaConnectedWallet,
-  SolanaTransactionInput,
-  SolanaTransactionRequest,
-} from "@/connect/types";
-import {
-  assertNonEmptyString,
-  bytesToHex,
-  describeValue,
-  isRecord,
-  messageToBytes,
-  normalizeChainId,
-  readStringResult,
-} from "@/connect/utils";
-import { ExternalChain } from "@/types";
+import { assertNonEmptyString, describeValue } from "@/connect/utils";
+import { ExternalChain, SolanaBridgeToken } from "@/types";
+import type { ConnectedExternalWallet } from "@/connect/index";
+import type { ChainId } from "starkzap";
 
-interface SolanaProvider {
-  signMessage(message: Uint8Array): Promise<unknown>;
+const SOLANA_MAINNET_GENESIS = "5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp";
+const SOLANA_DEVNET_GENESIS = "EtWTRABZaYq6iMfeYKouRu166VU2xqa1";
+
+export interface SolanaProvider {
+  signMessage(message: Uint8Array): Promise<Uint8Array>;
   signAndSendTransaction(
     transaction: object,
-    options?: Record<string, unknown>
-  ): Promise<unknown>;
+    signers?: object[]
+  ): Promise<{ signature: string }>;
+}
+
+export interface ConnectSolanaWalletOptions {
+  chain: ExternalChain.SOLANA;
+  provider: SolanaProvider;
+  address: string;
+  chainId: string;
 }
 
 function assertSolanaProvider(provider: unknown): SolanaProvider {
@@ -39,68 +38,38 @@ function assertSolanaProvider(provider: unknown): SolanaProvider {
   );
 }
 
-function isSolanaRequest(value: object): value is SolanaTransactionRequest {
-  return "transaction" in value;
-}
+export class ConnectedSolanaWallet implements ConnectedExternalWallet<SolanaBridgeToken> {
+  readonly chain = ExternalChain.SOLANA;
 
-function readSolanaSignature(value: unknown): string {
-  if (value instanceof Uint8Array) {
-    return bytesToHex(value);
+  private constructor(
+    readonly address: string,
+    readonly chainId: string,
+    readonly provider: SolanaProvider
+  ) {}
+
+  public static from(
+    options: ConnectSolanaWalletOptions,
+    starknetChain: ChainId
+  ): ConnectedSolanaWallet {
+    const address = assertNonEmptyString(options.address, "address");
+    const chainId = assertNonEmptyString(options.chainId, "chainId");
+    const provider = assertSolanaProvider(options.provider);
+
+    if (chainId === SOLANA_MAINNET_GENESIS && !starknetChain.isMainnet()) {
+      throw new Error("Solana mainnet cannot be used with Starknet testnet.");
+    }
+
+    if (chainId === SOLANA_DEVNET_GENESIS && !starknetChain.isSepolia()) {
+      throw new Error("Solana devnet cannot be used with Starknet mainnet.");
+    }
+
+    if (
+      chainId !== SOLANA_MAINNET_GENESIS &&
+      chainId !== SOLANA_DEVNET_GENESIS
+    ) {
+      throw new Error("Can connect only mainnet or devnet on solana");
+    }
+
+    return new ConnectedSolanaWallet(address, chainId, provider);
   }
-
-  if (isRecord(value) && value.signature instanceof Uint8Array) {
-    return bytesToHex(value.signature);
-  }
-
-  return readStringResult(value, "solana method", ["signature", "txid"]);
-}
-
-export function connectSolanaWallet(
-  provider: unknown,
-  address: string,
-  chainId: unknown
-): SolanaConnectedWallet {
-  const normalizedAddress = assertNonEmptyString(address, "address");
-  const normalizedChainId = normalizeChainId(ExternalChain.SOLANA, chainId);
-  const solanaProvider = assertSolanaProvider(provider);
-
-  return {
-    chain: ExternalChain.SOLANA,
-    address: normalizedAddress,
-    chainId: normalizedChainId,
-    async signMessage(message: string | Uint8Array): Promise<string> {
-      const result = await solanaProvider.signMessage(messageToBytes(message));
-      return readSolanaSignature(result);
-    },
-    async sendTransaction(tx: SolanaTransactionInput): Promise<string> {
-      if (!isRecord(tx)) {
-        throw new Error("Solana transaction must be an object.");
-      }
-
-      let transaction: object = tx;
-      let options: Record<string, unknown> | undefined;
-
-      if (isSolanaRequest(tx)) {
-        transaction = tx.transaction;
-        options = tx.options;
-      }
-
-      if (!isRecord(transaction)) {
-        throw new Error("Solana transaction payload must be an object.");
-      }
-
-      const result = await solanaProvider.signAndSendTransaction(
-        transaction,
-        options
-      );
-
-      return readStringResult(result, "signAndSendTransaction", [
-        "signature",
-        "txid",
-      ]);
-    },
-    getRawProvider(): unknown {
-      return solanaProvider;
-    },
-  };
 }

@@ -6,9 +6,15 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useAccount, useAppKit } from "@reown/appkit-react-native";
-import { useEffect, useState } from "react";
-import { ExternalChain } from "@starkzap/native";
+import { useAccount, useAppKit, useProvider } from "@reown/appkit-react-native";
+import { useEffect, useRef, useState } from "react";
+import {
+  type ConnectExternalWalletOptions,
+  type Eip1193Provider,
+  ExternalChain,
+  fromEthereumAddress,
+  type SolanaProvider,
+} from "@starkzap/native";
 
 import { ThemedText } from "@/components/themed-text";
 import { useThemeColor } from "@/hooks/use-theme-color";
@@ -21,22 +27,24 @@ export default function BridgeScreen() {
   const textSecondary = useThemeColor({}, "textSecondary");
   const cardBg = useThemeColor({}, "card");
   const bg = useThemeColor({}, "background");
-  const { open } = useAppKit();
-  const { address, chain, isConnected } = useAccount();
+  const { open, disconnect } = useAppKit();
+  const { address: connectedAddress, allAccounts: connectedAccounts } =
+    useAccount();
+  const { provider: walletProvider, providerType } = useProvider();
   const {
     bridgeChain: selectedChain,
     bridgeTokens: tokens,
     bridgeIsLoading: isLoading,
     bridgeError: error,
     bridgeLastUpdated: lastUpdated,
+    connectedEthWallet,
+    connectedSolWallet,
+    connectExternalWallet,
+    disconnectExternalWallets,
     setBridgeChain,
     fetchBridgeTokens,
     refreshBridgeTokens,
   } = useWalletStore((state) => state);
-
-  const shortAddress = address
-    ? `${address.slice(0, 6)}...${address.slice(-4)}`
-    : undefined;
 
   useEffect(() => {
     if (!isTokensSectionExpanded) {
@@ -44,6 +52,65 @@ export default function BridgeScreen() {
     }
     void fetchBridgeTokens();
   }, [selectedChain, fetchBridgeTokens, isTokensSectionExpanded]);
+
+  const prevAddressRef = useRef<string | undefined>(undefined);
+
+  useEffect(() => {
+    const prevAddress = prevAddressRef.current;
+    prevAddressRef.current = connectedAddress;
+
+    if (!connectedAddress || !walletProvider) {
+      if (prevAddress) {
+        disconnectExternalWallets();
+      }
+      return;
+    }
+
+    const connectedAccount = connectedAccounts.find(
+      (a) => a.address === connectedAddress
+    );
+    if (!connectedAccount) return;
+
+    let options: ConnectExternalWalletOptions | undefined;
+
+    if (providerType === "eip155") {
+      options = {
+        chain: ExternalChain.ETHEREUM,
+        provider: walletProvider as Eip1193Provider,
+        address: fromEthereumAddress(connectedAccount.address),
+        chainId: connectedAccount.chainId,
+      };
+    } else if (providerType === "solana") {
+      options = {
+        chain: ExternalChain.SOLANA,
+        provider: walletProvider as unknown as SolanaProvider,
+        address: connectedAccount.address,
+        chainId: connectedAccount.chainId,
+      };
+    }
+
+    if (options) {
+      try {
+        connectExternalWallet(options);
+      } catch (error) {
+        console.error(error);
+
+        if (options.chain === ExternalChain.ETHEREUM) {
+          disconnect("eip155");
+        } else {
+          disconnect("solana");
+        }
+      }
+    }
+  }, [
+    connectedAccounts,
+    connectedAddress,
+    walletProvider,
+    providerType,
+    disconnect,
+    connectExternalWallet,
+    disconnectExternalWallets,
+  ]);
 
   const chainOptions: { label: string; value: BridgeChainFilter }[] = [
     { label: "All", value: "all" },
@@ -72,32 +139,47 @@ export default function BridgeScreen() {
             <ThemedText
               style={[styles.connectButtonText, { color: primaryColor }]}
             >
-              {isConnected ? "Wallet Connected" : "Connect Wallet"}
+              {connectedEthWallet || connectedSolWallet
+                ? "Change Wallet"
+                : "Connect Wallet"}
             </ThemedText>
           </TouchableOpacity>
         </View>
 
-        {isConnected && address ? (
-          <View style={[styles.connectionCard, { borderColor }]}>
-            <ThemedText style={styles.connectionTitle}>
-              Connected Wallet
-            </ThemedText>
-            <ThemedText
-              style={[styles.connectionLine, { color: textSecondary }]}
-            >
-              Address: {shortAddress}
-            </ThemedText>
-            <ThemedText
-              style={[styles.connectionLine, { color: textSecondary }]}
-            >
-              Chain: {chain?.name ?? "Unknown"}
-            </ThemedText>
+        {connectedEthWallet || connectedSolWallet ? (
+          <View style={{ gap: 8 }}>
+            {connectedEthWallet ? (
+              <View style={[styles.connectionCard, { borderColor }]}>
+                <ThemedText style={styles.connectionTitle}>
+                  Ethereum Wallet
+                </ThemedText>
+                <ThemedText
+                  style={[styles.connectionLine, { color: textSecondary }]}
+                >
+                  Address:{" "}
+                  {`${connectedEthWallet.address.slice(0, 6)}...${connectedEthWallet.address.slice(-4)}`}
+                </ThemedText>
+              </View>
+            ) : null}
+            {connectedSolWallet ? (
+              <View style={[styles.connectionCard, { borderColor }]}>
+                <ThemedText style={styles.connectionTitle}>
+                  Solana Wallet
+                </ThemedText>
+                <ThemedText
+                  style={[styles.connectionLine, { color: textSecondary }]}
+                >
+                  Address:{" "}
+                  {`${connectedSolWallet.address.slice(0, 6)}...${connectedSolWallet.address.slice(-4)}`}
+                </ThemedText>
+              </View>
+            ) : null}
           </View>
         ) : (
           <ThemedText
             style={[styles.disconnectedHint, { color: textSecondary }]}
           >
-            No wallet connected.
+            No external wallet connected.
           </ThemedText>
         )}
 
@@ -221,7 +303,7 @@ export default function BridgeScreen() {
 
               {tokens.map((token) => (
                 <View
-                  key={`${token.chain}-${token.id}-${token.l2TokenAddress}`}
+                  key={`${token.chain}-${token.id}-${token.starknetAddress}`}
                   style={[
                     styles.tokenCard,
                     { borderColor, backgroundColor: cardBg },
@@ -247,7 +329,7 @@ export default function BridgeScreen() {
                     style={[styles.tokenMeta, { color: textSecondary }]}
                   >
                     L2 Token:{" "}
-                    {`${token.l2TokenAddress.slice(0, 10)}...${token.l2TokenAddress.slice(-8)}`}
+                    {`${token.starknetAddress.slice(0, 10)}...${token.starknetAddress.slice(-8)}`}
                   </ThemedText>
                 </View>
               ))}

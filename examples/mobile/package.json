@@ -23,6 +23,7 @@
     "@react-navigation/native": "^7.1.8",
     "@reown/appkit-ethers-react-native": "^2.0.2",
     "@reown/appkit-react-native": "^2.0.2",
+    "@reown/appkit-solana-react-native": "^2.0.2",
     "@starkzap/native": "file:../../packages/native",
     "@walletconnect/react-native-compat": "^2.23.7",
     "expo": "~54.0.33",

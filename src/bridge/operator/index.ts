@@ -1,1 +1,1 @@
-export * from "@/bridge/operator/operator";
+export * from "@/bridge/operator/BridgeOperator";

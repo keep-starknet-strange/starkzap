@@ -1,4 +1,4 @@
-import { ExternalChain } from "@/types";
+import type { ChainId } from "starkzap";
 
 export function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
@@ -37,18 +37,29 @@ export function assertNonEmptyString(
 }
 
 export function normalizeChainId(
-  chain: ExternalChain,
-  chainId: unknown
-): string {
-  if (typeof chainId === "string" && chainId.length > 0) {
-    return chainId;
+  starknetChain: ChainId,
+  chainId: number | string
+): string | number {
+  const numericChainId =
+    typeof chainId === "string" ? Number(chainId) : chainId;
+
+  if (!Number.isFinite(numericChainId) || numericChainId <= 0) {
+    throw new Error(`Invalid EVM chain ID: ${String(chainId)}`);
   }
-  if (typeof chainId === "number" && Number.isFinite(chainId)) {
-    return String(chainId);
+
+  if (numericChainId === 1 && !starknetChain.isMainnet()) {
+    throw new Error(`EVM chain id expected to be mainnet.`);
   }
-  throw new Error(
-    `Invalid chainId for ${chain}. Expected non-empty string or finite number, received ${describeValue(chainId)}.`
-  );
+
+  if (numericChainId === 11155111 && !starknetChain.isSepolia()) {
+    throw new Error("EVM chain id expected to be sepolia.");
+  }
+
+  if (numericChainId !== 1 && numericChainId !== 11155111) {
+    throw new Error("EVM chain id expected to be mainnet or sepolia.");
+  }
+
+  return chainId;
 }
 
 export function bytesToHex(bytes: Uint8Array): string {
@@ -64,13 +75,6 @@ export function messageToBytes(message: string | Uint8Array): Uint8Array {
     return new TextEncoder().encode(message);
   }
   return message;
-}
-
-export function messageToUtf8(message: string | Uint8Array): string {
-  if (typeof message === "string") {
-    return message;
-  }
-  return new TextDecoder().decode(message);
 }
 
 export function readStringResult(
@@ -94,11 +98,4 @@ export function readStringResult(
   throw new Error(
     `${methodName} returned an unexpected result (${describeValue(value)}).`
   );
-}
-
-export function assertObject(value: unknown, fieldName: string): object {
-  if (!isRecord(value)) {
-    throw new Error(`${fieldName} must be an object.`);
-  }
-  return value;
 }

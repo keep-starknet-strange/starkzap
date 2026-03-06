@@ -5,23 +5,26 @@ import {
   type AccountClassConfig,
   ArgentPreset,
   BraavosPreset,
+  type BridgeToken,
+  ChainId,
+  type ChainIdLiteral,
+  type ConnectedEthereumWallet,
+  type ConnectedSolanaWallet,
+  type ConnectExternalWalletOptions,
   DevnetPreset,
   ExternalChain,
   fromAddress,
-  OpenZeppelinPreset,
   OnboardStrategy,
-  type BridgeToken,
+  OpenZeppelinPreset,
   type StakingConfig,
-  StarkZap,
   StarkSigner,
+  StarkZap,
   type WalletInterface,
-  type ChainIdLiteral,
-  ChainId,
 } from "@starkzap/native";
 import {
+  showCopiedToast,
   showTransactionToast,
   updateTransactionToast,
-  showCopiedToast,
 } from "@/components/Toast";
 
 // Privy server URL - change this to your server URL
@@ -122,6 +125,10 @@ interface WalletState {
   // Logs
   logs: string[];
 
+  // External wallet state (sourced from StarkZap SDK)
+  connectedEthWallet: ConnectedEthereumWallet | undefined;
+  connectedSolWallet: ConnectedSolanaWallet | undefined;
+
   // Bridge state
   bridgeChain: BridgeChainFilter;
   bridgeTokens: BridgeToken[];
@@ -136,6 +143,8 @@ interface WalletState {
   setCustomChainId: (chainId: ChainIdLiteral) => void;
   confirmNetworkConfig: () => void;
   resetNetworkConfig: () => void;
+  connectExternalWallet: (options: ConnectExternalWalletOptions) => void;
+  disconnectExternalWallets: () => void;
   setBridgeChain: (chain: BridgeChainFilter) => void;
   fetchBridgeTokens: () => Promise<void>;
   refreshBridgeTokens: () => Promise<void>;
@@ -213,6 +222,8 @@ export const useWalletStore = create<WalletState>((set, get) => ({
   isConnecting: false,
   isCheckingStatus: false,
   logs: [],
+  connectedEthWallet: undefined,
+  connectedSolWallet: undefined,
   bridgeEnv: defaultNetwork.chainId.isMainnet() ? "mainnet" : "testnet",
   bridgeChain: "all",
   bridgeTokens: [],
@@ -324,6 +335,8 @@ export const useWalletStore = create<WalletState>((set, get) => ({
       selectedNetworkIndex: DEFAULT_NETWORK_INDEX,
       rpcUrl: defaultNetwork.rpcUrl,
       chainId: defaultNetwork.chainId,
+      connectedEthWallet: undefined,
+      connectedSolWallet: undefined,
       bridgeChain: "all",
       bridgeTokens: [],
       bridgeIsLoading: false,
@@ -331,6 +344,38 @@ export const useWalletStore = create<WalletState>((set, get) => ({
       bridgeLastUpdated: null,
     });
     addLog("Network configuration reset");
+  },
+
+  connectExternalWallet: (options: ConnectExternalWalletOptions) => {
+    const { sdk, addLog } = get();
+    if (!sdk) return;
+
+    try {
+      const wallet = sdk.connectExternalWallet(options);
+      set({
+        connectedEthWallet: sdk.getConnectedWallet(ExternalChain.ETHEREUM),
+        connectedSolWallet: sdk.getConnectedWallet(ExternalChain.SOLANA),
+      });
+      addLog(
+        `${options.chain} wallet connected: ${truncateAddress(wallet.address)}`
+      );
+    } catch (err) {
+      addLog(`Failed to connect ${options.chain} wallet: ${err}`);
+      throw err;
+    }
+  },
+
+  disconnectExternalWallets: () => {
+    const { sdk, addLog } = get();
+    if (!sdk) return;
+
+    sdk.disconnectWallet(ExternalChain.ETHEREUM);
+    sdk.disconnectWallet(ExternalChain.SOLANA);
+    set({
+      connectedEthWallet: undefined,
+      connectedSolWallet: undefined,
+    });
+    addLog("External wallets disconnected");
   },
 
   setBridgeChain: (bridgeChain) =>
