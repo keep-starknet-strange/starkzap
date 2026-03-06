@@ -4,6 +4,7 @@ import { StarkZap } from "@/sdk";
 import { StarkSigner } from "@/signer";
 import { sepoliaTokens } from "@/erc20";
 import { VesuLendingProvider, vesuPresets } from "@/lending/vesu";
+import type { Tx } from "@/tx";
 import { testnetConfig, testnetFunder } from "./config";
 
 const RUN_LIVE_VESU_SEPOLIA_TESTS =
@@ -46,6 +47,13 @@ async function createWallet() {
   });
 }
 
+async function waitAndLogTx(label: string, tx: Tx) {
+  console.log(`${label} tx: ${tx.hash}`);
+  console.log(`${label} explorer: ${tx.explorerUrl}`);
+  await tx.wait();
+  console.log(`${label} confirmed`);
+}
+
 async function ensureUsdcBuffer(
   wallet: Awaited<ReturnType<typeof createWallet>>,
   minUsdcBase: bigint
@@ -53,6 +61,9 @@ async function ensureUsdcBuffer(
   const usdc = sepoliaTokens.USDC;
   let usdcBalance = (await wallet.balanceOf(usdc)).toBase();
   if (usdcBalance >= minUsdcBase) {
+    console.log(
+      `USDC buffer already available: ${usdcBalance.toString()} base units`
+    );
     return usdcBalance;
   }
 
@@ -74,7 +85,7 @@ async function ensureUsdcBuffer(
     },
     { feeMode: "user_pays" }
   );
-  await tx.wait();
+  await waitAndLogTx("USDC buffer swap", tx);
 
   usdcBalance = (await wallet.balanceOf(usdc)).toBase();
   if (usdcBalance < minUsdcBase) {
@@ -127,7 +138,7 @@ maybeDescribe("Live Vesu Sepolia E2E (opt-in)", () => {
     const supplyTx = await lending.borrow(supplyOnlyRequest, {
       feeMode: "user_pays",
     });
-    await supplyTx.wait();
+    await waitAndLogTx("Supply-like collateral add", supplyTx);
 
     const withdrawOnlyRequest = {
       provider,
@@ -147,7 +158,7 @@ maybeDescribe("Live Vesu Sepolia E2E (opt-in)", () => {
     const withdrawTx = await lending.repay(withdrawOnlyRequest, {
       feeMode: "user_pays",
     });
-    await withdrawTx.wait();
+    await waitAndLogTx("Withdraw-like collateral remove", withdrawTx);
 
     const borrowRequest = {
       provider,
@@ -167,7 +178,7 @@ maybeDescribe("Live Vesu Sepolia E2E (opt-in)", () => {
     const borrowTx = await lending.borrow(borrowRequest, {
       feeMode: "user_pays",
     });
-    await borrowTx.wait();
+    await waitAndLogTx("Borrow lifecycle open", borrowTx);
 
     const postBorrowPosition = await lending.getPosition(healthRequest);
     expect((postBorrowPosition.debtAmount ?? 0n) > 0n).toBe(true);
@@ -188,7 +199,7 @@ maybeDescribe("Live Vesu Sepolia E2E (opt-in)", () => {
     });
     expect(repayQuote.simulation.ok).toBe(true);
     const repayTx = await lending.repay(repayRequest, { feeMode: "user_pays" });
-    await repayTx.wait();
+    await waitAndLogTx("Borrow lifecycle close", repayTx);
 
     const finalPosition = await lending.getPosition(healthRequest);
     expect(finalPosition.debtAmount ?? 0n).toBe(0n);
@@ -212,7 +223,7 @@ maybeDescribe("Live Vesu Sepolia E2E (opt-in)", () => {
         },
         { feeMode: "user_pays" }
       );
-      await depositTx.wait();
+      await waitAndLogTx("Deposit", depositTx);
 
       const withdrawTx = await lending.withdraw(
         {
@@ -222,7 +233,7 @@ maybeDescribe("Live Vesu Sepolia E2E (opt-in)", () => {
         },
         { feeMode: "user_pays" }
       );
-      await withdrawTx.wait();
+      await waitAndLogTx("Withdraw partial", withdrawTx);
 
       const withdrawMaxTx = await lending.withdrawMax(
         {
@@ -231,7 +242,7 @@ maybeDescribe("Live Vesu Sepolia E2E (opt-in)", () => {
         },
         { feeMode: "user_pays" }
       );
-      await withdrawMaxTx.wait();
+      await waitAndLogTx("Withdraw max", withdrawMaxTx);
     },
     420_000
   );
