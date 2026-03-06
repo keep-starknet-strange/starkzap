@@ -193,6 +193,14 @@ export class Staking {
     return member.isSome();
   }
 
+  private resolveWalletAddress(
+    walletOrAddress: WalletInterface | Address
+  ): Address {
+    return typeof walletOrAddress === "string"
+      ? walletOrAddress
+      : walletOrAddress.address;
+  }
+
   /**
    * Get the current staking position for a wallet in this pool.
    *
@@ -202,7 +210,7 @@ export class Staking {
    * - Exit/unpooling status
    * - Commission rate
    *
-   * @param wallet - The wallet to query
+   * @param walletOrAddress - The wallet (or address) to query
    * @returns The pool member position, or null if not a member
    *
    * @example
@@ -214,8 +222,13 @@ export class Staking {
    * }
    * ```
    */
-  async getPosition(wallet: WalletInterface): Promise<PoolMember | null> {
-    const memberInfo = await this.pool.get_pool_member_info_v1(wallet.address);
+  async getPosition(wallet: WalletInterface): Promise<PoolMember | null>;
+  async getPosition(address: Address): Promise<PoolMember | null>;
+  async getPosition(
+    walletOrAddress: WalletInterface | Address
+  ): Promise<PoolMember | null> {
+    const walletAddress = this.resolveWalletAddress(walletOrAddress);
+    const memberInfo = await this.pool.get_pool_member_info_v1(walletAddress);
 
     if (memberInfo.isNone()) {
       return null;

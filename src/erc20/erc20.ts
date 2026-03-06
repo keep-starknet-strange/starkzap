@@ -129,9 +129,17 @@ export class Erc20 {
     return await from.execute(calls, options);
   }
 
+  private resolveWalletAddress(
+    walletOrAddress: WalletInterface | Address
+  ): Address {
+    return typeof walletOrAddress === "string"
+      ? walletOrAddress
+      : walletOrAddress.address;
+  }
+
   /**
    * Get the balance in a wallet.
-   * @param wallet - Wallet to check the balance of
+   * @param walletOrAddress - Wallet (or address) to check the balance of
    * @returns Amount representing the token balance
    *
    * @example
@@ -143,13 +151,18 @@ export class Erc20 {
    * console.log(balance.toFormatted()); // "100.5 USDC"
    * ```
    */
-  public async balanceOf(wallet: WalletInterface): Promise<Amount> {
+  public async balanceOf(wallet: WalletInterface): Promise<Amount>;
+  public async balanceOf(address: Address): Promise<Amount>;
+  public async balanceOf(
+    walletOrAddress: WalletInterface | Address
+  ): Promise<Amount> {
+    const walletAddress = this.resolveWalletAddress(walletOrAddress);
     let result: number | bigint | Uint256;
     try {
-      result = await this.contract.balance_of(wallet.address);
+      result = await this.contract.balance_of(walletAddress);
     } catch (error) {
       if (error instanceof RpcError && error.isType("ENTRYPOINT_NOT_FOUND")) {
-        result = await this.contract.balanceOf(wallet.address);
+        result = await this.contract.balanceOf(walletAddress);
       } else {
         throw error;
       }
