@@ -1,6 +1,7 @@
 import type { Call, Calldata, PaymasterTimeBounds } from "starknet";
 import type { SignerInterface } from "@/signer/interface";
 import type { SwapProvider } from "@/swap/interface";
+import type { SponsorshipNotAvailableError } from "@/types/sponsorship-error";
 
 // ─── Account Class Configuration ─────────────────────────────────────────────
 
@@ -167,6 +168,16 @@ export interface ExecuteOptions {
   feeMode?: FeeMode;
   /** Optional time bounds for paymaster transactions */
   timeBounds?: PaymasterTimeBounds;
+  /**
+   * When sponsored execution fails with a sponsorship-related error, retry with user-paid fees.
+   * Only applies when `feeMode` is (or defaults to) `"sponsored"`.
+   */
+  fallbackTo?: "user_pays";
+  /**
+   * Called when sponsorship fails and a fallback (e.g. user_pays) is being attempted.
+   * Use for UX (e.g. toast: "Sponsorship unavailable, you'll pay gas").
+   */
+  onFallback?: (error: SponsorshipNotAvailableError) => void;
 }
 
 // ─── Preflight ───────────────────────────────────────────────────────────────

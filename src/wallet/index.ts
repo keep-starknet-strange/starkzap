@@ -33,7 +33,9 @@ import {
   preflightTransaction,
   sponsoredDetails,
 } from "@/wallet/utils";
+import { normalizeAvnuSponsorshipError } from "@/wallet/sponsorship-errors";
 import { BaseWallet } from "@/wallet/base";
+import { SponsorshipNotAvailableError } from "@/types/sponsorship-error";
 import {
   BraavosPreset,
   BRAAVOS_IMPL_CLASS_HASH,
@@ -484,40 +486,35 @@ export class Wallet extends BaseWallet {
     let transactionHash: string;
 
     if (feeMode === "sponsored") {
-      const deployed = await this.isDeployed();
-      if (deployed) {
-        transactionHash = (
-          await this.account.executePaymasterTransaction(
-            calls,
-            sponsoredDetails(timeBounds)
-          )
-        ).transaction_hash;
-      } else {
-        transactionHash = await this.withSponsoredDeployLock(async () => {
-          const recheckedDeployed = await this.isDeployed();
-          if (recheckedDeployed) {
-            return (
-              await this.account.executePaymasterTransaction(
-                calls,
-                sponsoredDetails(timeBounds)
-              )
-            ).transaction_hash;
-          }
+      try {
+        transactionHash = await this.runSponsoredExecution(calls, timeBounds);
+      } catch (rawError) {
+        const normalized = normalizeAvnuSponsorshipError(rawError);
+        if (!normalized) throw rawError;
 
-          try {
-            return (await this.deployPaymasterWith(calls, timeBounds)).hash;
-          } catch (error) {
-            if (!isAlreadyDeployedError(error)) {
-              throw error;
-            }
-            return (
-              await this.account.executePaymasterTransaction(
-                calls,
-                sponsoredDetails(timeBounds)
-              )
-            ).transaction_hash;
-          }
+        const sponsorshipError = new SponsorshipNotAvailableError({
+          reason: normalized.reason,
+          provider: normalized.provider,
+          rawError,
         });
+
+        if (options.fallbackTo !== "user_pays") {
+          throw sponsorshipError;
+        }
+
+        const canUserPay = await this.isDeployed();
+        if (!canUserPay) {
+          throw new SponsorshipNotAvailableError({
+            reason: "account_not_ready",
+            provider: "unknown",
+            rawError: sponsorshipError,
+            message:
+              "Sponsorship failed and user_pays fallback is not available: account is not deployed.",
+          });
+        }
+
+        options.onFallback?.(sponsorshipError);
+        transactionHash = (await this.account.execute(calls)).transaction_hash;
       }
     } else {
       const deployed = await this.isDeployed();
@@ -535,6 +532,46 @@ export class Wallet extends BaseWallet {
       this.chainId,
       this.explorerConfig
     );
+  }
+
+  /** Runs sponsored path only; throws on failure. Used for try/catch + fallback. */
+  private async runSponsoredExecution(
+    calls: Call[],
+    timeBounds?: PaymasterTimeBounds
+  ): Promise<string> {
+    const deployed = await this.isDeployed();
+    if (deployed) {
+      return (
+        await this.account.executePaymasterTransaction(
+          calls,
+          sponsoredDetails(timeBounds)
+        )
+      ).transaction_hash;
+    }
+    return this.withSponsoredDeployLock(async () => {
+      const recheckedDeployed = await this.isDeployed();
+      if (recheckedDeployed) {
+        return (
+          await this.account.executePaymasterTransaction(
+            calls,
+            sponsoredDetails(timeBounds)
+          )
+        ).transaction_hash;
+      }
+      try {
+        return (await this.deployPaymasterWith(calls, timeBounds)).hash;
+      } catch (error) {
+        if (!isAlreadyDeployedError(error)) {
+          throw error;
+        }
+        return (
+          await this.account.executePaymasterTransaction(
+            calls,
+            sponsoredDetails(timeBounds)
+          )
+        ).transaction_hash;
+      }
+    });
   }
 
   async signMessage(typedData: TypedData): Promise<Signature> {

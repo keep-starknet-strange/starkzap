@@ -27,6 +27,10 @@
     "./cartridge": {
       "types": "./dist/src/cartridge.d.ts",
       "import": "./dist/src/cartridge.js"
+    },
+    "./sponsorship": {
+      "types": "./dist/src/sponsorship.d.ts",
+      "import": "./dist/src/sponsorship.js"
     }
   },
   "peerDependencies": {
