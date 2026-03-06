@@ -18,40 +18,62 @@ import {
 
 import { ThemedText } from "@/components/themed-text";
 import { useThemeColor } from "@/hooks/use-theme-color";
-import { type BridgeChainFilter, useWalletStore } from "@/stores/wallet";
+import { useWalletStore } from "@/stores/wallet";
+
+const CHAIN_LABELS: Record<ExternalChain, string> = {
+  [ExternalChain.ETHEREUM]: "Ethereum",
+  [ExternalChain.SOLANA]: "Solana",
+};
 
 export default function BridgeScreen() {
-  const [isTokensSectionExpanded, setIsTokensSectionExpanded] = useState(false);
+  const [isTokenPickerOpen, setIsTokenPickerOpen] = useState(false);
+
   const borderColor = useThemeColor({}, "border");
   const primaryColor = useThemeColor({}, "primary");
   const textSecondary = useThemeColor({}, "textSecondary");
   const cardBg = useThemeColor({}, "card");
   const bg = useThemeColor({}, "background");
+
   const { open, disconnect } = useAppKit();
   const { address: connectedAddress, allAccounts: connectedAccounts } =
     useAccount();
   const { provider: walletProvider, providerType } = useProvider();
+
   const {
-    bridgeChain: selectedChain,
+    bridgeDirection,
+    bridgeExternalChain,
+    bridgeSelectedToken,
+    bridgeDepositBalance,
+    bridgeDepositBalanceLoading,
     bridgeTokens: tokens,
     bridgeIsLoading: isLoading,
     bridgeError: error,
-    bridgeLastUpdated: lastUpdated,
     connectedEthWallet,
     connectedSolWallet,
     connectExternalWallet,
     disconnectExternalWallets,
-    setBridgeChain,
+    setBridgeExternalChain,
+    toggleBridgeDirection,
+    selectBridgeToken,
     fetchBridgeTokens,
-    refreshBridgeTokens,
+    fetchBridgeDepositBalance,
   } = useWalletStore((state) => state);
 
   useEffect(() => {
-    if (!isTokensSectionExpanded) {
-      return;
-    }
     void fetchBridgeTokens();
-  }, [selectedChain, fetchBridgeTokens, isTokensSectionExpanded]);
+  }, [bridgeExternalChain, fetchBridgeTokens]);
+
+  useEffect(() => {
+    if (bridgeSelectedToken) {
+      void fetchBridgeDepositBalance();
+    }
+  }, [
+    bridgeSelectedToken,
+    bridgeDirection,
+    connectedEthWallet,
+    connectedSolWallet,
+    fetchBridgeDepositBalance,
+  ]);
 
   const prevAddressRef = useRef<string | undefined>(undefined);
 
@@ -112,11 +134,209 @@ export default function BridgeScreen() {
     disconnectExternalWallets,
   ]);
 
-  const chainOptions: { label: string; value: BridgeChainFilter }[] = [
-    { label: "All", value: "all" },
-    { label: "Ethereum", value: ExternalChain.ETHEREUM },
-    { label: "Solana", value: ExternalChain.SOLANA },
-  ];
+  const isDepositExternal = bridgeDirection === "to-starknet";
+
+  const renderExternalChainSection = (isDeposit: boolean) => (
+    <View
+      style={[styles.bridgeSection, { borderColor, backgroundColor: cardBg }]}
+    >
+      <ThemedText style={[styles.sectionLabel, { color: textSecondary }]}>
+        {isDeposit ? "From" : "To"}
+      </ThemedText>
+
+      <View style={styles.chainSelector}>
+        {([ExternalChain.ETHEREUM, ExternalChain.SOLANA] as const).map(
+          (chain) => (
+            <TouchableOpacity
+              key={chain}
+              style={[
+                styles.chainButton,
+                {
+                  borderColor,
+                  backgroundColor:
+                    bridgeExternalChain === chain ? `${primaryColor}15` : bg,
+                },
+              ]}
+              onPress={() => {
+                setBridgeExternalChain(chain);
+                setIsTokenPickerOpen(false);
+              }}
+            >
+              <ThemedText
+                style={[
+                  styles.chainButtonText,
+                  {
+                    color:
+                      bridgeExternalChain === chain
+                        ? primaryColor
+                        : textSecondary,
+                  },
+                ]}
+              >
+                {CHAIN_LABELS[chain]}
+              </ThemedText>
+            </TouchableOpacity>
+          )
+        )}
+      </View>
+
+      <TouchableOpacity
+        style={[styles.tokenSelector, { borderColor, backgroundColor: bg }]}
+        onPress={() => setIsTokenPickerOpen((prev) => !prev)}
+      >
+        <ThemedText
+          style={[
+            styles.tokenSelectorText,
+            !bridgeSelectedToken && { color: textSecondary },
+          ]}
+        >
+          {bridgeSelectedToken
+            ? `${bridgeSelectedToken.symbol} — ${bridgeSelectedToken.name}`
+            : "Select a token"}
+        </ThemedText>
+        <ThemedText
+          style={[styles.tokenSelectorArrow, { color: textSecondary }]}
+        >
+          {isTokenPickerOpen ? "▲" : "▼"}
+        </ThemedText>
+      </TouchableOpacity>
+
+      {isTokenPickerOpen ? (
+        <View style={[styles.tokenList, { borderColor }]}>
+          {isLoading ? (
+            <View style={styles.tokenListLoading}>
+              <ActivityIndicator size="small" />
+              <ThemedText
+                style={[styles.tokenListLoadingText, { color: textSecondary }]}
+              >
+                Loading tokens…
+              </ThemedText>
+            </View>
+          ) : error ? (
+            <ThemedText style={[styles.tokenListError, { color: "#D44545" }]}>
+              {error}
+            </ThemedText>
+          ) : tokens.length === 0 ? (
+            <ThemedText
+              style={[styles.tokenListEmpty, { color: textSecondary }]}
+            >
+              No tokens available.
+            </ThemedText>
+          ) : (
+            tokens.map((token) => {
+              const isSelected =
+                bridgeSelectedToken?.id === token.id &&
+                bridgeSelectedToken?.chain === token.chain;
+
+              return (
+                <TouchableOpacity
+                  key={`${token.chain}-${token.id}-${token.starknetAddress}`}
+                  style={[
+                    styles.tokenListItem,
+                    {
+                      borderColor,
+                      backgroundColor: isSelected
+                        ? `${primaryColor}10`
+                        : "transparent",
+                    },
+                  ]}
+                  onPress={() => {
+                    selectBridgeToken(token);
+                    setIsTokenPickerOpen(false);
+                  }}
+                >
+                  <View style={styles.tokenListItemContent}>
+                    <ThemedText style={styles.tokenListSymbol}>
+                      {token.symbol}
+                    </ThemedText>
+                    <ThemedText
+                      style={[styles.tokenListName, { color: textSecondary }]}
+                    >
+                      {token.name}
+                    </ThemedText>
+                  </View>
+                  <ThemedText
+                    style={[styles.tokenListProtocol, { color: textSecondary }]}
+                  >
+                    {token.protocol}
+                  </ThemedText>
+                </TouchableOpacity>
+              );
+            })
+          )}
+        </View>
+      ) : null}
+
+      {isDeposit && bridgeSelectedToken ? (
+        <View style={styles.balanceRow}>
+          <ThemedText style={[styles.balanceLabel, { color: textSecondary }]}>
+            Balance:
+          </ThemedText>
+          {bridgeDepositBalanceLoading ? (
+            <ActivityIndicator size="small" />
+          ) : (
+            <ThemedText style={styles.balanceValue}>
+              {bridgeDepositBalance ?? "—"}
+            </ThemedText>
+          )}
+        </View>
+      ) : null}
+    </View>
+  );
+
+  const renderStarknetSection = (isDeposit: boolean) => (
+    <View
+      style={[styles.bridgeSection, { borderColor, backgroundColor: cardBg }]}
+    >
+      <ThemedText style={[styles.sectionLabel, { color: textSecondary }]}>
+        {isDeposit ? "From" : "To"}
+      </ThemedText>
+
+      <View
+        style={[
+          styles.starknetChainBadge,
+          { borderColor, backgroundColor: `${primaryColor}08` },
+        ]}
+      >
+        <ThemedText style={styles.starknetChainText}>Starknet</ThemedText>
+      </View>
+
+      <View style={[styles.tokenDisplay, { borderColor, backgroundColor: bg }]}>
+        <ThemedText
+          style={[
+            styles.tokenDisplayText,
+            !bridgeSelectedToken && { color: textSecondary },
+          ]}
+        >
+          {bridgeSelectedToken
+            ? `${bridgeSelectedToken.symbol} — ${bridgeSelectedToken.name}`
+            : "Select a token on the other chain"}
+        </ThemedText>
+      </View>
+
+      {bridgeSelectedToken ? (
+        <ThemedText style={[styles.starknetAddress, { color: textSecondary }]}>
+          L2:{" "}
+          {`${bridgeSelectedToken.starknetAddress.slice(0, 10)}…${bridgeSelectedToken.starknetAddress.slice(-8)}`}
+        </ThemedText>
+      ) : null}
+
+      {isDeposit && bridgeSelectedToken ? (
+        <View style={styles.balanceRow}>
+          <ThemedText style={[styles.balanceLabel, { color: textSecondary }]}>
+            Balance:
+          </ThemedText>
+          {bridgeDepositBalanceLoading ? (
+            <ActivityIndicator size="small" />
+          ) : (
+            <ThemedText style={styles.balanceValue}>
+              {bridgeDepositBalance ?? "—"}
+            </ThemedText>
+          )}
+        </View>
+      ) : null}
+    </View>
+  );
 
   return (
     <SafeAreaView style={styles.container} edges={["top"]}>
@@ -183,166 +403,33 @@ export default function BridgeScreen() {
           </ThemedText>
         )}
 
-        <View
-          style={[styles.sectionCard, { borderColor, backgroundColor: bg }]}
-        >
-          <View style={styles.sectionHeader}>
-            <ThemedText style={styles.sectionTitle}>
-              Available Bridge Tokens
-            </ThemedText>
-            <View style={styles.sectionActions}>
-              {isTokensSectionExpanded ? (
-                <TouchableOpacity
-                  style={[
-                    styles.refreshButton,
-                    { borderColor, backgroundColor: `${primaryColor}12` },
-                  ]}
-                  onPress={() => {
-                    void refreshBridgeTokens();
-                  }}
-                >
-                  <ThemedText
-                    style={[styles.refreshButtonText, { color: primaryColor }]}
-                  >
-                    Refresh
-                  </ThemedText>
-                </TouchableOpacity>
-              ) : null}
-              <TouchableOpacity
-                style={[
-                  styles.toggleButton,
-                  { borderColor, backgroundColor: `${primaryColor}12` },
-                ]}
-                onPress={() => {
-                  setIsTokensSectionExpanded((prev) => !prev);
-                }}
+        <View style={styles.bridgeForm}>
+          {isDepositExternal
+            ? renderExternalChainSection(true)
+            : renderStarknetSection(true)}
+
+          <View style={styles.toggleRow}>
+            <TouchableOpacity
+              style={[
+                styles.toggleDirectionButton,
+                { borderColor, backgroundColor: `${primaryColor}12` },
+              ]}
+              onPress={() => {
+                toggleBridgeDirection();
+                setIsTokenPickerOpen(false);
+              }}
+            >
+              <ThemedText
+                style={[styles.toggleDirectionText, { color: primaryColor }]}
               >
-                <ThemedText
-                  style={[styles.toggleButtonText, { color: primaryColor }]}
-                >
-                  {isTokensSectionExpanded ? "Collapse" : "Expand"}
-                </ThemedText>
-              </TouchableOpacity>
-            </View>
+                ⇅
+              </ThemedText>
+            </TouchableOpacity>
           </View>
 
-          {!isTokensSectionExpanded ? (
-            <ThemedText
-              style={[styles.collapsedHint, { color: textSecondary }]}
-            >
-              Section collapsed. Tap Expand to load and view bridge tokens.
-            </ThemedText>
-          ) : null}
-
-          {isTokensSectionExpanded ? (
-            <>
-              <View style={styles.filterBlock}>
-                <ThemedText
-                  style={[styles.filterTitle, { color: textSecondary }]}
-                >
-                  Chain
-                </ThemedText>
-                <View style={styles.filterRow}>
-                  {chainOptions.map((option) => (
-                    <TouchableOpacity
-                      key={option.value}
-                      style={[
-                        styles.filterButton,
-                        {
-                          borderColor,
-                          backgroundColor:
-                            selectedChain === option.value
-                              ? `${primaryColor}15`
-                              : cardBg,
-                        },
-                      ]}
-                      onPress={() => setBridgeChain(option.value)}
-                    >
-                      <ThemedText
-                        style={[
-                          styles.filterButtonText,
-                          {
-                            color:
-                              selectedChain === option.value
-                                ? primaryColor
-                                : textSecondary,
-                          },
-                        ]}
-                      >
-                        {option.label}
-                      </ThemedText>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              </View>
-
-              {isLoading && tokens.length === 0 ? (
-                <View style={styles.loadingRow}>
-                  <ActivityIndicator />
-                  <ThemedText
-                    style={[styles.loadingText, { color: textSecondary }]}
-                  >
-                    Loading bridge tokens...
-                  </ThemedText>
-                </View>
-              ) : null}
-
-              {error ? (
-                <ThemedText style={[styles.errorText, { color: "#D44545" }]}>
-                  {error}
-                </ThemedText>
-              ) : null}
-
-              {!isLoading && !error && tokens.length === 0 ? (
-                <ThemedText
-                  style={[styles.emptyText, { color: textSecondary }]}
-                >
-                  No tokens available for the selected filters.
-                </ThemedText>
-              ) : null}
-
-              {tokens.map((token) => (
-                <View
-                  key={`${token.chain}-${token.id}-${token.starknetAddress}`}
-                  style={[
-                    styles.tokenCard,
-                    { borderColor, backgroundColor: cardBg },
-                  ]}
-                >
-                  <View style={styles.tokenHeader}>
-                    <ThemedText style={styles.tokenSymbol}>
-                      {token.symbol}
-                    </ThemedText>
-                    <ThemedText
-                      style={[styles.tokenChain, { color: textSecondary }]}
-                    >
-                      {token.chain}
-                    </ThemedText>
-                  </View>
-                  <ThemedText style={styles.tokenName}>{token.name}</ThemedText>
-                  <ThemedText
-                    style={[styles.tokenMeta, { color: textSecondary }]}
-                  >
-                    Protocol: {token.protocol}
-                  </ThemedText>
-                  <ThemedText
-                    style={[styles.tokenMeta, { color: textSecondary }]}
-                  >
-                    L2 Token:{" "}
-                    {`${token.starknetAddress.slice(0, 10)}...${token.starknetAddress.slice(-8)}`}
-                  </ThemedText>
-                </View>
-              ))}
-
-              {lastUpdated ? (
-                <ThemedText
-                  style={[styles.updatedAt, { color: textSecondary }]}
-                >
-                  Last updated: {lastUpdated.toLocaleTimeString()}
-                </ThemedText>
-              ) : null}
-            </>
-          ) : null}
+          {isDepositExternal
+            ? renderStarknetSection(false)
+            : renderExternalChainSection(false)}
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -394,125 +481,173 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: "500",
   },
-  sectionCard: {
+
+  // Bridge form
+  bridgeForm: {
+    gap: 0,
+  },
+  bridgeSection: {
     borderWidth: 1,
-    borderRadius: 12,
-    padding: 12,
-    gap: 12,
+    borderRadius: 14,
+    padding: 14,
+    gap: 10,
   },
-  sectionHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: 12,
-  },
-  sectionActions: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-  },
-  sectionTitle: {
-    fontSize: 16,
-    fontWeight: "700",
-  },
-  refreshButton: {
-    borderWidth: 1,
-    borderRadius: 8,
-    paddingVertical: 6,
-    paddingHorizontal: 10,
-  },
-  refreshButtonText: {
-    fontSize: 13,
-    fontWeight: "700",
-  },
-  toggleButton: {
-    borderWidth: 1,
-    borderRadius: 8,
-    paddingVertical: 6,
-    paddingHorizontal: 10,
-  },
-  toggleButtonText: {
-    fontSize: 13,
-    fontWeight: "700",
-  },
-  collapsedHint: {
-    fontSize: 13,
-    fontWeight: "500",
-  },
-  filterBlock: {
-    gap: 6,
-  },
-  filterTitle: {
+  sectionLabel: {
     fontSize: 12,
     fontWeight: "600",
     textTransform: "uppercase",
+    letterSpacing: 0.5,
   },
-  filterRow: {
+
+  // Chain selector (external)
+  chainSelector: {
     flexDirection: "row",
-    flexWrap: "wrap",
     gap: 8,
   },
-  envValue: {
-    fontSize: 13,
-    fontWeight: "600",
-  },
-  filterButton: {
-    borderWidth: 1,
-    borderRadius: 8,
-    paddingVertical: 6,
-    paddingHorizontal: 10,
-  },
-  filterButtonText: {
-    fontSize: 12,
-    fontWeight: "600",
-  },
-  loadingRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-  },
-  loadingText: {
-    fontSize: 13,
-  },
-  errorText: {
-    fontSize: 13,
-    fontWeight: "600",
-  },
-  emptyText: {
-    fontSize: 13,
-    fontWeight: "500",
-  },
-  tokenCard: {
+  chainButton: {
+    flex: 1,
     borderWidth: 1,
     borderRadius: 10,
-    padding: 10,
-    gap: 3,
+    paddingVertical: 10,
+    alignItems: "center",
   },
-  tokenHeader: {
+  chainButtonText: {
+    fontSize: 14,
+    fontWeight: "600",
+  },
+
+  // Starknet chain badge
+  starknetChainBadge: {
+    borderWidth: 1,
+    borderRadius: 10,
+    paddingVertical: 10,
+    alignItems: "center",
+  },
+  starknetChainText: {
+    fontSize: 14,
+    fontWeight: "600",
+  },
+
+  // Token selector (external)
+  tokenSelector: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    gap: 8,
+    borderWidth: 1,
+    borderRadius: 10,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
   },
-  tokenSymbol: {
-    fontSize: 15,
-    fontWeight: "700",
+  tokenSelectorText: {
+    fontSize: 14,
+    fontWeight: "600",
+    flex: 1,
   },
-  tokenChain: {
-    fontSize: 12,
+  tokenSelectorArrow: {
+    fontSize: 10,
+    marginLeft: 8,
+  },
+
+  // Token display (starknet, read-only mirror)
+  tokenDisplay: {
+    borderWidth: 1,
+    borderRadius: 10,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+  },
+  tokenDisplayText: {
+    fontSize: 14,
     fontWeight: "600",
   },
-  tokenName: {
+
+  starknetAddress: {
+    fontSize: 11,
+    fontWeight: "500",
+  },
+
+  // Token picker dropdown
+  tokenList: {
+    borderWidth: 1,
+    borderRadius: 10,
+    overflow: "hidden",
+  },
+  tokenListLoading: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    padding: 14,
+  },
+  tokenListLoadingText: {
+    fontSize: 13,
+  },
+  tokenListError: {
+    fontSize: 13,
+    fontWeight: "600",
+    padding: 14,
+  },
+  tokenListEmpty: {
+    fontSize: 13,
+    fontWeight: "500",
+    padding: 14,
+  },
+  tokenListItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  tokenListItemContent: {
+    flex: 1,
+    gap: 1,
+  },
+  tokenListSymbol: {
+    fontSize: 14,
+    fontWeight: "700",
+  },
+  tokenListName: {
+    fontSize: 12,
+    fontWeight: "500",
+  },
+  tokenListProtocol: {
+    fontSize: 11,
+    fontWeight: "500",
+    marginLeft: 8,
+  },
+
+  // Balance row
+  balanceRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  balanceLabel: {
+    fontSize: 13,
+    fontWeight: "500",
+  },
+  balanceValue: {
     fontSize: 13,
     fontWeight: "600",
   },
-  tokenMeta: {
-    fontSize: 12,
-    fontWeight: "500",
+
+  // Toggle direction
+  toggleRow: {
+    alignItems: "center",
+    paddingVertical: 4,
+    zIndex: 1,
   },
-  updatedAt: {
-    marginTop: 2,
-    fontSize: 11,
-    fontWeight: "500",
+  toggleDirectionButton: {
+    width: 40,
+    height: 40,
+    borderWidth: 1,
+    borderRadius: 20,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  toggleDirectionText: {
+    fontSize: 20,
+    fontWeight: "700",
+    lineHeight: 24,
   },
 });

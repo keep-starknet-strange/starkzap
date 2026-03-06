@@ -10,7 +10,9 @@ import {
   type EthereumTokenInterface,
 } from "@/bridge/ethereum/EthereumToken";
 import type { Provider } from "ethers";
-import type { Address, EthereumAddress } from "@/types";
+import type { Address, EthereumAddress, Token } from "@/types";
+import { Erc20 } from "@/erc20";
+import type { RpcProvider } from "starknet";
 
 export interface BridgeTokenParams<TAddress extends string = string> {
   id: string;
@@ -53,6 +55,17 @@ export abstract class BridgeToken<TAddress extends string = string> {
     this.bridgeAddress = params.l1Bridge;
     this.starknetAddress = params.starknetAddress;
     this.starknetBridge = params.starknetBridge;
+  }
+
+  public getBridgedErc20(rpcProvider: RpcProvider): Erc20 {
+    const token: Token = {
+      name: this.name,
+      address: this.starknetAddress,
+      decimals: this.decimals,
+      symbol: this.symbol,
+    };
+
+    return new Erc20(token, rpcProvider);
   }
 }
 
