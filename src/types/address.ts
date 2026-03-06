@@ -7,6 +7,7 @@ import { validateAndParseAddress, type BigNumberish } from "starknet";
  * regular strings, while remaining a string at runtime.
  */
 export type Address = string & { readonly __type: "StarknetAddress" };
+export type AddressInput = BigNumberish | { address: BigNumberish };
 
 /**
  * Parse a Starknet address from a BigNumberish value.
@@ -16,4 +17,18 @@ export type Address = string & { readonly __type: "StarknetAddress" };
  */
 export function fromAddress(value: BigNumberish): Address {
   return validateAndParseAddress(value) as Address;
+}
+
+/**
+ * Resolve an address input to a validated Address.
+ *
+ * Accepts either a raw address-like value or an object containing an `address` field
+ * (e.g. WalletInterface-compatible objects).
+ */
+export function resolveWalletAddress(value: AddressInput): Address {
+  if (value && typeof value === "object" && "address" in value) {
+    return fromAddress((value as { address: BigNumberish }).address);
+  }
+
+  return fromAddress(value);
 }

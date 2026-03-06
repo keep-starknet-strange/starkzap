@@ -7,7 +7,7 @@
  * Works with any MCP-compatible client: Claude, Cursor, OpenAI Agents SDK, etc.
  *
  * Usage:
- *   STARKNET_PRIVATE_KEY=0x... npx @keep-starknet-strange/starkzap-mcp --network mainnet
+ *   STARKNET_PRIVATE_KEY=0x... npx starkzap-mcp --network mainnet
  */
 
 import { fileURLToPath } from "node:url";
