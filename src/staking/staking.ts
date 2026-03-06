@@ -195,7 +195,7 @@ export class Staking {
   }
 
   private resolveWalletAddress(
-    walletOrAddress: WalletInterface | BigNumberish
+    walletOrAddress: WalletInterface | Address | BigNumberish
   ): Address {
     if (
       walletOrAddress &&
@@ -232,7 +232,7 @@ export class Staking {
    * ```
    */
   async getPosition(
-    walletOrAddress: WalletInterface | BigNumberish
+    walletOrAddress: WalletInterface | Address | BigNumberish
   ): Promise<PoolMember | null> {
     const walletAddress = this.resolveWalletAddress(walletOrAddress);
     const memberInfo = await this.pool.get_pool_member_info_v1(walletAddress);

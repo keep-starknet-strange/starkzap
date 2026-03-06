@@ -137,7 +137,7 @@ export class Erc20 {
   }
 
   private resolveWalletAddress(
-    walletOrAddress: WalletInterface | BigNumberish
+    walletOrAddress: WalletInterface | Address | BigNumberish
   ): Address {
     if (
       walletOrAddress &&
@@ -167,7 +167,7 @@ export class Erc20 {
    * ```
    */
   public async balanceOf(
-    walletOrAddress: WalletInterface | BigNumberish
+    walletOrAddress: WalletInterface | Address | BigNumberish
   ): Promise<Amount> {
     const walletAddress = this.resolveWalletAddress(walletOrAddress);
     let result: number | bigint | Uint256;
