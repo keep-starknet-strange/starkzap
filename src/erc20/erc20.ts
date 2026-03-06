@@ -137,7 +137,7 @@ export class Erc20 {
   }
 
   private resolveWalletAddress(
-    walletOrAddress: WalletInterface | Address | BigNumberish
+    walletOrAddress: WalletInterface | BigNumberish
   ): Address {
     if (
       walletOrAddress &&

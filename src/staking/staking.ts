@@ -195,7 +195,7 @@ export class Staking {
   }
 
   private resolveWalletAddress(
-    walletOrAddress: WalletInterface | Address | BigNumberish
+    walletOrAddress: WalletInterface | BigNumberish
   ): Address {
     if (
       walletOrAddress &&
