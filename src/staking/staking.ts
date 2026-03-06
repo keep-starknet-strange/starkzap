@@ -1,4 +1,5 @@
 import {
+  type BigNumberish,
   type Call,
   Contract,
   type ProviderOrAccount,
@@ -194,11 +195,19 @@ export class Staking {
   }
 
   private resolveWalletAddress(
-    walletOrAddress: WalletInterface | Address
+    walletOrAddress: WalletInterface | BigNumberish
   ): Address {
-    return typeof walletOrAddress === "string"
-      ? walletOrAddress
-      : walletOrAddress.address;
+    if (
+      walletOrAddress &&
+      typeof walletOrAddress === "object" &&
+      "address" in walletOrAddress
+    ) {
+      return fromAddress(
+        (walletOrAddress as { address: BigNumberish }).address
+      );
+    }
+
+    return fromAddress(walletOrAddress);
   }
 
   /**
@@ -210,7 +219,7 @@ export class Staking {
    * - Exit/unpooling status
    * - Commission rate
    *
-   * @param walletOrAddress - The wallet (or address) to query
+   * @param walletOrAddress - The wallet (or address value) to query
    * @returns The pool member position, or null if not a member
    *
    * @example
@@ -223,9 +232,9 @@ export class Staking {
    * ```
    */
   async getPosition(wallet: WalletInterface): Promise<PoolMember | null>;
-  async getPosition(address: Address): Promise<PoolMember | null>;
+  async getPosition(address: BigNumberish): Promise<PoolMember | null>;
   async getPosition(
-    walletOrAddress: WalletInterface | Address
+    walletOrAddress: WalletInterface | BigNumberish
   ): Promise<PoolMember | null> {
     const walletAddress = this.resolveWalletAddress(walletOrAddress);
     const memberInfo = await this.pool.get_pool_member_info_v1(walletAddress);

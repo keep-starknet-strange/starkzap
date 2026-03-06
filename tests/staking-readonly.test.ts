@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { Staking } from "@/staking";
 import { fromAddress, type Address, type Token } from "@/types";
 import type { WalletInterface } from "@/wallet/interface";
+import type { BigNumberish } from "starknet";
 
 const mockToken: Token = {
   name: "Starknet Token",
@@ -12,6 +13,44 @@ const mockToken: Token = {
 };
 
 describe("Staking.getPosition", () => {
+  it("should accept a raw address string", async () => {
+    const rawAddress =
+      "0x0234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef";
+    const normalizedAddress = fromAddress(rawAddress);
+    const getPoolMemberInfo = vi.fn().mockResolvedValue({
+      isNone: () => true,
+      unwrap: () => undefined,
+    });
+
+    const stakingLike = {
+      pool: { get_pool_member_info_v1: getPoolMemberInfo },
+      token: mockToken,
+      resolveWalletAddress: (
+        walletOrAddress: WalletInterface | BigNumberish
+      ): Address => {
+        if (
+          walletOrAddress &&
+          typeof walletOrAddress === "object" &&
+          "address" in walletOrAddress
+        ) {
+          return fromAddress(
+            (walletOrAddress as { address: BigNumberish }).address
+          );
+        }
+
+        return fromAddress(walletOrAddress);
+      },
+    } as unknown as Staking;
+
+    const position = await Staking.prototype.getPosition.call(
+      stakingLike,
+      rawAddress
+    );
+
+    expect(getPoolMemberInfo).toHaveBeenCalledWith(normalizedAddress);
+    expect(position).toBeNull();
+  });
+
   it("should accept an address directly", async () => {
     const walletAddress = fromAddress("0xCAFE");
     const rewardAddress = fromAddress("0xBEEF");
@@ -34,11 +73,20 @@ describe("Staking.getPosition", () => {
       pool: { get_pool_member_info_v1: getPoolMemberInfo },
       token: mockToken,
       resolveWalletAddress: (
-        walletOrAddress: WalletInterface | Address
-      ): Address =>
-        typeof walletOrAddress === "string"
-          ? walletOrAddress
-          : walletOrAddress.address,
+        walletOrAddress: WalletInterface | BigNumberish
+      ): Address => {
+        if (
+          walletOrAddress &&
+          typeof walletOrAddress === "object" &&
+          "address" in walletOrAddress
+        ) {
+          return fromAddress(
+            (walletOrAddress as { address: BigNumberish }).address
+          );
+        }
+
+        return fromAddress(walletOrAddress);
+      },
     } as unknown as Staking;
 
     const position = await Staking.prototype.getPosition.call(
@@ -67,11 +115,20 @@ describe("Staking.getPosition", () => {
       pool: { get_pool_member_info_v1: getPoolMemberInfo },
       token: mockToken,
       resolveWalletAddress: (
-        walletOrAddress: WalletInterface | Address
-      ): Address =>
-        typeof walletOrAddress === "string"
-          ? walletOrAddress
-          : walletOrAddress.address,
+        walletOrAddress: WalletInterface | BigNumberish
+      ): Address => {
+        if (
+          walletOrAddress &&
+          typeof walletOrAddress === "object" &&
+          "address" in walletOrAddress
+        ) {
+          return fromAddress(
+            (walletOrAddress as { address: BigNumberish }).address
+          );
+        }
+
+        return fromAddress(walletOrAddress);
+      },
     } as unknown as Staking;
 
     const position = await Staking.prototype.getPosition.call(
