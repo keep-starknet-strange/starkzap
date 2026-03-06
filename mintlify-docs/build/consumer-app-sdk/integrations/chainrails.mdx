@@ -1,0 +1,173 @@
+---
+title: Chainrails
+description: "Accept payments/deposits from any chain, in any token or currency — instantly."
+---
+
+## Overview
+[Chainrails](https://chainrails.io) is a cross-chain payment infrastructure that enables you to accept payments and deposits from any blockchain or fiat currency, with seamless settlement on Starknet. 
+
+Starkzap integrates seamlessly with Chainrails to provide a powerful payment solution for your Starknet applications. By enabling the Chainrails integration, you can:
+- Accept payments from 11+ blockchains (Ethereum, Base, Arbitrum, etc.)
+- Accept multiple tokens (ETH, BNB, STRK, USDC, USDT, and more) while settling in your preferred token on Starknet.
+- Allow users to pay with fiat currencies (USD, EUR, INR, NGN etc.)
+
+## Configuration
+To get started, simply add your Chainrails API key to the `payment` section of the SDK configuration:
+
+```typescript
+import { StarkZap } from "starkzap";
+const sdk = new StarkZap({
+  network: "mainnet",
+  payment: {
+    apiKey: "cr_live_...",  // Your Chainrails API key, never hardcode in production
+  },
+});
+```
+
+<Info>
+**Don't have a Chainrails account?** Sign up for free at the [Chainrails Dashboard](https://dashboard.chainrails.io) to get your API key, configure webhooks etc.
+</Info>
+
+## How It Works
+Every Chainrails transaction follows three simple steps from setup to completion:
+
+### Request a Quote
+Define the parameters for the transaction (the intent) — amount, source chain, source token, destination chain, recipient, and refund address. This tells Chainrails what the user wants to send and where it's going.
+
+### Generate an Intent Address
+Once the quote is confirmed, Chainrails creates a unique intent address for that transaction. Think of this as a one-time deposit address that tracks and processes the transfer logic automatically.
+
+ 
+### Fund the Intent
+The user then funds this intent address directly from their wallet. Once funded, Chainrails takes care of the rest — executing the cross-chain transfer, routing liquidity, and confirming settlement.
+
+The SDK abstracts most of these steps, so you can integrate this entire flow in just a few lines of code. Below is a detailed, step-by-step guide showing exactly which parts run on the **client** (browser/mobile app) and which run on the **server** (your backend API).
+
+---
+
+## Complete Integration Guide
+
+This guide walks you through implementing Chainrails payments in a real application. We'll build a checkout flow where:
+- **Server**: Creates the payment session (secure, protects API key)
+- **Client**: Opens the payment modal for the user to complete payment
+
+### Prerequisites
+
+1. A Chainrails account — sign up at [dashboard.chainrails.io](https://dashboard.chainrails.io)
+2. Your Chainrails API key (starts with `cr_live_` for production)
+3. Starkzap SDK installed: `npm install starkzap`
+
+---
+
+### Step 1: Server-Side — Initialize SDK and Create Payment Session
+
+**File: `src/payment/server.ts`** (Your backend)
+
+This step creates a secure, one-time session token that the client uses to open the payment modal. The API key stays on the server.
+
+```typescript
+import { StarkZap, PaymentChains, PaymentTokenSymbols } from "starkzap";
+
+const sdk = new StarkZap({
+  network: "mainnet",
+  payment: {
+    apiKey: process.env.CHAINRAILS_API_KEY!,
+  },
+});
+
+const payment = sdk.payment();
+
+export async function createPaymentSession(recipient: string, amount: string) {
+  const session = await payment.createSession({
+    recipient,
+    token: PaymentTokenSymbols.USDC,
+    destinationChain: PaymentChains.STARKNET,
+    amount,
+  });
+
+  console.log("Session created:", session.sessionToken);
+  
+  return session;
+}
+```
+
+**Parameters:**
+- `recipient` — Your wallet address on Starknet to receive funds
+- `amount` — Payment amount in USD
+- `returns` — sessionToken(and amount) to pass to client for modal
+
+---
+
+### Step 2: Client-Side — Open Payment Modal
+
+**File: `src/components/CheckoutButton.tsx`** (Your frontend)
+
+This is what the user interacts with:
+1. Modal opens showing payment options
+2. User selects payment method (crypto)
+3. User selects source chain and token
+4. User completes the cross-chain transfer
+5. Modal closes and returns success/failure
+
+Note: We do NOT include the payment API key here! The client only needs the session token from your server.
+
+```typescript
+import { StarkZap } from "starkzap";
+
+const sdk = new StarkZap({
+  network: "mainnet",
+});
+
+const payment = sdk.payment();
+
+export async function openPaymentModal(sessionToken: string, amount: string) {
+  const modal = payment.modal({
+    sessionToken,
+    amount,
+    platform: "web",
+  });
+
+  const success = await modal.pay();
+
+  return success;
+}
+```
+
+**Parameters:**
+- `sessionToken` — Token from your server's /api/payment/session
+- `amount` — Amount to display in the modal
+
+---
+
+<Warning>
+**Never expose your Chainrails API key on the client!** Always create sessions server-side. The client only needs the `sessionToken` returned from your server.
+</Warning>
+
+---
+
+## Alternative: Direct Intent Creation (Advanced)
+
+If you need more control, you can create intents directly instead of using sessions. This gives you more control but requires building your own UI for the payment flow. The session + modal approach (shown above) is recommended for most use cases.
+
+```typescript
+const intent = await payment.createIntent({
+  sender: "0xsender...",
+  amount: "10",
+  tokenIn: "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+  amountSymbol: "USDC",
+  source_chain: "ETHEREUM",
+  destination_chain: "STARKNET",
+  recipient: "0xrecipient...",
+  refund_address: "0xsender...",
+});
+
+console.log("Intent Address:", intent.intent_address);
+```
+
+**Note:** Show the intent address to the user so they can send funds to it.
+
+This gives you more control but requires building your own UI for the payment flow. The session + modal approach (shown above) is recommended for most use cases.
+
+---
+
+To dive deeper into the technical details, see the [Cross-Chain Payments Guide](/build/consumer-app-sdk/payment) for complete instructions on sessions, quotes, intents, and the payment modal.

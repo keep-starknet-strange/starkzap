@@ -65,6 +65,9 @@ jobs:
       - name: Build Flappy-Bird Example
         run: npm run -s build --workspace examples/flappy-bird
 
+      - name: Build Chainrails Next.js Example
+        run: npm run -s build --workspace examples/chainrails-nextjs-example
+
       - name: Build Mobile Example (iOS Bundle)
         working-directory: examples/mobile
         run: npx expo export --platform ios --output-dir /tmp/mobile-ios-build

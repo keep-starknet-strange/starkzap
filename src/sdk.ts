@@ -20,6 +20,7 @@ import {
   accountPresets,
   type AccountPresetName,
 } from "@/account";
+import { Payment } from "@/payment";
 
 /** Resolved SDK configuration with required rpcUrl and chainId */
 interface ResolvedConfig extends Omit<SDKConfig, "rpcUrl" | "chainId"> {
@@ -476,6 +477,51 @@ export class StarkZap {
    */
   getProvider(): RpcProvider {
     return this.provider;
+  }
+
+  // ════════════════════════════════════════════════════════
+  // Payment (Chainrails)
+  // ════════════════════════════════════════════════════════
+
+  /**
+   * Get the Payment module for cross-chain payment acceptance.
+   *
+   * Requires `payment.apiKey` to be set in the SDK config unless when used on the browser.
+   *
+   * @returns A {@link Payment} instance bound to the configured API key.
+   * @throws Error if payment is not configured in non-browser runtimes.
+   *
+   * @example
+   * ```ts
+   * const sdk = new StarkZap({
+   *   network: "mainnet",
+   *   payment: { apiKey: "cr_live_..." },
+   * });
+   *
+   * const payment = sdk.payment();
+   *
+   * // Get quotes from every source chain
+   * const quotes = await payment.getAllQuotes({
+   *   destinationChain: "STARKNET",
+   *   tokenOut: "0x053c91...",
+   *   amount: "10",
+   *   recipient: "0xabc...",
+   * });
+   *
+   * // Create an intent
+   * const intent = await payment.createIntent({ ... });
+   * ```
+   */
+  payment(): Payment {
+    if (!this.config.payment) {
+      if (isWebRuntime()) {
+        return new Payment({ apiKey: "" });
+      }
+      throw new Error(
+        "Payment is not configured. Provide a `payment` config with an `apiKey` when creating StarkZap."
+      );
+    }
+    return new Payment(this.config.payment);
   }
 
   /**

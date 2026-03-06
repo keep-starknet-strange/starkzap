@@ -15,6 +15,8 @@ export default defineConfig(
       "**/dist/**",
       "node_modules/",
       "**/node_modules/**",
+      "**/.next/**",
+      "**/next-env.d.ts",
       ".claude/**",
       ".codex/**",
       "coverage/",

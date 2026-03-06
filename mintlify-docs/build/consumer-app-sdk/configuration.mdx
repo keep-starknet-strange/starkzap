@@ -1,6 +1,6 @@
 ---
-title: Network RPC and Staking
-description: "Configure networks, RPC providers, and staking for the SDK"
+title: RPCs, Staking and Payments
+description: "Configure networks, RPC providers, staking, and payments for the SDK"
 icon: cog
 ---
 
@@ -111,6 +111,34 @@ The `StarkZap` accepts configuration through a single options object. You can us
       **Ready to implement staking?** See the [Staking & Delegation Guide](/build/consumer-app-sdk/staking) for complete instructions on how users can stake tokens, claim rewards, and manage their positions.
     </Info>
   </Accordion>
+
+  <Accordion title="Payments">
+
+    Enable **cross-chain, multi-token and fiat deposits/payments** powered by [Chainrails](https://chainrails.io). This allows users to pay from any blockchain (Ethereum, Base, Arbitrum, etc.) or fiat currency, and you receive funds on Starknet.
+
+    **What you can do:**
+    - **Accept payments from any chain, in any token** — Users can pay with ETH, BNB, STRK, USDC, USDT, and more from 11+ blockchains
+    - **Accept fiat payments** — Users can pay with credit cards, Apple Pay, direct bank transfer and you receive funds on Starknet
+    - **Automatic bridging** — Chainrails handles the entire bridging process, aggregating liquidity across multiple protocols for the best rates and user experience
+    - **Full customization** — Get started in minutes with Chainrails' pre-built payment modal, or build your own custom flow using the SDK/APIs.
+
+    To proceed, you will need to first get your API key from the [Chainrails Dashboard](https://dashboard.chainrails.io):
+
+    ```typescript
+    import { StarkZap } from "starkzap";
+
+    const sdk = new StarkZap({
+      network: "mainnet",
+      payment: {
+        apiKey: "cr_live_...",  // Your Chainrails API key, never hardcode in production
+      },
+    });
+    ```
+
+    <Info>
+      **Ready to implement payments?** See the [Cross-Chain Payments Guide](/build/consumer-app-sdk/payment) for complete instructions on sessions, quotes, intents, and the payment modal.
+    </Info>
+  </Accordion>
 </AccordionGroup>
 
 ## Complete Configuration Example
@@ -170,10 +198,16 @@ interface SDKConfig {
   // Optional features
   paymaster?: { nodeUrl: string; apiKey?: string };
   staking?: StakingConfig;
+  payment?: PaymentConfig;
 }
 
 interface StakingConfig {
   contract: Address; // optional override
+}
+
+interface PaymentConfig {
+  apiKey: string;
+  environment?: "production" | "staging";
 }
 ```
 
@@ -185,5 +219,6 @@ interface StakingConfig {
 
 - Set up [Paymasters](/build/consumer-app-sdk/paymasters) for gasless transactions
 - Enable [Staking & Delegation](/build/consumer-app-sdk/staking) so users can earn passive income
+- Add [Cross-Chain Payments](/build/consumer-app-sdk/payment) to accept payments from any blockchain
 - Learn about [Connecting Wallets](/build/consumer-app-sdk/connecting-wallets) with different signers
 - Configure [Account Presets](/build/consumer-app-sdk/connecting-wallets#account-presets) for your use case

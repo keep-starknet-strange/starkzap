@@ -3,12 +3,15 @@ import express from "express";
 import cors from "cors";
 import fs from "fs";
 import { PrivyClient } from "@privy-io/node";
+import { PaymentChains, PaymentTokenSymbols, StarkZap } from "starkzap";
 
 const PRIVY_APP_ID = process.env.PRIVY_APP_ID!;
 const PRIVY_APP_SECRET = process.env.PRIVY_APP_SECRET!;
 const AVNU_API_KEY = process.env.AVNU_API_KEY;
 const AVNU_PAYMASTER_URL =
   process.env.AVNU_PAYMASTER_URL || "https://sepolia.paymaster.avnu.fi";
+const CHAINRAILS_API_KEY = process.env.CHAINRAILS_API_KEY;
+
 if (!PRIVY_APP_ID || !PRIVY_APP_SECRET) {
   console.error(
     "Run with: PRIVY_APP_ID=xxx PRIVY_APP_SECRET=xxx npx tsx server.ts"
@@ -24,6 +27,19 @@ const privy = new PrivyClient({
   appId: PRIVY_APP_ID,
   appSecret: PRIVY_APP_SECRET,
 });
+
+let starkzap: StarkZap | null = null;
+if (CHAINRAILS_API_KEY) {
+  starkzap = new StarkZap({
+    network: "mainnet",
+    payment: {
+      apiKey: CHAINRAILS_API_KEY,
+    },
+  });
+} else {
+  console.warn("CHAINRAILS_API_KEY is not set. Payment features disabled.");
+}
+
 const app = express();
 app.use(cors());
 app.use(express.json());
@@ -187,6 +203,30 @@ app.post("/api/paymaster", async (req, res) => {
   }
 });
 
+// Payment session endpoint (requires CHAINRAILS_API_KEY)
+app.get("/session-token", async (_, res) => {
+  if (!starkzap) {
+    return res.status(503).json({
+      error: "Payment service not configured. Set CHAINRAILS_API_KEY in .env",
+    });
+  }
+
+  try {
+    const session = await starkzap.payment().createSession({
+      amount: "0.1",
+      recipient:
+        "0x0075597a61229d143Ffba493C9f8A8057ecCeeA7BFDDBFD8Aaf79AC8935205c0",
+      destinationChain: PaymentChains.STARKNET,
+      token: PaymentTokenSymbols.USDC,
+    });
+
+    return res.json(session);
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : String(error);
+    return res.status(500).json({ error: message });
+  }
+});
+
 app.get("/api/health", (_, res) => res.json({ status: "ok" }));
 
 // Keep reference to server to prevent garbage collection
@@ -196,6 +236,9 @@ const server = app.listen(3001, () => {
   );
   console.log(
     `AVNU Paymaster: ${AVNU_PAYMASTER_URL} (${AVNU_API_KEY ? "sponsored mode" : "gasless mode"})`
+  );
+  console.log(
+    `Payment Sessions: ${CHAINRAILS_API_KEY ? "enabled" : "disabled (set CHAINRAILS_API_KEY to enable)"}`
   );
 });
 

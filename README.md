@@ -71,6 +71,17 @@ For onboarding flows (Privy, Cartridge, etc.) and more examples, see the [Quick 
 
 ---
 
+## Payment (Chainrails)
+
+`sdk.payment()` uses the SDK `payment` config when provided.
+
+- In **browser runtimes**, calling `sdk.payment()` without `payment` config does not throw.
+- In **non-browser runtimes** (Node/server), calling `sdk.payment()` without `payment` config throws: `Payment is not configured...`
+
+For server-based payment flows, pass `payment: { apiKey: "..." }` when creating `StarkZap`.
+
+---
+
 ## Documentation
 
 All guides and API reference live on the Starknet docs site. We recommend starting with [Quick Start](https://docs.starknet.io/build/starkzap/quick-start).

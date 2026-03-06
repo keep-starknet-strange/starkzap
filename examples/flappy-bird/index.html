@@ -10,6 +10,21 @@
       <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
       <style>
          /* FOS-style controller & leaderboard (https://github.com/0xsisyfos/fos) */
+         /* Save Me revive feature */
+         .save-me-title { margin: 0; color: #2c3e50; font-size: 10px; text-shadow: 2px 2px 0 rgba(0,0,0,0.2); }
+         .save-me-copy { margin: 0; line-height: 1.8; }
+         .save-me-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 10px; }
+         .save-me-pay-btn, .save-me-cancel-btn {
+            padding: 6px 8px; font-size: 8px; color: #fff; border: 2px solid #34495e; border-radius: 4px;
+            cursor: pointer; font-family: 'Press Start 2P', cursive; text-shadow: 1px 1px 0 rgba(0,0,0,0.5);
+            transition: all 0.2s ease; box-shadow: 2px 2px 0 #34495e;
+         }
+         .save-me-pay-btn { background-color: #2c3e50; }
+         .save-me-cancel-btn { background-color: #6b7280; }
+         .save-me-pay-btn:hover, .save-me-cancel-btn:hover { transform: translate(1px, 1px); box-shadow: 1px 1px 0 #34495e; }
+         .save-me-pay-btn:active, .save-me-cancel-btn:active { transform: translate(2px, 2px); box-shadow: none; }
+         .save-me-pay-btn:disabled, .save-me-cancel-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+         /* Controller UI */
          .controller-ui { position: absolute; top: 20px; right: 20px; display: flex; flex-direction: column; gap: 8px; z-index: 3000; }
          .controller-btn, .leaderboard-btn {
             padding: 6px 8px; font-size: 8px; color: #fff; border: 2px solid #34495e; border-radius: 4px;
@@ -51,8 +66,9 @@
                <div id="flyarea">
                   <div id="ceiling" class="animated"></div>
                   <div id="player" class="bird animated"></div>
-                  <div id="bigscore"></div>
-                  <div id="splash"></div>
+                    <div id="bigscore"></div>
+                    <div id="revive-countdown"></div>
+                    <div id="splash"></div>
                   <div class="controller-ui">
                      <button type="button" id="starknet-connect" class="controller-btn">Connect Controller</button>
                      <button type="button" id="starknet-leaderboard" class="leaderboard-btn">Leaderboard</button>
@@ -61,7 +77,10 @@
                      <div id="medal"></div>
                      <div id="currentscore"></div>
                      <div id="highscore"></div>
-                     <div id="replay"><img src="/assets/replay.png" alt="replay"></div>
+                     <div id="actions">
+                       <div id="save-me"><img src="/assets/saveme.png" alt="save me"></div>
+                       <div id="replay"><img src="/assets/replay.png" alt="replay"></div>
+                      </div>
                   </div>
                </div>
             </div>
@@ -72,7 +91,7 @@
          <a href="https://www.dotgears.com/">original game/concept/art by dong nguyen</a>
          <a href="https://nebezb.com/">recreated by nebez briefkani</a>
          <a href="https://github.com/nebez/floppybird/">view github project</a>
-         This is a demo of StarkZap SDK using the Cartridge Controller.
+         This is a demo of StarkZap SDK using the Cartridge Controller and Chainrails for payments
       </div>
       <div class="boundingbox" id="playerbox"></div>
       <div class="boundingbox" id="pipebox"></div>
@@ -107,6 +126,24 @@
                <button type="button" class="close-btn" id="leaderboard-popup-close" aria-label="Close">×</button>
             </div>
             <div id="leaderboard-list" class="popup-content"></div>
+         </div>
+      </div>
+
+      <!-- Save Me payment modal -->
+      <div id="save-me-overlay" class="overlay">
+         <div class="popup">
+            <div class="popup-header">
+               <h2 class="save-me-title">Revive for $0.10</h2>
+               <button type="button" class="close-btn" id="save-me-popup-close" aria-label="Close">×</button>
+            </div>
+            <div class="popup-content">
+               <p class="save-me-copy">Pay 0.10 USD to revive and continue this run.</p>
+               <p id="save-me-status-line" class="save-me-copy">Ready to pay.</p>
+               <div class="save-me-actions">
+                  <button type="button" class="save-me-cancel-btn" id="save-me-cancel">Cancel</button>
+                  <button type="button" class="save-me-pay-btn" id="save-me-pay">Pay $0.10</button>
+               </div>
+            </div>
          </div>
       </div>
 

@@ -3,6 +3,7 @@ build
 coverage
 dist
 node_modules
+.next
 .expo
 expo-env.d.ts
 docs
