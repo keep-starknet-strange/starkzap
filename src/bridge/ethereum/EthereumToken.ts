@@ -23,6 +23,7 @@ export type EthereumTokenInterface = {
     signer: Signer
   ): Promise<ContractTransaction | null>;
   amount(from: bigint): Promise<Amount>;
+  isNativeEth(): boolean;
 };
 
 export class ERC20EthereumToken implements EthereumTokenInterface {
@@ -97,6 +98,10 @@ export class ERC20EthereumToken implements EthereumTokenInterface {
     const symbol = await this.symbol();
     return Amount.fromRaw(amount, decimals, symbol);
   }
+
+  public isNativeEth() {
+    return false;
+  }
 }
 
 export class EthereumToken implements EthereumTokenInterface {
@@ -139,5 +144,9 @@ export class EthereumToken implements EthereumTokenInterface {
 
   getContract(): null {
     return null;
+  }
+
+  isNativeEth() {
+    return true;
   }
 }

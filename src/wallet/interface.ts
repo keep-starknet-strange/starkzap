@@ -25,6 +25,7 @@ import type {
   PreflightResult,
   Token,
 } from "@/types";
+import type { BridgeOperatorInterface } from "@/bridge/operator/BridgeOperatorInterface";
 
 /**
  * Interface for a connected Starknet wallet.
@@ -44,7 +45,7 @@ import type {
  * await wallet.execute([...]);
  * ```
  */
-export interface WalletInterface {
+export interface WalletInterface extends BridgeOperatorInterface {
   /** The wallet's Starknet address */
   readonly address: Address;
 

@@ -27,7 +27,6 @@ import {
   OpenZeppelinPreset,
 } from "@/account";
 import { BridgeTokenRepository } from "@/bridge/tokens/repository";
-import { BridgeOperator } from "@/bridge/operator";
 import {
   ConnectedEthereumWallet,
   ConnectedSolanaWallet,
@@ -100,7 +99,6 @@ export class StarkZap {
   private bridgeTokenRepository: BridgeTokenRepository | null = null;
   private chainValidationPromise: Promise<void> | null = null;
   private externalWallets: ExternalWalletRegistry = {};
-  private bridgeOperator: BridgeOperator | null = null;
 
   constructor(config: SDKConfig) {
     this.config = this.resolveConfig(config);
@@ -583,9 +581,6 @@ export class StarkZap {
    */
   disconnectExternalWallet(chain: ExternalChain): void {
     delete this.externalWallets[chain];
-    if (chain === ExternalChain.ETHEREUM) {
-      this.bridgeOperator?.clearCache();
-    }
   }
 
   getConnectedExternalWallet(
@@ -598,13 +593,6 @@ export class StarkZap {
     chain: ExternalChain
   ): ConnectedEthereumWallet | ConnectedSolanaWallet | undefined {
     return this.externalWallets[chain];
-  }
-
-  getBridgeOperator(): BridgeOperator {
-    if (!this.bridgeOperator) {
-      this.bridgeOperator = new BridgeOperator();
-    }
-    return this.bridgeOperator;
   }
 
   /**

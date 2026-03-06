@@ -2,12 +2,13 @@ import {
   ActivityIndicator,
   ScrollView,
   StyleSheet,
+  TextInput,
   TouchableOpacity,
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useAccount, useAppKit, useProvider } from "@reown/appkit-react-native";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   type ConnectExternalWalletOptions,
   type Eip1193Provider,
@@ -44,7 +45,10 @@ export default function BridgeScreen() {
     bridgeExternalChain,
     bridgeSelectedToken,
     bridgeDepositBalance,
+    bridgeDepositBalanceUnit,
     bridgeDepositBalanceLoading,
+    bridgeAllowance,
+    bridgeAllowanceLoading,
     bridgeTokens: tokens,
     bridgeIsLoading: isLoading,
     bridgeError: error,
@@ -57,6 +61,7 @@ export default function BridgeScreen() {
     selectBridgeToken,
     fetchBridgeTokens,
     fetchBridgeDepositBalance,
+    fetchBridgeAllowance,
   } = useWalletStore((state) => state);
 
   useEffect(() => {
@@ -73,6 +78,18 @@ export default function BridgeScreen() {
     connectedEthWallet,
     connectedSolWallet,
     fetchBridgeDepositBalance,
+  ]);
+
+  useEffect(() => {
+    if (bridgeSelectedToken && bridgeDirection === "to-starknet") {
+      void fetchBridgeAllowance();
+    }
+  }, [
+    bridgeSelectedToken,
+    bridgeDirection,
+    connectedEthWallet,
+    connectedSolWallet,
+    fetchBridgeAllowance,
   ]);
 
   const prevAddressRef = useRef<string | undefined>(undefined);
@@ -135,6 +152,43 @@ export default function BridgeScreen() {
   ]);
 
   const isDepositExternal = bridgeDirection === "to-starknet";
+
+  const [amountInput, setAmountInput] = useState("");
+
+  useEffect(() => {
+    setAmountInput("");
+  }, [bridgeSelectedToken, bridgeDirection, bridgeExternalChain]);
+
+  const amountError = useMemo(() => {
+    if (!amountInput) return null;
+    const parsed = parseFloat(amountInput);
+    if (isNaN(parsed) || parsed <= 0) return "Amount must be greater than 0";
+    if (bridgeDepositBalanceUnit) {
+      const max = parseFloat(bridgeDepositBalanceUnit);
+      if (!isNaN(max) && parsed > max)
+        return "Amount exceeds available balance";
+    }
+    return null;
+  }, [amountInput, bridgeDepositBalanceUnit]);
+
+  const applyPercentage = useCallback(
+    (pct: number) => {
+      if (!bridgeDepositBalanceUnit) return;
+      const max = parseFloat(bridgeDepositBalanceUnit);
+      if (isNaN(max) || max <= 0) return;
+      if (pct >= 1) {
+        setAmountInput(bridgeDepositBalanceUnit);
+      } else {
+        const value = max * pct;
+        setAmountInput(
+          value
+            .toFixed(bridgeSelectedToken?.decimals ?? 18)
+            .replace(/\.?0+$/, "")
+        );
+      }
+    },
+    [bridgeDepositBalanceUnit, bridgeSelectedToken?.decimals]
+  );
 
   const renderExternalChainSection = (isDeposit: boolean) => (
     <View
@@ -281,6 +335,74 @@ export default function BridgeScreen() {
           )}
         </View>
       ) : null}
+
+      {isDeposit && bridgeSelectedToken && bridgeDirection === "to-starknet" ? (
+        <View style={styles.balanceRow}>
+          <ThemedText style={[styles.balanceLabel, { color: textSecondary }]}>
+            Allowance:
+          </ThemedText>
+          {bridgeAllowanceLoading ? (
+            <ActivityIndicator size="small" />
+          ) : (
+            <ThemedText style={styles.balanceValue}>
+              {bridgeAllowance ?? "—"}
+            </ThemedText>
+          )}
+        </View>
+      ) : null}
+
+      {isDeposit && bridgeSelectedToken ? (
+        <View style={styles.amountBlock}>
+          <TextInput
+            style={[
+              styles.amountInput,
+              {
+                borderColor: amountError ? "#D44545" : borderColor,
+                backgroundColor: bg,
+                color: amountError ? "#D44545" : undefined,
+              },
+            ]}
+            value={amountInput}
+            onChangeText={setAmountInput}
+            placeholder="0.0"
+            placeholderTextColor={textSecondary}
+            keyboardType="decimal-pad"
+            returnKeyType="done"
+          />
+          {amountError ? (
+            <ThemedText style={styles.amountError}>{amountError}</ThemedText>
+          ) : null}
+          <View style={styles.percentRow}>
+            {([25, 50, 75, 100] as const).map((pct) => (
+              <TouchableOpacity
+                key={pct}
+                style={[
+                  styles.percentButton,
+                  {
+                    borderColor,
+                    backgroundColor: `${primaryColor}10`,
+                  },
+                ]}
+                disabled={!bridgeDepositBalanceUnit}
+                onPress={() => applyPercentage(pct / 100)}
+              >
+                <ThemedText
+                  style={[
+                    styles.percentButtonText,
+                    {
+                      color: bridgeDepositBalanceUnit
+                        ? primaryColor
+                        : textSecondary,
+                    },
+                  ]}
+                >
+                  {pct === 100 ? "MAX" : `${pct}%`}
+                </ThemedText>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
+      ) : null}
     </View>
   );
 
@@ -333,6 +455,59 @@ export default function BridgeScreen() {
               {bridgeDepositBalance ?? "—"}
             </ThemedText>
           )}
+        </View>
+      ) : null}
+
+      {isDeposit && bridgeSelectedToken ? (
+        <View style={styles.amountBlock}>
+          <TextInput
+            style={[
+              styles.amountInput,
+              {
+                borderColor: amountError ? "#D44545" : borderColor,
+                backgroundColor: bg,
+                color: amountError ? "#D44545" : undefined,
+              },
+            ]}
+            value={amountInput}
+            onChangeText={setAmountInput}
+            placeholder="0.0"
+            placeholderTextColor={textSecondary}
+            keyboardType="decimal-pad"
+            returnKeyType="done"
+          />
+          {amountError ? (
+            <ThemedText style={styles.amountError}>{amountError}</ThemedText>
+          ) : null}
+          <View style={styles.percentRow}>
+            {([25, 50, 75, 100] as const).map((pct) => (
+              <TouchableOpacity
+                key={pct}
+                style={[
+                  styles.percentButton,
+                  {
+                    borderColor,
+                    backgroundColor: `${primaryColor}10`,
+                  },
+                ]}
+                disabled={!bridgeDepositBalanceUnit}
+                onPress={() => applyPercentage(pct / 100)}
+              >
+                <ThemedText
+                  style={[
+                    styles.percentButtonText,
+                    {
+                      color: bridgeDepositBalanceUnit
+                        ? primaryColor
+                        : textSecondary,
+                    },
+                  ]}
+                >
+                  {pct === 100 ? "MAX" : `${pct}%`}
+                </ThemedText>
+              </TouchableOpacity>
+            ))}
+          </View>
         </View>
       ) : null}
     </View>
@@ -629,6 +804,39 @@ const styles = StyleSheet.create({
   balanceValue: {
     fontSize: 13,
     fontWeight: "600",
+  },
+
+  // Amount input
+  amountBlock: {
+    gap: 8,
+  },
+  amountInput: {
+    borderWidth: 1,
+    borderRadius: 10,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    fontSize: 16,
+    fontWeight: "600",
+  },
+  amountError: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: "#D44545",
+  },
+  percentRow: {
+    flexDirection: "row",
+    gap: 8,
+  },
+  percentButton: {
+    flex: 1,
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingVertical: 8,
+    alignItems: "center",
+  },
+  percentButtonText: {
+    fontSize: 12,
+    fontWeight: "700",
   },
 
   // Toggle direction

@@ -3,6 +3,7 @@ import { Alert } from "react-native";
 import * as Clipboard from "expo-clipboard";
 import {
   type AccountClassConfig,
+  Amount,
   ArgentPreset,
   BraavosPreset,
   type BridgeToken,
@@ -134,7 +135,10 @@ interface WalletState {
   bridgeExternalChain: ExternalChain;
   bridgeSelectedToken: BridgeToken | null;
   bridgeDepositBalance: string | null;
+  bridgeDepositBalanceUnit: string | null;
   bridgeDepositBalanceLoading: boolean;
+  bridgeAllowance: string | null;
+  bridgeAllowanceLoading: boolean;
   bridgeTokens: BridgeToken[];
   bridgeIsLoading: boolean;
   bridgeError: string | null;
@@ -155,6 +159,7 @@ interface WalletState {
   fetchBridgeTokens: () => Promise<void>;
   refreshBridgeTokens: () => Promise<void>;
   fetchBridgeDepositBalance: () => Promise<void>;
+  fetchBridgeAllowance: () => Promise<void>;
   initiateBridge: (amount: string) => Promise<void>;
 
   // Actions
@@ -236,7 +241,10 @@ export const useWalletStore = create<WalletState>((set, get) => ({
   bridgeExternalChain: ExternalChain.ETHEREUM,
   bridgeSelectedToken: null,
   bridgeDepositBalance: null,
+  bridgeDepositBalanceUnit: null,
   bridgeDepositBalanceLoading: false,
+  bridgeAllowance: null,
+  bridgeAllowanceLoading: false,
   bridgeTokens: [],
   bridgeIsLoading: false,
   bridgeError: null,
@@ -252,6 +260,8 @@ export const useWalletStore = create<WalletState>((set, get) => ({
         chainId: network.chainId,
         bridgeSelectedToken: null,
         bridgeDepositBalance: null,
+        bridgeDepositBalanceUnit: null,
+        bridgeAllowance: null,
         bridgeTokens: [],
         bridgeError: null,
         bridgeLastUpdated: null,
@@ -320,6 +330,8 @@ export const useWalletStore = create<WalletState>((set, get) => ({
       isConfigured: true,
       bridgeSelectedToken: null,
       bridgeDepositBalance: null,
+      bridgeDepositBalanceUnit: null,
+      bridgeAllowance: null,
       bridgeTokens: [],
       bridgeError: null,
       bridgeLastUpdated: null,
@@ -356,7 +368,10 @@ export const useWalletStore = create<WalletState>((set, get) => ({
       bridgeExternalChain: ExternalChain.ETHEREUM,
       bridgeSelectedToken: null,
       bridgeDepositBalance: null,
+      bridgeDepositBalanceUnit: null,
       bridgeDepositBalanceLoading: false,
+      bridgeAllowance: null,
+      bridgeAllowanceLoading: false,
       bridgeTokens: [],
       bridgeIsLoading: false,
       bridgeError: null,
@@ -408,6 +423,8 @@ export const useWalletStore = create<WalletState>((set, get) => ({
       bridgeExternalChain: chain,
       bridgeSelectedToken: null,
       bridgeDepositBalance: null,
+      bridgeDepositBalanceUnit: null,
+      bridgeAllowance: null,
       bridgeTokens: [],
       bridgeError: null,
       bridgeLastUpdated: null,
@@ -421,11 +438,18 @@ export const useWalletStore = create<WalletState>((set, get) => ({
           ? "from-starknet"
           : "to-starknet",
       bridgeDepositBalance: null,
+      bridgeDepositBalanceUnit: null,
+      bridgeAllowance: null,
     }));
   },
 
   selectBridgeToken: (token) => {
-    set({ bridgeSelectedToken: token, bridgeDepositBalance: null });
+    set({
+      bridgeSelectedToken: token,
+      bridgeDepositBalance: null,
+      bridgeDepositBalanceUnit: null,
+      bridgeAllowance: null,
+    });
   },
 
   fetchBridgeTokens: async () => {
@@ -468,12 +492,18 @@ export const useWalletStore = create<WalletState>((set, get) => ({
       wallet,
     } = get();
 
+    const clearBalance = {
+      bridgeDepositBalance: null,
+      bridgeDepositBalanceUnit: null,
+      bridgeDepositBalanceLoading: false,
+    } as const;
+
     if (!sdk || !bridgeSelectedToken) {
-      set({ bridgeDepositBalance: null, bridgeDepositBalanceLoading: false });
+      set(clearBalance);
       return;
     }
 
-    set({ bridgeDepositBalance: null, bridgeDepositBalanceLoading: false });
+    set(clearBalance);
 
     const externalWallet =
       bridgeSelectedToken.chain === ExternalChain.ETHEREUM
@@ -481,7 +511,7 @@ export const useWalletStore = create<WalletState>((set, get) => ({
         : connectedSolWallet;
 
     if (!externalWallet) {
-      set({ bridgeDepositBalance: null, bridgeDepositBalanceLoading: false });
+      set(clearBalance);
       return;
     }
 
@@ -489,46 +519,102 @@ export const useWalletStore = create<WalletState>((set, get) => ({
 
     try {
       let balance: Amount | null;
-
-      if (bridgeDirection === "from-starknet") {
-        if (wallet) {
+      if (!wallet) {
+        balance = null;
+      } else {
+        if (bridgeDirection === "from-starknet") {
           const erc20 = bridgeSelectedToken.getBridgedErc20(sdk.getProvider());
 
-          balance = await erc20.balanceOf(externalWallet);
+          balance = await erc20.balanceOf(wallet);
         } else {
-          balance = null;
-        }
-      } else {
-        const operator = sdk.getBridgeOperator();
-
-        if (
-          bridgeSelectedToken.chain === ExternalChain.ETHEREUM &&
-          connectedEthWallet
-        ) {
-          balance = await operator.getDepositBalance(
-            bridgeSelectedToken as EthereumBridgeToken,
+          if (
+            bridgeSelectedToken.chain === ExternalChain.ETHEREUM &&
             connectedEthWallet
-          );
-        } else if (
-          bridgeSelectedToken.chain === ExternalChain.SOLANA &&
-          connectedSolWallet
-        ) {
-          balance = await operator.getDepositBalance(
-            bridgeSelectedToken as SolanaBridgeToken,
+          ) {
+            balance = await wallet.getDepositBalance(
+              bridgeSelectedToken as EthereumBridgeToken,
+              connectedEthWallet
+            );
+          } else if (
+            bridgeSelectedToken.chain === ExternalChain.SOLANA &&
             connectedSolWallet
-          );
-        } else {
-          balance = null;
+          ) {
+            balance = await wallet.getDepositBalance(
+              bridgeSelectedToken as SolanaBridgeToken,
+              connectedSolWallet
+            );
+          } else {
+            balance = null;
+          }
         }
       }
 
       set({
         bridgeDepositBalance: balance ? balance.toFormatted(true) : null,
+        bridgeDepositBalanceUnit: balance ? balance.toUnit() : null,
         bridgeDepositBalanceLoading: false,
       });
     } catch (error) {
       console.error("Failed to fetch deposit balance:", error);
-      set({ bridgeDepositBalance: null, bridgeDepositBalanceLoading: false });
+      set(clearBalance);
+    }
+  },
+
+  fetchBridgeAllowance: async () => {
+    const {
+      sdk,
+      wallet,
+      bridgeSelectedToken,
+      bridgeDirection,
+      connectedEthWallet,
+      connectedSolWallet,
+    } = get();
+
+    if (!sdk || !bridgeSelectedToken || bridgeDirection !== "to-starknet") {
+      set({ bridgeAllowance: null, bridgeAllowanceLoading: false });
+      return;
+    }
+
+    const externalWallet =
+      bridgeSelectedToken.chain === ExternalChain.ETHEREUM
+        ? connectedEthWallet
+        : connectedSolWallet;
+
+    if (!externalWallet || !wallet) {
+      set({ bridgeAllowance: null, bridgeAllowanceLoading: false });
+      return;
+    }
+
+    set({ bridgeAllowanceLoading: true });
+
+    try {
+      let allowance;
+
+      if (
+        bridgeSelectedToken.chain === ExternalChain.ETHEREUM &&
+        connectedEthWallet
+      ) {
+        allowance = await wallet.getAllowance(
+          bridgeSelectedToken as EthereumBridgeToken,
+          connectedEthWallet
+        );
+      } else if (
+        bridgeSelectedToken.chain === ExternalChain.SOLANA &&
+        connectedSolWallet
+      ) {
+        allowance = await wallet.getAllowance(
+          bridgeSelectedToken as SolanaBridgeToken,
+          connectedSolWallet
+        );
+      }
+
+      set({
+        bridgeAllowance: allowance ? allowance.toFormatted(true) : null,
+        bridgeAllowanceLoading: false,
+      });
+    } catch (error) {
+      console.error("Failed to fetch allowance:", error);
+      set({ bridgeAllowance: null, bridgeAllowanceLoading: false });
     }
   },
 
