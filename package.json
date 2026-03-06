@@ -78,6 +78,7 @@
     "prepare": "husky"
   },
   "devDependencies": {
+    "@0no-co/graphql.web": "^1.2.0",
     "@cartridge/controller": "^0.13.9",
     "@eslint/js": "^9.39.2",
     "@vitest/coverage-v8": "^4.0.17",
@@ -100,5 +101,8 @@
   "dependencies": {
     "@avnu/avnu-sdk": "^4.1.0-rc.0",
     "starknet": "^9.2.1"
+  },
+  "optionalDependencies": {
+    "utf-8-validate": "^6.0.6"
   }
 }
