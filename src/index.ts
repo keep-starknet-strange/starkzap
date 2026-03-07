@@ -33,6 +33,9 @@ export * from "@/swap";
 // Types
 export * from "@/types";
 
+// Creator
+export * from "@/creator";
+
 // Re-export useful starknet.js types and classes for apps that need read-only contract calls
 export {
   Contract,
