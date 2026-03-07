@@ -30,6 +30,9 @@ export * from "@/staking";
 // Swap
 export * from "@/swap";
 
+// Lending
+export * from "@/lending";
+
 // Types
 export * from "@/types";
 

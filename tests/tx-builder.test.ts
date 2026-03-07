@@ -12,24 +12,12 @@ import type { WalletInterface } from "@/wallet/interface";
 import type { Call } from "starknet";
 import type { Staking } from "@/staking";
 import type { SwapProvider } from "@/swap";
+import {
+  testLendingCollateralToken as mockSTRK,
+  testLendingDebtToken as mockUSDC,
+} from "./fixtures/lending";
 
 // ─── Test fixtures ───────────────────────────────────────────────────────────
-
-const mockUSDC: Token = {
-  name: "USD Coin",
-  address:
-    "0x053c91253bc9682c04929ca02ed00b3e423f6710d2ee7e0d5ebb06f3ecf368a8" as Address,
-  decimals: 6,
-  symbol: "USDC",
-};
-
-const mockSTRK: Token = {
-  name: "Starknet Token",
-  address:
-    "0x04718f5a0fc34cc1af16a1cdee98ffb20c31f5cd61d6ab07201858f4287c938d" as Address,
-  decimals: 18,
-  symbol: "STRK",
-};
 
 const alice = fromAddress("0xA11CE");
 const bob = fromAddress("0xB0B");
@@ -70,6 +58,36 @@ const exitCall: Call = {
   contractAddress: poolAddress,
   entrypoint: "exit_delegation_pool_action",
   calldata: ["0xwallet"],
+};
+
+const lendingDepositCall: Call = {
+  contractAddress: fromAddress("0x501"),
+  entrypoint: "deposit",
+  calldata: ["100", "0", "0xwallet"],
+};
+
+const lendingWithdrawCall: Call = {
+  contractAddress: fromAddress("0x502"),
+  entrypoint: "withdraw",
+  calldata: ["100", "0", "0xwallet", "0xwallet"],
+};
+
+const lendingWithdrawMaxCall: Call = {
+  contractAddress: fromAddress("0x502"),
+  entrypoint: "redeem",
+  calldata: ["100", "0", "0xwallet", "0xwallet"],
+};
+
+const lendingBorrowCall: Call = {
+  contractAddress: fromAddress("0x503"),
+  entrypoint: "modify_position",
+  calldata: [1, 2, 3],
+};
+
+const lendingRepayCall: Call = {
+  contractAddress: fromAddress("0x504"),
+  entrypoint: "modify_position",
+  calldata: [4, 5, 6],
 };
 
 // ─── Mock helpers ────────────────────────────────────────────────────────────
@@ -114,6 +132,23 @@ function createMockWallet(
 ): WalletInterface {
   const mockErc20Map = new Map<Address, Erc20>();
   const mockStaking = createMockStaking();
+  const mockLending = {
+    prepareDeposit: vi.fn().mockResolvedValue({
+      calls: [lendingDepositCall],
+    }),
+    prepareWithdraw: vi.fn().mockResolvedValue({
+      calls: [lendingWithdrawCall],
+    }),
+    prepareWithdrawMax: vi.fn().mockResolvedValue({
+      calls: [lendingWithdrawMaxCall],
+    }),
+    prepareBorrow: vi.fn().mockResolvedValue({
+      calls: [lendingBorrowCall],
+    }),
+    prepareRepay: vi.fn().mockResolvedValue({
+      calls: [lendingRepayCall],
+    }),
+  };
   const defaultSwapProvider: SwapProvider = {
     id: "default",
     supportsChain: () => true,
@@ -138,6 +173,7 @@ function createMockWallet(
       return erc20;
     }),
     staking: vi.fn().mockResolvedValue(mockStaking),
+    lending: vi.fn().mockReturnValue(mockLending),
     getChainId: vi.fn().mockReturnValue(ChainId.SEPOLIA),
     getDefaultSwapProvider: vi.fn().mockReturnValue(defaultSwapProvider),
     getSwapProvider: vi.fn(),
@@ -190,6 +226,29 @@ describe("TxBuilder", () => {
       expect(builder.claimPoolRewards(poolAddress)).toBe(builder);
       expect(builder.exitPoolIntent(poolAddress, amount)).toBe(builder);
       expect(builder.exitPool(poolAddress)).toBe(builder);
+      expect(builder.lendDeposit({ token: mockUSDC, amount } as unknown)).toBe(
+        builder
+      );
+      expect(builder.lendWithdraw({ token: mockUSDC, amount } as unknown)).toBe(
+        builder
+      );
+      expect(builder.lendWithdrawMax({ token: mockUSDC } as unknown)).toBe(
+        builder
+      );
+      expect(
+        builder.lendBorrow({
+          collateralToken: mockSTRK,
+          debtToken: mockUSDC,
+          amount,
+        } as unknown)
+      ).toBe(builder);
+      expect(
+        builder.lendRepay({
+          collateralToken: mockSTRK,
+          debtToken: mockUSDC,
+          amount,
+        } as unknown)
+      ).toBe(builder);
     });
   });
 
@@ -562,6 +621,113 @@ describe("TxBuilder", () => {
           amountIn: Amount.parse("1", mockSTRK),
         })
       ).toThrow('Unknown swap provider ""');
+    });
+  });
+
+  describe("lending", () => {
+    it("should resolve lending deposit calls", async () => {
+      const wallet = createMockWallet();
+      const amount = Amount.parse("100", mockUSDC);
+
+      const calls = await new TxBuilder(wallet)
+        .lendDeposit({ token: mockUSDC, amount })
+        .calls();
+
+      expect(wallet.lending).toHaveBeenCalledTimes(1);
+      const lending = wallet.lending();
+      expect(lending.prepareDeposit).toHaveBeenCalledWith({
+        token: mockUSDC,
+        amount,
+      });
+      expect(calls).toEqual([lendingDepositCall]);
+    });
+
+    it("should resolve lending withdraw calls", async () => {
+      const wallet = createMockWallet();
+      const amount = Amount.parse("100", mockUSDC);
+
+      const calls = await new TxBuilder(wallet)
+        .lendWithdraw({ token: mockUSDC, amount })
+        .calls();
+
+      expect(calls).toEqual([lendingWithdrawCall]);
+      const lending = wallet.lending();
+      expect(lending.prepareWithdraw).toHaveBeenCalledWith({
+        token: mockUSDC,
+        amount,
+      });
+    });
+
+    it("should resolve lending withdrawMax calls", async () => {
+      const wallet = createMockWallet();
+
+      const calls = await new TxBuilder(wallet)
+        .lendWithdrawMax({ token: mockUSDC })
+        .calls();
+
+      expect(calls).toEqual([lendingWithdrawMaxCall]);
+      const lending = wallet.lending();
+      expect(lending.prepareWithdrawMax).toHaveBeenCalledWith({
+        token: mockUSDC,
+      });
+    });
+
+    it("should resolve lending borrow calls", async () => {
+      const wallet = createMockWallet();
+      const amount = Amount.parse("10", mockUSDC);
+
+      const calls = await new TxBuilder(wallet)
+        .lendBorrow({
+          collateralToken: mockSTRK,
+          debtToken: mockUSDC,
+          amount,
+        })
+        .calls();
+
+      expect(calls).toEqual([lendingBorrowCall]);
+      const lending = wallet.lending();
+      expect(lending.prepareBorrow).toHaveBeenCalledWith({
+        collateralToken: mockSTRK,
+        debtToken: mockUSDC,
+        amount,
+      });
+    });
+
+    it("should resolve lending repay calls", async () => {
+      const wallet = createMockWallet();
+      const amount = Amount.parse("10", mockUSDC);
+
+      const calls = await new TxBuilder(wallet)
+        .lendRepay({
+          collateralToken: mockSTRK,
+          debtToken: mockUSDC,
+          amount,
+        })
+        .calls();
+
+      expect(calls).toEqual([lendingRepayCall]);
+      const lending = wallet.lending();
+      expect(lending.prepareRepay).toHaveBeenCalledWith({
+        collateralToken: mockSTRK,
+        debtToken: mockUSDC,
+        amount,
+      });
+    });
+
+    it("should throw when lending withdrawMax returns no calls", async () => {
+      const wallet = createMockWallet({
+        lending: vi.fn().mockReturnValue({
+          prepareWithdrawMax: vi.fn().mockResolvedValue({ calls: [] }),
+        }),
+      });
+
+      await expect(
+        new TxBuilder(wallet)
+          .lendWithdrawMax({
+            token: mockUSDC,
+          })
+          .calls()
+      ).rejects.toThrow('Lending action "withdrawMax" returned no calls');
     });
   });
 

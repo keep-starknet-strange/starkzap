@@ -1,6 +1,7 @@
 import type { Call, Calldata, PaymasterTimeBounds } from "starknet";
 import type { SignerInterface } from "@/signer/interface";
 import type { SwapProvider } from "@/swap/interface";
+import type { Address } from "@/types/address";
 
 // ─── Account Class Configuration ─────────────────────────────────────────────
 
@@ -95,6 +96,8 @@ export type FeeMode = "sponsored" | "user_pays";
 export interface ConnectWalletOptions {
   /** Account configuration */
   account: AccountConfig;
+  /** Optional known account address (skips SDK address derivation) */
+  accountAddress?: Address;
   /** How fees are paid (default: "user_pays") */
   feeMode?: FeeMode;
   /** Optional time bounds for paymaster transactions */
