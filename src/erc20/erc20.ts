@@ -1,4 +1,11 @@
-import { type Address, type AddressLike, getAddress, Amount, type ExecuteOptions, type Token } from "@/types";
+import {
+  type Address,
+  type AddressLike,
+  getAddress,
+  Amount,
+  type ExecuteOptions,
+  type Token,
+} from "@/types";
 import type { WalletInterface } from "@/wallet";
 import {
   type Call,

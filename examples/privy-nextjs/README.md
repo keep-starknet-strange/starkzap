@@ -96,21 +96,21 @@ Open [http://localhost:3000](http://localhost:3000) in your browser.
 
 ### Key Files
 
-| File | Purpose |
-|------|---------|
+| File                               | Purpose                             |
+| ---------------------------------- | ----------------------------------- |
 | `app/api/wallet/starknet/route.ts` | Create/get embedded Starknet wallet |
-| `app/api/wallet/sign/route.ts` | Sign transaction hashes with Privy |
-| `components/PrivyProvider.tsx` | Privy React provider config |
-| `components/StarknetWallet.tsx` | Main wallet component with starkzap |
-| `lib/starkzap.ts` | Starkzap SDK configuration |
+| `app/api/wallet/sign/route.ts`     | Sign transaction hashes with Privy  |
+| `components/PrivyProvider.tsx`     | Privy React provider config         |
+| `components/StarknetWallet.tsx`    | Main wallet component with starkzap |
+| `lib/starkzap.ts`                  | Starkzap SDK configuration          |
 
 ## Usage Examples
 
 ### Connect Wallet
 
 ```typescript
-import { usePrivy } from '@privy-io/react-auth';
-import { getSDK, OnboardStrategy, ArgentPreset } from 'starkzap';
+import { usePrivy } from "@privy-io/react-auth";
+import { getSDK, OnboardStrategy, ArgentPreset } from "starkzap";
 
 const { authenticated, getAccessToken } = usePrivy();
 
@@ -118,8 +118,8 @@ async function connectWallet() {
   const token = await getAccessToken();
 
   // Get wallet from backend
-  const response = await fetch('/api/wallet/starknet', {
-    method: 'POST',
+  const response = await fetch("/api/wallet/starknet", {
+    method: "POST",
     headers: { Authorization: `Bearer ${token}` },
   });
   const { wallet } = await response.json();
@@ -133,7 +133,7 @@ async function connectWallet() {
       resolve: async () => ({
         walletId: wallet.walletId,
         publicKey: wallet.publicKey,
-        serverUrl: '/api/wallet/sign',
+        serverUrl: "/api/wallet/sign",
         headers: () => ({ Authorization: `Bearer ${token}` }),
       }),
     },
@@ -151,8 +151,9 @@ const wallet = await connectWallet();
 // Transfer STRK
 const tx = await wallet.execute([
   {
-    contractAddress: '0x04718f5a0fc34cc1af16a1cdee98ffb20c31f5cd61d6ab07201858f4287c938d',
-    entrypoint: 'transfer',
+    contractAddress:
+      "0x04718f5a0fc34cc1af16a1cdee98ffb20c31f5cd61d6ab07201858f4287c938d",
+    entrypoint: "transfer",
     calldata: [recipientAddress, amountLow, amountHigh],
   },
 ]);
@@ -164,10 +165,7 @@ await tx.wait();
 
 ```typescript
 // Sponsored transaction - user pays no gas
-const tx = await wallet.execute(
-  calls,
-  { feeMode: 'sponsored' }
-);
+const tx = await wallet.execute(calls, { feeMode: "sponsored" });
 ```
 
 ## Production Considerations
@@ -199,9 +197,9 @@ try {
   const tx = await wallet.execute(calls);
   await tx.wait();
 } catch (error) {
-  if (error.message.includes('insufficient funds')) {
+  if (error.message.includes("insufficient funds")) {
     // Handle funding error
-  } else if (error.message.includes('not deployed')) {
+  } else if (error.message.includes("not deployed")) {
     // Prompt user to deploy first
   }
 }

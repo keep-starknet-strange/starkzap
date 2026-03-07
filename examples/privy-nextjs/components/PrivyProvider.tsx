@@ -1,7 +1,7 @@
-'use client';
+"use client";
 
-import { PrivyProvider as BasePrivyProvider } from '@privy-io/react-auth';
-import { ReactNode } from 'react';
+import { PrivyProvider as BasePrivyProvider } from "@privy-io/react-auth";
+import { ReactNode } from "react";
 
 interface PrivyProviderProps {
   children: ReactNode;
@@ -30,13 +30,13 @@ export function PrivyProvider({ children }: PrivyProviderProps) {
         // Configure embedded wallets - Starknet wallets are created server-side
         embeddedWallets: {
           ethereum: {
-            createOnLogin: 'users-without-wallets',
+            createOnLogin: "users-without-wallets",
           },
         },
         // Appearance
         appearance: {
-          theme: 'dark',
-          accentColor: '#403DED', // Starknet-inspired purple
+          theme: "dark",
+          accentColor: "#403DED", // Starknet-inspired purple
         },
       }}
     >

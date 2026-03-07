@@ -1,5 +1,5 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { PrivyClient } from '@privy-io/node';
+import { NextRequest, NextResponse } from "next/server";
+import { PrivyClient } from "@privy-io/node";
 
 const PRIVY_APP_ID = process.env.NEXT_PUBLIC_PRIVY_APP_ID;
 const PRIVY_APP_SECRET = process.env.PRIVY_APP_SECRET;
@@ -10,7 +10,7 @@ let privyClient: PrivyClient | null = null;
 function getPrivyClient(): PrivyClient {
   if (!privyClient) {
     if (!PRIVY_APP_ID || !PRIVY_APP_SECRET) {
-      throw new Error('PRIVY_APP_ID and PRIVY_APP_SECRET must be set');
+      throw new Error("PRIVY_APP_ID and PRIVY_APP_SECRET must be set");
     }
     privyClient = new PrivyClient({
       appId: PRIVY_APP_ID,
@@ -22,11 +22,14 @@ function getPrivyClient(): PrivyClient {
 
 // Simple in-memory wallet storage (use a database in production!)
 // In production, replace with: Redis, PostgreSQL, MongoDB, etc.
-const walletStore = new Map<string, {
-  walletId: string;
-  publicKey: string;
-  address: string;
-}>();
+const walletStore = new Map<
+  string,
+  {
+    walletId: string;
+    publicKey: string;
+    address: string;
+  }
+>();
 
 /**
  * GET /api/wallet/starknet
@@ -37,9 +40,12 @@ export async function GET(request: NextRequest) {
     const privy = getPrivyClient();
 
     // Verify Privy auth token from Authorization header
-    const authHeader = request.headers.get('authorization');
-    if (!authHeader?.startsWith('Bearer ')) {
-      return NextResponse.json({ error: 'Missing authorization token' }, { status: 401 });
+    const authHeader = request.headers.get("authorization");
+    if (!authHeader?.startsWith("Bearer ")) {
+      return NextResponse.json(
+        { error: "Missing authorization token" },
+        { status: 401 }
+      );
     }
 
     const token = authHeader.slice(7);
@@ -59,12 +65,14 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       wallet: null,
       isNew: false,
-      message: 'No Starknet wallet found. POST to create one.',
+      message: "No Starknet wallet found. POST to create one.",
     });
   } catch (error) {
-    console.error('GET /api/wallet/starknet error:', error);
+    console.error("GET /api/wallet/starknet error:", error);
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Internal server error' },
+      {
+        error: error instanceof Error ? error.message : "Internal server error",
+      },
       { status: 500 }
     );
   }
@@ -79,9 +87,12 @@ export async function POST(request: NextRequest) {
     const privy = getPrivyClient();
 
     // Verify Privy auth token
-    const authHeader = request.headers.get('authorization');
-    if (!authHeader?.startsWith('Bearer ')) {
-      return NextResponse.json({ error: 'Missing authorization token' }, { status: 401 });
+    const authHeader = request.headers.get("authorization");
+    if (!authHeader?.startsWith("Bearer ")) {
+      return NextResponse.json(
+        { error: "Missing authorization token" },
+        { status: 401 }
+      );
     }
 
     const token = authHeader.slice(7);
@@ -94,12 +105,12 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({
         wallet: existing,
         isNew: false,
-        message: 'Wallet already exists',
+        message: "Wallet already exists",
       });
     }
 
     // Create new embedded Starknet wallet via Privy
-    const wallet = await privy.wallets().create({ chain_type: 'starknet' });
+    const wallet = await privy.wallets().create({ chain_type: "starknet" });
 
     const walletData = {
       walletId: wallet.id,
@@ -115,9 +126,12 @@ export async function POST(request: NextRequest) {
       isNew: true,
     });
   } catch (error) {
-    console.error('POST /api/wallet/starknet error:', error);
+    console.error("POST /api/wallet/starknet error:", error);
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Failed to create wallet' },
+      {
+        error:
+          error instanceof Error ? error.message : "Failed to create wallet",
+      },
       { status: 500 }
     );
   }

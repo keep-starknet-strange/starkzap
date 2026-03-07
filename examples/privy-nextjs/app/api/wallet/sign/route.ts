@@ -1,5 +1,5 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { PrivyClient } from '@privy-io/node';
+import { NextRequest, NextResponse } from "next/server";
+import { PrivyClient } from "@privy-io/node";
 
 const PRIVY_APP_ID = process.env.NEXT_PUBLIC_PRIVY_APP_ID;
 const PRIVY_APP_SECRET = process.env.PRIVY_APP_SECRET;
@@ -10,7 +10,7 @@ let privyClient: PrivyClient | null = null;
 function getPrivyClient(): PrivyClient {
   if (!privyClient) {
     if (!PRIVY_APP_ID || !PRIVY_APP_SECRET) {
-      throw new Error('PRIVY_APP_ID and PRIVY_APP_SECRET must be set');
+      throw new Error("PRIVY_APP_ID and PRIVY_APP_SECRET must be set");
     }
     privyClient = new PrivyClient({
       appId: PRIVY_APP_ID,
@@ -32,9 +32,12 @@ export async function POST(request: NextRequest) {
     const privy = getPrivyClient();
 
     // Verify Privy auth token (optional: you may want to require auth here)
-    const authHeader = request.headers.get('authorization');
-    if (!authHeader?.startsWith('Bearer ')) {
-      return NextResponse.json({ error: 'Missing authorization token' }, { status: 401 });
+    const authHeader = request.headers.get("authorization");
+    if (!authHeader?.startsWith("Bearer ")) {
+      return NextResponse.json(
+        { error: "Missing authorization token" },
+        { status: 401 }
+      );
     }
 
     const token = authHeader.slice(7);
@@ -46,17 +49,17 @@ export async function POST(request: NextRequest) {
 
     if (!walletId || !hash) {
       return NextResponse.json(
-        { error: 'walletId and hash are required' },
+        { error: "walletId and hash are required" },
         { status: 400 }
       );
     }
 
     // Security: Verify the wallet belongs to the authenticated user
     const userWallets = await privy.wallets().list({ userId: claims.userId });
-    const ownsWallet = userWallets.some(w => w.id === walletId);
+    const ownsWallet = userWallets.some((w) => w.id === walletId);
     if (!ownsWallet) {
       return NextResponse.json(
-        { error: 'Wallet not found or not owned by user' },
+        { error: "Wallet not found or not owned by user" },
         { status: 403 }
       );
     }
@@ -68,9 +71,9 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ signature: result.signature });
   } catch (error) {
-    console.error('POST /api/wallet/sign error:', error);
+    console.error("POST /api/wallet/sign error:", error);
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Signing failed' },
+      { error: error instanceof Error ? error.message : "Signing failed" },
       { status: 500 }
     );
   }

@@ -24,6 +24,9 @@ export default defineConfig(
       "examples/flappy-bird/**",
       "examples/mobile/eslint.config.js",
       "examples/mobile/metro.config.js",
+      "examples/privy-nextjs/next.config.js",
+      "examples/privy-nextjs/postcss.config.js",
+      "examples/privy-nextjs/tailwind.config.js",
     ],
   },
   {

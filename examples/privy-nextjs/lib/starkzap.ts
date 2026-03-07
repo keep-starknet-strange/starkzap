@@ -5,10 +5,12 @@ import {
   OpenZeppelinPreset,
   type WalletInterface,
   type AccountClassConfig,
-} from 'starkzap';
+} from "starkzap";
 
 // Configuration
-const RPC_URL = process.env.NEXT_PUBLIC_RPC_URL || 'https://api.cartridge.gg/x/starknet/sepolia/rpc/v0_9';
+const RPC_URL =
+  process.env.NEXT_PUBLIC_RPC_URL ||
+  "https://api.cartridge.gg/x/starknet/sepolia/rpc/v0_9";
 const SDK_CHAIN_ID = ChainId.SEPOLIA;
 
 // Available account presets

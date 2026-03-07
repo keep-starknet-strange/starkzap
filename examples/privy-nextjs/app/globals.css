@@ -21,8 +21,8 @@ body {
 
 /* Privy modal theming */
 [data-privy-modal-container] {
-  --privy-color-primary: #403DED !important;
-  --privy-color-background: #0C0C4F !important;
+  --privy-color-primary: #403ded !important;
+  --privy-color-background: #0c0c4f !important;
 }
 
 /* Custom scrollbar */
@@ -45,7 +45,8 @@ body {
 
 /* Animation */
 @keyframes pulse {
-  0%, 100% {
+  0%,
+  100% {
     opacity: 1;
   }
   50% {

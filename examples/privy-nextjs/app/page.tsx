@@ -1,7 +1,7 @@
-import { StarknetWallet } from '@/components/StarknetWallet';
+import { StarknetWallet } from "@/components/StarknetWallet";
 
 // Force dynamic rendering to avoid build-time Privy initialization
-export const dynamic = 'force-dynamic';
+export const dynamic = "force-dynamic";
 
 export default function Home() {
   return (
@@ -22,7 +22,7 @@ export default function Home() {
       {/* Footer */}
       <footer className="mt-8 text-center text-sm text-gray-500">
         <p>
-          Built with{' '}
+          Built with{" "}
           <a
             href="https://github.com/keep-starknet-strange/starkzap"
             target="_blank"
@@ -30,8 +30,8 @@ export default function Home() {
             className="text-starknet-primary hover:underline"
           >
             Starkzap SDK
-          </a>
-          {' '}+{' '}
+          </a>{" "}
+          +{" "}
           <a
             href="https://docs.privy.io/"
             target="_blank"

@@ -1,9 +1,9 @@
-'use client';
+"use client";
 
-import { useState, useCallback, useEffect } from 'react';
-import { usePrivy } from '@privy-io/react-auth';
-import { getSDK, PRESETS, type WalletInterface } from '@/lib/starkzap';
-import { OnboardStrategy } from 'starkzap';
+import { useState, useCallback, useEffect } from "react";
+import { usePrivy } from "@privy-io/react-auth";
+import { getSDK, PRESETS, type WalletInterface } from "@/lib/starkzap";
+import { OnboardStrategy } from "starkzap";
 
 interface WalletData {
   walletId: string;
@@ -12,65 +12,81 @@ interface WalletData {
 }
 
 export function StarknetWallet() {
-  const { authenticated, user, login, logout, ready, getAccessToken } = usePrivy();
+  const { authenticated, user, login, logout, ready, getAccessToken } =
+    usePrivy();
 
-  const [starknetWallet, setStarknetWallet] = useState<WalletInterface | null>(null);
-  const [privyWalletData, setPrivyWalletData] = useState<WalletData | null>(null);
+  const [starknetWallet, setStarknetWallet] = useState<WalletInterface | null>(
+    null
+  );
+  const [privyWalletData, setPrivyWalletData] = useState<WalletData | null>(
+    null
+  );
   const [isDeployed, setIsDeployed] = useState<boolean | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [selectedPreset, setSelectedPreset] = useState<keyof typeof PRESETS>('argent');
+  const [selectedPreset, setSelectedPreset] =
+    useState<keyof typeof PRESETS>("argent");
+
+  // Track intentional disconnect to prevent auto-reconnect race
+  const [intentionalDisconnect, setIntentionalDisconnect] = useState(false);
 
   // Create or get Starknet wallet from our backend
-  const ensureStarknetWallet = useCallback(async (): Promise<WalletData | null> => {
-    const token = await getAccessToken();
-    if (!token) {
-      throw new Error('No access token available');
-    }
+  const ensureStarknetWallet =
+    useCallback(async (): Promise<WalletData | null> => {
+      const token = await getAccessToken();
+      if (!token) {
+        throw new Error("No access token available");
+      }
 
-    const response = await fetch('/api/wallet/starknet', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`,
-      },
-    });
+      const response = await fetch("/api/wallet/starknet", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+      });
 
-    if (!response.ok) {
-      const data = await response.json();
-      throw new Error(data.error || 'Failed to create wallet');
-    }
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || "Failed to create wallet");
+      }
 
-    const { wallet } = await response.json();
-    return wallet;
-  }, [getAccessToken]);
+      const { wallet } = await response.json();
+      return wallet;
+    }, [getAccessToken]);
 
   // Connect Starknet wallet using starkzap
-  const connectStarknetWallet = useCallback(async (walletData: WalletData) => {
-    const sdk = getSDK();
-    const token = await getAccessToken();
-    if (!token) {
-      throw new Error('No access token available');
-    }
+  const connectStarknetWallet = useCallback(
+    async (walletData: WalletData) => {
+      const sdk = getSDK();
 
-    const onboard = await sdk.onboard({
-      strategy: OnboardStrategy.Privy,
-      deploy: 'never',
-      accountPreset: PRESETS[selectedPreset],
-      privy: {
-        resolve: async () => ({
-          walletId: walletData.walletId,
-          publicKey: walletData.publicKey,
-          serverUrl: `${window.location.origin}/api/wallet/sign`,
-          headers: () => ({
-            'Authorization': `Bearer ${token}`,
+      const onboard = await sdk.onboard({
+        strategy: OnboardStrategy.Privy,
+        deploy: "never",
+        accountPreset: PRESETS[selectedPreset],
+        privy: {
+          resolve: async () => ({
+            walletId: walletData.walletId,
+            publicKey: walletData.publicKey,
+            serverUrl: `${window.location.origin}/api/wallet/sign`,
+            // Re-fetch token on each signing request to handle token expiration
+            headers: async () => {
+              const freshToken = await getAccessToken();
+              if (!freshToken) {
+                throw new Error("No access token available");
+              }
+              return {
+                Authorization: `Bearer ${freshToken}`,
+              };
+            },
           }),
-        }),
-      },
-    });
+        },
+      });
 
-    return onboard.wallet;
-  }, [selectedPreset, getAccessToken]);
+      return onboard.wallet;
+    },
+    [selectedPreset, getAccessToken]
+  );
 
   // Check deployment status
   const checkDeployment = useCallback(async (wallet: WalletInterface) => {
@@ -78,14 +94,15 @@ export function StarknetWallet() {
       const deployed = await wallet.isDeployed();
       setIsDeployed(deployed);
     } catch (err) {
-      console.error('Failed to check deployment:', err);
+      console.error("Failed to check deployment:", err);
       setIsDeployed(null);
     }
   }, []);
 
   // Auto-connect on authentication
   useEffect(() => {
-    if (authenticated && !starknetWallet) {
+    // Skip auto-connect if this was an intentional disconnect
+    if (authenticated && !starknetWallet && !intentionalDisconnect) {
       setLoading(true);
       setError(null);
 
@@ -99,17 +116,37 @@ export function StarknetWallet() {
           }
         })
         .catch((err) => {
-          console.error('Wallet setup error:', err);
-          setError(err.message || 'Failed to setup wallet');
+          console.error("Wallet setup error:", err);
+          setError(err.message || "Failed to setup wallet");
         })
         .finally(() => {
           setLoading(false);
         });
     }
-  }, [authenticated, starknetWallet, ensureStarknetWallet, connectStarknetWallet, checkDeployment]);
+  }, [
+    authenticated,
+    starknetWallet,
+    intentionalDisconnect,
+    ensureStarknetWallet,
+    connectStarknetWallet,
+    checkDeployment,
+  ]);
+
+  // Clear local wallet state when Privy reports unauthenticated
+  useEffect(() => {
+    if (!authenticated) {
+      setStarknetWallet(null);
+      setPrivyWalletData(null);
+      setIsDeployed(null);
+      // Reset intentional disconnect flag when auth state changes
+      setIntentionalDisconnect(false);
+    }
+  }, [authenticated]);
 
   // Disconnect wallet
   const handleDisconnect = useCallback(async () => {
+    // Mark as intentional disconnect BEFORE logout to prevent race condition
+    setIntentionalDisconnect(true);
     setStarknetWallet(null);
     setPrivyWalletData(null);
     setIsDeployed(null);
@@ -126,12 +163,12 @@ export function StarknetWallet() {
 
     try {
       const tx = await starknetWallet.deploy();
-      console.log('Deploy tx:', tx.hash);
+      console.log("Deploy tx:", tx.hash);
       await tx.wait();
       setIsDeployed(true);
     } catch (err) {
-      console.error('Deploy error:', err);
-      setError(err instanceof Error ? err.message : 'Deployment failed');
+      console.error("Deploy error:", err);
+      setError(err instanceof Error ? err.message : "Deployment failed");
     } finally {
       setLoading(false);
     }
@@ -146,22 +183,23 @@ export function StarknetWallet() {
 
     try {
       // STRK contract on Sepolia
-      const STRK_CONTRACT = '0x04718f5a0fc34cc1af16a1cdee98ffb20c31f5cd61d6ab07201858f4287c938d';
+      const STRK_CONTRACT =
+        "0x04718f5a0fc34cc1af16a1cdee98ffb20c31f5cd61d6ab07201858f4287c938d";
 
       const tx = await starknetWallet.execute([
         {
           contractAddress: STRK_CONTRACT,
-          entrypoint: 'transfer',
-          calldata: [starknetWallet.address, '0', '0'], // 0 STRK to self
+          entrypoint: "transfer",
+          calldata: [starknetWallet.address, "0", "0"], // 0 STRK to self
         },
       ]);
 
-      console.log('Transfer tx:', tx.hash);
+      console.log("Transfer tx:", tx.hash);
       await tx.wait();
-      alert('Transfer successful!');
+      alert("Transfer successful!");
     } catch (err) {
-      console.error('Transfer error:', err);
-      setError(err instanceof Error ? err.message : 'Transfer failed');
+      console.error("Transfer error:", err);
+      setError(err instanceof Error ? err.message : "Transfer failed");
     } finally {
       setLoading(false);
     }
@@ -178,10 +216,12 @@ export function StarknetWallet() {
   if (!authenticated) {
     return (
       <div className="flex flex-col items-center gap-4 p-8">
-        <h2 className="text-2xl font-bold text-white">Starknet Wallet with Privy</h2>
+        <h2 className="text-2xl font-bold text-white">
+          Starknet Wallet with Privy
+        </h2>
         <p className="text-gray-400 text-center max-w-md">
-          Connect with your favorite social login to get a Starknet embedded wallet.
-          No private keys to manage!
+          Connect with your favorite social login to get a Starknet embedded
+          wallet. No private keys to manage!
         </p>
         <button
           onClick={login}
@@ -217,7 +257,9 @@ export function StarknetWallet() {
         <label className="text-sm text-gray-400">Account Preset</label>
         <select
           value={selectedPreset}
-          onChange={(e) => setSelectedPreset(e.target.value as keyof typeof PRESETS)}
+          onChange={(e) =>
+            setSelectedPreset(e.target.value as keyof typeof PRESETS)
+          }
           className="bg-gray-800 border border-gray-700 rounded px-3 py-2 text-white"
           disabled={!!starknetWallet}
         >
@@ -237,14 +279,20 @@ export function StarknetWallet() {
           </div>
           <div className="flex justify-between text-sm">
             <span className="text-gray-400">Status:</span>
-            <span className={`font-medium ${
-              isDeployed === true ? 'text-green-400' :
-              isDeployed === false ? 'text-yellow-400' :
-              'text-gray-400'
-            }`}>
-              {isDeployed === true ? 'Deployed' :
-               isDeployed === false ? 'Not Deployed' :
-               'Checking...'}
+            <span
+              className={`font-medium ${
+                isDeployed === true
+                  ? "text-green-400"
+                  : isDeployed === false
+                    ? "text-yellow-400"
+                    : "text-gray-400"
+              }`}
+            >
+              {isDeployed === true
+                ? "Deployed"
+                : isDeployed === false
+                  ? "Not Deployed"
+                  : "Checking..."}
             </span>
           </div>
         </div>
@@ -298,8 +346,9 @@ export function StarknetWallet() {
 
       {/* Help Text */}
       <p className="text-xs text-gray-500 text-center">
-        {isDeployed === false && 'Fund your wallet address with STRK, then deploy.'}
-        {isDeployed === true && 'Your account is ready for transactions!'}
+        {isDeployed === false &&
+          "Fund your wallet address with STRK, then deploy."}
+        {isDeployed === true && "Your account is ready for transactions!"}
       </p>
     </div>
   );
