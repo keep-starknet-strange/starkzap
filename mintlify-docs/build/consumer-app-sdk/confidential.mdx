@@ -1,0 +1,174 @@
+---
+title: Confidential Transfers
+description: "Send and receive tokens privately using the Tongo confidential transaction protocol"
+icon: eye-slash
+---
+
+## Overview
+
+Starkzap integrates the [Tongo](https://github.com/fatlabsxyz/tongo) confidential transaction protocol, enabling private token transfers on Starknet. Tongo uses homomorphic encryption (ElGamal) and zero-knowledge proofs so that balances and transfer amounts remain hidden on-chain.
+
+Each confidential account has its own private key (separate from the Starknet wallet key) and is bound to a specific Tongo contract deployment.
+
+## Setup
+
+```typescript
+import { Confidential } from "starkzap";
+
+const confidential = new Confidential({
+  privateKey: tongoPrivateKey, // bigint or Uint8Array
+  contractAddress: TONGO_CONTRACT,
+  provider: wallet.getProvider(),
+});
+```
+
+<Warning>
+  The Tongo private key is **not** the same as the Starknet wallet private key. It is a separate secret that controls the confidential account. Keep it safe.
+</Warning>
+
+## Reading Account State
+
+```typescript
+// Get the decrypted balance, pending amount, and nonce
+const state = await confidential.getState();
+console.log(`Balance: ${state.balance}`);
+console.log(`Pending: ${state.pending}`);
+console.log(`Nonce: ${state.nonce}`);
+
+// Get the Tongo address (base58-encoded public key)
+const tongoAddress = confidential.tongoAddress;
+
+// Convert between ERC20 and Tongo units
+const tongoAmount = await confidential.erc20ToTongo(erc20Amount);
+const erc20Amount = await confidential.tongoToErc20(tongoAmount);
+```
+
+## Operations
+
+### Fund
+
+Deposit ERC20 tokens into the confidential account. You must include an ERC20 `approve` call before the fund call in the same transaction.
+
+```typescript
+const tx = await wallet
+  .tx()
+  .approve(token, TONGO_CONTRACT, amount)
+  .confidentialFund(confidential, {
+    amount: 100n,
+    sender: wallet.address,
+  })
+  .send();
+await tx.wait();
+```
+
+### Transfer
+
+Send tokens privately to another confidential account. The recipient is identified by their Tongo public key.
+
+```typescript
+const tx = await wallet
+  .tx()
+  .confidentialTransfer(confidential, {
+    amount: 50n,
+    to: recipientPublicKey, // { x: bigint, y: bigint }
+    sender: wallet.address,
+  })
+  .send();
+await tx.wait();
+```
+
+Transferred tokens arrive in the recipient's **pending** balance. The recipient must call rollover to activate them.
+
+### Rollover
+
+Activate pending balance received from transfers.
+
+```typescript
+const tx = await wallet
+  .tx()
+  .confidentialRollover(confidential, {
+    sender: wallet.address,
+  })
+  .send();
+await tx.wait();
+```
+
+### Withdraw
+
+Convert confidential balance back to public ERC20 tokens.
+
+```typescript
+const tx = await wallet
+  .tx()
+  .confidentialWithdraw(confidential, {
+    amount: 25n,
+    to: recipientAddress,
+    sender: wallet.address,
+  })
+  .send();
+await tx.wait();
+```
+
+### Ragequit
+
+Emergency full withdrawal of the entire confidential balance to a public address.
+
+```typescript
+const tx = await wallet
+  .tx()
+  .confidentialRagequit(confidential, {
+    to: recipientAddress,
+    sender: wallet.address,
+  })
+  .send();
+await tx.wait();
+```
+
+## Relayed Transactions
+
+All operations support an optional `feeTo` parameter for relayed transactions, where a third party submits the transaction and receives a fee:
+
+```typescript
+const calls = await confidential.populateFund({
+  amount: 100n,
+  sender: relayerAddress,
+  feeTo: 5n, // fee paid to the relayer
+});
+```
+
+## Using populate Methods Directly
+
+Each operation has a `populate*` method that returns `Call[]` without executing. This is useful for building custom transaction flows:
+
+```typescript
+const fundCalls = await confidential.populateFund({
+  amount: 100n,
+  sender: wallet.address,
+});
+
+const transferCalls = await confidential.populateTransfer({
+  amount: 50n,
+  to: recipientPublicKey,
+  sender: wallet.address,
+});
+
+// Combine with other operations
+const tx = await wallet
+  .tx()
+  .add(...fundCalls)
+  .add(...transferCalls)
+  .send();
+```
+
+## Advanced: Accessing the Tongo Account
+
+For operations not covered by the convenience methods (event reading, audit proofs, etc.), access the underlying Tongo account:
+
+```typescript
+const tongoAccount = confidential.getTongoAccount();
+```
+
+## Next Steps
+
+- Learn about [Transaction Builder](/build/consumer-app-sdk/tx-builder) for batching confidential operations with other calls
+- Explore [Transactions](/build/consumer-app-sdk/transactions) for direct execution methods

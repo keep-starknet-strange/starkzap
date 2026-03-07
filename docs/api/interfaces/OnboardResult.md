@@ -6,7 +6,7 @@
 
 # Interface: OnboardResult\<TWallet\>
 
-Defined in: [src/types/onboard.ts:79](https://github.com/keep-starknet-strange/x/blob/5e54d8974744c392df7cac56b636788dfe6ae268/src/types/onboard.ts#L79)
+Defined in: [src/types/onboard.ts:84](https://github.com/adrienlacombe/starkzap/blob/93cc8acdf4b5a2f6d62f768f289d59b40af648f2/src/types/onboard.ts#L84)
 
 ## Type Parameters
 
@@ -20,7 +20,7 @@ Defined in: [src/types/onboard.ts:79](https://github.com/keep-starknet-strange/x
 
 > **wallet**: `TWallet`
 
-Defined in: [src/types/onboard.ts:82](https://github.com/keep-starknet-strange/x/blob/5e54d8974744c392df7cac56b636788dfe6ae268/src/types/onboard.ts#L82)
+Defined in: [src/types/onboard.ts:87](https://github.com/adrienlacombe/starkzap/blob/93cc8acdf4b5a2f6d62f768f289d59b40af648f2/src/types/onboard.ts#L87)
 
 ***
 
@@ -28,7 +28,7 @@ Defined in: [src/types/onboard.ts:82](https://github.com/keep-starknet-strange/x
 
 > **strategy**: [`OnboardStrategy`](../type-aliases/OnboardStrategy.md)
 
-Defined in: [src/types/onboard.ts:83](https://github.com/keep-starknet-strange/x/blob/5e54d8974744c392df7cac56b636788dfe6ae268/src/types/onboard.ts#L83)
+Defined in: [src/types/onboard.ts:88](https://github.com/adrienlacombe/starkzap/blob/93cc8acdf4b5a2f6d62f768f289d59b40af648f2/src/types/onboard.ts#L88)
 
 ***
 
@@ -36,7 +36,7 @@ Defined in: [src/types/onboard.ts:83](https://github.com/keep-starknet-strange/x
 
 > **deployed**: `boolean`
 
-Defined in: [src/types/onboard.ts:84](https://github.com/keep-starknet-strange/x/blob/5e54d8974744c392df7cac56b636788dfe6ae268/src/types/onboard.ts#L84)
+Defined in: [src/types/onboard.ts:89](https://github.com/adrienlacombe/starkzap/blob/93cc8acdf4b5a2f6d62f768f289d59b40af648f2/src/types/onboard.ts#L89)
 
 ***
 
@@ -44,4 +44,4 @@ Defined in: [src/types/onboard.ts:84](https://github.com/keep-starknet-strange/x
 
 > `optional` **metadata**: `Record`\<`string`, `unknown`\>
 
-Defined in: [src/types/onboard.ts:85](https://github.com/keep-starknet-strange/x/blob/5e54d8974744c392df7cac56b636788dfe6ae268/src/types/onboard.ts#L85)
+Defined in: [src/types/onboard.ts:90](https://github.com/adrienlacombe/starkzap/blob/93cc8acdf4b5a2f6d62f768f289d59b40af648f2/src/types/onboard.ts#L90)

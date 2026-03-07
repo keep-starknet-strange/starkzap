@@ -10,6 +10,14 @@ import type {
   PreflightResult,
   Token,
 } from "@/types";
+import type { Confidential } from "@/confidential";
+import type {
+  ConfidentialFundDetails,
+  ConfidentialTransferDetails,
+  ConfidentialWithdrawDetails,
+  ConfidentialRagequitDetails,
+  ConfidentialRolloverDetails,
+} from "@/confidential";
 
 /**
  * Fluent transaction builder for batching multiple operations into a single transaction.
@@ -412,6 +420,121 @@ export class TxBuilder {
       .staking(poolAddress)
       .then((s) => [s.populateExit(this.wallet.address)]);
     this.queueAsyncCalls(p);
+    return this;
+  }
+
+  // ============================================================
+  // Confidential operations (Tongo)
+  // ============================================================
+
+  /**
+   * Fund a confidential account.
+   *
+   * Generates ZK proofs and adds the fund call to the batch.
+   * You must include an ERC20 approve call before this
+   * (e.g., via `.approve(token, tongoContract, amount)`).
+   *
+   * @param confidential - The Confidential instance to fund
+   * @param details - Fund parameters (amount, sender)
+   * @returns this (for chaining)
+   *
+   * @example
+   * ```ts
+   * wallet.tx()
+   *   .approve(token, tongoContract, amount)
+   *   .confidentialFund(confidential, { amount: 100n, sender: wallet.address })
+   *   .send();
+   * ```
+   */
+  confidentialFund(
+    confidential: Confidential,
+    details: ConfidentialFundDetails
+  ): this {
+    this.queueAsyncCalls(confidential.populateFund(details));
+    return this;
+  }
+
+  /**
+   * Transfer between confidential accounts.
+   *
+   * Generates ZK proofs for the confidential transfer.
+   *
+   * @param confidential - The sender's Confidential instance
+   * @param details - Transfer parameters (amount, recipient pubkey, sender)
+   * @returns this (for chaining)
+   *
+   * @example
+   * ```ts
+   * wallet.tx()
+   *   .confidentialTransfer(confidential, {
+   *     amount: 50n,
+   *     to: recipientPubKey,
+   *     sender: wallet.address,
+   *   })
+   *   .send();
+   * ```
+   */
+  confidentialTransfer(
+    confidential: Confidential,
+    details: ConfidentialTransferDetails
+  ): this {
+    this.queueAsyncCalls(confidential.populateTransfer(details));
+    return this;
+  }
+
+  /**
+   * Withdraw from a confidential account to a public address.
+   *
+   * @param confidential - The Confidential instance to withdraw from
+   * @param details - Withdraw parameters (amount, recipient, sender)
+   * @returns this (for chaining)
+   *
+   * @example
+   * ```ts
+   * wallet.tx()
+   *   .confidentialWithdraw(confidential, {
+   *     amount: 50n,
+   *     to: wallet.address,
+   *     sender: wallet.address,
+   *   })
+   *   .send();
+   * ```
+   */
+  confidentialWithdraw(
+    confidential: Confidential,
+    details: ConfidentialWithdrawDetails
+  ): this {
+    this.queueAsyncCalls(confidential.populateWithdraw(details));
+    return this;
+  }
+
+  /**
+   * Emergency ragequit — withdraw entire confidential balance.
+   *
+   * @param confidential - The Confidential instance to exit
+   * @param details - Ragequit parameters (recipient, sender)
+   * @returns this (for chaining)
+   */
+  confidentialRagequit(
+    confidential: Confidential,
+    details: ConfidentialRagequitDetails
+  ): this {
+    this.queueAsyncCalls(confidential.populateRagequit(details));
+    return this;
+  }
+
+  /**
+   * Rollover — activate pending balance from received transfers.
+   *
+   * @param confidential - The Confidential instance to rollover
+   * @param details - Rollover parameters (sender)
+   * @returns this (for chaining)
+   */
+  confidentialRollover(
+    confidential: Confidential,
+    details: ConfidentialRolloverDetails
+  ): this {
+    this.queueAsyncCalls(confidential.populateRollover(details));
     return this;
   }
 

@@ -6,7 +6,7 @@
 
 # Interface: PreflightResultError
 
-Defined in: [src/types/wallet.ts:191](https://github.com/keep-starknet-strange/x/blob/5e54d8974744c392df7cac56b636788dfe6ae268/src/types/wallet.ts#L191)
+Defined in: [src/types/wallet.ts:196](https://github.com/adrienlacombe/starkzap/blob/93cc8acdf4b5a2f6d62f768f289d59b40af648f2/src/types/wallet.ts#L196)
 
 Preflight failed — operation would fail
 
@@ -16,7 +16,7 @@ Preflight failed — operation would fail
 
 > **ok**: `false`
 
-Defined in: [src/types/wallet.ts:192](https://github.com/keep-starknet-strange/x/blob/5e54d8974744c392df7cac56b636788dfe6ae268/src/types/wallet.ts#L192)
+Defined in: [src/types/wallet.ts:197](https://github.com/adrienlacombe/starkzap/blob/93cc8acdf4b5a2f6d62f768f289d59b40af648f2/src/types/wallet.ts#L197)
 
 ***
 
@@ -24,6 +24,6 @@ Defined in: [src/types/wallet.ts:192](https://github.com/keep-starknet-strange/x
 
 > **reason**: `string`
 
-Defined in: [src/types/wallet.ts:194](https://github.com/keep-starknet-strange/x/blob/5e54d8974744c392df7cac56b636788dfe6ae268/src/types/wallet.ts#L194)
+Defined in: [src/types/wallet.ts:199](https://github.com/adrienlacombe/starkzap/blob/93cc8acdf4b5a2f6d62f768f289d59b40af648f2/src/types/wallet.ts#L199)
 
 Human-readable reason why it would fail

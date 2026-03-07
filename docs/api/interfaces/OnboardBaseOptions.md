@@ -6,7 +6,7 @@
 
 # Interface: OnboardBaseOptions
 
-Defined in: [src/types/onboard.ts:30](https://github.com/keep-starknet-strange/x/blob/5e54d8974744c392df7cac56b636788dfe6ae268/src/types/onboard.ts#L30)
+Defined in: [src/types/onboard.ts:31](https://github.com/adrienlacombe/starkzap/blob/93cc8acdf4b5a2f6d62f768f289d59b40af648f2/src/types/onboard.ts#L31)
 
 ## Extended by
 
@@ -20,7 +20,7 @@ Defined in: [src/types/onboard.ts:30](https://github.com/keep-starknet-strange/x
 
 > `optional` **feeMode**: [`FeeMode`](../type-aliases/FeeMode.md)
 
-Defined in: [src/types/onboard.ts:31](https://github.com/keep-starknet-strange/x/blob/5e54d8974744c392df7cac56b636788dfe6ae268/src/types/onboard.ts#L31)
+Defined in: [src/types/onboard.ts:32](https://github.com/adrienlacombe/starkzap/blob/93cc8acdf4b5a2f6d62f768f289d59b40af648f2/src/types/onboard.ts#L32)
 
 ***
 
@@ -28,7 +28,7 @@ Defined in: [src/types/onboard.ts:31](https://github.com/keep-starknet-strange/x
 
 > `optional` **timeBounds**: [`PaymasterTimeBounds`](PaymasterTimeBounds.md)
 
-Defined in: [src/types/onboard.ts:32](https://github.com/keep-starknet-strange/x/blob/5e54d8974744c392df7cac56b636788dfe6ae268/src/types/onboard.ts#L32)
+Defined in: [src/types/onboard.ts:33](https://github.com/adrienlacombe/starkzap/blob/93cc8acdf4b5a2f6d62f768f289d59b40af648f2/src/types/onboard.ts#L33)
 
 ***
 
@@ -36,7 +36,7 @@ Defined in: [src/types/onboard.ts:32](https://github.com/keep-starknet-strange/x
 
 > `optional` **deploy**: [`DeployMode`](../type-aliases/DeployMode.md)
 
-Defined in: [src/types/onboard.ts:33](https://github.com/keep-starknet-strange/x/blob/5e54d8974744c392df7cac56b636788dfe6ae268/src/types/onboard.ts#L33)
+Defined in: [src/types/onboard.ts:34](https://github.com/adrienlacombe/starkzap/blob/93cc8acdf4b5a2f6d62f768f289d59b40af648f2/src/types/onboard.ts#L34)
 
 ***
 
@@ -44,7 +44,7 @@ Defined in: [src/types/onboard.ts:33](https://github.com/keep-starknet-strange/x
 
 > `optional` **onProgress**: (`event`) => `void`
 
-Defined in: [src/types/onboard.ts:34](https://github.com/keep-starknet-strange/x/blob/5e54d8974744c392df7cac56b636788dfe6ae268/src/types/onboard.ts#L34)
+Defined in: [src/types/onboard.ts:35](https://github.com/adrienlacombe/starkzap/blob/93cc8acdf4b5a2f6d62f768f289d59b40af648f2/src/types/onboard.ts#L35)
 
 #### Parameters
 
@@ -55,3 +55,23 @@ Defined in: [src/types/onboard.ts:34](https://github.com/keep-starknet-strange/x
 #### Returns
 
 `void`
+
+***
+
+### swapProviders?
+
+> `optional` **swapProviders**: [`SwapProvider`](../type-aliases/SwapProvider.md)[]
+
+Defined in: [src/types/onboard.ts:37](https://github.com/adrienlacombe/starkzap/blob/93cc8acdf4b5a2f6d62f768f289d59b40af648f2/src/types/onboard.ts#L37)
+
+Optional additional swap providers to register on the wallet
+
+***
+
+### defaultSwapProviderId?
+
+> `optional` **defaultSwapProviderId**: `string`
+
+Defined in: [src/types/onboard.ts:39](https://github.com/adrienlacombe/starkzap/blob/93cc8acdf4b5a2f6d62f768f289d59b40af648f2/src/types/onboard.ts#L39)
+
+Optional default swap provider id (must be registered)

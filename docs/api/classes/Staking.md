@@ -6,7 +6,7 @@
 
 # Class: Staking
 
-Defined in: [src/staking/staking.ts:50](https://github.com/keep-starknet-strange/x/blob/5e54d8974744c392df7cac56b636788dfe6ae268/src/staking/staking.ts#L50)
+Defined in: [src/staking/staking.ts:57](https://github.com/adrienlacombe/starkzap/blob/93cc8acdf4b5a2f6d62f768f289d59b40af648f2/src/staking/staking.ts#L57)
 
 Represents a staking delegation pool and provides methods to interact with it.
 
@@ -41,7 +41,7 @@ if (position) {
 
 > **get** **poolAddress**(): [`Address`](../type-aliases/Address.md)
 
-Defined in: [src/staking/staking.ts:89](https://github.com/keep-starknet-strange/x/blob/5e54d8974744c392df7cac56b636788dfe6ae268/src/staking/staking.ts#L89)
+Defined in: [src/staking/staking.ts:96](https://github.com/adrienlacombe/starkzap/blob/93cc8acdf4b5a2f6d62f768f289d59b40af648f2/src/staking/staking.ts#L96)
 
 The pool contract address for this staking instance.
 
@@ -57,7 +57,7 @@ The Starknet address of the delegation pool contract
 
 > **populateEnter**(`walletAddress`, `amount`): [`Call`](../type-aliases/Call.md)[]
 
-Defined in: [src/staking/staking.ts:98](https://github.com/keep-starknet-strange/x/blob/5e54d8974744c392df7cac56b636788dfe6ae268/src/staking/staking.ts#L98)
+Defined in: [src/staking/staking.ts:105](https://github.com/adrienlacombe/starkzap/blob/93cc8acdf4b5a2f6d62f768f289d59b40af648f2/src/staking/staking.ts#L105)
 
 **`Internal`**
 
@@ -85,7 +85,7 @@ Build approve + enter pool Calls without executing.
 
 > **enter**(`wallet`, `amount`, `options?`): `Promise`\<[`Tx`](Tx.md)\>
 
-Defined in: [src/staking/staking.ts:130](https://github.com/keep-starknet-strange/x/blob/5e54d8974744c392df7cac56b636788dfe6ae268/src/staking/staking.ts#L130)
+Defined in: [src/staking/staking.ts:137](https://github.com/adrienlacombe/starkzap/blob/93cc8acdf4b5a2f6d62f768f289d59b40af648f2/src/staking/staking.ts#L137)
 
 Enter the delegation pool as a new member.
 
@@ -135,7 +135,7 @@ await tx.wait();
 
 > **stake**(`wallet`, `amount`, `options?`): `Promise`\<[`Tx`](Tx.md)\>
 
-Defined in: [src/staking/staking.ts:165](https://github.com/keep-starknet-strange/x/blob/5e54d8974744c392df7cac56b636788dfe6ae268/src/staking/staking.ts#L165)
+Defined in: [src/staking/staking.ts:172](https://github.com/adrienlacombe/starkzap/blob/93cc8acdf4b5a2f6d62f768f289d59b40af648f2/src/staking/staking.ts#L172)
 
 Stake tokens in this pool, automatically choosing enter or add.
 
@@ -183,7 +183,7 @@ await tx.wait();
 
 > **isMember**(`wallet`): `Promise`\<`boolean`\>
 
-Defined in: [src/staking/staking.ts:184](https://github.com/keep-starknet-strange/x/blob/5e54d8974744c392df7cac56b636788dfe6ae268/src/staking/staking.ts#L184)
+Defined in: [src/staking/staking.ts:191](https://github.com/adrienlacombe/starkzap/blob/93cc8acdf4b5a2f6d62f768f289d59b40af648f2/src/staking/staking.ts#L191)
 
 Check if a wallet is a member of this delegation pool.
 
@@ -207,7 +207,7 @@ True if the wallet is a pool member, false otherwise
 
 > **getPosition**(`wallet`): `Promise`\<[`PoolMember`](../interfaces/PoolMember.md) \| `null`\>
 
-Defined in: [src/staking/staking.ts:210](https://github.com/keep-starknet-strange/x/blob/5e54d8974744c392df7cac56b636788dfe6ae268/src/staking/staking.ts#L210)
+Defined in: [src/staking/staking.ts:217](https://github.com/adrienlacombe/starkzap/blob/93cc8acdf4b5a2f6d62f768f289d59b40af648f2/src/staking/staking.ts#L217)
 
 Get the current staking position for a wallet in this pool.
 
@@ -247,7 +247,7 @@ if (position) {
 
 > **getCommission**(): `Promise`\<`number`\>
 
-Defined in: [src/staking/staking.ts:258](https://github.com/keep-starknet-strange/x/blob/5e54d8974744c392df7cac56b636788dfe6ae268/src/staking/staking.ts#L258)
+Defined in: [src/staking/staking.ts:265](https://github.com/adrienlacombe/starkzap/blob/93cc8acdf4b5a2f6d62f768f289d59b40af648f2/src/staking/staking.ts#L265)
 
 Get the validator's commission rate for this pool.
 
@@ -273,7 +273,7 @@ console.log(`Validator commission: ${commission}%`);
 
 > **populateAdd**(`walletAddress`, `amount`): [`Call`](../type-aliases/Call.md)[]
 
-Defined in: [src/staking/staking.ts:268](https://github.com/keep-starknet-strange/x/blob/5e54d8974744c392df7cac56b636788dfe6ae268/src/staking/staking.ts#L268)
+Defined in: [src/staking/staking.ts:275](https://github.com/adrienlacombe/starkzap/blob/93cc8acdf4b5a2f6d62f768f289d59b40af648f2/src/staking/staking.ts#L275)
 
 **`Internal`**
 
@@ -301,7 +301,7 @@ Build approve + add-to-pool Calls without executing.
 
 > **add**(`wallet`, `amount`, `options?`): `Promise`\<[`Tx`](Tx.md)\>
 
-Defined in: [src/staking/staking.ts:299](https://github.com/keep-starknet-strange/x/blob/5e54d8974744c392df7cac56b636788dfe6ae268/src/staking/staking.ts#L299)
+Defined in: [src/staking/staking.ts:306](https://github.com/adrienlacombe/starkzap/blob/93cc8acdf4b5a2f6d62f768f289d59b40af648f2/src/staking/staking.ts#L306)
 
 Add more tokens to an existing stake in the pool.
 
@@ -350,7 +350,7 @@ await tx.wait();
 
 > **populateClaimRewards**(`walletAddress`): [`Call`](../type-aliases/Call.md)
 
-Defined in: [src/staking/staking.ts:315](https://github.com/keep-starknet-strange/x/blob/5e54d8974744c392df7cac56b636788dfe6ae268/src/staking/staking.ts#L315)
+Defined in: [src/staking/staking.ts:322](https://github.com/adrienlacombe/starkzap/blob/93cc8acdf4b5a2f6d62f768f289d59b40af648f2/src/staking/staking.ts#L322)
 
 **`Internal`**
 
@@ -374,7 +374,7 @@ Build a claim-rewards Call without executing.
 
 > **claimRewards**(`wallet`, `options?`): `Promise`\<[`Tx`](Tx.md)\>
 
-Defined in: [src/staking/staking.ts:341](https://github.com/keep-starknet-strange/x/blob/5e54d8974744c392df7cac56b636788dfe6ae268/src/staking/staking.ts#L341)
+Defined in: [src/staking/staking.ts:348](https://github.com/adrienlacombe/starkzap/blob/93cc8acdf4b5a2f6d62f768f289d59b40af648f2/src/staking/staking.ts#L348)
 
 Claim accumulated staking rewards.
 
@@ -429,7 +429,7 @@ if (position && !position.rewards.isZero()) {
 
 > **populateExitIntent**(`amount`): [`Call`](../type-aliases/Call.md)
 
-Defined in: [src/staking/staking.ts:364](https://github.com/keep-starknet-strange/x/blob/5e54d8974744c392df7cac56b636788dfe6ae268/src/staking/staking.ts#L364)
+Defined in: [src/staking/staking.ts:371](https://github.com/adrienlacombe/starkzap/blob/93cc8acdf4b5a2f6d62f768f289d59b40af648f2/src/staking/staking.ts#L371)
 
 **`Internal`**
 
@@ -453,7 +453,7 @@ Build an exit-intent Call without executing.
 
 > **exitIntent**(`wallet`, `amount`, `options?`): `Promise`\<[`Tx`](Tx.md)\>
 
-Defined in: [src/staking/staking.ts:404](https://github.com/keep-starknet-strange/x/blob/5e54d8974744c392df7cac56b636788dfe6ae268/src/staking/staking.ts#L404)
+Defined in: [src/staking/staking.ts:411](https://github.com/adrienlacombe/starkzap/blob/93cc8acdf4b5a2f6d62f768f289d59b40af648f2/src/staking/staking.ts#L411)
 
 Initiate an exit from the delegation pool.
 
@@ -524,7 +524,7 @@ await completeTx.wait();
 
 > **populateExit**(`walletAddress`): [`Call`](../type-aliases/Call.md)
 
-Defined in: [src/staking/staking.ts:431](https://github.com/keep-starknet-strange/x/blob/5e54d8974744c392df7cac56b636788dfe6ae268/src/staking/staking.ts#L431)
+Defined in: [src/staking/staking.ts:438](https://github.com/adrienlacombe/starkzap/blob/93cc8acdf4b5a2f6d62f768f289d59b40af648f2/src/staking/staking.ts#L438)
 
 **`Internal`**
 
@@ -548,7 +548,7 @@ Build an exit-pool Call without executing.
 
 > **exit**(`wallet`, `options?`): `Promise`\<[`Tx`](Tx.md)\>
 
-Defined in: [src/staking/staking.ts:457](https://github.com/keep-starknet-strange/x/blob/5e54d8974744c392df7cac56b636788dfe6ae268/src/staking/staking.ts#L457)
+Defined in: [src/staking/staking.ts:464](https://github.com/adrienlacombe/starkzap/blob/93cc8acdf4b5a2f6d62f768f289d59b40af648f2/src/staking/staking.ts#L464)
 
 Complete the exit from the delegation pool.
 
@@ -593,9 +593,9 @@ if (position?.unpoolTime && new Date() >= position.unpoolTime) {
 
 ### fromPool()
 
-> `static` **fromPool**(`poolAddress`, `provider`, `config`): `Promise`\<`Staking`\>
+> `static` **fromPool**(`poolAddress`, `provider`, `config`, `options?`): `Promise`\<`Staking`\>
 
-Defined in: [src/staking/staking.ts:528](https://github.com/keep-starknet-strange/x/blob/5e54d8974744c392df7cac56b636788dfe6ae268/src/staking/staking.ts#L528)
+Defined in: [src/staking/staking.ts:535](https://github.com/adrienlacombe/starkzap/blob/93cc8acdf4b5a2f6d62f768f289d59b40af648f2/src/staking/staking.ts#L535)
 
 Create a Staking instance from a known pool contract address.
 
@@ -611,7 +611,7 @@ The pool contract address
 
 ##### provider
 
-`RpcProvider`
+[`RpcProvider`](../interfaces/RpcProvider.md)
 
 The RPC provider
 
@@ -620,6 +620,10 @@ The RPC provider
 [`StakingConfig`](../interfaces/StakingConfig.md)
 
 The staking configuration
+
+##### options?
+
+`FromPoolOptions` = `{}`
 
 #### Returns
 
@@ -647,7 +651,7 @@ const staking = await Staking.fromPool(
 
 > `static` **fromStaker**(`stakerAddress`, `token`, `provider`, `config`): `Promise`\<`Staking`\>
 
-Defined in: [src/staking/staking.ts:604](https://github.com/keep-starknet-strange/x/blob/5e54d8974744c392df7cac56b636788dfe6ae268/src/staking/staking.ts#L604)
+Defined in: [src/staking/staking.ts:641](https://github.com/adrienlacombe/starkzap/blob/93cc8acdf4b5a2f6d62f768f289d59b40af648f2/src/staking/staking.ts#L641)
 
 Create a Staking instance from a validator's (staker's) address.
 
@@ -671,7 +675,7 @@ The token to stake (e.g., STRK)
 
 ##### provider
 
-`RpcProvider`
+[`RpcProvider`](../interfaces/RpcProvider.md)
 
 The RPC provider
 
@@ -708,7 +712,7 @@ const staking = await Staking.fromStaker(
 
 > `static` **activeTokens**(`provider`, `config`): `Promise`\<[`Token`](../interfaces/Token.md)[]\>
 
-Defined in: [src/staking/staking.ts:652](https://github.com/keep-starknet-strange/x/blob/5e54d8974744c392df7cac56b636788dfe6ae268/src/staking/staking.ts#L652)
+Defined in: [src/staking/staking.ts:689](https://github.com/adrienlacombe/starkzap/blob/93cc8acdf4b5a2f6d62f768f289d59b40af648f2/src/staking/staking.ts#L689)
 
 Get all tokens that are currently enabled for staking.
 
@@ -719,7 +723,7 @@ Typically, includes STRK and may include other tokens like wrapped BTC.
 
 ##### provider
 
-`RpcProvider`
+[`RpcProvider`](../interfaces/RpcProvider.md)
 
 The RPC provider
 
@@ -748,7 +752,7 @@ console.log(`Stakeable tokens: ${tokens.map(t => t.symbol).join(', ')}`);
 
 > `static` **getStakerPools**(`provider`, `stakerAddress`, `config`): `Promise`\<[`Pool`](../interfaces/Pool.md)[]\>
 
-Defined in: [src/staking/staking.ts:693](https://github.com/keep-starknet-strange/x/blob/5e54d8974744c392df7cac56b636788dfe6ae268/src/staking/staking.ts#L693)
+Defined in: [src/staking/staking.ts:730](https://github.com/adrienlacombe/starkzap/blob/93cc8acdf4b5a2f6d62f768f289d59b40af648f2/src/staking/staking.ts#L730)
 
 Get all delegation pools managed by a specific validator.
 
@@ -760,7 +764,7 @@ pool contract address, token, and total delegated amount.
 
 ##### provider
 
-`RpcProvider`
+[`RpcProvider`](../interfaces/RpcProvider.md)
 
 The RPC provider
 

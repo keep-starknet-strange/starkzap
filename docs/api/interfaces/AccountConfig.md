@@ -6,7 +6,7 @@
 
 # Interface: AccountConfig
 
-Defined in: [src/types/wallet.ts:54](https://github.com/keep-starknet-strange/x/blob/5e54d8974744c392df7cac56b636788dfe6ae268/src/types/wallet.ts#L54)
+Defined in: [src/types/wallet.ts:55](https://github.com/adrienlacombe/starkzap/blob/93cc8acdf4b5a2f6d62f768f289d59b40af648f2/src/types/wallet.ts#L55)
 
 Full account configuration for connecting a wallet.
 
@@ -27,7 +27,7 @@ import { StarkSigner, OpenZeppelinPreset } from "starkzap";
 
 > **signer**: [`SignerInterface`](SignerInterface.md)
 
-Defined in: [src/types/wallet.ts:56](https://github.com/keep-starknet-strange/x/blob/5e54d8974744c392df7cac56b636788dfe6ae268/src/types/wallet.ts#L56)
+Defined in: [src/types/wallet.ts:57](https://github.com/adrienlacombe/starkzap/blob/93cc8acdf4b5a2f6d62f768f289d59b40af648f2/src/types/wallet.ts#L57)
 
 Signer for transaction signing
 
@@ -37,6 +37,6 @@ Signer for transaction signing
 
 > `optional` **accountClass**: [`AccountClassConfig`](AccountClassConfig.md)
 
-Defined in: [src/types/wallet.ts:58](https://github.com/keep-starknet-strange/x/blob/5e54d8974744c392df7cac56b636788dfe6ae268/src/types/wallet.ts#L58)
+Defined in: [src/types/wallet.ts:59](https://github.com/adrienlacombe/starkzap/blob/93cc8acdf4b5a2f6d62f768f289d59b40af648f2/src/types/wallet.ts#L59)
 
 Account class configuration (default: OpenZeppelin)

@@ -12,6 +12,7 @@ import type { WalletInterface } from "@/wallet/interface";
 import type { Call } from "starknet";
 import type { Staking } from "@/staking";
 import type { SwapProvider } from "@/swap";
+import type { Confidential } from "@/confidential";
 
 // ─── Test fixtures ───────────────────────────────────────────────────────────
 
@@ -686,6 +687,198 @@ describe("TxBuilder", () => {
 
       expect(calls).toHaveLength(1);
       expect(calls[0].entrypoint).toBe("exit_delegation_pool_action");
+    });
+  });
+
+  // ============================================================
+  // Confidential operations
+  // ============================================================
+
+  describe("confidentialFund", () => {
+    it("should return the same builder instance", () => {
+      const wallet = createMockWallet();
+      const builder = new TxBuilder(wallet);
+      const mockConfidential = {
+        populateFund: vi.fn().mockResolvedValue([rawCall]),
+      } as unknown as Confidential;
+
+      expect(
+        builder.confidentialFund(mockConfidential, {
+          amount: 100n,
+          sender: fromAddress("0xABC1"),
+        })
+      ).toBe(builder);
+    });
+
+    it("should queue calls from populateFund", async () => {
+      const fundCall: Call = {
+        contractAddress: "0xTONGO",
+        entrypoint: "fund",
+        calldata: ["0x1"],
+      };
+      const mockConfidential = {
+        populateFund: vi.fn().mockResolvedValue([fundCall]),
+      } as unknown as Confidential;
+
+      const wallet = createMockWallet();
+      const calls = await new TxBuilder(wallet)
+        .confidentialFund(mockConfidential, {
+          amount: 100n,
+          sender: fromAddress("0xABC1"),
+        })
+        .calls();
+
+      expect(calls).toEqual([fundCall]);
+      expect(mockConfidential.populateFund).toHaveBeenCalledWith({
+        amount: 100n,
+        sender: fromAddress("0xABC1"),
+      });
+    });
+  });
+
+  describe("confidentialTransfer", () => {
+    it("should queue calls from populateTransfer", async () => {
+      const transferCall: Call = {
+        contractAddress: "0xTONGO",
+        entrypoint: "transfer",
+        calldata: ["0x2"],
+      };
+      const mockConfidential = {
+        populateTransfer: vi.fn().mockResolvedValue([transferCall]),
+      } as unknown as Confidential;
+
+      const wallet = createMockWallet();
+      const calls = await new TxBuilder(wallet)
+        .confidentialTransfer(mockConfidential, {
+          amount: 50n,
+          to: { x: 1n, y: 2n },
+          sender: fromAddress("0xABC1"),
+        })
+        .calls();
+
+      expect(calls).toEqual([transferCall]);
+      expect(mockConfidential.populateTransfer).toHaveBeenCalledWith({
+        amount: 50n,
+        to: { x: 1n, y: 2n },
+        sender: fromAddress("0xABC1"),
+      });
+    });
+  });
+
+  describe("confidentialWithdraw", () => {
+    it("should queue calls from populateWithdraw", async () => {
+      const withdrawCall: Call = {
+        contractAddress: "0xTONGO",
+        entrypoint: "withdraw",
+        calldata: ["0x3"],
+      };
+      const mockConfidential = {
+        populateWithdraw: vi.fn().mockResolvedValue([withdrawCall]),
+      } as unknown as Confidential;
+
+      const wallet = createMockWallet();
+      const calls = await new TxBuilder(wallet)
+        .confidentialWithdraw(mockConfidential, {
+          amount: 25n,
+          to: fromAddress("0xBEEF"),
+          sender: fromAddress("0xABC1"),
+        })
+        .calls();
+
+      expect(calls).toEqual([withdrawCall]);
+    });
+  });
+
+  describe("confidentialRagequit", () => {
+    it("should queue calls from populateRagequit", async () => {
+      const ragequitCall: Call = {
+        contractAddress: "0xTONGO",
+        entrypoint: "ragequit",
+        calldata: ["0x4"],
+      };
+      const mockConfidential = {
+        populateRagequit: vi.fn().mockResolvedValue([ragequitCall]),
+      } as unknown as Confidential;
+
+      const wallet = createMockWallet();
+      const calls = await new TxBuilder(wallet)
+        .confidentialRagequit(mockConfidential, {
+          to: fromAddress("0xBEEF"),
+          sender: fromAddress("0xABC1"),
+        })
+        .calls();
+
+      expect(calls).toEqual([ragequitCall]);
+    });
+  });
+
+  describe("confidentialRollover", () => {
+    it("should queue calls from populateRollover", async () => {
+      const rolloverCall: Call = {
+        contractAddress: "0xTONGO",
+        entrypoint: "rollover",
+        calldata: ["0x5"],
+      };
+      const mockConfidential = {
+        populateRollover: vi.fn().mockResolvedValue([rolloverCall]),
+      } as unknown as Confidential;
+
+      const wallet = createMockWallet();
+      const calls = await new TxBuilder(wallet)
+        .confidentialRollover(mockConfidential, {
+          sender: fromAddress("0xABC1"),
+        })
+        .calls();
+
+      expect(calls).toEqual([rolloverCall]);
+    });
+  });
+
+  describe("confidential error handling", () => {
+    it("should propagate populate errors through send", async () => {
+      const mockConfidential = {
+        populateFund: vi
+          .fn()
+          .mockRejectedValue(new Error("proof generation failed")),
+      } as unknown as Confidential;
+
+      const wallet = createMockWallet();
+      const builder = new TxBuilder(wallet).confidentialFund(mockConfidential, {
+        amount: 100n,
+        sender: fromAddress("0xABC1"),
+      });
+
+      await expect(builder.send()).rejects.toThrow("proof generation failed");
+    });
+  });
+
+  describe("confidential mixed batching", () => {
+    it("should batch confidential calls with other operations", async () => {
+      const confidentialCall: Call = {
+        contractAddress: "0xTONGO",
+        entrypoint: "fund",
+        calldata: ["0x1"],
+      };
+      const mockConfidential = {
+        populateFund: vi.fn().mockResolvedValue([confidentialCall]),
+      } as unknown as Confidential;
+
+      const wallet = createMockWallet();
+      const amount = Amount.parse("100", mockUSDC);
+
+      const calls = await new TxBuilder(wallet)
+        .approve(mockUSDC, fromAddress("0xDEAD"), amount)
+        .confidentialFund(mockConfidential, {
+          amount: 100n,
+          sender: fromAddress("0xABC1"),
+        })
+        .transfer(mockUSDC, { to: alice, amount })
+        .calls();
+
+      expect(calls).toHaveLength(3);
+      expect(calls[0]!.entrypoint).toBe("approve");
+      expect(calls[1]!.entrypoint).toBe("fund");
+      expect(calls[2]!.entrypoint).toBe("transfer");
     });
   });
 

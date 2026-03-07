@@ -6,7 +6,7 @@
 
 # Interface: PrivySignerConfig
 
-Defined in: [src/signer/privy.ts:20](https://github.com/keep-starknet-strange/x/blob/5e54d8974744c392df7cac56b636788dfe6ae268/src/signer/privy.ts#L20)
+Defined in: [src/signer/privy.ts:20](https://github.com/adrienlacombe/starkzap/blob/93cc8acdf4b5a2f6d62f768f289d59b40af648f2/src/signer/privy.ts#L20)
 
 Configuration for the Privy signer.
 
@@ -20,7 +20,7 @@ You can either provide:
 
 > **walletId**: `string`
 
-Defined in: [src/signer/privy.ts:22](https://github.com/keep-starknet-strange/x/blob/5e54d8974744c392df7cac56b636788dfe6ae268/src/signer/privy.ts#L22)
+Defined in: [src/signer/privy.ts:22](https://github.com/adrienlacombe/starkzap/blob/93cc8acdf4b5a2f6d62f768f289d59b40af648f2/src/signer/privy.ts#L22)
 
 Privy wallet ID
 
@@ -30,7 +30,7 @@ Privy wallet ID
 
 > **publicKey**: `string`
 
-Defined in: [src/signer/privy.ts:24](https://github.com/keep-starknet-strange/x/blob/5e54d8974744c392df7cac56b636788dfe6ae268/src/signer/privy.ts#L24)
+Defined in: [src/signer/privy.ts:24](https://github.com/adrienlacombe/starkzap/blob/93cc8acdf4b5a2f6d62f768f289d59b40af648f2/src/signer/privy.ts#L24)
 
 Public key returned by Privy when creating the wallet
 
@@ -40,7 +40,7 @@ Public key returned by Privy when creating the wallet
 
 > `optional` **serverUrl**: `string`
 
-Defined in: [src/signer/privy.ts:30](https://github.com/keep-starknet-strange/x/blob/5e54d8974744c392df7cac56b636788dfe6ae268/src/signer/privy.ts#L30)
+Defined in: [src/signer/privy.ts:30](https://github.com/adrienlacombe/starkzap/blob/93cc8acdf4b5a2f6d62f768f289d59b40af648f2/src/signer/privy.ts#L30)
 
 URL to your backend's sign endpoint.
 The signer will POST { walletId, hash } and expect { signature } back.
@@ -57,7 +57,7 @@ The signer will POST { walletId, hash } and expect { signature } back.
 
 > `optional` **rawSign**: (`walletId`, `messageHash`) => `Promise`\<`string`\>
 
-Defined in: [src/signer/privy.ts:35](https://github.com/keep-starknet-strange/x/blob/5e54d8974744c392df7cac56b636788dfe6ae268/src/signer/privy.ts#L35)
+Defined in: [src/signer/privy.ts:35](https://github.com/adrienlacombe/starkzap/blob/93cc8acdf4b5a2f6d62f768f289d59b40af648f2/src/signer/privy.ts#L35)
 
 Custom function to call Privy's rawSign.
 Use this for server-side signing with PrivyClient directly.
@@ -82,7 +82,7 @@ Use this for server-side signing with PrivyClient directly.
 
 > `optional` **headers**: `PrivySigningHeaders`
 
-Defined in: [src/signer/privy.ts:41](https://github.com/keep-starknet-strange/x/blob/5e54d8974744c392df7cac56b636788dfe6ae268/src/signer/privy.ts#L41)
+Defined in: [src/signer/privy.ts:41](https://github.com/adrienlacombe/starkzap/blob/93cc8acdf4b5a2f6d62f768f289d59b40af648f2/src/signer/privy.ts#L41)
 
 Optional headers (or header factory) for authenticated signing requests.
 
@@ -94,7 +94,7 @@ Use this to pass session/JWT headers when calling your backend endpoint.
 
 > `optional` **buildBody**: `PrivySigningBody`
 
-Defined in: [src/signer/privy.ts:47](https://github.com/keep-starknet-strange/x/blob/5e54d8974744c392df7cac56b636788dfe6ae268/src/signer/privy.ts#L47)
+Defined in: [src/signer/privy.ts:47](https://github.com/adrienlacombe/starkzap/blob/93cc8acdf4b5a2f6d62f768f289d59b40af648f2/src/signer/privy.ts#L47)
 
 Optional payload builder for challenge/nonce aware signing endpoints.
 
@@ -106,7 +106,7 @@ Default body is `{ walletId, hash }`.
 
 > `optional` **requestTimeoutMs**: `number`
 
-Defined in: [src/signer/privy.ts:52](https://github.com/keep-starknet-strange/x/blob/5e54d8974744c392df7cac56b636788dfe6ae268/src/signer/privy.ts#L52)
+Defined in: [src/signer/privy.ts:52](https://github.com/adrienlacombe/starkzap/blob/93cc8acdf4b5a2f6d62f768f289d59b40af648f2/src/signer/privy.ts#L52)
 
 Timeout for serverUrl requests in milliseconds.
 
