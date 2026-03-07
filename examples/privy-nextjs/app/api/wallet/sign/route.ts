@@ -38,7 +38,7 @@ export async function POST(request: NextRequest) {
     }
 
     const token = authHeader.slice(7);
-    await privy.utils().auth().verifyAccessToken(token);
+    const claims = await privy.utils().auth().verifyAccessToken(token);
 
     // Parse request body
     const body = await request.json();
@@ -48,6 +48,16 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { error: 'walletId and hash are required' },
         { status: 400 }
+      );
+    }
+
+    // Security: Verify the wallet belongs to the authenticated user
+    const userWallets = await privy.wallets().list({ userId: claims.userId });
+    const ownsWallet = userWallets.some(w => w.id === walletId);
+    if (!ownsWallet) {
+      return NextResponse.json(
+        { error: 'Wallet not found or not owned by user' },
+        { status: 403 }
       );
     }
 

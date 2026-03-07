@@ -49,6 +49,9 @@ export function StarknetWallet() {
   const connectStarknetWallet = useCallback(async (walletData: WalletData) => {
     const sdk = getSDK();
     const token = await getAccessToken();
+    if (!token) {
+      throw new Error('No access token available');
+    }
 
     const onboard = await sdk.onboard({
       strategy: OnboardStrategy.Privy,

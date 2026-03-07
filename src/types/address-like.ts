@@ -1,29 +1,32 @@
-import type { Address } from "@/types/address";
 import type { WalletInterface } from "@/wallet";
 
 /**
- * A type that represents either a raw Starknet address or a wallet instance.
+ * A type that represents either a raw Starknet address string or a wallet instance.
  *
  * This is used for read-only operations like balance queries and staking position
  * lookups where only the address is needed, not the full wallet capabilities.
  *
  * @example
  * ```ts
- * // All of these are valid AddressLike values:
- * const address: AddressLike = "0x123...";
- * const address: AddressLike = { address: "0x123..." } as WalletInterface;
+ * import { fromAddress } from "@/types/address";
+ *
+ * // Using a plain string (requires fromAddress for type safety):
+ * const address: AddressLike = fromAddress("0x123...");
+ *
+ * // Or pass a wallet directly:
+ * const address: AddressLike = wallet;
  *
  * // Use getAddress to extract the address:
  * const addr = getAddress(addressLike);
  * ```
  */
-export type AddressLike = Address | WalletInterface;
+export type AddressLike = string | WalletInterface;
 
 /**
- * Extract a Starknet address from an AddressLike value.
+ * Extract a Starknet address string from an AddressLike value.
  *
- * @param addressLike - Either an Address string or a WalletInterface
- * @returns The extracted Address
+ * @param addressLike - Either a string address or a WalletInterface
+ * @returns The extracted address string
  *
  * @example
  * ```ts
@@ -31,7 +34,7 @@ export type AddressLike = Address | WalletInterface;
  * const addr2 = getAddress(wallet);              // Returns wallet.address
  * ```
  */
-export function getAddress(addressLike: AddressLike): Address {
+export function getAddress(addressLike: AddressLike): string {
   if (typeof addressLike === "string") {
     return addressLike;
   }
