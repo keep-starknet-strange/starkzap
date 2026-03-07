@@ -345,12 +345,6 @@ export class StarkSDK {
     }
     
     if (options.strategy === "browser") {
-      if (!isWebRuntimeForCartridge()) {
-        throw new Error(
-          "Browser wallet strategy is only supported in web environments. " +
-            "Use signer or privy strategies on native or server runtimes."
-        );
-      }
 
       const { BrowserWallet } = await import("./wallet/browser");
       const wallet = await BrowserWallet.create(

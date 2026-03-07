@@ -98,6 +98,24 @@ export interface OnboardBrowserOptions extends OnboardBaseOptions {
   walletProvider: StarknetWindowObject;
   rpcUrl?: string;
   explorer?: ExplorerConfig;
+  /**
+   * Target mobile wallet store. Pass "ios" or "android" when connecting
+   * from a React Native app to installed Argent/Braavos mobile wallets.
+   * Omit for browser extension wallets.
+   *
+   * @example
+   * ```ts
+   * import { connect } from "@starknet-io/get-starknet";
+   *
+   * const starknet = await connect({ osVersion: "android" });
+   * await sdk.onboard({
+   *   strategy: "browser",
+   *   walletProvider: starknet,
+   *   osVersion: "android",
+   * });
+   * ```
+   */
+  osVersion?: "ios" | "android";
 }
 
 export type OnboardOptions =

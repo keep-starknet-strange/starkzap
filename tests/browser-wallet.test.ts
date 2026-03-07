@@ -72,6 +72,18 @@ describe("BrowserWallet", () => {
       );
     });
 
+    it("should accept osVersion for mobile wallet connections", async () => {
+      const wallet = await BrowserWallet.create(mockWalletProvider as never, {
+        rpcUrl: "https://rpc.starknet.io",
+        osVersion: "android",
+      });
+
+      expect(wallet).toBeInstanceOf(BrowserWallet);
+      expect(wallet.address).toBe(
+        "0x0000000000000000000000000000000000000000000000001234567890abcdef"
+      );
+    });
+
     it("should use WalletAccount.connect() from starknet.js", async () => {
       const { WalletAccount } = await import("starknet");
       await BrowserWallet.create(mockWalletProvider as never, {
@@ -86,7 +98,6 @@ describe("BrowserWallet", () => {
 
     it("should handle undeployed accounts — classHash stays 0x0", async () => {
       const { WalletAccount } = await import("starknet");
-      // Make WalletAccount.connect return an account whose classHash lookup fails
       (
         WalletAccount as unknown as { connect: ReturnType<typeof vi.fn> }
       ).connect.mockResolvedValueOnce({
@@ -101,8 +112,6 @@ describe("BrowserWallet", () => {
         rpcUrl: "https://rpc.starknet.io",
       });
 
-      // The getClassHashAt mock throws during create() for this address,
-      // so classHash should fall back to "0x0"
       expect(wallet.getClassHash()).toBeDefined();
     });
   });
@@ -195,7 +204,7 @@ describe("BrowserWallet", () => {
         rpcUrl: "https://rpc.starknet.io",
       });
       await expect(wallet.disconnect()).resolves.not.toThrow();
-  });
+    });
 
     it("should call walletProvider.disconnect() when it exists", async () => {
       const disconnectFn = vi.fn().mockResolvedValue(undefined);

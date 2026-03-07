@@ -37,6 +37,7 @@ export interface BrowserWalletOptions {
   chainId?: ChainId;
   feeMode?: FeeMode;
   explorer?: ExplorerConfig;
+  osVersion?: "ios" | "android";
 }
 
 /**
