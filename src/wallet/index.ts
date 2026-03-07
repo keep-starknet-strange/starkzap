@@ -26,6 +26,7 @@ import type {
   ChainId,
   StakingConfig,
 } from "@/types";
+import { SponsorshipNotAvailableError } from "@/errors/sponsorship";
 import type { SwapProvider } from "@/swap";
 import {
   checkDeployed,
@@ -484,40 +485,62 @@ export class Wallet extends BaseWallet {
     let transactionHash: string;
 
     if (feeMode === "sponsored") {
-      const deployed = await this.isDeployed();
-      if (deployed) {
-        transactionHash = (
-          await this.account.executePaymasterTransaction(
-            calls,
-            sponsoredDetails(timeBounds)
-          )
-        ).transaction_hash;
-      } else {
-        transactionHash = await this.withSponsoredDeployLock(async () => {
-          const recheckedDeployed = await this.isDeployed();
-          if (recheckedDeployed) {
-            return (
-              await this.account.executePaymasterTransaction(
-                calls,
-                sponsoredDetails(timeBounds)
-              )
-            ).transaction_hash;
-          }
-
-          try {
-            return (await this.deployPaymasterWith(calls, timeBounds)).hash;
-          } catch (error) {
-            if (!isAlreadyDeployedError(error)) {
-              throw error;
+      try {
+        const deployed = await this.isDeployed();
+        if (deployed) {
+          transactionHash = (
+            await this.account.executePaymasterTransaction(
+              calls,
+              sponsoredDetails(timeBounds)
+            )
+          ).transaction_hash;
+        } else {
+          transactionHash = await this.withSponsoredDeployLock(async () => {
+            const recheckedDeployed = await this.isDeployed();
+            if (recheckedDeployed) {
+              return (
+                await this.account.executePaymasterTransaction(
+                  calls,
+                  sponsoredDetails(timeBounds)
+                )
+              ).transaction_hash;
             }
-            return (
-              await this.account.executePaymasterTransaction(
-                calls,
-                sponsoredDetails(timeBounds)
-              )
-            ).transaction_hash;
+
+            try {
+              return (await this.deployPaymasterWith(calls, timeBounds)).hash;
+            } catch (error) {
+              if (!isAlreadyDeployedError(error)) {
+                throw error;
+              }
+              return (
+                await this.account.executePaymasterTransaction(
+                  calls,
+                  sponsoredDetails(timeBounds)
+                )
+              ).transaction_hash;
+            }
+          });
+        }
+      } catch (error) {
+        // Attempt to parse as sponsorship error
+        const structured = SponsorshipNotAvailableError.fromError(error);
+
+        if (structured instanceof SponsorshipNotAvailableError) {
+          // Call onFallback callback if provided
+          options.onFallback?.(structured);
+
+          // If fallbackTo is set, retry with that fee mode
+          if (options.fallbackTo !== undefined) {
+            // eslint-disable-next-line @typescript-eslint/no-unused-vars
+            const { fallbackTo, onFallback, ...restOptions } = options;
+            return this.execute(calls, {
+              ...restOptions,
+              feeMode: options.fallbackTo,
+            });
           }
-        });
+        }
+
+        throw structured;
       }
     } else {
       const deployed = await this.isDeployed();

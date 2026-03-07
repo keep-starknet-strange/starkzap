@@ -116,9 +116,19 @@ export class SponsorshipNotAvailableError extends Error {
     }
 
     if (!(error instanceof Error)) {
-      return new SponsorshipNotAvailableError("unknown", {
-        message: String(error),
-      });
+      // Only treat non-Error values as sponsorship errors if the string suggests it
+      const message = String(error).toLowerCase();
+      if (
+        message.includes("sponsor") ||
+        message.includes("paymaster") ||
+        message.includes("policy")
+      ) {
+        return new SponsorshipNotAvailableError("unknown", {
+          message: String(error),
+        });
+      }
+      // Return a generic Error for non-sponsorship related non-Error values
+      return new Error(String(error));
     }
 
     const message = error.message.toLowerCase();
