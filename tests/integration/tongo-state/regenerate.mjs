@@ -79,80 +79,83 @@ const devnet = await Devnet.spawnInstalled({
   maxStartupMillis: 15000,
 });
 
-const devnetUrl = devnet.provider.url;
-console.log(`Devnet running at ${devnetUrl}`);
+try {
+  const devnetUrl = devnet.provider.url;
+  console.log(`Devnet running at ${devnetUrl}`);
 
-const provider = new RpcProvider({ nodeUrl: devnetUrl });
-const devnetProvider = new DevnetProvider({ url: devnetUrl });
+  const provider = new RpcProvider({ nodeUrl: devnetUrl });
+  const devnetProvider = new DevnetProvider({ url: devnetUrl });
 
-// Get a predeployed account
-const accounts = await devnetProvider.getPredeployedAccounts();
-const acc = accounts[0];
-const deployer = new Account({
-  provider,
-  address: acc.address,
-  signer: acc.private_key,
-  cairoVersion: "1",
-});
+  // Get a predeployed account
+  const accounts = await devnetProvider.getPredeployedAccounts();
+  const acc = accounts[0];
+  const deployer = new Account({
+    provider,
+    address: acc.address,
+    signer: acc.private_key,
+    cairoVersion: "1",
+  });
 
-console.log(`Deployer: ${deployer.address}`);
+  console.log(`Deployer: ${deployer.address}`);
 
-// Declare the contract
-console.log("Declaring Tongo contract...");
-const declarePayload = { contract: sierra };
-if (casm) declarePayload.casm = casm;
-const declareResult = await deployer.declareIfNot(declarePayload);
-if (declareResult.transaction_hash) {
-  await provider.waitForTransaction(declareResult.transaction_hash, {
+  // Declare the contract
+  console.log("Declaring Tongo contract...");
+  const declarePayload = { contract: sierra };
+  if (casm) declarePayload.casm = casm;
+  const declareResult = await deployer.declareIfNot(declarePayload);
+  if (declareResult.transaction_hash) {
+    await provider.waitForTransaction(declareResult.transaction_hash, {
+      retryInterval: 500,
+    });
+  }
+  const classHash = declareResult.class_hash;
+  console.log(`Class hash: ${classHash}`);
+
+  // Build constructor calldata using the ABI
+  const calldata = new CallData(sierra.abi);
+  const constructorCalldata = calldata.compile("constructor", {
+    owner: deployer.address,
+    ERC20: STRK_ADDRESS,
+    rate: { low: 1n, high: 0n },
+    bit_size: 32,
+    auditor_key: new CairoOption(CairoOptionVariant.None),
+  });
+
+  // Deploy the contract
+  console.log("Deploying Tongo contract...");
+  const deployResult = await deployer.deployContract({
+    classHash,
+    constructorCalldata,
+    salt: "0",
+  });
+  await provider.waitForTransaction(deployResult.transaction_hash, {
     retryInterval: 500,
   });
+
+  const tongoAddress = deployResult.contract_address;
+  console.log(`Tongo deployed at: ${tongoAddress}`);
+
+  // Dump state via RPC
+  console.log("Dumping state...");
+  await devnetProvider.dump(DUMP_PATH);
+
+  // Save metadata
+  const meta = {
+    state: "devnet.state",
+    contracts: {
+      Tongo: {
+        class_hash: classHash,
+        address: tongoAddress,
+      },
+      STRK: {
+        address: STRK_ADDRESS,
+      },
+    },
+  };
+  writeFileSync(META_PATH, JSON.stringify(meta, null, 2) + "\n");
+  console.log(`Metadata written to ${META_PATH}`);
+
+  console.log("Done! State dumped to", DUMP_PATH);
+} finally {
+  devnet.kill();
 }
-const classHash = declareResult.class_hash;
-console.log(`Class hash: ${classHash}`);
-
-// Build constructor calldata using the ABI
-const calldata = new CallData(sierra.abi);
-const constructorCalldata = calldata.compile("constructor", {
-  owner: deployer.address,
-  ERC20: STRK_ADDRESS,
-  rate: { low: 1n, high: 0n },
-  bit_size: 32,
-  auditor_key: new CairoOption(CairoOptionVariant.None),
-});
-
-// Deploy the contract
-console.log("Deploying Tongo contract...");
-const deployResult = await deployer.deployContract({
-  classHash,
-  constructorCalldata,
-  salt: "0",
-});
-await provider.waitForTransaction(deployResult.transaction_hash, {
-  retryInterval: 500,
-});
-
-const tongoAddress = deployResult.contract_address;
-console.log(`Tongo deployed at: ${tongoAddress}`);
-
-// Dump state via RPC
-console.log("Dumping state...");
-await devnetProvider.dump(DUMP_PATH);
-
-// Save metadata
-const meta = {
-  state: "devnet.state",
-  contracts: {
-    Tongo: {
-      class_hash: classHash,
-      address: tongoAddress,
-    },
-    STRK: {
-      address: STRK_ADDRESS,
-    },
-  },
-};
-writeFileSync(META_PATH, JSON.stringify(meta, null, 2) + "\n");
-console.log(`Metadata written to ${META_PATH}`);
-
-devnet.kill();
-console.log("Done! State dumped to", DUMP_PATH);
