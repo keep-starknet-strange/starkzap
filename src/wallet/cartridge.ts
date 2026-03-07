@@ -66,7 +66,17 @@ function cartridgeDependencyError(extra?: string): Error {
 async function loadCartridgeControllerModule(): Promise<CartridgeControllerModule> {
   let imported: unknown;
   try {
-    imported = await import("@cartridge/controller");
+    // Dynamic import with try-catch for optional peer dependency
+    // The package '@cartridge/controller' is an optional peer dependency
+    // and should only be installed when using Cartridge integration
+    //
+    // We use a helper to construct the import to avoid static analysis by bundlers
+    // that might try to resolve the module at build time even though it's optional
+    const dynamicImport = new Function(
+      "packageName",
+      "return import(packageName)"
+    ) as (name: string) => Promise<unknown>;
+    imported = await dynamicImport("@cartridge/controller");
   } catch (error) {
     const details =
       error instanceof Error && error.message
