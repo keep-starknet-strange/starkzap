@@ -1,4 +1,5 @@
 export * from "@/types/address";
+export * from "@/types/address-like";
 export * from "@/types/amount";
 export * from "@/types/config";
 export * from "@/types/sponsorship";

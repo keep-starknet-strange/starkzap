@@ -1,4 +1,4 @@
-import { type Address, Amount, type ExecuteOptions, type Token } from "@/types";
+import { type Address, type AddressLike, getAddress, Amount, type ExecuteOptions, type Token } from "@/types";
 import type { WalletInterface } from "@/wallet";
 import {
   type Call,
@@ -130,26 +130,36 @@ export class Erc20 {
   }
 
   /**
-   * Get the balance in a wallet.
-   * @param wallet - Wallet to check the balance of
+   * Get the balance of an address.
+   *
+   * This is a read-only operation that does not require a signer.
+   * You can pass either a wallet instance or just an address string.
+   *
+   * @param addressLike - Either an Address string or a WalletInterface
    * @returns Amount representing the token balance
    *
    * @example
    * ```ts
    * const erc20 = wallet.erc20(USDC);
+   *
+   * // Using wallet instance
    * const balance = await erc20.balanceOf(wallet);
+   *
+   * // Using address directly (no signer needed)
+   * const balance = await erc20.balanceOf("0x123...");
    *
    * console.log(balance.toUnit());      // "100.5"
    * console.log(balance.toFormatted()); // "100.5 USDC"
    * ```
    */
-  public async balanceOf(wallet: WalletInterface): Promise<Amount> {
+  public async balanceOf(addressLike: AddressLike): Promise<Amount> {
+    const address = getAddress(addressLike);
     let result: number | bigint | Uint256;
     try {
-      result = await this.contract.balance_of(wallet.address);
+      result = await this.contract.balance_of(address);
     } catch (error) {
       if (error instanceof RpcError && error.isType("ENTRYPOINT_NOT_FOUND")) {
-        result = await this.contract.balanceOf(wallet.address);
+        result = await this.contract.balanceOf(address);
       } else {
         throw error;
       }
