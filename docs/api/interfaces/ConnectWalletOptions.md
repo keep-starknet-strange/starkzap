@@ -6,7 +6,7 @@
 
 # Interface: ConnectWalletOptions
 
-Defined in: [src/types/wallet.ts:95](https://github.com/adrienlacombe/starkzap/blob/93cc8acdf4b5a2f6d62f768f289d59b40af648f2/src/types/wallet.ts#L95)
+Defined in: [src/types/wallet.ts:94](https://github.com/keep-starknet-strange/x/blob/5e54d8974744c392df7cac56b636788dfe6ae268/src/types/wallet.ts#L94)
 
 Options for `sdk.connectWallet()`.
 
@@ -36,7 +36,7 @@ await sdk.connectWallet({
 
 > **account**: [`AccountConfig`](AccountConfig.md)
 
-Defined in: [src/types/wallet.ts:97](https://github.com/adrienlacombe/starkzap/blob/93cc8acdf4b5a2f6d62f768f289d59b40af648f2/src/types/wallet.ts#L97)
+Defined in: [src/types/wallet.ts:96](https://github.com/keep-starknet-strange/x/blob/5e54d8974744c392df7cac56b636788dfe6ae268/src/types/wallet.ts#L96)
 
 Account configuration
 
@@ -46,7 +46,7 @@ Account configuration
 
 > `optional` **feeMode**: [`FeeMode`](../type-aliases/FeeMode.md)
 
-Defined in: [src/types/wallet.ts:99](https://github.com/adrienlacombe/starkzap/blob/93cc8acdf4b5a2f6d62f768f289d59b40af648f2/src/types/wallet.ts#L99)
+Defined in: [src/types/wallet.ts:98](https://github.com/keep-starknet-strange/x/blob/5e54d8974744c392df7cac56b636788dfe6ae268/src/types/wallet.ts#L98)
 
 How fees are paid (default: "user_pays")
 
@@ -56,26 +56,6 @@ How fees are paid (default: "user_pays")
 
 > `optional` **timeBounds**: [`PaymasterTimeBounds`](PaymasterTimeBounds.md)
 
-Defined in: [src/types/wallet.ts:101](https://github.com/adrienlacombe/starkzap/blob/93cc8acdf4b5a2f6d62f768f289d59b40af648f2/src/types/wallet.ts#L101)
+Defined in: [src/types/wallet.ts:100](https://github.com/keep-starknet-strange/x/blob/5e54d8974744c392df7cac56b636788dfe6ae268/src/types/wallet.ts#L100)
 
 Optional time bounds for paymaster transactions
-
-***
-
-### swapProviders?
-
-> `optional` **swapProviders**: [`SwapProvider`](../type-aliases/SwapProvider.md)[]
-
-Defined in: [src/types/wallet.ts:103](https://github.com/adrienlacombe/starkzap/blob/93cc8acdf4b5a2f6d62f768f289d59b40af648f2/src/types/wallet.ts#L103)
-
-Optional additional swap providers to register on the connected wallet
-
-***
-
-### defaultSwapProviderId?
-
-> `optional` **defaultSwapProviderId**: `string`
-
-Defined in: [src/types/wallet.ts:105](https://github.com/adrienlacombe/starkzap/blob/93cc8acdf4b5a2f6d62f768f289d59b40af648f2/src/types/wallet.ts#L105)
-
-Optional default swap provider id (must be registered)

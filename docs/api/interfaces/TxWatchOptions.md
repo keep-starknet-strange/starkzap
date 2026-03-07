@@ -6,7 +6,7 @@
 
 # Interface: TxWatchOptions
 
-Defined in: [src/types/tx.ts:30](https://github.com/adrienlacombe/starkzap/blob/93cc8acdf4b5a2f6d62f768f289d59b40af648f2/src/types/tx.ts#L30)
+Defined in: [src/types/tx.ts:30](https://github.com/keep-starknet-strange/x/blob/5e54d8974744c392df7cac56b636788dfe6ae268/src/types/tx.ts#L30)
 
 Options for `tx.watch()` polling behavior.
 
@@ -16,7 +16,7 @@ Options for `tx.watch()` polling behavior.
 
 > `optional` **pollIntervalMs**: `number`
 
-Defined in: [src/types/tx.ts:32](https://github.com/adrienlacombe/starkzap/blob/93cc8acdf4b5a2f6d62f768f289d59b40af648f2/src/types/tx.ts#L32)
+Defined in: [src/types/tx.ts:32](https://github.com/keep-starknet-strange/x/blob/5e54d8974744c392df7cac56b636788dfe6ae268/src/types/tx.ts#L32)
 
 Poll interval in milliseconds (default: 5000).
 
@@ -26,7 +26,7 @@ Poll interval in milliseconds (default: 5000).
 
 > `optional` **timeoutMs**: `number`
 
-Defined in: [src/types/tx.ts:38](https://github.com/adrienlacombe/starkzap/blob/93cc8acdf4b5a2f6d62f768f289d59b40af648f2/src/types/tx.ts#L38)
+Defined in: [src/types/tx.ts:38](https://github.com/keep-starknet-strange/x/blob/5e54d8974744c392df7cac56b636788dfe6ae268/src/types/tx.ts#L38)
 
 Maximum watch duration in milliseconds before auto-stop.
 Set to `0` to disable timeout.
@@ -43,7 +43,7 @@ Set to `0` to disable timeout.
 
 > `optional` **onError**: (`error`) => `void`
 
-Defined in: [src/types/tx.ts:40](https://github.com/adrienlacombe/starkzap/blob/93cc8acdf4b5a2f6d62f768f289d59b40af648f2/src/types/tx.ts#L40)
+Defined in: [src/types/tx.ts:40](https://github.com/keep-starknet-strange/x/blob/5e54d8974744c392df7cac56b636788dfe6ae268/src/types/tx.ts#L40)
 
 Optional callback for recoverable polling errors or timeout.
 

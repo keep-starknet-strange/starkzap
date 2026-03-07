@@ -6,7 +6,7 @@
 
 # Class: StarkZap
 
-Defined in: [src/sdk.ts:82](https://github.com/adrienlacombe/starkzap/blob/93cc8acdf4b5a2f6d62f768f289d59b40af648f2/src/sdk.ts#L82)
+Defined in: [src/sdk.ts:79](https://github.com/keep-starknet-strange/x/blob/5e54d8974744c392df7cac56b636788dfe6ae268/src/sdk.ts#L79)
 
 Main SDK class for Starknet wallet integration.
 
@@ -42,7 +42,7 @@ await tx.wait();
 
 > **new StarkZap**(`config`): `StarkZap`
 
-Defined in: [src/sdk.ts:87](https://github.com/adrienlacombe/starkzap/blob/93cc8acdf4b5a2f6d62f768f289d59b40af648f2/src/sdk.ts#L87)
+Defined in: [src/sdk.ts:84](https://github.com/keep-starknet-strange/x/blob/5e54d8974744c392df7cac56b636788dfe6ae268/src/sdk.ts#L84)
 
 #### Parameters
 
@@ -60,7 +60,7 @@ Defined in: [src/sdk.ts:87](https://github.com/adrienlacombe/starkzap/blob/93cc8
 
 > **connectWallet**(`options`): `Promise`\<[`Wallet`](Wallet.md)\>
 
-Defined in: [src/sdk.ts:211](https://github.com/adrienlacombe/starkzap/blob/93cc8acdf4b5a2f6d62f768f289d59b40af648f2/src/sdk.ts#L211)
+Defined in: [src/sdk.ts:208](https://github.com/keep-starknet-strange/x/blob/5e54d8974744c392df7cac56b636788dfe6ae268/src/sdk.ts#L208)
 
 Connect a wallet using the specified signer and account configuration.
 
@@ -116,7 +116,7 @@ const wallet = await sdk.connectWallet({
 
 > **onboard**(`options`): `Promise`\<[`OnboardResult`](../interfaces/OnboardResult.md)\<[`WalletInterface`](../interfaces/WalletInterface.md)\>\>
 
-Defined in: [src/sdk.ts:259](https://github.com/adrienlacombe/starkzap/blob/93cc8acdf4b5a2f6d62f768f289d59b40af648f2/src/sdk.ts#L259)
+Defined in: [src/sdk.ts:248](https://github.com/keep-starknet-strange/x/blob/5e54d8974744c392df7cac56b636788dfe6ae268/src/sdk.ts#L248)
 
 High-level onboarding API for app integrations.
 
@@ -141,9 +141,9 @@ By default, onboarding calls `wallet.ensureReady({ deploy: "if_needed" })`.
 
 ### connectCartridge()
 
-> **connectCartridge**(`options?`): `Promise`\<[`CartridgeWalletInterface`](../interfaces/CartridgeWalletInterface.md)\>
+> **connectCartridge**(`options?`): `Promise`\<`CartridgeWalletInterface`\>
 
-Defined in: [src/sdk.ts:398](https://github.com/adrienlacombe/starkzap/blob/93cc8acdf4b5a2f6d62f768f289d59b40af648f2/src/sdk.ts#L398)
+Defined in: [src/sdk.ts:372](https://github.com/keep-starknet-strange/x/blob/5e54d8974744c392df7cac56b636788dfe6ae268/src/sdk.ts#L372)
 
 Connect using Cartridge Controller.
 
@@ -158,7 +158,7 @@ Returns a CartridgeWallet that implements WalletInterface.
 
 #### Returns
 
-`Promise`\<[`CartridgeWalletInterface`](../interfaces/CartridgeWalletInterface.md)\>
+`Promise`\<`CartridgeWalletInterface`\>
 
 #### Example
 
@@ -183,7 +183,7 @@ controller.openProfile();
 
 > **stakingTokens**(): `Promise`\<[`Token`](../interfaces/Token.md)[]\>
 
-Defined in: [src/sdk.ts:443](https://github.com/adrienlacombe/starkzap/blob/93cc8acdf4b5a2f6d62f768f289d59b40af648f2/src/sdk.ts#L443)
+Defined in: [src/sdk.ts:413](https://github.com/keep-starknet-strange/x/blob/5e54d8974744c392df7cac56b636788dfe6ae268/src/sdk.ts#L413)
 
 Get all tokens that are currently enabled for staking.
 
@@ -214,7 +214,7 @@ console.log(`Stakeable tokens: ${tokens.map(t => t.symbol).join(', ')}`);
 
 > **getStakerPools**(`staker`): `Promise`\<[`Pool`](../interfaces/Pool.md)[]\>
 
-Defined in: [src/sdk.ts:466](https://github.com/adrienlacombe/starkzap/blob/93cc8acdf4b5a2f6d62f768f289d59b40af648f2/src/sdk.ts#L466)
+Defined in: [src/sdk.ts:436](https://github.com/keep-starknet-strange/x/blob/5e54d8974744c392df7cac56b636788dfe6ae268/src/sdk.ts#L436)
 
 Get all delegation pools managed by a specific validator.
 
@@ -253,15 +253,15 @@ for (const pool of pools) {
 
 ### getProvider()
 
-> **getProvider**(): [`RpcProvider`](../interfaces/RpcProvider.md)
+> **getProvider**(): `RpcProvider`
 
-Defined in: [src/sdk.ts:477](https://github.com/adrienlacombe/starkzap/blob/93cc8acdf4b5a2f6d62f768f289d59b40af648f2/src/sdk.ts#L477)
+Defined in: [src/sdk.ts:447](https://github.com/keep-starknet-strange/x/blob/5e54d8974744c392df7cac56b636788dfe6ae268/src/sdk.ts#L447)
 
 Get the underlying RPC provider.
 
 #### Returns
 
-[`RpcProvider`](../interfaces/RpcProvider.md)
+`RpcProvider`
 
 ***
 
@@ -269,7 +269,7 @@ Get the underlying RPC provider.
 
 > **callContract**(`call`): `Promise`\<`string`[]\>
 
-Defined in: [src/sdk.ts:487](https://github.com/adrienlacombe/starkzap/blob/93cc8acdf4b5a2f6d62f768f289d59b40af648f2/src/sdk.ts#L487)
+Defined in: [src/sdk.ts:457](https://github.com/keep-starknet-strange/x/blob/5e54d8974744c392df7cac56b636788dfe6ae268/src/sdk.ts#L457)
 
 Call a read-only contract entrypoint using the SDK provider.
 

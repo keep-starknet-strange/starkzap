@@ -6,7 +6,7 @@
 
 # Interface: OnboardPrivyResolveResult
 
-Defined in: [src/types/onboard.ts:42](https://github.com/adrienlacombe/starkzap/blob/93cc8acdf4b5a2f6d62f768f289d59b40af648f2/src/types/onboard.ts#L42)
+Defined in: [src/types/onboard.ts:37](https://github.com/keep-starknet-strange/x/blob/5e54d8974744c392df7cac56b636788dfe6ae268/src/types/onboard.ts#L37)
 
 ## Properties
 
@@ -14,7 +14,7 @@ Defined in: [src/types/onboard.ts:42](https://github.com/adrienlacombe/starkzap/
 
 > **walletId**: `string`
 
-Defined in: [src/types/onboard.ts:43](https://github.com/adrienlacombe/starkzap/blob/93cc8acdf4b5a2f6d62f768f289d59b40af648f2/src/types/onboard.ts#L43)
+Defined in: [src/types/onboard.ts:38](https://github.com/keep-starknet-strange/x/blob/5e54d8974744c392df7cac56b636788dfe6ae268/src/types/onboard.ts#L38)
 
 ***
 
@@ -22,7 +22,7 @@ Defined in: [src/types/onboard.ts:43](https://github.com/adrienlacombe/starkzap/
 
 > **publicKey**: `string`
 
-Defined in: [src/types/onboard.ts:44](https://github.com/adrienlacombe/starkzap/blob/93cc8acdf4b5a2f6d62f768f289d59b40af648f2/src/types/onboard.ts#L44)
+Defined in: [src/types/onboard.ts:39](https://github.com/keep-starknet-strange/x/blob/5e54d8974744c392df7cac56b636788dfe6ae268/src/types/onboard.ts#L39)
 
 ***
 
@@ -30,7 +30,7 @@ Defined in: [src/types/onboard.ts:44](https://github.com/adrienlacombe/starkzap/
 
 > `optional` **serverUrl**: `string`
 
-Defined in: [src/types/onboard.ts:45](https://github.com/adrienlacombe/starkzap/blob/93cc8acdf4b5a2f6d62f768f289d59b40af648f2/src/types/onboard.ts#L45)
+Defined in: [src/types/onboard.ts:40](https://github.com/keep-starknet-strange/x/blob/5e54d8974744c392df7cac56b636788dfe6ae268/src/types/onboard.ts#L40)
 
 ***
 
@@ -38,7 +38,7 @@ Defined in: [src/types/onboard.ts:45](https://github.com/adrienlacombe/starkzap/
 
 > `optional` **rawSign**: (`walletId`, `messageHash`) => `Promise`\<`string`\>
 
-Defined in: [src/types/onboard.ts:46](https://github.com/adrienlacombe/starkzap/blob/93cc8acdf4b5a2f6d62f768f289d59b40af648f2/src/types/onboard.ts#L46)
+Defined in: [src/types/onboard.ts:41](https://github.com/keep-starknet-strange/x/blob/5e54d8974744c392df7cac56b636788dfe6ae268/src/types/onboard.ts#L41)
 
 #### Parameters
 
@@ -60,7 +60,7 @@ Defined in: [src/types/onboard.ts:46](https://github.com/adrienlacombe/starkzap/
 
 > `optional` **headers**: `PrivySigningHeaders`
 
-Defined in: [src/types/onboard.ts:47](https://github.com/adrienlacombe/starkzap/blob/93cc8acdf4b5a2f6d62f768f289d59b40af648f2/src/types/onboard.ts#L47)
+Defined in: [src/types/onboard.ts:42](https://github.com/keep-starknet-strange/x/blob/5e54d8974744c392df7cac56b636788dfe6ae268/src/types/onboard.ts#L42)
 
 ***
 
@@ -68,7 +68,7 @@ Defined in: [src/types/onboard.ts:47](https://github.com/adrienlacombe/starkzap/
 
 > `optional` **buildBody**: `PrivySigningBody`
 
-Defined in: [src/types/onboard.ts:48](https://github.com/adrienlacombe/starkzap/blob/93cc8acdf4b5a2f6d62f768f289d59b40af648f2/src/types/onboard.ts#L48)
+Defined in: [src/types/onboard.ts:43](https://github.com/keep-starknet-strange/x/blob/5e54d8974744c392df7cac56b636788dfe6ae268/src/types/onboard.ts#L43)
 
 ***
 
@@ -76,7 +76,7 @@ Defined in: [src/types/onboard.ts:48](https://github.com/adrienlacombe/starkzap/
 
 > `optional` **requestTimeoutMs**: `number`
 
-Defined in: [src/types/onboard.ts:49](https://github.com/adrienlacombe/starkzap/blob/93cc8acdf4b5a2f6d62f768f289d59b40af648f2/src/types/onboard.ts#L49)
+Defined in: [src/types/onboard.ts:44](https://github.com/keep-starknet-strange/x/blob/5e54d8974744c392df7cac56b636788dfe6ae268/src/types/onboard.ts#L44)
 
 ***
 
@@ -84,4 +84,4 @@ Defined in: [src/types/onboard.ts:49](https://github.com/adrienlacombe/starkzap/
 
 > `optional` **metadata**: `Record`\<`string`, `unknown`\>
 
-Defined in: [src/types/onboard.ts:50](https://github.com/adrienlacombe/starkzap/blob/93cc8acdf4b5a2f6d62f768f289d59b40af648f2/src/types/onboard.ts#L50)
+Defined in: [src/types/onboard.ts:45](https://github.com/keep-starknet-strange/x/blob/5e54d8974744c392df7cac56b636788dfe6ae268/src/types/onboard.ts#L45)

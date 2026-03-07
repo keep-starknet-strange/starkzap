@@ -6,7 +6,7 @@
 
 # Class: PrivySigner
 
-Defined in: [src/signer/privy.ts:120](https://github.com/adrienlacombe/starkzap/blob/93cc8acdf4b5a2f6d62f768f289d59b40af648f2/src/signer/privy.ts#L120)
+Defined in: [src/signer/privy.ts:120](https://github.com/keep-starknet-strange/x/blob/5e54d8974744c392df7cac56b636788dfe6ae268/src/signer/privy.ts#L120)
 
 Privy-based signer for Starknet.
 
@@ -56,7 +56,7 @@ const wallet = await sdk.connectWallet({
 
 > **new PrivySigner**(`config`): `PrivySigner`
 
-Defined in: [src/signer/privy.ts:128](https://github.com/adrienlacombe/starkzap/blob/93cc8acdf4b5a2f6d62f768f289d59b40af648f2/src/signer/privy.ts#L128)
+Defined in: [src/signer/privy.ts:128](https://github.com/keep-starknet-strange/x/blob/5e54d8974744c392df7cac56b636788dfe6ae268/src/signer/privy.ts#L128)
 
 #### Parameters
 
@@ -74,7 +74,7 @@ Defined in: [src/signer/privy.ts:128](https://github.com/adrienlacombe/starkzap/
 
 > **getPubKey**(): `Promise`\<`string`\>
 
-Defined in: [src/signer/privy.ts:246](https://github.com/adrienlacombe/starkzap/blob/93cc8acdf4b5a2f6d62f768f289d59b40af648f2/src/signer/privy.ts#L246)
+Defined in: [src/signer/privy.ts:246](https://github.com/keep-starknet-strange/x/blob/5e54d8974744c392df7cac56b636788dfe6ae268/src/signer/privy.ts#L246)
 
 Get the public key.
 
@@ -92,7 +92,7 @@ Get the public key.
 
 > **signRaw**(`hash`): `Promise`\<`Signature`\>
 
-Defined in: [src/signer/privy.ts:250](https://github.com/adrienlacombe/starkzap/blob/93cc8acdf4b5a2f6d62f768f289d59b40af648f2/src/signer/privy.ts#L250)
+Defined in: [src/signer/privy.ts:250](https://github.com/keep-starknet-strange/x/blob/5e54d8974744c392df7cac56b636788dfe6ae268/src/signer/privy.ts#L250)
 
 Sign a raw message hash.
 This is the core signing primitive - all transaction signing ultimately calls this.

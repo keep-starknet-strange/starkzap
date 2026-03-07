@@ -6,7 +6,7 @@
 
 # Interface: OnboardSignerOptions
 
-Defined in: [src/types/onboard.ts:53](https://github.com/adrienlacombe/starkzap/blob/93cc8acdf4b5a2f6d62f768f289d59b40af648f2/src/types/onboard.ts#L53)
+Defined in: [src/types/onboard.ts:48](https://github.com/keep-starknet-strange/x/blob/5e54d8974744c392df7cac56b636788dfe6ae268/src/types/onboard.ts#L48)
 
 ## Extends
 
@@ -18,7 +18,7 @@ Defined in: [src/types/onboard.ts:53](https://github.com/adrienlacombe/starkzap/
 
 > `optional` **feeMode**: [`FeeMode`](../type-aliases/FeeMode.md)
 
-Defined in: [src/types/onboard.ts:32](https://github.com/adrienlacombe/starkzap/blob/93cc8acdf4b5a2f6d62f768f289d59b40af648f2/src/types/onboard.ts#L32)
+Defined in: [src/types/onboard.ts:31](https://github.com/keep-starknet-strange/x/blob/5e54d8974744c392df7cac56b636788dfe6ae268/src/types/onboard.ts#L31)
 
 #### Inherited from
 
@@ -30,7 +30,7 @@ Defined in: [src/types/onboard.ts:32](https://github.com/adrienlacombe/starkzap/
 
 > `optional` **timeBounds**: [`PaymasterTimeBounds`](PaymasterTimeBounds.md)
 
-Defined in: [src/types/onboard.ts:33](https://github.com/adrienlacombe/starkzap/blob/93cc8acdf4b5a2f6d62f768f289d59b40af648f2/src/types/onboard.ts#L33)
+Defined in: [src/types/onboard.ts:32](https://github.com/keep-starknet-strange/x/blob/5e54d8974744c392df7cac56b636788dfe6ae268/src/types/onboard.ts#L32)
 
 #### Inherited from
 
@@ -42,7 +42,7 @@ Defined in: [src/types/onboard.ts:33](https://github.com/adrienlacombe/starkzap/
 
 > `optional` **deploy**: [`DeployMode`](../type-aliases/DeployMode.md)
 
-Defined in: [src/types/onboard.ts:34](https://github.com/adrienlacombe/starkzap/blob/93cc8acdf4b5a2f6d62f768f289d59b40af648f2/src/types/onboard.ts#L34)
+Defined in: [src/types/onboard.ts:33](https://github.com/keep-starknet-strange/x/blob/5e54d8974744c392df7cac56b636788dfe6ae268/src/types/onboard.ts#L33)
 
 #### Inherited from
 
@@ -54,7 +54,7 @@ Defined in: [src/types/onboard.ts:34](https://github.com/adrienlacombe/starkzap/
 
 > `optional` **onProgress**: (`event`) => `void`
 
-Defined in: [src/types/onboard.ts:35](https://github.com/adrienlacombe/starkzap/blob/93cc8acdf4b5a2f6d62f768f289d59b40af648f2/src/types/onboard.ts#L35)
+Defined in: [src/types/onboard.ts:34](https://github.com/keep-starknet-strange/x/blob/5e54d8974744c392df7cac56b636788dfe6ae268/src/types/onboard.ts#L34)
 
 #### Parameters
 
@@ -72,39 +72,11 @@ Defined in: [src/types/onboard.ts:35](https://github.com/adrienlacombe/starkzap/
 
 ***
 
-### swapProviders?
-
-> `optional` **swapProviders**: [`SwapProvider`](../type-aliases/SwapProvider.md)[]
-
-Defined in: [src/types/onboard.ts:37](https://github.com/adrienlacombe/starkzap/blob/93cc8acdf4b5a2f6d62f768f289d59b40af648f2/src/types/onboard.ts#L37)
-
-Optional additional swap providers to register on the wallet
-
-#### Inherited from
-
-[`OnboardBaseOptions`](OnboardBaseOptions.md).[`swapProviders`](OnboardBaseOptions.md#swapproviders)
-
-***
-
-### defaultSwapProviderId?
-
-> `optional` **defaultSwapProviderId**: `string`
-
-Defined in: [src/types/onboard.ts:39](https://github.com/adrienlacombe/starkzap/blob/93cc8acdf4b5a2f6d62f768f289d59b40af648f2/src/types/onboard.ts#L39)
-
-Optional default swap provider id (must be registered)
-
-#### Inherited from
-
-[`OnboardBaseOptions`](OnboardBaseOptions.md).[`defaultSwapProviderId`](OnboardBaseOptions.md#defaultswapproviderid)
-
-***
-
 ### strategy
 
 > **strategy**: `"signer"`
 
-Defined in: [src/types/onboard.ts:54](https://github.com/adrienlacombe/starkzap/blob/93cc8acdf4b5a2f6d62f768f289d59b40af648f2/src/types/onboard.ts#L54)
+Defined in: [src/types/onboard.ts:49](https://github.com/keep-starknet-strange/x/blob/5e54d8974744c392df7cac56b636788dfe6ae268/src/types/onboard.ts#L49)
 
 ***
 
@@ -112,7 +84,7 @@ Defined in: [src/types/onboard.ts:54](https://github.com/adrienlacombe/starkzap/
 
 > **account**: [`AccountConfig`](AccountConfig.md)
 
-Defined in: [src/types/onboard.ts:55](https://github.com/adrienlacombe/starkzap/blob/93cc8acdf4b5a2f6d62f768f289d59b40af648f2/src/types/onboard.ts#L55)
+Defined in: [src/types/onboard.ts:50](https://github.com/keep-starknet-strange/x/blob/5e54d8974744c392df7cac56b636788dfe6ae268/src/types/onboard.ts#L50)
 
 ***
 
@@ -120,4 +92,4 @@ Defined in: [src/types/onboard.ts:55](https://github.com/adrienlacombe/starkzap/
 
 > `optional` **accountPreset**: `"devnet"` \| [`AccountClassConfig`](AccountClassConfig.md) \| `"openzeppelin"` \| `"argent"` \| `"braavos"` \| `"argentXV050"`
 
-Defined in: [src/types/onboard.ts:56](https://github.com/adrienlacombe/starkzap/blob/93cc8acdf4b5a2f6d62f768f289d59b40af648f2/src/types/onboard.ts#L56)
+Defined in: [src/types/onboard.ts:51](https://github.com/keep-starknet-strange/x/blob/5e54d8974744c392df7cac56b636788dfe6ae268/src/types/onboard.ts#L51)

@@ -6,7 +6,7 @@
 
 # Class: Erc20
 
-Defined in: [src/erc20/erc20.ts:38](https://github.com/adrienlacombe/starkzap/blob/93cc8acdf4b5a2f6d62f768f289d59b40af648f2/src/erc20/erc20.ts#L38)
+Defined in: [src/erc20/erc20.ts:38](https://github.com/keep-starknet-strange/x/blob/5e54d8974744c392df7cac56b636788dfe6ae268/src/erc20/erc20.ts#L38)
 
 ERC20 token interaction helper.
 
@@ -36,7 +36,7 @@ const balance = await erc20.balanceOf(wallet);
 
 > **new Erc20**(`token`, `provider`): `Erc20`
 
-Defined in: [src/erc20/erc20.ts:42](https://github.com/adrienlacombe/starkzap/blob/93cc8acdf4b5a2f6d62f768f289d59b40af648f2/src/erc20/erc20.ts#L42)
+Defined in: [src/erc20/erc20.ts:43](https://github.com/keep-starknet-strange/x/blob/5e54d8974744c392df7cac56b636788dfe6ae268/src/erc20/erc20.ts#L43)
 
 #### Parameters
 
@@ -46,7 +46,7 @@ Defined in: [src/erc20/erc20.ts:42](https://github.com/adrienlacombe/starkzap/bl
 
 ##### provider
 
-[`RpcProvider`](../interfaces/RpcProvider.md)
+`RpcProvider`
 
 #### Returns
 
@@ -58,7 +58,7 @@ Defined in: [src/erc20/erc20.ts:42](https://github.com/adrienlacombe/starkzap/bl
 
 > **populateApprove**(`spender`, `amount`): [`Call`](../type-aliases/Call.md)
 
-Defined in: [src/erc20/erc20.ts:79](https://github.com/adrienlacombe/starkzap/blob/93cc8acdf4b5a2f6d62f768f289d59b40af648f2/src/erc20/erc20.ts#L79)
+Defined in: [src/erc20/erc20.ts:80](https://github.com/keep-starknet-strange/x/blob/5e54d8974744c392df7cac56b636788dfe6ae268/src/erc20/erc20.ts#L80)
 
 **`Internal`**
 
@@ -86,7 +86,7 @@ Build an ERC20 approve Call without executing.
 
 > **populateTransfer**(`transfers`): [`Call`](../type-aliases/Call.md)[]
 
-Defined in: [src/erc20/erc20.ts:92](https://github.com/adrienlacombe/starkzap/blob/93cc8acdf4b5a2f6d62f768f289d59b40af648f2/src/erc20/erc20.ts#L92)
+Defined in: [src/erc20/erc20.ts:93](https://github.com/keep-starknet-strange/x/blob/5e54d8974744c392df7cac56b636788dfe6ae268/src/erc20/erc20.ts#L93)
 
 **`Internal`**
 
@@ -110,7 +110,7 @@ Build transfer Call(s) without executing.
 
 > **transfer**(`from`, `transfers`, `options?`): `Promise`\<[`Tx`](Tx.md)\>
 
-Defined in: [src/erc20/erc20.ts:123](https://github.com/adrienlacombe/starkzap/blob/93cc8acdf4b5a2f6d62f768f289d59b40af648f2/src/erc20/erc20.ts#L123)
+Defined in: [src/erc20/erc20.ts:124](https://github.com/keep-starknet-strange/x/blob/5e54d8974744c392df7cac56b636788dfe6ae268/src/erc20/erc20.ts#L124)
 
 Transfer tokens to one or more addresses.
 
@@ -160,7 +160,7 @@ Error if any amount's decimals or symbol don't match the token
 
 > **balanceOf**(`wallet`): `Promise`\<[`Amount`](Amount.md)\>
 
-Defined in: [src/erc20/erc20.ts:146](https://github.com/adrienlacombe/starkzap/blob/93cc8acdf4b5a2f6d62f768f289d59b40af648f2/src/erc20/erc20.ts#L146)
+Defined in: [src/erc20/erc20.ts:147](https://github.com/keep-starknet-strange/x/blob/5e54d8974744c392df7cac56b636788dfe6ae268/src/erc20/erc20.ts#L147)
 
 Get the balance in a wallet.
 

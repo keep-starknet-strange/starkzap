@@ -8,7 +8,7 @@
 
 > **getChainId**(`provider`): `Promise`\<[`ChainId`](../classes/ChainId.md)\>
 
-Defined in: [src/types/config.ts:102](https://github.com/adrienlacombe/starkzap/blob/93cc8acdf4b5a2f6d62f768f289d59b40af648f2/src/types/config.ts#L102)
+Defined in: [src/types/config.ts:102](https://github.com/keep-starknet-strange/x/blob/5e54d8974744c392df7cac56b636788dfe6ae268/src/types/config.ts#L102)
 
 Detect the chain ID from an RPC provider.
 
@@ -16,7 +16,7 @@ Detect the chain ID from an RPC provider.
 
 ### provider
 
-[`RpcProvider`](../interfaces/RpcProvider.md)
+`RpcProvider`
 
 The RPC provider to query
 

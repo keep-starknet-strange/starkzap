@@ -8,7 +8,7 @@
 
 > `const` **stakingPresets**: `object`
 
-Defined in: [src/staking/presets.ts:9](https://github.com/adrienlacombe/starkzap/blob/93cc8acdf4b5a2f6d62f768f289d59b40af648f2/src/staking/presets.ts#L9)
+Defined in: [src/staking/presets.ts:9](https://github.com/keep-starknet-strange/x/blob/5e54d8974744c392df7cac56b636788dfe6ae268/src/staking/presets.ts#L9)
 
 Core staking contract presets per supported chain.
 

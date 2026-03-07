@@ -6,7 +6,7 @@
 
 # Class: TxBuilder
 
-Defined in: [src/tx/builder.ts:62](https://github.com/adrienlacombe/starkzap/blob/93cc8acdf4b5a2f6d62f768f289d59b40af648f2/src/tx/builder.ts#L62)
+Defined in: [src/tx/builder.ts:52](https://github.com/keep-starknet-strange/x/blob/5e54d8974744c392df7cac56b636788dfe6ae268/src/tx/builder.ts#L52)
 
 Fluent transaction builder for batching multiple operations into a single transaction.
 
@@ -52,7 +52,7 @@ const tx = await wallet.tx()
 
 > **new TxBuilder**(`wallet`): `TxBuilder`
 
-Defined in: [src/tx/builder.ts:69](https://github.com/adrienlacombe/starkzap/blob/93cc8acdf4b5a2f6d62f768f289d59b40af648f2/src/tx/builder.ts#L69)
+Defined in: [src/tx/builder.ts:59](https://github.com/keep-starknet-strange/x/blob/5e54d8974744c392df7cac56b636788dfe6ae268/src/tx/builder.ts#L59)
 
 #### Parameters
 
@@ -72,7 +72,7 @@ Defined in: [src/tx/builder.ts:69](https://github.com/adrienlacombe/starkzap/blo
 
 > **get** **length**(): `number`
 
-Defined in: [src/tx/builder.ts:116](https://github.com/adrienlacombe/starkzap/blob/93cc8acdf4b5a2f6d62f768f289d59b40af648f2/src/tx/builder.ts#L116)
+Defined in: [src/tx/builder.ts:106](https://github.com/keep-starknet-strange/x/blob/5e54d8974744c392df7cac56b636788dfe6ae268/src/tx/builder.ts#L106)
 
 The number of pending operations in the builder.
 
@@ -91,7 +91,7 @@ into multiple calls once resolved.
 
 > **get** **isEmpty**(): `boolean`
 
-Defined in: [src/tx/builder.ts:123](https://github.com/adrienlacombe/starkzap/blob/93cc8acdf4b5a2f6d62f768f289d59b40af648f2/src/tx/builder.ts#L123)
+Defined in: [src/tx/builder.ts:113](https://github.com/keep-starknet-strange/x/blob/5e54d8974744c392df7cac56b636788dfe6ae268/src/tx/builder.ts#L113)
 
 Whether the builder has no pending operations.
 
@@ -107,7 +107,7 @@ Whether the builder has no pending operations.
 
 > **get** **isSent**(): `boolean`
 
-Defined in: [src/tx/builder.ts:130](https://github.com/adrienlacombe/starkzap/blob/93cc8acdf4b5a2f6d62f768f289d59b40af648f2/src/tx/builder.ts#L130)
+Defined in: [src/tx/builder.ts:120](https://github.com/keep-starknet-strange/x/blob/5e54d8974744c392df7cac56b636788dfe6ae268/src/tx/builder.ts#L120)
 
 Whether `send()` has already been called successfully on this builder.
 
@@ -121,7 +121,7 @@ Whether `send()` has already been called successfully on this builder.
 
 > **add**(...`calls`): `this`
 
-Defined in: [src/tx/builder.ts:158](https://github.com/adrienlacombe/starkzap/blob/93cc8acdf4b5a2f6d62f768f289d59b40af648f2/src/tx/builder.ts#L158)
+Defined in: [src/tx/builder.ts:148](https://github.com/keep-starknet-strange/x/blob/5e54d8974744c392df7cac56b636788dfe6ae268/src/tx/builder.ts#L148)
 
 Add one or more raw contract calls to the transaction.
 
@@ -160,7 +160,7 @@ wallet.tx()
 
 > **approve**(`token`, `spender`, `amount`): `this`
 
-Defined in: [src/tx/builder.ts:183](https://github.com/adrienlacombe/starkzap/blob/93cc8acdf4b5a2f6d62f768f289d59b40af648f2/src/tx/builder.ts#L183)
+Defined in: [src/tx/builder.ts:173](https://github.com/keep-starknet-strange/x/blob/5e54d8974744c392df7cac56b636788dfe6ae268/src/tx/builder.ts#L173)
 
 Approve an address to spend ERC20 tokens on behalf of the wallet.
 
@@ -205,7 +205,7 @@ wallet.tx()
 
 > **transfer**(`token`, `transfers`): `this`
 
-Defined in: [src/tx/builder.ts:215](https://github.com/adrienlacombe/starkzap/blob/93cc8acdf4b5a2f6d62f768f289d59b40af648f2/src/tx/builder.ts#L215)
+Defined in: [src/tx/builder.ts:205](https://github.com/keep-starknet-strange/x/blob/5e54d8974744c392df7cac56b636788dfe6ae268/src/tx/builder.ts#L205)
 
 Transfer ERC20 tokens to one or more recipients.
 
@@ -251,35 +251,11 @@ wallet.tx()
 
 ***
 
-### swap()
-
-> **swap**(`request`): `this`
-
-Defined in: [src/tx/builder.ts:234](https://github.com/adrienlacombe/starkzap/blob/93cc8acdf4b5a2f6d62f768f289d59b40af648f2/src/tx/builder.ts#L234)
-
-Add a provider-driven swap operation.
-
-Set `request.provider` to a provider instance or provider id.
-If omitted, uses the wallet default provider.
-`chainId` and `takerAddress` are optional and default to the connected wallet.
-
-#### Parameters
-
-##### request
-
-[`SwapInput`](../type-aliases/SwapInput.md)
-
-#### Returns
-
-`this`
-
-***
-
 ### stake()
 
 > **stake**(`poolAddress`, `amount`): `this`
 
-Defined in: [src/tx/builder.ts:280](https://github.com/adrienlacombe/starkzap/blob/93cc8acdf4b5a2f6d62f768f289d59b40af648f2/src/tx/builder.ts#L280)
+Defined in: [src/tx/builder.ts:247](https://github.com/keep-starknet-strange/x/blob/5e54d8974744c392df7cac56b636788dfe6ae268/src/tx/builder.ts#L247)
 
 Stake tokens in a delegation pool, automatically choosing the right
 action based on current membership status.
@@ -329,7 +305,7 @@ await tx.wait();
 
 > **enterPool**(`poolAddress`, `amount`): `this`
 
-Defined in: [src/tx/builder.ts:311](https://github.com/adrienlacombe/starkzap/blob/93cc8acdf4b5a2f6d62f768f289d59b40af648f2/src/tx/builder.ts#L311)
+Defined in: [src/tx/builder.ts:278](https://github.com/keep-starknet-strange/x/blob/5e54d8974744c392df7cac56b636788dfe6ae268/src/tx/builder.ts#L278)
 
 Enter a delegation pool as a new member.
 
@@ -373,7 +349,7 @@ wallet.tx()
 
 > **addToPool**(`poolAddress`, `amount`): `this`
 
-Defined in: [src/tx/builder.ts:339](https://github.com/adrienlacombe/starkzap/blob/93cc8acdf4b5a2f6d62f768f289d59b40af648f2/src/tx/builder.ts#L339)
+Defined in: [src/tx/builder.ts:306](https://github.com/keep-starknet-strange/x/blob/5e54d8974744c392df7cac56b636788dfe6ae268/src/tx/builder.ts#L306)
 
 Add more tokens to an existing stake in a pool.
 
@@ -417,7 +393,7 @@ wallet.tx()
 
 > **claimPoolRewards**(`poolAddress`): `this`
 
-Defined in: [src/tx/builder.ts:364](https://github.com/adrienlacombe/starkzap/blob/93cc8acdf4b5a2f6d62f768f289d59b40af648f2/src/tx/builder.ts#L364)
+Defined in: [src/tx/builder.ts:331](https://github.com/keep-starknet-strange/x/blob/5e54d8974744c392df7cac56b636788dfe6ae268/src/tx/builder.ts#L331)
 
 Claim accumulated staking rewards from a pool.
 
@@ -453,7 +429,7 @@ wallet.tx()
 
 > **exitPoolIntent**(`poolAddress`, `amount`): `this`
 
-Defined in: [src/tx/builder.ts:393](https://github.com/adrienlacombe/starkzap/blob/93cc8acdf4b5a2f6d62f768f289d59b40af648f2/src/tx/builder.ts#L393)
+Defined in: [src/tx/builder.ts:360](https://github.com/keep-starknet-strange/x/blob/5e54d8974744c392df7cac56b636788dfe6ae268/src/tx/builder.ts#L360)
 
 Initiate an exit from a delegation pool.
 
@@ -498,7 +474,7 @@ wallet.tx()
 
 > **exitPool**(`poolAddress`): `this`
 
-Defined in: [src/tx/builder.ts:418](https://github.com/adrienlacombe/starkzap/blob/93cc8acdf4b5a2f6d62f768f289d59b40af648f2/src/tx/builder.ts#L418)
+Defined in: [src/tx/builder.ts:385](https://github.com/keep-starknet-strange/x/blob/5e54d8974744c392df7cac56b636788dfe6ae268/src/tx/builder.ts#L385)
 
 Complete the exit from a delegation pool after the exit window has passed.
 
@@ -530,200 +506,11 @@ wallet.tx()
 
 ***
 
-### confidentialFund()
-
-> **confidentialFund**(`confidential`, `details`): `this`
-
-Defined in: [src/tx/builder.ts:449](https://github.com/adrienlacombe/starkzap/blob/93cc8acdf4b5a2f6d62f768f289d59b40af648f2/src/tx/builder.ts#L449)
-
-Fund a confidential account.
-
-Generates ZK proofs and adds the fund call to the batch.
-You must include an ERC20 approve call before this
-(e.g., via `.approve(token, tongoContract, amount)`).
-
-#### Parameters
-
-##### confidential
-
-[`Confidential`](Confidential.md)
-
-The Confidential instance to fund
-
-##### details
-
-[`ConfidentialFundDetails`](../interfaces/ConfidentialFundDetails.md)
-
-Fund parameters (amount, sender)
-
-#### Returns
-
-`this`
-
-this (for chaining)
-
-#### Example
-
-```ts
-wallet.tx()
-  .approve(token, tongoContract, amount)
-  .confidentialFund(confidential, { amount: 100n, sender: wallet.address })
-  .send();
-```
-
-***
-
-### confidentialTransfer()
-
-> **confidentialTransfer**(`confidential`, `details`): `this`
-
-Defined in: [src/tx/builder.ts:477](https://github.com/adrienlacombe/starkzap/blob/93cc8acdf4b5a2f6d62f768f289d59b40af648f2/src/tx/builder.ts#L477)
-
-Transfer between confidential accounts.
-
-Generates ZK proofs for the confidential transfer.
-
-#### Parameters
-
-##### confidential
-
-[`Confidential`](Confidential.md)
-
-The sender's Confidential instance
-
-##### details
-
-[`ConfidentialTransferDetails`](../interfaces/ConfidentialTransferDetails.md)
-
-Transfer parameters (amount, recipient pubkey, sender)
-
-#### Returns
-
-`this`
-
-this (for chaining)
-
-#### Example
-
-```ts
-wallet.tx()
-  .confidentialTransfer(confidential, {
-    amount: 50n,
-    to: recipientPubKey,
-    sender: wallet.address,
-  })
-  .send();
-```
-
-***
-
-### confidentialWithdraw()
-
-> **confidentialWithdraw**(`confidential`, `details`): `this`
-
-Defined in: [src/tx/builder.ts:503](https://github.com/adrienlacombe/starkzap/blob/93cc8acdf4b5a2f6d62f768f289d59b40af648f2/src/tx/builder.ts#L503)
-
-Withdraw from a confidential account to a public address.
-
-#### Parameters
-
-##### confidential
-
-[`Confidential`](Confidential.md)
-
-The Confidential instance to withdraw from
-
-##### details
-
-[`ConfidentialWithdrawDetails`](../interfaces/ConfidentialWithdrawDetails.md)
-
-Withdraw parameters (amount, recipient, sender)
-
-#### Returns
-
-`this`
-
-this (for chaining)
-
-#### Example
-
-```ts
-wallet.tx()
-  .confidentialWithdraw(confidential, {
-    amount: 50n,
-    to: wallet.address,
-    sender: wallet.address,
-  })
-  .send();
-```
-
-***
-
-### confidentialRagequit()
-
-> **confidentialRagequit**(`confidential`, `details`): `this`
-
-Defined in: [src/tx/builder.ts:518](https://github.com/adrienlacombe/starkzap/blob/93cc8acdf4b5a2f6d62f768f289d59b40af648f2/src/tx/builder.ts#L518)
-
-Emergency ragequit — withdraw entire confidential balance.
-
-#### Parameters
-
-##### confidential
-
-[`Confidential`](Confidential.md)
-
-The Confidential instance to exit
-
-##### details
-
-[`ConfidentialRagequitDetails`](../interfaces/ConfidentialRagequitDetails.md)
-
-Ragequit parameters (recipient, sender)
-
-#### Returns
-
-`this`
-
-this (for chaining)
-
-***
-
-### confidentialRollover()
-
-> **confidentialRollover**(`confidential`, `details`): `this`
-
-Defined in: [src/tx/builder.ts:533](https://github.com/adrienlacombe/starkzap/blob/93cc8acdf4b5a2f6d62f768f289d59b40af648f2/src/tx/builder.ts#L533)
-
-Rollover — activate pending balance from received transfers.
-
-#### Parameters
-
-##### confidential
-
-[`Confidential`](Confidential.md)
-
-The Confidential instance to rollover
-
-##### details
-
-[`ConfidentialRolloverDetails`](../interfaces/ConfidentialRolloverDetails.md)
-
-Rollover parameters (sender)
-
-#### Returns
-
-`this`
-
-this (for chaining)
-
-***
-
 ### calls()
 
 > **calls**(): `Promise`\<[`Call`](../type-aliases/Call.md)[]\>
 
-Defined in: [src/tx/builder.ts:562](https://github.com/adrienlacombe/starkzap/blob/93cc8acdf4b5a2f6d62f768f289d59b40af648f2/src/tx/builder.ts#L562)
+Defined in: [src/tx/builder.ts:414](https://github.com/keep-starknet-strange/x/blob/5e54d8974744c392df7cac56b636788dfe6ae268/src/tx/builder.ts#L414)
 
 Resolve all pending operations into a flat array of Calls without executing.
 
@@ -752,7 +539,7 @@ const fee = await wallet.estimateFee(calls);
 
 > **estimateFee**(): `Promise`\<`EstimateFeeResponseOverhead`\>
 
-Defined in: [src/tx/builder.ts:585](https://github.com/adrienlacombe/starkzap/blob/93cc8acdf4b5a2f6d62f768f289d59b40af648f2/src/tx/builder.ts#L585)
+Defined in: [src/tx/builder.ts:437](https://github.com/keep-starknet-strange/x/blob/5e54d8974744c392df7cac56b636788dfe6ae268/src/tx/builder.ts#L437)
 
 Estimate the fee for all collected calls.
 
@@ -781,7 +568,7 @@ console.log("Estimated fee:", fee.overall_fee);
 
 > **preflight**(): `Promise`\<[`PreflightResult`](../type-aliases/PreflightResult.md)\>
 
-Defined in: [src/tx/builder.ts:614](https://github.com/adrienlacombe/starkzap/blob/93cc8acdf4b5a2f6d62f768f289d59b40af648f2/src/tx/builder.ts#L614)
+Defined in: [src/tx/builder.ts:466](https://github.com/keep-starknet-strange/x/blob/5e54d8974744c392df7cac56b636788dfe6ae268/src/tx/builder.ts#L466)
 
 Simulate the transaction to check if it would succeed.
 
@@ -817,7 +604,7 @@ if (!result.ok) {
 
 > **send**(`options?`): `Promise`\<[`Tx`](Tx.md)\>
 
-Defined in: [src/tx/builder.ts:643](https://github.com/adrienlacombe/starkzap/blob/93cc8acdf4b5a2f6d62f768f289d59b40af648f2/src/tx/builder.ts#L643)
+Defined in: [src/tx/builder.ts:495](https://github.com/keep-starknet-strange/x/blob/5e54d8974744c392df7cac56b636788dfe6ae268/src/tx/builder.ts#L495)
 
 Execute all collected calls as a single atomic transaction.
 

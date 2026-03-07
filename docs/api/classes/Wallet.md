@@ -6,7 +6,7 @@
 
 # Class: Wallet
 
-Defined in: [src/wallet/index.ts:108](https://github.com/adrienlacombe/starkzap/blob/93cc8acdf4b5a2f6d62f768f289d59b40af648f2/src/wallet/index.ts#L108)
+Defined in: [src/wallet/index.ts:102](https://github.com/keep-starknet-strange/x/blob/5e54d8974744c392df7cac56b636788dfe6ae268/src/wallet/index.ts#L102)
 
 Abstract base class for wallet implementations.
 
@@ -44,7 +44,7 @@ class CustomWallet extends BaseWallet {
 
 > `readonly` **address**: [`Address`](../type-aliases/Address.md)
 
-Defined in: [src/wallet/base.ts:62](https://github.com/adrienlacombe/starkzap/blob/93cc8acdf4b5a2f6d62f768f289d59b40af648f2/src/wallet/base.ts#L62)
+Defined in: [src/wallet/base.ts:56](https://github.com/keep-starknet-strange/x/blob/5e54d8974744c392df7cac56b636788dfe6ae268/src/wallet/base.ts#L56)
 
 The wallet's Starknet address
 
@@ -58,7 +58,7 @@ The wallet's Starknet address
 
 > **callContract**(`call`): `Promise`\<`string`[]\>
 
-Defined in: [src/wallet/base.ts:119](https://github.com/adrienlacombe/starkzap/blob/93cc8acdf4b5a2f6d62f768f289d59b40af648f2/src/wallet/base.ts#L119)
+Defined in: [src/wallet/base.ts:103](https://github.com/keep-starknet-strange/x/blob/5e54d8974744c392df7cac56b636788dfe6ae268/src/wallet/base.ts#L103)
 
 Call a read-only contract entrypoint.
 
@@ -85,7 +85,7 @@ Use this for view methods that don't mutate state.
 
 > **tx**(): [`TxBuilder`](TxBuilder.md)
 
-Defined in: [src/wallet/base.ts:168](https://github.com/adrienlacombe/starkzap/blob/93cc8acdf4b5a2f6d62f768f289d59b40af648f2/src/wallet/base.ts#L168)
+Defined in: [src/wallet/base.ts:152](https://github.com/keep-starknet-strange/x/blob/5e54d8974744c392df7cac56b636788dfe6ae268/src/wallet/base.ts#L152)
 
 Create a transaction builder for batching multiple operations into a single transaction.
 
@@ -111,197 +111,11 @@ await tx.wait();
 
 ***
 
-### getQuote()
-
-> **getQuote**(`request`): `Promise`\<[`SwapQuote`](../type-aliases/SwapQuote.md)\>
-
-Defined in: [src/wallet/base.ts:178](https://github.com/adrienlacombe/starkzap/blob/93cc8acdf4b5a2f6d62f768f289d59b40af648f2/src/wallet/base.ts#L178)
-
-Fetch a quote.
-
-Set `request.provider` to a provider instance or provider id.
-If omitted, uses the wallet default provider.
-
-#### Parameters
-
-##### request
-
-[`SwapInput`](../type-aliases/SwapInput.md)
-
-#### Returns
-
-`Promise`\<[`SwapQuote`](../type-aliases/SwapQuote.md)\>
-
-#### Inherited from
-
-[`BaseWallet`](BaseWallet.md).[`getQuote`](BaseWallet.md#getquote)
-
-***
-
-### swap()
-
-> **swap**(`request`, `options?`): `Promise`\<[`Tx`](Tx.md)\>
-
-Defined in: [src/wallet/base.ts:193](https://github.com/adrienlacombe/starkzap/blob/93cc8acdf4b5a2f6d62f768f289d59b40af648f2/src/wallet/base.ts#L193)
-
-Execute a swap.
-
-Set `request.provider` to a provider instance or provider id.
-If omitted, uses the wallet default provider.
-
-#### Parameters
-
-##### request
-
-[`SwapInput`](../type-aliases/SwapInput.md)
-
-##### options?
-
-[`ExecuteOptions`](../interfaces/ExecuteOptions.md)
-
-#### Returns
-
-`Promise`\<[`Tx`](Tx.md)\>
-
-#### Inherited from
-
-[`BaseWallet`](BaseWallet.md).[`swap`](BaseWallet.md#swap)
-
-***
-
-### registerSwapProvider()
-
-> **registerSwapProvider**(`provider`, `makeDefault?`): `void`
-
-Defined in: [src/wallet/base.ts:204](https://github.com/adrienlacombe/starkzap/blob/93cc8acdf4b5a2f6d62f768f289d59b40af648f2/src/wallet/base.ts#L204)
-
-Register or replace a swap provider on this wallet.
-
-#### Parameters
-
-##### provider
-
-[`SwapProvider`](../type-aliases/SwapProvider.md)
-
-##### makeDefault?
-
-`boolean` = `false`
-
-#### Returns
-
-`void`
-
-#### Inherited from
-
-[`BaseWallet`](BaseWallet.md).[`registerSwapProvider`](BaseWallet.md#registerswapprovider)
-
-***
-
-### setDefaultSwapProvider()
-
-> **setDefaultSwapProvider**(`providerId`): `void`
-
-Defined in: [src/wallet/base.ts:211](https://github.com/adrienlacombe/starkzap/blob/93cc8acdf4b5a2f6d62f768f289d59b40af648f2/src/wallet/base.ts#L211)
-
-Set the default swap provider by id.
-
-#### Parameters
-
-##### providerId
-
-`string`
-
-#### Returns
-
-`void`
-
-#### Inherited from
-
-[`BaseWallet`](BaseWallet.md).[`setDefaultSwapProvider`](BaseWallet.md#setdefaultswapprovider)
-
-***
-
-### getSwapProvider()
-
-> **getSwapProvider**(`providerId`): [`SwapProvider`](../type-aliases/SwapProvider.md)
-
-Defined in: [src/wallet/base.ts:220](https://github.com/adrienlacombe/starkzap/blob/93cc8acdf4b5a2f6d62f768f289d59b40af648f2/src/wallet/base.ts#L220)
-
-Resolve a registered provider by id.
-
-#### Parameters
-
-##### providerId
-
-`string`
-
-#### Returns
-
-[`SwapProvider`](../type-aliases/SwapProvider.md)
-
-#### Inherited from
-
-[`BaseWallet`](BaseWallet.md).[`getSwapProvider`](BaseWallet.md#getswapprovider)
-
-***
-
-### listSwapProviders()
-
-> **listSwapProviders**(): `string`[]
-
-Defined in: [src/wallet/base.ts:230](https://github.com/adrienlacombe/starkzap/blob/93cc8acdf4b5a2f6d62f768f289d59b40af648f2/src/wallet/base.ts#L230)
-
-List registered swap provider ids.
-
-#### Returns
-
-`string`[]
-
-#### Inherited from
-
-[`BaseWallet`](BaseWallet.md).[`listSwapProviders`](BaseWallet.md#listswapproviders)
-
-***
-
-### getDefaultSwapProvider()
-
-> **getDefaultSwapProvider**(): [`SwapProvider`](../type-aliases/SwapProvider.md)
-
-Defined in: [src/wallet/base.ts:234](https://github.com/adrienlacombe/starkzap/blob/93cc8acdf4b5a2f6d62f768f289d59b40af648f2/src/wallet/base.ts#L234)
-
-Resolve the wallet default swap provider.
-
-#### Returns
-
-[`SwapProvider`](../type-aliases/SwapProvider.md)
-
-#### Inherited from
-
-[`BaseWallet`](BaseWallet.md).[`getDefaultSwapProvider`](BaseWallet.md#getdefaultswapprovider)
-
-***
-
-### clearCaches()
-
-> `protected` **clearCaches**(): `void`
-
-Defined in: [src/wallet/base.ts:241](https://github.com/adrienlacombe/starkzap/blob/93cc8acdf4b5a2f6d62f768f289d59b40af648f2/src/wallet/base.ts#L241)
-
-#### Returns
-
-`void`
-
-#### Inherited from
-
-[`BaseWallet`](BaseWallet.md).[`clearCaches`](BaseWallet.md#clearcaches)
-
-***
-
 ### erc20()
 
 > **erc20**(`token`): [`Erc20`](Erc20.md)
 
-Defined in: [src/wallet/base.ts:277](https://github.com/adrienlacombe/starkzap/blob/93cc8acdf4b5a2f6d62f768f289d59b40af648f2/src/wallet/base.ts#L277)
+Defined in: [src/wallet/base.ts:169](https://github.com/keep-starknet-strange/x/blob/5e54d8974744c392df7cac56b636788dfe6ae268/src/wallet/base.ts#L169)
 
 Gets or creates an Erc20 instance for the given token.
 
@@ -332,7 +146,7 @@ The cached or newly created Erc20 instance
 
 > **transfer**(`token`, `transfers`, `options?`): `Promise`\<[`Tx`](Tx.md)\>
 
-Defined in: [src/wallet/base.ts:316](https://github.com/adrienlacombe/starkzap/blob/93cc8acdf4b5a2f6d62f768f289d59b40af648f2/src/wallet/base.ts#L316)
+Defined in: [src/wallet/base.ts:205](https://github.com/keep-starknet-strange/x/blob/5e54d8974744c392df7cac56b636788dfe6ae268/src/wallet/base.ts#L205)
 
 Transfer ERC20 tokens to one or more recipients.
 
@@ -395,7 +209,7 @@ await tx.wait();
 
 > **balanceOf**(`token`): `Promise`\<[`Amount`](Amount.md)\>
 
-Defined in: [src/wallet/base.ts:345](https://github.com/adrienlacombe/starkzap/blob/93cc8acdf4b5a2f6d62f768f289d59b40af648f2/src/wallet/base.ts#L345)
+Defined in: [src/wallet/base.ts:234](https://github.com/keep-starknet-strange/x/blob/5e54d8974744c392df7cac56b636788dfe6ae268/src/wallet/base.ts#L234)
 
 Get the wallet's balance of an ERC20 token.
 
@@ -437,7 +251,7 @@ console.log(balance.toFormatted()); // "150.5 USDC"
 
 > **enterPool**(`poolAddress`, `amount`, `options?`): `Promise`\<[`Tx`](Tx.md)\>
 
-Defined in: [src/wallet/base.ts:375](https://github.com/adrienlacombe/starkzap/blob/93cc8acdf4b5a2f6d62f768f289d59b40af648f2/src/wallet/base.ts#L375)
+Defined in: [src/wallet/base.ts:264](https://github.com/keep-starknet-strange/x/blob/5e54d8974744c392df7cac56b636788dfe6ae268/src/wallet/base.ts#L264)
 
 Enter a delegation pool as a new member.
 
@@ -495,7 +309,7 @@ await tx.wait();
 
 > **addToPool**(`poolAddress`, `amount`, `options?`): `Promise`\<[`Tx`](Tx.md)\>
 
-Defined in: [src/wallet/base.ts:405](https://github.com/adrienlacombe/starkzap/blob/93cc8acdf4b5a2f6d62f768f289d59b40af648f2/src/wallet/base.ts#L405)
+Defined in: [src/wallet/base.ts:294](https://github.com/keep-starknet-strange/x/blob/5e54d8974744c392df7cac56b636788dfe6ae268/src/wallet/base.ts#L294)
 
 Add more tokens to an existing stake in a pool.
 
@@ -553,7 +367,7 @@ await tx.wait();
 
 > **stake**(`poolAddress`, `amount`, `options?`): `Promise`\<[`Tx`](Tx.md)\>
 
-Defined in: [src/wallet/base.ts:434](https://github.com/adrienlacombe/starkzap/blob/93cc8acdf4b5a2f6d62f768f289d59b40af648f2/src/wallet/base.ts#L434)
+Defined in: [src/wallet/base.ts:323](https://github.com/keep-starknet-strange/x/blob/5e54d8974744c392df7cac56b636788dfe6ae268/src/wallet/base.ts#L323)
 
 Stake in a pool, automatically entering or adding based on membership.
 
@@ -608,7 +422,7 @@ await tx.wait();
 
 > **claimPoolRewards**(`poolAddress`, `options?`): `Promise`\<[`Tx`](Tx.md)\>
 
-Defined in: [src/wallet/base.ts:466](https://github.com/adrienlacombe/starkzap/blob/93cc8acdf4b5a2f6d62f768f289d59b40af648f2/src/wallet/base.ts#L466)
+Defined in: [src/wallet/base.ts:355](https://github.com/keep-starknet-strange/x/blob/5e54d8974744c392df7cac56b636788dfe6ae268/src/wallet/base.ts#L355)
 
 Claim accumulated staking rewards from a pool.
 
@@ -663,7 +477,7 @@ if (!position?.rewards.isZero()) {
 
 > **exitPoolIntent**(`poolAddress`, `amount`, `options?`): `Promise`\<[`Tx`](Tx.md)\>
 
-Defined in: [src/wallet/base.ts:506](https://github.com/adrienlacombe/starkzap/blob/93cc8acdf4b5a2f6d62f768f289d59b40af648f2/src/wallet/base.ts#L506)
+Defined in: [src/wallet/base.ts:395](https://github.com/keep-starknet-strange/x/blob/5e54d8974744c392df7cac56b636788dfe6ae268/src/wallet/base.ts#L395)
 
 Initiate an exit from a delegation pool.
 
@@ -732,7 +546,7 @@ if (position?.unpoolTime && new Date() >= position.unpoolTime) {
 
 > **exitPool**(`poolAddress`, `options?`): `Promise`\<[`Tx`](Tx.md)\>
 
-Defined in: [src/wallet/base.ts:538](https://github.com/adrienlacombe/starkzap/blob/93cc8acdf4b5a2f6d62f768f289d59b40af648f2/src/wallet/base.ts#L538)
+Defined in: [src/wallet/base.ts:427](https://github.com/keep-starknet-strange/x/blob/5e54d8974744c392df7cac56b636788dfe6ae268/src/wallet/base.ts#L427)
 
 Complete the exit from a delegation pool.
 
@@ -787,7 +601,7 @@ if (position?.unpoolTime && new Date() >= position.unpoolTime) {
 
 > **isPoolMember**(`poolAddress`): `Promise`\<`boolean`\>
 
-Defined in: [src/wallet/base.ts:558](https://github.com/adrienlacombe/starkzap/blob/93cc8acdf4b5a2f6d62f768f289d59b40af648f2/src/wallet/base.ts#L558)
+Defined in: [src/wallet/base.ts:447](https://github.com/keep-starknet-strange/x/blob/5e54d8974744c392df7cac56b636788dfe6ae268/src/wallet/base.ts#L447)
 
 Check if the wallet is a member of a delegation pool.
 
@@ -827,7 +641,7 @@ if (await wallet.isPoolMember(poolAddress)) {
 
 > **getPoolPosition**(`poolAddress`): `Promise`\<[`PoolMember`](../interfaces/PoolMember.md) \| `null`\>
 
-Defined in: [src/wallet/base.ts:583](https://github.com/adrienlacombe/starkzap/blob/93cc8acdf4b5a2f6d62f768f289d59b40af648f2/src/wallet/base.ts#L583)
+Defined in: [src/wallet/base.ts:472](https://github.com/keep-starknet-strange/x/blob/5e54d8974744c392df7cac56b636788dfe6ae268/src/wallet/base.ts#L472)
 
 Get the wallet's staking position in a pool.
 
@@ -872,7 +686,7 @@ if (position) {
 
 > **getPoolCommission**(`poolAddress`): `Promise`\<`number`\>
 
-Defined in: [src/wallet/base.ts:605](https://github.com/adrienlacombe/starkzap/blob/93cc8acdf4b5a2f6d62f768f289d59b40af648f2/src/wallet/base.ts#L605)
+Defined in: [src/wallet/base.ts:494](https://github.com/keep-starknet-strange/x/blob/5e54d8974744c392df7cac56b636788dfe6ae268/src/wallet/base.ts#L494)
 
 Get the validator's commission rate for a pool.
 
@@ -914,7 +728,7 @@ console.log(`Validator commission: ${commission}%`);
 
 > **staking**(`poolAddress`): `Promise`\<[`Staking`](Staking.md)\>
 
-Defined in: [src/wallet/base.ts:644](https://github.com/adrienlacombe/starkzap/blob/93cc8acdf4b5a2f6d62f768f289d59b40af648f2/src/wallet/base.ts#L644)
+Defined in: [src/wallet/base.ts:533](https://github.com/keep-starknet-strange/x/blob/5e54d8974744c392df7cac56b636788dfe6ae268/src/wallet/base.ts#L533)
 
 Get or create a Staking instance for a specific pool.
 
@@ -964,7 +778,7 @@ const position = await staking.getPosition(wallet);
 
 > **stakingInStaker**(`stakerAddress`, `token`): `Promise`\<[`Staking`](Staking.md)\>
 
-Defined in: [src/wallet/base.ts:695](https://github.com/adrienlacombe/starkzap/blob/93cc8acdf4b5a2f6d62f768f289d59b40af648f2/src/wallet/base.ts#L695)
+Defined in: [src/wallet/base.ts:568](https://github.com/keep-starknet-strange/x/blob/5e54d8974744c392df7cac56b636788dfe6ae268/src/wallet/base.ts#L568)
 
 Get or create a Staking instance for a validator's pool.
 
@@ -1021,7 +835,7 @@ await staking.enter(wallet, Amount.parse("100", STRK));
 
 > `static` **create**(`options`): `Promise`\<`Wallet`\>
 
-Defined in: [src/wallet/index.ts:154](https://github.com/adrienlacombe/starkzap/blob/93cc8acdf4b5a2f6d62f768f289d59b40af648f2/src/wallet/index.ts#L154)
+Defined in: [src/wallet/index.ts:146](https://github.com/keep-starknet-strange/x/blob/5e54d8974744c392df7cac56b636788dfe6ae268/src/wallet/index.ts#L146)
 
 Create a new Wallet instance.
 
@@ -1060,7 +874,7 @@ const wallet = await Wallet.create({
 
 > **isDeployed**(): `Promise`\<`boolean`\>
 
-Defined in: [src/wallet/index.ts:222](https://github.com/adrienlacombe/starkzap/blob/93cc8acdf4b5a2f6d62f768f289d59b40af648f2/src/wallet/index.ts#L222)
+Defined in: [src/wallet/index.ts:201](https://github.com/keep-starknet-strange/x/blob/5e54d8974744c392df7cac56b636788dfe6ae268/src/wallet/index.ts#L201)
 
 Check if the account contract is deployed on-chain.
 
@@ -1078,7 +892,7 @@ Check if the account contract is deployed on-chain.
 
 > **ensureReady**(`options?`): `Promise`\<`void`\>
 
-Defined in: [src/wallet/index.ts:267](https://github.com/adrienlacombe/starkzap/blob/93cc8acdf4b5a2f6d62f768f289d59b40af648f2/src/wallet/index.ts#L267)
+Defined in: [src/wallet/index.ts:214](https://github.com/keep-starknet-strange/x/blob/5e54d8974744c392df7cac56b636788dfe6ae268/src/wallet/index.ts#L214)
 
 Ensure the wallet is ready for transactions.
 Optionally deploys the account if needed.
@@ -1103,7 +917,7 @@ Optionally deploys the account if needed.
 
 > **deploy**(`options?`): `Promise`\<[`Tx`](Tx.md)\>
 
-Defined in: [src/wallet/index.ts:271](https://github.com/adrienlacombe/starkzap/blob/93cc8acdf4b5a2f6d62f768f289d59b40af648f2/src/wallet/index.ts#L271)
+Defined in: [src/wallet/index.ts:218](https://github.com/keep-starknet-strange/x/blob/5e54d8974744c392df7cac56b636788dfe6ae268/src/wallet/index.ts#L218)
 
 Deploy the account contract.
 Returns a Tx object to track the deployment.
@@ -1128,7 +942,7 @@ Returns a Tx object to track the deployment.
 
 > **execute**(`calls`, `options?`): `Promise`\<[`Tx`](Tx.md)\>
 
-Defined in: [src/wallet/index.ts:480](https://github.com/adrienlacombe/starkzap/blob/93cc8acdf4b5a2f6d62f768f289d59b40af648f2/src/wallet/index.ts#L480)
+Defined in: [src/wallet/index.ts:409](https://github.com/keep-starknet-strange/x/blob/5e54d8974744c392df7cac56b636788dfe6ae268/src/wallet/index.ts#L409)
 
 Execute one or more contract calls.
 Returns a Tx object to track the transaction.
@@ -1157,7 +971,7 @@ Returns a Tx object to track the transaction.
 
 > **signMessage**(`typedData`): `Promise`\<`Signature`\>
 
-Defined in: [src/wallet/index.ts:540](https://github.com/adrienlacombe/starkzap/blob/93cc8acdf4b5a2f6d62f768f289d59b40af648f2/src/wallet/index.ts#L540)
+Defined in: [src/wallet/index.ts:444](https://github.com/keep-starknet-strange/x/blob/5e54d8974744c392df7cac56b636788dfe6ae268/src/wallet/index.ts#L444)
 
 Sign a typed data message (EIP-712 style).
 Returns the signature.
@@ -1182,7 +996,7 @@ Returns the signature.
 
 > **preflight**(`options`): `Promise`\<[`PreflightResult`](../type-aliases/PreflightResult.md)\>
 
-Defined in: [src/wallet/index.ts:544](https://github.com/adrienlacombe/starkzap/blob/93cc8acdf4b5a2f6d62f768f289d59b40af648f2/src/wallet/index.ts#L544)
+Defined in: [src/wallet/index.ts:448](https://github.com/keep-starknet-strange/x/blob/5e54d8974744c392df7cac56b636788dfe6ae268/src/wallet/index.ts#L448)
 
 Simulate a transaction to check if it would succeed.
 
@@ -1206,7 +1020,7 @@ Simulate a transaction to check if it would succeed.
 
 > **getAccount**(): `Account`
 
-Defined in: [src/wallet/index.ts:552](https://github.com/adrienlacombe/starkzap/blob/93cc8acdf4b5a2f6d62f768f289d59b40af648f2/src/wallet/index.ts#L552)
+Defined in: [src/wallet/index.ts:456](https://github.com/keep-starknet-strange/x/blob/5e54d8974744c392df7cac56b636788dfe6ae268/src/wallet/index.ts#L456)
 
 Get the underlying starknet.js Account instance.
 Use this for advanced operations not covered by the SDK.
@@ -1223,16 +1037,16 @@ Use this for advanced operations not covered by the SDK.
 
 ### getProvider()
 
-> **getProvider**(): [`RpcProvider`](../interfaces/RpcProvider.md)
+> **getProvider**(): `RpcProvider`
 
-Defined in: [src/wallet/index.ts:556](https://github.com/adrienlacombe/starkzap/blob/93cc8acdf4b5a2f6d62f768f289d59b40af648f2/src/wallet/index.ts#L556)
+Defined in: [src/wallet/index.ts:460](https://github.com/keep-starknet-strange/x/blob/5e54d8974744c392df7cac56b636788dfe6ae268/src/wallet/index.ts#L460)
 
 Get the RPC provider instance.
 Use this for read-only operations like balance queries.
 
 #### Returns
 
-[`RpcProvider`](../interfaces/RpcProvider.md)
+`RpcProvider`
 
 #### Overrides
 
@@ -1244,7 +1058,7 @@ Use this for read-only operations like balance queries.
 
 > **getChainId**(): [`ChainId`](ChainId.md)
 
-Defined in: [src/wallet/index.ts:563](https://github.com/adrienlacombe/starkzap/blob/93cc8acdf4b5a2f6d62f768f289d59b40af648f2/src/wallet/index.ts#L563)
+Defined in: [src/wallet/index.ts:467](https://github.com/keep-starknet-strange/x/blob/5e54d8974744c392df7cac56b636788dfe6ae268/src/wallet/index.ts#L467)
 
 Get the chain ID this wallet is connected to.
 
@@ -1262,7 +1076,7 @@ Get the chain ID this wallet is connected to.
 
 > **getFeeMode**(): [`FeeMode`](../type-aliases/FeeMode.md)
 
-Defined in: [src/wallet/index.ts:570](https://github.com/adrienlacombe/starkzap/blob/93cc8acdf4b5a2f6d62f768f289d59b40af648f2/src/wallet/index.ts#L570)
+Defined in: [src/wallet/index.ts:474](https://github.com/keep-starknet-strange/x/blob/5e54d8974744c392df7cac56b636788dfe6ae268/src/wallet/index.ts#L474)
 
 Get the default fee mode for this wallet.
 
@@ -1280,7 +1094,7 @@ Get the default fee mode for this wallet.
 
 > **getClassHash**(): `string`
 
-Defined in: [src/wallet/index.ts:577](https://github.com/adrienlacombe/starkzap/blob/93cc8acdf4b5a2f6d62f768f289d59b40af648f2/src/wallet/index.ts#L577)
+Defined in: [src/wallet/index.ts:481](https://github.com/keep-starknet-strange/x/blob/5e54d8974744c392df7cac56b636788dfe6ae268/src/wallet/index.ts#L481)
 
 Get the account class hash.
 
@@ -1298,7 +1112,7 @@ Get the account class hash.
 
 > **estimateFee**(`calls`): `Promise`\<`EstimateFeeResponseOverhead`\>
 
-Defined in: [src/wallet/index.ts:592](https://github.com/adrienlacombe/starkzap/blob/93cc8acdf4b5a2f6d62f768f289d59b40af648f2/src/wallet/index.ts#L592)
+Defined in: [src/wallet/index.ts:496](https://github.com/keep-starknet-strange/x/blob/5e54d8974744c392df7cac56b636788dfe6ae268/src/wallet/index.ts#L496)
 
 Estimate the fee for executing calls.
 
@@ -1331,7 +1145,7 @@ console.log(`Estimated fee: ${fee.overall_fee}`);
 
 > **disconnect**(): `Promise`\<`void`\>
 
-Defined in: [src/wallet/index.ts:596](https://github.com/adrienlacombe/starkzap/blob/93cc8acdf4b5a2f6d62f768f289d59b40af648f2/src/wallet/index.ts#L596)
+Defined in: [src/wallet/index.ts:500](https://github.com/keep-starknet-strange/x/blob/5e54d8974744c392df7cac56b636788dfe6ae268/src/wallet/index.ts#L500)
 
 Disconnect the wallet and clean up resources.
 
