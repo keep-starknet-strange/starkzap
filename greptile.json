@@ -1,0 +1,77 @@
+{
+  "strictness": 2,
+  "commentTypes": ["logic", "syntax", "style", "info"],
+  "triggerOnUpdates": true,
+  "statusCheck": true,
+  "statusCommentsEnabled": true,
+  "shouldUpdateDescription": false,
+  "updateExistingSummaryComment": true,
+  "fixWithAI": true,
+  "excludeAuthors": ["dependabot[bot]", "github-actions[bot]"],
+  "ignorePatterns": "dist/**\ndocs/api/**\ndocs/export/**\nnode_modules/**\n**/package-lock.json\n**/*.tgz",
+  "instructions": "StarkZap is a Starknet SDK plus MCP server for agentic wallet operations. Prioritize critical correctness, security, and performance risks over style-only feedback. Focus on address normalization/validation, write-path opt-in safety for MCP tools, amount and decimal checks before transaction submission, sanitized client-facing errors, and backwards-compatible SDK API changes with tests.",
+  "reviewProfile": "security-focused",
+  "focus": [
+    "security",
+    "correctness",
+    "performance",
+    "maintainability",
+    "error-handling",
+    "type-safety",
+    "documentation"
+  ],
+  "customContext": {
+    "files": [
+      {
+        "path": "src/index.ts",
+        "description": "Public SDK entrypoint."
+      },
+      {
+        "path": "src/wallet/base.ts",
+        "description": "Wallet base primitives."
+      },
+      {
+        "path": "src/staking/staking.ts",
+        "description": "Staking flows and transaction construction."
+      },
+      {
+        "path": "packages/mcp-server/src/index.ts",
+        "description": "MCP server entrypoint."
+      },
+      {
+        "path": "packages/mcp-server/src/core.ts",
+        "description": "MCP core tool wiring."
+      }
+    ],
+    "rules": [
+      {
+        "scope": ["src/**/*.ts", "packages/mcp-server/src/**/*.ts"],
+        "rule": "All external addresses must be normalized and validated before use. Flag any direct unchecked address usage."
+      },
+      {
+        "scope": ["packages/mcp-server/src/**/*.ts"],
+        "rule": "State-changing MCP tools must remain opt-in and explicitly gated. Default behavior should be read-only when write mode is not enabled."
+      },
+      {
+        "scope": ["src/**/*.ts", "packages/mcp-server/src/**/*.ts"],
+        "rule": "Amounts and token decimals must be validated and bounded before submitting transactions."
+      },
+      {
+        "scope": ["src/**/*.ts", "packages/mcp-server/src/**/*.ts"],
+        "rule": "Internal errors can be logged with detail, but client-facing responses must be sanitized and stable."
+      },
+      {
+        "scope": ["src/**/*.ts", "tests/**/*.ts"],
+        "rule": "Changes to public SDK APIs should preserve backwards compatibility and include tests for behavior changes."
+      }
+    ]
+  },
+  "paths": {
+    "include": [
+      "src/**",
+      "packages/mcp-server/**",
+      "tests/**",
+      ".github/workflows/**"
+    ]
+  }
+}

@@ -78,6 +78,7 @@
     "prepare": "husky"
   },
   "devDependencies": {
+    "@0no-co/graphql.web": "^1.2.0",
     "@cartridge/controller": "^0.13.9",
     "@eslint/js": "^9.39.2",
     "@vitest/coverage-v8": "^4.0.17",
@@ -94,6 +95,7 @@
     "typedoc-plugin-markdown": "^4.10.0",
     "typescript": "^5.9.3",
     "typescript-eslint": "^8.53.1",
+    "utf-8-validate": "^6.0.6",
     "vite": "^7.3.1",
     "vitest": "^4.0.17"
   },
