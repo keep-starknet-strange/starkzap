@@ -75,7 +75,7 @@ const devnet = await Devnet.spawnInstalled({
     DUMP_PATH,
   ],
   stdout: "ignore",
-  stderr: "ignore",
+  stderr: "inherit",
   maxStartupMillis: 15000,
 });
 
