@@ -54,7 +54,7 @@ try {
 }
 
 const STRK_ADDRESS =
-  "0x4718F5A0FC34CC1AF16A1CDEE98FFB20C31F5CD61D6AB07201858F4287C938D";
+  "0x04718f5a0fc34cc1af16a1cdee98ffb20c31f5cd61d6ab07201858f4287c938d";
 const DUMP_PATH = path.join(__dirname, "devnet.state");
 const META_PATH = path.join(__dirname, "devnet.json");
 
