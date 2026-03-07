@@ -8,6 +8,8 @@ import {
 import { getTokensFromAddresses } from "@/erc20";
 import {
   type Address,
+  type AddressLike,
+  getAddress,
   Amount,
   type ExecuteOptions,
   fromAddress,
@@ -183,18 +185,22 @@ export class Staking {
   }
 
   /**
-   * Check if a wallet is a member of this delegation pool.
+   * Check if an address is a member of this delegation pool.
    *
-   * @param wallet - The wallet to check
-   * @returns True if the wallet is a pool member, false otherwise
+   * This is a read-only operation that does not require a signer.
+   * You can pass either a wallet instance or just an address string.
+   *
+   * @param addressLike - Either an Address string or a WalletInterface
+   * @returns True if the address is a pool member, false otherwise
    */
-  async isMember(wallet: WalletInterface): Promise<boolean> {
-    const member = await this.pool.get_pool_member_info_v1(wallet.address);
+  async isMember(addressLike: AddressLike): Promise<boolean> {
+    const address = getAddress(addressLike);
+    const member = await this.pool.get_pool_member_info_v1(address);
     return member.isSome();
   }
 
   /**
-   * Get the current staking position for a wallet in this pool.
+   * Get the current staking position for an address in this pool.
    *
    * Returns detailed information about the delegator's stake including:
    * - Staked amount
@@ -202,20 +208,29 @@ export class Staking {
    * - Exit/unpooling status
    * - Commission rate
    *
-   * @param wallet - The wallet to query
+   * This is a read-only operation that does not require a signer.
+   * You can pass either a wallet instance or just an address string.
+   *
+   * @param addressLike - Either an Address string or a WalletInterface
    * @returns The pool member position, or null if not a member
    *
    * @example
    * ```ts
+   * // Using wallet instance
    * const position = await staking.getPosition(wallet);
+   *
+   * // Using address directly (no signer needed)
+   * const position = await staking.getPosition("0x123...");
+   *
    * if (position) {
    *   console.log(`Staked: ${position.staked.toFormatted()}`);
    *   console.log(`Rewards: ${position.rewards.toFormatted()}`);
    * }
    * ```
    */
-  async getPosition(wallet: WalletInterface): Promise<PoolMember | null> {
-    const memberInfo = await this.pool.get_pool_member_info_v1(wallet.address);
+  async getPosition(addressLike: AddressLike): Promise<PoolMember | null> {
+    const address = getAddress(addressLike);
+    const memberInfo = await this.pool.get_pool_member_info_v1(address);
 
     if (memberInfo.isNone()) {
       return null;
