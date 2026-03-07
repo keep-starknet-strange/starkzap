@@ -1,6 +1,7 @@
 import type { Call, Calldata, PaymasterTimeBounds } from "starknet";
 import type { SignerInterface } from "@/signer/interface";
 import type { SwapProvider } from "@/swap/interface";
+import type { SponsorshipNotAvailableError } from "@/errors/sponsorship";
 
 // ─── Account Class Configuration ─────────────────────────────────────────────
 
@@ -161,12 +162,37 @@ export interface DeployOptions {
 
 // ─── Execute ─────────────────────────────────────────────────────────────────
 
-/** Options for `wallet.execute()` */
+/**
+ * Options for `wallet.execute()`.
+ *
+ * @example
+ * ```ts
+ * // Basic execution with sponsored fees
+ * await wallet.execute(calls, { feeMode: "sponsored" });
+ *
+ * // With automatic fallback to user pays
+ * await wallet.execute(calls, {
+ *   feeMode: "sponsored",
+ *   fallbackTo: "user_pays",
+ *   onFallback: (err) => console.log("Falling back:", err.reason),
+ * });
+ * ```
+ */
 export interface ExecuteOptions {
   /** How fees are paid */
   feeMode?: FeeMode;
   /** Optional time bounds for paymaster transactions */
   timeBounds?: PaymasterTimeBounds;
+  /**
+   * Automatically retry with this fee mode if sponsorship fails.
+   * Only applies when `feeMode: "sponsored"`.
+   */
+  fallbackTo?: FeeMode;
+  /**
+   * Callback invoked when falling back from sponsored to another fee mode.
+   * Receives the structured error explaining why sponsorship failed.
+   */
+  onFallback?: (error: SponsorshipNotAvailableError) => void;
 }
 
 // ─── Preflight ───────────────────────────────────────────────────────────────

@@ -33,6 +33,9 @@ export * from "@/swap";
 // Types
 export * from "@/types";
 
+// Errors
+export { SponsorshipNotAvailableError } from "@/errors/sponsorship";
+
 // Re-export useful starknet.js types and classes for apps that need read-only contract calls
 export {
   Contract,
