@@ -1,9 +1,10 @@
+import { fileURLToPath, URL } from "node:url";
 import { defineConfig } from "vite";
 
 export default defineConfig({
   resolve: {
     alias: {
-      starkzap: new URL("../..", import.meta.url).pathname,
+      starkzap: fileURLToPath(new URL("../../src/index.ts", import.meta.url)),
     },
   },
 });

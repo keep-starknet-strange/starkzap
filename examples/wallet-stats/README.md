@@ -8,24 +8,22 @@ Starknet wallet integration.
 ### Core Features
 
 - **Multi-Provider Wallet Connection**
-  - Cartridge Controller (embedded wallet)
-  - Argent X (browser extension)
-  - Braavos (browser extension)
+  - ✅ Cartridge Controller (embedded wallet) - **Fully Implemented**
+  - ⏳ Argent X (browser extension) - **Placeholder** (shows alert directing to web example)
+  - ⏳ Braavos (browser extension) - **Placeholder** (shows alert directing to web example)
 
-- **Token Balance Display**
+- **Token Balance Display** - ✅ **Fully Implemented**
   - Real-time balance fetching for all supported ERC20 tokens
-  - USD value estimation
+  - USD value estimation (mock prices for demo)
   - Auto-refresh capability
 
-- **Staking Positions**
-  - View staking positions across validators
-  - Track rewards and APY
-  - Monitor staked amounts
+- **Staking Positions** - ⏳ **Placeholder**
+  - Currently shows empty state
+  - Ready for staking position integration via `Staking` class
 
-- **Activity Tracking**
-  - Transaction history
-  - Real-time status updates
-  - Transaction type categorization
+- **Activity Tracking** - ⏳ **Placeholder**
+  - In-memory transaction log (cleared on disconnect)
+  - No persistent storage or indexer integration
 
 ### Dashboard Stats
 

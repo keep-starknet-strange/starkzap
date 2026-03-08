@@ -31,7 +31,8 @@ const presetTokens = Object.values(getPresets(SDK_CHAIN_ID)).sort((a, b) =>
 
 let wallet: WalletInterface | null = null;
 let walletType: string | null = null;
-let isRefreshing = false;
+let isRefreshingBalances = false;
+let isRefreshingStaking = false;
 
 // Recent transactions (simulated for demo)
 const recentTxs: Array<{
@@ -271,9 +272,9 @@ function renderTokenBalances(balances: Map<string, Amount>): void {
 }
 
 async function fetchBalances(): Promise<void> {
-  if (!wallet || isRefreshing) return;
+  if (!wallet || isRefreshingBalances) return;
 
-  isRefreshing = true;
+  isRefreshingBalances = true;
   renderLoadingBalances();
 
   try {
@@ -301,7 +302,7 @@ async function fetchBalances(): Promise<void> {
     console.error("Failed to fetch balances:", error);
     renderEmptyBalances();
   } finally {
-    isRefreshing = false;
+    isRefreshingBalances = false;
   }
 }
 
@@ -369,7 +370,9 @@ function renderStakingPositions(
 }
 
 async function fetchStakingPositions(): Promise<void> {
-  if (!wallet || isRefreshing) return;
+  if (!wallet || isRefreshingStaking) return;
+
+  isRefreshingStaking = true;
 
   try {
     // In a real implementation, you would fetch staking positions from the staking contract
@@ -387,6 +390,8 @@ async function fetchStakingPositions(): Promise<void> {
   } catch (error) {
     console.error("Failed to fetch staking positions:", error);
     renderEmptyStaking();
+  } finally {
+    isRefreshingStaking = false;
   }
 }
 
@@ -536,8 +541,14 @@ function disconnect(): void {
     wallet.disconnect();
   }
 
+  // Clear all wallet-scoped state
   wallet = null;
   walletType = null;
+  recentTxs.length = 0;
+  isRefreshingBalances = false;
+  isRefreshingStaking = false;
+
+  // Reset UI
   hideWalletInfo();
   renderEmptyBalances();
   renderEmptyStaking();
@@ -545,6 +556,9 @@ function disconnect(): void {
   elements.statBalance.textContent = "$0.00";
   elements.statStaked.textContent = "0 STRK";
   elements.statTx.textContent = "0";
+  elements.statGas.textContent = "$0.00";
+  document.getElementById("stat-apy")!.textContent = "— APY";
+  document.getElementById("stat-tx-pending")!.textContent = "—";
 }
 
 // ============================================================================
