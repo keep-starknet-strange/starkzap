@@ -183,9 +183,14 @@ export class SponsorshipNotAvailableError extends Error {
     }
 
     // Match "network not supported for sponsorship" patterns specifically
+    // Require explicit unavailability phrases to avoid false positives
     if (
       (message.includes("network") || message.includes("chain")) &&
-      (message.includes("sponsored") || message.includes("sponsor") || message.includes("paymaster"))
+      (message.includes("sponsored") || message.includes("sponsor") || message.includes("paymaster")) &&
+      (message.includes("not available") ||
+        message.includes("unavailable") ||
+        message.includes("not supported") ||
+        message.includes("unsupported"))
     ) {
       return new SponsorshipNotAvailableError("network_unavailable", {
         originalError: error,
@@ -204,6 +209,7 @@ export class SponsorshipNotAvailableError extends Error {
     }
 
     // If the error mentions sponsorship but we couldn't categorize it
+    // Do not enable automatic fallback since we can't confirm it's safe
     if (
       message.includes("sponsored") ||
       message.includes("sponsor") ||
@@ -211,7 +217,9 @@ export class SponsorshipNotAvailableError extends Error {
     ) {
       return new SponsorshipNotAvailableError("unknown", {
         originalError: error,
-        fallbackFeeRequired: true,
+        // Only set fallbackFeeRequired: true in code paths that explicitly verify
+        // a paymaster refusal. Unknown errors should not trigger automatic fallback.
+        fallbackFeeRequired: false,
       });
     }
 
