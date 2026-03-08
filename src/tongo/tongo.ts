@@ -1,4 +1,4 @@
-import type { Address, Token, ExecuteOptions, Amount } from "@/types";
+import type { Address, ExecuteOptions, Amount } from "@/types";
 import type { WalletInterface } from "@/wallet";
 import type { Tx } from "@/tx";
 import type {
@@ -7,15 +7,8 @@ import type {
   ProjectivePoint,
   CipherBalance,
   ConfidentialTransfer,
-  TongoOptions,
 } from "./types";
-import {
-  Contract,
-  type RpcProvider,
-  type Call,
-  type BigNumberish,
-  num,
-} from "starknet";
+import { Contract, type RpcProvider, type Call, num } from "starknet";
 import { ABI as TONGO_ABI } from "@/abi/tongo";
 
 /**
@@ -82,7 +75,9 @@ export class Tongo {
    * @param publicKey - The account's public key
    * @returns The account state or null if not found
    */
-  async getAccountState(publicKey: ProjectivePoint): Promise<TongoAccountState | null> {
+  async getAccountState(
+    publicKey: ProjectivePoint
+  ): Promise<TongoAccountState | null> {
     try {
       const accountKey = this.pointToContractFormat(publicKey);
       const state = await this.contract.get_account(accountKey);
@@ -107,7 +102,7 @@ export class Tongo {
       }
 
       return result;
-    } catch (error) {
+    } catch {
       // Account doesn't exist yet
       return null;
     }
@@ -179,10 +174,7 @@ export class Tongo {
       {
         contractAddress: this.config.address,
         entrypoint: "transfer",
-        calldata: [
-          this.pointToCalldata(transfer.to),
-          transfer.amount,
-        ].flat(),
+        calldata: [this.pointToCalldata(transfer.to), transfer.amount].flat(),
       },
     ];
 
@@ -314,10 +306,7 @@ export class Tongo {
     return {
       contractAddress: this.config.address,
       entrypoint: "transfer",
-      calldata: [
-        this.pointToCalldata(transfer.to),
-        transfer.amount,
-      ].flat(),
+      calldata: [this.pointToCalldata(transfer.to), transfer.amount].flat(),
     };
   }
 
@@ -354,7 +343,10 @@ export class Tongo {
   /**
    * Convert a projective point to contract storage format.
    */
-  private pointToContractFormat(point: ProjectivePoint): { x: bigint; y: bigint } {
+  private pointToContractFormat(point: ProjectivePoint): {
+    x: bigint;
+    y: bigint;
+  } {
     return {
       x: point.x,
       y: point.y,
@@ -371,7 +363,10 @@ export class Tongo {
   /**
    * Convert contract cipher balance to our type.
    */
-  private cipherFromContract(cipher: { L: { x: bigint; y: bigint }; R: { x: bigint; y: bigint } }): CipherBalance {
+  private cipherFromContract(cipher: {
+    L: { x: bigint; y: bigint };
+    R: { x: bigint; y: bigint };
+  }): CipherBalance {
     return {
       L: { x: cipher.L.x, y: cipher.L.y },
       R: { x: cipher.R.x, y: cipher.R.y },
