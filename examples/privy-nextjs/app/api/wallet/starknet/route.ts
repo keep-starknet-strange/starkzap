@@ -1,24 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { PrivyClient } from "@privy-io/node";
-
-const PRIVY_APP_ID = process.env.NEXT_PUBLIC_PRIVY_APP_ID;
-const PRIVY_APP_SECRET = process.env.PRIVY_APP_SECRET;
-
-// Lazy-initialize Privy client to avoid build-time errors
-let privyClient: PrivyClient | null = null;
-
-function getPrivyClient(): PrivyClient {
-  if (!privyClient) {
-    if (!PRIVY_APP_ID || !PRIVY_APP_SECRET) {
-      throw new Error("PRIVY_APP_ID and PRIVY_APP_SECRET must be set");
-    }
-    privyClient = new PrivyClient({
-      appId: PRIVY_APP_ID,
-      appSecret: PRIVY_APP_SECRET,
-    });
-  }
-  return privyClient;
-}
+import { getPrivyClient } from "@/lib/privy";
 
 // Simple in-memory wallet storage (use a database in production!)
 // In production, replace with: Redis, PostgreSQL, MongoDB, etc.
@@ -30,6 +11,15 @@ const walletStore = new Map<
     address: string;
   }
 >();
+
+// Warn about in-memory storage in production
+if (process.env.NODE_ENV === "production") {
+  console.warn(
+    "⚠️ WARNING: Using in-memory wallet storage. " +
+      "Wallets will be lost on server restart. " +
+      "Configure a persistent database (Redis/PostgreSQL/MongoDB) for production."
+  );
+}
 
 /**
  * GET /api/wallet/starknet
@@ -50,7 +40,7 @@ export async function GET(request: NextRequest) {
 
     const token = authHeader.slice(7);
     const claims = await privy.utils().auth().verifyAccessToken(token);
-    const userId = claims.user_id;
+    const userId = claims.userId;
 
     // Check for existing wallet
     const existing = walletStore.get(userId);
@@ -97,7 +87,7 @@ export async function POST(request: NextRequest) {
 
     const token = authHeader.slice(7);
     const claims = await privy.utils().auth().verifyAccessToken(token);
-    const userId = claims.user_id;
+    const userId = claims.userId;
 
     // Check for existing wallet first
     const existing = walletStore.get(userId);
