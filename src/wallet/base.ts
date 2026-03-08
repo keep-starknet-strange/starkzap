@@ -25,12 +25,14 @@ import type {
 } from "starknet";
 import { Erc20 } from "@/erc20";
 import { Staking } from "@/staking";
+import { Tongo, type TongoConfig, type ConfidentialTransfer } from "@/tongo";
 import type { SwapInput, SwapQuote, SwapProvider } from "@/swap";
 import { AvnuSwapProvider } from "@/swap";
 import { resolveSwapInput } from "@/swap/utils";
 
 const MAX_ERC20_CACHE_SIZE = 128;
 const MAX_STAKING_CACHE_SIZE = 128;
+const MAX_TONGO_CACHE_SIZE = 16;
 
 /**
  * Abstract base class for wallet implementations.
@@ -76,6 +78,12 @@ export abstract class BaseWallet implements WalletInterface {
    */
   private stakingMap: Map<Address, Staking> = new Map();
   private stakingInFlight: Map<Address, Promise<Staking>> = new Map();
+
+  /**
+   * Cache of Tongo instances keyed by contract address.
+   * Prevents creating multiple instances for the same Tongo deployment.
+   */
+  private tongoMap: Map<Address, Tongo> = new Map();
 
   /**
    * Creates a new BaseWallet instance.
@@ -242,6 +250,7 @@ export abstract class BaseWallet implements WalletInterface {
     this.erc20s.clear();
     this.stakingMap.clear();
     this.stakingInFlight.clear();
+    this.tongoMap.clear();
   }
 
   private assertSwapCalls(calls: Call[], source?: string): void {
@@ -713,5 +722,179 @@ export abstract class BaseWallet implements WalletInterface {
     this.stakingInFlight.delete(poolAddress);
 
     return staking;
+  }
+
+  // ============================================================
+  // Tongo (Confidential Payments) delegated methods
+  // ============================================================
+
+  /**
+   * Gets or creates a Tongo instance for the given configuration.
+   *
+   * Uses a cache to avoid creating multiple instances for the same Tongo contract,
+   * improving performance when performing multiple confidential operations.
+   *
+   * @param config - The Tongo configuration (contract address, token, etc.)
+   * @returns The cached or newly created Tongo instance
+   *
+   * @example
+   * ```ts
+   * const tongo = wallet.tongo({
+   *   address: "0x...",
+   *   token: USDC.address,
+   * });
+   * ```
+   */
+  tongo(config: TongoConfig): Tongo {
+    let tongo = this.tongoMap.get(config.address);
+    if (!tongo) {
+      if (this.tongoMap.size >= MAX_TONGO_CACHE_SIZE) {
+        const oldest = this.tongoMap.keys().next().value;
+        if (oldest !== undefined) {
+          this.tongoMap.delete(oldest);
+        }
+      }
+      tongo = new Tongo(config, this.getProvider());
+      this.tongoMap.set(config.address, tongo);
+    }
+    return tongo;
+  }
+
+  /**
+   * Fund a Tongo confidential account.
+   *
+   * Converts public ERC20 tokens to confidential Tongos.
+   * The amount is publicly visible on-chain but encrypted in the Tongo balance.
+   *
+   * @param config - The Tongo configuration
+   * @param amount - The amount of tokens to fund
+   * @param options - Optional execution options
+   * @returns A Tx object to track the transaction
+   *
+   * @example
+   * ```ts
+   * const tx = await wallet.tongoFund(tongoConfig, Amount.parse("100", USDC));
+   * await tx.wait();
+   * ```
+   *
+   * @see {@link Tongo#fund}
+   */
+  async tongoFund(
+    config: TongoConfig,
+    amount: Amount,
+    options?: ExecuteOptions
+  ): Promise<Tx> {
+    const tongo = this.tongo(config);
+    return await tongo.fund(this, amount, options);
+  }
+
+  /**
+   * Perform a confidential transfer between Tongo accounts.
+   *
+   * The amount is hidden from the public, only visible to sender and recipient.
+   *
+   * @param config - The Tongo configuration
+   * @param transfer - Transfer details (recipient public key and amount)
+   * @param options - Optional execution options
+   * @returns A Tx object to track the transaction
+   *
+   * @example
+   * ```ts
+   * const tx = await wallet.tongoTransfer(tongoConfig, {
+   *   to: recipientPublicKey,
+   *   amount: 1000000n, // in base units
+   * });
+   * await tx.wait();
+   * ```
+   *
+   * @see {@link Tongo#transfer}
+   */
+  async tongoTransfer(
+    config: TongoConfig,
+    transfer: ConfidentialTransfer,
+    options?: ExecuteOptions
+  ): Promise<Tx> {
+    const tongo = this.tongo(config);
+    return await tongo.transfer(this, transfer, options);
+  }
+
+  /**
+   * Withdraw Tongos back to public ERC20 tokens.
+   *
+   * The withdrawn amount becomes publicly visible on-chain.
+   *
+   * @param config - The Tongo configuration
+   * @param amount - The amount to withdraw
+   * @param to - The recipient Starknet address (optional, defaults to wallet address)
+   * @param options - Optional execution options
+   * @returns A Tx object to track the transaction
+   *
+   * @example
+   * ```ts
+   * const tx = await wallet.tongoWithdraw(tongoConfig, Amount.parse("50", USDC));
+   * await tx.wait();
+   * ```
+   *
+   * @see {@link Tongo#withdraw}
+   */
+  async tongoWithdraw(
+    config: TongoConfig,
+    amount: Amount,
+    to?: Address,
+    options?: ExecuteOptions
+  ): Promise<Tx> {
+    const tongo = this.tongo(config);
+    return await tongo.withdraw(this, amount, to, options);
+  }
+
+  /**
+   * Rollover pending balance to current balance.
+   *
+   * After receiving confidential transfers, the pending balance must be
+   * rolled over to become spendable.
+   *
+   * @param config - The Tongo configuration
+   * @param options - Optional execution options
+   * @returns A Tx object to track the transaction
+   *
+   * @example
+   * ```ts
+   * const tx = await wallet.tongoRollover(tongoConfig);
+   * await tx.wait();
+   * ```
+   *
+   * @see {@link Tongo#rollover}
+   */
+  async tongoRollover(
+    config: TongoConfig,
+    options?: ExecuteOptions
+  ): Promise<Tx> {
+    const tongo = this.tongo(config);
+    return await tongo.rollover(this, options);
+  }
+
+  /**
+   * Emergency withdrawal of all funds from a Tongo account.
+   *
+   * @param config - The Tongo configuration
+   * @param to - The recipient Starknet address
+   * @param options - Optional execution options
+   * @returns A Tx object to track the transaction
+   *
+   * @example
+   * ```ts
+   * const tx = await wallet.tongoRagequit(tongoConfig, recipientAddress);
+   * await tx.wait();
+   * ```
+   *
+   * @see {@link Tongo#ragequit}
+   */
+  async tongoRagequit(
+    config: TongoConfig,
+    to: Address,
+    options?: ExecuteOptions
+  ): Promise<Tx> {
+    const tongo = this.tongo(config);
+    return await tongo.ragequit(this, to, options);
   }
 }

@@ -30,6 +30,9 @@ export * from "@/staking";
 // Swap
 export * from "@/swap";
 
+// Tongo (Confidential Payments)
+export * from "@/tongo";
+
 // Types
 export * from "@/types";
 
