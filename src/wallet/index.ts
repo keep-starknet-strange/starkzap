@@ -523,23 +523,26 @@ export class Wallet extends BaseWallet {
           });
         }
       } catch (error) {
-        // If fallback is configured, try to fall back
+        // If fallback is configured, try to fall back only for sponsorship errors
         if (fallbackTo) {
           const structuredError =
             SponsorshipNotAvailableError.fromError(error);
 
-          // Notify caller about fallback
-          if (onFallback && structuredError instanceof SponsorshipNotAvailableError) {
-            onFallback(structuredError);
-          }
+          // Only fallback for sponsorship-specific errors
+          if (structuredError instanceof SponsorshipNotAvailableError) {
+            // Notify caller about fallback
+            if (onFallback) {
+              onFallback(structuredError);
+            }
 
-          // Retry with fallback fee mode
-          // eslint-disable-next-line @typescript-eslint/no-unused-vars
-          const { fallbackTo: _, onFallback: __, ...restOptions } = options;
-          return this.execute(calls, {
-            ...restOptions,
-            feeMode: fallbackTo,
-          });
+            // Retry with fallback fee mode
+            // eslint-disable-next-line @typescript-eslint/no-unused-vars
+            const { fallbackTo: _, onFallback: __, ...restOptions } = options;
+            return this.execute(calls, {
+              ...restOptions,
+              feeMode: fallbackTo,
+            });
+          }
         }
 
         throw error;
