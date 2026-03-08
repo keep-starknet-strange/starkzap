@@ -3,6 +3,7 @@ import {
   ReadonlyWallet,
   readonlyWallet,
   isReadonlyWallet,
+  hasWalletAddress,
   isAddress,
 } from "@/wallet/readonly";
 import { fromAddress } from "@/types";
@@ -64,6 +65,15 @@ describe("ReadonlyWallet", () => {
     });
   });
 
+  describe("hasWalletAddress type guard", () => {
+    it("is an alias for isReadonlyWallet", () => {
+      const wallet = new ReadonlyWallet(testAddress);
+      expect(hasWalletAddress(wallet)).toBe(true);
+      expect(hasWalletAddress({ address: testAddress })).toBe(true);
+      expect(hasWalletAddress(null)).toBe(false);
+    });
+  });
+
   describe("isAddress type guard", () => {
     it("returns true for valid Starknet addresses", () => {
       expect(isAddress("0x123")).toBe(true);
@@ -97,10 +107,10 @@ describe("ReadonlyWallet", () => {
   });
 
   describe("use with balanceOf", () => {
-    it("can be used as a balance query target", () => {
+    it("exposes address property for balance query integration", () => {
       const wallet = new ReadonlyWallet(testAddress);
-      // This test verifies the type compatibility
-      // The actual balance query would require a provider
+      // This test verifies the address property exists and is typed correctly.
+      // Actual balance queries would require a connected provider.
       expect(wallet.address).toBe(testAddress);
     });
   });

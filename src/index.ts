@@ -12,6 +12,7 @@ export {
   ReadonlyWallet,
   readonlyWallet,
   isReadonlyWallet,
+  hasWalletAddress,
   type ReadonlyWalletInterface,
 } from "@/wallet";
 

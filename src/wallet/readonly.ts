@@ -63,8 +63,9 @@ export class ReadonlyWallet implements ReadonlyWalletInterface {
  * Factory function to create a read-only wallet.
  *
  * Convenience function for creating ReadonlyWallet instances.
+ * Accepts the same types as the ReadonlyWallet constructor.
  *
- * @param address - The Starknet address
+ * @param address - The Starknet address (validated string or Address type)
  * @returns A ReadonlyWallet instance
  *
  * @example
@@ -75,17 +76,21 @@ export class ReadonlyWallet implements ReadonlyWalletInterface {
  * const balance = await erc20.balanceOf(wallet);
  * ```
  */
-export function readonlyWallet(address: Address): ReadonlyWallet {
+export function readonlyWallet(address: Address | string): ReadonlyWallet {
   return new ReadonlyWallet(address);
 }
 
 /**
- * Type guard to check if a value is a ReadonlyWalletInterface.
+ * Type guard to check if a value has a wallet address property.
+ *
+ * This checks for any object with an address property (string),
+ * which includes both ReadonlyWallet and full WalletInterface objects.
+ * Use this to detect "anything that can be used as a read-only target."
  *
  * @param value - The value to check
  * @returns True if the value has an address property
  */
-export function isReadonlyWallet(
+export function hasWalletAddress(
   value: unknown
 ): value is ReadonlyWalletInterface {
   return (
@@ -95,6 +100,12 @@ export function isReadonlyWallet(
     typeof (value as ReadonlyWalletInterface).address === "string"
   );
 }
+
+/**
+ * @deprecated Use `hasWalletAddress` instead.
+ * This alias is kept for backward compatibility.
+ */
+export const isReadonlyWallet = hasWalletAddress;
 
 /**
  * Type guard to check if a value is an Address string.
