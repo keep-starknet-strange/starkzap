@@ -1,0 +1,948 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>StarkZap Wallet Stats Dashboard</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --bg-primary: #0c0c10;
+        --bg-secondary: #141418;
+        --bg-tertiary: #1c1c24;
+        --bg-card: #18181f;
+        --accent: #0ea5e9;
+        --accent-glow: rgba(14, 165, 233, 0.3);
+        --success: #22c55e;
+        --warning: #f59e0b;
+        --error: #ef4444;
+        --text-primary: #fafafa;
+        --text-secondary: #a1a1aa;
+        --text-muted: #71717a;
+        --border: #27272a;
+        --gradient-hero: linear-gradient(
+          135deg,
+          #0ea5e9 0%,
+          #8b5cf6 50%,
+          #ec4899 100%
+        );
+        --font: "Inter", -apple-system, BlinkMacSystemFont, sans-serif;
+      }
+
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        font-family: var(--font);
+        background: var(--bg-primary);
+        color: var(--text-primary);
+        min-height: 100vh;
+        line-height: 1.6;
+      }
+
+      /* Header */
+      .header {
+        background: var(--bg-secondary);
+        border-bottom: 1px solid var(--border);
+        padding: 1rem 2rem;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        position: sticky;
+        top: 0;
+        z-index: 100;
+      }
+
+      .logo {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+      }
+
+      .logo-icon {
+        width: 40px;
+        height: 40px;
+        background: var(--gradient-hero);
+        border-radius: 10px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 800;
+        font-size: 1.25rem;
+      }
+
+      .logo-text {
+        font-size: 1.25rem;
+        font-weight: 700;
+        background: var(--gradient-hero);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+      }
+
+      .network-badge {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.5rem 1rem;
+        background: var(--bg-tertiary);
+        border-radius: 8px;
+        font-size: 0.875rem;
+        color: var(--text-secondary);
+      }
+
+      .network-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: var(--success);
+        animation: pulse 2s ease-in-out infinite;
+      }
+
+      @keyframes pulse {
+        0%,
+        100% {
+          opacity: 1;
+        }
+        50% {
+          opacity: 0.5;
+        }
+      }
+
+      /* Main Layout */
+      .app {
+        display: grid;
+        grid-template-columns: 280px 1fr;
+        min-height: calc(100vh - 65px);
+      }
+
+      @media (max-width: 1024px) {
+        .app {
+          grid-template-columns: 1fr;
+        }
+        .sidebar {
+          display: none;
+        }
+      }
+
+      /* Sidebar */
+      .sidebar {
+        background: var(--bg-secondary);
+        border-right: 1px solid var(--border);
+        padding: 1.5rem;
+      }
+
+      .connect-section {
+        margin-bottom: 2rem;
+      }
+
+      .section-title {
+        font-size: 0.75rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: var(--text-muted);
+        margin-bottom: 1rem;
+      }
+
+      .connect-buttons {
+        display: flex;
+        flex-direction: column;
+        gap: 0.75rem;
+      }
+
+      .btn {
+        font-family: var(--font);
+        font-size: 0.875rem;
+        font-weight: 600;
+        padding: 0.75rem 1rem;
+        border-radius: 10px;
+        border: none;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.5rem;
+      }
+
+      .btn:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+
+      .btn-cartridge {
+        background: linear-gradient(135deg, #f97316 0%, #ea580c 100%);
+        color: white;
+      }
+
+      .btn-cartridge:hover:not(:disabled) {
+        transform: translateY(-1px);
+        box-shadow: 0 4px 12px rgba(249, 115, 22, 0.3);
+      }
+
+      .btn-argent {
+        background: linear-gradient(135deg, #0066ff 0%, #0052cc 100%);
+        color: white;
+      }
+
+      .btn-argent:hover:not(:disabled) {
+        transform: translateY(-1px);
+        box-shadow: 0 4px 12px rgba(0, 102, 255, 0.3);
+      }
+
+      .btn-braavos {
+        background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+        color: white;
+      }
+
+      .btn-braavos:hover:not(:disabled) {
+        transform: translateY(-1px);
+        box-shadow: 0 4px 12px rgba(245, 158, 11, 0.3);
+      }
+
+      .btn-disconnect {
+        background: transparent;
+        color: var(--error);
+        border: 1px solid var(--error);
+      }
+
+      .btn-disconnect:hover:not(:disabled) {
+        background: rgba(239, 68, 68, 0.1);
+      }
+
+      /* Wallet Info in Sidebar */
+      .wallet-info {
+        display: none;
+        animation: fadeIn 0.3s ease;
+      }
+
+      .wallet-info.visible {
+        display: block;
+      }
+
+      @keyframes fadeIn {
+        from {
+          opacity: 0;
+          transform: translateY(-10px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+
+      .wallet-address-box {
+        background: var(--bg-tertiary);
+        border-radius: 10px;
+        padding: 1rem;
+        margin-bottom: 1rem;
+      }
+
+      .wallet-label {
+        font-size: 0.75rem;
+        color: var(--text-muted);
+        margin-bottom: 0.25rem;
+      }
+
+      .wallet-address {
+        font-family: monospace;
+        font-size: 0.8rem;
+        color: var(--accent);
+        word-break: break-all;
+      }
+
+      .copy-btn {
+        background: transparent;
+        border: none;
+        color: var(--text-muted);
+        cursor: pointer;
+        padding: 0.25rem;
+        margin-left: 0.5rem;
+        transition: color 0.2s;
+      }
+
+      .copy-btn:hover {
+        color: var(--accent);
+      }
+
+      .status-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0.75rem 0;
+        border-bottom: 1px solid var(--border);
+      }
+
+      .status-label {
+        color: var(--text-secondary);
+        font-size: 0.875rem;
+      }
+      .status-value {
+        font-weight: 600;
+        font-size: 0.875rem;
+      }
+
+      .status-deployed {
+        color: var(--success);
+      }
+      .status-not-deployed {
+        color: var(--warning);
+      }
+
+      /* Main Content */
+      .main {
+        padding: 2rem;
+        overflow-y: auto;
+      }
+
+      /* Stats Grid */
+      .stats-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 1rem;
+        margin-bottom: 2rem;
+      }
+
+      .stat-card {
+        background: var(--bg-card);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 1.25rem;
+        transition: transform 0.2s, box-shadow 0.2s;
+      }
+
+      .stat-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+      }
+
+      .stat-icon {
+        width: 40px;
+        height: 40px;
+        border-radius: 10px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin-bottom: 0.75rem;
+        font-size: 1.25rem;
+      }
+
+      .stat-icon.balance {
+        background: rgba(14, 165, 233, 0.2);
+      }
+      .stat-icon.staking {
+        background: rgba(139, 92, 246, 0.2);
+      }
+      .stat-icon.transactions {
+        background: rgba(34, 197, 94, 0.2);
+      }
+      .stat-icon.gas {
+        background: rgba(236, 72, 153, 0.2);
+      }
+
+      .stat-label {
+        font-size: 0.75rem;
+        color: var(--text-muted);
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        margin-bottom: 0.25rem;
+      }
+
+      .stat-value {
+        font-size: 1.5rem;
+        font-weight: 700;
+      }
+
+      .stat-change {
+        font-size: 0.75rem;
+        margin-top: 0.25rem;
+      }
+
+      .stat-change.positive {
+        color: var(--success);
+      }
+      .stat-change.negative {
+        color: var(--error);
+      }
+
+      /* Cards */
+      .card {
+        background: var(--bg-card);
+        border: 1px solid var(--border);
+        border-radius: 16px;
+        margin-bottom: 1.5rem;
+        overflow: hidden;
+      }
+
+      .card-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 1.25rem 1.5rem;
+        border-bottom: 1px solid var(--border);
+      }
+
+      .card-title {
+        font-size: 1rem;
+        font-weight: 600;
+      }
+
+      .card-body {
+        padding: 1.5rem;
+      }
+
+      /* Token Balance List */
+      .token-list {
+        display: flex;
+        flex-direction: column;
+      }
+
+      .token-item {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 1rem;
+        border-bottom: 1px solid var(--border);
+        transition: background 0.2s;
+      }
+
+      .token-item:last-child {
+        border-bottom: none;
+      }
+      .token-item:hover {
+        background: var(--bg-tertiary);
+      }
+
+      .token-left {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+      }
+
+      .token-icon {
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 700;
+        font-size: 0.875rem;
+      }
+
+      .token-name {
+        font-weight: 600;
+        margin-bottom: 0.125rem;
+      }
+
+      .token-symbol {
+        font-size: 0.75rem;
+        color: var(--text-muted);
+      }
+
+      .token-balance {
+        text-align: right;
+      }
+
+      .token-amount {
+        font-weight: 600;
+        margin-bottom: 0.125rem;
+      }
+
+      .token-value {
+        font-size: 0.75rem;
+        color: var(--text-muted);
+      }
+
+      /* Staking Positions */
+      .staking-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+        gap: 1rem;
+      }
+
+      .staking-card {
+        background: var(--bg-tertiary);
+        border-radius: 12px;
+        padding: 1.25rem;
+        border: 1px solid var(--border);
+      }
+
+      .staking-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 1rem;
+      }
+
+      .validator-info {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+      }
+
+      .validator-avatar {
+        width: 32px;
+        height: 32px;
+        border-radius: 8px;
+        background: var(--gradient-hero);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 700;
+        font-size: 0.75rem;
+      }
+
+      .validator-name {
+        font-weight: 600;
+        font-size: 0.875rem;
+      }
+
+      .apy-badge {
+        background: rgba(34, 197, 94, 0.2);
+        color: var(--success);
+        padding: 0.25rem 0.5rem;
+        border-radius: 4px;
+        font-size: 0.75rem;
+        font-weight: 600;
+      }
+
+      .staking-stats {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 0.75rem;
+      }
+
+      .staking-stat {
+        background: var(--bg-secondary);
+        border-radius: 8px;
+        padding: 0.75rem;
+      }
+
+      .staking-stat-label {
+        font-size: 0.7rem;
+        color: var(--text-muted);
+        text-transform: uppercase;
+        margin-bottom: 0.25rem;
+      }
+
+      .staking-stat-value {
+        font-weight: 600;
+        font-size: 0.9rem;
+      }
+
+      /* Transaction History */
+      .tx-list {
+        display: flex;
+        flex-direction: column;
+      }
+
+      .tx-item {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 1rem;
+        border-bottom: 1px solid var(--border);
+        transition: background 0.2s;
+      }
+
+      .tx-item:last-child {
+        border-bottom: none;
+      }
+      .tx-item:hover {
+        background: var(--bg-tertiary);
+      }
+
+      .tx-left {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+      }
+
+      .tx-icon {
+        width: 36px;
+        height: 36px;
+        border-radius: 8px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+
+      .tx-icon.transfer {
+        background: rgba(14, 165, 233, 0.2);
+      }
+      .tx-icon.stake {
+        background: rgba(139, 92, 246, 0.2);
+      }
+      .tx-icon.swap {
+        background: rgba(236, 72, 153, 0.2);
+      }
+
+      .tx-type {
+        font-weight: 600;
+        font-size: 0.875rem;
+      }
+
+      .tx-time {
+        font-size: 0.75rem;
+        color: var(--text-muted);
+      }
+
+      .tx-right {
+        text-align: right;
+      }
+
+      .tx-amount {
+        font-weight: 600;
+        font-size: 0.875rem;
+      }
+
+      .tx-status {
+        font-size: 0.75rem;
+      }
+
+      .tx-status.confirmed {
+        color: var(--success);
+      }
+      .tx-status.pending {
+        color: var(--warning);
+      }
+
+      /* Empty State */
+      .empty-state {
+        text-align: center;
+        padding: 3rem 2rem;
+        color: var(--text-muted);
+      }
+
+      .empty-icon {
+        font-size: 3rem;
+        margin-bottom: 1rem;
+        opacity: 0.5;
+      }
+
+      .empty-title {
+        font-size: 1.125rem;
+        font-weight: 600;
+        margin-bottom: 0.5rem;
+        color: var(--text-secondary);
+      }
+
+      .empty-desc {
+        font-size: 0.875rem;
+      }
+
+      /* Refresh Button */
+      .refresh-btn {
+        background: transparent;
+        border: 1px solid var(--border);
+        color: var(--text-secondary);
+        padding: 0.5rem 0.75rem;
+        border-radius: 6px;
+        font-size: 0.75rem;
+        cursor: pointer;
+        transition: all 0.2s;
+      }
+
+      .refresh-btn:hover {
+        border-color: var(--accent);
+        color: var(--accent);
+      }
+
+      .refresh-btn.loading {
+        animation: spin 1s linear infinite;
+      }
+
+      @keyframes spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+
+      /* Loading Spinner */
+      .spinner {
+        width: 16px;
+        height: 16px;
+        border: 2px solid transparent;
+        border-top-color: currentColor;
+        border-radius: 50%;
+        animation: spin 0.8s linear infinite;
+        display: inline-block;
+      }
+
+      /* Tabs */
+      .tabs {
+        display: flex;
+        gap: 0.5rem;
+        margin-bottom: 1.5rem;
+        border-bottom: 1px solid var(--border);
+        padding-bottom: 0.5rem;
+      }
+
+      .tab {
+        background: transparent;
+        border: none;
+        color: var(--text-muted);
+        padding: 0.5rem 1rem;
+        font-size: 0.875rem;
+        font-weight: 500;
+        cursor: pointer;
+        border-radius: 6px;
+        transition: all 0.2s;
+      }
+
+      .tab:hover {
+        color: var(--text-secondary);
+      }
+      .tab.active {
+        background: var(--accent);
+        color: white;
+      }
+
+      /* Hidden utility */
+      .hidden {
+        display: none !important;
+      }
+
+      /* Responsive */
+      @media (max-width: 640px) {
+        .header {
+          padding: 1rem;
+        }
+        .main {
+          padding: 1rem;
+        }
+        .stats-grid {
+          grid-template-columns: 1fr 1fr;
+        }
+        .staking-grid {
+          grid-template-columns: 1fr;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <!-- Header -->
+    <header class="header">
+      <div class="logo">
+        <div class="logo-icon">Z</div>
+        <span class="logo-text">StarkZap</span>
+      </div>
+      <div class="network-badge">
+        <span class="network-dot"></span>
+        <span id="network-name">Sepolia Testnet</span>
+      </div>
+    </header>
+
+    <div class="app">
+      <!-- Sidebar -->
+      <aside class="sidebar">
+        <div class="connect-section">
+          <div class="section-title">Connect Wallet</div>
+          <div id="connect-buttons" class="connect-buttons">
+            <button id="btn-cartridge" class="btn btn-cartridge">
+              <svg
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+              >
+                <path d="M12 2L2 7l10 5 10-5-10-5z" />
+                <path d="M2 17l10 5 10-5" />
+                <path d="M2 12l10 5 10-5" />
+              </svg>
+              Cartridge
+            </button>
+            <button id="btn-argent" class="btn btn-argent">
+              <svg
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+              >
+                <circle cx="12" cy="12" r="10" />
+                <path d="M12 6v6l4 2" />
+              </svg>
+              Argent X
+            </button>
+            <button id="btn-braavos" class="btn btn-braavos">
+              <svg
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+              >
+                <path
+                  d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"
+                />
+              </svg>
+              Braavos
+            </button>
+          </div>
+
+          <!-- Wallet Info (shown when connected) -->
+          <div id="wallet-info" class="wallet-info">
+            <div class="wallet-address-box">
+              <div class="wallet-label">Wallet Address</div>
+              <div style="display: flex; align-items: center">
+                <span id="wallet-address" class="wallet-address">—</span>
+                <button id="btn-copy" class="copy-btn" title="Copy address">
+                  <svg
+                    width="14"
+                    height="14"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                  >
+                    <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+                    <path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+
+            <div class="status-row">
+              <span class="status-label">Status</span>
+              <span id="wallet-status" class="status-value status-checking"
+                >Checking...</span
+              >
+            </div>
+            <div class="status-row">
+              <span class="status-label">Network</span>
+              <span id="wallet-network" class="status-value">—</span>
+            </div>
+            <div class="status-row">
+              <span class="status-label">Type</span>
+              <span id="wallet-type" class="status-value">—</span>
+            </div>
+
+            <button
+              id="btn-disconnect"
+              class="btn btn-disconnect"
+              style="width: 100%; margin-top: 1rem"
+            >
+              Disconnect
+            </button>
+          </div>
+        </div>
+      </aside>
+
+      <!-- Main Content -->
+      <main class="main">
+        <!-- Stats Overview -->
+        <div class="stats-grid">
+          <div class="stat-card">
+            <div class="stat-icon balance">💰</div>
+            <div class="stat-label">Total Balance</div>
+            <div id="stat-balance" class="stat-value">$0.00</div>
+            <div class="stat-change positive" id="stat-balance-change">—</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon staking">🔒</div>
+            <div class="stat-label">Staked</div>
+            <div id="stat-staked" class="stat-value">0 STRK</div>
+            <div class="stat-change positive" id="stat-apy">— APY</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon transactions">📤</div>
+            <div class="stat-label">Transactions</div>
+            <div id="stat-tx" class="stat-value">0</div>
+            <div class="stat-change" id="stat-tx-pending">—</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon gas">⛽</div>
+            <div class="stat-label">Gas Saved</div>
+            <div id="stat-gas" class="stat-value">$0.00</div>
+            <div class="stat-change positive">Sponsored tx</div>
+          </div>
+        </div>
+
+        <!-- Tabs -->
+        <div class="tabs">
+          <button class="tab active" data-tab="balances">Balances</button>
+          <button class="tab" data-tab="staking">Staking</button>
+          <button class="tab" data-tab="activity">Activity</button>
+        </div>
+
+        <!-- Balances Tab -->
+        <div id="tab-balances" class="tab-content">
+          <div class="card">
+            <div class="card-header">
+              <span class="card-title">Token Balances</span>
+              <button id="btn-refresh-balances" class="refresh-btn">
+                ↻ Refresh
+              </button>
+            </div>
+            <div id="token-list" class="card-body token-list">
+              <div class="empty-state">
+                <div class="empty-icon">💳</div>
+                <div class="empty-title">No wallet connected</div>
+                <div class="empty-desc">
+                  Connect your wallet to view balances
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Staking Tab -->
+        <div id="tab-staking" class="tab-content hidden">
+          <div class="card">
+            <div class="card-header">
+              <span class="card-title">Staking Positions</span>
+              <button id="btn-refresh-staking" class="refresh-btn">
+                ↻ Refresh
+              </button>
+            </div>
+            <div id="staking-list" class="card-body">
+              <div class="empty-state">
+                <div class="empty-icon">🔒</div>
+                <div class="empty-title">No staking positions</div>
+                <div class="empty-desc">
+                  Connect wallet to view staking positions
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Activity Tab -->
+        <div id="tab-activity" class="tab-content hidden">
+          <div class="card">
+            <div class="card-header">
+              <span class="card-title">Recent Activity</span>
+              <button id="btn-refresh-activity" class="refresh-btn">
+                ↻ Refresh
+              </button>
+            </div>
+            <div id="activity-list" class="card-body tx-list">
+              <div class="empty-state">
+                <div class="empty-icon">📝</div>
+                <div class="empty-title">No recent activity</div>
+                <div class="empty-desc">Transactions will appear here</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </main>
+    </div>
+
+    <script type="module" src="/main.ts"></script>
+  </body>
+</html>
