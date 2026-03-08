@@ -39,6 +39,7 @@ import {
   BRAAVOS_IMPL_CLASS_HASH,
   OpenZeppelinPreset,
 } from "@/account/presets";
+import { SponsorshipNotAvailableError } from "@/errors/sponsorship";
 
 // Braavos factory address (same on Sepolia and Mainnet)
 const BRAAVOS_FACTORY_ADDRESS =
@@ -480,44 +481,68 @@ export class Wallet extends BaseWallet {
   async execute(calls: Call[], options: ExecuteOptions = {}): Promise<Tx> {
     const feeMode = options.feeMode ?? this.defaultFeeMode;
     const timeBounds = options.timeBounds ?? this.defaultTimeBounds;
+    const { fallbackTo, onFallback } = options;
 
     let transactionHash: string;
 
     if (feeMode === "sponsored") {
-      const deployed = await this.isDeployed();
-      if (deployed) {
-        transactionHash = (
-          await this.account.executePaymasterTransaction(
-            calls,
-            sponsoredDetails(timeBounds)
-          )
-        ).transaction_hash;
-      } else {
-        transactionHash = await this.withSponsoredDeployLock(async () => {
-          const recheckedDeployed = await this.isDeployed();
-          if (recheckedDeployed) {
-            return (
-              await this.account.executePaymasterTransaction(
-                calls,
-                sponsoredDetails(timeBounds)
-              )
-            ).transaction_hash;
+      try {
+        const deployed = await this.isDeployed();
+        if (deployed) {
+          transactionHash = (
+            await this.account.executePaymasterTransaction(
+              calls,
+              sponsoredDetails(timeBounds)
+            )
+          ).transaction_hash;
+        } else {
+          transactionHash = await this.withSponsoredDeployLock(async () => {
+            const recheckedDeployed = await this.isDeployed();
+            if (recheckedDeployed) {
+              return (
+                await this.account.executePaymasterTransaction(
+                  calls,
+                  sponsoredDetails(timeBounds)
+                )
+              ).transaction_hash;
+            }
+
+            try {
+              return (await this.deployPaymasterWith(calls, timeBounds)).hash;
+            } catch (error) {
+              if (!isAlreadyDeployedError(error)) {
+                throw error;
+              }
+              return (
+                await this.account.executePaymasterTransaction(
+                  calls,
+                  sponsoredDetails(timeBounds)
+                )
+              ).transaction_hash;
+            }
+          });
+        }
+      } catch (error) {
+        // If fallback is configured, try to fall back
+        if (fallbackTo) {
+          const structuredError =
+            SponsorshipNotAvailableError.fromError(error);
+
+          // Notify caller about fallback
+          if (onFallback && structuredError instanceof SponsorshipNotAvailableError) {
+            onFallback(structuredError);
           }
 
-          try {
-            return (await this.deployPaymasterWith(calls, timeBounds)).hash;
-          } catch (error) {
-            if (!isAlreadyDeployedError(error)) {
-              throw error;
-            }
-            return (
-              await this.account.executePaymasterTransaction(
-                calls,
-                sponsoredDetails(timeBounds)
-              )
-            ).transaction_hash;
-          }
-        });
+          // Retry with fallback fee mode
+          // eslint-disable-next-line @typescript-eslint/no-unused-vars
+          const { fallbackTo: _, onFallback: __, ...restOptions } = options;
+          return this.execute(calls, {
+            ...restOptions,
+            feeMode: fallbackTo,
+          });
+        }
+
+        throw error;
       }
     } else {
       const deployed = await this.isDeployed();

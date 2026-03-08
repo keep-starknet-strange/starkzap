@@ -149,9 +149,10 @@ export class SponsorshipNotAvailableError extends Error {
     }
 
     if (
-      message.includes("network") ||
-      message.includes("chain") ||
-      message.includes("not available on")
+      message.includes("network not supported") ||
+      message.includes("chain not supported") ||
+      message.includes("not available on this network") ||
+      message.includes("not available on this chain")
     ) {
       return new SponsorshipNotAvailableError("network_unavailable", {
         originalError: error,
