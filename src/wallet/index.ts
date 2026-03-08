@@ -529,8 +529,10 @@ export class Wallet extends BaseWallet {
           // Call onFallback callback if provided
           options.onFallback?.(structured);
 
-          // If fallbackTo is set, retry with that fee mode
-          if (options.fallbackTo !== undefined) {
+          // Only attempt fallback if:
+          // 1. fallbackTo is set
+          // 2. fallbackFeeRequired is true (user can pay fees)
+          if (options.fallbackTo !== undefined && structured.fallbackFeeRequired) {
             // eslint-disable-next-line @typescript-eslint/no-unused-vars
             const { fallbackTo, onFallback, ...restOptions } = options;
             return this.execute(calls, {

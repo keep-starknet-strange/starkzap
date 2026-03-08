@@ -116,17 +116,30 @@ export class SponsorshipNotAvailableError extends Error {
     }
 
     if (!(error instanceof Error)) {
-      // Only treat non-Error values as sponsorship errors if the string suggests it
+      // Only treat non-Error values as sponsorship errors if the string strongly suggests it
+      // Require both a sponsorship keyword AND a failure indicator to avoid false positives
       const message = String(error).toLowerCase();
-      if (
+      
+      const hasSponsorKeyword =
         message.includes("sponsor") ||
         message.includes("paymaster") ||
-        message.includes("policy")
-      ) {
+        message.includes("sponsored");
+      
+      const hasFailureIndicator =
+        message.includes("not available") ||
+        message.includes("failed") ||
+        message.includes("error") ||
+        message.includes("exceeded") ||
+        message.includes("unsupported") ||
+        message.includes("invalid");
+
+      if (hasSponsorKeyword && hasFailureIndicator) {
         return new SponsorshipNotAvailableError("unknown", {
           message: String(error),
+          fallbackFeeRequired: true,
         });
       }
+      
       // Return a generic Error for non-sponsorship related non-Error values
       return new Error(String(error));
     }
@@ -158,10 +171,21 @@ export class SponsorshipNotAvailableError extends Error {
       });
     }
 
+    // Be more specific to avoid matching unrelated network/chain errors
     if (
-      message.includes("network") ||
-      message.includes("chain") ||
-      message.includes("not available on")
+      message.includes("sponsored") &&
+      (message.includes("not available") || message.includes("unavailable"))
+    ) {
+      return new SponsorshipNotAvailableError("network_unavailable", {
+        originalError: error,
+        fallbackFeeRequired: false,
+      });
+    }
+
+    // Match "network not supported for sponsorship" patterns specifically
+    if (
+      (message.includes("network") || message.includes("chain")) &&
+      (message.includes("sponsored") || message.includes("sponsor") || message.includes("paymaster"))
     ) {
       return new SponsorshipNotAvailableError("network_unavailable", {
         originalError: error,
