@@ -1,4 +1,4 @@
-import type { Address } from "@/types";
+import { fromAddress, type Address } from "@/types";
 
 /**
  * Interface for read-only wallet operations.
@@ -52,8 +52,10 @@ export interface ReadonlyWalletInterface {
 export class ReadonlyWallet implements ReadonlyWalletInterface {
   readonly address: Address;
 
-  constructor(address: Address) {
-    this.address = address;
+  constructor(address: Address | string) {
+    // Validate and normalize the address using fromAddress
+    // This ensures the address is a valid Starknet address format
+    this.address = fromAddress(address);
   }
 }
 
@@ -97,11 +99,28 @@ export function isReadonlyWallet(
 /**
  * Type guard to check if a value is an Address string.
  *
+ * Validates that the value is a valid Starknet address format:
+ * - Starts with "0x"
+ * - Contains only hex characters
+ * - Is between 3 and 66 characters (felt252 or full 252-bit address)
+ *
  * @param value - The value to check
- * @returns True if the value is a string that looks like a Starknet address
+ * @returns True if the value is a valid Starknet address string
  */
 export function isAddress(value: unknown): value is Address {
   if (typeof value !== "string") return false;
-  // Starknet addresses are hex strings starting with 0x
-  return value.startsWith("0x") && value.length >= 3;
+  
+  // Must start with 0x
+  if (!value.startsWith("0x")) return false;
+  
+  // Remove 0x prefix
+  const hex = value.slice(2);
+  
+  // Must be valid hex characters only
+  if (!/^[0-9a-fA-F]*$/.test(hex)) return false;
+  
+  // Starknet addresses are felt252, which can be 1-63 hex chars (0-2^252-1)
+  // Full 252-bit addresses are 64 hex chars
+  // Minimum is 1 hex char after 0x (felt252 can be small)
+  return hex.length >= 1 && hex.length <= 64;
 }
