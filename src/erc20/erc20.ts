@@ -1,5 +1,5 @@
 import { type Address, Amount, type ExecuteOptions, type Token } from "@/types";
-import type { WalletInterface } from "@/wallet";
+import type { WalletInterface, ReadonlyWalletInterface } from "@/wallet";
 import {
   type Call,
   Contract,
@@ -12,6 +12,14 @@ import {
 } from "starknet";
 import type { Tx } from "@/tx";
 import { ABI as ERC20_ABI } from "@/abi/erc20";
+
+/**
+ * Type for balance queries - accepts either a full wallet or just an address.
+ *
+ * This allows read-only balance queries without requiring a fully initialized
+ * wallet with signing capabilities.
+ */
+export type BalanceQueryTarget = WalletInterface | ReadonlyWalletInterface | Address;
 
 /**
  * ERC20 token interaction helper.
@@ -130,26 +138,43 @@ export class Erc20 {
   }
 
   /**
-   * Get the balance in a wallet.
-   * @param wallet - Wallet to check the balance of
+   * Get the balance of an address.
+   *
+   * Accepts either a full wallet interface or just an address for read-only queries.
+   * This is useful for server-side rendering, API routes, and analytics dashboards
+   * where you want to display balances without a signer.
+   *
+   * @param target - Wallet, ReadonlyWallet, or Address to check the balance of
    * @returns Amount representing the token balance
    *
    * @example
    * ```ts
    * const erc20 = wallet.erc20(USDC);
+   *
+   * // With a full wallet
    * const balance = await erc20.balanceOf(wallet);
+   *
+   * // With just an address (read-only)
+   * const balance = await erc20.balanceOf("0x123..." as Address);
+   *
+   * // Or with a ReadonlyWallet
+   * const readonly = new ReadonlyWallet("0x123..." as Address);
+   * const balance = await erc20.balanceOf(readonly);
    *
    * console.log(balance.toUnit());      // "100.5"
    * console.log(balance.toFormatted()); // "100.5 USDC"
    * ```
    */
-  public async balanceOf(wallet: WalletInterface): Promise<Amount> {
+  public async balanceOf(target: BalanceQueryTarget): Promise<Amount> {
+    // Extract address from wallet interface or use directly
+    const address = typeof target === "string" ? target : target.address;
+
     let result: number | bigint | Uint256;
     try {
-      result = await this.contract.balance_of(wallet.address);
+      result = await this.contract.balance_of(address);
     } catch (error) {
       if (error instanceof RpcError && error.isType("ENTRYPOINT_NOT_FOUND")) {
-        result = await this.contract.balanceOf(wallet.address);
+        result = await this.contract.balanceOf(address);
       } else {
         throw error;
       }

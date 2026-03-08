@@ -48,6 +48,12 @@ const NEGATIVE_DEPLOYMENT_CACHE_TTL_MS = 3_000;
 export { type WalletInterface } from "@/wallet/interface";
 export { BaseWallet } from "@/wallet/base";
 export { AccountProvider } from "@/wallet/accounts/provider";
+export {
+  ReadonlyWallet,
+  readonlyWallet,
+  isReadonlyWallet,
+  type ReadonlyWalletInterface,
+} from "@/wallet/readonly";
 
 /**
  * Options for creating a Wallet.

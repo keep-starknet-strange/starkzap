@@ -8,6 +8,12 @@ export type {
 // Wallet
 export { Wallet, AccountProvider, BaseWallet } from "@/wallet";
 export type { WalletInterface, WalletOptions } from "@/wallet";
+export {
+  ReadonlyWallet,
+  readonlyWallet,
+  isReadonlyWallet,
+  type ReadonlyWalletInterface,
+} from "@/wallet";
 
 // Transaction
 export { Tx, TxBuilder } from "@/tx";

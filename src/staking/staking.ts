@@ -17,10 +17,18 @@ import {
 import { ABI as POOL_ABI } from "@/abi/pool";
 import { ABI as STAKING_ABI } from "@/abi/staking";
 import { ABI as ERC20_ABI } from "@/abi/erc20";
-import type { WalletInterface } from "@/wallet";
+import type { WalletInterface, ReadonlyWalletInterface } from "@/wallet";
 import type { Tx } from "@/tx";
 import type { Pool, PoolMember } from "@/types/pool";
 import { groupBy } from "@/utils";
+
+/**
+ * Type for staking queries - accepts either a full wallet or just an address.
+ *
+ * This allows read-only staking position queries without requiring a fully
+ * initialized wallet with signing capabilities.
+ */
+export type StakingQueryTarget = WalletInterface | ReadonlyWalletInterface | Address;
 
 const DEFAULT_FROM_POOL_TIMEOUT_MS = 20_000;
 
@@ -183,18 +191,25 @@ export class Staking {
   }
 
   /**
-   * Check if a wallet is a member of this delegation pool.
+   * Check if an address is a member of this delegation pool.
    *
-   * @param wallet - The wallet to check
-   * @returns True if the wallet is a pool member, false otherwise
+   * Accepts either a full wallet interface or just an address for read-only queries.
+   *
+   * @param target - Wallet, ReadonlyWallet, or Address to check
+   * @returns True if the address is a pool member, false otherwise
    */
-  async isMember(wallet: WalletInterface): Promise<boolean> {
-    const member = await this.pool.get_pool_member_info_v1(wallet.address);
+  async isMember(target: StakingQueryTarget): Promise<boolean> {
+    const address = typeof target === "string" ? target : target.address;
+    const member = await this.pool.get_pool_member_info_v1(address);
     return member.isSome();
   }
 
   /**
-   * Get the current staking position for a wallet in this pool.
+   * Get the current staking position for an address in this pool.
+   *
+   * Accepts either a full wallet interface or just an address for read-only queries.
+   * This is useful for server-side rendering, API routes, and analytics dashboards
+   * where you want to display staking positions without a signer.
    *
    * Returns detailed information about the delegator's stake including:
    * - Staked amount
@@ -202,20 +217,26 @@ export class Staking {
    * - Exit/unpooling status
    * - Commission rate
    *
-   * @param wallet - The wallet to query
+   * @param target - Wallet, ReadonlyWallet, or Address to query
    * @returns The pool member position, or null if not a member
    *
    * @example
    * ```ts
+   * // With a full wallet
    * const position = await staking.getPosition(wallet);
+   *
+   * // With just an address (read-only)
+   * const position = await staking.getPosition("0x123..." as Address);
+   *
    * if (position) {
    *   console.log(`Staked: ${position.staked.toFormatted()}`);
    *   console.log(`Rewards: ${position.rewards.toFormatted()}`);
    * }
    * ```
    */
-  async getPosition(wallet: WalletInterface): Promise<PoolMember | null> {
-    const memberInfo = await this.pool.get_pool_member_info_v1(wallet.address);
+  async getPosition(target: StakingQueryTarget): Promise<PoolMember | null> {
+    const address = typeof target === "string" ? target : target.address;
+    const memberInfo = await this.pool.get_pool_member_info_v1(address);
 
     if (memberInfo.isNone()) {
       return null;
