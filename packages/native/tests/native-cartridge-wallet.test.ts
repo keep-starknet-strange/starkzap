@@ -44,7 +44,9 @@ describe("NativeCartridgeWallet", () => {
       feeMode: "sponsored",
     });
     expect(tx.hash).toBe("0xfeed");
-    expect(session.account.executePaymasterTransaction).toHaveBeenCalledTimes(1);
+    expect(session.account.executePaymasterTransaction).toHaveBeenCalledTimes(
+      1
+    );
   });
 
   it("rejects user_pays execution", async () => {
@@ -62,7 +64,9 @@ describe("NativeCartridgeWallet", () => {
 
   it("rejects deploy and deploy-driven ensureReady", async () => {
     const undeployedProvider = {
-      getClassHashAt: vi.fn().mockRejectedValue(new Error("contract not found")),
+      getClassHashAt: vi
+        .fn()
+        .mockRejectedValue(new Error("contract not found")),
     } as unknown as RpcProvider;
     const wallet = await NativeCartridgeWallet.create({
       session,
@@ -90,4 +94,3 @@ describe("NativeCartridgeWallet", () => {
     expect(session.disconnect).toHaveBeenCalledTimes(1);
   });
 });
-

@@ -1,8 +1,4 @@
-import {
-  BaseWallet,
-  Tx,
-  fromAddress,
-} from "starkzap";
+import { BaseWallet, Tx, fromAddress } from "starkzap";
 import type {
   ChainId,
   DeployOptions,
@@ -55,11 +51,11 @@ function isContractNotFound(error: unknown): boolean {
 }
 
 function unsupportedDeployMessage(): string {
-  return "Native Cartridge wallet does not support deployment in this release. Use deploy: \"never\" and sponsored session execution.";
+  return 'Native Cartridge wallet does not support deployment in this release. Use deploy: "never" and sponsored session execution.';
 }
 
 function unsupportedUserPaysMessage(): string {
-  return "Native Cartridge wallet currently supports sponsored session execution only. Use feeMode: \"sponsored\".";
+  return 'Native Cartridge wallet currently supports sponsored session execution only. Use feeMode: "sponsored".';
 }
 
 export interface NativeCartridgeWalletOptions {
@@ -215,9 +211,14 @@ export class NativeCartridgeWallet extends BaseWallet {
         { type: "INVOKE", payload: options.calls },
       ]);
       const first = simulation[0] as
-        | { transaction_trace?: { execute_invocation?: { revert_reason?: string } } }
+        | {
+            transaction_trace?: {
+              execute_invocation?: { revert_reason?: string };
+            };
+          }
         | undefined;
-      const reason = first?.transaction_trace?.execute_invocation?.revert_reason;
+      const reason =
+        first?.transaction_trace?.execute_invocation?.revert_reason;
       if (reason) {
         return { ok: false, reason };
       }

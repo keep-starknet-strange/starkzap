@@ -1,8 +1,8 @@
 import {
   type PaymasterOptions,
   RpcProvider,
-  CairoFelt252,
   constants,
+  shortString,
 } from "starknet";
 import type { NetworkPreset, NetworkName } from "@/network";
 import type { Address } from "@/types";
@@ -11,6 +11,27 @@ import type { Address } from "@/types";
 export type ChainIdLiteral = "SN_MAIN" | "SN_SEPOLIA";
 
 const VALID_CHAIN_IDS: readonly string[] = ["SN_MAIN", "SN_SEPOLIA"];
+
+function decodeFelt252ToAscii(felt252: string): string {
+  try {
+    return shortString.decodeShortString(felt252);
+  } catch {
+    const hex = felt252.startsWith("0x")
+      ? felt252.slice(2)
+      : BigInt(felt252).toString(16);
+    const normalizedHex = hex.length % 2 === 0 ? hex : `0${hex}`;
+
+    let decoded = "";
+    for (let i = 0; i < normalizedHex.length; i += 2) {
+      const byte = Number.parseInt(normalizedHex.slice(i, i + 2), 16);
+      if (!Number.isFinite(byte) || byte === 0) {
+        continue;
+      }
+      decoded += String.fromCharCode(byte);
+    }
+    return decoded;
+  }
+}
 
 /**
  * Represents a Starknet chain identifier.
@@ -83,7 +104,7 @@ export class ChainId {
    * @throws Error if the decoded value is not a supported chain
    */
   static fromFelt252(felt252: string): ChainId {
-    const decoded = new CairoFelt252(felt252).decodeUtf8();
+    const decoded = decodeFelt252ToAscii(felt252);
     if (!VALID_CHAIN_IDS.includes(decoded)) {
       throw new Error(
         `Unsupported chain ID: "${decoded}". Expected one of: ${VALID_CHAIN_IDS.join(", ")}`
