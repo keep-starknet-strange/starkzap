@@ -1,4 +1,4 @@
-import type { Address, Token, ExecuteOptions, Amount } from "@/types";
+import type { Address, ExecuteOptions, Amount } from "@/types";
 import type { WalletInterface } from "@/wallet";
 import type { Tx } from "@/tx";
 import type {
@@ -8,7 +8,7 @@ import type {
   CipherBalance,
   ConfidentialTransfer,
   TongoOptions,
-} from "./types";
+} from "@/tongo/types";
 import {
   Contract,
   type RpcProvider,
@@ -108,8 +108,22 @@ export class Tongo {
 
       return result;
     } catch (error) {
-      // Account doesn't exist yet
-      return null;
+      // Only return null for explicit "account missing" conditions
+      // Rethrow network/ABI/decode failures so caller can surface/retry
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      const isMissingAccount =
+        errorMessage.includes("not found") ||
+        errorMessage.includes("does not exist") ||
+        errorMessage.includes("no record") ||
+        errorMessage.includes("no entry");
+
+      if (isMissingAccount) {
+        // Account doesn't exist yet
+        return null;
+      }
+
+      // Rethrow all other errors (RPC failures, ABI issues, etc.)
+      throw error;
     }
   }
 
