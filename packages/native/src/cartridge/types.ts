@@ -42,6 +42,7 @@ export interface CartridgeNativeSessionHandle {
 }
 
 export interface CartridgeNativeAdapter {
-  connect(args: CartridgeNativeConnectArgs): Promise<CartridgeNativeSessionHandle>;
+  connect(
+    args: CartridgeNativeConnectArgs
+  ): Promise<CartridgeNativeSessionHandle>;
 }
-

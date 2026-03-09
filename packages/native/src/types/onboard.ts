@@ -1,7 +1,4 @@
-import type {
-  FeeMode,
-  OnboardOptions as CoreOnboardOptions,
-} from "starkzap";
+import type { FeeMode, OnboardOptions as CoreOnboardOptions } from "starkzap";
 import type { PaymasterTimeBounds } from "starknet";
 
 type CoreCartridgeOnboardOptions = Extract<
@@ -14,7 +11,9 @@ type CoreNonCartridgeOnboardOptions = Exclude<
   CoreCartridgeOnboardOptions
 >;
 
-type CoreCartridgeConfig = NonNullable<CoreCartridgeOnboardOptions["cartridge"]>;
+type CoreCartridgeConfig = NonNullable<
+  CoreCartridgeOnboardOptions["cartridge"]
+>;
 
 export interface NativeOnboardCartridgeConfig extends CoreCartridgeConfig {
   redirectUrl?: string;

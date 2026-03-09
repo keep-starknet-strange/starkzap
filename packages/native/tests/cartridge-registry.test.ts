@@ -52,4 +52,3 @@ describe("cartridge native adapter registry", () => {
     );
   });
 });
-
