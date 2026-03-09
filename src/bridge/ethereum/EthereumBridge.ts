@@ -4,10 +4,12 @@ import {
   Amount,
   type EthereumAddress,
   EthereumBridgeToken,
+  fromAddress,
   fromEthereumAddress,
 } from "@/types";
 import type { EthereumTokenInterface } from "@/bridge/ethereum/EthereumToken";
 import {
+  type ApprovalFeeEstimation,
   ethereumAddress,
   type EthereumTransactionDetails,
   type EthereumWalletConfig,
@@ -15,22 +17,31 @@ import {
 import {
   Contract,
   type ContractTransaction,
-  ContractTransactionReceipt,
+  type ContractTransactionReceipt,
   type ContractTransactionResponse,
   isError,
   toBigInt,
 } from "ethers";
 import {
+  FeeErrorCause,
   StarkzapTransactionError,
   TransactionErrorCause,
 } from "@/types/errors";
 import { type PRICE_UNIT, RPC, uint256 } from "starknet";
 import type { WalletInterface } from "@/wallet";
 import BRIDGE_ABI from "@/abi/ethereum/canonicalBridge.json";
+import type { FeeEstimation } from "@/bridge/types/generics";
 
 export abstract class EthereumBridge implements BridgeInterface<EthereumBridgeToken> {
   public static readonly ALLOWANCE_CACHE_TTL = 60_000;
   public static readonly GAS_LIMIT_SAFE_MULTIPLIER = 1.5;
+  private static readonly DUMMY_SN_ADDRESS = fromAddress(
+    "0x023123100123103023123acb1231231231231031231ca123f23123123123100a"
+  );
+  private static readonly DUMMY_ETH_ADDRESS = fromEthereumAddress(
+    "0x023123100123103023123acb1231231231231031"
+  );
+  private static readonly DEFAULT_ESTIMATED_DEPOSIT_GAS_REQUIREMENT = 154744n;
 
   private allowanceCache: {
     current: Amount | null;
@@ -60,25 +71,65 @@ export abstract class EthereumBridge implements BridgeInterface<EthereumBridgeTo
     recipient: Address,
     amount: Amount
   ): Promise<ContractTransactionResponse> {
-    // In case that the token is an erc20, we need to approve the allowance
     await this.approveSpendingOf(amount);
 
-    const transactionDetails = await this.prepareDepositTransactionDetails(
+    const details = await this.prepareDepositTransactionDetails(
       recipient,
       amount
     );
-    // Calculate the gas limit with some added for safety
-    const safeGasLimit = await this.getSafeGasLimitValue(transactionDetails);
-    const preparedTransaction = await this.prepareTransaction(
-      transactionDetails,
-      safeGasLimit
-    );
-
-    const response = await this.execute(preparedTransaction);
+    const tx = await this.populateTransaction(details);
+    const gasLimit = await this.estimateEthereumSafeGasLimitForTx(tx);
+    const response = await this.execute({ ...tx, gasLimit });
 
     this.clearCachedAllowance();
 
     return response;
+  }
+
+  async getDepositFeeEstimate(): Promise<FeeEstimation<EthereumBridgeToken>> {
+    const minimalAmount = await this.token.amount(1n);
+
+    const [allowance, l1ToL2MessageFee, approvalFeeEstimation] =
+      await Promise.all([
+        this.getAllowance(),
+        this.estimateL1ToL2MessageFee(
+          EthereumBridge.DUMMY_SN_ADDRESS,
+          minimalAmount
+        ),
+        this.estimateApprovalFee(),
+      ]);
+
+    const { fee: l2Fee, unit, l2FeeError } = l1ToL2MessageFee;
+    const { approvalFee, approvalFeeError } = approvalFeeEstimation;
+
+    let l1Fee: bigint;
+    let l1FeeError: FeeErrorCause | undefined;
+
+    const needsFallback = allowance !== null && allowance.isZero();
+    if (needsFallback) {
+      l1Fee =
+        EthereumBridge.DEFAULT_ESTIMATED_DEPOSIT_GAS_REQUIREMENT *
+        (await this.getEthereumGasPrice());
+    } else {
+      const details = await this.prepareDepositTransactionDetails(
+        EthereumBridge.DUMMY_SN_ADDRESS,
+        minimalAmount
+      );
+      const tx = await this.populateTransaction(details);
+      const estimate = await this.estimateEthereumGasFeeForTx(tx);
+      l1Fee = estimate.gasFee;
+      l1FeeError = estimate.error;
+    }
+
+    return {
+      l1Fee,
+      l1FeeError,
+      l2Fee,
+      l2FeeUnit: unit === "WEI" ? "eth" : "strk",
+      l2FeeError,
+      approvalFee,
+      approvalFeeError,
+    };
   }
 
   async getAvailableDepositBalance(account: EthereumAddress): Promise<Amount> {
@@ -116,29 +167,25 @@ export abstract class EthereumBridge implements BridgeInterface<EthereumBridgeTo
 
     const allowance = await this.getAllowance();
     if (!allowance) {
-      console.log("No approve needed");
       return;
     }
 
-    if (allowance.lt(amount)) {
-      // Send TX
-      const tx = await this.getApprovalTransaction(spender, amount);
-      if (!tx) {
-        return;
-      }
-
-      const response = await this.execute(tx);
-      const receipt = await response.wait();
-      if (!receipt?.status) {
-        throw new StarkzapTransactionError(
-          TransactionErrorCause.APPROVE_FAILED
-        );
-      }
-
-      await this.updateAllowanceFromReceipt(receipt);
-    } else {
-      console.log("No approve needed");
+    if (!allowance.lt(amount)) {
+      return;
     }
+
+    const tx = await this.getApprovalTransaction(spender, amount);
+    if (!tx) {
+      return;
+    }
+
+    const response = await this.execute(tx);
+    const receipt = await response.wait();
+    if (!receipt?.status) {
+      throw new StarkzapTransactionError(TransactionErrorCause.APPROVE_FAILED);
+    }
+
+    await this.updateAllowanceFromReceipt(receipt);
   }
 
   protected async getApprovalTransaction(
@@ -226,13 +273,10 @@ export abstract class EthereumBridge implements BridgeInterface<EthereumBridgeTo
 
     const approvalLog = receipt.logs.find((log) => {
       const parsedLog = tokenInterface.parseLog(log);
-      if (parsedLog?.name === "Approval" && parsedLog.args) {
-        const approvedAmount = parsedLog.args.value;
-        return typeof approvedAmount === "bigint";
-      }
-
-      // TODO check that
-      return;
+      return (
+        parsedLog?.name === "Approval" &&
+        typeof parsedLog.args?.value === "bigint"
+      );
     });
 
     if (approvalLog) {
@@ -249,16 +293,16 @@ export abstract class EthereumBridge implements BridgeInterface<EthereumBridgeTo
     recipient: Address,
     amount: Amount
   ): Promise<bigint> {
-    const { fee } = await this.estimateL1ToL2MessageFeeValue(recipient, amount);
+    const { fee } = await this.estimateL1ToL2MessageFee(recipient, amount);
 
     const bridgedEthAmount = this.token.isNativeEth() ? amount.toBase() : 0n;
     return fee + bridgedEthAmount;
   }
 
-  private async estimateL1ToL2MessageFeeValue(
+  private async estimateL1ToL2MessageFee(
     recipient: Address,
     amount: Amount
-  ): Promise<{ fee: bigint; unit: PRICE_UNIT }> {
+  ): Promise<{ fee: bigint; unit: PRICE_UNIT; l2FeeError?: FeeErrorCause }> {
     try {
       const { low, high } = uint256.bnToUint256(amount.toBase());
       const l1Message: RPC.RPCSPEC010.L1Message = {
@@ -279,36 +323,95 @@ export abstract class EthereumBridge implements BridgeInterface<EthereumBridgeTo
         .estimateMessageFee(l1Message);
 
       return { fee: BigInt(overall_fee), unit };
-    } catch (error) {
-      console.error("Estimate L1->L2 fee error", error);
-      return { fee: 0n, unit: "WEI" };
+    } catch {
+      return {
+        fee: 0n,
+        unit: "WEI",
+        l2FeeError: FeeErrorCause.GENERIC_L2_FEE_ERROR,
+      };
     }
   }
 
-  private async getSafeGasLimitValue(
-    transactionDetails: EthereumTransactionDetails
-  ): Promise<bigint> {
-    const preparedTransaction =
-      await this.prepareTransaction(transactionDetails);
-    const estimatedGas =
-      await this.config.provider.estimateGas(preparedTransaction);
+  private async estimateApprovalFee(): Promise<ApprovalFeeEstimation> {
+    if (this.token.isNativeEth()) {
+      return { approvalFee: 0n };
+    }
 
+    const contract = this.token.getContract();
+    if (!contract) {
+      return {
+        approvalFee: 0n,
+        approvalFeeError: FeeErrorCause.NO_TOKEN_CONTRACT,
+      };
+    }
+
+    try {
+      const approvalTransaction = await this.getApprovalTransaction(
+        EthereumBridge.DUMMY_ETH_ADDRESS,
+        await this.token.amount(1n)
+      );
+      if (!approvalTransaction) {
+        return {
+          approvalFee: 0n,
+          approvalFeeError: FeeErrorCause.NO_TOKEN_CONTRACT,
+        };
+      }
+
+      const [approvalGasRequirement, gasPrice] = await Promise.all([
+        this.config.provider.estimateGas(approvalTransaction),
+        this.getEthereumGasPrice(),
+      ]);
+
+      const approvalFee: bigint = approvalGasRequirement * gasPrice;
+      return { approvalFee };
+    } catch {
+      return {
+        approvalFee: 0n,
+        approvalFeeError: FeeErrorCause.APPROVAL_FEE_ERROR,
+      };
+    }
+  }
+
+  private async populateTransaction(
+    details: EthereumTransactionDetails
+  ): Promise<ContractTransaction> {
+    return await this.bridge
+      .getFunction(details.method)
+      .populateTransaction(...details.args, details.transaction);
+  }
+
+  private async estimateEthereumSafeGasLimitForTx(
+    tx: ContractTransaction
+  ): Promise<bigint> {
+    const estimated = await this.config.provider.estimateGas(tx);
     return (
-      (estimatedGas *
+      (estimated *
         toBigInt(Math.ceil(EthereumBridge.GAS_LIMIT_SAFE_MULTIPLIER * 100))) /
       100n
     );
   }
 
-  private async prepareTransaction(
-    transactionDetails: EthereumTransactionDetails,
-    gasLimit?: bigint | undefined
-  ): Promise<ContractTransaction> {
-    return await this.bridge
-      .getFunction(transactionDetails.method)
-      .populateTransaction(...transactionDetails.args, {
-        ...transactionDetails.transaction,
-        ...(gasLimit ? { gasLimit } : {}),
-      });
+  private async estimateEthereumGasFeeForTx(
+    tx: ContractTransaction
+  ): Promise<{ gasFee: bigint; error?: FeeErrorCause }> {
+    try {
+      const [gasUnits, gasPrice] = await Promise.all([
+        this.config.provider.estimateGas(tx),
+        this.getEthereumGasPrice(),
+      ]);
+      return { gasFee: gasUnits * gasPrice };
+    } catch {
+      return { gasFee: 0n, error: FeeErrorCause.GENERIC_L1_FEE_ERROR };
+    }
+  }
+
+  private async getEthereumGasPrice(): Promise<bigint> {
+    const gasData = await this.config.provider.getFeeData();
+    const gasPrice = gasData.gasPrice ?? 0n;
+    const maxFeePerGas = gasData.maxFeePerGas;
+
+    return maxFeePerGas && gasData.maxPriorityFeePerGas
+      ? maxFeePerGas
+      : gasPrice;
   }
 }

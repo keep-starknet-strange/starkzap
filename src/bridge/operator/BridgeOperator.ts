@@ -3,18 +3,38 @@ import { BridgeToken, EthereumBridgeToken } from "@/types/bridge/bridge-token";
 import type { BridgeInterface } from "@/bridge/types/BridgeInterface";
 import { CanonicalEthereumBridge } from "@/bridge/ethereum/CanonicalEthereumBridge";
 import { Protocol } from "@/types/bridge/protocol";
-import { isTokenForChain } from "@/bridge/types/generics";
+import {
+  type FeeEstimation,
+  isTokenForChain,
+  type TxResponseFor,
+} from "@/bridge/types/generics";
 import {
   ConnectedEthereumWallet,
   type ConnectedExternalWallet,
 } from "@/connect";
 import type { WalletInterface } from "@/wallet";
 import type { BridgeOperatorInterface } from "@/bridge/operator/BridgeOperatorInterface";
+import type { Address } from "@/types";
+import type { Amount } from "starkzap";
 
 export class BridgeOperator implements BridgeOperatorInterface {
   private cache = new BridgeCache();
 
   constructor(private readonly starknetWallet: WalletInterface) {}
+
+  public async deposit<T extends BridgeToken>(
+    recipient: Address,
+    amount: Amount,
+    token: T,
+    externalWallet: ConnectedExternalWallet<T>
+  ): Promise<TxResponseFor<T>> {
+    const bridge = await this.bridge(
+      token,
+      externalWallet,
+      this.starknetWallet
+    );
+    return bridge.deposit(recipient, amount);
+  }
 
   public async getDepositBalance<T extends BridgeToken>(
     token: T,
@@ -26,6 +46,18 @@ export class BridgeOperator implements BridgeOperatorInterface {
       this.starknetWallet
     );
     return bridge.getAvailableDepositBalance(externalWallet.address);
+  }
+
+  async getDepositFeeEstimate<T extends BridgeToken>(
+    token: T,
+    externalWallet: ConnectedExternalWallet<T>
+  ): Promise<FeeEstimation<T>> {
+    const bridge = await this.bridge(
+      token,
+      externalWallet,
+      this.starknetWallet
+    );
+    return bridge.getDepositFeeEstimate();
   }
 
   public async getAllowance<T extends BridgeToken>(

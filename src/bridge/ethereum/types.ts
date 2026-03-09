@@ -5,6 +5,7 @@ import {
   type Signer,
 } from "ethers";
 import { type EthereumAddress, fromEthereumAddress } from "@/types";
+import type { FeeErrorCause } from "@/types/errors";
 
 export type EthereumWalletConfig = {
   signer: Signer;
@@ -15,6 +16,21 @@ export type EthereumTransactionDetails = {
   method: string;
   args: string[];
   transaction: PreparedTransactionRequest;
+};
+
+export type SnFeeUnit = "eth" | "strk";
+
+export type ApprovalFeeEstimation = {
+  approvalFee: bigint;
+  approvalFeeError?: FeeErrorCause | undefined;
+};
+
+export type EthereumDepositFeeEstimation = ApprovalFeeEstimation & {
+  l1Fee: bigint;
+  l2Fee: bigint;
+  l2FeeUnit: SnFeeUnit;
+  l1FeeError?: FeeErrorCause | undefined;
+  l2FeeError?: FeeErrorCause | undefined;
 };
 
 export async function ethereumAddress(
