@@ -62,6 +62,9 @@ export default function BridgeScreen() {
     fetchBridgeTokens,
     fetchBridgeDepositBalance,
     fetchBridgeAllowance,
+    fetchBridgeDepositFeeEstimate,
+    bridgeDepositFeeEstimate,
+    bridgeDepositFeeLoading,
   } = useWalletStore((state) => state);
 
   useEffect(() => {
@@ -90,6 +93,17 @@ export default function BridgeScreen() {
     connectedEthWallet,
     connectedSolWallet,
     fetchBridgeAllowance,
+  ]);
+
+  useEffect(() => {
+    if (bridgeSelectedToken && bridgeDirection === "to-starknet") {
+      void fetchBridgeDepositFeeEstimate();
+    }
+  }, [
+    bridgeSelectedToken,
+    bridgeDirection,
+    connectedEthWallet,
+    fetchBridgeDepositFeeEstimate,
   ]);
 
   const prevAddressRef = useRef<string | undefined>(undefined);
@@ -606,6 +620,69 @@ export default function BridgeScreen() {
             ? renderStarknetSection(false)
             : renderExternalChainSection(false)}
         </View>
+
+        {bridgeDirection === "to-starknet" && bridgeSelectedToken ? (
+          <View
+            style={[
+              styles.feeSection,
+              { borderColor, backgroundColor: cardBg },
+            ]}
+          >
+            <ThemedText
+              style={[styles.feeSectionTitle, { color: textSecondary }]}
+            >
+              Estimated Fees
+            </ThemedText>
+            {bridgeDepositFeeLoading ? (
+              <View style={styles.feeRow}>
+                <ActivityIndicator size="small" />
+                <ThemedText style={[styles.feeLabel, { color: textSecondary }]}>
+                  Calculating…
+                </ThemedText>
+              </View>
+            ) : bridgeDepositFeeEstimate ? (
+              <>
+                <View style={styles.feeRow}>
+                  <ThemedText
+                    style={[styles.feeLabel, { color: textSecondary }]}
+                  >
+                    L1 Gas Fee
+                  </ThemedText>
+                  <ThemedText style={styles.feeValue}>
+                    {bridgeDepositFeeEstimate.l1FeeError ??
+                      bridgeDepositFeeEstimate.l1Fee.toFormatted()}
+                  </ThemedText>
+                </View>
+                <View style={styles.feeRow}>
+                  <ThemedText
+                    style={[styles.feeLabel, { color: textSecondary }]}
+                  >
+                    L2 Message Fee
+                  </ThemedText>
+                  <ThemedText style={styles.feeValue}>
+                    {bridgeDepositFeeEstimate.l2FeeError ??
+                      bridgeDepositFeeEstimate.l2Fee.toFormatted()}
+                  </ThemedText>
+                </View>
+                <View style={styles.feeRow}>
+                  <ThemedText
+                    style={[styles.feeLabel, { color: textSecondary }]}
+                  >
+                    Approval Fee
+                  </ThemedText>
+                  <ThemedText style={styles.feeValue}>
+                    {bridgeDepositFeeEstimate.approvalFeeError ??
+                      bridgeDepositFeeEstimate.approvalFee.toFormatted()}
+                  </ThemedText>
+                </View>
+              </>
+            ) : (
+              <ThemedText style={[styles.feeLabel, { color: textSecondary }]}>
+                —
+              </ThemedText>
+            )}
+          </View>
+        ) : null}
       </ScrollView>
     </SafeAreaView>
   );
@@ -837,6 +914,35 @@ const styles = StyleSheet.create({
   percentButtonText: {
     fontSize: 12,
     fontWeight: "700",
+  },
+
+  // Fee section
+  feeSection: {
+    borderWidth: 1,
+    borderRadius: 14,
+    padding: 14,
+    gap: 8,
+  },
+  feeSectionTitle: {
+    fontSize: 12,
+    fontWeight: "600",
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+    marginBottom: 2,
+  },
+  feeRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 8,
+  },
+  feeLabel: {
+    fontSize: 13,
+    fontWeight: "500",
+  },
+  feeValue: {
+    fontSize: 13,
+    fontWeight: "600",
   },
 
   // Toggle direction

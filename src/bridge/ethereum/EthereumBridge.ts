@@ -27,7 +27,7 @@ import {
   StarkzapTransactionError,
   TransactionErrorCause,
 } from "@/types/errors";
-import { type PRICE_UNIT, RPC, uint256 } from "starknet";
+import { RPC, uint256 } from "starknet";
 import type { WalletInterface } from "@/wallet";
 import BRIDGE_ABI from "@/abi/ethereum/canonicalBridge.json";
 import type { FeeEstimation } from "@/bridge/types/generics";
@@ -99,17 +99,18 @@ export abstract class EthereumBridge implements BridgeInterface<EthereumBridgeTo
         this.estimateApprovalFee(),
       ]);
 
-    const { fee: l2Fee, unit, l2FeeError } = l1ToL2MessageFee;
+    const { fee: l2Fee, l2FeeError } = l1ToL2MessageFee;
     const { approvalFee, approvalFeeError } = approvalFeeEstimation;
 
-    let l1Fee: bigint;
+    let l1Fee;
     let l1FeeError: FeeErrorCause | undefined;
 
     const needsFallback = allowance !== null && allowance.isZero();
     if (needsFallback) {
-      l1Fee =
+      const feeDecimal =
         EthereumBridge.DEFAULT_ESTIMATED_DEPOSIT_GAS_REQUIREMENT *
         (await this.getEthereumGasPrice());
+      l1Fee = this.ethAmount(feeDecimal);
     } else {
       const details = await this.prepareDepositTransactionDetails(
         EthereumBridge.DUMMY_SN_ADDRESS,
@@ -125,7 +126,6 @@ export abstract class EthereumBridge implements BridgeInterface<EthereumBridgeTo
       l1Fee,
       l1FeeError,
       l2Fee,
-      l2FeeUnit: unit === "WEI" ? "eth" : "strk",
       l2FeeError,
       approvalFee,
       approvalFeeError,
@@ -139,6 +139,7 @@ export abstract class EthereumBridge implements BridgeInterface<EthereumBridgeTo
   async getAllowance(): Promise<Amount | null> {
     const allowanceSpender = await this.getAllowanceSpender();
     if (!allowanceSpender) {
+      console.error("No allowance spender found");
       return null;
     }
 
@@ -147,14 +148,16 @@ export abstract class EthereumBridge implements BridgeInterface<EthereumBridgeTo
       EthereumBridge.ALLOWANCE_CACHE_TTL
     ) {
       const signerAddress = await this.config.signer.getAddress();
+      console.log("Getting allowance from token");
       const allowance = await this.token.allowance(
         fromEthereumAddress(signerAddress),
         allowanceSpender
       );
-
+      console.log("Updating allowance cache");
       this.setCachedAllowance(allowance);
     }
 
+    console.log("Returning allowance", this.allowanceCache.current);
     return this.allowanceCache.current;
   }
 
@@ -244,7 +247,7 @@ export abstract class EthereumBridge implements BridgeInterface<EthereumBridgeTo
       ],
       transaction: {
         from: signer,
-        value: depositValue,
+        value: depositValue.toBase(),
       },
     };
   }
@@ -292,17 +295,19 @@ export abstract class EthereumBridge implements BridgeInterface<EthereumBridgeTo
   private async getEthDepositValue(
     recipient: Address,
     amount: Amount
-  ): Promise<bigint> {
+  ): Promise<Amount> {
     const { fee } = await this.estimateL1ToL2MessageFee(recipient, amount);
 
-    const bridgedEthAmount = this.token.isNativeEth() ? amount.toBase() : 0n;
-    return fee + bridgedEthAmount;
+    const bridgedEthAmount = this.token.isNativeEth()
+      ? amount
+      : this.ethAmount(0n);
+    return fee.add(bridgedEthAmount);
   }
 
   private async estimateL1ToL2MessageFee(
     recipient: Address,
     amount: Amount
-  ): Promise<{ fee: bigint; unit: PRICE_UNIT; l2FeeError?: FeeErrorCause }> {
+  ): Promise<{ fee: Amount; l2FeeError?: FeeErrorCause }> {
     try {
       const { low, high } = uint256.bnToUint256(amount.toBase());
       const l1Message: RPC.RPCSPEC010.L1Message = {
@@ -322,11 +327,16 @@ export abstract class EthereumBridge implements BridgeInterface<EthereumBridgeTo
         .getProvider()
         .estimateMessageFee(l1Message);
 
-      return { fee: BigInt(overall_fee), unit };
+      const fee = Amount.fromRaw(
+        overall_fee,
+        18,
+        unit === "WEI" ? "ETH" : "STRK"
+      );
+
+      return { fee };
     } catch {
       return {
-        fee: 0n,
-        unit: "WEI",
+        fee: Amount.fromRaw(0n, 18, "ETH"),
         l2FeeError: FeeErrorCause.GENERIC_L2_FEE_ERROR,
       };
     }
@@ -334,13 +344,13 @@ export abstract class EthereumBridge implements BridgeInterface<EthereumBridgeTo
 
   private async estimateApprovalFee(): Promise<ApprovalFeeEstimation> {
     if (this.token.isNativeEth()) {
-      return { approvalFee: 0n };
+      return { approvalFee: this.ethAmount(0n) };
     }
 
     const contract = this.token.getContract();
     if (!contract) {
       return {
-        approvalFee: 0n,
+        approvalFee: this.ethAmount(0n),
         approvalFeeError: FeeErrorCause.NO_TOKEN_CONTRACT,
       };
     }
@@ -352,21 +362,23 @@ export abstract class EthereumBridge implements BridgeInterface<EthereumBridgeTo
       );
       if (!approvalTransaction) {
         return {
-          approvalFee: 0n,
+          approvalFee: this.ethAmount(0n),
           approvalFeeError: FeeErrorCause.NO_TOKEN_CONTRACT,
         };
       }
 
+      const from = await this.config.signer.getAddress();
       const [approvalGasRequirement, gasPrice] = await Promise.all([
-        this.config.provider.estimateGas(approvalTransaction),
+        this.config.provider.estimateGas({ ...approvalTransaction, from }),
         this.getEthereumGasPrice(),
       ]);
 
       const approvalFee: bigint = approvalGasRequirement * gasPrice;
-      return { approvalFee };
-    } catch {
+      return { approvalFee: this.ethAmount(approvalFee) };
+    } catch (error) {
+      console.error("Failed to calc approval fee", error);
       return {
-        approvalFee: 0n,
+        approvalFee: this.ethAmount(0n),
         approvalFeeError: FeeErrorCause.APPROVAL_FEE_ERROR,
       };
     }
@@ -393,15 +405,18 @@ export abstract class EthereumBridge implements BridgeInterface<EthereumBridgeTo
 
   private async estimateEthereumGasFeeForTx(
     tx: ContractTransaction
-  ): Promise<{ gasFee: bigint; error?: FeeErrorCause }> {
+  ): Promise<{ gasFee: Amount; error?: FeeErrorCause }> {
     try {
       const [gasUnits, gasPrice] = await Promise.all([
         this.config.provider.estimateGas(tx),
         this.getEthereumGasPrice(),
       ]);
-      return { gasFee: gasUnits * gasPrice };
+      return { gasFee: this.ethAmount(gasUnits * gasPrice) };
     } catch {
-      return { gasFee: 0n, error: FeeErrorCause.GENERIC_L1_FEE_ERROR };
+      return {
+        gasFee: this.ethAmount(0n),
+        error: FeeErrorCause.GENERIC_L1_FEE_ERROR,
+      };
     }
   }
 
@@ -413,5 +428,9 @@ export abstract class EthereumBridge implements BridgeInterface<EthereumBridgeTo
     return maxFeePerGas && gasData.maxPriorityFeePerGas
       ? maxFeePerGas
       : gasPrice;
+  }
+
+  private ethAmount(value: bigint): Amount {
+    return Amount.fromRaw(value, 18, "ETH");
   }
 }

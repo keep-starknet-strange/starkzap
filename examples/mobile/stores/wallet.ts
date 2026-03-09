@@ -13,6 +13,7 @@ import {
   type ConnectedSolanaWallet,
   type ConnectExternalWalletOptions,
   DevnetPreset,
+  type EthereumDepositFeeEstimation,
   EthereumBridgeToken,
   ExternalChain,
   fromAddress,
@@ -143,6 +144,8 @@ interface WalletState {
   bridgeIsLoading: boolean;
   bridgeError: string | null;
   bridgeLastUpdated: Date | null;
+  bridgeDepositFeeEstimate: EthereumDepositFeeEstimation | null;
+  bridgeDepositFeeLoading: boolean;
 
   // Network configuration actions
   selectNetwork: (index: number) => void;
@@ -160,6 +163,7 @@ interface WalletState {
   refreshBridgeTokens: () => Promise<void>;
   fetchBridgeDepositBalance: () => Promise<void>;
   fetchBridgeAllowance: () => Promise<void>;
+  fetchBridgeDepositFeeEstimate: () => Promise<void>;
   initiateBridge: (amount: string) => Promise<void>;
 
   // Actions
@@ -249,6 +253,8 @@ export const useWalletStore = create<WalletState>((set, get) => ({
   bridgeIsLoading: false,
   bridgeError: null,
   bridgeLastUpdated: null,
+  bridgeDepositFeeEstimate: null,
+  bridgeDepositFeeLoading: false,
 
   // Network configuration actions
   selectNetwork: (index) => {
@@ -265,6 +271,8 @@ export const useWalletStore = create<WalletState>((set, get) => ({
         bridgeTokens: [],
         bridgeError: null,
         bridgeLastUpdated: null,
+        bridgeDepositFeeEstimate: null,
+        bridgeDepositFeeLoading: false,
       });
     }
   },
@@ -335,6 +343,8 @@ export const useWalletStore = create<WalletState>((set, get) => ({
       bridgeTokens: [],
       bridgeError: null,
       bridgeLastUpdated: null,
+      bridgeDepositFeeEstimate: null,
+      bridgeDepositFeeLoading: false,
       logs: [
         `SDK configured with ${selectedNetworkIndex !== null ? NETWORKS[selectedNetworkIndex].name : "Custom Network"}`,
       ],
@@ -376,6 +386,8 @@ export const useWalletStore = create<WalletState>((set, get) => ({
       bridgeIsLoading: false,
       bridgeError: null,
       bridgeLastUpdated: null,
+      bridgeDepositFeeEstimate: null,
+      bridgeDepositFeeLoading: false,
     });
     addLog("Network configuration reset");
   },
@@ -428,6 +440,8 @@ export const useWalletStore = create<WalletState>((set, get) => ({
       bridgeTokens: [],
       bridgeError: null,
       bridgeLastUpdated: null,
+      bridgeDepositFeeEstimate: null,
+      bridgeDepositFeeLoading: false,
     });
   },
 
@@ -440,6 +454,8 @@ export const useWalletStore = create<WalletState>((set, get) => ({
       bridgeDepositBalance: null,
       bridgeDepositBalanceUnit: null,
       bridgeAllowance: null,
+      bridgeDepositFeeEstimate: null,
+      bridgeDepositFeeLoading: false,
     }));
   },
 
@@ -449,6 +465,8 @@ export const useWalletStore = create<WalletState>((set, get) => ({
       bridgeDepositBalance: null,
       bridgeDepositBalanceUnit: null,
       bridgeAllowance: null,
+      bridgeDepositFeeEstimate: null,
+      bridgeDepositFeeLoading: false,
     });
   },
 
@@ -568,6 +586,7 @@ export const useWalletStore = create<WalletState>((set, get) => ({
       bridgeDirection,
       connectedEthWallet,
       connectedSolWallet,
+      addLog,
     } = get();
 
     if (!sdk || !bridgeSelectedToken || bridgeDirection !== "to-starknet") {
@@ -613,8 +632,49 @@ export const useWalletStore = create<WalletState>((set, get) => ({
         bridgeAllowanceLoading: false,
       });
     } catch (error) {
-      console.error("Failed to fetch allowance:", error);
+      addLog(`Failed to calculate allowance ${error?.toString()}`);
       set({ bridgeAllowance: null, bridgeAllowanceLoading: false });
+    }
+  },
+
+  fetchBridgeDepositFeeEstimate: async () => {
+    const {
+      wallet,
+      bridgeSelectedToken,
+      bridgeDirection,
+      connectedEthWallet,
+      addLog,
+    } = get();
+
+    if (
+      !wallet ||
+      !bridgeSelectedToken ||
+      bridgeDirection !== "to-starknet" ||
+      bridgeSelectedToken.chain !== ExternalChain.ETHEREUM ||
+      !connectedEthWallet
+    ) {
+      set({ bridgeDepositFeeEstimate: null, bridgeDepositFeeLoading: false });
+      return;
+    }
+
+    set({ bridgeDepositFeeLoading: true });
+
+    try {
+      const estimate = await wallet.getDepositFeeEstimate(
+        bridgeSelectedToken as EthereumBridgeToken,
+        connectedEthWallet
+      );
+      console.log("Estimation:");
+      console.log("L1 FEE: ", estimate.l1Fee);
+      console.log("L2 FEE: ", estimate.l2Fee);
+      console.log("Approval FEE: ", estimate.approvalFee);
+      set({
+        bridgeDepositFeeEstimate: estimate,
+        bridgeDepositFeeLoading: false,
+      });
+    } catch (error) {
+      addLog(`Failed to calculate fee estimate ${error?.toString()}`);
+      set({ bridgeDepositFeeEstimate: null, bridgeDepositFeeLoading: false });
     }
   },
 

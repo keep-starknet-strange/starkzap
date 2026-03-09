@@ -6,6 +6,7 @@ import {
 } from "ethers";
 import { type EthereumAddress, fromEthereumAddress } from "@/types";
 import type { FeeErrorCause } from "@/types/errors";
+import type { Amount } from "starkzap";
 
 export type EthereumWalletConfig = {
   signer: Signer;
@@ -21,14 +22,13 @@ export type EthereumTransactionDetails = {
 export type SnFeeUnit = "eth" | "strk";
 
 export type ApprovalFeeEstimation = {
-  approvalFee: bigint;
+  approvalFee: Amount;
   approvalFeeError?: FeeErrorCause | undefined;
 };
 
 export type EthereumDepositFeeEstimation = ApprovalFeeEstimation & {
-  l1Fee: bigint;
-  l2Fee: bigint;
-  l2FeeUnit: SnFeeUnit;
+  l1Fee: Amount;
+  l2Fee: Amount;
   l1FeeError?: FeeErrorCause | undefined;
   l2FeeError?: FeeErrorCause | undefined;
 };
