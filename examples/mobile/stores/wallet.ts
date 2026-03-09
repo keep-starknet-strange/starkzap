@@ -13,6 +13,7 @@ import {
   type ConnectedSolanaWallet,
   type ConnectExternalWalletOptions,
   DevnetPreset,
+  Erc20,
   type EthereumDepositFeeEstimation,
   EthereumBridgeToken,
   ExternalChain,
@@ -541,7 +542,15 @@ export const useWalletStore = create<WalletState>((set, get) => ({
         balance = null;
       } else {
         if (bridgeDirection === "from-starknet") {
-          const erc20 = bridgeSelectedToken.getBridgedErc20(sdk.getProvider());
+          const erc20 = new Erc20(
+            {
+              name: bridgeSelectedToken.name,
+              address: bridgeSelectedToken.starknetAddress,
+              decimals: bridgeSelectedToken.decimals,
+              symbol: bridgeSelectedToken.symbol,
+            },
+            sdk.getProvider()
+          );
 
           balance = await erc20.balanceOf(wallet);
         } else {
@@ -664,16 +673,12 @@ export const useWalletStore = create<WalletState>((set, get) => ({
         bridgeSelectedToken as EthereumBridgeToken,
         connectedEthWallet
       );
-      console.log("Estimation:");
-      console.log("L1 FEE: ", estimate.l1Fee);
-      console.log("L2 FEE: ", estimate.l2Fee);
-      console.log("Approval FEE: ", estimate.approvalFee);
       set({
         bridgeDepositFeeEstimate: estimate,
         bridgeDepositFeeLoading: false,
       });
     } catch (error) {
-      addLog(`Failed to calculate fee estimate ${error?.toString()}`);
+      addLog(`Failed to estimate fees ${error?.toString()}`);
       set({ bridgeDepositFeeEstimate: null, bridgeDepositFeeLoading: false });
     }
   },
@@ -713,10 +718,40 @@ export const useWalletStore = create<WalletState>((set, get) => ({
         return;
       }
 
-      // TODO: Implement deposit via sdk.getBridgeOperator()
       addLog(
         `Bridge deposit: ${amount} ${bridgeSelectedToken.symbol} → Starknet`
       );
+
+      try {
+        const depositAmount = Amount.parse(
+          amount,
+          bridgeSelectedToken.decimals,
+          bridgeSelectedToken.symbol
+        );
+
+        if (
+          bridgeSelectedToken.chain === ExternalChain.ETHEREUM &&
+          connectedEthWallet
+        ) {
+          const txResponse = await wallet.deposit(
+            wallet.address,
+            depositAmount,
+            bridgeSelectedToken as EthereumBridgeToken,
+            connectedEthWallet
+          );
+          addLog(`Deposit tx sent: ${txResponse.hash}`);
+        } else if (
+          bridgeSelectedToken.chain === ExternalChain.SOLANA &&
+          connectedSolWallet
+        ) {
+          throw new Error("Not supported yet");
+          // addLog(`Deposit tx sent: ${txSignature}`);
+        }
+      } catch (err) {
+        const errStr = String(err);
+        addLog(`Deposit failed: ${errStr}`);
+        Alert.alert("Deposit Failed", errStr);
+      }
     } else {
       if (!wallet) {
         Alert.alert("Error", "Please connect your Starknet wallet first.");

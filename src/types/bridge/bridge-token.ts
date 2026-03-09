@@ -4,15 +4,7 @@ import {
   type SolanaBridgeProtocol,
 } from "@/types/bridge/protocol";
 import { ExternalChain } from "@/types/bridge/external-chain";
-import {
-  ERC20EthereumToken,
-  EthereumToken,
-  type EthereumTokenInterface,
-} from "@/bridge/ethereum/EthereumToken";
-import type { Provider } from "ethers";
-import type { Address, EthereumAddress, Token } from "@/types";
-import { Erc20 } from "@/erc20";
-import type { RpcProvider } from "starknet";
+import type { Address, EthereumAddress } from "@/types";
 
 export interface BridgeTokenParams<TAddress extends string = string> {
   id: string;
@@ -56,17 +48,6 @@ export abstract class BridgeToken<TAddress extends string = string> {
     this.starknetAddress = params.starknetAddress;
     this.starknetBridge = params.starknetBridge;
   }
-
-  public getBridgedErc20(rpcProvider: RpcProvider): Erc20 {
-    const token: Token = {
-      name: this.name,
-      address: this.starknetAddress,
-      decimals: this.decimals,
-      symbol: this.symbol,
-    };
-
-    return new Erc20(token, rpcProvider);
-  }
 }
 
 export interface EthereumBridgeTokenParams extends BridgeTokenParams<EthereumAddress> {
@@ -80,14 +61,6 @@ export class EthereumBridgeToken extends BridgeToken<EthereumAddress> {
   constructor(params: EthereumBridgeTokenParams) {
     super({ ...params });
     this.protocol = params.protocol;
-  }
-
-  public asEthereumToken(provider: Provider): EthereumTokenInterface {
-    if (this.id == "eth") {
-      return EthereumToken.create(provider);
-    } else {
-      return ERC20EthereumToken.create(this.address, provider);
-    }
   }
 }
 

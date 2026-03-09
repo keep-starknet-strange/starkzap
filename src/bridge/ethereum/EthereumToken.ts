@@ -67,12 +67,10 @@ export class ERC20EthereumToken implements EthereumTokenInterface {
   }
 
   public async allowance(owner: EthereumAddress, spender: EthereumAddress) {
-    console.log("Getting allowance from token");
     const allowance: bigint = await this.contract.getFunction("allowance")(
       owner,
       spender
     );
-    console.log("Returning allowance from token", allowance);
     return this.amount(allowance);
   }
 

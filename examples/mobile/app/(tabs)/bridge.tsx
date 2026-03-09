@@ -65,6 +65,7 @@ export default function BridgeScreen() {
     fetchBridgeDepositFeeEstimate,
     bridgeDepositFeeEstimate,
     bridgeDepositFeeLoading,
+    initiateBridge,
   } = useWalletStore((state) => state);
 
   useEffect(() => {
@@ -168,6 +169,17 @@ export default function BridgeScreen() {
   const isDepositExternal = bridgeDirection === "to-starknet";
 
   const [amountInput, setAmountInput] = useState("");
+  const [isBridging, setIsBridging] = useState(false);
+
+  const handleBridge = useCallback(async () => {
+    if (!amountInput || isBridging) return;
+    setIsBridging(true);
+    try {
+      await initiateBridge(amountInput);
+    } finally {
+      setIsBridging(false);
+    }
+  }, [amountInput, isBridging, initiateBridge]);
 
   useEffect(() => {
     setAmountInput("");
@@ -184,6 +196,25 @@ export default function BridgeScreen() {
     }
     return null;
   }, [amountInput, bridgeDepositBalanceUnit]);
+
+  const canBridge = useMemo(() => {
+    if (!bridgeSelectedToken || !amountInput || !!amountError || isBridging)
+      return false;
+    const parsed = parseFloat(amountInput);
+    if (isNaN(parsed) || parsed <= 0) return false;
+    if (isDepositExternal) {
+      return !!(connectedEthWallet || connectedSolWallet);
+    }
+    return true;
+  }, [
+    bridgeSelectedToken,
+    amountInput,
+    amountError,
+    isBridging,
+    isDepositExternal,
+    connectedEthWallet,
+    connectedSolWallet,
+  ]);
 
   const applyPercentage = useCallback(
     (pct: number) => {
@@ -683,6 +714,27 @@ export default function BridgeScreen() {
             )}
           </View>
         ) : null}
+
+        {bridgeSelectedToken ? (
+          <TouchableOpacity
+            style={[
+              styles.bridgeButton,
+              {
+                backgroundColor: canBridge ? primaryColor : `${primaryColor}40`,
+              },
+            ]}
+            disabled={!canBridge}
+            onPress={handleBridge}
+          >
+            {isBridging ? (
+              <ActivityIndicator size="small" color="#fff" />
+            ) : (
+              <ThemedText style={styles.bridgeButtonText}>
+                {isDepositExternal ? "Deposit" : "Withdraw"}
+              </ThemedText>
+            )}
+          </TouchableOpacity>
+        ) : null}
       </ScrollView>
     </SafeAreaView>
   );
@@ -943,6 +995,19 @@ const styles = StyleSheet.create({
   feeValue: {
     fontSize: 13,
     fontWeight: "600",
+  },
+
+  // Bridge action button
+  bridgeButton: {
+    borderRadius: 12,
+    paddingVertical: 16,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  bridgeButtonText: {
+    color: "#fff",
+    fontSize: 16,
+    fontWeight: "700",
   },
 
   // Toggle direction

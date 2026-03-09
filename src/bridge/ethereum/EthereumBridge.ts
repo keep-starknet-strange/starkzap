@@ -7,7 +7,11 @@ import {
   fromAddress,
   fromEthereumAddress,
 } from "@/types";
-import type { EthereumTokenInterface } from "@/bridge/ethereum/EthereumToken";
+import {
+  ERC20EthereumToken,
+  EthereumToken,
+  type EthereumTokenInterface,
+} from "@/bridge/ethereum/EthereumToken";
 import {
   type ApprovalFeeEstimation,
   ethereumAddress,
@@ -59,7 +63,10 @@ export abstract class EthereumBridge implements BridgeInterface<EthereumBridgeTo
       current: null,
       timestamp: 0,
     };
-    this.token = bridgeToken.asEthereumToken(config.provider);
+    this.token =
+      bridgeToken.id === "eth"
+        ? EthereumToken.create(config.provider)
+        : ERC20EthereumToken.create(bridgeToken.address, config.provider);
     this.bridge = new Contract(
       bridgeToken.bridgeAddress,
       BRIDGE_ABI,
@@ -139,7 +146,6 @@ export abstract class EthereumBridge implements BridgeInterface<EthereumBridgeTo
   async getAllowance(): Promise<Amount | null> {
     const allowanceSpender = await this.getAllowanceSpender();
     if (!allowanceSpender) {
-      console.error("No allowance spender found");
       return null;
     }
 
@@ -148,16 +154,13 @@ export abstract class EthereumBridge implements BridgeInterface<EthereumBridgeTo
       EthereumBridge.ALLOWANCE_CACHE_TTL
     ) {
       const signerAddress = await this.config.signer.getAddress();
-      console.log("Getting allowance from token");
       const allowance = await this.token.allowance(
         fromEthereumAddress(signerAddress),
         allowanceSpender
       );
-      console.log("Updating allowance cache");
       this.setCachedAllowance(allowance);
     }
 
-    console.log("Returning allowance", this.allowanceCache.current);
     return this.allowanceCache.current;
   }
 
@@ -375,8 +378,7 @@ export abstract class EthereumBridge implements BridgeInterface<EthereumBridgeTo
 
       const approvalFee: bigint = approvalGasRequirement * gasPrice;
       return { approvalFee: this.ethAmount(approvalFee) };
-    } catch (error) {
-      console.error("Failed to calc approval fee", error);
+    } catch {
       return {
         approvalFee: this.ethAmount(0n),
         approvalFeeError: FeeErrorCause.APPROVAL_FEE_ERROR,
