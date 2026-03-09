@@ -10,13 +10,11 @@ import type {
   PreflightResult,
   Token,
 } from "@/types";
-import type { Confidential } from "@/confidential";
+import type { ConfidentialProvider } from "@/confidential";
 import type {
   ConfidentialFundDetails,
   ConfidentialTransferDetails,
   ConfidentialWithdrawDetails,
-  ConfidentialRagequitDetails,
-  ConfidentialRolloverDetails,
 } from "@/confidential";
 
 /**
@@ -424,7 +422,7 @@ export class TxBuilder {
   }
 
   // ============================================================
-  // Confidential operations (Tongo)
+  // Confidential operations
   // ============================================================
 
   /**
@@ -434,7 +432,7 @@ export class TxBuilder {
    * You must include an ERC20 approve call before this
    * (e.g., via `.approve(token, tongoContract, amount)`).
    *
-   * @param confidential - The Confidential instance to fund
+   * @param confidential - A {@link ConfidentialProvider} instance
    * @param details - Fund parameters (amount, sender)
    * @returns this (for chaining)
    *
@@ -447,7 +445,7 @@ export class TxBuilder {
    * ```
    */
   confidentialFund(
-    confidential: Confidential,
+    confidential: ConfidentialProvider,
     details: ConfidentialFundDetails
   ): this {
     this.queueAsyncCalls(confidential.populateFund(details));
@@ -459,7 +457,7 @@ export class TxBuilder {
    *
    * Generates ZK proofs for the confidential transfer.
    *
-   * @param confidential - The sender's Confidential instance
+   * @param confidential - A {@link ConfidentialProvider} instance
    * @param details - Transfer parameters (amount, recipient pubkey, sender)
    * @returns this (for chaining)
    *
@@ -475,7 +473,7 @@ export class TxBuilder {
    * ```
    */
   confidentialTransfer(
-    confidential: Confidential,
+    confidential: ConfidentialProvider,
     details: ConfidentialTransferDetails
   ): this {
     this.queueAsyncCalls(confidential.populateTransfer(details));
@@ -485,7 +483,7 @@ export class TxBuilder {
   /**
    * Withdraw from a confidential account to a public address.
    *
-   * @param confidential - The Confidential instance to withdraw from
+   * @param confidential - A {@link ConfidentialProvider} instance
    * @param details - Withdraw parameters (amount, recipient, sender)
    * @returns this (for chaining)
    *
@@ -501,40 +499,10 @@ export class TxBuilder {
    * ```
    */
   confidentialWithdraw(
-    confidential: Confidential,
+    confidential: ConfidentialProvider,
     details: ConfidentialWithdrawDetails
   ): this {
     this.queueAsyncCalls(confidential.populateWithdraw(details));
-    return this;
-  }
-
-  /**
-   * Emergency ragequit — withdraw entire confidential balance.
-   *
-   * @param confidential - The Confidential instance to exit
-   * @param details - Ragequit parameters (recipient, sender)
-   * @returns this (for chaining)
-   */
-  confidentialRagequit(
-    confidential: Confidential,
-    details: ConfidentialRagequitDetails
-  ): this {
-    this.queueAsyncCalls(confidential.populateRagequit(details));
-    return this;
-  }
-
-  /**
-   * Rollover — activate pending balance from received transfers.
-   *
-   * @param confidential - The Confidential instance to rollover
-   * @param details - Rollover parameters (sender)
-   * @returns this (for chaining)
-   */
-  confidentialRollover(
-    confidential: Confidential,
-    details: ConfidentialRolloverDetails
-  ): this {
-    this.queueAsyncCalls(confidential.populateRollover(details));
     return this;
   }
 

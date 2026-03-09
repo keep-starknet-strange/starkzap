@@ -3,6 +3,7 @@ import {
   Account as TongoAccount,
   type TongoAddress,
 } from "@fatsolutions/tongo-sdk";
+import type { ConfidentialProvider } from "@/confidential/interface";
 import type {
   ConfidentialConfig,
   ConfidentialFundDetails,
@@ -14,20 +15,24 @@ import type {
 } from "@/confidential/types";
 
 /**
- * Wraps the Tongo confidential transaction protocol for use with StarkZap.
+ * Tongo implementation of the {@link ConfidentialProvider} interface.
  *
  * Each instance is bound to a single Tongo private key and contract.
  * Use the `populate*` methods to get `Call[]` arrays that can be passed
  * to `wallet.execute()` or added to a `TxBuilder` via `.add()`.
  *
+ * In addition to the standard {@link ConfidentialProvider} methods,
+ * this class exposes Tongo-specific operations: {@link populateRagequit},
+ * {@link populateRollover}, and rate conversion helpers.
+ *
  * @example
  * ```ts
- * import { StarkZap, Confidential } from "starkzap";
+ * import { StarkZap, TongoConfidential } from "starkzap";
  *
  * const sdk = new StarkZap({ network: "mainnet" });
  * const wallet = await sdk.connectWallet({ ... });
  *
- * const confidential = new Confidential({
+ * const confidential = new TongoConfidential({
  *   privateKey: tongoPrivateKey,
  *   contractAddress: TONGO_CONTRACT,
  *   provider: wallet.getProvider(),
@@ -37,10 +42,7 @@ import type {
  * const amount = Amount.fromRaw(100n, token);
  * const tx = await wallet.tx()
  *   .approve(token, TONGO_CONTRACT, amount)
- *   .add(...await confidential.populateFund({
- *     amount,
- *     sender: wallet.address,
- *   }))
+ *   .confidentialFund(confidential, { amount, sender: wallet.address })
  *   .send();
  *
  * // Check balance
@@ -48,7 +50,8 @@ import type {
  * console.log(`Confidential balance: ${state.balance}`);
  * ```
  */
-export class Confidential {
+export class TongoConfidential implements ConfidentialProvider {
+  readonly id = "tongo";
   private readonly account: TongoAccount;
 
   constructor(config: ConfidentialConfig) {

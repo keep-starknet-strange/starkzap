@@ -12,7 +12,7 @@ import type { WalletInterface } from "@/wallet/interface";
 import type { Call } from "starknet";
 import type { Staking } from "@/staking";
 import type { SwapProvider } from "@/swap";
-import type { Confidential } from "@/confidential";
+import type { ConfidentialProvider } from "@/confidential";
 
 // ─── Test fixtures ───────────────────────────────────────────────────────────
 
@@ -700,7 +700,7 @@ describe("TxBuilder", () => {
       const builder = new TxBuilder(wallet);
       const mockConfidential = {
         populateFund: vi.fn().mockResolvedValue([rawCall]),
-      } as unknown as Confidential;
+      } as unknown as ConfidentialProvider;
 
       expect(
         builder.confidentialFund(mockConfidential, {
@@ -718,7 +718,7 @@ describe("TxBuilder", () => {
       };
       const mockConfidential = {
         populateFund: vi.fn().mockResolvedValue([fundCall]),
-      } as unknown as Confidential;
+      } as unknown as ConfidentialProvider;
 
       const wallet = createMockWallet();
       const calls = await new TxBuilder(wallet)
@@ -745,7 +745,7 @@ describe("TxBuilder", () => {
       };
       const mockConfidential = {
         populateTransfer: vi.fn().mockResolvedValue([transferCall]),
-      } as unknown as Confidential;
+      } as unknown as ConfidentialProvider;
 
       const wallet = createMockWallet();
       const calls = await new TxBuilder(wallet)
@@ -774,7 +774,7 @@ describe("TxBuilder", () => {
       };
       const mockConfidential = {
         populateWithdraw: vi.fn().mockResolvedValue([withdrawCall]),
-      } as unknown as Confidential;
+      } as unknown as ConfidentialProvider;
 
       const wallet = createMockWallet();
       const calls = await new TxBuilder(wallet)
@@ -789,58 +789,13 @@ describe("TxBuilder", () => {
     });
   });
 
-  describe("confidentialRagequit", () => {
-    it("should queue calls from populateRagequit", async () => {
-      const ragequitCall: Call = {
-        contractAddress: "0xTONGO",
-        entrypoint: "ragequit",
-        calldata: ["0x4"],
-      };
-      const mockConfidential = {
-        populateRagequit: vi.fn().mockResolvedValue([ragequitCall]),
-      } as unknown as Confidential;
-
-      const wallet = createMockWallet();
-      const calls = await new TxBuilder(wallet)
-        .confidentialRagequit(mockConfidential, {
-          to: fromAddress("0xBEEF"),
-          sender: fromAddress("0xABC1"),
-        })
-        .calls();
-
-      expect(calls).toEqual([ragequitCall]);
-    });
-  });
-
-  describe("confidentialRollover", () => {
-    it("should queue calls from populateRollover", async () => {
-      const rolloverCall: Call = {
-        contractAddress: "0xTONGO",
-        entrypoint: "rollover",
-        calldata: ["0x5"],
-      };
-      const mockConfidential = {
-        populateRollover: vi.fn().mockResolvedValue([rolloverCall]),
-      } as unknown as Confidential;
-
-      const wallet = createMockWallet();
-      const calls = await new TxBuilder(wallet)
-        .confidentialRollover(mockConfidential, {
-          sender: fromAddress("0xABC1"),
-        })
-        .calls();
-
-      expect(calls).toEqual([rolloverCall]);
-    });
-  });
-
   describe("confidential error handling", () => {
     it("should propagate populate errors through send", async () => {
       const mockConfidential = {
         populateFund: vi
           .fn()
           .mockRejectedValue(new Error("proof generation failed")),
-      } as unknown as Confidential;
+      } as unknown as ConfidentialProvider;
 
       const wallet = createMockWallet();
       const builder = new TxBuilder(wallet).confidentialFund(mockConfidential, {
@@ -861,7 +816,7 @@ describe("TxBuilder", () => {
       };
       const mockConfidential = {
         populateFund: vi.fn().mockResolvedValue([confidentialCall]),
-      } as unknown as Confidential;
+      } as unknown as ConfidentialProvider;
 
       const wallet = createMockWallet();
       const amount = Amount.parse("100", mockUSDC);

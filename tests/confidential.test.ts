@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import type { Call } from "starknet";
-import { Confidential } from "@/confidential";
+import { TongoConfidential } from "@/confidential";
 import type {
   ConfidentialFundDetails,
   ConfidentialTransferDetails,
@@ -83,8 +83,8 @@ vi.mock("@fatsolutions/tongo-sdk", () => ({
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
-function createConfidential(): Confidential {
-  return new Confidential({
+function createConfidential(): TongoConfidential {
+  return new TongoConfidential({
     privateKey: 123n,
     contractAddress: "0xTONGO" as never,
     provider: {} as never,
@@ -93,7 +93,7 @@ function createConfidential(): Confidential {
 
 // ─── Tests ──────────────────────────────────────────────────────────────────
 
-describe("Confidential", () => {
+describe("TongoConfidential", () => {
   describe("constructor", () => {
     it("should create a TongoAccount with the provided config", () => {
       const c = createConfidential();

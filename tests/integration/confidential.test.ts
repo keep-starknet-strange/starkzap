@@ -3,7 +3,7 @@ import { Account, RpcProvider } from "starknet";
 import { Devnet, DevnetProvider } from "starknet-devnet";
 
 import { keccak } from "@scure/starknet";
-import { Confidential } from "@/confidential";
+import { TongoConfidential } from "@/confidential";
 import { Amount } from "@/types/amount";
 import path from "path";
 import { readFileSync } from "fs";
@@ -108,7 +108,7 @@ describe("Confidential (Integration)", () => {
     const relayer = await getRelayer(0);
     const privateKey = kg.from(1);
 
-    const confidential = new Confidential({
+    const confidential = new TongoConfidential({
       privateKey,
       contractAddress: TONGO_CONTRACT as never,
       provider,
@@ -154,7 +154,7 @@ describe("Confidential (Integration)", () => {
     const relayer = await getRelayer(1);
     const privateKey = kg.from(1);
 
-    const confidential = new Confidential({
+    const confidential = new TongoConfidential({
       privateKey,
       contractAddress: TONGO_CONTRACT as never,
       provider,
@@ -197,12 +197,12 @@ describe("Confidential (Integration)", () => {
     const kg = new KeyGen("starkzap-transfer");
     const relayer = await getRelayer(2);
 
-    const sender = new Confidential({
+    const sender = new TongoConfidential({
       privateKey: kg.from(1),
       contractAddress: TONGO_CONTRACT as never,
       provider,
     });
-    const receiver = new Confidential({
+    const receiver = new TongoConfidential({
       privateKey: kg.from(2),
       contractAddress: TONGO_CONTRACT as never,
       provider,
@@ -257,12 +257,12 @@ describe("Confidential (Integration)", () => {
     const kg = new KeyGen("starkzap-rollover");
     const relayer = await getRelayer(3);
 
-    const sender = new Confidential({
+    const sender = new TongoConfidential({
       privateKey: kg.from(1),
       contractAddress: TONGO_CONTRACT as never,
       provider,
     });
-    const receiver = new Confidential({
+    const receiver = new TongoConfidential({
       privateKey: kg.from(2),
       contractAddress: TONGO_CONTRACT as never,
       provider,
