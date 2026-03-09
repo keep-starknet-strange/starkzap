@@ -108,9 +108,11 @@ export class StarkZap extends CoreStarkZap {
   }
 
   private resolveProviderRpcUrl(): string {
-    const config = (this as unknown as {
-      config?: { rpcUrl?: unknown };
-    }).config;
+    const config = (
+      this as unknown as {
+        config?: { rpcUrl?: unknown };
+      }
+    ).config;
     const configRpcUrl = config?.rpcUrl;
     if (typeof configRpcUrl === "string" && configRpcUrl.length > 0) {
       return configRpcUrl;
@@ -132,9 +134,11 @@ export class StarkZap extends CoreStarkZap {
     explorer?: ExplorerConfig;
     staking?: StakingConfig;
   } {
-    const config = (this as unknown as {
-      config?: { explorer?: ExplorerConfig; staking?: StakingConfig };
-    }).config;
+    const config = (
+      this as unknown as {
+        config?: { explorer?: ExplorerConfig; staking?: StakingConfig };
+      }
+    ).config;
     if (!config) {
       return {};
     }

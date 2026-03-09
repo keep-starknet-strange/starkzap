@@ -25,4 +25,3 @@ export function getCartridgeNativeAdapterOrThrow(): CartridgeNativeAdapter {
   }
   return cartridgeNativeAdapter;
 }
-

@@ -1,0 +1,17 @@
+{
+  "name": "controller-native",
+  "version": "0.1.0",
+  "description": "Controller Native Module for React Native",
+  "main": "src/index",
+  "author": "Cartridge",
+  "license": "MIT",
+  "homepage": "https://github.com/cartridge-gg/controller.c",
+  "codegenConfig": {
+    "name": "ControllerSpec",
+    "type": "modules",
+    "jsSrcsDir": "src",
+    "android": {
+      "javaPackageName": "com.cartridge.controller"
+    }
+  }
+}

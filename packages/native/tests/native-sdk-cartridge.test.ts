@@ -30,8 +30,9 @@ function makeAdapter() {
 function makeSdk(): StarkZap {
   const sdk = new StarkZap({ network: "sepolia" });
   // Avoid network I/O from inherited chain validation helper.
-  (sdk as unknown as { ensureProviderChainMatchesConfig: () => Promise<void> })
-    .ensureProviderChainMatchesConfig = async () => {};
+  (
+    sdk as unknown as { ensureProviderChainMatchesConfig: () => Promise<void> }
+  ).ensureProviderChainMatchesConfig = async () => {};
   vi.spyOn(sdk.getProvider(), "getChainId").mockResolvedValue(
     ChainId.SEPOLIA.toFelt252()
   );
@@ -123,4 +124,3 @@ describe("@starkzap/native cartridge sdk", () => {
     ).rejects.toThrow("does not support deployment in this release");
   });
 });
-
