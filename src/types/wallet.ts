@@ -184,12 +184,12 @@ export interface ExecuteOptions {
   /** Optional time bounds for paymaster transactions */
   timeBounds?: PaymasterTimeBounds;
   /**
-   * Automatically retry with this fee mode if sponsorship fails.
+   * @experimental Automatically retry with this fee mode if sponsorship fails.
    * Only applies when `feeMode: "sponsored"`.
    */
   fallbackTo?: FeeMode;
   /**
-   * Callback invoked when falling back from sponsored to another fee mode.
+   * @experimental Callback invoked when falling back from sponsored to another fee mode.
    * Receives the structured error explaining why sponsorship failed.
    */
   onFallback?: (error: SponsorshipNotAvailableError) => void;
