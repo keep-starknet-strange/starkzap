@@ -7,7 +7,7 @@ import type {
   ProjectivePoint,
   CipherBalance,
   ConfidentialTransfer,
-} from "./types";
+} from "@/tongo/types";
 import { Contract, type RpcProvider, type Call, num } from "starknet";
 import { ABI as TONGO_ABI } from "@/abi/tongo";
 
@@ -102,9 +102,23 @@ export class Tongo {
       }
 
       return result;
-    } catch {
-      // Account doesn't exist yet
-      return null;
+    } catch (error) {
+      // Only return null for explicit "account missing" conditions
+      // Rethrow network/ABI/decode failures so caller can surface/retry
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      const isMissingAccount =
+        errorMessage.includes("not found") ||
+        errorMessage.includes("does not exist") ||
+        errorMessage.includes("no record") ||
+        errorMessage.includes("no entry");
+
+      if (isMissingAccount) {
+        // Account doesn't exist yet
+        return null;
+      }
+
+      // Rethrow all other errors (RPC failures, ABI issues, etc.)
+      throw error;
     }
   }
 

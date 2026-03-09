@@ -1,4 +1,4 @@
-import type { Address } from "@/types";
+import type { Address, ChainId } from "@/types";
 
 /**
  * A point on the Stark curve (projective coordinates).
@@ -47,7 +47,7 @@ export interface TongoConfig {
   /** Optional auditor public key for compliance */
   auditorPublicKey?: ProjectivePoint;
   /** Network/chain identifier */
-  chainId?: string;
+  chainId?: ChainId;
 }
 
 /**

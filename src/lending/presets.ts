@@ -1,5 +1,5 @@
 import { fromAddress, type ChainId } from "@/types";
-import type { VesuConfig, RewardCampaign, RewardCampaignInfo } from "./types";
+import type { VesuConfig, RewardCampaign, RewardCampaignInfo } from "@/lending/types";
 
 /**
  * Vesu lending protocol configuration presets per chain.
@@ -50,7 +50,7 @@ export const campaignInfo: Record<RewardCampaign, RewardCampaignInfo> = {
   defi_spring: {
     campaign: "defi_spring",
     name: "DeFi Spring",
-    status: "ended",
+    status: "claim_only",
     description:
       "Starknet Foundation incentive program distributing STRK rewards for DeFi participation on Vesu. " +
       "Rewards were earned for supplying STRK, xSTRK, wstETH, ETH, USDC, and USDT.",

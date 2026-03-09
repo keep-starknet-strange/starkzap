@@ -9,8 +9,8 @@ import {
   type ClaimRewardsResult,
   type VesuConfig,
   type RewardCampaignInfo,
-} from "./types";
-import { getVesuPreset, campaignInfo } from "./presets";
+} from "@/lending/types";
+import { getVesuPreset, campaignInfo } from "@/lending/presets";
 import type { WalletInterface } from "@/wallet";
 import type { Tx } from "@/tx";
 import type { ChainId } from "@/types";
@@ -179,16 +179,23 @@ export class VesuRewards {
         token: strkToken,
         canClaim: !claimable.isZero(),
       };
-    } catch {
-      // Return zero rewards on error
-      return {
-        campaign,
-        claimable: Amount.fromRaw(0n, strkToken),
-        claimed: Amount.fromRaw(0n, strkToken),
-        totalEarned: Amount.fromRaw(0n, strkToken),
-        token: strkToken,
-        canClaim: false,
-      };
+    } catch (error) {
+      // Only swallow specific "account not found" errors
+      // Rethrow RPC/ABI failures so caller can surface/retry
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      if (errorMessage.includes("not found") || errorMessage.includes("does not exist")) {
+        // Return zero rewards for missing accounts
+        return {
+          campaign,
+          claimable: Amount.fromRaw(0n, strkToken),
+          claimed: Amount.fromRaw(0n, strkToken),
+          totalEarned: Amount.fromRaw(0n, strkToken),
+          token: strkToken,
+          canClaim: false,
+        };
+      }
+      // Rethrow all other errors (RPC failures, ABI issues, etc.)
+      throw error;
     }
   }
 
@@ -233,15 +240,17 @@ export class VesuRewards {
    *
    * @param user - User wallet address
    * @param campaigns - Campaigns to claim from (defaults to all with claimable rewards)
-   * @returns Array of calls to execute
+   * @returns Array of calls to execute and preflight claimable amounts
    */
   async buildClaimCalls(
     user: Address,
     campaigns?: RewardCampaign[]
-  ): Promise<{ calls: Call[]; campaigns: RewardCampaign[] }> {
+  ): Promise<{ calls: Call[]; campaigns: RewardCampaign[]; preflightAmounts: Amount[] }> {
     const targetCampaigns = campaigns ?? this.getSupportedCampaigns();
     const calls: Call[] = [];
     const claimedCampaigns: RewardCampaign[] = [];
+    const preflightAmounts: Amount[] = [];
+    const strkToken = await this.getStrkToken();
 
     for (const campaign of targetCampaigns) {
       const distributorAddress = this.getDistributorAddress(campaign);
@@ -257,6 +266,9 @@ export class VesuRewards {
         continue;
       }
 
+      // Cache the claimable amount BEFORE claiming
+      preflightAmounts.push(info.claimable);
+
       // Build the claim call
       const claimCall: Call = {
         contractAddress: distributorAddress,
@@ -267,7 +279,7 @@ export class VesuRewards {
       claimedCampaigns.push(campaign);
     }
 
-    return { calls, campaigns: claimedCampaigns };
+    return { calls, campaigns: claimedCampaigns, preflightAmounts };
   }
 
   /**
@@ -283,8 +295,8 @@ export class VesuRewards {
   ): Promise<{ tx: Tx; result: ClaimRewardsResult }> {
     const { campaigns, throwOnEmpty = false } = options;
 
-    // Build claim calls
-    const { calls, campaigns: claimedCampaigns } = await this.buildClaimCalls(
+    // Build claim calls and cache preflight amounts
+    const { calls, campaigns: claimedCampaigns, preflightAmounts } = await this.buildClaimCalls(
       wallet.address,
       campaigns
     );
@@ -294,10 +306,10 @@ export class VesuRewards {
         throw new Error("No rewards available to claim");
       }
 
-      // Return empty result
+      // Short-circuit: return empty result without executing empty transaction
       const strkToken = await this.getStrkToken();
       return {
-        tx: await wallet.execute([]),
+        tx: undefined as unknown as Tx,
         result: {
           amount: Amount.fromRaw(0n, strkToken),
           token: strkToken,
@@ -310,13 +322,11 @@ export class VesuRewards {
     // Execute the claims
     const tx = await wallet.execute(calls);
 
-    // Calculate total claimed
+    // Calculate total claimed from cached preflight values
+    // (avoids re-querying after claim which would return 0)
     const strkToken = await this.getStrkToken();
-    let totalClaimed = Amount.fromRaw(0n, strkToken);
-    for (const campaign of claimedCampaigns) {
-      const info = await this.getRewardInfo(wallet.address, campaign);
-      totalClaimed = totalClaimed.add(info.claimable);
-    }
+    const totalClaimed = preflightAmounts
+      .reduce((sum, amt) => sum.add(amt), Amount.fromRaw(0n, strkToken));
 
     return {
       tx,
