@@ -26,7 +26,9 @@ import {
   preflightTransaction,
   sponsoredDetails,
 } from "@/wallet/utils";
+import { normalizeCartridgeSponsorshipError } from "@/wallet/sponsorship-errors";
 import { BaseWallet } from "@/wallet/base";
+import { SponsorshipNotAvailableError } from "@/types/sponsorship-error";
 import { assertSafeHttpUrl } from "@/utils";
 
 const NEGATIVE_DEPLOYMENT_CACHE_TTL_MS = 3_000;
@@ -302,17 +304,45 @@ export class CartridgeWallet extends BaseWallet {
     const feeMode = options.feeMode ?? this.defaultFeeMode;
     const timeBounds = options.timeBounds ?? this.defaultTimeBounds;
 
-    let transaction_hash: string;
+    let transactionHash: string;
 
     if (feeMode === "sponsored") {
-      // Allow provider/controller implementations to handle undeployed accounts
-      // atomically via paymaster flow when supported.
-      transaction_hash = (
-        await this.walletAccount.executePaymasterTransaction(
-          calls,
-          sponsoredDetails(timeBounds)
-        )
-      ).transaction_hash;
+      try {
+        transactionHash = (
+          await this.walletAccount.executePaymasterTransaction(
+            calls,
+            sponsoredDetails(timeBounds)
+          )
+        ).transaction_hash;
+      } catch (rawError) {
+        const normalized = normalizeCartridgeSponsorshipError(rawError);
+        if (!normalized) throw rawError;
+
+        const sponsorshipError = new SponsorshipNotAvailableError({
+          reason: normalized.reason,
+          provider: normalized.provider,
+          rawError,
+        });
+
+        if (options.fallbackTo !== "user_pays") {
+          throw sponsorshipError;
+        }
+
+        const canUserPay = await this.isDeployed();
+        if (!canUserPay) {
+          throw new SponsorshipNotAvailableError({
+            reason: "account_not_ready",
+            provider: "unknown",
+            rawError: sponsorshipError,
+            message:
+              "Sponsorship failed and user_pays fallback is not available: account is not deployed.",
+          });
+        }
+
+        options.onFallback?.(sponsorshipError);
+        transactionHash = (await this.walletAccount.execute(calls))
+          .transaction_hash;
+      }
     } else {
       const deployed = await this.isDeployed();
       if (!deployed) {
@@ -320,12 +350,12 @@ export class CartridgeWallet extends BaseWallet {
           'Account is not deployed. Call wallet.ensureReady({ deploy: "if_needed" }) before execute() in user_pays mode.'
         );
       }
-      transaction_hash = (await this.walletAccount.execute(calls))
+      transactionHash = (await this.walletAccount.execute(calls))
         .transaction_hash;
     }
 
     return new Tx(
-      transaction_hash,
+      transactionHash,
       this.provider,
       this.chainId,
       this.explorerConfig
