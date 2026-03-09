@@ -1,8 +1,5 @@
 import type { Call } from "starknet";
-import {
-  Account as TongoAccount,
-  type TongoAddress,
-} from "@fatsolutions/tongo-sdk";
+import { Account as TongoAccount } from "@fatsolutions/tongo-sdk";
 import type { ConfidentialProvider } from "@/confidential/interface";
 import type {
   ConfidentialConfig,
@@ -23,7 +20,7 @@ import type {
  *
  * In addition to the standard {@link ConfidentialProvider} methods,
  * this class exposes Tongo-specific operations: {@link populateRagequit},
- * {@link populateRollover}, and rate conversion helpers.
+ * {@link populateRollover}, and direct access to the underlying Tongo account.
  *
  * @example
  * ```ts
@@ -65,7 +62,7 @@ export class TongoConfidential implements ConfidentialProvider {
   }
 
   /** The Tongo address (base58-encoded public key) for this account. */
-  get tongoAddress(): TongoAddress {
+  get address(): string {
     return this.account.tongoAddress();
   }
 
@@ -87,17 +84,19 @@ export class TongoConfidential implements ConfidentialProvider {
   }
 
   /**
-   * Convert an ERC20 amount to tongo units using the on-chain rate.
+   * Convert a public ERC20 amount to tongo (confidential) units
+   * using the on-chain rate.
    */
-  async erc20ToTongo(erc20Amount: bigint): Promise<bigint> {
+  async toConfidentialUnits(erc20Amount: bigint): Promise<bigint> {
     return await this.account.erc20ToTongo(erc20Amount);
   }
 
   /**
-   * Convert a tongo amount to ERC20 units using the on-chain rate.
+   * Convert tongo (confidential) units back to a public ERC20 amount
+   * using the on-chain rate.
    */
-  async tongoToErc20(tongoAmount: bigint): Promise<bigint> {
-    return await this.account.tongoToErc20(tongoAmount);
+  async toPublicUnits(confidentialAmount: bigint): Promise<bigint> {
+    return await this.account.tongoToErc20(confidentialAmount);
   }
 
   /**

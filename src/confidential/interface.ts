@@ -20,6 +20,9 @@ export interface ConfidentialProvider {
   /** Stable provider identifier (e.g. `"tongo"`). */
   readonly id: string;
 
+  /** The confidential account address (format is provider-specific). */
+  readonly address: string;
+
   /**
    * Get the decrypted confidential account state.
    *
@@ -29,6 +32,20 @@ export interface ConfidentialProvider {
 
   /** Get the account nonce. */
   getNonce(): Promise<bigint>;
+
+  /**
+   * Convert a public ERC20 amount to confidential units.
+   *
+   * For providers with a 1:1 rate, this returns the input unchanged.
+   */
+  toConfidentialUnits(erc20Amount: bigint): Promise<bigint>;
+
+  /**
+   * Convert confidential units back to a public ERC20 amount.
+   *
+   * For providers with a 1:1 rate, this returns the input unchanged.
+   */
+  toPublicUnits(confidentialAmount: bigint): Promise<bigint>;
 
   /**
    * Build the Call(s) for funding this confidential account.

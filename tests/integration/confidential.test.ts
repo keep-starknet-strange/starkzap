@@ -140,8 +140,8 @@ describe("Confidential (Integration)", () => {
     expect(nonce).toBe(1n);
 
     // Verify tongo address is valid
-    expect(confidential.tongoAddress).toBeDefined();
-    expect(typeof confidential.tongoAddress).toBe("string");
+    expect(confidential.address).toBeDefined();
+    expect(typeof confidential.address).toBe("string");
   });
 
   it("should build fund calls via populateFund", async () => {

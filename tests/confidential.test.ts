@@ -102,10 +102,10 @@ describe("TongoConfidential", () => {
     });
   });
 
-  describe("tongoAddress", () => {
+  describe("address", () => {
     it("should delegate to account.tongoAddress()", () => {
       const c = createConfidential();
-      expect(c.tongoAddress).toBe("mockBase58Address");
+      expect(c.address).toBe("mockBase58Address");
       expect(mockTongoAccount.tongoAddress).toHaveBeenCalled();
     });
   });
@@ -128,19 +128,19 @@ describe("TongoConfidential", () => {
     });
   });
 
-  describe("erc20ToTongo", () => {
-    it("should convert erc20 amount to tongo units", async () => {
+  describe("toConfidentialUnits", () => {
+    it("should convert erc20 amount to confidential units", async () => {
       const c = createConfidential();
-      const result = await c.erc20ToTongo(1000n);
+      const result = await c.toConfidentialUnits(1000n);
       expect(result).toBe(200n);
       expect(mockTongoAccount.erc20ToTongo).toHaveBeenCalledWith(1000n);
     });
   });
 
-  describe("tongoToErc20", () => {
-    it("should convert tongo amount to erc20 units", async () => {
+  describe("toPublicUnits", () => {
+    it("should convert confidential units to erc20 amount", async () => {
       const c = createConfidential();
-      const result = await c.tongoToErc20(100n);
+      const result = await c.toPublicUnits(100n);
       expect(result).toBe(50n);
       expect(mockTongoAccount.tongoToErc20).toHaveBeenCalledWith(100n);
     });
