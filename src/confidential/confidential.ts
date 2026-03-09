@@ -33,10 +33,12 @@ import type {
  *   provider: wallet.getProvider(),
  * });
  *
- * // Fund confidential account
+ * // Fund confidential account (approve + fund in one tx)
+ * const amount = Amount.fromRaw(100n, token);
  * const tx = await wallet.tx()
+ *   .approve(token, TONGO_CONTRACT, amount)
  *   .add(...await confidential.populateFund({
- *     amount: Amount.fromRaw(100n, token),
+ *     amount,
  *     sender: wallet.address,
  *   }))
  *   .send();
