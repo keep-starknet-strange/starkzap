@@ -4,6 +4,7 @@ import { Devnet, DevnetProvider } from "starknet-devnet";
 
 import { keccak } from "@scure/starknet";
 import { Confidential } from "@/confidential";
+import { Amount } from "@/types/amount";
 import path from "path";
 import { readFileSync } from "fs";
 
@@ -161,7 +162,7 @@ describe("Confidential (Integration)", () => {
 
     // Use populateFund to get calls
     const calls = await confidential.populateFund({
-      amount: 50n,
+      amount: Amount.fromRaw(50n, 0),
       sender: relayer.address as never,
     });
 
@@ -224,7 +225,7 @@ describe("Confidential (Integration)", () => {
     // Transfer using populateTransfer
     const receiverAccount = receiver.getTongoAccount();
     const transferCalls = await sender.populateTransfer({
-      amount: 23n,
+      amount: Amount.fromRaw(23n, 0),
       to: receiverAccount.publicKey,
       sender: relayer.address as never,
     });
@@ -282,7 +283,7 @@ describe("Confidential (Integration)", () => {
     // Transfer to receiver
     const receiverAccount = receiver.getTongoAccount();
     const transferCalls = await sender.populateTransfer({
-      amount: 30n,
+      amount: Amount.fromRaw(30n, 0),
       to: receiverAccount.publicKey,
       sender: relayer.address as never,
     });

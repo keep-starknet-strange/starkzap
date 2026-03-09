@@ -442,7 +442,7 @@ export class TxBuilder {
    * ```ts
    * wallet.tx()
    *   .approve(token, tongoContract, amount)
-   *   .confidentialFund(confidential, { amount: 100n, sender: wallet.address })
+   *   .confidentialFund(confidential, { amount: Amount.fromRaw(100n, token), sender: wallet.address })
    *   .send();
    * ```
    */
@@ -467,7 +467,7 @@ export class TxBuilder {
    * ```ts
    * wallet.tx()
    *   .confidentialTransfer(confidential, {
-   *     amount: 50n,
+   *     amount: Amount.fromRaw(50n, token),
    *     to: recipientPubKey,
    *     sender: wallet.address,
    *   })
@@ -493,7 +493,7 @@ export class TxBuilder {
    * ```ts
    * wallet.tx()
    *   .confidentialWithdraw(confidential, {
-   *     amount: 50n,
+   *     amount: Amount.fromRaw(50n, token),
    *     to: wallet.address,
    *     sender: wallet.address,
    *   })

@@ -704,7 +704,7 @@ describe("TxBuilder", () => {
 
       expect(
         builder.confidentialFund(mockConfidential, {
-          amount: 100n,
+          amount: Amount.fromRaw(100n, 0),
           sender: fromAddress("0xABC1"),
         })
       ).toBe(builder);
@@ -723,14 +723,14 @@ describe("TxBuilder", () => {
       const wallet = createMockWallet();
       const calls = await new TxBuilder(wallet)
         .confidentialFund(mockConfidential, {
-          amount: 100n,
+          amount: Amount.fromRaw(100n, 0),
           sender: fromAddress("0xABC1"),
         })
         .calls();
 
       expect(calls).toEqual([fundCall]);
       expect(mockConfidential.populateFund).toHaveBeenCalledWith({
-        amount: 100n,
+        amount: Amount.fromRaw(100n, 0),
         sender: fromAddress("0xABC1"),
       });
     });
@@ -750,7 +750,7 @@ describe("TxBuilder", () => {
       const wallet = createMockWallet();
       const calls = await new TxBuilder(wallet)
         .confidentialTransfer(mockConfidential, {
-          amount: 50n,
+          amount: Amount.fromRaw(50n, 0),
           to: { x: 1n, y: 2n },
           sender: fromAddress("0xABC1"),
         })
@@ -758,7 +758,7 @@ describe("TxBuilder", () => {
 
       expect(calls).toEqual([transferCall]);
       expect(mockConfidential.populateTransfer).toHaveBeenCalledWith({
-        amount: 50n,
+        amount: Amount.fromRaw(50n, 0),
         to: { x: 1n, y: 2n },
         sender: fromAddress("0xABC1"),
       });
@@ -779,7 +779,7 @@ describe("TxBuilder", () => {
       const wallet = createMockWallet();
       const calls = await new TxBuilder(wallet)
         .confidentialWithdraw(mockConfidential, {
-          amount: 25n,
+          amount: Amount.fromRaw(25n, 0),
           to: fromAddress("0xBEEF"),
           sender: fromAddress("0xABC1"),
         })
@@ -844,7 +844,7 @@ describe("TxBuilder", () => {
 
       const wallet = createMockWallet();
       const builder = new TxBuilder(wallet).confidentialFund(mockConfidential, {
-        amount: 100n,
+        amount: Amount.fromRaw(100n, 0),
         sender: fromAddress("0xABC1"),
       });
 
@@ -869,7 +869,7 @@ describe("TxBuilder", () => {
       const calls = await new TxBuilder(wallet)
         .approve(mockUSDC, fromAddress("0xDEAD"), amount)
         .confidentialFund(mockConfidential, {
-          amount: 100n,
+          amount: Amount.fromRaw(100n, 0),
           sender: fromAddress("0xABC1"),
         })
         .transfer(mockUSDC, { to: alice, amount })

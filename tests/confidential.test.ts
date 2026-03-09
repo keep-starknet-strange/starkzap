@@ -8,6 +8,7 @@ import type {
   ConfidentialRagequitDetails,
   ConfidentialRolloverDetails,
 } from "@/confidential";
+import { Amount } from "@/types/amount";
 
 // ─── Mock tongo-sdk ─────────────────────────────────────────────────────────
 
@@ -149,7 +150,7 @@ describe("Confidential", () => {
     it("should return fund call from tongo account", async () => {
       const c = createConfidential();
       const details: ConfidentialFundDetails = {
-        amount: 100n,
+        amount: Amount.fromRaw(100n, 0),
         sender: "0xSENDER" as never,
       };
       const calls = await c.populateFund(details);
@@ -164,7 +165,7 @@ describe("Confidential", () => {
       mockTongoAccount.fund.mockClear();
       const c = createConfidential();
       const details: ConfidentialFundDetails = {
-        amount: 100n,
+        amount: Amount.fromRaw(100n, 0),
         sender: "0xSENDER" as never,
         feeTo: 5n,
       };
@@ -180,7 +181,7 @@ describe("Confidential", () => {
       mockTongoAccount.fund.mockClear();
       const c = createConfidential();
       await c.populateFund({
-        amount: 100n,
+        amount: Amount.fromRaw(100n, 0),
         sender: "0xSENDER" as never,
       });
       const callArgs = mockTongoAccount.fund.mock.calls[0]![0];
@@ -193,7 +194,7 @@ describe("Confidential", () => {
       mockTongoAccount.transfer.mockClear();
       const c = createConfidential();
       const details: ConfidentialTransferDetails = {
-        amount: 50n,
+        amount: Amount.fromRaw(50n, 0),
         to: { x: 1n, y: 2n },
         sender: "0xSENDER" as never,
       };
@@ -210,7 +211,7 @@ describe("Confidential", () => {
       mockTongoAccount.transfer.mockClear();
       const c = createConfidential();
       await c.populateTransfer({
-        amount: 50n,
+        amount: Amount.fromRaw(50n, 0),
         to: { x: 1n, y: 2n },
         sender: "0xSENDER" as never,
         feeTo: 3n,
@@ -229,7 +230,7 @@ describe("Confidential", () => {
       mockTongoAccount.withdraw.mockClear();
       const c = createConfidential();
       const details: ConfidentialWithdrawDetails = {
-        amount: 25n,
+        amount: Amount.fromRaw(25n, 0),
         to: "0xRECIPIENT" as never,
         sender: "0xSENDER" as never,
       };
@@ -246,7 +247,7 @@ describe("Confidential", () => {
       mockTongoAccount.withdraw.mockClear();
       const c = createConfidential();
       await c.populateWithdraw({
-        amount: 25n,
+        amount: Amount.fromRaw(25n, 0),
         to: "0xRECIPIENT" as never,
         sender: "0xSENDER" as never,
         feeTo: 2n,

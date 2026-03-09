@@ -36,7 +36,7 @@ import type {
  * // Fund confidential account
  * const tx = await wallet.tx()
  *   .add(...await confidential.populateFund({
- *     amount: 100n,
+ *     amount: Amount.fromRaw(100n, token),
  *     sender: wallet.address,
  *   }))
  *   .send();
@@ -103,7 +103,7 @@ export class Confidential {
    */
   async populateFund(details: ConfidentialFundDetails): Promise<Call[]> {
     const op = await this.account.fund({
-      amount: details.amount,
+      amount: details.amount.toBase(),
       sender: details.sender,
       ...(details.feeTo !== undefined && { fee_to_sender: details.feeTo }),
     });
@@ -119,7 +119,7 @@ export class Confidential {
     details: ConfidentialTransferDetails
   ): Promise<Call[]> {
     const op = await this.account.transfer({
-      amount: details.amount,
+      amount: details.amount.toBase(),
       to: details.to,
       sender: details.sender,
       ...(details.feeTo !== undefined && { fee_to_sender: details.feeTo }),
@@ -136,7 +136,7 @@ export class Confidential {
     details: ConfidentialWithdrawDetails
   ): Promise<Call[]> {
     const op = await this.account.withdraw({
-      amount: details.amount,
+      amount: details.amount.toBase(),
       to: details.to,
       sender: details.sender,
       ...(details.feeTo !== undefined && { fee_to_sender: details.feeTo }),

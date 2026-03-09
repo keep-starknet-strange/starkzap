@@ -1,5 +1,6 @@
 import type { BigNumberish, RpcProvider } from "starknet";
 import type { Address } from "@/types";
+import type { Amount } from "@/types/amount";
 
 /** Configuration for creating a Confidential instance. */
 export interface ConfidentialConfig {
@@ -13,8 +14,8 @@ export interface ConfidentialConfig {
 
 /** Details for funding a confidential account. */
 export interface ConfidentialFundDetails {
-  /** Amount to fund (in tongo units). */
-  amount: bigint;
+  /** Amount to fund. */
+  amount: Amount;
   /** The Starknet sender address (wallet address executing the tx). */
   sender: Address;
   /** Optional fee paid to sender (for relayed txs). */
@@ -23,8 +24,8 @@ export interface ConfidentialFundDetails {
 
 /** Details for a confidential transfer. */
 export interface ConfidentialTransferDetails {
-  /** Amount to transfer (in tongo units). */
-  amount: bigint;
+  /** Amount to transfer. */
+  amount: Amount;
   /** Recipient's Tongo public key (as {x, y} coordinates). */
   to: { x: BigNumberish; y: BigNumberish };
   /** The Starknet sender address. */
@@ -35,8 +36,8 @@ export interface ConfidentialTransferDetails {
 
 /** Details for withdrawing from a confidential account. */
 export interface ConfidentialWithdrawDetails {
-  /** Amount to withdraw (in tongo units). */
-  amount: bigint;
+  /** Amount to withdraw. */
+  amount: Amount;
   /** The Starknet address to receive the withdrawn ERC20 tokens. */
   to: Address;
   /** The Starknet sender address. */
