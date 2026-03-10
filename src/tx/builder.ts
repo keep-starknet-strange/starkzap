@@ -448,7 +448,7 @@ export class TxBuilder {
     confidential: ConfidentialProvider,
     details: ConfidentialFundDetails
   ): this {
-    this.queueAsyncCalls(confidential.populateFund(details));
+    this.queueAsyncCalls(confidential.fund(details));
     return this;
   }
 
@@ -476,7 +476,7 @@ export class TxBuilder {
     confidential: ConfidentialProvider,
     details: ConfidentialTransferDetails
   ): this {
-    this.queueAsyncCalls(confidential.populateTransfer(details));
+    this.queueAsyncCalls(confidential.transfer(details));
     return this;
   }
 
@@ -502,7 +502,7 @@ export class TxBuilder {
     confidential: ConfidentialProvider,
     details: ConfidentialWithdrawDetails
   ): this {
-    this.queueAsyncCalls(confidential.populateWithdraw(details));
+    this.queueAsyncCalls(confidential.withdraw(details));
     return this;
   }
 

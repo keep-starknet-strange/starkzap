@@ -161,7 +161,7 @@ describe("Confidential (Integration)", () => {
     });
 
     // Use populateFund to get calls
-    const calls = await confidential.populateFund({
+    const calls = await confidential.fund({
       amount: Amount.fromRaw(50n, 0),
       sender: relayer.address as never,
     });
@@ -224,7 +224,7 @@ describe("Confidential (Integration)", () => {
 
     // Transfer using populateTransfer
     const receiverAccount = receiver.getTongoAccount();
-    const transferCalls = await sender.populateTransfer({
+    const transferCalls = await sender.transfer({
       amount: Amount.fromRaw(23n, 0),
       to: receiverAccount.publicKey,
       sender: relayer.address as never,
@@ -282,7 +282,7 @@ describe("Confidential (Integration)", () => {
 
     // Transfer to receiver
     const receiverAccount = receiver.getTongoAccount();
-    const transferCalls = await sender.populateTransfer({
+    const transferCalls = await sender.transfer({
       amount: Amount.fromRaw(30n, 0),
       to: receiverAccount.publicKey,
       sender: relayer.address as never,
@@ -299,7 +299,7 @@ describe("Confidential (Integration)", () => {
     expect(beforeRollover.balance).toBe(0n);
 
     // Rollover
-    const rolloverCalls = await receiver.populateRollover({
+    const rolloverCalls = await receiver.rollover({
       sender: relayer.address as never,
     });
     expect(rolloverCalls).toHaveLength(1);

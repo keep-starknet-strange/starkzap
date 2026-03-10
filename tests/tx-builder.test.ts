@@ -699,7 +699,7 @@ describe("TxBuilder", () => {
       const wallet = createMockWallet();
       const builder = new TxBuilder(wallet);
       const mockConfidential = {
-        populateFund: vi.fn().mockResolvedValue([rawCall]),
+        fund: vi.fn().mockResolvedValue([rawCall]),
       } as unknown as ConfidentialProvider;
 
       expect(
@@ -710,14 +710,14 @@ describe("TxBuilder", () => {
       ).toBe(builder);
     });
 
-    it("should queue calls from populateFund", async () => {
+    it("should queue calls from fund", async () => {
       const fundCall: Call = {
         contractAddress: "0xTONGO",
         entrypoint: "fund",
         calldata: ["0x1"],
       };
       const mockConfidential = {
-        populateFund: vi.fn().mockResolvedValue([fundCall]),
+        fund: vi.fn().mockResolvedValue([fundCall]),
       } as unknown as ConfidentialProvider;
 
       const wallet = createMockWallet();
@@ -729,7 +729,7 @@ describe("TxBuilder", () => {
         .calls();
 
       expect(calls).toEqual([fundCall]);
-      expect(mockConfidential.populateFund).toHaveBeenCalledWith({
+      expect(mockConfidential.fund).toHaveBeenCalledWith({
         amount: Amount.fromRaw(100n, 0),
         sender: fromAddress("0xABC1"),
       });
@@ -737,14 +737,14 @@ describe("TxBuilder", () => {
   });
 
   describe("confidentialTransfer", () => {
-    it("should queue calls from populateTransfer", async () => {
+    it("should queue calls from transfer", async () => {
       const transferCall: Call = {
         contractAddress: "0xTONGO",
         entrypoint: "transfer",
         calldata: ["0x2"],
       };
       const mockConfidential = {
-        populateTransfer: vi.fn().mockResolvedValue([transferCall]),
+        transfer: vi.fn().mockResolvedValue([transferCall]),
       } as unknown as ConfidentialProvider;
 
       const wallet = createMockWallet();
@@ -757,7 +757,7 @@ describe("TxBuilder", () => {
         .calls();
 
       expect(calls).toEqual([transferCall]);
-      expect(mockConfidential.populateTransfer).toHaveBeenCalledWith({
+      expect(mockConfidential.transfer).toHaveBeenCalledWith({
         amount: Amount.fromRaw(50n, 0),
         to: { x: 1n, y: 2n },
         sender: fromAddress("0xABC1"),
@@ -766,14 +766,14 @@ describe("TxBuilder", () => {
   });
 
   describe("confidentialWithdraw", () => {
-    it("should queue calls from populateWithdraw", async () => {
+    it("should queue calls from withdraw", async () => {
       const withdrawCall: Call = {
         contractAddress: "0xTONGO",
         entrypoint: "withdraw",
         calldata: ["0x3"],
       };
       const mockConfidential = {
-        populateWithdraw: vi.fn().mockResolvedValue([withdrawCall]),
+        withdraw: vi.fn().mockResolvedValue([withdrawCall]),
       } as unknown as ConfidentialProvider;
 
       const wallet = createMockWallet();
@@ -792,9 +792,7 @@ describe("TxBuilder", () => {
   describe("confidential error handling", () => {
     it("should propagate populate errors through send", async () => {
       const mockConfidential = {
-        populateFund: vi
-          .fn()
-          .mockRejectedValue(new Error("proof generation failed")),
+        fund: vi.fn().mockRejectedValue(new Error("proof generation failed")),
       } as unknown as ConfidentialProvider;
 
       const wallet = createMockWallet();
@@ -815,7 +813,7 @@ describe("TxBuilder", () => {
         calldata: ["0x1"],
       };
       const mockConfidential = {
-        populateFund: vi.fn().mockResolvedValue([confidentialCall]),
+        fund: vi.fn().mockResolvedValue([confidentialCall]),
       } as unknown as ConfidentialProvider;
 
       const wallet = createMockWallet();

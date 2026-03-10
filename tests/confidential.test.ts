@@ -131,7 +131,7 @@ describe("TongoConfidential", () => {
   describe("toConfidentialUnits", () => {
     it("should convert erc20 amount to confidential units", async () => {
       const c = createConfidential();
-      const result = await c.toConfidentialUnits(1000n);
+      const result = await c.toConfidentialUnits(Amount.fromRaw(1000n, 0));
       expect(result).toBe(200n);
       expect(mockTongoAccount.erc20ToTongo).toHaveBeenCalledWith(1000n);
     });
@@ -146,14 +146,14 @@ describe("TongoConfidential", () => {
     });
   });
 
-  describe("populateFund", () => {
+  describe("fund", () => {
     it("should return fund call from tongo account", async () => {
       const c = createConfidential();
       const details: ConfidentialFundDetails = {
         amount: Amount.fromRaw(100n, 0),
         sender: "0xSENDER" as never,
       };
-      const calls = await c.populateFund(details);
+      const calls = await c.fund(details);
       expect(calls).toEqual([fundCall]);
       expect(mockTongoAccount.fund).toHaveBeenCalledWith({
         amount: 100n,
@@ -169,7 +169,7 @@ describe("TongoConfidential", () => {
         sender: "0xSENDER" as never,
         feeTo: 5n,
       };
-      await c.populateFund(details);
+      await c.fund(details);
       expect(mockTongoAccount.fund).toHaveBeenCalledWith({
         amount: 100n,
         sender: "0xSENDER",
@@ -180,7 +180,7 @@ describe("TongoConfidential", () => {
     it("should omit fee_to_sender when feeTo is undefined", async () => {
       mockTongoAccount.fund.mockClear();
       const c = createConfidential();
-      await c.populateFund({
+      await c.fund({
         amount: Amount.fromRaw(100n, 0),
         sender: "0xSENDER" as never,
       });
@@ -189,7 +189,7 @@ describe("TongoConfidential", () => {
     });
   });
 
-  describe("populateTransfer", () => {
+  describe("transfer", () => {
     it("should return transfer call with recipient pubkey", async () => {
       mockTongoAccount.transfer.mockClear();
       const c = createConfidential();
@@ -198,7 +198,7 @@ describe("TongoConfidential", () => {
         to: { x: 1n, y: 2n },
         sender: "0xSENDER" as never,
       };
-      const calls = await c.populateTransfer(details);
+      const calls = await c.transfer(details);
       expect(calls).toEqual([transferCall]);
       expect(mockTongoAccount.transfer).toHaveBeenCalledWith({
         amount: 50n,
@@ -210,7 +210,7 @@ describe("TongoConfidential", () => {
     it("should pass fee_to_sender when feeTo is set", async () => {
       mockTongoAccount.transfer.mockClear();
       const c = createConfidential();
-      await c.populateTransfer({
+      await c.transfer({
         amount: Amount.fromRaw(50n, 0),
         to: { x: 1n, y: 2n },
         sender: "0xSENDER" as never,
@@ -225,7 +225,7 @@ describe("TongoConfidential", () => {
     });
   });
 
-  describe("populateWithdraw", () => {
+  describe("withdraw", () => {
     it("should return withdraw call", async () => {
       mockTongoAccount.withdraw.mockClear();
       const c = createConfidential();
@@ -234,7 +234,7 @@ describe("TongoConfidential", () => {
         to: "0xRECIPIENT" as never,
         sender: "0xSENDER" as never,
       };
-      const calls = await c.populateWithdraw(details);
+      const calls = await c.withdraw(details);
       expect(calls).toEqual([withdrawCall]);
       expect(mockTongoAccount.withdraw).toHaveBeenCalledWith({
         amount: 25n,
@@ -246,7 +246,7 @@ describe("TongoConfidential", () => {
     it("should pass fee_to_sender when feeTo is set", async () => {
       mockTongoAccount.withdraw.mockClear();
       const c = createConfidential();
-      await c.populateWithdraw({
+      await c.withdraw({
         amount: Amount.fromRaw(25n, 0),
         to: "0xRECIPIENT" as never,
         sender: "0xSENDER" as never,
@@ -261,7 +261,7 @@ describe("TongoConfidential", () => {
     });
   });
 
-  describe("populateRagequit", () => {
+  describe("ragequit", () => {
     it("should return ragequit call", async () => {
       mockTongoAccount.ragequit.mockClear();
       const c = createConfidential();
@@ -269,7 +269,7 @@ describe("TongoConfidential", () => {
         to: "0xRECIPIENT" as never,
         sender: "0xSENDER" as never,
       };
-      const calls = await c.populateRagequit(details);
+      const calls = await c.ragequit(details);
       expect(calls).toEqual([ragequitCall]);
       expect(mockTongoAccount.ragequit).toHaveBeenCalledWith({
         to: "0xRECIPIENT",
@@ -280,7 +280,7 @@ describe("TongoConfidential", () => {
     it("should pass fee_to_sender when feeTo is set", async () => {
       mockTongoAccount.ragequit.mockClear();
       const c = createConfidential();
-      await c.populateRagequit({
+      await c.ragequit({
         to: "0xRECIPIENT" as never,
         sender: "0xSENDER" as never,
         feeTo: 1n,
@@ -293,14 +293,14 @@ describe("TongoConfidential", () => {
     });
   });
 
-  describe("populateRollover", () => {
+  describe("rollover", () => {
     it("should return rollover call", async () => {
       mockTongoAccount.rollover.mockClear();
       const c = createConfidential();
       const details: ConfidentialRolloverDetails = {
         sender: "0xSENDER" as never,
       };
-      const calls = await c.populateRollover(details);
+      const calls = await c.rollover(details);
       expect(calls).toEqual([rolloverCall]);
       expect(mockTongoAccount.rollover).toHaveBeenCalledWith({
         sender: "0xSENDER",

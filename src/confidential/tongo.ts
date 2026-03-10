@@ -1,6 +1,7 @@
 import type { Call } from "starknet";
 import { Account as TongoAccount } from "@fatsolutions/tongo-sdk";
 import type { ConfidentialProvider } from "@/confidential/interface";
+import type { Amount } from "@/types/amount";
 import type {
   ConfidentialConfig,
   ConfidentialFundDetails,
@@ -15,12 +16,10 @@ import type {
  * Tongo implementation of the {@link ConfidentialProvider} interface.
  *
  * Each instance is bound to a single Tongo private key and contract.
- * Use the `populate*` methods to get `Call[]` arrays that can be passed
- * to `wallet.execute()` or added to a `TxBuilder` via `.add()`.
  *
  * In addition to the standard {@link ConfidentialProvider} methods,
- * this class exposes Tongo-specific operations: {@link populateRagequit},
- * {@link populateRollover}, and direct access to the underlying Tongo account.
+ * this class exposes Tongo-specific operations: {@link ragequit},
+ * {@link rollover}, and direct access to the underlying Tongo account.
  *
  * @example
  * ```ts
@@ -87,8 +86,8 @@ export class TongoConfidential implements ConfidentialProvider {
    * Convert a public ERC20 amount to tongo (confidential) units
    * using the on-chain rate.
    */
-  async toConfidentialUnits(erc20Amount: bigint): Promise<bigint> {
-    return await this.account.erc20ToTongo(erc20Amount);
+  async toConfidentialUnits(amount: Amount): Promise<bigint> {
+    return await this.account.erc20ToTongo(amount.toBase());
   }
 
   /**
@@ -105,7 +104,7 @@ export class TongoConfidential implements ConfidentialProvider {
    * The caller is responsible for including an ERC20 approve call
    * before this in the transaction batch.
    */
-  async populateFund(details: ConfidentialFundDetails): Promise<Call[]> {
+  async fund(details: ConfidentialFundDetails): Promise<Call[]> {
     const op = await this.account.fund({
       amount: details.amount.toBase(),
       sender: details.sender,
@@ -119,9 +118,7 @@ export class TongoConfidential implements ConfidentialProvider {
    *
    * Generates ZK proofs locally and returns the call to submit on-chain.
    */
-  async populateTransfer(
-    details: ConfidentialTransferDetails
-  ): Promise<Call[]> {
+  async transfer(details: ConfidentialTransferDetails): Promise<Call[]> {
     const op = await this.account.transfer({
       amount: details.amount.toBase(),
       to: details.to,
@@ -136,9 +133,7 @@ export class TongoConfidential implements ConfidentialProvider {
    *
    * Converts confidential balance back to public ERC20 tokens.
    */
-  async populateWithdraw(
-    details: ConfidentialWithdrawDetails
-  ): Promise<Call[]> {
+  async withdraw(details: ConfidentialWithdrawDetails): Promise<Call[]> {
     const op = await this.account.withdraw({
       amount: details.amount.toBase(),
       to: details.to,
@@ -152,10 +147,9 @@ export class TongoConfidential implements ConfidentialProvider {
    * Build the Call for an emergency ragequit (full withdrawal).
    *
    * Exits the entire confidential balance to a public address.
+   * This is a Tongo-specific operation.
    */
-  async populateRagequit(
-    details: ConfidentialRagequitDetails
-  ): Promise<Call[]> {
+  async ragequit(details: ConfidentialRagequitDetails): Promise<Call[]> {
     const op = await this.account.ragequit({
       to: details.to,
       sender: details.sender,
@@ -168,10 +162,9 @@ export class TongoConfidential implements ConfidentialProvider {
    * Build the Call for a rollover (activate pending balance).
    *
    * Moves pending balance (from received transfers) into the active balance.
+   * This is a Tongo-specific operation.
    */
-  async populateRollover(
-    details: ConfidentialRolloverDetails
-  ): Promise<Call[]> {
+  async rollover(details: ConfidentialRolloverDetails): Promise<Call[]> {
     const op = await this.account.rollover({
       sender: details.sender,
     });
