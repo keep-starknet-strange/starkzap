@@ -10,6 +10,7 @@ import type { Tx } from "@/tx";
 import type { TxBuilder } from "@/tx/builder";
 import type { Erc20 } from "@/erc20";
 import type { Staking } from "@/staking";
+import type { LendingClient } from "@/lending";
 import type { SwapInput, SwapQuote, SwapProvider } from "@/swap";
 import type {
   Address,
@@ -94,6 +95,11 @@ export interface WalletInterface {
    * ```
    */
   tx(): TxBuilder;
+
+  /**
+   * Access lending helpers and protocol connectors (Vesu, etc.).
+   */
+  lending(): LendingClient;
 
   /**
    * Fetch a quote.

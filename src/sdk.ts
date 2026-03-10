@@ -212,6 +212,7 @@ export class StarkZap {
     await this.ensureProviderChainMatchesConfig();
     const {
       account,
+      accountAddress,
       feeMode,
       timeBounds,
       swapProviders,
@@ -220,6 +221,7 @@ export class StarkZap {
 
     return Wallet.create({
       account,
+      ...(accountAddress && { accountAddress }),
       provider: this.provider,
       config: this.config,
       ...(feeMode && { feeMode }),

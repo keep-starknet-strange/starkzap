@@ -1,6 +1,14 @@
-import { type Address, Amount, type ExecuteOptions, type Token } from "@/types";
+import {
+  type Address,
+  Amount,
+  assertAmountMatchesToken,
+  type ExecuteOptions,
+  resolveWalletAddress,
+  type Token,
+} from "@/types";
 import type { WalletInterface } from "@/wallet";
 import {
+  type BigNumberish,
   type Call,
   Contract,
   num,
@@ -49,35 +57,12 @@ export class Erc20 {
   }
 
   /**
-   * Validates that an Amount matches this ERC20 token's configuration.
-   * @param amount - The Amount to validate
-   * @throws Error if decimals or symbol don't match the token
-   */
-  private validateAmount(amount: Amount): void {
-    const amountDecimals = amount.getDecimals();
-    const amountSymbol = amount.getSymbol();
-
-    if (amountDecimals !== this.token.decimals) {
-      throw new Error(
-        `Amount decimals mismatch: expected ${this.token.decimals} (${this.token.symbol}), got ${amountDecimals}`
-      );
-    }
-
-    // Only validate symbol if the amount has one set
-    if (amountSymbol !== undefined && amountSymbol !== this.token.symbol) {
-      throw new Error(
-        `Amount symbol mismatch: expected "${this.token.symbol}", got "${amountSymbol}"`
-      );
-    }
-  }
-
-  /**
    * Build an ERC20 approve Call without executing.
    *
    * @internal Used by {@link TxBuilder} — not part of the public API.
    */
   public populateApprove(spender: Address, amount: Amount): Call {
-    this.validateAmount(amount);
+    assertAmountMatchesToken(amount, this.token);
     return this.contract.populateTransaction.approve(
       spender,
       uint256.bnToUint256(amount.toBase())
@@ -93,7 +78,7 @@ export class Erc20 {
     transfers: { to: Address; amount: Amount }[]
   ): Call[] {
     return transfers.map((transfer) => {
-      this.validateAmount(transfer.amount);
+      assertAmountMatchesToken(transfer.amount, this.token);
       return this.contract.populateTransaction.transfer(
         transfer.to,
         uint256.bnToUint256(transfer.amount.toBase())
@@ -131,7 +116,7 @@ export class Erc20 {
 
   /**
    * Get the balance in a wallet.
-   * @param wallet - Wallet to check the balance of
+   * @param walletOrAddress - Wallet (or address value) to check the balance of
    * @returns Amount representing the token balance
    *
    * @example
@@ -143,13 +128,16 @@ export class Erc20 {
    * console.log(balance.toFormatted()); // "100.5 USDC"
    * ```
    */
-  public async balanceOf(wallet: WalletInterface): Promise<Amount> {
+  public async balanceOf(
+    walletOrAddress: WalletInterface | Address | BigNumberish
+  ): Promise<Amount> {
+    const walletAddress = resolveWalletAddress(walletOrAddress);
     let result: number | bigint | Uint256;
     try {
-      result = await this.contract.balance_of(wallet.address);
+      result = await this.contract.balance_of(walletAddress);
     } catch (error) {
       if (error instanceof RpcError && error.isType("ENTRYPOINT_NOT_FOUND")) {
-        result = await this.contract.balanceOf(wallet.address);
+        result = await this.contract.balanceOf(walletAddress);
       } else {
         throw error;
       }

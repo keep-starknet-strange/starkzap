@@ -1,15 +1,61 @@
 import { ChainId, fromAddress, type SDKConfig } from "@/types";
 import "dotenv/config";
 
+const TESTNET_RPC_URL =
+  process.env.STARKZAP_TESTNET_RPC_URL ??
+  process.env.SEPOLIA_RPC_URL ??
+  process.env.TESTNET_RPC_URL;
+
+const TESTNET_FUNDER_PRIVATE_KEY =
+  process.env.STARKZAP_TESTNET_FUNDER_PRIVATE_KEY ??
+  process.env.FUNDER_PRIVATE_KEY ??
+  process.env.TEST_PRIVATE_KEY;
+
+const TESTNET_FUNDER_ADDRESS_RAW =
+  process.env.STARKZAP_TESTNET_FUNDER_ADDRESS ?? process.env.FUNDER_ADDRESS;
+
+const TESTNET_PAYMASTER_URL =
+  process.env.STARKZAP_TESTNET_PAYMASTER_URL ??
+  "https://sepolia.paymaster.avnu.fi";
+
+const TESTNET_PAYMASTER_API_KEY =
+  process.env.STARKZAP_TESTNET_PAYMASTER_API_KEY;
+
+function parseOptionalAddress(value: string | undefined) {
+  if (!value || !value.trim()) {
+    return undefined;
+  }
+  return fromAddress(value);
+}
+
 /**
  * Test configuration for Starknet Sepolia testnet.
  */
 export const testnetConfig: SDKConfig = {
-  rpcUrl:
-    process.env.TESTNET_RPC_URL ??
-    "https://starknet-sepolia.public.blastapi.io",
+  rpcUrl: TESTNET_RPC_URL ?? "https://starknet-sepolia.public.blastapi.io",
   chainId: ChainId.SEPOLIA,
 };
+
+/**
+ * Optional funded Sepolia test account used for live test execution.
+ */
+export const testnetFunder = {
+  address: parseOptionalAddress(TESTNET_FUNDER_ADDRESS_RAW),
+  privateKey: TESTNET_FUNDER_PRIVATE_KEY,
+};
+
+export const testnetPaymasterConfig =
+  TESTNET_PAYMASTER_API_KEY && TESTNET_PAYMASTER_API_KEY.trim()
+    ? {
+        nodeUrl: TESTNET_PAYMASTER_URL,
+        headers: {
+          "x-paymaster-api-key": TESTNET_PAYMASTER_API_KEY.trim(),
+          "x-api-key": TESTNET_PAYMASTER_API_KEY.trim(),
+        },
+      }
+    : {
+        nodeUrl: TESTNET_PAYMASTER_URL,
+      };
 
 /**
  * Test configuration for local devnet.
@@ -59,7 +105,7 @@ export function getTestConfig(): {
   if (network === "testnet") {
     return {
       config: testnetConfig,
-      privateKey: process.env.TEST_PRIVATE_KEY ?? testPrivateKeys.key1,
+      privateKey: TESTNET_FUNDER_PRIVATE_KEY ?? testPrivateKeys.key1,
       network: "testnet",
     };
   }

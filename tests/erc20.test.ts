@@ -236,6 +236,40 @@ describe("Erc20", () => {
   });
 
   describe("balanceOf", () => {
+    it("should accept a raw address string", async () => {
+      const wallet = createMockWallet();
+      const erc20 = new Erc20(mockUSDC, wallet.getProvider());
+
+      const mockBalance = 7000000n;
+      (
+        wallet.getProvider().callContract as ReturnType<typeof vi.fn>
+      ).mockResolvedValue(["0x" + mockBalance.toString(16), "0x0"]);
+
+      const rawAddress =
+        "0x0234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef";
+      const balance = await erc20.balanceOf(rawAddress);
+
+      expect(balance.toBase()).toBe(mockBalance);
+      expect(balance.toUnit()).toBe("7");
+      expect(balance.getSymbol()).toBe("USDC");
+    });
+
+    it("should accept an address directly", async () => {
+      const wallet = createMockWallet();
+      const erc20 = new Erc20(mockUSDC, wallet.getProvider());
+
+      const mockBalance = 42000000n;
+      (
+        wallet.getProvider().callContract as ReturnType<typeof vi.fn>
+      ).mockResolvedValue(["0x" + mockBalance.toString(16), "0x0"]);
+
+      const balance = await erc20.balanceOf(wallet.address);
+
+      expect(balance.toBase()).toBe(mockBalance);
+      expect(balance.toUnit()).toBe("42");
+      expect(balance.getSymbol()).toBe("USDC");
+    });
+
     it("should return Amount with correct token info", async () => {
       const wallet = createMockWallet();
       const erc20 = new Erc20(mockUSDC, wallet.getProvider());

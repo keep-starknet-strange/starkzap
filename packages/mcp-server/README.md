@@ -4,7 +4,7 @@ An [MCP (Model Context Protocol)](https://modelcontextprotocol.io/) server that 
 
 Any MCP-compatible client (Claude, Cursor, OpenAI Agents SDK, etc.) can use these tools to manage wallets, transfer tokens, stake STRK, and execute contract calls on Starknet.
 
-Package and binary names are `@keep-starknet-strange/starkzap-mcp` and `starkzap-mcp`.
+Package and binary names are `starkzap-mcp`.
 
 ## Why
 
