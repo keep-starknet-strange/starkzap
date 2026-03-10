@@ -11,8 +11,12 @@ config.resolver.nodeModulesPaths = [
   path.resolve(__dirname, "node_modules"),
   path.resolve(workspaceRoot, "node_modules"),
 ];
-
+const STUBS = new Set(["fs", "path", "net", "tls"]);
+const EMPTY_MODULE = { type: "empty" };
 config.resolver.resolveRequest = (context, moduleName, platform) => {
+  if (STUBS.has(moduleName)) {
+    return EMPTY_MODULE;
+  }
   if (moduleName === "isows" || moduleName.startsWith("zustand")) {
     return context.resolveRequest(
       { ...context, unstable_enablePackageExports: false },
