@@ -1,4 +1,4 @@
-import { Amount, type EthereumAddress } from "@/types";
+import { Amount, type EthereumAddress, EthereumBridgeToken } from "@/types";
 import {
   Contract,
   type ContractTransaction,
@@ -6,6 +6,7 @@ import {
   type Signer,
 } from "ethers";
 import ERC20_ABI from "@/abi/ethereum/erc20.json";
+import type { EthereumWalletConfig } from "@/bridge";
 
 export type EthereumTokenInterface = {
   name(): Promise<string>;
@@ -26,10 +27,21 @@ export type EthereumTokenInterface = {
   isNativeEth(): boolean;
 };
 
-export class ERC20EthereumToken implements EthereumTokenInterface {
-  private _name: string = "";
-  private _symbol: string = "";
-  private _decimals?: number = undefined;
+export function intoEthereumToken(
+  bridgeToken: EthereumBridgeToken,
+  config: EthereumWalletConfig
+): EthereumTokenInterface {
+  return bridgeToken.id === "eth"
+    ? EtherToken.create(config.provider)
+    : ERC20EthereumToken.create(bridgeToken.address, config.provider);
+}
+
+class ERC20EthereumToken implements EthereumTokenInterface {
+  private _metadata?: Promise<{
+    name: string;
+    symbol: string;
+    decimals: number;
+  }>;
 
   public static create(address: EthereumAddress, provider: Provider) {
     const contract = new Contract(address, ERC20_ABI, provider);
@@ -38,25 +50,31 @@ export class ERC20EthereumToken implements EthereumTokenInterface {
 
   constructor(private readonly contract: Contract) {}
 
+  private metadata() {
+    this._metadata ??= Promise.all([
+      this.contract.getFunction("name")() as Promise<string>,
+      this.contract.getFunction("symbol")() as Promise<string>,
+      this.contract.getFunction("decimals")() as Promise<bigint>,
+    ]).then(([name, symbol, decimals]) => {
+      return {
+        name,
+        symbol,
+        decimals: Number(decimals),
+      };
+    });
+    return this._metadata;
+  }
+
   public async name() {
-    if (!this._name) {
-      this._name = await this.contract.getFunction("name")();
-    }
-    return this._name;
+    return (await this.metadata()).name;
   }
 
   public async symbol() {
-    if (!this._symbol) {
-      this._symbol = await this.contract.getFunction("symbol")();
-    }
-    return this._symbol;
+    return (await this.metadata()).symbol;
   }
 
   public async decimals() {
-    if (!this._decimals) {
-      this._decimals = Number(await this.contract.getFunction("decimals")());
-    }
-    return this._decimals;
+    return (await this.metadata()).decimals;
   }
 
   public async balanceOf(account: EthereumAddress) {
@@ -104,9 +122,9 @@ export class ERC20EthereumToken implements EthereumTokenInterface {
   }
 }
 
-export class EthereumToken implements EthereumTokenInterface {
+class EtherToken implements EthereumTokenInterface {
   public static create(provider: Provider) {
-    return new EthereumToken(provider);
+    return new EtherToken(provider);
   }
 
   private constructor(private readonly _provider: Provider) {}

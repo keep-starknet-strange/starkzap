@@ -76,7 +76,7 @@ export class BridgeOperator implements BridgeOperatorInterface {
     this.cache.clear();
   }
 
-  private async bridge<T extends BridgeToken>(
+  private bridge<T extends BridgeToken>(
     token: T,
     wallet: ConnectedExternalWallet<T>,
     starknetWallet: WalletInterface
@@ -86,9 +86,9 @@ export class BridgeOperator implements BridgeOperatorInterface {
     const cached = this.cache.get<T>(key);
     if (cached) return cached;
 
-    const bridge = await this.createBridge(token, wallet, starknetWallet);
-    this.cache.set(key, bridge);
-    return bridge;
+    const promise = this.createBridge(token, wallet, starknetWallet);
+    this.cache.set(key, promise);
+    return promise;
   }
 
   private async createBridge<T extends BridgeToken>(

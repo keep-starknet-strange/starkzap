@@ -8,10 +8,9 @@ import {
   fromEthereumAddress,
 } from "@/types";
 import {
-  ERC20EthereumToken,
-  EthereumToken,
   type EthereumTokenInterface,
-} from "@/bridge/ethereum/EthereumToken";
+  intoEthereumToken,
+} from "@/bridge/ethereum/EtherToken";
 import {
   type ApprovalFeeEstimation,
   ethereumAddress,
@@ -63,10 +62,7 @@ export abstract class EthereumBridge implements BridgeInterface<EthereumBridgeTo
       current: null,
       timestamp: 0,
     };
-    this.token =
-      bridgeToken.id === "eth"
-        ? EthereumToken.create(config.provider)
-        : ERC20EthereumToken.create(bridgeToken.address, config.provider);
+    this.token = intoEthereumToken(bridgeToken, config);
     this.bridge = new Contract(
       bridgeToken.bridgeAddress,
       BRIDGE_ABI,
