@@ -1,10 +1,11 @@
 import { BridgeCache } from "@/bridge/operator/BridgeCache";
 import { BridgeToken, EthereumBridgeToken } from "@/types/bridge/bridge-token";
 import type { BridgeInterface } from "@/bridge/types/BridgeInterface";
-import { CanonicalEthereumBridge } from "@/bridge/ethereum/CanonicalEthereumBridge";
+import { CanonicalEthereumBridge } from "@/bridge/ethereum/canonical/CanonicalEthereumBridge";
 import { Protocol } from "@/types/bridge/protocol";
 import {
-  type FeeEstimation,
+  type AddressFor,
+  type FeeEstimationFor,
   isTokenForChain,
   type TxResponseFor,
 } from "@/bridge/types/generics";
@@ -14,8 +15,17 @@ import {
 } from "@/connect";
 import type { WalletInterface } from "@/wallet";
 import type { BridgeOperatorInterface } from "@/bridge/operator/BridgeOperatorInterface";
-import type { Address } from "@/types";
+import type { Address, EthereumAddress } from "@/types";
 import type { Amount } from "starkzap";
+import { CCTPBridge } from "@/bridge/ethereum/cctp/CCTPBridge";
+import type { EthereumDepositFeeEstimation } from "@/bridge/ethereum/types";
+import type { TransactionResponse } from "ethers";
+
+export type BridgeType<T extends BridgeToken> = BridgeInterface<
+  AddressFor<T>,
+  TxResponseFor<T>,
+  FeeEstimationFor<T>
+>;
 
 export class BridgeOperator implements BridgeOperatorInterface {
   private cache = new BridgeCache();
@@ -26,7 +36,7 @@ export class BridgeOperator implements BridgeOperatorInterface {
     recipient: Address,
     amount: Amount,
     token: T,
-    externalWallet: ConnectedExternalWallet<T>
+    externalWallet: ConnectedExternalWallet<AddressFor<T>>
   ): Promise<TxResponseFor<T>> {
     const bridge = await this.bridge(
       token,
@@ -38,7 +48,7 @@ export class BridgeOperator implements BridgeOperatorInterface {
 
   public async getDepositBalance<T extends BridgeToken>(
     token: T,
-    externalWallet: ConnectedExternalWallet<T>
+    externalWallet: ConnectedExternalWallet<AddressFor<T>>
   ) {
     const bridge = await this.bridge(
       token,
@@ -50,8 +60,8 @@ export class BridgeOperator implements BridgeOperatorInterface {
 
   async getDepositFeeEstimate<T extends BridgeToken>(
     token: T,
-    externalWallet: ConnectedExternalWallet<T>
-  ): Promise<FeeEstimation<T>> {
+    externalWallet: ConnectedExternalWallet<AddressFor<T>>
+  ): Promise<FeeEstimationFor<T>> {
     const bridge = await this.bridge(
       token,
       externalWallet,
@@ -62,7 +72,7 @@ export class BridgeOperator implements BridgeOperatorInterface {
 
   public async getAllowance<T extends BridgeToken>(
     token: T,
-    externalWallet: ConnectedExternalWallet<T>
+    externalWallet: ConnectedExternalWallet<AddressFor<T>>
   ) {
     const bridge = await this.bridge(
       token,
@@ -78,9 +88,9 @@ export class BridgeOperator implements BridgeOperatorInterface {
 
   private bridge<T extends BridgeToken>(
     token: T,
-    wallet: ConnectedExternalWallet<T>,
+    wallet: ConnectedExternalWallet<AddressFor<T>>,
     starknetWallet: WalletInterface
-  ): Promise<BridgeInterface<T>> {
+  ): Promise<BridgeType<T>> {
     const key = `${token.id}:${wallet.address}`;
 
     const cached = this.cache.get<T>(key);
@@ -93,15 +103,15 @@ export class BridgeOperator implements BridgeOperatorInterface {
 
   private async createBridge<T extends BridgeToken>(
     token: T,
-    wallet: ConnectedExternalWallet<T>,
+    wallet: ConnectedExternalWallet<AddressFor<T>>,
     starknetWallet: WalletInterface
-  ): Promise<BridgeInterface<T>> {
+  ): Promise<BridgeType<T>> {
     if (isTokenForChain(token, "ethereum")) {
       return (await this.createEthereumBridge(
         token,
         wallet as ConnectedEthereumWallet,
         starknetWallet
-      )) as unknown as BridgeInterface<T>;
+      )) as unknown as BridgeType<T>;
     }
 
     throw new Error(`Unsupported chain "${token.chain}".`);
@@ -111,12 +121,20 @@ export class BridgeOperator implements BridgeOperatorInterface {
     token: EthereumBridgeToken,
     externalWallet: ConnectedEthereumWallet,
     starknetWallet: WalletInterface
-  ): Promise<BridgeInterface<EthereumBridgeToken>> {
+  ): Promise<
+    BridgeInterface<
+      EthereumAddress,
+      TransactionResponse,
+      EthereumDepositFeeEstimation
+    >
+  > {
     const walletConfig = await externalWallet.toEthWalletConfig();
 
     switch (token.protocol) {
       case Protocol.CANONICAL:
         return new CanonicalEthereumBridge(token, walletConfig, starknetWallet);
+      case Protocol.CCTP:
+        return new CCTPBridge(token, walletConfig, starknetWallet);
       default:
         throw new Error(`Unsupported protocol "${token.protocol}".`);
     }

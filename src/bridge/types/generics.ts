@@ -34,7 +34,8 @@ type EntryFor<T extends BridgeToken> = {
 
 export type AddressFor<T extends BridgeToken> = EntryFor<T>["address"];
 export type TxResponseFor<T extends BridgeToken> = EntryFor<T>["txResponse"];
-export type FeeEstimation<T extends BridgeToken> = EntryFor<T>["feeEstimation"];
+export type FeeEstimationFor<T extends BridgeToken> =
+  EntryFor<T>["feeEstimation"];
 
 export function isTokenForChain<C extends keyof BridgeTokenRegistry>(
   token: BridgeToken,

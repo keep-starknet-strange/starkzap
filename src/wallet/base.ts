@@ -36,7 +36,11 @@ import {
 } from "@/lending";
 import { BridgeOperator } from "@/bridge";
 import type { ConnectedExternalWallet } from "..";
-import type { FeeEstimation, TxResponseFor } from "@/bridge/types/generics";
+import type {
+  AddressFor,
+  FeeEstimationFor,
+  TxResponseFor,
+} from "@/bridge/types/generics";
 
 const MAX_ERC20_CACHE_SIZE = 128;
 const MAX_STAKING_CACHE_SIZE = 128;
@@ -753,29 +757,29 @@ export abstract class BaseWallet implements WalletInterface {
     recipient: Address,
     amount: Amount,
     token: T,
-    externalWallet: ConnectedExternalWallet<T>
+    externalWallet: ConnectedExternalWallet<AddressFor<T>>
   ): Promise<TxResponseFor<T>> {
     return this.bridging.deposit(recipient, amount, token, externalWallet);
   }
 
   getDepositBalance<T extends BridgeToken>(
     token: T,
-    externalWallet: ConnectedExternalWallet<T>
+    externalWallet: ConnectedExternalWallet<AddressFor<T>>
   ): Promise<Amount> {
     return this.bridging.getDepositBalance(token, externalWallet);
   }
 
   getAllowance<T extends BridgeToken>(
     token: T,
-    externalWallet: ConnectedExternalWallet<T>
+    externalWallet: ConnectedExternalWallet<AddressFor<T>>
   ): Promise<Amount | null> {
     return this.bridging.getAllowance(token, externalWallet);
   }
 
   getDepositFeeEstimate<T extends BridgeToken>(
     token: T,
-    externalWallet: ConnectedExternalWallet<T>
-  ): Promise<FeeEstimation<T>> {
+    externalWallet: ConnectedExternalWallet<AddressFor<T>>
+  ): Promise<FeeEstimationFor<T>> {
     return this.bridging.getDepositFeeEstimate(token, externalWallet);
   }
 }

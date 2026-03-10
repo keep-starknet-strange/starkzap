@@ -8,12 +8,13 @@ import {
   fromEthereumAddress,
 } from "@/types";
 import {
+  ethereumAddress,
   type EthereumTokenInterface,
   intoEthereumToken,
 } from "@/bridge/ethereum/EtherToken";
 import {
   type ApprovalFeeEstimation,
-  ethereumAddress,
+  type EthereumDepositFeeEstimation,
   type EthereumTransactionDetails,
   type EthereumWalletConfig,
 } from "@/bridge/ethereum/types";
@@ -24,6 +25,7 @@ import {
   type ContractTransactionResponse,
   isError,
   toBigInt,
+  type TransactionResponse,
 } from "ethers";
 import {
   FeeErrorCause,
@@ -33,9 +35,12 @@ import {
 import { RPC, uint256 } from "starknet";
 import type { WalletInterface } from "@/wallet";
 import BRIDGE_ABI from "@/abi/ethereum/canonicalBridge.json";
-import type { FeeEstimation } from "@/bridge/types/generics";
 
-export abstract class EthereumBridge implements BridgeInterface<EthereumBridgeToken> {
+export abstract class EthereumBridge implements BridgeInterface<
+  EthereumAddress,
+  TransactionResponse,
+  EthereumDepositFeeEstimation
+> {
   public static readonly ALLOWANCE_CACHE_TTL = 60_000;
   public static readonly GAS_LIMIT_SAFE_MULTIPLIER = 1.5;
   private static readonly DUMMY_SN_ADDRESS = fromAddress(
@@ -73,7 +78,7 @@ export abstract class EthereumBridge implements BridgeInterface<EthereumBridgeTo
   async deposit(
     recipient: Address,
     amount: Amount
-  ): Promise<ContractTransactionResponse> {
+  ): Promise<TransactionResponse> {
     await this.approveSpendingOf(amount);
 
     const details = await this.prepareDepositTransactionDetails(
@@ -89,7 +94,7 @@ export abstract class EthereumBridge implements BridgeInterface<EthereumBridgeTo
     return response;
   }
 
-  async getDepositFeeEstimate(): Promise<FeeEstimation<EthereumBridgeToken>> {
+  async getDepositFeeEstimate(): Promise<EthereumDepositFeeEstimation> {
     const minimalAmount = await this.token.amount(1n);
 
     const [allowance, l1ToL2MessageFee, approvalFeeEstimation] =
@@ -176,7 +181,7 @@ export abstract class EthereumBridge implements BridgeInterface<EthereumBridgeTo
       return;
     }
 
-    const tx = await this.getApprovalTransaction(spender, amount);
+    const tx = await this.token.approve(spender, amount, this.config.signer);
     if (!tx) {
       return;
     }
@@ -188,20 +193,6 @@ export abstract class EthereumBridge implements BridgeInterface<EthereumBridgeTo
     }
 
     await this.updateAllowanceFromReceipt(receipt);
-  }
-
-  protected async getApprovalTransaction(
-    spender: EthereumAddress,
-    amount: Amount
-  ): Promise<ContractTransaction | null> {
-    const contract = this.token.getContract(this.config.signer);
-    if (!contract) {
-      return null;
-    }
-
-    return await contract
-      .getFunction("approve")
-      .populateTransaction(spender, amount.toBase());
   }
 
   protected async execute(
@@ -346,6 +337,11 @@ export abstract class EthereumBridge implements BridgeInterface<EthereumBridgeTo
       return { approvalFee: this.ethAmount(0n) };
     }
 
+    const spender = await this.getAllowanceSpender();
+    if (!spender) {
+      return { approvalFee: this.ethAmount(0n) };
+    }
+
     const contract = this.token.getContract();
     if (!contract) {
       return {
@@ -355,9 +351,10 @@ export abstract class EthereumBridge implements BridgeInterface<EthereumBridgeTo
     }
 
     try {
-      const approvalTransaction = await this.getApprovalTransaction(
-        EthereumBridge.DUMMY_ETH_ADDRESS,
-        await this.token.amount(1n)
+      const approvalTransaction = await this.token.approve(
+        spender,
+        await this.token.amount(1n),
+        this.config.signer
       );
       if (!approvalTransaction) {
         return {

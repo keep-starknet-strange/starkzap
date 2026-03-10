@@ -1,4 +1,9 @@
-import { Amount, type EthereumAddress, EthereumBridgeToken } from "@/types";
+import {
+  Amount,
+  type EthereumAddress,
+  EthereumBridgeToken,
+  fromEthereumAddress,
+} from "@/types";
 import {
   Contract,
   type ContractTransaction,
@@ -6,7 +11,20 @@ import {
   type Signer,
 } from "ethers";
 import ERC20_ABI from "@/abi/ethereum/erc20.json";
-import type { EthereumWalletConfig } from "@/bridge";
+import { type EthereumWalletConfig } from "@/bridge";
+
+export async function ethereumAddress(
+  contract: Contract
+): Promise<EthereumAddress> {
+  const target = contract.target;
+
+  if (typeof target === "string") {
+    return fromEthereumAddress(target);
+  } else {
+    const address = await target.getAddress();
+    return fromEthereumAddress(address);
+  }
+}
 
 export type EthereumTokenInterface = {
   name(): Promise<string>;
@@ -36,7 +54,7 @@ export function intoEthereumToken(
     : ERC20EthereumToken.create(bridgeToken.address, config.provider);
 }
 
-class ERC20EthereumToken implements EthereumTokenInterface {
+export class ERC20EthereumToken implements EthereumTokenInterface {
   private _metadata?: Promise<{
     name: string;
     symbol: string;
@@ -108,7 +126,7 @@ class ERC20EthereumToken implements EthereumTokenInterface {
     const contract = this.getContract(signer);
     return await contract
       .getFunction("approve")
-      .populateTransaction(spender, amount);
+      .populateTransaction(spender, amount.toBase());
   }
 
   public async amount(amount: bigint): Promise<Amount> {
@@ -120,9 +138,13 @@ class ERC20EthereumToken implements EthereumTokenInterface {
   public isNativeEth() {
     return false;
   }
+
+  public async getAddress(): Promise<EthereumAddress> {
+    return ethereumAddress(this.getContract());
+  }
 }
 
-class EtherToken implements EthereumTokenInterface {
+export class EtherToken implements EthereumTokenInterface {
   public static create(provider: Provider) {
     return new EtherToken(provider);
   }

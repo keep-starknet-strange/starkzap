@@ -1,5 +1,5 @@
 import { assertNonEmptyString, describeValue } from "@/connect/utils";
-import { ExternalChain, SolanaBridgeToken } from "@/types";
+import { ExternalChain } from "@/types";
 import type { ConnectedExternalWallet } from "@/connect/index";
 import type { ChainId } from "starkzap";
 
@@ -38,7 +38,7 @@ function assertSolanaProvider(provider: unknown): SolanaProvider {
   );
 }
 
-export class ConnectedSolanaWallet implements ConnectedExternalWallet<SolanaBridgeToken> {
+export class ConnectedSolanaWallet implements ConnectedExternalWallet<string> {
   readonly chain = ExternalChain.SOLANA;
 
   private constructor(

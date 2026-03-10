@@ -1,19 +1,19 @@
-import { type Address, Amount, BridgeToken } from "@/types";
-import type {
-  AddressFor,
-  FeeEstimation,
-  TxResponseFor,
-} from "@/bridge/types/generics";
+import { Amount } from "@/types";
 import type { WalletInterface } from "@/wallet";
+import type { Address } from "starkzap";
 
-export interface BridgeInterface<T extends BridgeToken> {
+export interface BridgeInterface<
+  ExternalAddress = unknown,
+  TxResponse = unknown,
+  Fee = unknown,
+> {
   readonly starknetWallet: WalletInterface;
 
-  deposit(recipient: Address, amount: Amount): Promise<TxResponseFor<T>>;
+  deposit(recipient: Address, amount: Amount): Promise<TxResponse>;
 
-  getDepositFeeEstimate(): Promise<FeeEstimation<T>>;
+  getDepositFeeEstimate(): Promise<Fee>;
 
-  getAvailableDepositBalance(account: AddressFor<T>): Promise<Amount>;
+  getAvailableDepositBalance(account: ExternalAddress): Promise<Amount>;
 
   getAllowance(): Promise<Amount | null>;
 }

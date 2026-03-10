@@ -1,10 +1,4 @@
-import {
-  type Contract,
-  type PreparedTransactionRequest,
-  type Provider,
-  type Signer,
-} from "ethers";
-import { type EthereumAddress, fromEthereumAddress } from "@/types";
+import type { PreparedTransactionRequest, Provider, Signer } from "ethers";
 import type { FeeErrorCause } from "@/types/errors";
 import type { Amount } from "starkzap";
 
@@ -19,8 +13,6 @@ export type EthereumTransactionDetails = {
   transaction: PreparedTransactionRequest;
 };
 
-export type SnFeeUnit = "eth" | "strk";
-
 export type ApprovalFeeEstimation = {
   approvalFee: Amount;
   approvalFeeError?: FeeErrorCause | undefined;
@@ -33,15 +25,6 @@ export type EthereumDepositFeeEstimation = ApprovalFeeEstimation & {
   l2FeeError?: FeeErrorCause | undefined;
 };
 
-export async function ethereumAddress(
-  contract: Contract
-): Promise<EthereumAddress> {
-  const target = contract.target;
-
-  if (typeof target === "string") {
-    return fromEthereumAddress(target);
-  } else {
-    const address = await target.getAddress();
-    return fromEthereumAddress(address);
-  }
-}
+export type CCTPDepositFeeEstimation = EthereumDepositFeeEstimation & {
+  fastTransferBpFee: number;
+};

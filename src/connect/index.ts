@@ -1,9 +1,12 @@
-import { BridgeToken, ExternalChain } from "@/types";
-import type { ConnectedEthereumWallet } from "@/connect/evm";
-import type { ConnectedSolanaWallet } from "@/connect/solana";
-import type { ConnectEthereumWalletOptions } from "@/connect/evm";
-import type { ConnectSolanaWalletOptions } from "@/connect/solana";
-import type { AddressFor } from "@/bridge/types/generics";
+import { ExternalChain } from "@/types";
+import type {
+  ConnectedEthereumWallet,
+  ConnectEthereumWalletOptions,
+} from "@/connect/evm";
+import type {
+  ConnectedSolanaWallet,
+  ConnectSolanaWalletOptions,
+} from "@/connect/solana";
 
 export * from "@/connect/evm";
 export * from "@/connect/solana";
@@ -24,7 +27,7 @@ export interface ExternalWalletRegistry {
   [ExternalChain.SOLANA]?: ConnectedSolanaWallet;
 }
 
-export interface ConnectedExternalWallet<T extends BridgeToken> {
+export interface ConnectedExternalWallet<A extends string> {
   readonly chain: ExternalChain;
-  readonly address: AddressFor<T>;
+  readonly address: A;
 }

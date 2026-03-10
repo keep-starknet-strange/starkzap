@@ -1,7 +1,6 @@
 import { describeValue, normalizeChainId } from "@/connect/utils";
 import {
   type EthereumAddress,
-  EthereumBridgeToken,
   ExternalChain,
   fromEthereumAddress,
 } from "@/types";
@@ -43,7 +42,7 @@ export interface ConnectEthereumWalletOptions {
   chainId: string | number;
 }
 
-export class ConnectedEthereumWallet implements ConnectedExternalWallet<EthereumBridgeToken> {
+export class ConnectedEthereumWallet implements ConnectedExternalWallet<EthereumAddress> {
   readonly chain = ExternalChain.ETHEREUM;
 
   private constructor(
