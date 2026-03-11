@@ -2,38 +2,18 @@ import {
   type Address,
   Amount,
   type EthereumAddress,
-  EthereumBridgeToken,
   fromAddress,
   fromEthereumAddress,
 } from "@/types";
-import type {
-  BridgeDepositOptions,
-  BridgeInterface,
-} from "@/bridge/types/BridgeInterface";
-import type {
-  ApprovalFeeEstimation,
-  CCTPDepositFeeEstimation,
-  EthereumWalletConfig,
-} from "@/bridge";
-import type { WalletInterface } from "@/wallet";
+import type { BridgeDepositOptions } from "@/bridge/types/BridgeInterface";
+import type { CCTPDepositFeeEstimation } from "@/bridge";
+import { ERC20EthereumToken } from "@/bridge/ethereum/EtherToken";
 import {
-  ERC20EthereumToken,
-  intoEthereumToken,
-} from "@/bridge/ethereum/EtherToken";
-import {
-  type ContractTransaction,
-  type ContractTransactionReceipt,
-  type ContractTransactionResponse,
   Interface,
-  isError,
   type TransactionRequest,
   type TransactionResponse,
 } from "ethers";
-import {
-  FeeErrorCause,
-  StarkzapTransactionError,
-  TransactionErrorCause,
-} from "@/types/errors";
+import { FeeErrorCause } from "@/types/errors";
 import { BridgeDirection, CCTPFees } from "@/bridge/ethereum/cctp/CCTPFees";
 import {
   getFinalityThreshold,
@@ -41,11 +21,7 @@ import {
 } from "@/bridge/ethereum/cctp/constants";
 import { EthereumBridge } from "@/bridge/ethereum/EthereumBridge";
 
-export class CCTPBridge implements BridgeInterface<
-  EthereumAddress,
-  TransactionResponse,
-  CCTPDepositFeeEstimation
-> {
+export class CCTPBridge extends EthereumBridge<CCTPDepositFeeEstimation> {
   private static readonly MAINNET_TOKEN_MESSENGER = fromEthereumAddress(
     "0x28b5a0e9C621a5BadaA536219b3a228C8168cf5d"
   );
@@ -65,28 +41,7 @@ export class CCTPBridge implements BridgeInterface<
 
   private static readonly ZERO_ETH = Amount.fromRaw(0n, 18, "ETH");
 
-  private readonly usdcToken: ERC20EthereumToken;
   private readonly cctpFees = CCTPFees.getInstance();
-
-  private allowanceCache: {
-    current: Amount | null;
-    timestamp: number;
-  };
-
-  constructor(
-    private readonly bridgeToken: EthereumBridgeToken,
-    private readonly config: EthereumWalletConfig,
-    readonly starknetWallet: WalletInterface
-  ) {
-    this.usdcToken = intoEthereumToken(
-      bridgeToken,
-      config
-    ) as ERC20EthereumToken;
-    this.allowanceCache = {
-      current: null,
-      timestamp: 0,
-    };
-  }
 
   async deposit(
     recipient: Address,
@@ -107,31 +62,6 @@ export class CCTPBridge implements BridgeInterface<
     this.clearCachedAllowance();
 
     return txResponse;
-  }
-
-  async getAllowance(): Promise<Amount | null> {
-    const allowanceSpender = this.getAllowanceSpender();
-    if (!allowanceSpender) {
-      return null;
-    }
-
-    if (
-      Date.now() - this.allowanceCache.timestamp >
-      EthereumBridge.ALLOWANCE_CACHE_TTL
-    ) {
-      const signerAddress = await this.config.signer.getAddress();
-      const allowance = await this.usdcToken.allowance(
-        fromEthereumAddress(signerAddress),
-        allowanceSpender
-      );
-      this.setCachedAllowance(allowance);
-    }
-
-    return this.allowanceCache.current;
-  }
-
-  async getAvailableDepositBalance(account: EthereumAddress): Promise<Amount> {
-    return this.usdcToken.balanceOf(account);
   }
 
   async getDepositFeeEstimate(
@@ -192,177 +122,18 @@ export class CCTPBridge implements BridgeInterface<
     }
   }
 
-  ///// Private
-
-  private getAllowanceSpender(): EthereumAddress {
+  protected getAllowanceSpender(): Promise<EthereumAddress> {
     if (this.starknetWallet.getChainId().isMainnet()) {
-      return CCTPBridge.MAINNET_TOKEN_MESSENGER;
+      return Promise.resolve(CCTPBridge.MAINNET_TOKEN_MESSENGER);
     } else {
-      return CCTPBridge.SEPOLIA_TOKEN_MESSENGER;
+      return Promise.resolve(CCTPBridge.SEPOLIA_TOKEN_MESSENGER);
     }
   }
 
-  // DUB
-  protected async approveSpendingOf(amount: Amount): Promise<void> {
-    const spender = this.getAllowanceSpender();
-    // TODO this is not null ever
-    if (!spender) {
-      return;
-    }
-
-    const allowance = await this.getAllowance();
-    if (!allowance) {
-      return;
-    }
-
-    if (!allowance.lt(amount)) {
-      return;
-    }
-
-    const tx = await this.usdcToken.approve(
-      spender,
-      amount,
-      this.config.signer
-    );
-    if (!tx) {
-      return;
-    }
-
-    const response = await this.execute(tx);
-    const receipt = await response.wait();
-    if (!receipt?.status) {
-      throw new StarkzapTransactionError(TransactionErrorCause.APPROVE_FAILED);
-    }
-
-    await this.updateAllowanceFromReceipt(receipt);
-  }
-
-  // DUB
-  protected async execute(
-    tx: TransactionRequest
-  ): Promise<ContractTransactionResponse> {
-    try {
-      return (await this.config.signer.sendTransaction(
-        tx
-      )) as ContractTransactionResponse;
-    } catch (e) {
-      if (isError(e, "ACTION_REJECTED")) {
-        throw new StarkzapTransactionError(TransactionErrorCause.USER_REJECTED);
-      }
-
-      if (isError(e, "INSUFFICIENT_FUNDS")) {
-        throw new StarkzapTransactionError(
-          TransactionErrorCause.INSUFFICIENT_BALANCE
-        );
-      }
-
-      // TODO be more specific with other ethers errors
-      throw e;
-    }
-  }
-
-  // DUB
-  private async estimateApprovalFee(): Promise<ApprovalFeeEstimation> {
-    const contract = this.usdcToken.getContract();
-    if (!contract) {
-      return {
-        approvalFee: this.ethAmount(0n),
-        approvalFeeError: FeeErrorCause.NO_TOKEN_CONTRACT,
-      };
-    }
-
-    try {
-      const approvalTransaction = await this.getApprovalTransaction(
-        this.getAllowanceSpender(),
-        await this.usdcToken.amount(2n)
-      );
-      if (!approvalTransaction) {
-        return {
-          approvalFee: this.ethAmount(0n),
-          approvalFeeError: FeeErrorCause.NO_TOKEN_CONTRACT,
-        };
-      }
-
-      const [approvalGasRequirement, gasPrice] = await Promise.all([
-        this.config.signer.estimateGas(approvalTransaction),
-        this.getEthereumGasPrice(),
-      ]);
-
-      const approvalFee: bigint = approvalGasRequirement * gasPrice;
-      return { approvalFee: this.ethAmount(approvalFee) };
-    } catch {
-      return {
-        approvalFee: this.ethAmount(0n),
-        approvalFeeError: FeeErrorCause.APPROVAL_FEE_ERROR,
-      };
-    }
-  }
-
-  // DUB
-  protected async getApprovalTransaction(
-    spender: EthereumAddress,
-    amount: Amount
-  ): Promise<ContractTransaction | null> {
-    const contract = this.usdcToken.getContract(this.config.signer);
-    if (!contract) {
-      return null;
-    }
-
-    return await contract
-      .getFunction("approve")
-      .populateTransaction(spender, amount.toBase());
-  }
-
-  // DUB + Overridden
-  private async getEthereumGasPrice(): Promise<bigint> {
+  protected async getEthereumGasPrice(): Promise<bigint> {
     const feeData = await this.config.provider.getFeeData();
 
     return feeData.maxFeePerGas ?? feeData.gasPrice ?? 0n;
-  }
-
-  // DUB
-  private ethAmount(value: bigint): Amount {
-    return Amount.fromRaw(value, 18, "ETH");
-  }
-
-  // DUB
-  private setCachedAllowance(newValue: Amount | null) {
-    this.allowanceCache = {
-      current: newValue,
-      timestamp: Date.now(),
-    };
-  }
-
-  // DUB
-  private clearCachedAllowance() {
-    this.allowanceCache.timestamp = -1;
-  }
-
-  // DUB
-  private async updateAllowanceFromReceipt(
-    receipt: ContractTransactionReceipt
-  ) {
-    // TODO remove this log later
-    console.log("UPDATE ALLOWANCE RECEIPT", receipt.logs, receipt.toJSON());
-    const tokenInterface = this.usdcToken.getContract()?.interface;
-    if (!tokenInterface || !receipt.logs) return;
-
-    const approvalLog = receipt.logs.find((log) => {
-      const parsedLog = tokenInterface.parseLog(log);
-      return (
-        parsedLog?.name === "Approval" &&
-        typeof parsedLog.args?.value === "bigint"
-      );
-    });
-
-    if (approvalLog) {
-      const newAllowance: bigint =
-        tokenInterface.parseLog(approvalLog)!.args.value;
-      const amount = await this.usdcToken.amount(newAllowance);
-      this.setCachedAllowance(amount);
-    } else {
-      this.clearCachedAllowance();
-    }
   }
 
   private usdcAmount(value: bigint): Amount {
@@ -375,7 +146,8 @@ export class CCTPBridge implements BridgeInterface<
     fastTransferFeeBps?: number,
     fastTransfer?: boolean
   ): Promise<TransactionRequest> {
-    const usdcAddress = await this.usdcToken.getAddress();
+    const usdcToken = this.token as ERC20EthereumToken;
+    const usdcAddress = await usdcToken.getAddress();
     const feeBps =
       fastTransferFeeBps ??
       (await this.cctpFees.getMinimumFeeBps(
