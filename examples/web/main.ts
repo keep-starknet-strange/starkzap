@@ -15,6 +15,8 @@ import {
   Protocol,
   type Eip1193Provider,
   type SolanaProvider,
+  type DcaProvider,
+  type DcaOrder,
   type WalletInterface,
   type AccountClassConfig,
   type SwapProvider,
@@ -28,6 +30,7 @@ import {
   initializeAppKit,
   formatFeeEstimate,
 } from "./bridge";
+import { getDcaProviders } from "./dca";
 
 // Configuration
 const NETWORK =
@@ -52,6 +55,14 @@ const OFT_PUBLIC_KEY = import.meta.env.VITE_OFT_PUBLIC_KEY as
   | undefined;
 const BPS_DENOMINATOR = 10_000n;
 const DEFAULT_SLIPPAGE_BPS = 100n;
+const DEFAULT_DCA_FREQUENCY = "P1D";
+const DCA_ORDER_PAGE_SIZE = 8;
+const DCA_FREQUENCY_OPTIONS = [
+  { value: "PT12H", label: "Every 12 hours" },
+  { value: "P1D", label: "Daily" },
+  { value: "P3D", label: "Every 3 days" },
+  { value: "P1W", label: "Weekly" },
+] as const;
 
 // Tongo confidential contract addresses per token
 // Full list: https://docs.tongo.cash/protocol/contracts.html
@@ -78,9 +89,14 @@ const swapProviders: SwapProvider[] = getSwapProviders();
 const swapProvidersById = new Map<string, SwapProvider>(
   swapProviders.map((provider) => [provider.id, provider])
 );
+const dcaProviders: DcaProvider[] = getDcaProviders();
+const dcaProvidersById = new Map<string, DcaProvider>(
+  dcaProviders.map((provider) => [provider.id, provider])
+);
 const presetTokens = Object.values(getPresets(SDK_CHAIN_ID)).sort((a, b) =>
   a.symbol.localeCompare(b.symbol)
 );
+const dcaTokens = getDcaDemoTokens();
 
 // SDK instance
 const sdk = new StarkZap({
@@ -190,6 +206,47 @@ const btnSwapSubmit = document.getElementById(
   "btn-swap-submit"
 ) as HTMLButtonElement;
 const swapQuoteEl = document.getElementById("swap-quote")!;
+const dcaPreviewProviderSelect = document.getElementById(
+  "dca-preview-provider"
+) as HTMLSelectElement;
+const dcaProviderSelect = document.getElementById(
+  "dca-provider"
+) as HTMLSelectElement;
+const dcaTokenInSelect = document.getElementById(
+  "dca-token-in"
+) as HTMLSelectElement;
+const dcaTokenOutSelect = document.getElementById(
+  "dca-token-out"
+) as HTMLSelectElement;
+const dcaTotalAmountInput = document.getElementById(
+  "dca-total-amount"
+) as HTMLInputElement;
+const dcaCycleAmountInput = document.getElementById(
+  "dca-cycle-amount"
+) as HTMLInputElement;
+const dcaFrequencySelect = document.getElementById(
+  "dca-frequency"
+) as HTMLSelectElement;
+const dcaMinBuyInput = document.getElementById(
+  "dca-min-buy"
+) as HTMLInputElement;
+const dcaMaxBuyInput = document.getElementById(
+  "dca-max-buy"
+) as HTMLInputElement;
+const dcaSponsoredInput = document.getElementById(
+  "dca-sponsored"
+) as HTMLInputElement;
+const btnDcaPreview = document.getElementById(
+  "btn-dca-preview"
+) as HTMLButtonElement;
+const btnDcaCreate = document.getElementById(
+  "btn-dca-create"
+) as HTMLButtonElement;
+const btnDcaRefresh = document.getElementById(
+  "btn-dca-refresh"
+) as HTMLButtonElement;
+const dcaPreviewEl = document.getElementById("dca-preview")!;
+const dcaOrdersEl = document.getElementById("dca-orders")!;
 
 // Tongo DOM elements
 const tongoTokenSelect = document.getElementById(
@@ -332,9 +389,35 @@ function formatProtocolTag(protocol: Protocol): string {
   }
 }
 
-function getTokenByAddress(address: string): Token | null {
-  const token = presetTokens.find((item) => item.address === address);
+function getTokenByAddress(
+  address: string,
+  tokens: readonly Token[] = presetTokens
+): Token | null {
+  const token = tokens.find((item) => item.address === address);
   return token ?? null;
+}
+
+function getDcaDemoTokens(): Token[] {
+  const preferredSymbols = SDK_CHAIN_ID.isSepolia()
+    ? ["STRK", "USDC.e", "USDC", "ETH", "WBTC"]
+    : ["STRK", "USDC", "USDT", "DAI", "ETH", "WBTC"];
+
+  const selected: Token[] = [];
+  for (const symbol of preferredSymbols) {
+    const token = presetTokens.find((item) => item.symbol === symbol);
+    if (
+      token &&
+      !selected.some((current) => current.address === token.address)
+    ) {
+      selected.push(token);
+    }
+  }
+
+  if (selected.length >= 2) {
+    return selected;
+  }
+
+  return presetTokens.slice(0, Math.min(presetTokens.length, 6));
 }
 
 function getPreferredSwapTokens(): { tokenIn: Token; tokenOut: Token } {
@@ -359,6 +442,60 @@ function getPreferredSwapTokens(): { tokenIn: Token; tokenOut: Token } {
   const tokenOut =
     presetTokens.find((token) => token.address !== tokenIn.address) ?? tokenIn;
   return { tokenIn, tokenOut };
+}
+
+function getPreferredDcaTokens(): { tokenIn: Token; tokenOut: Token } {
+  const fallback = dcaTokens[0];
+  if (!fallback) {
+    throw new Error("No curated DCA tokens available for this chain");
+  }
+
+  const tokenIn =
+    dcaTokens.find((token) => token.symbol === "STRK") ?? fallback;
+  const preferredOutSymbols = SDK_CHAIN_ID.isSepolia()
+    ? ["USDC.e", "USDC", "ETH"]
+    : ["USDC", "USDT", "DAI", "ETH"];
+
+  for (const symbol of preferredOutSymbols) {
+    const tokenOut = dcaTokens.find((token) => token.symbol === symbol);
+    if (tokenOut && tokenOut.address !== tokenIn.address) {
+      return { tokenIn, tokenOut };
+    }
+  }
+
+  const tokenOut =
+    dcaTokens.find((token) => token.address !== tokenIn.address) ?? tokenIn;
+  return { tokenIn, tokenOut };
+}
+
+function getPreferredDcaPreviewProviderId(): string {
+  return swapProvidersById.has("ekubo")
+    ? "ekubo"
+    : (swapProviders[0]?.id ?? "");
+}
+
+function getAvailableDcaProviders(): DcaProvider[] {
+  if (!wallet) {
+    return dcaProviders;
+  }
+
+  return wallet
+    .dca()
+    .listProviders()
+    .map((providerId) => wallet!.dca().getDcaProvider(providerId));
+}
+
+function getPreferredDcaProviderId(): string {
+  const availableProviders = getAvailableDcaProviders();
+  return (
+    availableProviders.find((provider) => provider.id === "avnu")?.id ??
+    availableProviders[0]?.id ??
+    ""
+  );
+}
+
+function isEkuboDcaBackend(providerId: string): boolean {
+  return providerId === "ekubo";
 }
 
 function clearSwapQuote(): void {
@@ -528,6 +665,459 @@ function initializeSwapForm(): void {
   updateSwapButtons();
 }
 
+function clearDcaPreview(): void {
+  dcaPreviewEl.innerHTML = "";
+  dcaPreviewEl.classList.add("hidden");
+}
+
+function renderDcaPreview(params: {
+  dcaProviderId: string;
+  previewProviderId: string;
+  sellAmountPerCycle: Amount;
+  tokenOut: Token;
+  amountOutBase: bigint;
+  routeCallCount?: number;
+  priceImpactBps?: bigint | null;
+}): void {
+  const amountOut = Amount.fromRaw(
+    params.amountOutBase,
+    params.tokenOut.decimals,
+    params.tokenOut.symbol
+  );
+  const priceImpactText =
+    params.priceImpactBps == null
+      ? "n/a"
+      : `${(Number(params.priceImpactBps) / 100).toFixed(2)}%`;
+  const routeCalls =
+    params.routeCallCount != null ? `${params.routeCallCount}` : "n/a";
+
+  dcaPreviewEl.innerHTML = `
+    <div class="quote-row"><span class="quote-label">Preview Source</span><span class="quote-value">${params.previewProviderId.toUpperCase()}</span></div>
+    <div class="quote-row"><span class="quote-label">Cycle Sell</span><span class="quote-value">${params.sellAmountPerCycle.toFormatted(true)}</span></div>
+    <div class="quote-row"><span class="quote-label">Estimated Cycle Buy</span><span class="quote-value">${amountOut.toFormatted(true)}</span></div>
+    <div class="quote-row"><span class="quote-label">Price Impact</span><span class="quote-value">${priceImpactText}</span></div>
+    <div class="quote-row"><span class="quote-label">Route Calls</span><span class="quote-value">${routeCalls}</span></div>
+    <div class="quote-row"><span class="quote-label">Recurring Backend</span><span class="quote-value">${params.dcaProviderId.toUpperCase()}</span></div>
+  `;
+  dcaPreviewEl.classList.remove("hidden");
+}
+
+function renderEmptyDcaOrders(message: string): void {
+  dcaOrdersEl.innerHTML = `<div class="orders-empty">${message}</div>`;
+}
+
+function describeTokenAddress(address: string): string {
+  return getTokenByAddress(address)?.symbol ?? truncateAddress(address);
+}
+
+function formatTokenAmount(base: bigint, tokenAddress: string): string {
+  const token = getTokenByAddress(tokenAddress);
+  if (!token) {
+    return `${base.toString()} (${truncateAddress(tokenAddress)})`;
+  }
+  return Amount.fromRaw(base, token.decimals, token.symbol).toFormatted(true);
+}
+
+function getDcaBackendLabel(providerId: string): string {
+  return providerId.toUpperCase();
+}
+
+function formatDcaFrequency(order: DcaOrder): string {
+  return order.frequency === "CONTINUOUS" || order.providerId === "ekubo"
+    ? "Continuous"
+    : order.frequency;
+}
+
+function buildDcaCancelInput(order: DcaOrder) {
+  return order.providerId === "ekubo"
+    ? { provider: order.providerId, orderId: order.id }
+    : { provider: order.providerId, orderAddress: order.orderAddress };
+}
+
+async function cancelDcaOrder(
+  order: DcaOrder,
+  button: HTMLButtonElement
+): Promise<void> {
+  if (!wallet) {
+    return;
+  }
+
+  setButtonLoading(button, true);
+
+  try {
+    const deployed = await wallet.isDeployed();
+    if (!deployed) {
+      throw new Error("Account not deployed - deploy first");
+    }
+
+    log(
+      `Cancelling ${getDcaBackendLabel(order.providerId)} DCA order ${truncateAddress(order.orderAddress)}...`,
+      "info"
+    );
+    const sponsor = dcaSponsoredInput.checked;
+    const tx = await wallet
+      .dca()
+      .cancel(
+        buildDcaCancelInput(order),
+        sponsor ? { feeMode: "sponsored" } : undefined
+      );
+
+    log(`DCA cancel submitted: ${truncateAddress(tx.hash)}`, "success");
+    if (sponsor) {
+      log("DCA cancellation submitted in sponsored mode", "info");
+    }
+
+    log("Waiting for DCA cancellation confirmation...", "info");
+    await tx.wait();
+    log("DCA order cancelled!", "success");
+    if (tx.explorerUrl) {
+      log(`Explorer: ${tx.explorerUrl}`, "info");
+    }
+
+    await refreshDcaOrders(true);
+  } catch (err) {
+    log(`DCA cancellation failed: ${err}`, "error");
+  } finally {
+    setButtonLoading(button, false, "Cancel Order");
+    updateDcaButtons();
+  }
+}
+
+function renderDcaOrders(orders: DcaOrder[]): void {
+  if (orders.length === 0) {
+    renderEmptyDcaOrders("No DCA orders found for this wallet yet.");
+    return;
+  }
+
+  dcaOrdersEl.innerHTML = "";
+
+  for (const order of orders) {
+    const card = document.createElement("div");
+    card.className = "order-card";
+
+    const orderHeader = document.createElement("div");
+    orderHeader.className = "order-header";
+    orderHeader.innerHTML = `
+      <div>
+        <div class="order-title">${describeTokenAddress(order.sellTokenAddress)} -> ${describeTokenAddress(order.buyTokenAddress)}</div>
+        <div class="order-subtitle">${getDcaBackendLabel(order.providerId)} · ${truncateAddress(order.orderAddress)} · ${order.timestamp.toLocaleString()}</div>
+      </div>
+      <span class="status-badge ${order.status === "ACTIVE" ? "status-deployed" : order.status === "INDEXING" ? "status-checking" : "status-not-deployed"}">${order.status}</span>
+    `;
+    card.appendChild(orderHeader);
+
+    const orderGrid = document.createElement("div");
+    orderGrid.className = "order-grid";
+    orderGrid.innerHTML = `
+      <div class="order-meta">
+        <span class="order-meta-label">Total Sell</span>
+        <span class="order-meta-value">${formatTokenAmount(order.sellAmountBase, order.sellTokenAddress)}</span>
+      </div>
+      <div class="order-meta">
+        <span class="order-meta-label">Sell / Cycle</span>
+        <span class="order-meta-value">${formatTokenAmount(order.sellAmountPerCycleBase, order.sellTokenAddress)}</span>
+      </div>
+      <div class="order-meta">
+        <span class="order-meta-label">Bought So Far</span>
+        <span class="order-meta-value">${formatTokenAmount(order.amountBoughtBase, order.buyTokenAddress)}</span>
+      </div>
+      <div class="order-meta">
+        <span class="order-meta-label">Frequency</span>
+        <span class="order-meta-value">${formatDcaFrequency(order)}</span>
+      </div>
+      <div class="order-meta">
+        <span class="order-meta-label">Progress</span>
+        <span class="order-meta-value">${order.executedTradesCount}/${order.iterations} executed</span>
+      </div>
+      <div class="order-meta">
+        <span class="order-meta-label">Status Detail</span>
+        <span class="order-meta-value">${order.pendingTradesCount} pending · ${order.cancelledTradesCount} cancelled</span>
+      </div>
+    `;
+    card.appendChild(orderGrid);
+
+    if (order.status !== "CLOSED") {
+      const actions = document.createElement("div");
+      actions.className = "order-actions";
+      const cancelButton = document.createElement("button");
+      cancelButton.className = "btn btn-secondary btn-small";
+      cancelButton.textContent = "Cancel Order";
+      cancelButton.addEventListener("click", () => {
+        void cancelDcaOrder(order, cancelButton);
+      });
+      actions.appendChild(cancelButton);
+      card.appendChild(actions);
+    }
+
+    dcaOrdersEl.appendChild(card);
+  }
+}
+
+function updateDcaButtons(): void {
+  const isWalletConnected = wallet != null;
+  const hasDcaProvider = dcaProviderSelect.value.length > 0;
+  const hasPreviewProvider = dcaPreviewProviderSelect.value.length > 0;
+  const hasTotal = dcaTotalAmountInput.value.trim().length > 0;
+  const hasCycle = dcaCycleAmountInput.value.trim().length > 0;
+
+  btnDcaPreview.disabled =
+    !isWalletConnected ||
+    !hasDcaProvider ||
+    !hasPreviewProvider ||
+    !hasTotal ||
+    !hasCycle;
+  btnDcaCreate.disabled =
+    !isWalletConnected ||
+    !hasDcaProvider ||
+    !hasPreviewProvider ||
+    !hasTotal ||
+    !hasCycle;
+  btnDcaRefresh.disabled = !isWalletConnected;
+}
+
+function normalizeDcaTokenSelection(changed: "in" | "out"): void {
+  if (dcaTokenInSelect.value !== dcaTokenOutSelect.value) {
+    return;
+  }
+
+  const alternative = dcaTokens.find(
+    (token) => token.address !== dcaTokenInSelect.value
+  );
+  if (!alternative) {
+    return;
+  }
+
+  if (changed === "in") {
+    dcaTokenOutSelect.value = alternative.address;
+  } else {
+    dcaTokenInSelect.value = alternative.address;
+  }
+}
+
+function populateDcaProviders(): void {
+  const availableProviders = getAvailableDcaProviders();
+  dcaProviderSelect.innerHTML = "";
+  for (const provider of availableProviders) {
+    const option = document.createElement("option");
+    option.value = provider.id;
+    option.textContent = provider.id.toUpperCase();
+    dcaProviderSelect.appendChild(option);
+  }
+
+  dcaProviderSelect.value = getPreferredDcaProviderId();
+}
+
+function populateDcaPreviewProviders(): void {
+  dcaPreviewProviderSelect.innerHTML = "";
+  for (const provider of swapProviders) {
+    const option = document.createElement("option");
+    option.value = provider.id;
+    option.textContent = provider.id.toUpperCase();
+    dcaPreviewProviderSelect.appendChild(option);
+  }
+
+  dcaPreviewProviderSelect.value = getPreferredDcaPreviewProviderId();
+}
+
+function populateDcaTokens(): void {
+  dcaTokenInSelect.innerHTML = "";
+  dcaTokenOutSelect.innerHTML = "";
+
+  for (const token of dcaTokens) {
+    const inOption = document.createElement("option");
+    inOption.value = token.address;
+    inOption.textContent = tokenOptionLabel(token);
+    dcaTokenInSelect.appendChild(inOption);
+
+    const outOption = document.createElement("option");
+    outOption.value = token.address;
+    outOption.textContent = tokenOptionLabel(token);
+    dcaTokenOutSelect.appendChild(outOption);
+  }
+
+  const preferred = getPreferredDcaTokens();
+  dcaTokenInSelect.value = preferred.tokenIn.address;
+  dcaTokenOutSelect.value = preferred.tokenOut.address;
+}
+
+function populateDcaFrequencyOptions(): void {
+  dcaFrequencySelect.innerHTML = "";
+  for (const optionConfig of DCA_FREQUENCY_OPTIONS) {
+    const option = document.createElement("option");
+    option.value = optionConfig.value;
+    option.textContent = optionConfig.label;
+    dcaFrequencySelect.appendChild(option);
+  }
+  dcaFrequencySelect.value = DEFAULT_DCA_FREQUENCY;
+}
+
+function initializeDcaForm(): void {
+  populateDcaProviders();
+  populateDcaPreviewProviders();
+  populateDcaTokens();
+  populateDcaFrequencyOptions();
+  dcaSponsoredInput.checked = false;
+  dcaTotalAmountInput.value = "";
+  dcaCycleAmountInput.value = "";
+  dcaMinBuyInput.value = "";
+  dcaMaxBuyInput.value = "";
+  clearDcaPreview();
+  renderEmptyDcaOrders("Connect a wallet to load DCA orders.");
+  updateDcaButtons();
+}
+
+function parseOptionalAmountInput(
+  rawValue: string,
+  token: Token,
+  label: string
+): Amount | undefined {
+  const raw = rawValue.trim();
+  if (!raw) {
+    return undefined;
+  }
+
+  const amount = Amount.parse(raw, token);
+  if (amount.toBase() <= 0n) {
+    throw new Error(`${label} must be greater than zero`);
+  }
+  return amount;
+}
+
+function buildDcaInput() {
+  const dcaProviderId = dcaProviderSelect.value;
+  if (!dcaProviderId || !dcaProvidersById.has(dcaProviderId)) {
+    throw new Error("Select a valid recurring DCA backend");
+  }
+
+  const previewProviderId = dcaPreviewProviderSelect.value;
+  if (!previewProviderId || !swapProvidersById.has(previewProviderId)) {
+    throw new Error("Select a valid DCA preview source");
+  }
+
+  const sellToken = getTokenByAddress(dcaTokenInSelect.value, dcaTokens);
+  if (!sellToken) {
+    throw new Error("Select sell token");
+  }
+
+  const buyToken = getTokenByAddress(dcaTokenOutSelect.value, dcaTokens);
+  if (!buyToken) {
+    throw new Error("Select buy token");
+  }
+
+  if (sellToken.address === buyToken.address) {
+    throw new Error("Sell token and buy token must be different");
+  }
+
+  const totalSellAmountRaw = dcaTotalAmountInput.value.trim();
+  if (!totalSellAmountRaw) {
+    throw new Error("Enter a total sell amount");
+  }
+
+  const sellAmount = Amount.parse(totalSellAmountRaw, sellToken);
+  if (sellAmount.toBase() <= 0n) {
+    throw new Error("Total sell amount must be greater than zero");
+  }
+
+  const cycleSellAmountRaw = dcaCycleAmountInput.value.trim();
+  if (!cycleSellAmountRaw) {
+    throw new Error("Enter a per-cycle sell amount");
+  }
+
+  const sellAmountPerCycle = Amount.parse(cycleSellAmountRaw, sellToken);
+  if (sellAmountPerCycle.toBase() <= 0n) {
+    throw new Error("Per-cycle sell amount must be greater than zero");
+  }
+
+  if (sellAmountPerCycle.toBase() > sellAmount.toBase()) {
+    throw new Error("Per-cycle sell amount cannot exceed total sell amount");
+  }
+
+  const minBuyAmount = parseOptionalAmountInput(
+    dcaMinBuyInput.value,
+    buyToken,
+    "Min buy / cycle"
+  );
+  const maxBuyAmount = parseOptionalAmountInput(
+    dcaMaxBuyInput.value,
+    buyToken,
+    "Max buy / cycle"
+  );
+
+  if (
+    minBuyAmount &&
+    maxBuyAmount &&
+    minBuyAmount.toBase() > maxBuyAmount.toBase()
+  ) {
+    throw new Error("Min buy / cycle cannot exceed max buy / cycle");
+  }
+
+  if (
+    isEkuboDcaBackend(dcaProviderId) &&
+    (minBuyAmount != null || maxBuyAmount != null)
+  ) {
+    throw new Error("Ekubo DCA does not support min/max buy constraints");
+  }
+
+  return {
+    dcaProviderId,
+    previewProviderId,
+    sellToken,
+    buyToken,
+    sellAmount,
+    sellAmountPerCycle,
+    frequency: dcaFrequencySelect.value || DEFAULT_DCA_FREQUENCY,
+    ...(!isEkuboDcaBackend(dcaProviderId) && (minBuyAmount || maxBuyAmount)
+      ? {
+          pricingStrategy: {
+            ...(minBuyAmount && { minBuyAmount }),
+            ...(maxBuyAmount && { maxBuyAmount }),
+          },
+        }
+      : {}),
+  };
+}
+
+async function refreshDcaOrders(silent = false): Promise<void> {
+  if (!wallet) {
+    renderEmptyDcaOrders("Connect a wallet to load DCA orders.");
+    return;
+  }
+
+  const providerId = dcaProviderSelect.value;
+  if (!providerId || !dcaProvidersById.has(providerId)) {
+    renderEmptyDcaOrders("Select a DCA backend to load orders.");
+    return;
+  }
+
+  if (!silent) {
+    setButtonLoading(btnDcaRefresh, true);
+  }
+
+  try {
+    const page = await wallet.dca().getOrders({
+      provider: providerId,
+      size: DCA_ORDER_PAGE_SIZE,
+    });
+    renderDcaOrders(page.content);
+    if (!silent) {
+      log(
+        `Loaded ${page.content.length} ${providerId.toUpperCase()} DCA orders`,
+        "success"
+      );
+    }
+  } catch (err) {
+    renderEmptyDcaOrders("Unable to load DCA orders right now.");
+    if (!silent) {
+      log(`DCA order refresh failed: ${err}`, "error");
+    }
+  } finally {
+    if (!silent) {
+      setButtonLoading(btnDcaRefresh, false, "Refresh Orders");
+    }
+    updateDcaButtons();
+  }
+}
+
 // Logging
 function log(
   message: string,
@@ -673,12 +1263,14 @@ function showConnected() {
   };
   walletTypeLabelEl.textContent =
     labels[walletType || ""] || "Connected Wallet";
+  populateDcaProviders();
   updateSwapButtons();
 
   if (bridgeController && wallet) {
     bridgeSection.classList.remove("hidden");
     bridgeController.setStarknetWallet(wallet);
   }
+  updateDcaButtons();
 }
 
 function showDisconnected() {
@@ -688,12 +1280,16 @@ function showDisconnected() {
   wallet = null;
   walletType = null;
   clearSwapQuote();
+  populateDcaProviders();
+  clearDcaPreview();
+  renderEmptyDcaOrders("Connect a wallet to load DCA orders.");
   updateSwapButtons();
 
   bridgeSection.classList.add("hidden");
   if (bridgeController) {
     bridgeController.setStarknetWallet(null);
   }
+  updateDcaButtons();
 }
 
 function setStatus(status: "deployed" | "not-deployed" | "checking") {
@@ -753,6 +1349,10 @@ async function connectCartridge() {
       strategy: OnboardStrategy.Cartridge,
       deploy: "never",
       cartridge: { policies: [DUMMY_POLICY] },
+      swapProviders,
+      defaultSwapProviderId: swapProviders[0]?.id,
+      dcaProviders,
+      defaultDcaProviderId: dcaProviders[0]?.id,
     });
     wallet = onboard.wallet;
     walletType = "cartridge";
@@ -764,6 +1364,7 @@ async function connectCartridge() {
     log(`Connected: ${truncateAddress(wallet.address)}`, "success");
     showConnected();
     await checkDeploymentStatus();
+    await refreshDcaOrders(true);
   } catch (err) {
     log(`Cartridge connection failed: ${err}`, "error");
     log("Check if popups are blocked (look for icon in URL bar)", "info");
@@ -796,6 +1397,10 @@ async function connectPrivateKey() {
       deploy: "never",
       account: { signer },
       accountPreset: preset,
+      swapProviders,
+      defaultSwapProviderId: swapProviders[0]?.id,
+      dcaProviders,
+      defaultDcaProviderId: dcaProviders[0]?.id,
     });
     wallet = onboard.wallet;
     walletType = "privatekey";
@@ -814,6 +1419,7 @@ async function connectPrivateKey() {
     log("Click 📋 to copy address, then fund it with STRK", "info");
     showConnected();
     await checkDeploymentStatus();
+    await refreshDcaOrders(true);
   } catch (err) {
     log(`Connection failed: ${err}`, "error");
   } finally {
@@ -877,6 +1483,10 @@ async function connectPrivy() {
       strategy: OnboardStrategy.Privy,
       deploy: "never",
       accountPreset: preset,
+      swapProviders,
+      defaultSwapProviderId: swapProviders[0]?.id,
+      dcaProviders,
+      defaultDcaProviderId: dcaProviders[0]?.id,
       privy: {
         resolve: async () => ({
           walletId: walletData.id,
@@ -897,6 +1507,7 @@ async function connectPrivy() {
     log(`Connected: ${truncateAddress(wallet.address)}`, "success");
     showConnected();
     await checkDeploymentStatus();
+    await refreshDcaOrders(true);
   } catch (err) {
     log(`Privy connection failed: ${err}`, "error");
     if (String(err).includes("server not running")) {
@@ -1391,6 +2002,120 @@ async function confidentialRagequit() {
   }
 }
 
+async function fetchDcaPreview() {
+  if (!wallet) {
+    return;
+  }
+
+  setButtonLoading(btnDcaPreview, true);
+  clearDcaPreview();
+
+  try {
+    const {
+      dcaProviderId,
+      previewProviderId,
+      sellToken,
+      buyToken,
+      sellAmountPerCycle,
+    } = buildDcaInput();
+
+    log(
+      `Previewing ${previewProviderId.toUpperCase()} DCA cycle ${sellAmountPerCycle.toUnit()} ${sellToken.symbol} -> ${buyToken.symbol}`,
+      "info"
+    );
+
+    const quote = await wallet.dca().previewCycle({
+      swapProvider: previewProviderId,
+      sellToken,
+      buyToken,
+      sellAmountPerCycle,
+    });
+
+    renderDcaPreview({
+      dcaProviderId,
+      previewProviderId: quote.provider ?? previewProviderId,
+      sellAmountPerCycle,
+      tokenOut: buyToken,
+      amountOutBase: quote.amountOutBase,
+      routeCallCount: quote.routeCallCount,
+      priceImpactBps: quote.priceImpactBps,
+    });
+    log(
+      `DCA cycle preview received: ${Amount.fromRaw(quote.amountOutBase, buyToken.decimals, buyToken.symbol).toFormatted(true)}`,
+      "success"
+    );
+  } catch (err) {
+    log(`DCA preview failed: ${err}`, "error");
+  } finally {
+    setButtonLoading(btnDcaPreview, false, "Preview Cycle");
+    updateDcaButtons();
+  }
+}
+
+async function createDcaOrder() {
+  if (!wallet) {
+    return;
+  }
+
+  setButtonLoading(btnDcaCreate, true);
+
+  try {
+    const deployed = await wallet.isDeployed();
+    if (!deployed) {
+      throw new Error("Account not deployed - deploy first");
+    }
+
+    const {
+      dcaProviderId,
+      previewProviderId,
+      sellToken,
+      buyToken,
+      sellAmount,
+      sellAmountPerCycle,
+      frequency,
+      pricingStrategy,
+    } = buildDcaInput();
+    const sponsor = dcaSponsoredInput.checked;
+
+    log(
+      `Creating ${dcaProviderId.toUpperCase()} DCA order ${sellAmount.toUnit()} ${sellToken.symbol} total / ${sellAmountPerCycle.toUnit()} per cycle into ${buyToken.symbol} (${frequency}, preview ${previewProviderId.toUpperCase()})`,
+      "info"
+    );
+
+    const tx = await wallet.dca().create(
+      {
+        provider: dcaProviderId,
+        sellToken,
+        buyToken,
+        sellAmount,
+        sellAmountPerCycle,
+        frequency,
+        ...(pricingStrategy && { pricingStrategy }),
+      },
+      sponsor ? { feeMode: "sponsored" } : undefined
+    );
+
+    log(`DCA create submitted: ${truncateAddress(tx.hash)}`, "success");
+    if (sponsor) {
+      log("DCA order submitted in sponsored mode", "info");
+    }
+
+    log("Waiting for DCA confirmation...", "info");
+    await tx.wait();
+    log("DCA order created!", "success");
+    if (tx.explorerUrl) {
+      log(`Explorer: ${tx.explorerUrl}`, "info");
+    }
+
+    await refreshDcaOrders(true);
+  } catch (err) {
+    log(`DCA creation failed: ${err}`, "error");
+  } finally {
+    setButtonLoading(btnDcaCreate, false, "Create DCA");
+    updateDcaButtons();
+  }
+}
+
 // Deploy account
 async function deployAccount() {
   if (!wallet) return;
@@ -1465,6 +2190,11 @@ btnTransferSponsored.addEventListener("click", testSponsoredTransfer);
 btnDisconnect.addEventListener("click", disconnect);
 btnSwapQuote.addEventListener("click", fetchSwapQuote);
 btnSwapSubmit.addEventListener("click", submitSwap);
+btnDcaPreview.addEventListener("click", fetchDcaPreview);
+btnDcaCreate.addEventListener("click", createDcaOrder);
+btnDcaRefresh.addEventListener("click", () => {
+  void refreshDcaOrders();
+});
 
 swapProviderSelect.addEventListener("change", () => {
   clearSwapQuote();
@@ -1494,6 +2224,55 @@ swapSlippageInput.addEventListener("input", () => {
 
 swapSponsoredInput.addEventListener("change", () => {
   updateSwapButtons();
+});
+
+dcaProviderSelect.addEventListener("change", () => {
+  clearDcaPreview();
+  void refreshDcaOrders(true);
+  updateDcaButtons();
+});
+
+dcaPreviewProviderSelect.addEventListener("change", () => {
+  clearDcaPreview();
+  updateDcaButtons();
+});
+
+dcaTokenInSelect.addEventListener("change", () => {
+  normalizeDcaTokenSelection("in");
+  clearDcaPreview();
+  updateDcaButtons();
+});
+
+dcaTokenOutSelect.addEventListener("change", () => {
+  normalizeDcaTokenSelection("out");
+  clearDcaPreview();
+  updateDcaButtons();
+});
+
+dcaTotalAmountInput.addEventListener("input", () => {
+  clearDcaPreview();
+  updateDcaButtons();
+});
+
+dcaCycleAmountInput.addEventListener("input", () => {
+  clearDcaPreview();
+  updateDcaButtons();
+});
+
+dcaFrequencySelect.addEventListener("change", () => {
+  clearDcaPreview();
+});
+
+dcaMinBuyInput.addEventListener("input", () => {
+  clearDcaPreview();
+});
+
+dcaMaxBuyInput.addEventListener("input", () => {
+  clearDcaPreview();
+});
+
+dcaSponsoredInput.addEventListener("change", () => {
+  updateDcaButtons();
 });
 
 // Allow Enter key to submit private key form
@@ -1666,6 +2445,7 @@ btnTongoRefresh.addEventListener("click", async () => {
 // Initial log
 initializeSwapForm();
 populateTongoTokenSelect();
+initializeDcaForm();
 log(`SDK initialized on ${NETWORK} with RPC: ${RPC_URL}`, "info");
 if (REOWN_PROJECT_ID) {
   log("Bridge enabled (Reown AppKit)", "info");

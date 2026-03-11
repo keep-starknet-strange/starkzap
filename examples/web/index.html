@@ -372,6 +372,12 @@
         width: auto;
       }
 
+      .panel-note {
+        margin-bottom: 0.85rem;
+        color: var(--text-secondary);
+        font-size: 0.85rem;
+      }
+
       .quote-box {
         margin-top: 0.75rem;
         border: 1px solid var(--border-color);
@@ -399,6 +405,87 @@
       .quote-value {
         font-family: var(--font-mono);
         color: var(--text-primary);
+      }
+
+      .orders-list {
+        display: grid;
+        gap: 0.75rem;
+        margin-top: 0.75rem;
+      }
+
+      .order-card {
+        border: 1px solid var(--border-color);
+        border-radius: 12px;
+        padding: 0.9rem;
+        background: rgba(10, 10, 15, 0.35);
+      }
+
+      .order-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: 0.75rem;
+        flex-wrap: wrap;
+        margin-bottom: 0.75rem;
+      }
+
+      .order-title {
+        font-weight: 600;
+      }
+
+      .order-subtitle {
+        color: var(--text-secondary);
+        font-size: 0.85rem;
+        font-family: var(--font-mono);
+      }
+
+      .order-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 0.6rem 1rem;
+      }
+
+      .order-meta {
+        display: flex;
+        flex-direction: column;
+        gap: 0.15rem;
+      }
+
+      .order-meta-label {
+        color: var(--text-muted);
+        font-size: 0.72rem;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+      }
+
+      .order-meta-value {
+        color: var(--text-primary);
+        font-size: 0.88rem;
+        font-family: var(--font-mono);
+      }
+
+      .order-actions {
+        display: flex;
+        justify-content: flex-end;
+        margin-top: 0.9rem;
+      }
+
+      .btn-small {
+        flex: 0 0 auto;
+        min-width: 0;
+        padding: 0.7rem 0.95rem;
+        font-size: 0.82rem;
+      }
+
+      .orders-empty {
+        color: var(--text-secondary);
+        font-size: 0.9rem;
+      }
+
+      @media (max-width: 640px) {
+        .order-grid {
+          grid-template-columns: 1fr;
+        }
       }
 
       .log-container {
@@ -990,6 +1077,80 @@
                 Refresh State
               </button>
             </div>
+          </div>
+        </div>
+
+        <div class="swap-card">
+          <div class="card-title" style="margin-bottom: 0.75rem">DCA</div>
+          <p class="panel-note">
+            Choose the recurring-order backend separately from the one-cycle
+            preview route. AVNU supports min/max buy constraints; EKUBO runs a
+            native continuous TWAMM order instead.
+          </p>
+          <div class="form-group">
+            <label for="dca-provider">Recurring Backend</label>
+            <select id="dca-provider"></select>
+          </div>
+          <div class="form-group">
+            <label for="dca-preview-provider">Cycle Preview Source</label>
+            <select id="dca-preview-provider"></select>
+          </div>
+          <div class="swap-grid">
+            <div class="form-group">
+              <label for="dca-token-in">Sell Token</label>
+              <select id="dca-token-in"></select>
+            </div>
+            <div class="form-group">
+              <label for="dca-token-out">Buy Token</label>
+              <select id="dca-token-out"></select>
+            </div>
+          </div>
+          <div class="swap-grid">
+            <div class="form-group">
+              <label for="dca-total-amount">Total Sell Amount</label>
+              <input id="dca-total-amount" type="text" placeholder="10" />
+            </div>
+            <div class="form-group">
+              <label for="dca-cycle-amount">Sell Amount / Cycle</label>
+              <input id="dca-cycle-amount" type="text" placeholder="1" />
+            </div>
+          </div>
+          <div class="swap-grid">
+            <div class="form-group">
+              <label for="dca-frequency">Frequency</label>
+              <select id="dca-frequency"></select>
+            </div>
+            <div class="form-group">
+              <label for="dca-min-buy">Min Buy / Cycle (optional)</label>
+              <input id="dca-min-buy" type="text" placeholder="0.1" />
+            </div>
+          </div>
+          <div class="swap-grid">
+            <div class="form-group">
+              <label for="dca-max-buy">Max Buy / Cycle (optional)</label>
+              <input id="dca-max-buy" type="text" placeholder="1.5" />
+            </div>
+            <div class="form-group swap-inline" style="margin-top: 1.85rem">
+              <input id="dca-sponsored" type="checkbox" />
+              <label for="dca-sponsored" style="margin: 0"
+                >Use sponsored fee mode</label
+              >
+            </div>
+          </div>
+          <div class="actions" style="margin-top: 0.75rem">
+            <button id="btn-dca-preview" class="btn btn-secondary">
+              Preview Cycle
+            </button>
+            <button id="btn-dca-create" class="btn btn-primary">
+              Create DCA
+            </button>
+            <button id="btn-dca-refresh" class="btn btn-secondary">
+              Refresh Orders
+            </button>
+          </div>
+          <div id="dca-preview" class="quote-box hidden"></div>
+          <div id="dca-orders" class="orders-list">
+            <div class="orders-empty">Connect a wallet to load DCA orders.</div>
           </div>
         </div>
       </div>
