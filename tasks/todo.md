@@ -727,3 +727,36 @@
   - repo is clean after push (`rtk git status --branch --short`)
 - Note:
   - this preserves the current implementation split exactly as pushed; it does not change the earlier architectural caveat that AVNU uses a hosted DCA backend while the current Ekubo DCA path is a client-side integration over Ekubo APIs/contracts.
+
+# Task: AVNU DCA Clarity Cleanup (2026-03-11)
+
+## Plan
+- [x] Review `src/dca/avnu.ts` to separate useful adapter boundaries from trivial helper indirection.
+- [x] Simplify the file so validation, mapping, and API fallback remain explicit while one-line wrappers are inlined.
+- [x] Run focused AVNU DCA validation and root typecheck.
+
+## Review
+- Simplified `src/dca/avnu.ts` to privilege direct readability:
+  - removed the one-line `toHexQuantity`, `getErrorMessage`, `parseOptionalBigInt`, and `mapOrdersPage` helpers
+  - kept the helpers that still isolate meaningful boundaries: `toPricingStrategy`, `validateCreateRequest`, `mapPricingStrategy`, `mapTrade`, `mapOrder`, and API-base fallback selection
+  - made `getOrders()` read as straight-line fetch-then-map logic instead of nested helper composition
+- Verification:
+  - `rtk vitest run tests/dca-avnu-provider.test.ts`
+  - `rtk proxy npm run -s typecheck`
+
+# Task: Ekubo DCA Clarity Cleanup (2026-03-11)
+
+## Plan
+- [x] Review `src/dca/ekubo.ts` to separate meaningful protocol boundaries from trivial helper indirection.
+- [x] Simplify the file while preserving the order-id, API parsing, timing, and on-chain call boundaries that actually carry complexity.
+- [x] Run focused Ekubo DCA validation and root typecheck.
+
+## Review
+- Simplified `src/dca/ekubo.ts` for readability without changing the protocol boundary:
+  - removed trivial wrappers like decimal-string/address/date/status helpers and used direct expressions where the data flow is obvious
+  - made `getOrders()` linear by building parsed order descriptors once instead of encoding and then immediately decoding the same order ids
+  - centralized duplicated Ekubo HTTP request/error handling in a single `fetchJson()` method, while keeping response-schema parsing separate
+  - kept the helpers that still isolate real complexity: API payload parsing, duration/timing alignment, order-id encoding/decoding, request validation, and Starknet call construction
+- Verification:
+  - `rtk vitest run tests/dca-ekubo-provider.test.ts`
+  - `rtk proxy npm run -s typecheck`
