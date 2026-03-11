@@ -11,7 +11,8 @@ export type CartridgePolicy = { target: string; method: string };
 export interface CartridgeNativeConnectArgs {
   rpcUrl: string;
   chainId: string;
-  policies?: CartridgePolicy[];
+  /** Session policies (required, non-empty). At least one policy is required. */
+  policies: CartridgePolicy[];
   preset?: string;
   url?: string;
   redirectUrl?: string;

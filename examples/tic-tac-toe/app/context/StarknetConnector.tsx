@@ -1,15 +1,5 @@
-import type {
-  CartridgeNativeAdapter,
-  CartridgeNativeSessionHandle,
-  WalletInterface,
-} from "@starkzap/native";
+import type { CartridgeNativeAdapter, WalletInterface } from "@starkzap/native";
 import * as WebBrowser from "expo-web-browser";
-import {
-  SessionAccount,
-  type SessionPolicies,
-  type SessionPolicy,
-  type Call,
-} from "@/modules/controller/src";
 import React, {
   createContext,
   useCallback,
@@ -21,8 +11,29 @@ import React, {
 type StarknetNetwork = "SN_MAIN" | "SN_SEPOLIA" | "SN_DEVNET";
 type StarknetProvider = ReturnType<WalletInterface["getProvider"]>;
 type StarknetAccount = ReturnType<WalletInterface["getAccount"]>;
-type StarkZapNativeModule = typeof import("@starkzap/native");
-type StarknetModule = typeof import("starknet");
+
+type CartridgeTsOpenSessionArgs = {
+  url: string;
+  redirectUrl?: string;
+  redirectQueryName: string;
+};
+
+type CartridgeTsOpenSessionResult = {
+  encodedSession?: string;
+  callbackUrl?: string;
+  status?: "success" | "cancel" | "dismiss";
+};
+
+type StarkZapNativeModule = typeof import("@starkzap/native") & {
+  createCartridgeTsAdapter: (options?: {
+    logger?: Pick<Console, "info" | "warn" | "error">;
+    sessionRegistrationTimeoutMs?: number;
+    sessionRequestTimeoutMs?: number;
+    openSession?: (
+      args: CartridgeTsOpenSessionArgs
+    ) => Promise<CartridgeTsOpenSessionResult>;
+  }) => CartridgeNativeAdapter;
+};
 
 const DEFAULT_NETWORK: StarknetNetwork = "SN_SEPOLIA";
 const DEFAULT_TIC_TAC_TOE_CONTRACT_ADDRESS =
@@ -55,9 +66,7 @@ function toSdkNetwork(
   }
 }
 
-const CARTRIDGE_API_URL = "https://api.cartridge.gg";
-const DEFAULT_CARTRIDGE_URL = "https://x.cartridge.gg";
-const DEFAULT_MAX_FEE = "0x5AF3107A4000"; // 100_000_000_000_000 wei
+const DEFAULT_REDIRECT_URL = "tictactoe://cartridge/callback";
 
 function toErrorMessage(error: unknown): string {
   if (error instanceof Error) {
@@ -74,205 +83,79 @@ function resolveCartridgeRpc(network: StarknetNetwork): string {
   return CARTRIDGE_RPC_BY_NETWORK[network];
 }
 
-function buildSessionPolicies(
-  starknet: StarknetModule,
-  policies: Array<{ target: string; method: string }>,
-  maxFee: string = DEFAULT_MAX_FEE
-): SessionPolicies {
-  const sessionPolicies: SessionPolicy[] = policies.map((p) => ({
-    contractAddress:
-      typeof starknet.addAddressPadding === "function"
-        ? starknet.addAddressPadding(String(p.target))
-        : String(p.target),
-    entrypoint: String(p.method),
-  }));
-  return { policies: sessionPolicies, maxFee };
-}
-
-function normalizeCallsForUniffi(
-  starknet: StarknetModule,
-  calls: unknown[]
-): Call[] {
-  type CallInput = {
-    contractAddress?: unknown;
-    entrypoint?: unknown;
-    calldata?: unknown;
-  };
-
-  return calls.map((call) => {
-    const normalized = (call ?? {}) as CallInput;
-    const rawCalldata = normalized.calldata ?? [];
-    const calldataElements: string[] = Array.isArray(rawCalldata)
-      ? starknet.CallData.compile(rawCalldata)
-      : [];
-    return {
-      contractAddress:
-        typeof starknet.addAddressPadding === "function"
-          ? starknet.addAddressPadding(String(normalized.contractAddress))
-          : String(normalized.contractAddress),
-      entrypoint: String(normalized.entrypoint),
-      calldata: calldataElements,
-    };
-  });
-}
-
-function normalizeTransactionHash(response: unknown): string {
-  if (typeof response === "string" && response) {
-    return response;
+function resolveCartridgeRedirectUrl(): string {
+  const configured = process.env.EXPO_PUBLIC_CARTRIDGE_REDIRECT_URL?.trim();
+  if (configured) {
+    return configured;
   }
-  const result = response as {
-    transaction_hash?: string;
-    transactionHash?: string;
-    data?: { transaction_hash?: string; transactionHash?: string };
-  };
-  return (
-    result?.transaction_hash ||
-    result?.transactionHash ||
-    result?.data?.transaction_hash ||
-    result?.data?.transactionHash ||
-    ""
-  );
+  return DEFAULT_REDIRECT_URL;
 }
 
-function buildCartridgeSessionUrl(
-  baseUrl: string,
-  publicKey: string,
-  policies: Array<{ target: string; method: string }>,
-  rpcUrl: string
-): string {
-  const root = baseUrl.replace(/\/+$/, "");
-  const params = new URLSearchParams({
-    public_key: publicKey,
-    policies: JSON.stringify(
-      policies.map((p) => ({ target: p.target, method: p.method }))
-    ),
-    rpc_url: rpcUrl,
-  });
-  return `${root}/session?${params.toString()}`;
+function extractEncodedSessionFromAuthUrl(
+  callbackUrl: string,
+  queryName: string = "startapp"
+): string | null {
+  try {
+    const parsed = new URL(callbackUrl);
+    const value = parsed.searchParams.get(queryName);
+    return value && value.length > 0 ? value : null;
+  } catch {
+    return null;
+  }
 }
 
-function createSessionAccountAsync(
-  privateKey: string,
-  sessionPolicies: SessionPolicies,
-  rpcUrl: string
-): Promise<ReturnType<typeof SessionAccount.createFromSubscribe>> {
-  return new Promise((resolve, reject) => {
-    // createFromSubscribe is synchronous and can block JS while waiting on auth.
-    // Queue it so Safari can be opened first.
-    setTimeout(() => {
-      try {
-        resolve(
-          SessionAccount.createFromSubscribe(
-            privateKey,
-            sessionPolicies,
-            rpcUrl,
-            CARTRIDGE_API_URL
-          )
-        );
-      } catch (error) {
-        reject(error);
+function createTsCartridgeAdapter(
+  native: StarkZapNativeModule
+): CartridgeNativeAdapter {
+  if (typeof native.createCartridgeTsAdapter !== "function") {
+    throw new Error(
+      "Installed @starkzap/native build does not expose createCartridgeTsAdapter(). Rebuild @starkzap/native before running the app."
+    );
+  }
+
+  return native.createCartridgeTsAdapter({
+    logger: console,
+    sessionRegistrationTimeoutMs: 90_000,
+    sessionRequestTimeoutMs: 10_000,
+    openSession: async ({
+      url,
+      redirectUrl,
+      redirectQueryName,
+    }: CartridgeTsOpenSessionArgs): Promise<CartridgeTsOpenSessionResult> => {
+      const callbackTarget = redirectUrl || resolveCartridgeRedirectUrl();
+      const result = await WebBrowser.openAuthSessionAsync(url, callbackTarget);
+      if (result.type !== "success") {
+        return {
+          status: result.type === "cancel" ? "cancel" : "dismiss",
+        };
       }
-    }, 0);
-  });
-}
-
-async function createDefaultNativeCartridgeAdapter(): Promise<CartridgeNativeAdapter> {
-  return {
-    async connect(args) {
-      const starknet = await import("starknet");
-      const sessionPrivateKey = starknet.stark.randomAddress();
-      const sessionPublicKey =
-        starknet.ec.starkCurve.getStarkKey(sessionPrivateKey);
-      const formattedPrivateKey =
-        starknet.encode.addHexPrefix(sessionPrivateKey);
-
-      const policies = (args.policies ?? []) as Array<{
-        target: string;
-        method: string;
-      }>;
-      const sessionPolicies = buildSessionPolicies(starknet, policies);
-      const cartridgeUrl =
-        args.url ||
-        process.env.EXPO_PUBLIC_CARTRIDGE_URL ||
-        DEFAULT_CARTRIDGE_URL;
-      const sessionUrl = buildCartridgeSessionUrl(
-        cartridgeUrl,
-        sessionPublicKey,
-        policies,
-        args.rpcUrl
+      const encodedSession = extractEncodedSessionFromAuthUrl(
+        result.url,
+        redirectQueryName
       );
-
-      const browserTask = WebBrowser.openBrowserAsync(sessionUrl);
-      let sessionAccount: ReturnType<typeof SessionAccount.createFromSubscribe>;
-      try {
-        sessionAccount = await createSessionAccountAsync(
-          formattedPrivateKey,
-          sessionPolicies,
-          args.rpcUrl
-        );
-      } catch (error) {
-        try {
-          await WebBrowser.dismissBrowser();
-        } catch {
-          // Browser may already be closed by the user.
-        }
-        throw error;
-      }
-
-      try {
-        await WebBrowser.dismissBrowser();
-      } catch {
-        // Browser may already be closed by the user.
-      }
-      void browserTask.catch(() => undefined);
-
-      const address = sessionAccount.address();
-
-      const executeSession = async (calls: unknown[]) => {
-        const normalizedCalls = normalizeCallsForUniffi(starknet, calls);
-        try {
-          return sessionAccount.executeFromOutside(normalizedCalls);
-        } catch {
-          return sessionAccount.execute(normalizedCalls);
-        }
+      return {
+        status: "success",
+        ...(encodedSession ? { encodedSession } : {}),
+        callbackUrl: result.url,
       };
-
-      const sessionHandle: CartridgeNativeSessionHandle = {
-        account: {
-          address,
-          executePaymasterTransaction: async (calls: unknown[]) => {
-            const transaction_hash = normalizeTransactionHash(
-              await executeSession(calls)
-            );
-            if (!transaction_hash) {
-              throw new Error("Cartridge did not return a transaction hash.");
-            }
-
-            return { transaction_hash };
-          },
-        },
-        username: async () => sessionAccount.username(),
-        disconnect: async () => {},
-        controller: { type: "cartridge-native-session" },
-      };
-      return sessionHandle;
     },
-  };
+  });
 }
 
 let nativeModulePromise: Promise<StarkZapNativeModule> | null = null;
 function loadNativeModule(): Promise<StarkZapNativeModule> {
   if (!nativeModulePromise) {
-    nativeModulePromise = import("@starkzap/native");
+    nativeModulePromise =
+      import("@starkzap/native") as unknown as Promise<StarkZapNativeModule>;
   }
   return nativeModulePromise;
 }
 
-let didRegisterNativeAdapter = false;
+let didRegisterCartridgeAdapter = false;
 let adapterRegistrationPromise: Promise<void> | null = null;
 
-async function ensureNativeAdapterRegistered(): Promise<void> {
-  if (didRegisterNativeAdapter) {
+async function ensureCartridgeAdapterRegistered(): Promise<void> {
+  if (didRegisterCartridgeAdapter) {
     return;
   }
   if (adapterRegistrationPromise) {
@@ -281,9 +164,9 @@ async function ensureNativeAdapterRegistered(): Promise<void> {
 
   adapterRegistrationPromise = (async () => {
     const native = await loadNativeModule();
-    const adapter = await createDefaultNativeCartridgeAdapter();
+    const adapter = createTsCartridgeAdapter(native);
     native.registerCartridgeNativeAdapter(adapter);
-    didRegisterNativeAdapter = true;
+    didRegisterCartridgeAdapter = true;
   })();
 
   try {
@@ -350,7 +233,7 @@ export const StarknetConnectorProvider: React.FC<{
         network: toSdkNetwork(network),
         rpcUrl: cartridgeRpc,
       });
-      await ensureNativeAdapterRegistered();
+      await ensureCartridgeAdapterRegistered();
       const policies = getTicTacToePolicies();
       const onboard = await sdk.onboard({
         strategy: "cartridge",
@@ -365,7 +248,7 @@ export const StarknetConnectorProvider: React.FC<{
             : { url: "https://x.cartridge.gg" }),
           ...(process.env.EXPO_PUBLIC_CARTRIDGE_REDIRECT_URL
             ? { redirectUrl: process.env.EXPO_PUBLIC_CARTRIDGE_REDIRECT_URL }
-            : { redirectUrl: "tictactoe://cartridge/callback" }),
+            : { redirectUrl: DEFAULT_REDIRECT_URL }),
         },
       });
 

@@ -33,6 +33,14 @@ export class StarkZap extends CoreStarkZap {
     }
 
     const adapter = getCartridgeNativeAdapterOrThrow();
+
+    const policies = options.policies;
+    if (!policies || policies.length === 0) {
+      throw new Error(
+        "policies are required and cannot be empty for Cartridge session connection. Provide at least one policy, e.g. [{ target: '0x...', method: 'create_game' }]."
+      );
+    }
+
     const provider = this.getProvider();
     const chainId = await getChainId(provider);
     const rpcUrl = this.resolveProviderRpcUrl();
@@ -41,7 +49,7 @@ export class StarkZap extends CoreStarkZap {
     const args: CartridgeNativeConnectArgs = {
       rpcUrl,
       chainId: chainId.toFelt252(),
-      ...(options.policies && { policies: options.policies }),
+      policies,
       ...(options.preset && { preset: options.preset }),
       ...(options.url && { url: options.url }),
       ...(options.redirectUrl && { redirectUrl: options.redirectUrl }),
@@ -126,7 +134,7 @@ export class StarkZap extends CoreStarkZap {
       return nodeUrl;
     }
     throw new Error(
-      "Unable to resolve RPC URL from the SDK provider for native Cartridge."
+      "Unable to resolve RPC URL from the SDK provider for Cartridge."
     );
   }
 

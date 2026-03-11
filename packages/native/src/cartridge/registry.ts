@@ -3,7 +3,7 @@ import type { CartridgeNativeAdapter } from "@/cartridge/types";
 let cartridgeNativeAdapter: CartridgeNativeAdapter | null = null;
 
 const MISSING_NATIVE_ADAPTER_MESSAGE =
-  "Cartridge native adapter is not registered. Call registerCartridgeNativeAdapter(adapter) once at app startup before connectCartridge()/onboard({ strategy: OnboardStrategy.Cartridge }).";
+  "Cartridge adapter is not registered. Call registerCartridgeNativeAdapter(adapter) or registerCartridgeTsAdapter(options) once at app startup before connectCartridge()/onboard({ strategy: OnboardStrategy.Cartridge }).";
 
 export function registerCartridgeNativeAdapter(
   adapter: CartridgeNativeAdapter
