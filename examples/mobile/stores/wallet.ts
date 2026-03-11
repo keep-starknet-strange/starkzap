@@ -31,6 +31,8 @@ import {
   showTransactionToast,
   updateTransactionToast,
 } from "@/components/Toast";
+import { swapProviders } from "@/swaps";
+import { dcaProviders } from "@/dca";
 
 // Privy server URL - change this to your server URL
 export const PRIVY_SERVER_URL = process.env.EXPO_PUBLIC_PRIVY_SERVER_URL ?? "";
@@ -844,6 +846,10 @@ export const useWalletStore = create<WalletState>((set, get) => ({
         ...(preferSponsored && { feeMode: "sponsored" as const }),
         account: { signer },
         accountPreset: PRESETS[selectedPreset],
+        swapProviders,
+        defaultSwapProviderId: swapProviders[0]?.id,
+        dcaProviders,
+        defaultDcaProviderId: dcaProviders[0]?.id,
       });
       const connectedWallet = onboard.wallet;
 
@@ -885,6 +891,10 @@ export const useWalletStore = create<WalletState>((set, get) => ({
         deploy: "never",
         ...(preferSponsored && { feeMode: "sponsored" as const }),
         accountPreset: PRESETS[privySelectedPreset],
+        swapProviders,
+        defaultSwapProviderId: swapProviders[0]?.id,
+        dcaProviders,
+        defaultDcaProviderId: dcaProviders[0]?.id,
         privy: {
           resolve: async () => ({
             walletId,

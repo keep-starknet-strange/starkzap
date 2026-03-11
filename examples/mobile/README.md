@@ -87,6 +87,24 @@ Notes:
 - On Sepolia, the Swap tab defaults to `USDC.e` instead of `USDC` because `USDC` routes are often unavailable on Ekubo testnet.
 - On low-liquidity pairs, the quote API can return an error such as `Insufficient liquidity in the routes ...`.
 
+## DCA flow in this example
+
+The same tab now includes a `DCA` mode for recurring buys:
+
+- choose the recurring backend first (`AVNU` or `Ekubo`)
+- `wallet.dca().previewCycle(...)` previews one cycle through the selected swap source (`AVNU` or `Ekubo`, depending on network support).
+- `wallet.dca().create(...)` creates the recurring order through the selected native backend.
+- `wallet.dca().getOrders(...)` refreshes recent orders for the selected backend on the connected wallet.
+- `wallet.dca().cancel(...)` cancels an active order through that same backend.
+
+Notes:
+
+- The mobile wallet session registers both swap providers and DCA providers during onboarding, so the backend selector and preview selector only show integrations the connected wallet can actually use.
+- The mobile example keeps DCA token choices curated and chain-specific instead of exposing the full swap token list.
+- `AVNU` creates discrete recurring orders.
+- `Ekubo` creates a native continuous TWAMM order, so listed orders show `Continuous` instead of a preset cadence.
+- Pull-to-refresh updates balances, and in `DCA` mode it also refreshes the recent order list.
+
 ## Backend for Privy and paymaster (optional but recommended)
 
 This app expects the same backend contract as `examples/server`:
