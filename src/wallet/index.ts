@@ -27,6 +27,7 @@ import type {
   StakingConfig,
 } from "@/types";
 import type { SwapProvider } from "@/swap";
+import type { DcaProvider } from "@/dca";
 import {
   checkDeployed,
   ensureWalletReady,
@@ -71,6 +72,10 @@ export interface WalletOptions {
   swapProviders?: SwapProvider[];
   /** Optional default swap provider id (must be registered) */
   defaultSwapProviderId?: string;
+  /** Optional additional DCA providers to register on this wallet */
+  dcaProviders?: DcaProvider[];
+  /** Optional default DCA provider id (must be registered) */
+  defaultDcaProviderId?: string;
 }
 
 /**
@@ -161,6 +166,8 @@ export class Wallet extends BaseWallet {
       timeBounds,
       swapProviders,
       defaultSwapProviderId,
+      dcaProviders,
+      defaultDcaProviderId,
     } = options;
 
     // Build or use provided AccountProvider
@@ -214,6 +221,14 @@ export class Wallet extends BaseWallet {
     }
     if (defaultSwapProviderId) {
       wallet.setDefaultSwapProvider(defaultSwapProviderId);
+    }
+    if (dcaProviders?.length) {
+      for (const dcaProvider of dcaProviders) {
+        wallet.dca().registerProvider(dcaProvider);
+      }
+    }
+    if (defaultDcaProviderId) {
+      wallet.dca().setDefaultProvider(defaultDcaProviderId);
     }
 
     return wallet;

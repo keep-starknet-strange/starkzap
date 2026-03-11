@@ -91,6 +91,18 @@ const lendingRepayCall: Call = {
   calldata: [4, 5, 6],
 };
 
+const dcaCreateCall: Call = {
+  contractAddress: fromAddress("0x601"),
+  entrypoint: "open_dca",
+  calldata: [7, 8, 9],
+};
+
+const dcaCancelCall: Call = {
+  contractAddress: fromAddress("0x602"),
+  entrypoint: "cancel_dca",
+  calldata: [10, 11, 12],
+};
+
 // ─── Mock helpers ────────────────────────────────────────────────────────────
 
 function createMockErc20(token: Token) {
@@ -150,6 +162,14 @@ function createMockWallet(
       calls: [lendingRepayCall],
     }),
   };
+  const mockDca = {
+    prepareCreate: vi.fn().mockResolvedValue({
+      calls: [dcaCreateCall],
+    }),
+    prepareCancel: vi.fn().mockResolvedValue({
+      calls: [dcaCancelCall],
+    }),
+  };
   const defaultSwapProvider: SwapProvider = {
     id: "default",
     supportsChain: () => true,
@@ -175,6 +195,7 @@ function createMockWallet(
     }),
     staking: vi.fn().mockResolvedValue(mockStaking),
     lending: vi.fn().mockReturnValue(mockLending),
+    dca: vi.fn().mockReturnValue(mockDca),
     getChainId: vi.fn().mockReturnValue(ChainId.SEPOLIA),
     getDefaultSwapProvider: vi.fn().mockReturnValue(defaultSwapProvider),
     getSwapProvider: vi.fn(),
@@ -250,6 +271,16 @@ describe("TxBuilder", () => {
           amount,
         } as unknown)
       ).toBe(builder);
+      expect(
+        builder.dcaCreate({
+          sellToken: mockUSDC,
+          buyToken: mockSTRK,
+          sellAmount: amount,
+          sellAmountPerCycle: Amount.parse("10", mockUSDC),
+          frequency: "P1D",
+        })
+      ).toBe(builder);
+      expect(builder.dcaCancel({ orderAddress: "0x123" })).toBe(builder);
     });
   });
 
@@ -729,6 +760,59 @@ describe("TxBuilder", () => {
           })
           .calls()
       ).rejects.toThrow('Lending action "withdrawMax" returned no calls');
+    });
+  });
+
+  describe("dca", () => {
+    it("should resolve DCA create calls via wallet.dca()", async () => {
+      const wallet = createMockWallet();
+      const sellAmount = Amount.parse("100", mockUSDC);
+      const sellAmountPerCycle = Amount.parse("10", mockUSDC);
+
+      const calls = await new TxBuilder(wallet)
+        .dcaCreate({
+          sellToken: mockUSDC,
+          buyToken: mockSTRK,
+          sellAmount,
+          sellAmountPerCycle,
+          frequency: "P1D",
+        })
+        .calls();
+
+      expect(wallet.dca).toHaveBeenCalledTimes(1);
+      expect(calls).toEqual([dcaCreateCall]);
+    });
+
+    it("should resolve DCA cancel calls via wallet.dca()", async () => {
+      const wallet = createMockWallet();
+
+      const calls = await new TxBuilder(wallet)
+        .dcaCancel({ orderAddress: "0x123" })
+        .calls();
+
+      expect(wallet.dca).toHaveBeenCalledTimes(1);
+      expect(calls).toEqual([dcaCancelCall]);
+    });
+
+    it("should throw when DCA create returns no calls", async () => {
+      const wallet = createMockWallet({
+        dca: vi.fn().mockReturnValue({
+          prepareCreate: vi.fn().mockResolvedValue({ calls: [] }),
+          prepareCancel: vi.fn(),
+        }),
+      });
+
+      await expect(
+        new TxBuilder(wallet)
+          .dcaCreate({
+            sellToken: mockUSDC,
+            buyToken: mockSTRK,
+            sellAmount: Amount.parse("100", mockUSDC),
+            sellAmountPerCycle: Amount.parse("10", mockUSDC),
+            frequency: "P1D",
+          })
+          .calls()
+      ).rejects.toThrow('DCA action "create" returned no calls');
     });
   });
 

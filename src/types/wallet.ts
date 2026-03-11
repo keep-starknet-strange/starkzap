@@ -1,6 +1,7 @@
 import type { Call, Calldata, PaymasterTimeBounds } from "starknet";
 import type { SignerInterface } from "@/signer/interface";
 import type { SwapProvider } from "@/swap/interface";
+import type { DcaProvider } from "@/dca/interface";
 import type { Address } from "@/types/address";
 
 // ─── Account Class Configuration ─────────────────────────────────────────────
@@ -106,6 +107,10 @@ export interface ConnectWalletOptions {
   swapProviders?: SwapProvider[];
   /** Optional default swap provider id (must be registered) */
   defaultSwapProviderId?: string;
+  /** Optional additional DCA providers to register on the connected wallet */
+  dcaProviders?: DcaProvider[];
+  /** Optional default DCA provider id (must be registered) */
+  defaultDcaProviderId?: string;
 }
 
 // ─── Ensure Ready ────────────────────────────────────────────────────────────

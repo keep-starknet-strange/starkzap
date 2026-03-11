@@ -10,6 +10,7 @@ import type { ExplorerConfig } from "@/types/config";
 import type { WalletInterface } from "@/wallet/interface";
 import type { AccountPresetName } from "@/account/presets";
 import type { SwapProvider } from "@/swap/interface";
+import type { DcaProvider } from "@/dca/interface";
 
 type PrivySigningHeaders =
   | Record<string, string>
@@ -37,6 +38,10 @@ export interface OnboardBaseOptions {
   swapProviders?: SwapProvider[];
   /** Optional default swap provider id (must be registered) */
   defaultSwapProviderId?: string;
+  /** Optional additional DCA providers to register on the wallet */
+  dcaProviders?: DcaProvider[];
+  /** Optional default DCA provider id (must be registered) */
+  defaultDcaProviderId?: string;
 }
 
 export interface OnboardPrivyResolveResult {

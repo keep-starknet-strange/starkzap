@@ -217,6 +217,8 @@ export class StarkZap {
       timeBounds,
       swapProviders,
       defaultSwapProviderId,
+      dcaProviders,
+      defaultDcaProviderId,
     } = options;
 
     return Wallet.create({
@@ -228,6 +230,8 @@ export class StarkZap {
       ...(timeBounds && { timeBounds }),
       ...(swapProviders && { swapProviders }),
       ...(defaultSwapProviderId && { defaultSwapProviderId }),
+      ...(dcaProviders && { dcaProviders }),
+      ...(defaultDcaProviderId && { defaultDcaProviderId }),
     });
   }
 
@@ -264,6 +268,8 @@ export class StarkZap {
     const timeBounds = options.timeBounds;
     const swapProviders = options.swapProviders;
     const defaultSwapProviderId = options.defaultSwapProviderId;
+    const dcaProviders = options.dcaProviders;
+    const defaultDcaProviderId = options.defaultDcaProviderId;
     const shouldEnsureReady = deploy !== "never";
 
     if (options.strategy === "signer") {
@@ -279,6 +285,8 @@ export class StarkZap {
         ...(timeBounds && { timeBounds }),
         ...(swapProviders && { swapProviders }),
         ...(defaultSwapProviderId && { defaultSwapProviderId }),
+        ...(dcaProviders && { dcaProviders }),
+        ...(defaultDcaProviderId && { defaultDcaProviderId }),
       });
 
       if (shouldEnsureReady) {
@@ -322,6 +330,8 @@ export class StarkZap {
         ...(timeBounds && { timeBounds }),
         ...(swapProviders && { swapProviders }),
         ...(defaultSwapProviderId && { defaultSwapProviderId }),
+        ...(dcaProviders && { dcaProviders }),
+        ...(defaultDcaProviderId && { defaultDcaProviderId }),
       });
 
       if (shouldEnsureReady) {
@@ -354,6 +364,14 @@ export class StarkZap {
       }
       if (defaultSwapProviderId) {
         wallet.setDefaultSwapProvider(defaultSwapProviderId);
+      }
+      if (dcaProviders?.length) {
+        for (const dcaProvider of dcaProviders) {
+          wallet.dca().registerProvider(dcaProvider);
+        }
+      }
+      if (defaultDcaProviderId) {
+        wallet.dca().setDefaultProvider(defaultDcaProviderId);
       }
 
       if (shouldEnsureReady) {

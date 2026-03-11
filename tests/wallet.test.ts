@@ -4,6 +4,7 @@ import { StarkSigner } from "@/signer";
 import { OpenZeppelinPreset, ArgentPreset, BraavosPreset } from "@/account";
 import { Amount, ChainId, fromAddress, type Token } from "@/types";
 import type { SwapProvider } from "@/swap";
+import type { DcaProvider } from "@/dca";
 import { getTestConfig, testPrivateKeys } from "./config.js";
 
 describe("Wallet", () => {
@@ -161,6 +162,53 @@ describe("Wallet", () => {
 
       expect(quote.provider).toBe("ekubo");
       expect(ekuboProvider.getQuote).toHaveBeenCalledTimes(1);
+    });
+
+    it("should accept additional DCA providers via connectWallet options", async () => {
+      const signer = new StarkSigner(privateKey);
+      const ekuboDcaProvider: DcaProvider = {
+        id: "ekubo",
+        supportsChain: () => true,
+        getOrders: vi.fn().mockResolvedValue({
+          content: [],
+          totalPages: 0,
+          totalElements: 0,
+          size: 10,
+          number: 0,
+        }),
+        prepareCreate: vi.fn().mockResolvedValue({
+          providerId: "ekubo",
+          action: "create" as const,
+          calls: [
+            {
+              contractAddress: fromAddress("0x999"),
+              entrypoint: "mint_and_increase_sell_amount",
+              calldata: [],
+            },
+          ],
+        }),
+        prepareCancel: vi.fn().mockResolvedValue({
+          providerId: "ekubo",
+          action: "cancel" as const,
+          calls: [
+            {
+              contractAddress: fromAddress("0x999"),
+              entrypoint: "decrease_sale_rate_to_self",
+              calldata: [],
+            },
+          ],
+        }),
+      };
+
+      const wallet = await sdk.connectWallet({
+        account: { signer },
+        dcaProviders: [ekuboDcaProvider],
+        defaultDcaProviderId: "ekubo",
+      });
+
+      expect(wallet.dca().getDcaProvider("ekubo")).toBe(ekuboDcaProvider);
+      expect(wallet.dca().listProviders()).toContain("ekubo");
+      expect(wallet.dca().getDefaultDcaProvider()).toBe(ekuboDcaProvider);
     });
   });
 
