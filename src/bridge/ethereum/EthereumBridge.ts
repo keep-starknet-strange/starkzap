@@ -229,11 +229,10 @@ export abstract class EthereumBridge<Fee = unknown> implements BridgeInterface<
   private async updateAllowanceFromReceipt(
     receipt: ContractTransactionReceipt
   ) {
-    // TODO remove this log later
-    console.log("UPDATE ALLOWANCE RECEIPT", receipt.logs, receipt.toJSON());
     const tokenInterface = this.token.getContract()?.interface;
     if (!tokenInterface || !receipt.logs) return;
 
+    // TODO this can be improved to parse logs once
     const approvalLog = receipt.logs.find((log) => {
       const parsedLog = tokenInterface.parseLog(log);
       return (

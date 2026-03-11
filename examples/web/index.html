@@ -465,6 +465,84 @@
           transform: rotate(360deg);
         }
       }
+
+      /* Bridge section */
+      .bridge-card {
+        margin-top: 1.5rem;
+        padding: 1rem;
+        border: 1px solid var(--border-color);
+        border-radius: 12px;
+        background: var(--bg-tertiary);
+      }
+
+      .bridge-direction-btn {
+        background: var(--bg-secondary);
+        border: 1px solid var(--border-color);
+        border-radius: 8px;
+        padding: 0.5rem 1rem;
+        color: var(--text-primary);
+        cursor: pointer;
+        font-family: var(--font-sans);
+        font-size: 0.85rem;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        transition: border-color 0.2s;
+      }
+
+      .bridge-direction-btn:hover {
+        border-color: var(--accent-primary);
+      }
+
+      .bridge-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 0.5rem 0;
+        font-size: 0.85rem;
+      }
+
+      .bridge-row-label {
+        color: var(--text-secondary);
+      }
+
+      .bridge-row-value {
+        font-family: var(--font-mono);
+        color: var(--text-primary);
+        font-size: 0.8rem;
+      }
+
+      .bridge-row-value.loading {
+        color: var(--text-muted);
+        font-style: italic;
+      }
+
+      .bridge-fees {
+        margin-top: 0.5rem;
+        padding: 0.75rem;
+        border: 1px solid var(--border-color);
+        border-radius: 8px;
+        background: rgba(10, 10, 15, 0.45);
+        font-size: 0.8rem;
+        white-space: pre-line;
+        color: var(--text-secondary);
+        font-family: var(--font-mono);
+      }
+
+      .bridge-toggle {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        font-size: 0.85rem;
+        color: var(--text-secondary);
+        cursor: pointer;
+        user-select: none;
+      }
+
+      .bridge-toggle input[type="checkbox"] {
+        width: auto;
+        accent-color: var(--accent-primary);
+      }
     </style>
   </head>
 
@@ -896,6 +974,125 @@
                 Refresh State
               </button>
             </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Bridge (shown when Starknet wallet connected) -->
+      <div id="bridge-section" class="card hidden">
+        <div class="card-title">Bridge</div>
+
+        <div
+          style="
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            margin-bottom: 1rem;
+          "
+        >
+          <button id="bridge-direction-btn" class="bridge-direction-btn">
+            Ethereum &rarr; Starknet
+          </button>
+          <button
+            id="btn-appkit-connect"
+            class="btn btn-secondary"
+            style="padding: 0.6rem 1.2rem; font-size: 0.85rem"
+          >
+            Connect Ethereum Wallet
+          </button>
+          <span
+            id="bridge-eth-address"
+            class="info-value"
+            style="font-size: 0.8rem; color: var(--text-muted)"
+          ></span>
+        </div>
+
+        <div class="bridge-card">
+          <div class="form-group">
+            <label for="bridge-token">Token</label>
+            <select id="bridge-token">
+              <option value="">Select a token...</option>
+            </select>
+          </div>
+
+          <div
+            style="
+              display: flex;
+              justify-content: space-between;
+              align-items: center;
+              padding: 0.25rem 0;
+            "
+          >
+            <span
+              style="
+                font-size: 0.75rem;
+                font-weight: 600;
+                text-transform: uppercase;
+                letter-spacing: 0.05em;
+                color: var(--text-muted);
+              "
+              >Balances</span
+            >
+            <button
+              id="btn-bridge-refresh"
+              class="bridge-direction-btn"
+              style="padding: 0.25rem 0.6rem; font-size: 0.75rem"
+              title="Refresh balances &amp; allowance"
+            >
+              Refresh
+            </button>
+          </div>
+
+          <div class="bridge-row">
+            <span class="bridge-row-label">Starknet Balance</span>
+            <span id="bridge-starknet-balance" class="bridge-row-value">—</span>
+          </div>
+
+          <div class="bridge-row">
+            <span id="bridge-external-balance-label" class="bridge-row-label"
+              >Ethereum Balance</span
+            >
+            <span id="bridge-external-balance" class="bridge-row-value">—</span>
+          </div>
+
+          <div id="bridge-allowance-row" class="bridge-row">
+            <span class="bridge-row-label">Allowance</span>
+            <span id="bridge-allowance" class="bridge-row-value">—</span>
+          </div>
+
+          <div
+            id="bridge-fast-transfer-row"
+            class="hidden"
+            style="padding: 0.5rem 0"
+          >
+            <label class="bridge-toggle">
+              <input type="checkbox" id="bridge-fast-transfer" />
+              Fast Transfer (CCTP)
+            </label>
+          </div>
+
+          <div id="bridge-fees-section" class="hidden">
+            <div
+              style="
+                font-size: 0.75rem;
+                color: var(--text-muted);
+                margin-bottom: 0.375rem;
+              "
+            >
+              Fee Estimate
+            </div>
+            <div id="bridge-fees" class="bridge-fees">—</div>
+          </div>
+
+          <div class="form-group" style="margin-top: 0.75rem">
+            <label for="bridge-amount">Amount</label>
+            <input id="bridge-amount" type="text" placeholder="0.001" />
+          </div>
+
+          <div class="actions" style="margin-top: 0.75rem">
+            <button id="btn-bridge-deposit" class="btn btn-primary" disabled>
+              Bridge Deposit
+            </button>
           </div>
         </div>
       </div>

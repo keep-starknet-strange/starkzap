@@ -11,6 +11,7 @@ import {
   BraavosPreset,
   DevnetPreset,
   TongoConfidential,
+  type Eip1193Provider,
   type WalletInterface,
   type AccountClassConfig,
   type SwapProvider,
@@ -18,6 +19,11 @@ import {
 } from "starkzap";
 import { ec, RpcProvider } from "starknet";
 import { getSwapProviders } from "./swaps";
+import {
+  BridgeController,
+  initializeAppKit,
+  formatFeeEstimate,
+} from "./bridge";
 
 // Configuration
 const RPC_URL = "https://api.cartridge.gg/x/starknet/sepolia/rpc/v0_9";
@@ -200,6 +206,65 @@ const btnTongoRagequit = document.getElementById(
 const btnTongoRefresh = document.getElementById(
   "btn-tongo-refresh"
 ) as HTMLButtonElement;
+
+// Bridge DOM elements
+const bridgeSection = document.getElementById("bridge-section")!;
+const bridgeDirectionBtn = document.getElementById(
+  "bridge-direction-btn"
+) as HTMLButtonElement;
+const btnAppkitConnect = document.getElementById(
+  "btn-appkit-connect"
+) as HTMLButtonElement;
+const bridgeEthAddress = document.getElementById("bridge-eth-address")!;
+const bridgeTokenSelect = document.getElementById(
+  "bridge-token"
+) as HTMLSelectElement;
+const btnBridgeRefresh = document.getElementById(
+  "btn-bridge-refresh"
+) as HTMLButtonElement;
+const bridgeStarknetBalanceEl = document.getElementById(
+  "bridge-starknet-balance"
+)!;
+const bridgeExternalBalanceLabel = document.getElementById(
+  "bridge-external-balance-label"
+)!;
+const bridgeExternalBalanceEl = document.getElementById(
+  "bridge-external-balance"
+)!;
+const bridgeAllowanceRow = document.getElementById("bridge-allowance-row")!;
+const bridgeAllowanceEl = document.getElementById("bridge-allowance")!;
+const bridgeFastTransferRow = document.getElementById(
+  "bridge-fast-transfer-row"
+)!;
+const bridgeFastTransferInput = document.getElementById(
+  "bridge-fast-transfer"
+) as HTMLInputElement;
+const bridgeFeesSection = document.getElementById("bridge-fees-section")!;
+const bridgeFeesEl = document.getElementById("bridge-fees")!;
+const bridgeAmountInput = document.getElementById(
+  "bridge-amount"
+) as HTMLInputElement;
+const btnBridgeDeposit = document.getElementById(
+  "btn-bridge-deposit"
+) as HTMLButtonElement;
+
+// Reown AppKit + Bridge Controller
+const REOWN_PROJECT_ID = import.meta.env.VITE_REOWN_PROJECT_ID as
+  | string
+  | undefined;
+const AUTO_PRIVATE_KEY = import.meta.env.VITE_PRIVATE_KEY as string | undefined;
+const AUTO_ACCOUNT_PRESET = import.meta.env.VITE_ACCOUNT_PRESET as
+  | string
+  | undefined;
+let appKit: ReturnType<typeof initializeAppKit> | null = null;
+let bridgeController: BridgeController | null = null;
+
+if (REOWN_PROJECT_ID) {
+  appKit = initializeAppKit(REOWN_PROJECT_ID);
+  bridgeController = new BridgeController(sdk, SDK_CHAIN_ID, log, renderBridge);
+} else {
+  log("VITE_REOWN_PROJECT_ID not set - bridge disabled", "info");
+}
 
 // Preset mapping
 const presets: Record<string, AccountClassConfig> = {
@@ -423,6 +488,113 @@ function log(
   logContainer.scrollTop = logContainer.scrollHeight;
 }
 
+// Bridge rendering
+function renderBridge(): void {
+  if (!bridgeController) return;
+  const s = bridgeController.getState();
+
+  // Direction button
+  bridgeDirectionBtn.innerHTML =
+    s.direction === "to-starknet"
+      ? "Ethereum &rarr; Starknet"
+      : "Starknet &rarr; Ethereum";
+
+  // Eth wallet address + chain
+  if (s.connectedEthWallet) {
+    const addr = s.connectedEthWallet.address;
+    bridgeEthAddress.textContent = `${addr.slice(0, 6)}...${addr.slice(-4)} (chain ${s.connectedEthWallet.chainId})`;
+    bridgeEthAddress.title = addr;
+    btnAppkitConnect.textContent = "Change Wallet";
+  } else {
+    bridgeEthAddress.textContent = "";
+    bridgeEthAddress.title = "";
+    btnAppkitConnect.textContent = "Connect Ethereum Wallet";
+  }
+
+  // Populate token select
+  const currentValue = bridgeTokenSelect.value;
+  bridgeTokenSelect.innerHTML = '<option value="">Select a token...</option>';
+  for (const token of s.tokens) {
+    const opt = document.createElement("option");
+    opt.value = token.id;
+    opt.textContent = `${token.symbol} (${token.name})`;
+    bridgeTokenSelect.appendChild(opt);
+  }
+  if (s.selectedToken && s.tokens.some((t) => t.id === s.selectedToken!.id)) {
+    bridgeTokenSelect.value = s.selectedToken.id;
+  } else if (currentValue) {
+    bridgeTokenSelect.value = currentValue;
+  }
+
+  // Starknet balance
+  if (s.starknetBalanceLoading) {
+    bridgeStarknetBalanceEl.textContent = "Loading...";
+    bridgeStarknetBalanceEl.classList.add("loading");
+  } else {
+    bridgeStarknetBalanceEl.textContent = s.starknetBalance ?? "—";
+    bridgeStarknetBalanceEl.classList.remove("loading");
+  }
+
+  // External chain balance
+  const chainLabel = s.selectedToken?.chain ?? "Ethereum";
+  bridgeExternalBalanceLabel.textContent = `${chainLabel} Balance`;
+  if (s.externalBalanceLoading) {
+    bridgeExternalBalanceEl.textContent = "Loading...";
+    bridgeExternalBalanceEl.classList.add("loading");
+  } else {
+    bridgeExternalBalanceEl.textContent = s.externalBalance ?? "—";
+    bridgeExternalBalanceEl.classList.remove("loading");
+  }
+
+  // Refresh button
+  btnBridgeRefresh.disabled = s.refreshing || !s.selectedToken;
+
+  // Allowance
+  if (s.direction === "to-starknet") {
+    bridgeAllowanceRow.classList.remove("hidden");
+    if (s.allowanceLoading) {
+      bridgeAllowanceEl.textContent = "Loading...";
+      bridgeAllowanceEl.classList.add("loading");
+    } else {
+      bridgeAllowanceEl.textContent = s.allowance ?? "—";
+      bridgeAllowanceEl.classList.remove("loading");
+    }
+  } else {
+    bridgeAllowanceRow.classList.add("hidden");
+  }
+
+  // Fast transfer toggle (CCTP only, to-starknet only)
+  if (bridgeController.isCCTP() && s.direction === "to-starknet") {
+    bridgeFastTransferRow.classList.remove("hidden");
+    bridgeFastTransferInput.checked = s.fastTransfer;
+  } else {
+    bridgeFastTransferRow.classList.add("hidden");
+  }
+
+  // Fee estimate
+  if (s.direction === "to-starknet" && s.selectedToken) {
+    bridgeFeesSection.classList.remove("hidden");
+    if (s.feeLoading) {
+      bridgeFeesEl.textContent = "Estimating...";
+    } else if (s.feeEstimate) {
+      bridgeFeesEl.textContent = formatFeeEstimate(s.feeEstimate);
+    } else {
+      bridgeFeesEl.textContent = "—";
+    }
+  } else {
+    bridgeFeesSection.classList.add("hidden");
+  }
+
+  // Deposit button
+  const hasAmount = bridgeAmountInput.value.trim().length > 0;
+  const canDeposit =
+    s.direction === "to-starknet" &&
+    s.connectedEthWallet != null &&
+    s.selectedToken != null &&
+    hasAmount;
+  btnBridgeDeposit.disabled = !canDeposit;
+}
+
 // UI State
 function showConnected() {
   walletSection.classList.add("visible");
@@ -434,6 +606,11 @@ function showConnected() {
   walletTypeLabelEl.textContent =
     labels[walletType || ""] || "Connected Wallet";
   updateSwapButtons();
+
+  if (bridgeController && wallet) {
+    bridgeSection.classList.remove("hidden");
+    bridgeController.setStarknetWallet(wallet);
+  }
 }
 
 function showDisconnected() {
@@ -444,6 +621,11 @@ function showDisconnected() {
   walletType = null;
   clearSwapQuote();
   updateSwapButtons();
+
+  bridgeSection.classList.add("hidden");
+  if (bridgeController) {
+    bridgeController.setStarknetWallet(null);
+  }
 }
 
 function setStatus(status: "deployed" | "not-deployed" | "checking") {
@@ -1267,6 +1449,117 @@ btnGenerateKey.addEventListener("click", () => {
   log("This is a NEW account - fund it before deploying", "info");
 });
 
+// Bridge Event Listeners
+btnBridgeRefresh.addEventListener("click", () => {
+  bridgeController?.refresh();
+});
+
+btnAppkitConnect.addEventListener("click", () => {
+  if (appKit) {
+    appKit.open();
+  }
+});
+
+bridgeDirectionBtn.addEventListener("click", () => {
+  bridgeController?.toggleDirection();
+});
+
+bridgeTokenSelect.addEventListener("change", () => {
+  bridgeController?.selectToken(bridgeTokenSelect.value || null);
+});
+
+bridgeFastTransferInput.addEventListener("change", () => {
+  bridgeController?.setFastTransfer(bridgeFastTransferInput.checked);
+});
+
+bridgeAmountInput.addEventListener("input", () => {
+  renderBridge();
+});
+
+btnBridgeDeposit.addEventListener("click", () => {
+  const amount = bridgeAmountInput.value.trim();
+  if (amount && bridgeController) {
+    bridgeController.deposit(amount);
+  }
+});
+
+// Subscribe to AppKit account and network changes.
+// Account and network are separate subscriptions; we store latest
+// values and reconcile in a shared sync function.
+let appKitProvider: Eip1193Provider | null = null;
+
+function syncEthWalletFromAppKit(): void {
+  if (!bridgeController || !appKit) return;
+
+  const address = appKit.getAddress();
+  const chainId = appKit.getChainId();
+  const isConnected = appKit.getIsConnectedState();
+
+  if (isConnected && address && chainId && appKitProvider) {
+    bridgeController.connectEthereumWallet(
+      appKitProvider,
+      address,
+      String(chainId)
+    );
+  } else if (!isConnected) {
+    bridgeController.disconnectEthWallet();
+  }
+}
+
+if (appKit) {
+  appKit.subscribeProviders((providers) => {
+    appKitProvider =
+      (providers[
+        "eip155" as keyof typeof providers
+      ] as unknown as Eip1193Provider) ?? null;
+    syncEthWalletFromAppKit();
+  });
+
+  appKit.subscribeAccount(() => {
+    syncEthWalletFromAppKit();
+  });
+
+  appKit.subscribeNetwork(() => {
+    syncEthWalletFromAppKit();
+  });
+}
+
+// Auto-connect with private key from env vars
+async function autoConnect(): Promise<void> {
+  if (!AUTO_PRIVATE_KEY) return;
+
+  const presetKey = AUTO_ACCOUNT_PRESET ?? "openzeppelin";
+  const preset = presets[presetKey];
+  if (!preset) {
+    log(`Invalid VITE_ACCOUNT_PRESET: "${presetKey}"`, "error");
+    return;
+  }
+
+  log(`Auto-connecting with ${presetKey} account...`, "info");
+
+  try {
+    const signer = new StarkSigner(AUTO_PRIVATE_KEY);
+    const onboard = await sdk.onboard({
+      strategy: OnboardStrategy.Signer,
+      deploy: "never",
+      account: { signer },
+      accountPreset: preset,
+    });
+    wallet = onboard.wallet;
+    walletType = "privatekey";
+    registerWalletSwapProviders(wallet);
+
+    walletAddressEl.textContent = truncateAddress(wallet.address);
+    walletAddressEl.title = wallet.address;
+
+    log(`Auto-connected: ${truncateAddress(wallet.address)}`, "success");
+    showConnected();
+    await checkDeploymentStatus();
+  } catch (err) {
+    log(`Auto-connect failed: ${err}`, "error");
+  }
+}
+
 // Tongo event listeners
 btnTongoInit.addEventListener("click", initializeConfidential);
 btnTongoFund.addEventListener("click", confidentialFund);
@@ -1284,3 +1577,7 @@ btnTongoRefresh.addEventListener("click", async () => {
 initializeSwapForm();
 populateTongoTokenSelect();
 log(`SDK initialized with RPC: ${RPC_URL}`, "info");
+if (REOWN_PROJECT_ID) {
+  log("Bridge enabled (Reown AppKit)", "info");
+}
+autoConnect();

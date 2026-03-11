@@ -12,6 +12,9 @@
   },
   "dependencies": {
     "@cartridge/controller": "^0.13.9",
+    "@reown/appkit": "^1.7.0",
+    "@reown/appkit-adapter-ethers": "^1.7.0",
+    "ethers": "^6.16.0",
     "starkzap": "file:../.."
   },
   "devDependencies": {

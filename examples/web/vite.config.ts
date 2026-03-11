@@ -14,4 +14,5 @@ export default defineConfig({
   optimizeDeps: {
     exclude: ["starkzap"],
   },
+  envPrefix: "VITE_",
 });
