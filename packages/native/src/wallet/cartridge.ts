@@ -51,11 +51,11 @@ function isContractNotFound(error: unknown): boolean {
 }
 
 function unsupportedDeployMessage(): string {
-  return 'Native Cartridge wallet does not support deployment in this release. Use deploy: "never" and sponsored session execution.';
+  return 'Cartridge wallet does not support deployment in this release. Use deploy: "never" and sponsored session execution.';
 }
 
 function unsupportedUserPaysMessage(): string {
-  return 'Native Cartridge wallet currently supports sponsored session execution only. Use feeMode: "sponsored".';
+  return 'Cartridge wallet currently supports sponsored session execution only. Use feeMode: "sponsored".';
 }
 
 export interface NativeCartridgeWalletOptions {
@@ -176,9 +176,7 @@ export class NativeCartridgeWallet extends BaseWallet {
       typeof response !== "object" ||
       typeof response.transaction_hash !== "string"
     ) {
-      throw new Error(
-        "Native Cartridge execution did not return a transaction hash."
-      );
+      throw new Error("Cartridge execution did not return a transaction hash.");
     }
     return new Tx(
       response.transaction_hash,
@@ -191,7 +189,7 @@ export class NativeCartridgeWallet extends BaseWallet {
   async signMessage(typedData: TypedData): Promise<Signature> {
     if (!this.session.account.signMessage) {
       throw new Error(
-        "Native Cartridge session does not expose signMessage in this release."
+        "Cartridge session does not expose signMessage in this release."
       );
     }
     return this.session.account.signMessage(typedData);
@@ -254,7 +252,7 @@ export class NativeCartridgeWallet extends BaseWallet {
   async estimateFee(calls: Call[]): Promise<EstimateFeeResponseOverhead> {
     if (!this.session.account.estimateInvokeFee) {
       throw new Error(
-        "Native Cartridge session does not expose estimateInvokeFee in this release."
+        "Cartridge session does not expose estimateInvokeFee in this release."
       );
     }
     return this.session.account.estimateInvokeFee(calls);
