@@ -1,6 +1,9 @@
 import { BridgeCache } from "@/bridge/operator/BridgeCache";
 import { BridgeToken, EthereumBridgeToken } from "@/types/bridge/bridge-token";
-import type { BridgeInterface } from "@/bridge/types/BridgeInterface";
+import type {
+  BridgeDepositOptions,
+  BridgeInterface,
+} from "@/bridge/types/BridgeInterface";
 import { CanonicalEthereumBridge } from "@/bridge/ethereum/canonical/CanonicalEthereumBridge";
 import { Protocol } from "@/types/bridge/protocol";
 import {
@@ -36,14 +39,15 @@ export class BridgeOperator implements BridgeOperatorInterface {
     recipient: Address,
     amount: Amount,
     token: T,
-    externalWallet: ConnectedExternalWallet<AddressFor<T>>
+    externalWallet: ConnectedExternalWallet<AddressFor<T>>,
+    options?: BridgeDepositOptions
   ): Promise<TxResponseFor<T>> {
     const bridge = await this.bridge(
       token,
       externalWallet,
       this.starknetWallet
     );
-    return bridge.deposit(recipient, amount);
+    return bridge.deposit(recipient, amount, options);
   }
 
   public async getDepositBalance<T extends BridgeToken>(
@@ -60,14 +64,15 @@ export class BridgeOperator implements BridgeOperatorInterface {
 
   async getDepositFeeEstimate<T extends BridgeToken>(
     token: T,
-    externalWallet: ConnectedExternalWallet<AddressFor<T>>
+    externalWallet: ConnectedExternalWallet<AddressFor<T>>,
+    options?: BridgeDepositOptions
   ): Promise<FeeEstimationFor<T>> {
     const bridge = await this.bridge(
       token,
       externalWallet,
       this.starknetWallet
     );
-    return bridge.getDepositFeeEstimate();
+    return bridge.getDepositFeeEstimate(options);
   }
 
   public async getAllowance<T extends BridgeToken>(
@@ -82,22 +87,16 @@ export class BridgeOperator implements BridgeOperatorInterface {
     return bridge.getAllowance();
   }
 
-  public clearCache(): void {
-    this.cache.clear();
-  }
-
   private bridge<T extends BridgeToken>(
     token: T,
     wallet: ConnectedExternalWallet<AddressFor<T>>,
     starknetWallet: WalletInterface
   ): Promise<BridgeType<T>> {
-    const key = `${token.id}:${wallet.address}`;
-
-    const cached = this.cache.get<T>(key);
+    const cached = this.cache.get(token, wallet);
     if (cached) return cached;
 
     const promise = this.createBridge(token, wallet, starknetWallet);
-    this.cache.set(key, promise);
+    this.cache.set(token, wallet, promise);
     return promise;
   }
 

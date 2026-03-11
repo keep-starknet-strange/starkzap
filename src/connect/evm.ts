@@ -47,12 +47,23 @@ export class ConnectedEthereumWallet implements ConnectedExternalWallet<Ethereum
 
   private constructor(
     readonly address: EthereumAddress,
-    readonly chainId: string | number,
+    readonly chainId: number,
     readonly provider: Eip1193Provider
   ) {}
 
   public async toEthWalletConfig(): Promise<EthereumWalletConfig> {
-    const provider = new BrowserProvider(this.provider);
+    const ethChainIdRaw = await this.provider.request<string>({
+      method: "eth_chainId",
+    });
+    const ethChainId = Number(BigInt(ethChainIdRaw));
+
+    if (ethChainId !== this.chainId) {
+      throw new Error(
+        `Cannot create Ethereum Bridge. Expected ethereum chain id to be ${this.chainId} but got ${ethChainId}.`
+      );
+    }
+
+    const provider = new BrowserProvider(this.provider, this.chainId);
     const signer = await provider.getSigner(this.address);
     return { provider, signer };
   }

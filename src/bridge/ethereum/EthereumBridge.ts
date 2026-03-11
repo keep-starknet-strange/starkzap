@@ -1,4 +1,7 @@
-import type { BridgeInterface } from "@/bridge/types/BridgeInterface";
+import type {
+  BridgeDepositOptions,
+  BridgeInterface,
+} from "@/bridge/types/BridgeInterface";
 import {
   type Address,
   Amount,
@@ -77,7 +80,8 @@ export abstract class EthereumBridge implements BridgeInterface<
 
   async deposit(
     recipient: Address,
-    amount: Amount
+    amount: Amount,
+    _options?: BridgeDepositOptions
   ): Promise<TransactionResponse> {
     await this.approveSpendingOf(amount);
 
@@ -94,7 +98,9 @@ export abstract class EthereumBridge implements BridgeInterface<
     return response;
   }
 
-  async getDepositFeeEstimate(): Promise<EthereumDepositFeeEstimation> {
+  async getDepositFeeEstimate(
+    _options?: BridgeDepositOptions
+  ): Promise<EthereumDepositFeeEstimation> {
     const minimalAmount = await this.token.amount(1n);
 
     const [allowance, l1ToL2MessageFee, approvalFeeEstimation] =

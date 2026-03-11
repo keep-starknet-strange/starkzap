@@ -11,7 +11,7 @@ import {
   type Signer,
 } from "ethers";
 import ERC20_ABI from "@/abi/ethereum/erc20.json";
-import { type EthereumWalletConfig } from "@/bridge";
+import { type EthereumWalletConfig } from "@/bridge/ethereum/types";
 
 export async function ethereumAddress(
   contract: Contract

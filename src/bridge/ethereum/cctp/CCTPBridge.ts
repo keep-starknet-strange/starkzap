@@ -6,7 +6,10 @@ import {
   fromAddress,
   fromEthereumAddress,
 } from "@/types";
-import type { BridgeInterface } from "@/bridge/types/BridgeInterface";
+import type {
+  BridgeDepositOptions,
+  BridgeInterface,
+} from "@/bridge/types/BridgeInterface";
 import type {
   ApprovalFeeEstimation,
   CCTPDepositFeeEstimation,
@@ -87,14 +90,16 @@ export class CCTPBridge implements BridgeInterface<
 
   async deposit(
     recipient: Address,
-    amount: Amount
+    amount: Amount,
+    options?: BridgeDepositOptions
   ): Promise<TransactionResponse> {
     await this.approveSpendingOf(amount);
 
     const txRequest = await this.createDepositForBurnTransaction(
       recipient,
-      amount
-      // TODO how to get the extra param
+      amount,
+      undefined,
+      options?.fastTransfer
     );
 
     const txResponse = await this.execute(txRequest);
@@ -129,7 +134,10 @@ export class CCTPBridge implements BridgeInterface<
     return this.usdcToken.balanceOf(account);
   }
 
-  async getDepositFeeEstimate(): Promise<CCTPDepositFeeEstimation> {
+  async getDepositFeeEstimate(
+    options?: BridgeDepositOptions
+  ): Promise<CCTPDepositFeeEstimation> {
+    const fastTransfer = options?.fastTransfer;
     const minimalAmount = this.usdcAmount(2n);
     const [allowance, approvalFeeData, feeData, minimumFeeBps] =
       await Promise.all([
@@ -139,7 +147,7 @@ export class CCTPBridge implements BridgeInterface<
         this.cctpFees.getMinimumFeeBps(
           BridgeDirection.DEPOSIT_TO_STARKNET,
           this.starknetWallet.getChainId(),
-          true
+          fastTransfer
         ),
       ]);
 
@@ -158,7 +166,8 @@ export class CCTPBridge implements BridgeInterface<
       const txRequest = await this.createDepositForBurnTransaction(
         CCTPBridge.DUMMY_SN_ADDRESS,
         minimalAmount,
-        minimumFeeBps
+        minimumFeeBps,
+        fastTransfer
       );
 
       try {
@@ -363,17 +372,18 @@ export class CCTPBridge implements BridgeInterface<
   private async createDepositForBurnTransaction(
     recipient: Address,
     amount: Amount,
-    fastTransferFeeBps?: number
+    fastTransferFeeBps?: number,
+    fastTransfer?: boolean
   ): Promise<TransactionRequest> {
     const usdcAddress = await this.usdcToken.getAddress();
-    const fastTransferFee =
+    const feeBps =
       fastTransferFeeBps ??
       (await this.cctpFees.getMinimumFeeBps(
         BridgeDirection.DEPOSIT_TO_STARKNET,
         this.starknetWallet.getChainId(),
-        true
+        fastTransfer
       ));
-    const maxFee = this.calculateMaxFee(amount, fastTransferFee);
+    const maxFee = this.calculateMaxFee(amount, feeBps);
     const calldata = CCTPBridge.TOKEN_MESSENGER_INTERFACE.encodeFunctionData(
       "depositForBurn",
       [
@@ -381,9 +391,9 @@ export class CCTPBridge implements BridgeInterface<
         STARKNET_DOMAIN_ID,
         recipient,
         usdcAddress,
-        "0x0000000000000000000000000000000000000000000000000000000000000000", // Empty destination caller
+        "0x0000000000000000000000000000000000000000000000000000000000000000",
         maxFee.toBase(),
-        getFinalityThreshold(),
+        getFinalityThreshold(fastTransfer),
       ]
     );
 

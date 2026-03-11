@@ -2,6 +2,7 @@ import {
   ActivityIndicator,
   ScrollView,
   StyleSheet,
+  Switch,
   TextInput,
   TouchableOpacity,
   View,
@@ -10,10 +11,12 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useAccount, useAppKit, useProvider } from "@reown/appkit-react-native";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
+  type CCTPDepositFeeEstimation,
   type ConnectExternalWalletOptions,
   type Eip1193Provider,
   ExternalChain,
   fromEthereumAddress,
+  Protocol,
   type SolanaProvider,
 } from "@starkzap/native";
 
@@ -65,6 +68,8 @@ export default function BridgeScreen() {
     fetchBridgeDepositFeeEstimate,
     bridgeDepositFeeEstimate,
     bridgeDepositFeeLoading,
+    bridgeFastTransfer,
+    setBridgeFastTransfer,
     initiateBridge,
   } = useWalletStore((state) => state);
 
@@ -104,6 +109,7 @@ export default function BridgeScreen() {
     bridgeSelectedToken,
     bridgeDirection,
     connectedEthWallet,
+    bridgeFastTransfer,
     fetchBridgeDepositFeeEstimate,
   ]);
 
@@ -167,6 +173,7 @@ export default function BridgeScreen() {
   ]);
 
   const isDepositExternal = bridgeDirection === "to-starknet";
+  const isCCTP = bridgeSelectedToken?.protocol === Protocol.CCTP;
 
   const [amountInput, setAmountInput] = useState("");
   const [isBridging, setIsBridging] = useState(false);
@@ -664,6 +671,19 @@ export default function BridgeScreen() {
             >
               Estimated Fees
             </ThemedText>
+            {isCCTP ? (
+              <View style={styles.feeRow}>
+                <ThemedText style={[styles.feeLabel, { color: textSecondary }]}>
+                  Fast Transfer
+                </ThemedText>
+                <Switch
+                  value={bridgeFastTransfer}
+                  onValueChange={setBridgeFastTransfer}
+                  trackColor={{ false: borderColor, true: `${primaryColor}80` }}
+                  thumbColor={bridgeFastTransfer ? primaryColor : "#ccc"}
+                />
+              </View>
+            ) : null}
             {bridgeDepositFeeLoading ? (
               <View style={styles.feeRow}>
                 <ActivityIndicator size="small" />
@@ -706,6 +726,18 @@ export default function BridgeScreen() {
                       bridgeDepositFeeEstimate.approvalFee.toFormatted()}
                   </ThemedText>
                 </View>
+                {isCCTP && "fastTransferBpFee" in bridgeDepositFeeEstimate ? (
+                  <View style={styles.feeRow}>
+                    <ThemedText
+                      style={[styles.feeLabel, { color: textSecondary }]}
+                    >
+                      CCTP Fee
+                    </ThemedText>
+                    <ThemedText style={styles.feeValue}>
+                      {`${((bridgeDepositFeeEstimate as CCTPDepositFeeEstimation).fastTransferBpFee / 100).toFixed(2)}%`}
+                    </ThemedText>
+                  </View>
+                ) : null}
               </>
             ) : (
               <ThemedText style={[styles.feeLabel, { color: textSecondary }]}>

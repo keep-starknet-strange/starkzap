@@ -2,6 +2,26 @@ import { Amount } from "@/types";
 import type { WalletInterface } from "@/wallet";
 import type { Address } from "starkzap";
 
+/**
+ * Protocol-specific options for bridge deposit operations.
+ *
+ * These options are passed through the generic bridge interface and operator.
+ * Each bridge implementation reads only the fields relevant to its protocol
+ * and ignores the rest.
+ */
+export interface BridgeDepositOptions {
+  /**
+   * Enable fast transfer mode for CCTP (native USDC) deposits.
+   *
+   * When `true`, the deposit uses a lower finality threshold and pays
+   * a small basis-point fee (deducted from the transferred USDC amount)
+   * in exchange for faster cross-chain settlement.
+   *
+   * Ignored by non-CCTP bridge implementations.
+   */
+  fastTransfer?: boolean;
+}
+
 export interface BridgeInterface<
   ExternalAddress = unknown,
   TxResponse = unknown,
@@ -9,9 +29,13 @@ export interface BridgeInterface<
 > {
   readonly starknetWallet: WalletInterface;
 
-  deposit(recipient: Address, amount: Amount): Promise<TxResponse>;
+  deposit(
+    recipient: Address,
+    amount: Amount,
+    options?: BridgeDepositOptions
+  ): Promise<TxResponse>;
 
-  getDepositFeeEstimate(): Promise<Fee>;
+  getDepositFeeEstimate(options?: BridgeDepositOptions): Promise<Fee>;
 
   getAvailableDepositBalance(account: ExternalAddress): Promise<Amount>;
 

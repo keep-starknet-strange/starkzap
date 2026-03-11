@@ -7,13 +7,15 @@ import type {
   TxResponseFor,
 } from "@/bridge/types/generics";
 import type { Address } from "@/types";
+import type { BridgeDepositOptions } from "@/bridge/types/BridgeInterface";
 
 export interface BridgeOperatorInterface {
   deposit<T extends BridgeToken>(
     recipient: Address,
     amount: Amount,
     token: T,
-    externalWallet: ConnectedExternalWallet<AddressFor<T>>
+    externalWallet: ConnectedExternalWallet<AddressFor<T>>,
+    options?: BridgeDepositOptions
   ): Promise<TxResponseFor<T>>;
 
   getDepositBalance<T extends BridgeToken>(
@@ -23,7 +25,8 @@ export interface BridgeOperatorInterface {
 
   getDepositFeeEstimate<T extends BridgeToken>(
     token: T,
-    externalWallet: ConnectedExternalWallet<AddressFor<T>>
+    externalWallet: ConnectedExternalWallet<AddressFor<T>>,
+    options?: BridgeDepositOptions
   ): Promise<FeeEstimationFor<T>>;
 
   getAllowance<T extends BridgeToken>(

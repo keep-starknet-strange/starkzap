@@ -5,33 +5,57 @@ import type {
   FeeEstimationFor,
   TxResponseFor,
 } from "@/bridge/types/generics";
+import type { ConnectedExternalWallet } from "@/connect";
 
 export class BridgeCache {
-  private readonly cache = new Map<string, Promise<unknown>>();
+  private readonly cache = new Map<
+    string,
+    {
+      wallet: ConnectedExternalWallet<string>;
+      bridge: Promise<unknown>;
+    }
+  >();
 
   public get<T extends BridgeToken>(
-    key: string
+    token: T,
+    wallet: ConnectedExternalWallet<AddressFor<T>>
   ):
     | Promise<
         BridgeInterface<AddressFor<T>, TxResponseFor<T>, FeeEstimationFor<T>>
       >
     | undefined {
-    if (!this.cache.has(key)) return undefined;
-    return this.cache.get(key) as Promise<
+    const key = this.key(token, wallet);
+    const entry = this.cache.get(key);
+    if (!entry) {
+      return undefined;
+    }
+
+    if (entry.wallet !== wallet) {
+      this.cache.delete(key);
+      return undefined;
+    }
+
+    return entry.bridge as Promise<
       BridgeInterface<AddressFor<T>, TxResponseFor<T>, FeeEstimationFor<T>>
     >;
   }
 
   public set<T extends BridgeToken>(
-    key: string,
+    token: T,
+    wallet: ConnectedExternalWallet<AddressFor<T>>,
     bridge: Promise<
       BridgeInterface<AddressFor<T>, TxResponseFor<T>, FeeEstimationFor<T>>
     >
   ): void {
-    this.cache.set(key, bridge);
+    const key = this.key(token, wallet);
+
+    this.cache.set(key, { wallet, bridge });
   }
 
-  public clear(): void {
-    this.cache.clear();
+  private key<T extends BridgeToken>(
+    token: T,
+    wallet: ConnectedExternalWallet<AddressFor<T>>
+  ): string {
+    return `${wallet.chainId}:${wallet.address}:${token.address}`;
   }
 }

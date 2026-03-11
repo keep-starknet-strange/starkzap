@@ -147,6 +147,7 @@ interface WalletState {
   bridgeLastUpdated: Date | null;
   bridgeDepositFeeEstimate: EthereumDepositFeeEstimation | null;
   bridgeDepositFeeLoading: boolean;
+  bridgeFastTransfer: boolean;
 
   // Network configuration actions
   selectNetwork: (index: number) => void;
@@ -165,6 +166,7 @@ interface WalletState {
   fetchBridgeDepositBalance: () => Promise<void>;
   fetchBridgeAllowance: () => Promise<void>;
   fetchBridgeDepositFeeEstimate: () => Promise<void>;
+  setBridgeFastTransfer: (value: boolean) => void;
   initiateBridge: (amount: string) => Promise<void>;
 
   // Actions
@@ -256,6 +258,7 @@ export const useWalletStore = create<WalletState>((set, get) => ({
   bridgeLastUpdated: null,
   bridgeDepositFeeEstimate: null,
   bridgeDepositFeeLoading: false,
+  bridgeFastTransfer: false,
 
   // Network configuration actions
   selectNetwork: (index) => {
@@ -274,6 +277,7 @@ export const useWalletStore = create<WalletState>((set, get) => ({
         bridgeLastUpdated: null,
         bridgeDepositFeeEstimate: null,
         bridgeDepositFeeLoading: false,
+        bridgeFastTransfer: false,
       });
     }
   },
@@ -346,6 +350,7 @@ export const useWalletStore = create<WalletState>((set, get) => ({
       bridgeLastUpdated: null,
       bridgeDepositFeeEstimate: null,
       bridgeDepositFeeLoading: false,
+      bridgeFastTransfer: false,
       logs: [
         `SDK configured with ${selectedNetworkIndex !== null ? NETWORKS[selectedNetworkIndex].name : "Custom Network"}`,
       ],
@@ -389,6 +394,7 @@ export const useWalletStore = create<WalletState>((set, get) => ({
       bridgeLastUpdated: null,
       bridgeDepositFeeEstimate: null,
       bridgeDepositFeeLoading: false,
+      bridgeFastTransfer: false,
     });
     addLog("Network configuration reset");
   },
@@ -443,6 +449,7 @@ export const useWalletStore = create<WalletState>((set, get) => ({
       bridgeLastUpdated: null,
       bridgeDepositFeeEstimate: null,
       bridgeDepositFeeLoading: false,
+      bridgeFastTransfer: false,
     });
   },
 
@@ -457,6 +464,7 @@ export const useWalletStore = create<WalletState>((set, get) => ({
       bridgeAllowance: null,
       bridgeDepositFeeEstimate: null,
       bridgeDepositFeeLoading: false,
+      bridgeFastTransfer: false,
     }));
   },
 
@@ -468,6 +476,7 @@ export const useWalletStore = create<WalletState>((set, get) => ({
       bridgeAllowance: null,
       bridgeDepositFeeEstimate: null,
       bridgeDepositFeeLoading: false,
+      bridgeFastTransfer: false,
     });
   },
 
@@ -652,6 +661,7 @@ export const useWalletStore = create<WalletState>((set, get) => ({
       bridgeSelectedToken,
       bridgeDirection,
       connectedEthWallet,
+      bridgeFastTransfer,
       addLog,
     } = get();
 
@@ -671,7 +681,8 @@ export const useWalletStore = create<WalletState>((set, get) => ({
     try {
       const estimate = await wallet.getDepositFeeEstimate(
         bridgeSelectedToken as EthereumBridgeToken,
-        connectedEthWallet
+        connectedEthWallet,
+        { fastTransfer: bridgeFastTransfer }
       );
       set({
         bridgeDepositFeeEstimate: estimate,
@@ -683,11 +694,16 @@ export const useWalletStore = create<WalletState>((set, get) => ({
     }
   },
 
+  setBridgeFastTransfer: (value: boolean) => {
+    set({ bridgeFastTransfer: value });
+  },
+
   initiateBridge: async (amount: string) => {
     const {
       sdk,
       bridgeSelectedToken,
       bridgeDirection,
+      bridgeFastTransfer,
       wallet,
       connectedEthWallet,
       connectedSolWallet,
@@ -737,7 +753,8 @@ export const useWalletStore = create<WalletState>((set, get) => ({
             wallet.address,
             depositAmount,
             bridgeSelectedToken as EthereumBridgeToken,
-            connectedEthWallet
+            connectedEthWallet,
+            { fastTransfer: bridgeFastTransfer }
           );
           addLog(`Deposit tx sent: ${txResponse.hash}`);
         } else if (

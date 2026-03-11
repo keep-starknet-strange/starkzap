@@ -30,4 +30,5 @@ export interface ExternalWalletRegistry {
 export interface ConnectedExternalWallet<A extends string> {
   readonly chain: ExternalChain;
   readonly address: A;
+  readonly chainId: string | number;
 }

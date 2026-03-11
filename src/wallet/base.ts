@@ -35,6 +35,7 @@ import {
   VesuLendingProvider,
 } from "@/lending";
 import { BridgeOperator } from "@/bridge";
+import type { BridgeDepositOptions } from "@/bridge/types/BridgeInterface";
 import type { ConnectedExternalWallet } from "..";
 import type {
   AddressFor,
@@ -757,9 +758,16 @@ export abstract class BaseWallet implements WalletInterface {
     recipient: Address,
     amount: Amount,
     token: T,
-    externalWallet: ConnectedExternalWallet<AddressFor<T>>
+    externalWallet: ConnectedExternalWallet<AddressFor<T>>,
+    options?: BridgeDepositOptions
   ): Promise<TxResponseFor<T>> {
-    return this.bridging.deposit(recipient, amount, token, externalWallet);
+    return this.bridging.deposit(
+      recipient,
+      amount,
+      token,
+      externalWallet,
+      options
+    );
   }
 
   getDepositBalance<T extends BridgeToken>(
@@ -778,8 +786,9 @@ export abstract class BaseWallet implements WalletInterface {
 
   getDepositFeeEstimate<T extends BridgeToken>(
     token: T,
-    externalWallet: ConnectedExternalWallet<AddressFor<T>>
+    externalWallet: ConnectedExternalWallet<AddressFor<T>>,
+    options?: BridgeDepositOptions
   ): Promise<FeeEstimationFor<T>> {
-    return this.bridging.getDepositFeeEstimate(token, externalWallet);
+    return this.bridging.getDepositFeeEstimate(token, externalWallet, options);
   }
 }
