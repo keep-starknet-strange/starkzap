@@ -188,7 +188,6 @@ export default function SwapScreen() {
       ...sorted.filter((token) => !primaryAddresses.has(token.address)),
     ];
   }, [integrationTokens, primaryTokens]);
-
   const networkName =
     NETWORKS.find((n) => n.chainId.toLiteral() === chainId.toLiteral())?.name ??
     "Custom";

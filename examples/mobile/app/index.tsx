@@ -543,7 +543,6 @@ function Step2PrivateKeyChoice({
   const borderColor = useThemeColor({}, "border");
   const primaryColor = useThemeColor({}, "primary");
   const textSecondary = useThemeColor({}, "textSecondary");
-  const _cardBg = useThemeColor({}, "card");
 
   const createAccountTypeOptions = [
     { label: "Ready", value: ARGENT_PRESET },
@@ -760,7 +759,6 @@ function Step2PrivateKey({
   const primaryColor = useThemeColor({}, "primary");
   const textSecondary = useThemeColor({}, "textSecondary");
   const textColor = useThemeColor({}, "text");
-  const _cardBg = useThemeColor({}, "card");
 
   const accountTypeOptions = [
     { label: "Ready", value: ARGENT_PRESET },
@@ -1534,7 +1532,6 @@ function LandingWithPrivy() {
     selectedNetworkIndex,
     chainId,
     confirmNetworkConfig,
-    resetNetworkConfig,
     privateKey,
     selectedPreset,
     preferSponsored,
@@ -1545,8 +1542,6 @@ function LandingWithPrivy() {
     setSelectedPreset,
     setPreferSponsored,
     connect,
-    privySelectedPreset: _privySelectedPreset,
-    setPrivySelectedPreset: _setPrivySelectedPreset,
     connectWithPrivy,
     disconnect,
     selectNetwork,
@@ -1653,10 +1648,6 @@ function LandingWithPrivy() {
     []
   );
   const handleBackToChoice = useCallback(() => setLoginStep(1), []);
-  const _handleChangeNetwork = useCallback(() => {
-    resetNetworkConfig();
-    setLoginStep(0);
-  }, [resetNetworkConfig]);
 
   const cardBg = useThemeColor({}, "card");
   const networkName =
@@ -1732,7 +1723,7 @@ function LandingWithPrivy() {
                           selectNetwork={selectNetwork}
                           connectionMethod={connectionMethod}
                           setConnectionMethod={setConnectionMethod}
-                          onNext={() => setLoginStep(1)}
+                          onNext={handleNext}
                           privyAvailable={true}
                           setShowEmailForm={setShowEmailForm}
                         />
@@ -1907,7 +1898,6 @@ function LandingNoPrivy() {
     selectedNetworkIndex,
     chainId,
     confirmNetworkConfig,
-    resetNetworkConfig,
     privateKey,
     selectedPreset,
     preferSponsored,
@@ -1940,10 +1930,6 @@ function LandingNoPrivy() {
     []
   );
   const handleBackToChoice = useCallback(() => setLoginStep(1), []);
-  const _handleChangeNetwork = useCallback(() => {
-    resetNetworkConfig();
-    setLoginStep(0);
-  }, [resetNetworkConfig]);
 
   const cardBg = useThemeColor({}, "card");
   const networkName =
@@ -2016,7 +2002,7 @@ function LandingNoPrivy() {
                           selectNetwork={selectNetwork}
                           connectionMethod="privatekey"
                           setConnectionMethod={() => {}}
-                          onNext={() => setLoginStep(1)}
+                          onNext={handleNext}
                           privyAvailable={false}
                         />
                       </View>

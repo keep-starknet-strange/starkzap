@@ -21,6 +21,7 @@ import {
   updateTransactionToast,
   showCopiedToast,
 } from "@/components/Toast";
+import { getNetworkSelectionPatch } from "@/network-selection";
 
 // Privy server URL - change this to your server URL
 export const PRIVY_SERVER_URL = process.env.EXPO_PUBLIC_PRIVY_SERVER_URL ?? "";
@@ -103,6 +104,8 @@ interface WalletState {
   walletType: "privatekey" | "privy" | null;
   privyEmail: string;
   privySelectedPreset: string;
+  privyWalletId: string | null;
+  privyPublicKey: string | null;
   preferSponsored: boolean;
   setPreferSponsored: (value: boolean) => void;
   setPrivySelectedPreset: (preset: string) => void;
@@ -124,6 +127,7 @@ interface WalletState {
   setCustomRpcUrl: (url: string) => void;
   setCustomChainId: (chainId: ChainIdLiteral) => void;
   confirmNetworkConfig: () => void;
+  switchNetwork: (index: number, accessToken?: string) => Promise<void>;
   resetNetworkConfig: () => void;
 
   // Actions
@@ -169,6 +173,100 @@ async function registerAccount(
   }
 }
 
+interface ConfiguredSdkState {
+  sdk: StarkZap;
+  paymasterNodeUrl: string | null;
+  rpcUrl: string;
+  chainId: ChainId;
+}
+
+function getStakingConfig(chainId: ChainId): StakingConfig | undefined {
+  if (chainId.isMainnet()) {
+    return {
+      contract: fromAddress(
+        "0x00ca1702e64c81d9a07b86bd2c540188d92a2c73cf5cc0e508d949015e7e84a7"
+      ),
+    };
+  }
+
+  if (chainId.isSepolia()) {
+    return {
+      contract: fromAddress(
+        "0x03745ab04a431fc02871a139be6b93d9260b0ff3e779ad9c8b377183b23109f1"
+      ),
+    };
+  }
+
+  return undefined;
+}
+
+function createConfiguredSdkState(params: {
+  rpcUrl: string;
+  chainId: ChainId;
+}): ConfiguredSdkState {
+  const paymasterNodeUrl = PAYMASTER_PROXY_URL.trim() || null;
+  const stakingConfig = getStakingConfig(params.chainId);
+  const sdk = new StarkZap({
+    rpcUrl: params.rpcUrl,
+    chainId: params.chainId,
+    ...(paymasterNodeUrl && {
+      paymaster: { nodeUrl: paymasterNodeUrl },
+    }),
+    ...(stakingConfig ? { staking: stakingConfig } : {}),
+  });
+
+  return {
+    sdk,
+    paymasterNodeUrl,
+    rpcUrl: params.rpcUrl,
+    chainId: params.chainId,
+  };
+}
+
+async function onboardPrivateKeyWallet(params: {
+  sdk: StarkZap;
+  privateKey: string;
+  selectedPreset: string;
+  preferSponsored: boolean;
+}): Promise<WalletInterface> {
+  const signer = new StarkSigner(params.privateKey.trim());
+  const onboard = await params.sdk.onboard({
+    strategy: OnboardStrategy.Signer,
+    deploy: "never",
+    ...(params.preferSponsored && { feeMode: "sponsored" as const }),
+    account: { signer },
+    accountPreset: PRESETS[params.selectedPreset],
+  });
+
+  return onboard.wallet;
+}
+
+async function onboardPrivyWallet(params: {
+  sdk: StarkZap;
+  walletId: string;
+  publicKey: string;
+  accessToken: string;
+  privySelectedPreset: string;
+  preferSponsored: boolean;
+}): Promise<WalletInterface> {
+  const onboard = await params.sdk.onboard({
+    strategy: OnboardStrategy.Privy,
+    deploy: "never",
+    ...(params.preferSponsored && { feeMode: "sponsored" as const }),
+    accountPreset: PRESETS[params.privySelectedPreset],
+    privy: {
+      resolve: async () => ({
+        walletId: params.walletId,
+        publicKey: params.publicKey,
+        serverUrl: `${PRIVY_SERVER_URL}/api/wallet/sign`,
+        headers: { Authorization: `Bearer ${params.accessToken}` },
+      }),
+    },
+  });
+
+  return onboard.wallet;
+}
+
 export const useWalletStore = create<WalletState>((set, get) => ({
   // SDK configuration - starts unconfigured
   rpcUrl: defaultNetwork.rpcUrl,
@@ -190,6 +288,8 @@ export const useWalletStore = create<WalletState>((set, get) => ({
   walletType: null,
   privyEmail: "",
   privySelectedPreset: "Argent",
+  privyWalletId: null,
+  privyPublicKey: null,
   preferSponsored: false,
   setPreferSponsored: (value) => set({ preferSponsored: value }),
   setPrivySelectedPreset: (preset) => set({ privySelectedPreset: preset }),
@@ -201,16 +301,16 @@ export const useWalletStore = create<WalletState>((set, get) => ({
   logs: [],
 
   // Network configuration actions
-  selectNetwork: (index) => {
-    const network = NETWORKS[index];
-    if (network) {
-      set({
-        selectedNetworkIndex: index,
-        rpcUrl: network.rpcUrl,
-        chainId: network.chainId,
+  selectNetwork: (index) =>
+    set((state) => {
+      const patch = getNetworkSelectionPatch({
+        index,
+        isConfigured: state.isConfigured,
+        network: NETWORKS[index],
       });
-    }
-  },
+
+      return patch ?? {};
+    }),
 
   selectCustomNetwork: () => {
     set({ selectedNetworkIndex: null });
@@ -225,7 +325,6 @@ export const useWalletStore = create<WalletState>((set, get) => ({
 
     let rpcUrl: string;
     let chainId: ChainId;
-    let stakingConfig: StakingConfig;
 
     if (selectedNetworkIndex !== null) {
       const network = NETWORKS[selectedNetworkIndex];
@@ -241,35 +340,9 @@ export const useWalletStore = create<WalletState>((set, get) => ({
       chainId = customChainId;
     }
 
-    if (chainId.isMainnet()) {
-      stakingConfig = {
-        contract: fromAddress(
-          "0x00ca1702e64c81d9a07b86bd2c540188d92a2c73cf5cc0e508d949015e7e84a7"
-        ),
-      };
-    } else if (chainId.isSepolia()) {
-      stakingConfig = {
-        contract: fromAddress(
-          "0x03745ab04a431fc02871a139be6b93d9260b0ff3e779ad9c8b377183b23109f1"
-        ),
-      };
-    }
-
-    const paymasterNodeUrl = PAYMASTER_PROXY_URL.trim() || null;
-
-    const newSdk = new StarkZap({
-      rpcUrl,
-      chainId,
-      ...(paymasterNodeUrl && {
-        paymaster: { nodeUrl: paymasterNodeUrl },
-      }),
-      staking: stakingConfig!,
-    });
+    const configuredSdkState = createConfiguredSdkState({ rpcUrl, chainId });
     set({
-      sdk: newSdk,
-      paymasterNodeUrl,
-      rpcUrl,
-      chainId,
+      ...configuredSdkState,
       isConfigured: true,
       logs: [
         `SDK configured with ${selectedNetworkIndex !== null ? NETWORKS[selectedNetworkIndex].name : "Custom Network"}`,
@@ -277,10 +350,87 @@ export const useWalletStore = create<WalletState>((set, get) => ({
     });
     addLog(`RPC: ${rpcUrl}`);
     addLog(`Chain: ${chainId.toLiteral()}`);
-    if (paymasterNodeUrl) {
-      addLog(`Paymaster: ${paymasterNodeUrl}`);
+    if (configuredSdkState.paymasterNodeUrl) {
+      addLog(`Paymaster: ${configuredSdkState.paymasterNodeUrl}`);
     } else {
       addLog("Paymaster: disabled");
+    }
+  },
+
+  switchNetwork: async (index, accessToken) => {
+    const state = get();
+    const nextNetwork = NETWORKS[index];
+
+    if (!nextNetwork) {
+      throw new Error("Unknown network selection");
+    }
+
+    if (
+      state.chainId.toLiteral() === nextNetwork.chainId.toLiteral() &&
+      state.selectedNetworkIndex === index
+    ) {
+      return;
+    }
+
+    set({ isConnecting: true });
+    state.addLog(`Switching network to ${nextNetwork.name}...`);
+
+    try {
+      const configuredSdkState = createConfiguredSdkState({
+        rpcUrl: nextNetwork.rpcUrl,
+        chainId: nextNetwork.chainId,
+      });
+
+      let nextWallet = state.wallet;
+      if (state.walletType === "privatekey") {
+        if (!state.privateKey.trim()) {
+          throw new Error(
+            "Private key session is unavailable. Reconnect the wallet first."
+          );
+        }
+
+        nextWallet = await onboardPrivateKeyWallet({
+          sdk: configuredSdkState.sdk,
+          privateKey: state.privateKey,
+          selectedPreset: state.selectedPreset,
+          preferSponsored: state.preferSponsored,
+        });
+      } else if (state.walletType === "privy") {
+        if (!state.privyWalletId || !state.privyPublicKey || !accessToken) {
+          throw new Error(
+            "Privy session is unavailable. Log in again before switching networks."
+          );
+        }
+
+        nextWallet = await onboardPrivyWallet({
+          sdk: configuredSdkState.sdk,
+          walletId: state.privyWalletId,
+          publicKey: state.privyPublicKey,
+          accessToken,
+          privySelectedPreset: state.privySelectedPreset,
+          preferSponsored: state.preferSponsored,
+        });
+      }
+
+      set({
+        ...configuredSdkState,
+        selectedNetworkIndex: index,
+        isConfigured: true,
+        wallet: nextWallet,
+        isDeployed: null,
+      });
+      get().addLog(`Switched to ${nextNetwork.name}`);
+      get().addLog(`RPC: ${configuredSdkState.rpcUrl}`);
+      get().addLog(`Chain: ${configuredSdkState.chainId.toLiteral()}`);
+
+      if (nextWallet) {
+        await get().checkDeploymentStatus();
+      }
+    } catch (error) {
+      get().addLog(`Network switch failed: ${error}`);
+      throw error;
+    } finally {
+      set({ isConnecting: false });
     }
   },
 
@@ -295,6 +445,8 @@ export const useWalletStore = create<WalletState>((set, get) => ({
       isDeployed: null,
       privateKey: "",
       privyEmail: "",
+      privyWalletId: null,
+      privyPublicKey: null,
       selectedNetworkIndex: DEFAULT_NETWORK_INDEX,
       rpcUrl: defaultNetwork.rpcUrl,
       chainId: defaultNetwork.chainId,
@@ -334,17 +486,19 @@ export const useWalletStore = create<WalletState>((set, get) => ({
     addLog(`Connecting with ${selectedPreset} account...`);
 
     try {
-      const signer = new StarkSigner(privateKey.trim());
-      const onboard = await sdk.onboard({
-        strategy: OnboardStrategy.Signer,
-        deploy: "never",
-        ...(preferSponsored && { feeMode: "sponsored" as const }),
-        account: { signer },
-        accountPreset: PRESETS[selectedPreset],
+      const connectedWallet = await onboardPrivateKeyWallet({
+        sdk,
+        privateKey,
+        selectedPreset,
+        preferSponsored,
       });
-      const connectedWallet = onboard.wallet;
 
-      set({ wallet: connectedWallet, walletType: "privatekey" });
+      set({
+        wallet: connectedWallet,
+        walletType: "privatekey",
+        privyWalletId: null,
+        privyPublicKey: null,
+      });
       addLog(`Connected: ${truncateAddress(connectedWallet.address)}`);
 
       // Check deployment status after connecting
@@ -377,23 +531,21 @@ export const useWalletStore = create<WalletState>((set, get) => ({
     addLog(`Connecting with Privy (${email})...`);
 
     try {
-      const onboard = await sdk.onboard({
-        strategy: OnboardStrategy.Privy,
-        deploy: "never",
-        ...(preferSponsored && { feeMode: "sponsored" as const }),
-        accountPreset: PRESETS[privySelectedPreset],
-        privy: {
-          resolve: async () => ({
-            walletId,
-            publicKey,
-            serverUrl: `${PRIVY_SERVER_URL}/api/wallet/sign`,
-            headers: { Authorization: `Bearer ${accessToken}` },
-          }),
-        },
+      const connectedWallet = await onboardPrivyWallet({
+        sdk,
+        walletId,
+        publicKey,
+        accessToken,
+        privySelectedPreset,
+        preferSponsored,
       });
-      const connectedWallet = onboard.wallet;
 
-      set({ wallet: connectedWallet, walletType: "privy" });
+      set({
+        wallet: connectedWallet,
+        walletType: "privy",
+        privyWalletId: walletId,
+        privyPublicKey: publicKey,
+      });
       addLog(`Connected: ${truncateAddress(connectedWallet.address)}`);
 
       await registerAccount(
@@ -419,6 +571,8 @@ export const useWalletStore = create<WalletState>((set, get) => ({
       isDeployed: null,
       privateKey: "",
       privyEmail: "",
+      privyWalletId: null,
+      privyPublicKey: null,
     });
     addLog("Disconnected");
   },

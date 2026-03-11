@@ -24,6 +24,7 @@ const MAPPING = {
   "wallet.bifold.fill": "account-balance-wallet",
   "chart.line.uptrend.xyaxis": "trending-up",
   "arrow.left.arrow.right": "swap-horiz",
+  "building.columns.fill": "account-balance",
 } as IconMapping;
 
 /**
