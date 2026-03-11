@@ -27,13 +27,6 @@ import {
   OpenZeppelinPreset,
 } from "@/account";
 import { BridgeTokenRepository } from "@/bridge/tokens/repository";
-import {
-  ConnectedEthereumWallet,
-  ConnectedSolanaWallet,
-  type ConnectExternalWalletOptions,
-  type ExternalWalletRegistry,
-  type WalletForOptions,
-} from "@/connect";
 
 /** Resolved SDK configuration with required rpcUrl and chainId */
 interface ResolvedConfig extends Omit<SDKConfig, "rpcUrl" | "chainId"> {
@@ -98,7 +91,6 @@ export class StarkZap {
   private readonly provider: RpcProvider;
   private bridgeTokenRepository: BridgeTokenRepository | null = null;
   private chainValidationPromise: Promise<void> | null = null;
-  private externalWallets: ExternalWalletRegistry = {};
 
   constructor(config: SDKConfig) {
     this.config = this.resolveConfig(config);
@@ -522,77 +514,6 @@ export class StarkZap {
       env,
       ...(chain ? { chain } : {}),
     });
-  }
-
-  /**
-   * Connect an external wallet for bridge operations.
-   *
-   * Accepts chain-specific options discriminated by the `chain` field.
-   * The SDK validates the chain ID against the Starknet configuration
-   * and stores the connection for use in bridge operations.
-   *
-   * @param options - Chain-specific provider, address, and chain ID
-   * @returns The connected wallet descriptor
-   * @throws If the address is invalid or chain ID doesn't match the SDK config
-   *
-   * @example
-   * ```ts
-   * // Ethereum via Reown AppKit
-   * sdk.connectExternalWallet({
-   *   chain: ExternalChain.ETHEREUM,
-   *   provider,
-   *   address,
-   *   chainId: 1,
-   * });
-   *
-   * // Solana
-   * sdk.connectExternalWallet({
-   *   chain: ExternalChain.SOLANA,
-   *   provider,
-   *   address,
-   *   chainId: "5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp",
-   * });
-   * ```
-   */
-  connectExternalWallet<O extends ConnectExternalWalletOptions>(
-    options: O
-  ): WalletForOptions<O> {
-    switch (options.chain) {
-      case ExternalChain.ETHEREUM: {
-        const wallet = ConnectedEthereumWallet.from(
-          options,
-          this.config.chainId
-        );
-        this.externalWallets[ExternalChain.ETHEREUM] = wallet;
-        return wallet as WalletForOptions<O>;
-      }
-      case ExternalChain.SOLANA: {
-        const wallet = ConnectedSolanaWallet.from(options, this.config.chainId);
-        this.externalWallets[ExternalChain.SOLANA] = wallet;
-        return wallet as WalletForOptions<O>;
-      }
-    }
-  }
-
-  /**
-   * Disconnect an external wallet by chain.
-   *
-   * @param chain - The external chain to disconnect
-   */
-  disconnectExternalWallet(chain: ExternalChain): void {
-    delete this.externalWallets[chain];
-  }
-
-  getConnectedExternalWallet(
-    chain: ExternalChain.ETHEREUM
-  ): ConnectedEthereumWallet | undefined;
-  getConnectedExternalWallet(
-    chain: ExternalChain.SOLANA
-  ): ConnectedSolanaWallet | undefined;
-  getConnectedExternalWallet(
-    chain: ExternalChain
-  ): ConnectedEthereumWallet | ConnectedSolanaWallet | undefined {
-    return this.externalWallets[chain];
   }
 
   /**

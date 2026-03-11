@@ -9,8 +9,8 @@ import {
   type BridgeToken,
   ChainId,
   type ChainIdLiteral,
-  type ConnectedEthereumWallet,
-  type ConnectedSolanaWallet,
+  ConnectedEthereumWallet,
+  ConnectedSolanaWallet,
   type ConnectExternalWalletOptions,
   DevnetPreset,
   Erc20,
@@ -400,22 +400,22 @@ export const useWalletStore = create<WalletState>((set, get) => ({
   },
 
   connectExternalWallet: (options: ConnectExternalWalletOptions) => {
-    const { sdk, addLog } = get();
-    if (!sdk) return;
+    const { chainId, addLog } = get();
 
     try {
-      const wallet = sdk.connectExternalWallet(options);
-      set({
-        connectedEthWallet: sdk.getConnectedExternalWallet(
-          ExternalChain.ETHEREUM
-        ),
-        connectedSolWallet: sdk.getConnectedExternalWallet(
-          ExternalChain.SOLANA
-        ),
-      });
-      addLog(
-        `${options.chain} wallet connected: ${truncateAddress(wallet.address)}`
-      );
+      if (options.chain === ExternalChain.ETHEREUM) {
+        const wallet = ConnectedEthereumWallet.from(options, chainId);
+        set({ connectedEthWallet: wallet });
+        addLog(
+          `${options.chain} wallet connected: ${truncateAddress(wallet.address)}`
+        );
+      } else if (options.chain === ExternalChain.SOLANA) {
+        const wallet = ConnectedSolanaWallet.from(options, chainId);
+        set({ connectedSolWallet: wallet });
+        addLog(
+          `${options.chain} wallet connected: ${truncateAddress(wallet.address)}`
+        );
+      }
     } catch (err) {
       addLog(`Failed to connect ${options.chain} wallet: ${err}`);
       throw err;
@@ -423,11 +423,8 @@ export const useWalletStore = create<WalletState>((set, get) => ({
   },
 
   disconnectExternalWallets: () => {
-    const { sdk, addLog } = get();
-    if (!sdk) return;
+    const { addLog } = get();
 
-    sdk.disconnectExternalWallet(ExternalChain.ETHEREUM);
-    sdk.disconnectExternalWallet(ExternalChain.SOLANA);
     set({
       connectedEthWallet: undefined,
       connectedSolWallet: undefined,
