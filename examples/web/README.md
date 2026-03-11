@@ -1,6 +1,6 @@
 # Web Example
 
-Browser-based playground for the SDK. Demonstrates three wallet connection strategies (Cartridge Controller, private key, Privy), account deployment, transfers, sponsored (gasless) transactions, and provider-based token swaps on Starknet Sepolia.
+Browser-based playground for the SDK. Demonstrates three wallet connection strategies (Cartridge Controller, private key, Privy), account deployment, transfers, sponsored (gasless) transactions, provider-based token swaps, and native AVNU or Ekubo DCA flows on Starknet Sepolia.
 
 ## Prerequisites
 
@@ -218,6 +218,62 @@ await wallet.swap(
   },
   { feeMode: "sponsored" }
 );
+```
+
+## DCA Demo
+
+The connected wallet card also includes a **DCA** panel with:
+
+- recurring backend selector (`AVNU` or `Ekubo`)
+- cycle preview source selector (`AVNU` or `Ekubo`)
+- curated sell/buy token selectors for the example
+- total sell amount and per-cycle sell amount inputs
+- frequency presets
+- optional min/max buy-per-cycle guards when `AVNU` is selected
+- `Preview Cycle` (calls `wallet.dca().previewCycle({ swapProvider, ... })`)
+- `Create DCA` (calls `wallet.dca().create({ provider, ... }, options?)`)
+- `Refresh Orders` + inline `Cancel Order` actions for orders from the selected backend
+
+Important boundary in this demo:
+
+- `wallet.dca().create()`, `getOrders()`, and `cancel()` go through the selected native backend (`avnu` or `ekubo`).
+- The preview selector only estimates a single recurring leg through the wallet's registered swap providers. It does not change the recurring order backend.
+- `AVNU` supports optional min/max buy-per-cycle guards in this demo.
+- `Ekubo` creates a native continuous TWAMM order, so the orders list will show `Continuous` instead of a discrete cadence.
+
+Example usage:
+
+```ts
+const cycleQuote = await wallet.dca().previewCycle({
+  swapProvider: "ekubo",
+  sellToken,
+  buyToken,
+  sellAmountPerCycle: Amount.parse("1", sellToken),
+});
+
+await wallet.dca().create(
+  {
+    provider: "avnu",
+    sellToken,
+    buyToken,
+    sellAmount: Amount.parse("10", sellToken),
+    sellAmountPerCycle: Amount.parse("1", sellToken),
+    frequency: "P1D",
+    pricingStrategy: {
+      minBuyAmount: Amount.parse("0.1", buyToken),
+    },
+  },
+  { feeMode: "sponsored" }
+);
+
+await wallet.dca().create({
+  provider: "ekubo",
+  sellToken,
+  buyToken,
+  sellAmount: Amount.parse("10", sellToken),
+  sellAmountPerCycle: Amount.parse("1", sellToken),
+  frequency: "P1D",
+});
 ```
 
 ## Configuration
