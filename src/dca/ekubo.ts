@@ -114,6 +114,12 @@ interface ParsedEkuboOrderId {
   orderKey: EkuboOrderKey;
 }
 
+interface EkuboOrderDescriptor {
+  apiOrder: EkuboApiOrder;
+  orderId: string;
+  parsedOrderId: ParsedEkuboOrderId;
+}
+
 export interface EkuboDcaProviderOptions {
   /** Optional Ekubo API base URL override. */
   apiBase?: string;
@@ -137,16 +143,8 @@ function assertFitsU128(value: bigint, label: string): void {
   }
 }
 
-function toDecimalString(value: bigint | number): string {
-  return value.toString(10);
-}
-
 function toEkuboApiChainId(chainId: ChainId): string {
   return BigInt(chainId.toFelt252()).toString(10);
-}
-
-function normalizeEkuboAddress(value: string): Address {
-  return fromAddress(value);
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -336,11 +334,11 @@ function decodeEkuboOrderId(orderId: string): ParsedEkuboOrderId {
   }
 
   return {
-    positions: normalizeEkuboAddress(parts[1]!),
+    positions: fromAddress(parts[1]!),
     tokenId: parsePositiveBigInt(parts[2], "tokenId"),
     orderKey: {
-      sellToken: normalizeEkuboAddress(parts[3]!),
-      buyToken: normalizeEkuboAddress(parts[4]!),
+      sellToken: fromAddress(parts[3]!),
+      buyToken: fromAddress(parts[4]!),
       fee: parsePositiveBigInt(parts[5], "fee"),
       startTime: Number(parsePositiveBigInt(parts[6], "startTime")),
       endTime: Number(parsePositiveBigInt(parts[7], "endTime")),
@@ -350,12 +348,12 @@ function decodeEkuboOrderId(orderId: string): ParsedEkuboOrderId {
 
 function toOrderInfoCalldata(order: ParsedEkuboOrderId): string[] {
   return [
-    toDecimalString(order.tokenId),
+    order.tokenId.toString(),
     order.orderKey.sellToken,
     order.orderKey.buyToken,
-    toDecimalString(order.orderKey.fee),
-    toDecimalString(order.orderKey.startTime),
-    toDecimalString(order.orderKey.endTime),
+    order.orderKey.fee.toString(),
+    order.orderKey.startTime.toString(),
+    order.orderKey.endTime.toString(),
   ];
 }
 
@@ -400,21 +398,6 @@ function parseOrderInfosResult(
   return infos;
 }
 
-function toDateFromEpochSeconds(value: number): Date {
-  return new Date(value * 1000);
-}
-
-function determineEkuboStatus(
-  info: EkuboOnChainOrderInfo,
-  orderKey: EkuboOrderKey,
-  nowSeconds: number
-): DcaOrder["status"] {
-  if (info.saleRate === 0n || nowSeconds >= orderKey.endTime) {
-    return "CLOSED";
-  }
-  return "ACTIVE";
-}
-
 function validateCreateRequest(request: DcaCreateRequest): void {
   assertAmountMatchesToken(request.sellAmount, request.sellToken);
   assertAmountMatchesToken(request.sellAmountPerCycle, request.sellToken);
@@ -440,7 +423,7 @@ function pickTwammPoolFee(
   twammExtension: Address
 ): bigint {
   const matchingPool = payload.topPools.find(
-    (pool) => normalizeEkuboAddress(pool.extension) === twammExtension
+    (pool) => fromAddress(pool.extension) === twammExtension
   );
   if (!matchingPool) {
     throw new Error("Ekubo did not return a TWAMM-enabled pool for this pair");
@@ -505,39 +488,47 @@ export class EkuboDcaProvider implements DcaProvider {
 
     const preset = this.getPreset(context.chainId);
     const page = await this.fetchOrdersPage(context.chainId, request);
-    const currentChainId = toEkuboApiChainId(context.chainId);
-    const descriptors = page.orders
-      .filter(
-        (group) =>
-          group.chain_id.toLowerCase() === currentChainId.toLowerCase() &&
-          normalizeEkuboAddress(group.nft_address) === preset.positionsNft
-      )
-      .flatMap((group) =>
-        group.orders.map((order) => ({
-          apiOrder: order,
-          orderId: encodeEkuboOrderId({
-            positions: preset.positions,
-            tokenId: parsePositiveBigInt(group.token_id, "token_id"),
-            orderKey: {
-              sellToken: normalizeEkuboAddress(order.key.sell_token),
-              buyToken: normalizeEkuboAddress(order.key.buy_token),
-              fee: parsePositiveBigInt(order.key.fee, "fee"),
-              startTime: order.key.start_time,
-              endTime: order.key.end_time,
-            },
-          }),
-        }))
-      );
+    const currentChainId = toEkuboApiChainId(context.chainId).toLowerCase();
+    const descriptors: EkuboOrderDescriptor[] = [];
+
+    for (const group of page.orders) {
+      if (
+        group.chain_id.toLowerCase() !== currentChainId ||
+        fromAddress(group.nft_address) !== preset.positionsNft
+      ) {
+        continue;
+      }
+
+      const tokenId = parsePositiveBigInt(group.token_id, "token_id");
+      for (const apiOrder of group.orders) {
+        const parsedOrderId = {
+          positions: preset.positions,
+          tokenId,
+          orderKey: {
+            sellToken: fromAddress(apiOrder.key.sell_token),
+            buyToken: fromAddress(apiOrder.key.buy_token),
+            fee: parsePositiveBigInt(apiOrder.key.fee, "fee"),
+            startTime: apiOrder.key.start_time,
+            endTime: apiOrder.key.end_time,
+          },
+        };
+
+        descriptors.push({
+          apiOrder,
+          orderId: encodeEkuboOrderId(parsedOrderId),
+          parsedOrderId,
+        });
+      }
+    }
 
     const infos = await this.getOrderInfos(
       context,
-      descriptors.map((item) => decodeEkuboOrderId(item.orderId))
+      descriptors.map((item) => item.parsedOrderId)
     );
     const nowSeconds = Math.floor(Date.now() / 1000);
 
     const content = descriptors.map(
-      ({ apiOrder, orderId }, index): DcaOrder => {
-        const parsedOrderId = decodeEkuboOrderId(orderId);
+      ({ apiOrder, orderId, parsedOrderId }, index): DcaOrder => {
         const info = infos[index]!;
         const totalAmountSold = parsePositiveBigInt(
           apiOrder.total_amount_sold,
@@ -549,15 +540,12 @@ export class EkuboDcaProvider implements DcaProvider {
         );
         const sellAmountBase = totalAmountSold + info.remainingSellAmount;
         const amountBoughtBase = proceedsWithdrawn + info.purchasedAmount;
-        const startDate = toDateFromEpochSeconds(
-          parsedOrderId.orderKey.startTime
-        );
-        const endDate = toDateFromEpochSeconds(parsedOrderId.orderKey.endTime);
-        const status = determineEkuboStatus(
-          info,
-          parsedOrderId.orderKey,
-          nowSeconds
-        );
+        const startDate = new Date(parsedOrderId.orderKey.startTime * 1000);
+        const endDate = new Date(parsedOrderId.orderKey.endTime * 1000);
+        const status =
+          info.saleRate === 0n || nowSeconds >= parsedOrderId.orderKey.endTime
+            ? "CLOSED"
+            : "ACTIVE";
 
         return {
           id: orderId,
@@ -663,10 +651,7 @@ export class EkuboDcaProvider implements DcaProvider {
       calls.push({
         contractAddress: order.positions,
         entrypoint: "decrease_sale_rate_to_self",
-        calldata: [
-          ...toOrderInfoCalldata(order),
-          toDecimalString(info.saleRate),
-        ],
+        calldata: [...toOrderInfoCalldata(order), info.saleRate.toString()],
       });
     }
 
@@ -710,21 +695,12 @@ export class EkuboDcaProvider implements DcaProvider {
       params.set("state", "closed");
     }
 
-    const url = `${this.apiBase}/twap/orders/${request.traderAddress}?${params.toString()}`;
-    const response = await this.fetcher(url);
-    const payload = await response.json().catch(() => null);
-
-    if (!response.ok) {
-      throw new Error(
-        `Ekubo TWAP orders request failed (${response.status})${
-          isRecord(payload) && typeof payload.error === "string"
-            ? `: ${payload.error}`
-            : ""
-        }`
-      );
-    }
-
-    return parseEkuboOrdersResponse(payload);
+    return parseEkuboOrdersResponse(
+      await this.fetchJson(
+        `/twap/orders/${request.traderAddress}?${params.toString()}`,
+        "TWAP orders"
+      )
+    );
   }
 
   private async resolvePoolFee(
@@ -734,24 +710,13 @@ export class EkuboDcaProvider implements DcaProvider {
   ): Promise<bigint> {
     const minTvlUsdParam =
       this.minTvlUsd > 0 ? `?minTvlUsd=${this.minTvlUsd}` : "";
-    const url =
-      `${this.apiBase}/pair/${toEkuboApiChainId(chainId)}/${request.sellToken.address}/${request.buyToken.address}/pools` +
-      minTvlUsdParam;
-    const response = await this.fetcher(url);
-    const payload = await response.json().catch(() => null);
-
-    if (!response.ok) {
-      throw new Error(
-        `Ekubo pair pools request failed (${response.status})${
-          isRecord(payload) && typeof payload.error === "string"
-            ? `: ${payload.error}`
-            : ""
-        }`
-      );
-    }
-
     return pickTwammPoolFee(
-      parseEkuboPoolsResponse(payload),
+      parseEkuboPoolsResponse(
+        await this.fetchJson(
+          `/pair/${toEkuboApiChainId(chainId)}/${request.sellToken.address}/${request.buyToken.address}/pools${minTvlUsdParam}`,
+          "pair pools"
+        )
+      ),
       preset.twammExtension
     );
   }
@@ -780,10 +745,10 @@ export class EkuboDcaProvider implements DcaProvider {
         calldata: [
           params.sellToken,
           params.buyToken,
-          toDecimalString(params.fee),
-          toDecimalString(params.startTime),
-          toDecimalString(params.endTime),
-          toDecimalString(params.sellAmountBase),
+          params.fee.toString(),
+          params.startTime.toString(),
+          params.endTime.toString(),
+          params.sellAmountBase.toString(),
         ],
       },
       {
@@ -803,6 +768,26 @@ export class EkuboDcaProvider implements DcaProvider {
     return timestamp;
   }
 
+  private async fetchJson(
+    path: string,
+    requestLabel: string
+  ): Promise<unknown> {
+    const response = await this.fetcher(`${this.apiBase}${path}`);
+    const payload = await response.json().catch(() => null);
+
+    if (!response.ok) {
+      const errorSuffix =
+        isRecord(payload) && typeof payload.error === "string"
+          ? `: ${payload.error}`
+          : "";
+      throw new Error(
+        `Ekubo ${requestLabel} request failed (${response.status})${errorSuffix}`
+      );
+    }
+
+    return payload;
+  }
+
   private async getOrderInfos(
     context: DcaProviderContext,
     orders: ParsedEkuboOrderId[]
@@ -820,7 +805,7 @@ export class EkuboDcaProvider implements DcaProvider {
       contractAddress: firstPositions,
       entrypoint: "get_orders_info",
       calldata: [
-        toDecimalString(orders.length),
+        orders.length.toString(),
         ...orders.flatMap((order) => toOrderInfoCalldata(order)),
       ],
     });

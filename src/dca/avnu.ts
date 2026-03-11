@@ -5,7 +5,6 @@ import {
   type DcaOrder as AvnuDcaOrder,
   type DcaOrderStatus as AvnuDcaOrderStatus,
   type DcaTrade as AvnuDcaTrade,
-  type Page as AvnuPage,
   type PricingStrategy,
 } from "@avnu/avnu-sdk";
 import type { Duration } from "moment";
@@ -27,24 +26,6 @@ import { DEFAULT_AVNU_API_BASES, normalizeAvnuCalls } from "@/utils/avnu";
 export interface AvnuDcaProviderOptions {
   /** Optional API base override per chain. */
   apiBases?: Partial<Record<"SN_MAIN" | "SN_SEPOLIA", string[]>>;
-}
-
-function toHexQuantity(value: bigint): string {
-  return `0x${value.toString(16)}`;
-}
-
-function getErrorMessage(error: unknown): string {
-  if (error instanceof Error) {
-    return error.message;
-  }
-  return String(error);
-}
-
-function parseOptionalBigInt(value: string | undefined): bigint | undefined {
-  if (value == null || value.length === 0) {
-    return undefined;
-  }
-  return BigInt(value);
 }
 
 function toPricingStrategy(
@@ -76,9 +57,13 @@ function toPricingStrategy(
 
   return {
     tokenToMinAmount:
-      minBuyAmountBase != null ? toHexQuantity(minBuyAmountBase) : undefined,
+      minBuyAmountBase != null
+        ? `0x${minBuyAmountBase.toString(16)}`
+        : undefined,
     tokenToMaxAmount:
-      maxBuyAmountBase != null ? toHexQuantity(maxBuyAmountBase) : undefined,
+      maxBuyAmountBase != null
+        ? `0x${maxBuyAmountBase.toString(16)}`
+        : undefined,
   };
 }
 
@@ -109,12 +94,18 @@ function validateCreateRequest(request: DcaCreateRequest): void {
 function mapPricingStrategy(
   strategy: AvnuDcaOrder["pricingStrategy"]
 ): DcaPricingStrategy {
-  if (!("tokenToMinAmount" in strategy) && !("tokenToMaxAmount" in strategy)) {
+  const minBuyAmountBase =
+    "tokenToMinAmount" in strategy && strategy.tokenToMinAmount
+      ? BigInt(strategy.tokenToMinAmount)
+      : undefined;
+  const maxBuyAmountBase =
+    "tokenToMaxAmount" in strategy && strategy.tokenToMaxAmount
+      ? BigInt(strategy.tokenToMaxAmount)
+      : undefined;
+
+  if (minBuyAmountBase == null && maxBuyAmountBase == null) {
     return {};
   }
-
-  const minBuyAmountBase = parseOptionalBigInt(strategy.tokenToMinAmount);
-  const maxBuyAmountBase = parseOptionalBigInt(strategy.tokenToMaxAmount);
 
   return {
     ...(minBuyAmountBase != null && { minBuyAmountBase }),
@@ -171,13 +162,6 @@ function mapOrder(order: AvnuDcaOrder): DcaOrder {
   };
 }
 
-function mapOrdersPage(page: AvnuPage<AvnuDcaOrder>): DcaOrdersPage {
-  return {
-    ...page,
-    content: page.content.map(mapOrder),
-  };
-}
-
 export class AvnuDcaProvider implements DcaProvider {
   readonly id = "avnu";
 
@@ -201,25 +185,28 @@ export class AvnuDcaProvider implements DcaProvider {
     context: DcaProviderContext,
     request: DcaOrdersRequest
   ): Promise<DcaOrdersPage> {
-    return await this.withApiBaseFallback(
+    const page = await this.withApiBaseFallback(
       context.chainId,
       "get DCA orders",
       async (baseUrl) =>
-        mapOrdersPage(
-          await getDcaOrders(
-            {
-              traderAddress: request.traderAddress,
-              ...(request.status && {
-                status: request.status as AvnuDcaOrderStatus,
-              }),
-              ...(request.page != null && { page: request.page }),
-              ...(request.size != null && { size: request.size }),
-              ...(request.sort && { sort: request.sort }),
-            },
-            { baseUrl }
-          )
+        await getDcaOrders(
+          {
+            traderAddress: request.traderAddress,
+            ...(request.status && {
+              status: request.status as AvnuDcaOrderStatus,
+            }),
+            ...(request.page != null && { page: request.page }),
+            ...(request.size != null && { size: request.size }),
+            ...(request.sort && { sort: request.sort }),
+          },
+          { baseUrl }
         )
     );
+
+    return {
+      ...page,
+      content: page.content.map(mapOrder),
+    };
   }
 
   async prepareCreate(
@@ -236,10 +223,10 @@ export class AvnuDcaProvider implements DcaProvider {
           {
             sellTokenAddress: request.sellToken.address,
             buyTokenAddress: request.buyToken.address,
-            sellAmount: toHexQuantity(request.sellAmount.toBase()),
-            sellAmountPerCycle: toHexQuantity(
-              request.sellAmountPerCycle.toBase()
-            ),
+            sellAmount: `0x${request.sellAmount.toBase().toString(16)}`,
+            sellAmountPerCycle: `0x${request.sellAmountPerCycle
+              .toBase()
+              .toString(16)}`,
             frequency: request.frequency as unknown as Duration,
             pricingStrategy: toPricingStrategy(request.pricingStrategy),
             traderAddress: request.traderAddress,
@@ -318,7 +305,8 @@ export class AvnuDcaProvider implements DcaProvider {
       try {
         return await run(apiBase);
       } catch (error) {
-        failures.push(`${apiBase}: ${getErrorMessage(error)}`);
+        const message = error instanceof Error ? error.message : String(error);
+        failures.push(`${apiBase}: ${message}`);
       }
     }
 
