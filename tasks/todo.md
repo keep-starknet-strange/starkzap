@@ -760,3 +760,32 @@
 - Verification:
   - `rtk vitest run tests/dca-ekubo-provider.test.ts`
   - `rtk proxy npm run -s typecheck`
+
+# Task: Provider Helper Dedup Cleanup (2026-03-11)
+
+## Plan
+- [x] Review AVNU and Ekubo swap/DCA adapters to identify duplicated provider plumbing worth extracting.
+- [x] Extract shared AVNU transport helpers and shared Ekubo chain/error helpers into provider-specific utility modules.
+- [x] Update the affected swap and DCA adapters to use the shared helpers without obscuring business logic.
+- [x] Run focused provider tests and root typecheck.
+
+## Review
+- Extracted AVNU provider plumbing into `src/utils/avnu.ts`:
+  - shared `supportsAvnuChain(...)`
+  - shared API-base resolution and fallback via `getAvnuApiBases(...)` and `withAvnuApiBaseFallback(...)`
+  - kept call normalization there as the AVNU-specific Starknet-call adapter
+- Extracted Ekubo provider plumbing into `src/utils/ekubo.ts`:
+  - shared `supportsEkuboChain(...)`
+  - shared `getEkuboChainLiteral(...)` for chain-gated preset/quoter lookups
+  - shared `getEkuboErrorMessageFromPayload(...)` for Ekubo HTTP error handling
+- Updated the provider adapters to use the shared utilities:
+  - `src/swap/avnu.ts`
+  - `src/dca/avnu.ts`
+  - `src/swap/ekubo.helpers.ts`
+  - `src/swap/ekubo.ts`
+  - `src/dca/ekubo.ts`
+- Intentionally left local:
+  - swap quote parsing/building and DCA order parsing/call-building stay in their provider files because that logic is feature-specific and clearer in place
+- Verification:
+  - `rtk vitest run tests/swap-avnu.test.ts tests/dca-avnu-provider.test.ts tests/swap-ekubo.test.ts tests/dca-ekubo-provider.test.ts tests/dca-wallet.test.ts tests/swap-wallet.test.ts`
+  - `rtk proxy npm run -s typecheck`

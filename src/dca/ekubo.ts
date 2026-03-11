@@ -15,6 +15,11 @@ import type {
   DcaProviderContext,
   PreparedDcaAction,
 } from "@/dca/interface";
+import {
+  getEkuboChainLiteral,
+  getEkuboErrorMessageFromPayload,
+  supportsEkuboChain,
+} from "@/utils/ekubo";
 
 const DEFAULT_EKUBO_DCA_API_BASE = "https://prod-api.ekubo.org";
 const EKUBO_TIME_SPACING_SECONDS = 16;
@@ -432,14 +437,7 @@ function pickTwammPoolFee(
 }
 
 export function getEkuboDcaPreset(chainId: ChainId): EkuboDcaConfig {
-  const literal = chainId.toLiteral();
-  if (literal === "SN_MAIN") {
-    return ekuboDcaPresets.SN_MAIN;
-  }
-  if (literal === "SN_SEPOLIA") {
-    return ekuboDcaPresets.SN_SEPOLIA;
-  }
-  throw new Error(`Unsupported chain for Ekubo DCA: ${literal}`);
+  return ekuboDcaPresets[getEkuboChainLiteral(chainId, "DCA")];
 }
 
 export class EkuboDcaProvider implements DcaProvider {
@@ -467,8 +465,7 @@ export class EkuboDcaProvider implements DcaProvider {
   }
 
   supportsChain(chainId: ChainId): boolean {
-    const literal = chainId.toLiteral();
-    return literal === "SN_MAIN" || literal === "SN_SEPOLIA";
+    return supportsEkuboChain(chainId);
   }
 
   async getOrders(
@@ -669,14 +666,7 @@ export class EkuboDcaProvider implements DcaProvider {
   }
 
   private getPreset(chainId: ChainId): EkuboDcaConfig {
-    const literal = chainId.toLiteral();
-    if (literal === "SN_MAIN") {
-      return this.presets.SN_MAIN;
-    }
-    if (literal === "SN_SEPOLIA") {
-      return this.presets.SN_SEPOLIA;
-    }
-    throw new Error(`Unsupported chain for Ekubo DCA: ${literal}`);
+    return this.presets[getEkuboChainLiteral(chainId, "DCA")];
   }
 
   private async fetchOrdersPage(
@@ -776,10 +766,8 @@ export class EkuboDcaProvider implements DcaProvider {
     const payload = await response.json().catch(() => null);
 
     if (!response.ok) {
-      const errorSuffix =
-        isRecord(payload) && typeof payload.error === "string"
-          ? `: ${payload.error}`
-          : "";
+      const errorMessage = getEkuboErrorMessageFromPayload(payload);
+      const errorSuffix = errorMessage ? `: ${errorMessage}` : "";
       throw new Error(
         `Ekubo ${requestLabel} request failed (${response.status})${errorSuffix}`
       );

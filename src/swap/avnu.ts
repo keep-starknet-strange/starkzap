@@ -6,7 +6,12 @@ import type {
   SwapQuote,
   SwapRequest,
 } from "@/swap/interface";
-import { DEFAULT_AVNU_API_BASES, normalizeAvnuCalls } from "@/utils/avnu";
+import {
+  DEFAULT_AVNU_API_BASES,
+  normalizeAvnuCalls,
+  supportsAvnuChain,
+  withAvnuApiBaseFallback,
+} from "@/utils/avnu";
 import { getQuotes, quoteToCalls, type Quote } from "@avnu/avnu-sdk";
 
 const DEFAULT_QUOTES_PAGE_SIZE = 5;
@@ -57,13 +62,6 @@ function toSwapQuote(params: {
   return quote;
 }
 
-function getErrorMessage(error: unknown): string {
-  if (error instanceof Error) {
-    return error.message;
-  }
-  return String(error);
-}
-
 export class AvnuSwapProvider implements SwapProvider {
   readonly id = "avnu";
 
@@ -83,8 +81,7 @@ export class AvnuSwapProvider implements SwapProvider {
   }
 
   supportsChain(chainId: ChainId): boolean {
-    const literal = chainId.toLiteral();
-    return literal === "SN_MAIN" || literal === "SN_SEPOLIA";
+    return supportsAvnuChain(chainId);
   }
 
   async getQuote(request: SwapRequest): Promise<SwapQuote> {
@@ -122,23 +119,6 @@ export class AvnuSwapProvider implements SwapProvider {
     };
   }
 
-  private getApiBases(chainId: ChainId): string[] {
-    const literal = chainId.toLiteral();
-    let apiBases: string[];
-    if (literal === "SN_MAIN") {
-      apiBases = this.apiBases.SN_MAIN;
-    } else if (literal === "SN_SEPOLIA") {
-      apiBases = this.apiBases.SN_SEPOLIA;
-    } else {
-      throw new Error(`Unsupported chain for AVNU quote: ${literal}`);
-    }
-
-    if (apiBases.length === 0) {
-      throw new Error(`No AVNU API base configured for chain: ${literal}`);
-    }
-    return [...apiBases];
-  }
-
   private fetchQuoteForRequest(request: SwapRequest) {
     return this.fetchQuote({
       chainId: request.chainId,
@@ -158,11 +138,12 @@ export class AvnuSwapProvider implements SwapProvider {
     amountInBase: bigint;
     takerAddress?: Address;
   }): Promise<{ quote: Quote; apiBase: string }> {
-    const apiBases = this.getApiBases(params.chainId);
-    const failures: string[] = [];
-
-    for (const apiBase of apiBases) {
-      try {
+    return await withAvnuApiBaseFallback({
+      apiBasesByChain: this.apiBases,
+      chainId: params.chainId,
+      feature: "quote",
+      action: "quote",
+      run: async (apiBase) => {
         const quotes = await getQuotes(
           {
             sellTokenAddress: params.tokenInAddress,
@@ -177,18 +158,13 @@ export class AvnuSwapProvider implements SwapProvider {
         );
 
         if (!quotes.length) {
-          failures.push(`${apiBase}: AVNU quote returned no routes`);
-          continue;
+          throw new Error("AVNU quote returned no routes");
         }
 
         return { quote: quotes[0]!, apiBase };
-      } catch (error) {
-        failures.push(`${apiBase}: ${getErrorMessage(error)}`);
-      }
-    }
-
-    throw new Error(
-      `AVNU quote returned no routes for this pair/amount. Try a larger amount, another token pair, or switch source. (${failures.join(" | ")})`
-    );
+      },
+      formatFinalError: (failures) =>
+        `AVNU quote returned no routes for this pair/amount. Try a larger amount, another token pair, or switch source. (${failures.join(" | ")})`,
+    });
   }
 }

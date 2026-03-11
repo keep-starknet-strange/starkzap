@@ -8,12 +8,16 @@ import type {
 import {
   buildEkuboSwapCalls,
   DEFAULT_EKUBO_API_BASE,
-  getEkuboErrorMessageFromPayload,
   getEkuboQuoterChainId,
   parseEkuboQuoteResponse,
   toEkuboSwapQuote,
   type EkuboQuoteResponse,
 } from "@/swap/ekubo.helpers";
+import {
+  getEkuboChainLiteral,
+  getEkuboErrorMessageFromPayload,
+  supportsEkuboChain,
+} from "@/utils/ekubo";
 
 /**
  * Ekubo extension router configuration.
@@ -45,14 +49,7 @@ export const ekuboPresets = {
  * Get Ekubo preset configuration for the target chain.
  */
 export function getEkuboPreset(chainId: ChainId): EkuboSwapConfig {
-  const literal = chainId.toLiteral();
-  if (literal === "SN_MAIN") {
-    return ekuboPresets.SN_MAIN;
-  }
-  if (literal === "SN_SEPOLIA") {
-    return ekuboPresets.SN_SEPOLIA;
-  }
-  throw new Error(`Unsupported chain for Ekubo config: ${literal}`);
+  return ekuboPresets[getEkuboChainLiteral(chainId, "config")];
 }
 
 export interface EkuboSwapProviderOptions {
@@ -74,8 +71,7 @@ export class EkuboSwapProvider implements SwapProvider {
   }
 
   supportsChain(chainId: ChainId): boolean {
-    const literal = chainId.toLiteral();
-    return literal === "SN_MAIN" || literal === "SN_SEPOLIA";
+    return supportsEkuboChain(chainId);
   }
 
   async getQuote(request: SwapRequest): Promise<SwapQuote> {

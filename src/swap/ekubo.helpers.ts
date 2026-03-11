@@ -1,6 +1,10 @@
 import type { ChainId, Token } from "@/types";
 import type { SwapQuote } from "@/swap/interface";
 import { CallData, cairo, type Call } from "starknet";
+import {
+  getEkuboChainLiteral,
+  getEkuboErrorMessageFromPayload,
+} from "@/utils/ekubo";
 
 export const DEFAULT_EKUBO_API_BASE = "https://prod-api-quoter.ekubo.org";
 
@@ -42,24 +46,8 @@ function isObjectRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
 }
 
-export function getEkuboErrorMessageFromPayload(
-  payload: unknown
-): string | null {
-  if (!isObjectRecord(payload)) {
-    return null;
-  }
-  return typeof payload.error === "string" ? payload.error : null;
-}
-
 export function getEkuboQuoterChainId(chainId: ChainId): string {
-  const literal = chainId.toLiteral();
-  if (literal === "SN_MAIN") {
-    return EKUBO_QUOTER_CHAIN_IDS.SN_MAIN;
-  }
-  if (literal === "SN_SEPOLIA") {
-    return EKUBO_QUOTER_CHAIN_IDS.SN_SEPOLIA;
-  }
-  throw new Error(`Unsupported chain for Ekubo quote: ${literal}`);
+  return EKUBO_QUOTER_CHAIN_IDS[getEkuboChainLiteral(chainId, "quote")];
 }
 
 function parseNonNegativeBigInt(
