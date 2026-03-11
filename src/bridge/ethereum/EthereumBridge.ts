@@ -32,7 +32,8 @@ import {
   TransactionErrorCause,
 } from "@/types/errors";
 import type { WalletInterface } from "@/wallet";
-import BRIDGE_ABI from "@/abi/ethereum/canonicalBridge.json";
+import CANONICAL_BRIDGE_ABI from "@/abi/ethereum/canonicalBridge.json";
+import type { InterfaceAbi } from "ethers";
 import type { Address } from "starkzap";
 
 export abstract class EthereumBridge<Fee = unknown> implements BridgeInterface<
@@ -53,7 +54,8 @@ export abstract class EthereumBridge<Fee = unknown> implements BridgeInterface<
   constructor(
     protected readonly bridgeToken: EthereumBridgeToken,
     protected readonly config: EthereumWalletConfig,
-    readonly starknetWallet: WalletInterface
+    readonly starknetWallet: WalletInterface,
+    bridgeAbi: InterfaceAbi = CANONICAL_BRIDGE_ABI
   ) {
     this.allowanceCache = {
       current: null,
@@ -62,7 +64,7 @@ export abstract class EthereumBridge<Fee = unknown> implements BridgeInterface<
     this.token = intoEthereumToken(bridgeToken, config);
     this.bridge = new Contract(
       bridgeToken.bridgeAddress,
-      BRIDGE_ABI,
+      bridgeAbi,
       config.signer
     );
   }

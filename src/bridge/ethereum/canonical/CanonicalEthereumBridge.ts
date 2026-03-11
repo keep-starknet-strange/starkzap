@@ -123,7 +123,7 @@ export class CanonicalEthereumBridge extends EthereumBridge<EthereumDepositFeeEs
     };
   }
 
-  private async estimateL1ToL2MessageFee(
+  protected async estimateL1ToL2MessageFee(
     recipient: Address,
     amount: Amount
   ): Promise<{ fee: Amount; l2FeeError?: FeeErrorCause }> {
@@ -189,7 +189,7 @@ export class CanonicalEthereumBridge extends EthereumBridge<EthereumDepositFeeEs
     );
   }
 
-  private async getEthDepositValue(
+  protected async getEthDepositValue(
     recipient: Address,
     amount: Amount
   ): Promise<Amount> {

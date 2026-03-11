@@ -21,6 +21,7 @@ import type { BridgeOperatorInterface } from "@/bridge/operator/BridgeOperatorIn
 import type { Address, EthereumAddress } from "@/types";
 import type { Amount } from "starkzap";
 import { CCTPBridge } from "@/bridge/ethereum/cctp/CCTPBridge";
+import { LordsBridge } from "@/bridge/ethereum/lords/LordsBridge";
 import type { EthereumDepositFeeEstimation } from "@/bridge/ethereum/types";
 import type { TransactionResponse } from "ethers";
 
@@ -128,6 +129,10 @@ export class BridgeOperator implements BridgeOperatorInterface {
     >
   > {
     const walletConfig = await externalWallet.toEthWalletConfig();
+
+    if (token.id === "lords") {
+      return new LordsBridge(token, walletConfig, starknetWallet);
+    }
 
     switch (token.protocol) {
       case Protocol.CANONICAL:
