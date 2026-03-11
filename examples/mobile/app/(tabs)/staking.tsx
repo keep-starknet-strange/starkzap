@@ -13,10 +13,10 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { router } from "expo-router";
-import { usePrivy } from "@privy-io/expo";
 import * as Clipboard from "expo-clipboard";
 import * as Haptics from "expo-haptics";
 import Ionicons from "@expo/vector-icons/Ionicons";
+import { usePrivy } from "@privy-io/expo";
 
 import { ThemedText } from "@/components/themed-text";
 import { ValidatorCard } from "@/components/ValidatorCard";
@@ -30,8 +30,13 @@ import {
   getUsdcToken,
   getWbtcToken,
 } from "@/stores/balances";
+import {
+  useStakingStore,
+  getValidatorsForNetwork,
+  type StakingPosition as StakingPositionType,
+} from "@/stores/staking";
 import { showCopiedToast } from "@/components/Toast";
-import type { Amount, Token } from "@starkzap/native";
+import type { Amount, Pool, Token, Validator } from "@starkzap/native";
 
 function TinyTokenLogo({ token }: { token: Token }) {
   const [imageError, setImageError] = useState(false);
@@ -87,12 +92,6 @@ function cropAddress(addr: string): string {
   if (addr.length <= 10) return addr;
   return `${addr.slice(0, 5)}...${addr.slice(-5)}`;
 }
-import {
-  useStakingStore,
-  getValidatorsForNetwork,
-  type StakingPosition as StakingPositionType,
-} from "@/stores/staking";
-import type { Validator, Pool } from "@starkzap/native";
 
 export default function StakingScreen() {
   const {
@@ -150,6 +149,7 @@ export default function StakingScreen() {
     claimRewards,
     exitIntent,
     exit,
+    clearStaking,
   } = useStakingStore();
 
   const [showValidatorPicker, setShowValidatorPicker] = useState(false);
@@ -175,7 +175,6 @@ export default function StakingScreen() {
 
   const validators = getValidatorsForNetwork(chainId);
   const validatorEntries = Object.entries(validators);
-
   const networkName =
     NETWORKS.find((n) => n.chainId.toLiteral() === chainId.toLiteral())?.name ??
     "Custom";
@@ -195,6 +194,10 @@ export default function StakingScreen() {
   const filteredValidators = validatorEntries.filter(([, validator]) =>
     validator.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
+
+  useEffect(() => {
+    clearStaking();
+  }, [chainId, clearStaking]);
 
   useEffect(() => {
     if (wallet) {
@@ -310,7 +313,7 @@ export default function StakingScreen() {
       });
       await fetchBalances(wallet, chainId);
     },
-    [wallet, addLog, stake, fetchBalances]
+    [wallet, chainId, addLog, stake, fetchBalances]
   );
 
   const handleAddStake = useCallback(async () => {

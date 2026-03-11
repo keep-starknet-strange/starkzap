@@ -34,6 +34,7 @@ const MAPPING = {
   "wallet.bifold.fill": { family: "material", name: "account-balance-wallet" },
   "chart.line.uptrend.xyaxis": { family: "material", name: "trending-up" },
   "arrow.left.arrow.right": { family: "material", name: "swap-horiz" },
+  "building.columns.fill": { family: "material", name: "account-balance" },
   "point.3.connected.trianglepath.dotted": {
     family: "material-community",
     name: "bridge",

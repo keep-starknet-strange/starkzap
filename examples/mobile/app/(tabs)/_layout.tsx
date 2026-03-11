@@ -58,6 +58,15 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
+        name="vesu"
+        options={{
+          title: "Vesu",
+          tabBarIcon: ({ color }) => (
+            <IconSymbol size={28} name="building.columns.fill" color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
         name="staking"
         options={{
           title: "Staking",

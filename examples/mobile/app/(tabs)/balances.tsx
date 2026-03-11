@@ -1,5 +1,7 @@
 import { useEffect, useCallback, useState, useMemo } from "react";
 import {
+  Alert,
+  Modal,
   StyleSheet,
   ScrollView,
   RefreshControl,
@@ -8,14 +10,11 @@ import {
   ActivityIndicator,
   Image,
 } from "react-native";
-import {
-  SafeAreaView,
-  useSafeAreaInsets,
-} from "react-native-safe-area-context";
-import { router } from "expo-router";
+import { SafeAreaView } from "react-native-safe-area-context";
 import * as Clipboard from "expo-clipboard";
 import * as Haptics from "expo-haptics";
 import * as WebBrowser from "expo-web-browser";
+import { router } from "expo-router";
 import { usePrivy } from "@privy-io/expo";
 
 import Ionicons from "@expo/vector-icons/Ionicons";
@@ -113,16 +112,17 @@ export default function BalancesScreen() {
     isConnecting,
     deploy,
     checkDeploymentStatus,
+    switchNetwork,
   } = useWalletStore();
-  const { logout } = usePrivy();
+  const { logout, getAccessToken } = usePrivy();
   const { balances, isLoading, fetchBalances, getBalance, clearBalances } =
     useBalancesStore();
 
-  const _insets = useSafeAreaInsets();
   const borderColor = useThemeColor({}, "border");
   const primaryColor = useThemeColor({}, "primary");
   const textSecondary = useThemeColor({}, "textSecondary");
   const cardBg = useThemeColor({}, "card");
+  const backgroundColor = useThemeColor({}, "background");
 
   const allTokens = getTokensForNetwork(chainId);
   const strkToken = getStrkToken(chainId);
@@ -132,11 +132,11 @@ export default function BalancesScreen() {
     const eth = allTokens.find((t) => t.symbol === "ETH");
     return [eth].filter((t): t is Token => t != null);
   }, [allTokens]);
-
   const networkName =
     NETWORKS.find((n) => n.chainId.toLiteral() === chainId.toLiteral())?.name ??
     "Custom";
 
+  const [isNetworkPickerOpen, setIsNetworkPickerOpen] = useState(false);
   const [showMoreTokens, setShowMoreTokens] = useState(false);
 
   const handleRefresh = useCallback(() => {
@@ -154,6 +154,35 @@ export default function BalancesScreen() {
     resetNetworkConfig();
     router.replace("/");
   }, [clearBalances, disconnect, resetNetworkConfig, walletType, logout]);
+
+  const handleSelectNetwork = useCallback(
+    async (index: number) => {
+      const nextNetwork = NETWORKS[index];
+      setIsNetworkPickerOpen(false);
+
+      if (
+        !nextNetwork ||
+        nextNetwork.chainId.toLiteral() === chainId.toLiteral() ||
+        isConnecting
+      ) {
+        return;
+      }
+
+      try {
+        const accessToken =
+          walletType === "privy"
+            ? ((await getAccessToken()) ?? undefined)
+            : undefined;
+        await switchNetwork(index, accessToken);
+      } catch (error) {
+        Alert.alert(
+          "Network Switch Failed",
+          error instanceof Error ? error.message : String(error)
+        );
+      }
+    },
+    [chainId, getAccessToken, isConnecting, switchNetwork, walletType]
+  );
 
   const handleCopyAddress = useCallback(async () => {
     if (wallet) {
@@ -230,15 +259,23 @@ export default function BalancesScreen() {
             <ThemedText type="title">Balances</ThemedText>
           </View>
           <View style={styles.headerRight}>
-            <View
+            <TouchableOpacity
               style={[styles.networkPill, { backgroundColor: borderColor }]}
+              onPress={() => setIsNetworkPickerOpen(true)}
+              disabled={isConnecting}
+              activeOpacity={0.88}
             >
               <ThemedText
                 style={[styles.networkPillText, { color: primaryColor }]}
               >
                 {networkName}
               </ThemedText>
-            </View>
+              {isConnecting ? (
+                <ActivityIndicator size="small" color={primaryColor} />
+              ) : (
+                <Ionicons name="chevron-down" size={12} color={primaryColor} />
+              )}
+            </TouchableOpacity>
             <TouchableOpacity onPress={handleDisconnect} hitSlop={8}>
               <ThemedText type="link" style={styles.disconnectLink}>
                 Disconnect
@@ -583,6 +620,74 @@ export default function BalancesScreen() {
           </View>
         )}
       </ScrollView>
+
+      <Modal
+        visible={isNetworkPickerOpen}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={() => setIsNetworkPickerOpen(false)}
+      >
+        <SafeAreaView
+          style={[styles.modalContainer, { backgroundColor: cardBg }]}
+        >
+          <View
+            style={[styles.modalHeader, { borderBottomColor: borderColor }]}
+          >
+            <ThemedText type="title">Switch Network</ThemedText>
+            <TouchableOpacity
+              style={[
+                styles.modalCloseButton,
+                { backgroundColor: borderColor },
+              ]}
+              onPress={() => setIsNetworkPickerOpen(false)}
+              activeOpacity={0.88}
+            >
+              <ThemedText
+                style={[styles.modalCloseText, { color: primaryColor }]}
+              >
+                Close
+              </ThemedText>
+            </TouchableOpacity>
+          </View>
+
+          <View style={styles.modalContent}>
+            {NETWORKS.map((network, index) => {
+              const isSelected =
+                network.chainId.toLiteral() === chainId.toLiteral();
+
+              return (
+                <TouchableOpacity
+                  key={network.name}
+                  style={[
+                    styles.networkOption,
+                    { backgroundColor, borderColor },
+                    isSelected && styles.networkOptionSelected,
+                  ]}
+                  onPress={() => void handleSelectNetwork(index)}
+                  activeOpacity={0.88}
+                >
+                  <View style={styles.networkOptionText}>
+                    <ThemedText style={styles.networkOptionTitle}>
+                      {network.name}
+                    </ThemedText>
+                    <ThemedText
+                      style={[
+                        styles.networkOptionSubtitle,
+                        { color: textSecondary },
+                      ]}
+                    >
+                      {network.chainId.toLiteral()}
+                    </ThemedText>
+                  </View>
+                  {isSelected && (
+                    <Ionicons name="checkmark" size={18} color={primaryColor} />
+                  )}
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        </SafeAreaView>
+      </Modal>
       <LogsFAB />
     </SafeAreaView>
   );
@@ -603,11 +708,11 @@ const styles = StyleSheet.create({
     alignSelf: "stretch",
   },
   header: {
+    width: "100%",
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
     marginBottom: 6,
-    width: "100%",
   },
   headerTitle: {
     flex: 0,
@@ -619,6 +724,9 @@ const styles = StyleSheet.create({
     flex: 0,
   },
   networkPill: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 6,
@@ -854,6 +962,55 @@ const styles = StyleSheet.create({
   moreTokenAmount: {
     fontSize: 11,
     fontWeight: "500",
+  },
+  modalContainer: {
+    flex: 1,
+  },
+  modalHeader: {
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    gap: 12,
+  },
+  modalCloseButton: {
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+  },
+  modalCloseText: {
+    fontSize: 12,
+    fontWeight: "600",
+  },
+  modalContent: {
+    padding: 20,
+    gap: 10,
+  },
+  networkOption: {
+    borderWidth: 1,
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    gap: 12,
+  },
+  networkOptionSelected: {
+    borderColor: "#000",
+  },
+  networkOptionText: {
+    flex: 1,
+    gap: 4,
+  },
+  networkOptionTitle: {
+    fontSize: 15,
+    fontWeight: "700",
+  },
+  networkOptionSubtitle: {
+    fontSize: 12,
   },
   deployCard: {
     borderWidth: 1,

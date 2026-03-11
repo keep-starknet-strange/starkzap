@@ -8,7 +8,7 @@ React Native + Expo app showing how to integrate `@starkzap/native` in a mobile 
 - Connect with a local private key via `sdk.onboard({ strategy: OnboardStrategy.Signer })`.
 - Connect with Privy via `sdk.onboard({ strategy: OnboardStrategy.Privy })`.
 - Check account deployment status and deploy when needed.
-- Read balances, send transfers, execute Ekubo swaps, and use staking flows.
+- Read balances, send transfers, execute Ekubo swaps, use Vesu lending/vault flows, and use staking flows.
 - Use sponsored transactions when a paymaster proxy is configured.
 
 ## Prerequisites
@@ -61,6 +61,7 @@ Note: this example depends on the local native package via `"@starkzap/native": 
 - `metro.config.js`: uses minimal monorepo resolution and package-exports compatibility overrides.
 - `stores/wallet.ts`: creates `StarkZap`, configures paymaster, and handles signer/Privy onboarding.
 - `app/index.tsx`: connection screen and network setup flow.
+- `app/(tabs)/vesu.tsx`: Vesu Lite-inspired market cards with live supply/borrow stats when available, plus vault deposit/withdraw, withdraw max, and borrow/repay health previews.
 - `app/(tabs)/*`: balances, transfers, swap, and staking screens.
 
 ## Swap flow in this example
