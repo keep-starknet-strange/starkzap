@@ -32,6 +32,7 @@ import { Staking } from "@/staking";
 import type { SwapInput, SwapProvider, SwapQuote } from "@/swap";
 import { AvnuSwapProvider } from "@/swap";
 import { resolveSwapInput } from "@/swap/utils";
+import { AvnuDcaProvider, DcaClient, type DcaProvider } from "@/dca";
 import {
   LendingClient,
   type LendingProvider,
@@ -101,6 +102,7 @@ export abstract class BaseWallet implements WalletInterface {
     bridgingConfig?: BridgingConfig | undefined;
     defaultSwapProvider?: SwapProvider | undefined;
     defaultLendingProvider?: LendingProvider | undefined;
+    defaultDcaProvider?: DcaProvider | undefined;
   }) {
     this.address = options.address;
     this.stakingConfig = options.stakingConfig;
@@ -118,12 +120,24 @@ export abstract class BaseWallet implements WalletInterface {
       },
       options.defaultLendingProvider ?? new VesuLendingProvider()
     );
+    this.dcaClient = new DcaClient(
+      {
+        address: this.address,
+        getChainId: () => this.getChainId(),
+        getProvider: () => this.getProvider(),
+        execute: (calls, options) => this.execute(calls, options),
+        getDefaultSwapProvider: () => this.getDefaultSwapProvider(),
+        getSwapProvider: (providerId) => this.getSwapProvider(providerId),
+      },
+      options.defaultDcaProvider ?? new AvnuDcaProvider()
+    );
   }
 
   /** Registered swap providers by id. */
   private readonly swapProviders: Map<string, SwapProvider>;
   private defaultSwapProviderId: string | null = null;
   private readonly lendingClient: LendingClient;
+  private readonly dcaClient: DcaClient;
 
   // ============================================================
   // Abstract methods - children MUST implement
@@ -200,6 +214,13 @@ export abstract class BaseWallet implements WalletInterface {
    */
   lending(): LendingClient {
     return this.lendingClient;
+  }
+
+  /**
+   * Access DCA helpers for protocol-native recurring orders and per-cycle swap previews.
+   */
+  dca(): DcaClient {
+    return this.dcaClient;
   }
 
   /**

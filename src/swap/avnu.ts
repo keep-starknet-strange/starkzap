@@ -1,23 +1,13 @@
 import type { Address, ChainId } from "@/types";
-import { CallData, type Call } from "starknet";
+import type { Call } from "starknet";
 import type {
   PreparedSwap,
   SwapProvider,
   SwapQuote,
   SwapRequest,
 } from "@/swap/interface";
-import {
-  BASE_URL,
-  SEPOLIA_BASE_URL,
-  getQuotes,
-  quoteToCalls,
-  type Quote,
-} from "@avnu/avnu-sdk";
-
-const DEFAULT_AVNU_API_BASES = {
-  SN_MAIN: [BASE_URL],
-  SN_SEPOLIA: [SEPOLIA_BASE_URL, BASE_URL],
-} as const;
+import { DEFAULT_AVNU_API_BASES, normalizeAvnuCalls } from "@/utils/avnu";
+import { getQuotes, quoteToCalls, type Quote } from "@avnu/avnu-sdk";
 
 const DEFAULT_QUOTES_PAGE_SIZE = 5;
 const DEFAULT_SLIPPAGE_BPS = 100n;
@@ -49,18 +39,6 @@ function percentToBps(value: number | null): bigint | null {
     return null;
   }
   return BigInt(Math.round(value * 100));
-}
-
-function normalizeAvnuCalls(calls: Call[]): Call[] {
-  if (!calls.length) {
-    throw new Error("AVNU build returned no calls");
-  }
-
-  return calls.map((call) => ({
-    contractAddress: call.contractAddress as Address,
-    entrypoint: `${call.entrypoint}`,
-    calldata: CallData.compile(call.calldata ?? []),
-  }));
 }
 
 function toSwapQuote(params: {
@@ -130,7 +108,10 @@ export class AvnuSwapProvider implements SwapProvider {
       },
       { baseUrl: apiBase }
     );
-    const calls = normalizeAvnuCalls(result.calls as Call[]);
+    const calls = normalizeAvnuCalls(
+      result.calls as Call[],
+      "AVNU build returned no calls"
+    );
 
     return {
       calls,

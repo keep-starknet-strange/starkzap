@@ -3,6 +3,7 @@ import type { WalletInterface } from "@/wallet/interface";
 import type { Tx } from "@/tx";
 import type { SwapInput } from "@/swap";
 import { resolveSwapInput } from "@/swap/utils";
+import type { DcaCancelInput, DcaCreateInput, PreparedDcaAction } from "@/dca";
 import type {
   LendingBorrowRequest,
   LendingDepositRequest,
@@ -88,9 +89,29 @@ export class TxBuilder {
     action: string,
     preparedPromise: Promise<PreparedLendingAction>
   ): this {
+    return this.queuePreparedCalls(
+      `Lending action "${action}" returned no calls`,
+      preparedPromise
+    );
+  }
+
+  private queueDcaAction(
+    action: string,
+    preparedPromise: Promise<PreparedDcaAction>
+  ): this {
+    return this.queuePreparedCalls(
+      `DCA action "${action}" returned no calls`,
+      preparedPromise
+    );
+  }
+
+  private queuePreparedCalls(
+    emptyMessage: string,
+    preparedPromise: Promise<{ calls: Call[] }>
+  ): this {
     const calls = preparedPromise.then((prepared) => {
       if (prepared.calls.length === 0) {
-        throw new Error(`Lending action "${action}" returned no calls`);
+        throw new Error(emptyMessage);
       }
       return prepared.calls;
     });
@@ -314,6 +335,26 @@ export class TxBuilder {
     return this.queueLendingAction(
       "repay",
       this.wallet.lending().prepareRepay(request)
+    );
+  }
+
+  /**
+   * Add a DCA order creation operation.
+   */
+  dcaCreate(request: DcaCreateInput): this {
+    return this.queueDcaAction(
+      "create",
+      this.wallet.dca().prepareCreate(request)
+    );
+  }
+
+  /**
+   * Add a DCA cancellation operation.
+   */
+  dcaCancel(request: DcaCancelInput): this {
+    return this.queueDcaAction(
+      "cancel",
+      this.wallet.dca().prepareCancel(request)
     );
   }
 
