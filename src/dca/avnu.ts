@@ -21,7 +21,12 @@ import type {
   DcaTrade,
   PreparedDcaAction,
 } from "@/dca/interface";
-import { DEFAULT_AVNU_API_BASES, normalizeAvnuCalls } from "@/utils/avnu";
+import {
+  DEFAULT_AVNU_API_BASES,
+  normalizeAvnuCalls,
+  supportsAvnuChain,
+  withAvnuApiBaseFallback,
+} from "@/utils/avnu";
 
 export interface AvnuDcaProviderOptions {
   /** Optional API base override per chain. */
@@ -177,18 +182,19 @@ export class AvnuDcaProvider implements DcaProvider {
   }
 
   supportsChain(chainId: ChainId): boolean {
-    const literal = chainId.toLiteral();
-    return literal === "SN_MAIN" || literal === "SN_SEPOLIA";
+    return supportsAvnuChain(chainId);
   }
 
   async getOrders(
     context: DcaProviderContext,
     request: DcaOrdersRequest
   ): Promise<DcaOrdersPage> {
-    const page = await this.withApiBaseFallback(
-      context.chainId,
-      "get DCA orders",
-      async (baseUrl) =>
+    const page = await withAvnuApiBaseFallback({
+      apiBasesByChain: this.apiBases,
+      chainId: context.chainId,
+      feature: "DCA",
+      action: "get DCA orders",
+      run: async (baseUrl) =>
         await getDcaOrders(
           {
             traderAddress: request.traderAddress,
@@ -200,8 +206,8 @@ export class AvnuDcaProvider implements DcaProvider {
             ...(request.sort && { sort: request.sort }),
           },
           { baseUrl }
-        )
-    );
+        ),
+    });
 
     return {
       ...page,
@@ -215,10 +221,12 @@ export class AvnuDcaProvider implements DcaProvider {
   ): Promise<PreparedDcaAction> {
     validateCreateRequest(request);
 
-    const calls = await this.withApiBaseFallback(
-      context.chainId,
-      "prepare DCA create",
-      async (baseUrl) => {
+    const calls = await withAvnuApiBaseFallback({
+      apiBasesByChain: this.apiBases,
+      chainId: context.chainId,
+      feature: "DCA",
+      action: "prepare DCA create",
+      run: async (baseUrl) => {
         const response = await createDcaToCalls(
           {
             sellTokenAddress: request.sellToken.address,
@@ -238,8 +246,8 @@ export class AvnuDcaProvider implements DcaProvider {
           response.calls,
           "AVNU DCA create returned no calls"
         );
-      }
-    );
+      },
+    });
 
     return {
       providerId: this.id,
@@ -257,15 +265,17 @@ export class AvnuDcaProvider implements DcaProvider {
     }
     const orderAddress = request.orderAddress;
 
-    const calls = await this.withApiBaseFallback(
-      context.chainId,
-      "prepare DCA cancel",
-      async (baseUrl) =>
+    const calls = await withAvnuApiBaseFallback({
+      apiBasesByChain: this.apiBases,
+      chainId: context.chainId,
+      feature: "DCA",
+      action: "prepare DCA cancel",
+      run: async (baseUrl) =>
         normalizeAvnuCalls(
           (await cancelDcaToCalls(orderAddress, { baseUrl })).calls,
           "AVNU DCA cancel returned no calls"
-        )
-    );
+        ),
+    });
 
     return {
       providerId: this.id,
@@ -273,43 +283,5 @@ export class AvnuDcaProvider implements DcaProvider {
       calls,
       orderAddress,
     };
-  }
-
-  private getApiBases(chainId: ChainId): string[] {
-    const literal = chainId.toLiteral();
-    let apiBases: string[];
-
-    if (literal === "SN_MAIN") {
-      apiBases = this.apiBases.SN_MAIN;
-    } else if (literal === "SN_SEPOLIA") {
-      apiBases = this.apiBases.SN_SEPOLIA;
-    } else {
-      throw new Error(`Unsupported chain for AVNU DCA: ${literal}`);
-    }
-
-    if (apiBases.length === 0) {
-      throw new Error(`No AVNU API base configured for chain: ${literal}`);
-    }
-
-    return [...apiBases];
-  }
-
-  private async withApiBaseFallback<T>(
-    chainId: ChainId,
-    action: string,
-    run: (baseUrl: string) => Promise<T>
-  ): Promise<T> {
-    const failures: string[] = [];
-
-    for (const apiBase of this.getApiBases(chainId)) {
-      try {
-        return await run(apiBase);
-      } catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
-        failures.push(`${apiBase}: ${message}`);
-      }
-    }
-
-    throw new Error(`AVNU ${action} failed (${failures.join(" | ")})`);
   }
 }
