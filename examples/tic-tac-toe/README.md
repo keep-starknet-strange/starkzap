@@ -47,56 +47,10 @@ npm install
 
 This app depends on `@starkzap/native` from `../../packages/native`. The `postinstall` script builds the SDK packages from repo root.
 
-## Cartridge Native Module Setup
+## Cartridge Session Adapter
 
-This app uses Cartridge native Controller module setup (not wasm) via `uniffi-bindgen-react-native`.
-
-1. Clone `controller.c`:
-
-```bash
-git clone https://github.com/cartridge-gg/controller.c
-```
-
-2. Point this app to that local checkout:
-
-```bash
-export CONTROLLER_C_DIR=/absolute/path/to/controller.c
-```
-
-3. Build iOS binary using the official script and sync RN bindings:
-
-```bash
-cd examples/tic-tac-toe
-npm run cartridge:setup:ios
-```
-
-This uses:
-
-- `uniffi-bindgen-react-native` (`github:Larkooo/uniffi-bindgen-react-native#update-uniffi-0.30`)
-- `controller.c/scripts/build_ios.sh`
-
-If `uniffi-bindgen-react-native` is not found, run `npm install` in this workspace,
-the script will also fall back to `npx` with:
-`github:Larkooo/uniffi-bindgen-react-native#update-uniffi-0.30`.
-
-If you still prefer global install, use cargo:
-
-```bash
-cargo install --git https://github.com/Larkooo/uniffi-bindgen-react-native --branch update-uniffi-0.30 uniffi-bindgen-react-native
-```
-
-If you get a Rust target error (for example `can't find crate for core`), install iOS targets once:
-
-```bash
-rustup target add aarch64-apple-ios aarch64-apple-ios-sim x86_64-apple-ios
-```
-
-If `controller.c`'s pinned `stable` toolchain causes target-install issues on your machine, override the build toolchain:
-
-```bash
-export CONTROLLER_RUST_TOOLCHAIN=nightly-aarch64-apple-darwin
-npm run cartridge:setup:ios
-```
+This app uses the TypeScript Cartridge session adapter from `@starkzap/native`.
+No local Rust, UniFFI binding generation, or XCFramework build step is required for the session flow.
 
 ## Run
 
@@ -113,10 +67,10 @@ Platform shortcuts:
 - `npm run android`
 - `npm run web`
 
-## Notes For Native Onboarding
+## Notes For Cartridge Onboarding
 
 - `@starkzap/native` is loaded lazily when connecting Cartridge (not at app bootstrap), which avoids early runtime crashes from transitive modules.
-- Cartridge auth/session is handled by native Controller through `modules/controller/src`.
+- Cartridge auth/session is handled by the TS session adapter in `app/context/StarknetConnector.tsx`.
 - Cartridge redirect URL is `EXPO_PUBLIC_CARTRIDGE_REDIRECT_URL` (default: `tictactoe://cartridge/callback`).
 - App scheme is `tictactoe`, so Cartridge redirect URL is `tictactoe://cartridge/callback`.
 - Keep a single React Native version in the tree (this app is pinned to `react-native@0.81.5` to match Expo SDK 54).

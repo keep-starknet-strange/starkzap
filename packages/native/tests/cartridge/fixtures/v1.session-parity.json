@@ -1,0 +1,66 @@
+{
+  "version": "controller-ts-v1",
+  "guidVectors": [
+    {
+      "privateKey": "0x1",
+      "expectedGuid": "0x2ef6054c87de43adb2299e6996182a8b11414b15606ac63f1ef433c96ea81c5"
+    },
+    {
+      "privateKey": "0x1234",
+      "expectedGuid": "0x60d6dda42a1098d140dde02808adaa635cd3ffd015c9c8220f8f18b1777b8d9"
+    },
+    {
+      "privateKey": "0xabcde",
+      "expectedGuid": "0x7b525ecaf1516c18062a2c94596aa97175e7d0426a7ed6d88ee46cdfc74265f"
+    }
+  ],
+  "policyVectors": [
+    {
+      "name": "three-policies-unsorted",
+      "input": [
+        {
+          "target": "0xabc",
+          "method": "play_move"
+        },
+        {
+          "target": "0x1",
+          "method": "create_game"
+        },
+        {
+          "target": "0xabc",
+          "method": "create_game"
+        }
+      ],
+      "expectedCanonical": [
+        {
+          "contractAddress": "0x0000000000000000000000000000000000000000000000000000000000000001",
+          "entrypoint": "create_game"
+        },
+        {
+          "contractAddress": "0x0000000000000000000000000000000000000000000000000000000000000abc",
+          "entrypoint": "create_game"
+        },
+        {
+          "contractAddress": "0x0000000000000000000000000000000000000000000000000000000000000abc",
+          "entrypoint": "play_move"
+        }
+      ],
+      "expectedMerkleRoot": "0xdf3fc35241b2377e6e50d31bb73701aba1ac815d2c3cefde5dd808a129fa28"
+    }
+  ],
+  "sessionVectors": [
+    {
+      "name": "redirect-encoded-session",
+      "encodedSession": "eyJ1c2VybmFtZSI6InBsYXllcjEiLCJhZGRyZXNzIjoiMHhhYmMiLCJvd25lckd1aWQiOiIweDEyMyIsImV4cGlyZXNBdCI6IjEyMzQ1Njc4OTAiLCJndWFyZGlhbktleUd1aWQiOiIweDAiLCJtZXRhZGF0YUhhc2giOiIweDAiLCJzZXNzaW9uS2V5R3VpZCI6IjB4OTk5In0=",
+      "expected": {
+        "username": "player1",
+        "address": "0x0000000000000000000000000000000000000000000000000000000000000abc",
+        "ownerGuid": "0x123",
+        "expiresAt": "1234567890",
+        "guardianKeyGuid": "0x0",
+        "metadataHash": "0x0",
+        "sessionKeyGuid": "0x999"
+      }
+    }
+  ]
+}
