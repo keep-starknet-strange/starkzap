@@ -284,7 +284,7 @@ export const StarknetConnectorProvider: React.FC<{
     }
   }, [wallet]);
 
-  const provider = wallet?.getProvider() ?? null;
+  const provider = useMemo(() => wallet?.getProvider() ?? null, [wallet]);
 
   const waitForTransaction = useCallback(
     async (txHash: string): Promise<boolean> => {
