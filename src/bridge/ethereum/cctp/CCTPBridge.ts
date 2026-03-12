@@ -2,17 +2,14 @@ import {
   type Address,
   Amount,
   type EthereumAddress,
+  type ExternalTransactionResponse,
   fromAddress,
   fromEthereumAddress,
 } from "@/types";
 import type { BridgeDepositOptions } from "@/bridge/types/BridgeInterface";
 import type { CCTPDepositFeeEstimation } from "@/bridge";
 import { ERC20EthereumToken } from "@/bridge/ethereum/EtherToken";
-import {
-  Interface,
-  type TransactionRequest,
-  type TransactionResponse,
-} from "ethers";
+import { Interface, type TransactionRequest } from "ethers";
 import { FeeErrorCause } from "@/types/errors";
 import { BridgeDirection, CCTPFees } from "@/bridge/ethereum/cctp/CCTPFees";
 import {
@@ -47,7 +44,7 @@ export class CCTPBridge extends EthereumBridge<CCTPDepositFeeEstimation> {
     recipient: Address,
     amount: Amount,
     options?: BridgeDepositOptions
-  ): Promise<TransactionResponse> {
+  ): Promise<ExternalTransactionResponse> {
     await this.approveSpendingOf(amount);
 
     const txRequest = await this.createDepositForBurnTransaction(
@@ -61,7 +58,7 @@ export class CCTPBridge extends EthereumBridge<CCTPDepositFeeEstimation> {
 
     this.clearCachedAllowance();
 
-    return txResponse;
+    return { hash: txResponse.hash };
   }
 
   async getDepositFeeEstimate(

@@ -6,6 +6,7 @@ import {
   Amount,
   type EthereumAddress,
   EthereumBridgeToken,
+  type ExternalTransactionResponse,
   fromEthereumAddress,
 } from "@/types";
 import {
@@ -17,6 +18,7 @@ import {
   type EthereumTransactionDetails,
   type EthereumWalletConfig,
 } from "@/bridge/ethereum/types";
+import type { InterfaceAbi } from "ethers";
 import {
   Contract,
   type ContractTransaction,
@@ -24,7 +26,6 @@ import {
   type ContractTransactionResponse,
   isError,
   type TransactionRequest,
-  type TransactionResponse,
 } from "ethers";
 import {
   FeeErrorCause,
@@ -33,12 +34,10 @@ import {
 } from "@/types/errors";
 import type { WalletInterface } from "@/wallet";
 import CANONICAL_BRIDGE_ABI from "@/abi/ethereum/canonicalBridge.json";
-import type { InterfaceAbi } from "ethers";
 import type { Address } from "starkzap";
 
 export abstract class EthereumBridge<Fee = unknown> implements BridgeInterface<
   EthereumAddress,
-  TransactionResponse,
   Fee
 > {
   public static readonly ALLOWANCE_CACHE_TTL = 60_000;
@@ -73,7 +72,7 @@ export abstract class EthereumBridge<Fee = unknown> implements BridgeInterface<
     recipient: Address,
     amount: Amount,
     options?: BridgeDepositOptions
-  ): Promise<TransactionResponse>;
+  ): Promise<ExternalTransactionResponse>;
 
   abstract getDepositFeeEstimate(_options?: BridgeDepositOptions): Promise<Fee>;
 

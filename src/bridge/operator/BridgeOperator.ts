@@ -10,7 +10,6 @@ import {
   type AddressFor,
   type FeeEstimationFor,
   isTokenForChain,
-  type TxResponseFor,
 } from "@/bridge/types/generics";
 import {
   ConnectedEthereumWallet,
@@ -18,17 +17,27 @@ import {
 } from "@/connect";
 import type { WalletInterface } from "@/wallet";
 import type { BridgeOperatorInterface } from "@/bridge/operator/BridgeOperatorInterface";
-import type { Address, BridgingConfig, EthereumAddress } from "@/types";
-import type { Amount } from "starkzap";
+import type {
+  Address,
+  BridgingConfig,
+  EthereumAddress,
+  ExternalTransactionResponse,
+  SolanaAddress,
+} from "@/types";
+import {
+  type Amount,
+  ConnectedSolanaWallet,
+  SolanaBridgeToken,
+} from "starkzap";
 import { CCTPBridge } from "@/bridge/ethereum/cctp/CCTPBridge";
 import { LordsBridge } from "@/bridge/ethereum/lords/LordsBridge";
 import { OftBridge } from "@/bridge/ethereum/oft/OftBridge";
 import type { EthereumDepositFeeEstimation } from "@/bridge/ethereum/types";
-import type { TransactionResponse } from "ethers";
+import { SolanaHyperlaneBridge } from "@/bridge/solana/SolanaHyperlaneBridge";
+import type { SolanaDepositFeeEstimation } from "@/bridge/solana/types";
 
 export type BridgeType<T extends BridgeToken> = BridgeInterface<
   AddressFor<T>,
-  TxResponseFor<T>,
   FeeEstimationFor<T>
 >;
 
@@ -46,7 +55,7 @@ export class BridgeOperator implements BridgeOperatorInterface {
     token: T,
     externalWallet: ConnectedExternalWallet<AddressFor<T>>,
     options?: BridgeDepositOptions
-  ): Promise<TxResponseFor<T>> {
+  ): Promise<ExternalTransactionResponse> {
     const bridge = await this.bridge(
       token,
       externalWallet,
@@ -113,7 +122,13 @@ export class BridgeOperator implements BridgeOperatorInterface {
     if (isTokenForChain(token, "ethereum")) {
       return (await this.createEthereumBridge(
         token,
-        wallet as ConnectedEthereumWallet,
+        wallet as unknown as ConnectedEthereumWallet,
+        starknetWallet
+      )) as unknown as BridgeType<T>;
+    } else if (isTokenForChain(token, "solana")) {
+      return (await this.createSolanaBridge(
+        token,
+        wallet as unknown as ConnectedSolanaWallet,
         starknetWallet
       )) as unknown as BridgeType<T>;
     }
@@ -125,13 +140,7 @@ export class BridgeOperator implements BridgeOperatorInterface {
     token: EthereumBridgeToken,
     externalWallet: ConnectedEthereumWallet,
     starknetWallet: WalletInterface
-  ): Promise<
-    BridgeInterface<
-      EthereumAddress,
-      TransactionResponse,
-      EthereumDepositFeeEstimation
-    >
-  > {
+  ): Promise<BridgeInterface<EthereumAddress, EthereumDepositFeeEstimation>> {
     const walletConfig = await externalWallet.toEthWalletConfig();
 
     if (token.id === "lords") {
@@ -155,7 +164,28 @@ export class BridgeOperator implements BridgeOperatorInterface {
         return new OftBridge(token, walletConfig, starknetWallet, apiKey);
       }
       default:
-        throw new Error(`Unsupported protocol "${token.protocol}".`);
+        throw new Error(
+          `Unsupported protocol "${token.protocol}" for ${token.chain} chain.`
+        );
+    }
+  }
+
+  private async createSolanaBridge(
+    token: SolanaBridgeToken,
+    externalWallet: ConnectedSolanaWallet,
+    starknetWallet: WalletInterface
+  ): Promise<BridgeInterface<SolanaAddress, SolanaDepositFeeEstimation>> {
+    const walletConfig = externalWallet.toSolanaWalletConfig(
+      this.bridgingConfig?.solanaRpcUrl
+    );
+
+    switch (token.protocol) {
+      case Protocol.HYPERLANE:
+        return new SolanaHyperlaneBridge(token, walletConfig, starknetWallet);
+      default:
+        throw new Error(
+          `Unsupported protocol "${token.protocol}" for ${token.chain} chain.`
+        );
     }
   }
 }

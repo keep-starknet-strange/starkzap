@@ -1,10 +1,6 @@
 import type { BridgeInterface } from "@/bridge/types/BridgeInterface";
 import { BridgeToken } from "@/types";
-import type {
-  AddressFor,
-  FeeEstimationFor,
-  TxResponseFor,
-} from "@/bridge/types/generics";
+import type { AddressFor, FeeEstimationFor } from "@/bridge/types/generics";
 import type { ConnectedExternalWallet } from "@/connect";
 
 export class BridgeCache {
@@ -19,11 +15,7 @@ export class BridgeCache {
   public get<T extends BridgeToken>(
     token: T,
     wallet: ConnectedExternalWallet<AddressFor<T>>
-  ):
-    | Promise<
-        BridgeInterface<AddressFor<T>, TxResponseFor<T>, FeeEstimationFor<T>>
-      >
-    | undefined {
+  ): Promise<BridgeInterface<AddressFor<T>, FeeEstimationFor<T>>> | undefined {
     const key = this.key(token, wallet);
     const entry = this.cache.get(key);
     if (!entry) {
@@ -36,16 +28,14 @@ export class BridgeCache {
     }
 
     return entry.bridge as Promise<
-      BridgeInterface<AddressFor<T>, TxResponseFor<T>, FeeEstimationFor<T>>
+      BridgeInterface<AddressFor<T>, FeeEstimationFor<T>>
     >;
   }
 
   public set<T extends BridgeToken>(
     token: T,
     wallet: ConnectedExternalWallet<AddressFor<T>>,
-    bridge: Promise<
-      BridgeInterface<AddressFor<T>, TxResponseFor<T>, FeeEstimationFor<T>>
-    >
+    bridge: Promise<BridgeInterface<AddressFor<T>, FeeEstimationFor<T>>>
   ): void {
     const key = this.key(token, wallet);
 

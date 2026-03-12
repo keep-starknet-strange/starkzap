@@ -1,5 +1,6 @@
-import { validateAndParseAddress, type BigNumberish } from "starknet";
+import { type BigNumberish, validateAndParseAddress } from "starknet";
 import { getAddress } from "ethers";
+import { PublicKey } from "@solana/web3.js";
 
 /**
  * Branded type for Starknet addresses.
@@ -50,4 +51,22 @@ export type EthereumAddress = string & { readonly __type: "EthereumAddress" };
  */
 export function fromEthereumAddress(value: string): EthereumAddress {
   return getAddress(value) as EthereumAddress;
+}
+
+/**
+ * Branded type for Solana addresses.
+ *
+ * This provides compile-time type safety to distinguish addresses from
+ * regular strings, while remaining a string at runtime.
+ */
+export type SolanaAddress = string & { readonly __type: "SolanaAddress" };
+
+/**
+ * Validate a base58-encoded Solana address.
+ * @param value - The address string to validate
+ * @returns The validated address
+ * @throws If the value is not a valid base58-encoded Solana public key
+ */
+export function fromSolanaAddress(value: string): SolanaAddress {
+  return new PublicKey(value).toBase58() as SolanaAddress;
 }

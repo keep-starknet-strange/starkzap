@@ -4,7 +4,7 @@ import type {
   EthereumWalletConfig,
   OftDepositFeeEstimation,
 } from "@/bridge/ethereum/types";
-import type { Address } from "@/types";
+import type { Address, ExternalTransactionResponse } from "@/types";
 import {
   Amount,
   type EthereumAddress,
@@ -13,7 +13,7 @@ import {
   fromAddress,
 } from "@/types";
 import type { WalletInterface } from "@/wallet";
-import type { ContractTransaction, TransactionResponse } from "ethers";
+import type { ContractTransaction } from "ethers";
 import { FeeErrorCause } from "@/types/errors";
 import { LayerZeroApi } from "@/bridge/ethereum/oft/LayerZeroApi";
 import {
@@ -61,7 +61,7 @@ export class OftBridge extends EthereumBridge<OftDepositFeeEstimation> {
     recipient: Address,
     amount: Amount,
     _options?: BridgeDepositOptions
-  ): Promise<TransactionResponse> {
+  ): Promise<ExternalTransactionResponse> {
     await this.approveSpendingOf(amount);
 
     const signerAddress = await this.config.signer.getAddress();
@@ -80,7 +80,7 @@ export class OftBridge extends EthereumBridge<OftDepositFeeEstimation> {
 
     const response = await this.execute(depositTx);
     this.clearCachedAllowance();
-    return response;
+    return { hash: response.hash };
   }
 
   async getDepositFeeEstimate(

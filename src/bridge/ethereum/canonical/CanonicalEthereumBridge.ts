@@ -4,13 +4,13 @@ import type {
   EthereumDepositFeeEstimation,
   EthereumTransactionDetails,
 } from "@/bridge";
-import { type EthereumAddress, fromAddress } from "@/types";
-import { ethereumAddress } from "@/bridge/ethereum/EtherToken";
 import {
-  type ContractTransaction,
-  toBigInt,
-  type TransactionResponse,
-} from "ethers";
+  type EthereumAddress,
+  type ExternalTransactionResponse,
+  fromAddress,
+} from "@/types";
+import { ethereumAddress } from "@/bridge/ethereum/EtherToken";
+import { type ContractTransaction, toBigInt } from "ethers";
 import { type Address, Amount } from "starkzap";
 import { RPC, uint256 } from "starknet";
 import { FeeErrorCause } from "@/types/errors";
@@ -25,7 +25,7 @@ export class CanonicalEthereumBridge extends EthereumBridge<EthereumDepositFeeEs
     recipient: Address,
     amount: Amount,
     _options?: BridgeDepositOptions
-  ): Promise<TransactionResponse> {
+  ): Promise<ExternalTransactionResponse> {
     await this.approveSpendingOf(amount);
 
     const details = await this.prepareDepositTransactionDetails(
@@ -38,7 +38,7 @@ export class CanonicalEthereumBridge extends EthereumBridge<EthereumDepositFeeEs
 
     this.clearCachedAllowance();
 
-    return response;
+    return { hash: response.hash };
   }
 
   protected getAllowanceSpender(): Promise<EthereumAddress | null> {

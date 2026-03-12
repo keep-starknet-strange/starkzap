@@ -2,12 +2,13 @@ import type { WalletInterface } from "@/wallet/interface";
 import {
   type Address,
   Amount,
-  type BridgingConfig,
   BridgeToken,
+  type BridgingConfig,
   type ChainId,
   type DeployOptions,
   type EnsureReadyOptions,
   type ExecuteOptions,
+  type ExternalTransactionResponse,
   type FeeMode,
   type PoolMember,
   type PreflightOptions,
@@ -27,7 +28,7 @@ import type {
 } from "starknet";
 import { Erc20 } from "@/erc20";
 import { Staking } from "@/staking";
-import type { SwapInput, SwapQuote, SwapProvider } from "@/swap";
+import type { SwapInput, SwapProvider, SwapQuote } from "@/swap";
 import { AvnuSwapProvider } from "@/swap";
 import { resolveSwapInput } from "@/swap/utils";
 import {
@@ -38,11 +39,7 @@ import {
 import { BridgeOperator } from "@/bridge";
 import type { BridgeDepositOptions } from "@/bridge/types/BridgeInterface";
 import type { ConnectedExternalWallet } from "..";
-import type {
-  AddressFor,
-  FeeEstimationFor,
-  TxResponseFor,
-} from "@/bridge/types/generics";
+import type { AddressFor, FeeEstimationFor } from "@/bridge/types/generics";
 
 const MAX_ERC20_CACHE_SIZE = 128;
 const MAX_STAKING_CACHE_SIZE = 128;
@@ -764,7 +761,7 @@ export abstract class BaseWallet implements WalletInterface {
     token: T,
     externalWallet: ConnectedExternalWallet<AddressFor<T>>,
     options?: BridgeDepositOptions
-  ): Promise<TxResponseFor<T>> {
+  ): Promise<ExternalTransactionResponse> {
     return this.bridging.deposit(
       recipient,
       amount,

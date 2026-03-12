@@ -1,4 +1,4 @@
-import { Amount } from "@/types";
+import { Amount, type ExternalTransactionResponse } from "@/types";
 import type { WalletInterface } from "@/wallet";
 import type { Address } from "starkzap";
 
@@ -22,18 +22,14 @@ export interface BridgeDepositOptions {
   fastTransfer?: boolean;
 }
 
-export interface BridgeInterface<
-  ExternalAddress = unknown,
-  TxResponse = unknown,
-  Fee = unknown,
-> {
+export interface BridgeInterface<ExternalAddress = unknown, Fee = unknown> {
   readonly starknetWallet: WalletInterface;
 
   deposit(
     recipient: Address,
     amount: Amount,
     options?: BridgeDepositOptions
-  ): Promise<TxResponse>;
+  ): Promise<ExternalTransactionResponse>;
 
   getDepositFeeEstimate(options?: BridgeDepositOptions): Promise<Fee>;
 

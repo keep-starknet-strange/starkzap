@@ -171,6 +171,12 @@ export interface BridgingConfig {
    * is mainnet-only -- OFT bridging is not available on testnets.
    */
   layerZeroApiKey?: string;
+
+  /** Custom Ethereum JSON-RPC endpoint used for gas estimation in Ethereum bridges. */
+  ethereumRpcUrl?: string;
+
+  /** Custom Solana RPC endpoint. Falls back to the public cluster URL if omitted. */
+  solanaRpcUrl?: string;
 }
 
 /**
