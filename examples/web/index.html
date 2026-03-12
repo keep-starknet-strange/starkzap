@@ -719,6 +719,185 @@
           </div>
           <div id="swap-quote" class="quote-box hidden"></div>
         </div>
+
+        <div class="swap-card">
+          <div class="card-title" style="margin-bottom: 0.75rem">
+            Confidential (Tongo)
+          </div>
+          <div class="form-group">
+            <label for="tongo-token-select">Token</label>
+            <select id="tongo-token-select"></select>
+          </div>
+          <div class="actions" style="margin-top: 0.75rem">
+            <button id="btn-tongo-init" class="btn btn-primary">
+              Initialize
+            </button>
+          </div>
+
+          <div id="tongo-ops" class="hidden">
+            <div
+              style="
+                margin-top: 1rem;
+                padding-top: 0.75rem;
+                border-top: 1px solid var(--border-color);
+              "
+            >
+              <div class="info-row">
+                <span class="info-label">Tongo Address</span>
+                <span
+                  id="tongo-address"
+                  class="info-value address"
+                  style="user-select: all"
+                  >—</span
+                >
+              </div>
+              <div class="info-row">
+                <span class="info-label">Active Balance</span>
+                <span id="tongo-balance" class="info-value">—</span>
+              </div>
+              <div class="info-row">
+                <span class="info-label">Pending Balance</span>
+                <span id="tongo-pending" class="info-value">—</span>
+              </div>
+              <div class="info-row">
+                <span class="info-label">Nonce</span>
+                <span id="tongo-nonce" class="info-value">—</span>
+              </div>
+            </div>
+
+            <div class="swap-grid" style="margin-top: 1rem">
+              <div class="form-group">
+                <label for="tongo-fund-amount">Fund Amount</label>
+                <input id="tongo-fund-amount" type="text" placeholder="0.01" />
+              </div>
+              <div class="form-group" style="display: flex; align-items: end">
+                <button
+                  id="btn-tongo-fund"
+                  class="btn btn-primary"
+                  style="width: 100%"
+                >
+                  Fund
+                </button>
+              </div>
+            </div>
+
+            <div
+              style="
+                margin-top: 0.75rem;
+                padding-top: 0.75rem;
+                border-top: 1px solid var(--border-color);
+              "
+            >
+              <div class="swap-grid">
+                <div class="form-group">
+                  <label for="tongo-transfer-rx">Recipient X</label>
+                  <input
+                    id="tongo-transfer-rx"
+                    type="text"
+                    placeholder="0x..."
+                  />
+                </div>
+                <div class="form-group">
+                  <label for="tongo-transfer-ry">Recipient Y</label>
+                  <input
+                    id="tongo-transfer-ry"
+                    type="text"
+                    placeholder="0x..."
+                  />
+                </div>
+              </div>
+              <div class="swap-grid">
+                <div class="form-group">
+                  <label for="tongo-transfer-amount">Transfer Amount</label>
+                  <input
+                    id="tongo-transfer-amount"
+                    type="text"
+                    placeholder="0.01"
+                  />
+                </div>
+                <div class="form-group" style="display: flex; align-items: end">
+                  <button
+                    id="btn-tongo-transfer"
+                    class="btn btn-primary"
+                    style="width: 100%"
+                  >
+                    Transfer
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div
+              style="
+                margin-top: 0.75rem;
+                padding-top: 0.75rem;
+                border-top: 1px solid var(--border-color);
+              "
+            >
+              <div class="swap-grid">
+                <div class="form-group">
+                  <label for="tongo-withdraw-amount">Withdraw Amount</label>
+                  <input
+                    id="tongo-withdraw-amount"
+                    type="text"
+                    placeholder="0.01"
+                  />
+                </div>
+                <div class="form-group">
+                  <label for="tongo-withdraw-to">To Address</label>
+                  <input
+                    id="tongo-withdraw-to"
+                    type="text"
+                    placeholder="0x..."
+                  />
+                </div>
+              </div>
+              <div class="actions" style="margin-top: 0.75rem">
+                <button id="btn-tongo-withdraw" class="btn btn-primary">
+                  Withdraw
+                </button>
+              </div>
+            </div>
+
+            <div
+              style="
+                margin-top: 0.75rem;
+                padding-top: 0.75rem;
+                border-top: 1px solid var(--border-color);
+              "
+            >
+              <div class="actions" style="margin-top: 0">
+                <button id="btn-tongo-rollover" class="btn btn-secondary">
+                  Rollover
+                </button>
+              </div>
+            </div>
+
+            <div
+              style="
+                margin-top: 0.75rem;
+                padding-top: 0.75rem;
+                border-top: 1px solid var(--border-color);
+              "
+            >
+              <div class="form-group">
+                <label for="tongo-ragequit-to">Ragequit To Address</label>
+                <input id="tongo-ragequit-to" type="text" placeholder="0x..." />
+              </div>
+              <div class="actions" style="margin-top: 0.75rem">
+                <button id="btn-tongo-ragequit" class="btn btn-primary">
+                  Ragequit
+                </button>
+              </div>
+            </div>
+
+            <div class="actions" style="margin-top: 0.75rem">
+              <button id="btn-tongo-refresh" class="btn btn-secondary">
+                Refresh State
+              </button>
+            </div>
+          </div>
+        </div>
       </div>
 
       <!-- Activity Log -->

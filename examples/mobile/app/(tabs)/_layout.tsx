@@ -70,6 +70,15 @@ export default function TabLayout() {
           ),
         }}
       />
+      <Tabs.Screen
+        name="confidential"
+        options={{
+          title: "Confidential",
+          tabBarIcon: ({ color }) => (
+            <IconSymbol size={28} name="lock.shield.fill" color={color} />
+          ),
+        }}
+      />
     </Tabs>
   );
 }

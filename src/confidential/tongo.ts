@@ -110,8 +110,9 @@ export class TongoConfidential implements ConfidentialProvider {
    * followed by the fund call, so consumers can execute the batch as-is.
    */
   async fund(details: ConfidentialFundDetails): Promise<Call[]> {
+    const tongoAmount = await this.toConfidentialUnits(details.amount);
     const op = await this.account.fund({
-      amount: details.amount.toBase(),
+      amount: tongoAmount,
       sender: details.sender,
       ...(details.feeTo !== undefined && { fee_to_sender: details.feeTo }),
     });
@@ -127,8 +128,9 @@ export class TongoConfidential implements ConfidentialProvider {
    * Generates ZK proofs locally and returns the call to submit on-chain.
    */
   async transfer(details: ConfidentialTransferDetails): Promise<Call[]> {
+    const tongoAmount = await this.toConfidentialUnits(details.amount);
     const op = await this.account.transfer({
-      amount: details.amount.toBase(),
+      amount: tongoAmount,
       to: details.to,
       sender: details.sender,
       ...(details.feeTo !== undefined && { fee_to_sender: details.feeTo }),
@@ -142,8 +144,9 @@ export class TongoConfidential implements ConfidentialProvider {
    * Converts confidential balance back to public ERC20 tokens.
    */
   async withdraw(details: ConfidentialWithdrawDetails): Promise<Call[]> {
+    const tongoAmount = await this.toConfidentialUnits(details.amount);
     const op = await this.account.withdraw({
-      amount: details.amount.toBase(),
+      amount: tongoAmount,
       to: details.to,
       sender: details.sender,
       ...(details.feeTo !== undefined && { fee_to_sender: details.feeTo }),

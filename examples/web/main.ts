@@ -10,12 +10,13 @@ import {
   ArgentXV050Preset,
   BraavosPreset,
   DevnetPreset,
+  TongoConfidential,
   type WalletInterface,
   type AccountClassConfig,
   type SwapProvider,
   type Token,
 } from "starkzap";
-import { ec } from "starknet";
+import { ec, RpcProvider } from "starknet";
 import { getSwapProviders } from "./swaps";
 
 // Configuration
@@ -28,6 +29,27 @@ const DUMMY_POLICY = {
 const SDK_CHAIN_ID = ChainId.SEPOLIA;
 const BPS_DENOMINATOR = 10_000n;
 const DEFAULT_SLIPPAGE_BPS = 100n;
+
+// Tongo confidential contract addresses per token
+// Full list: https://docs.tongo.cash/protocol/contracts.html
+const TONGO_CONTRACTS_SEPOLIA: Record<string, string> = {
+  STRK: "0x408163bfcfc2d76f34b444cb55e09dace5905cf84c0884e4637c2c0f06ab6ed",
+  ETH: "0x2cf0dc1d9e8c7731353dd15e6f2f22140120ef2d27116b982fa4fed87f6fef5",
+  USDC: "0x2caae365e67921979a4e5c16dd70eaa5776cfc6a9592bcb903d91933aaf2552",
+  WBTC: "0x02b9f62f9be99590ad2505e9e89ca746c8fb67bdb6a4be2a1b9a1d867af7339e",
+};
+const TONGO_CONTRACTS_MAINNET: Record<string, string> = {
+  STRK: "0x3a542d7eb73b3e33a2c54e9827ec17a6365e289ec35ccc94dde97950d9db498",
+  ETH: "0x276e11a5428f6de18a38b7abc1d60abc75ce20aa3a925e20a393fcec9104f89",
+  WBTC: "0x6d82c8c467eac77f880a1d5a090e0e0094a557bf67d74b98ba1881200750e27",
+  "USDC.e": "0x72098b84989a45cc00697431dfba300f1f5d144ae916e98287418af4e548d96",
+  USDC: "0x026f79017c3c382148832c6ae50c22502e66f7a2f81ccbdb9e1377af31859d3a",
+  USDT: "0x659c62ba8bc3ac92ace36ba190b350451d0c767aa973dd63b042b59cc065da0",
+  DAI: "0x511741b1ad1777b4ad59fbff49d64b8eb188e2aeb4fc72438278a589d8a10d8",
+};
+const TONGO_CONTRACTS = SDK_CHAIN_ID.isSepolia()
+  ? TONGO_CONTRACTS_SEPOLIA
+  : TONGO_CONTRACTS_MAINNET;
 
 const swapProviders: SwapProvider[] = getSwapProviders();
 const swapProvidersById = new Map<string, SwapProvider>(
@@ -46,6 +68,7 @@ const sdk = new StarkZap({
 // Current wallet
 let wallet: WalletInterface | null = null;
 let walletType: "cartridge" | "privatekey" | "privy" | null = null;
+let confidential: TongoConfidential | null = null;
 
 // DOM Elements
 const walletSection = document.getElementById("wallet-section")!;
@@ -125,6 +148,58 @@ const btnSwapSubmit = document.getElementById(
   "btn-swap-submit"
 ) as HTMLButtonElement;
 const swapQuoteEl = document.getElementById("swap-quote")!;
+
+// Tongo DOM elements
+const tongoTokenSelect = document.getElementById(
+  "tongo-token-select"
+) as HTMLSelectElement;
+const btnTongoInit = document.getElementById(
+  "btn-tongo-init"
+) as HTMLButtonElement;
+const tongoOpsEl = document.getElementById("tongo-ops")!;
+const tongoAddressEl = document.getElementById("tongo-address")!;
+const tongoBalanceEl = document.getElementById("tongo-balance")!;
+const tongoPendingEl = document.getElementById("tongo-pending")!;
+const tongoNonceEl = document.getElementById("tongo-nonce")!;
+const tongoFundAmountInput = document.getElementById(
+  "tongo-fund-amount"
+) as HTMLInputElement;
+const btnTongoFund = document.getElementById(
+  "btn-tongo-fund"
+) as HTMLButtonElement;
+const tongoTransferRxInput = document.getElementById(
+  "tongo-transfer-rx"
+) as HTMLInputElement;
+const tongoTransferRyInput = document.getElementById(
+  "tongo-transfer-ry"
+) as HTMLInputElement;
+const tongoTransferAmountInput = document.getElementById(
+  "tongo-transfer-amount"
+) as HTMLInputElement;
+const btnTongoTransfer = document.getElementById(
+  "btn-tongo-transfer"
+) as HTMLButtonElement;
+const tongoWithdrawAmountInput = document.getElementById(
+  "tongo-withdraw-amount"
+) as HTMLInputElement;
+const tongoWithdrawToInput = document.getElementById(
+  "tongo-withdraw-to"
+) as HTMLInputElement;
+const btnTongoWithdraw = document.getElementById(
+  "btn-tongo-withdraw"
+) as HTMLButtonElement;
+const btnTongoRollover = document.getElementById(
+  "btn-tongo-rollover"
+) as HTMLButtonElement;
+const tongoRagequitToInput = document.getElementById(
+  "tongo-ragequit-to"
+) as HTMLInputElement;
+const btnTongoRagequit = document.getElementById(
+  "btn-tongo-ragequit"
+) as HTMLButtonElement;
+const btnTongoRefresh = document.getElementById(
+  "btn-tongo-refresh"
+) as HTMLButtonElement;
 
 // Preset mapping
 const presets: Record<string, AccountClassConfig> = {
@@ -773,6 +848,299 @@ async function submitSwap() {
   }
 }
 
+// Confidential (Tongo)
+function getSelectedTongoToken(): Token {
+  const symbol =
+    tongoTokenSelect.options[tongoTokenSelect.selectedIndex]?.textContent;
+  if (!symbol) {
+    throw new Error("No Tongo token selected");
+  }
+  const token = presetTokens.find((t) => t.symbol === symbol);
+  if (!token) {
+    throw new Error(`Token preset not found for ${symbol}`);
+  }
+  return token;
+}
+
+function populateTongoTokenSelect(): void {
+  tongoTokenSelect.innerHTML = "";
+  for (const [symbol, address] of Object.entries(TONGO_CONTRACTS)) {
+    const option = document.createElement("option");
+    option.value = address;
+    option.textContent = symbol;
+    tongoTokenSelect.appendChild(option);
+  }
+}
+
+async function initializeConfidential() {
+  if (!wallet) {
+    log("Connect a wallet first", "error");
+    return;
+  }
+
+  // Derive the Tongo key from the wallet private key
+  const walletKey = privateKeyInput.value.trim();
+  if (!walletKey) {
+    log(
+      "Tongo requires a private-key wallet (key needed for derivation)",
+      "error"
+    );
+    return;
+  }
+
+  const contractAddress = tongoTokenSelect.value;
+  if (!contractAddress) {
+    log("Select a token", "error");
+    return;
+  }
+
+  const selectedToken =
+    tongoTokenSelect.options[tongoTokenSelect.selectedIndex]?.textContent ??
+    "unknown";
+
+  setButtonLoading(btnTongoInit, true);
+  log(`Initializing Tongo for ${selectedToken}...`, "info");
+
+  try {
+    const rpcProvider = new RpcProvider({ nodeUrl: RPC_URL });
+    confidential = new TongoConfidential({
+      privateKey: walletKey,
+      contractAddress,
+      provider: rpcProvider,
+    });
+
+    tongoAddressEl.textContent = confidential.address;
+    tongoOpsEl.classList.remove("hidden");
+
+    log(
+      `Tongo initialized (${selectedToken}): ${confidential.address}`,
+      "success"
+    );
+    await refreshConfidentialState();
+  } catch (err) {
+    log(`Tongo initialization failed: ${err}`, "error");
+  } finally {
+    setButtonLoading(btnTongoInit, false, "Initialize");
+  }
+}
+
+async function refreshConfidentialState() {
+  if (!confidential) return;
+
+  log("Refreshing Tongo state...", "info");
+  try {
+    const state = await confidential.getState();
+    const token = getSelectedTongoToken();
+
+    // Convert tongo units back to human-readable ERC20 amounts
+    const balanceErc20 = await confidential.toPublicUnits(state.balance);
+    const pendingErc20 = await confidential.toPublicUnits(state.pending);
+    const balanceDisplay = Amount.fromRaw(balanceErc20, token).toFormatted();
+    const pendingDisplay = Amount.fromRaw(pendingErc20, token).toFormatted();
+
+    tongoBalanceEl.textContent = balanceDisplay;
+    tongoPendingEl.textContent = pendingDisplay;
+    tongoNonceEl.textContent = state.nonce.toString();
+    log(
+      `State: balance=${balanceDisplay}, pending=${pendingDisplay}, nonce=${state.nonce}`,
+      "success"
+    );
+  } catch (err) {
+    log(`Failed to refresh Tongo state: ${err}`, "error");
+  }
+}
+
+async function confidentialFund() {
+  if (!wallet || !confidential) return;
+
+  const rawAmount = tongoFundAmountInput.value.trim();
+  if (!rawAmount) {
+    log("Enter an amount to fund", "error");
+    return;
+  }
+
+  setButtonLoading(btnTongoFund, true);
+  log(`Funding Tongo with ${rawAmount} STRK...`, "info");
+
+  try {
+    const strkToken = getSelectedTongoToken();
+    const amount = Amount.parse(rawAmount, strkToken);
+    const tx = await wallet
+      .tx()
+      .confidentialFund(confidential, {
+        amount,
+        sender: wallet.address,
+      })
+      .send();
+
+    log(`Fund tx submitted: ${truncateAddress(tx.hash)}`, "success");
+    log("Waiting for confirmation...", "info");
+    await tx.wait();
+    log("Fund confirmed!", "success");
+    if (tx.explorerUrl) {
+      log(`Explorer: ${tx.explorerUrl}`, "info");
+    }
+    await refreshConfidentialState();
+  } catch (err) {
+    log(`Fund failed: ${err}`, "error");
+  } finally {
+    setButtonLoading(btnTongoFund, false, "Fund");
+  }
+}
+
+async function confidentialTransfer() {
+  if (!wallet || !confidential) return;
+
+  const recipientX = tongoTransferRxInput.value.trim();
+  const recipientY = tongoTransferRyInput.value.trim();
+  const rawAmount = tongoTransferAmountInput.value.trim();
+
+  if (!recipientX || !recipientY) {
+    log("Enter recipient X and Y coordinates", "error");
+    return;
+  }
+  if (!rawAmount) {
+    log("Enter an amount to transfer", "error");
+    return;
+  }
+
+  setButtonLoading(btnTongoTransfer, true);
+  log(`Confidential transfer of ${rawAmount} STRK...`, "info");
+
+  try {
+    const strkToken = getSelectedTongoToken();
+    const amount = Amount.parse(rawAmount, strkToken);
+    const tx = await wallet
+      .tx()
+      .confidentialTransfer(confidential, {
+        amount,
+        to: { x: recipientX, y: recipientY },
+        sender: wallet.address,
+      })
+      .send();
+
+    log(`Transfer tx submitted: ${truncateAddress(tx.hash)}`, "success");
+    log("Waiting for confirmation...", "info");
+    await tx.wait();
+    log("Confidential transfer confirmed!", "success");
+    if (tx.explorerUrl) {
+      log(`Explorer: ${tx.explorerUrl}`, "info");
+    }
+    await refreshConfidentialState();
+  } catch (err) {
+    log(`Confidential transfer failed: ${err}`, "error");
+  } finally {
+    setButtonLoading(btnTongoTransfer, false, "Transfer");
+  }
+}
+
+async function confidentialWithdraw() {
+  if (!wallet || !confidential) return;
+
+  const rawAmount = tongoWithdrawAmountInput.value.trim();
+  const toAddress = tongoWithdrawToInput.value.trim();
+
+  if (!rawAmount) {
+    log("Enter an amount to withdraw", "error");
+    return;
+  }
+  if (!toAddress) {
+    log("Enter a destination address", "error");
+    return;
+  }
+
+  setButtonLoading(btnTongoWithdraw, true);
+  log(
+    `Withdrawing ${rawAmount} STRK to ${truncateAddress(toAddress)}...`,
+    "info"
+  );
+
+  try {
+    const strkToken = getSelectedTongoToken();
+    const amount = Amount.parse(rawAmount, strkToken);
+    const tx = await wallet
+      .tx()
+      .confidentialWithdraw(confidential, {
+        amount,
+        to: toAddress,
+        sender: wallet.address,
+      })
+      .send();
+
+    log(`Withdraw tx submitted: ${truncateAddress(tx.hash)}`, "success");
+    log("Waiting for confirmation...", "info");
+    await tx.wait();
+    log("Withdrawal confirmed!", "success");
+    if (tx.explorerUrl) {
+      log(`Explorer: ${tx.explorerUrl}`, "info");
+    }
+    await refreshConfidentialState();
+  } catch (err) {
+    log(`Withdrawal failed: ${err}`, "error");
+  } finally {
+    setButtonLoading(btnTongoWithdraw, false, "Withdraw");
+  }
+}
+
+async function confidentialRollover() {
+  if (!wallet || !confidential) return;
+
+  setButtonLoading(btnTongoRollover, true);
+  log("Executing rollover...", "info");
+
+  try {
+    const calls = await confidential.rollover({ sender: wallet.address });
+    const tx = await wallet.execute(calls);
+
+    log(`Rollover tx submitted: ${truncateAddress(tx.hash)}`, "success");
+    log("Waiting for confirmation...", "info");
+    await tx.wait();
+    log("Rollover confirmed!", "success");
+    if (tx.explorerUrl) {
+      log(`Explorer: ${tx.explorerUrl}`, "info");
+    }
+    await refreshConfidentialState();
+  } catch (err) {
+    log(`Rollover failed: ${err}`, "error");
+  } finally {
+    setButtonLoading(btnTongoRollover, false, "Rollover");
+  }
+}
+
+async function confidentialRagequit() {
+  if (!wallet || !confidential) return;
+
+  const toAddress = tongoRagequitToInput.value.trim();
+  if (!toAddress) {
+    log("Enter a destination address for ragequit", "error");
+    return;
+  }
+
+  setButtonLoading(btnTongoRagequit, true);
+  log(`Ragequit to ${truncateAddress(toAddress)}...`, "info");
+
+  try {
+    const calls = await confidential.ragequit({
+      to: toAddress,
+      sender: wallet.address,
+    });
+    const tx = await wallet.execute(calls);
+
+    log(`Ragequit tx submitted: ${truncateAddress(tx.hash)}`, "success");
+    log("Waiting for confirmation...", "info");
+    await tx.wait();
+    log("Ragequit confirmed!", "success");
+    if (tx.explorerUrl) {
+      log(`Explorer: ${tx.explorerUrl}`, "info");
+    }
+    await refreshConfidentialState();
+  } catch (err) {
+    log(`Ragequit failed: ${err}`, "error");
+  } finally {
+    setButtonLoading(btnTongoRagequit, false, "Ragequit");
+  }
+}
+
 // Deploy account
 async function deployAccount() {
   if (!wallet) return;
@@ -899,6 +1267,20 @@ btnGenerateKey.addEventListener("click", () => {
   log("This is a NEW account - fund it before deploying", "info");
 });
 
+// Tongo event listeners
+btnTongoInit.addEventListener("click", initializeConfidential);
+btnTongoFund.addEventListener("click", confidentialFund);
+btnTongoTransfer.addEventListener("click", confidentialTransfer);
+btnTongoWithdraw.addEventListener("click", confidentialWithdraw);
+btnTongoRollover.addEventListener("click", confidentialRollover);
+btnTongoRagequit.addEventListener("click", confidentialRagequit);
+btnTongoRefresh.addEventListener("click", async () => {
+  setButtonLoading(btnTongoRefresh, true);
+  await refreshConfidentialState();
+  setButtonLoading(btnTongoRefresh, false, "Refresh State");
+});
+
 // Initial log
 initializeSwapForm();
+populateTongoTokenSelect();
 log(`SDK initialized with RPC: ${RPC_URL}`, "info");
