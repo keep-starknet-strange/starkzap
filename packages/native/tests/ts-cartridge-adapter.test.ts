@@ -92,7 +92,9 @@ describe("cartridge ts adapter", () => {
     expect(body.params?.address).toBe(
       "0x0000000000000000000000000000000000000000000000000000000000000abc"
     );
-    expect(body.params?.outside_execution?.caller).toBe("0x414e595f43414c4c4552");
+    expect(body.params?.outside_execution?.caller).toBe(
+      "0x414e595f43414c4c4552"
+    );
     expect(body.params?.outside_execution?.nonce?.[1]).toBe("0x1");
     expect(body.params?.signature?.[0]).toBe("0x73657373696f6e2d746f6b656e");
   });

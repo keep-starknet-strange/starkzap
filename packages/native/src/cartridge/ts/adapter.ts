@@ -255,8 +255,8 @@ export function createCartridgeTsAdapter(
             session,
             sessionPrivateKey,
           }) => {
-            const { outsideExecution, signature } = buildSignedOutsideExecutionV3(
-              {
+            const { outsideExecution, signature } =
+              buildSignedOutsideExecutionV3({
                 calls,
                 ...(details ? { details } : {}),
                 chainId,
@@ -265,8 +265,7 @@ export function createCartridgeTsAdapter(
                 policyRoot,
                 sessionKeyGuid,
                 policyProofIndex,
-              }
-            );
+              });
 
             options.logger?.info?.(
               "[starkzap] cartridge-ts executing via cartridge_addExecuteOutsideTransaction (pure TS V3)"
