@@ -1,7 +1,9 @@
-import { ec, encode, hash, num } from "starknet";
+import { ec, encode, hash, num, shortString } from "starknet";
 import { SessionProtocolError } from "@/cartridge/ts/errors";
 
-const SESSION_SIGNER_DOMAIN = num.toHex(hash.starknetKeccak("session_signer"));
+const STARKNET_SIGNER_DOMAIN = num
+  .toHex(shortString.encodeShortString("Starknet Signer"))
+  .toLowerCase();
 
 export function deriveSessionSignerGuid(privateKey: string): string {
   const normalizedPrivateKey = String(privateKey ?? "").trim();
@@ -16,9 +18,7 @@ export function deriveSessionSignerGuid(privateKey: string): string {
     normalizedHex = encode.addHexPrefix(normalizedPrivateKey);
     const publicKey = ec.starkCurve.getStarkKey(normalizedHex);
     return num
-      .toHex(
-        hash.computePoseidonHashOnElements([SESSION_SIGNER_DOMAIN, publicKey])
-      )
+      .toHex(hash.computePoseidonHash(STARKNET_SIGNER_DOMAIN, publicKey))
       .toLowerCase();
   } catch (error) {
     throw new SessionProtocolError(

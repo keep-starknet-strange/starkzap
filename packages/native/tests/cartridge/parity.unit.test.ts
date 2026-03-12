@@ -101,6 +101,26 @@ describe("cartridge ts parity fixtures", () => {
       "tictactoe://cartridge/callback"
     );
     expect(parsed.searchParams.get("redirect_query_name")).toBe("startapp");
+    expect(parsed.searchParams.get("preset")).toBeNull();
+    expect(parsed.searchParams.get("needs_session_creation")).toBeNull();
+  });
+
+  it("PAR-101b session URL includes preset and force-new-session when provided", () => {
+    const canonical = canonicalizeSessionPolicies([
+      { target: "0xabc", method: "play_move" },
+    ]);
+    const url = buildCartridgeSessionUrl({
+      baseUrl: "https://x.cartridge.gg",
+      publicKey: "0x1234",
+      policies: canonical,
+      rpcUrl: "https://api.cartridge.gg/x/starknet/sepolia",
+      preset: "tic-tac-toe",
+      needsSessionCreation: true,
+    });
+
+    const parsed = new URL(url);
+    expect(parsed.searchParams.get("preset")).toBe("tic-tac-toe");
+    expect(parsed.searchParams.get("needs_session_creation")).toBe("true");
   });
 
   it("PAR-102 redirect payload parsing matches fixture vectors", () => {
@@ -143,6 +163,36 @@ describe("cartridge ts parity fixtures", () => {
       chainId: "SN_SEPOLIA",
       appId: "app-1",
       isRevoked: false,
+    });
+  });
+
+  it("PAR-102d redirect parsing prefers top-level identity over controller identity", () => {
+    const payload = {
+      username: "legacy-user",
+      address:
+        "0x0982172dc42288d482abd0cd836c0d50f20b9f4717353acf9be577fabb228c8",
+      controller: {
+        address: "0xabc",
+        accountID: "player1",
+      },
+      authorization: ["0xdead", "0x123"],
+      expiresAt: "4702444800",
+      sessionKeyGuid: "0x999",
+    };
+    const encoded = Buffer.from(JSON.stringify(payload), "utf8").toString(
+      "base64url"
+    );
+
+    expect(parseSessionFromEncodedRedirect(encoded)).toEqual({
+      username: "legacy-user",
+      address:
+        "0x0982172dc42288d482abd0cd836c0d50f20b9f4717353acf9be577fabb228c8",
+      ownerGuid: "0x123",
+      expiresAt: "4702444800",
+      guardianKeyGuid: "0x0",
+      metadataHash: "0x0",
+      sessionKeyGuid: "0x999",
+      authorization: ["0xdead", "0x123"],
     });
   });
 

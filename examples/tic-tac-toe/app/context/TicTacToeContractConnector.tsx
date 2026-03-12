@@ -1,5 +1,5 @@
 import React, { createContext, useCallback, useContext, useState } from "react";
-import type { Call } from "starknet";
+import { addAddressPadding, type Call } from "starknet";
 import { useStarknetConnector } from "./StarknetConnector";
 
 const DEFAULT_TIC_TAC_TOE_CONTRACT_ADDRESS =
@@ -39,6 +39,24 @@ type TicTacToeContextType = {
 const TicTacToeContext = createContext<TicTacToeContextType | undefined>(
   undefined
 );
+
+function normalizeAddress(value: string | undefined | null): string {
+  const raw = (value || "").trim();
+  if (!raw) {
+    return "";
+  }
+
+  try {
+    return addAddressPadding(raw.toLowerCase());
+  } catch {
+    try {
+      const asHex = `0x${BigInt(raw).toString(16)}`;
+      return addAddressPadding(asHex.toLowerCase());
+    } catch {
+      return raw.toLowerCase();
+    }
+  }
+}
 
 export const useTicTacToe = () => {
   const ctx = useContext(TicTacToeContext);
@@ -91,10 +109,8 @@ export const TicTacToeProvider: React.FC<{ children: React.ReactNode }> = ({
           }
         ).getTransactionReceipt(txHash);
         if (__DEV__) console.log("create_game receipt:", receipt);
-        const normalize = (s: string | undefined | null) =>
-          (s || "").toLowerCase();
-        const expectedX = normalize(wallet.address || "");
-        const expectedO = normalize(opponentAddress);
+        const expectedX = normalizeAddress(wallet.address || "");
+        const expectedO = normalizeAddress(opponentAddress);
 
         let foundId: number | null = null;
         const events = Array.isArray(receipt?.events) ? receipt.events : [];
@@ -106,8 +122,8 @@ export const TicTacToeProvider: React.FC<{ children: React.ReactNode }> = ({
           if (__DEV__) console.log("create_game event data:", data);
           if (data.length >= 3) {
             const [gidHex, xAddr, oAddr] = data;
-            const xNorm = normalize(xAddr);
-            const oNorm = normalize(oAddr);
+            const xNorm = normalizeAddress(xAddr);
+            const oNorm = normalizeAddress(oAddr);
             if (xNorm === expectedX && oNorm === expectedO) {
               try {
                 const gid = Number(BigInt(gidHex));
@@ -210,8 +226,8 @@ export const TicTacToeProvider: React.FC<{ children: React.ReactNode }> = ({
           }
         };
         const game: Game = {
-          player_x: toHex(values[0]),
-          player_o: toHex(values[1]),
+          player_x: normalizeAddress(toHex(values[0])),
+          player_o: normalizeAddress(toHex(values[1])),
           x_bits: toNum(values[2]),
           o_bits: toNum(values[3]),
           turn: toNum(values[4]),

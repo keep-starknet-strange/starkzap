@@ -15,8 +15,27 @@ import { useColorScheme } from "@/components/useColorScheme";
 import { useTicTacToe } from "@/app/context/TicTacToeContractConnector";
 import { useStarknetConnector } from "@/app/context/StarknetConnector";
 import AccountGate from "@/components/AccountGate";
+import { addAddressPadding } from "starknet";
 
 type CellValue = "X" | "O" | null;
+
+function normalizeAddress(value: string | undefined | null): string {
+  const raw = (value || "").trim();
+  if (!raw) {
+    return "";
+  }
+
+  try {
+    return addAddressPadding(raw.toLowerCase());
+  } catch {
+    try {
+      const hex = `0x${BigInt(raw).toString(16)}`;
+      return addAddressPadding(hex.toLowerCase());
+    } catch {
+      return raw.toLowerCase();
+    }
+  }
+}
 
 function calculateWinner(board: CellValue[]): {
   winner: "X" | "O" | null;
@@ -52,7 +71,6 @@ export default function PlayScreen() {
   const [myRole, setMyRole] = useState<"X" | "O" | null>(null);
   const [gameStarted, setGameStarted] = useState(false);
   const [creatingGame, setCreatingGame] = useState(false);
-  const [fetchingGame, setFetchingGame] = useState(false);
   const {
     createGame,
     playMove,
@@ -77,9 +95,9 @@ export default function PlayScreen() {
     [currentPlayer, myRole]
   );
 
-  const myAddress = (account?.address || "").toLowerCase();
+  const myAddress = normalizeAddress(account?.address || "");
 
-  // Fetch game state once when gameId changes (no loop)
+  // Poll game state while a game is selected.
   useEffect(() => {
     if (currentGameId == null) return;
 
@@ -93,26 +111,35 @@ export default function PlayScreen() {
     };
 
     let cancelled = false;
+    let inFlight = false;
     const sync = async () => {
+      if (cancelled || inFlight) return;
+      inFlight = true;
       try {
         const game = await getGame(currentGameId);
         if (cancelled || !game) return;
         setBoard(bitsToBoard(game.x_bits, game.o_bits));
         setCurrentPlayer(game.turn === 0 ? "X" : "O");
         const me = myAddress;
-        const playerX = (game.player_x || "").toLowerCase();
-        const playerO = (game.player_o || "").toLowerCase();
+        const playerX = normalizeAddress(game.player_x || "");
+        const playerO = normalizeAddress(game.player_o || "");
         const role = me === playerX ? "X" : me === playerO ? "O" : null;
         setMyRole(role);
       } catch {
-        // Ignore one-off refresh errors; user can manually refresh.
+        // Ignore polling errors and try again on next interval.
+      } finally {
+        inFlight = false;
       }
     };
 
-    // initial fetch only
-    sync();
+    void sync();
+    const intervalId = setInterval(() => {
+      void sync();
+    }, 1000);
+
     return () => {
       cancelled = true;
+      clearInterval(intervalId);
     };
   }, [currentGameId, getGame, myAddress]);
 
@@ -159,39 +186,12 @@ export default function PlayScreen() {
     }
   }
 
-  function handleReset() {
-    setBoard(Array(9).fill(null));
-    setCurrentPlayer("X");
-  }
-
   function handleNewGame() {
     setOpponentAddress("");
     setGameStarted(false);
     setBoard(Array(9).fill(null));
     setCurrentPlayer("X");
-  }
-
-  async function handleRefreshGame() {
-    if (currentGameId == null || fetchingGame) return;
-    setFetchingGame(true);
-    try {
-      const game = await getGame(currentGameId);
-      if (!game) return;
-      const arr: CellValue[] = Array(9).fill(null);
-      for (let i = 0; i < 9; i++) {
-        if ((game.x_bits & (1 << i)) !== 0) arr[i] = "X";
-        else if ((game.o_bits & (1 << i)) !== 0) arr[i] = "O";
-      }
-      setBoard(arr);
-      setCurrentPlayer(game.turn === 0 ? "X" : "O");
-      const me = myAddress;
-      const playerX = (game.player_x || "").toLowerCase();
-      const playerO = (game.player_o || "").toLowerCase();
-      const role = me === playerX ? "X" : me === playerO ? "O" : null;
-      setMyRole(role);
-    } finally {
-      setFetchingGame(false);
-    }
+    setMyRole(null);
   }
 
   const statusText = winner
@@ -404,40 +404,6 @@ export default function PlayScreen() {
 
         <View style={styles.statusRow}>
           <Text style={styles.status}>{statusText}</Text>
-          {gameStarted && (
-            <>
-              <Pressable
-                onPress={handleRefreshGame}
-                disabled={fetchingGame || currentGameId == null}
-                style={({ pressed }) => [
-                  styles.resetButton,
-                  {
-                    opacity:
-                      fetchingGame || currentGameId == null
-                        ? 0.5
-                        : pressed
-                          ? 0.7
-                          : 1,
-                  },
-                ]}
-              >
-                {fetchingGame ? (
-                  <ActivityIndicator />
-                ) : (
-                  <Text style={styles.resetText}>Get Game</Text>
-                )}
-              </Pressable>
-              <Pressable
-                onPress={handleReset}
-                style={({ pressed }) => [
-                  styles.resetButton,
-                  { opacity: pressed ? 0.7 : 1 },
-                ]}
-              >
-                <Text style={styles.resetText}>Reset Board</Text>
-              </Pressable>
-            </>
-          )}
         </View>
 
         <TicTacToeBoard
@@ -585,17 +551,6 @@ const styles = StyleSheet.create({
   },
   status: {
     fontSize: 16,
-    fontWeight: "600",
-  },
-  resetButton: {
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 8,
-    borderWidth: StyleSheet.hairlineWidth * 2,
-    borderColor: "rgba(127,127,127,0.4)",
-  },
-  resetText: {
-    fontSize: 14,
     fontWeight: "600",
   },
   board: {

@@ -7,19 +7,54 @@ export interface PolicyMerkleResult {
   root: string;
 }
 
+export interface PolicyMerkleProof {
+  contractAddress: string;
+  selector: string;
+  leaf: string;
+  proof: string[];
+}
+
 function normalizeFelt(value: string): string {
   return num.toHex(value).toLowerCase();
 }
 
+const POLICY_CALL_TYPE_HASH = normalizeFelt(
+  hash.getSelectorFromName(
+    "\"Allowed Method\"(\"Contract Address\":\"ContractAddress\",\"selector\":\"selector\")"
+  )
+);
+
+const ZERO_FELT = "0x0";
+
+function selectorFromEntrypoint(entrypoint: string): string {
+  if (/^0x[0-9a-f]+$/i.test(entrypoint)) {
+    return normalizeFelt(entrypoint);
+  }
+  return normalizeFelt(hash.getSelectorFromName(entrypoint));
+}
+
 function hashPair(left: string, right: string): string {
-  return normalizeFelt(hash.computePoseidonHash(left, right));
+  const leftBigInt = BigInt(left);
+  const rightBigInt = BigInt(right);
+  if (leftBigInt <= rightBigInt) {
+    return normalizeFelt(hash.computePoseidonHash(left, right));
+  }
+  return normalizeFelt(hash.computePoseidonHash(right, left));
 }
 
 function hashPolicyLeaf(policy: CanonicalSessionPolicy): string {
-  const selector = hash.getSelectorFromName(policy.entrypoint);
+  const selector = selectorFromEntrypoint(policy.entrypoint);
   return normalizeFelt(
-    hash.computePoseidonHashOnElements([policy.contractAddress, selector])
+    hash.computePoseidonHashOnElements([
+      POLICY_CALL_TYPE_HASH,
+      policy.contractAddress,
+      selector,
+    ])
   );
+}
+
+function policySelector(policy: CanonicalSessionPolicy): string {
+  return selectorFromEntrypoint(policy.entrypoint);
 }
 
 export function computePolicyMerkle(
@@ -36,6 +71,9 @@ export function computePolicyMerkle(
 
   while (currentLevel.length > 1) {
     const nextLevel: string[] = [];
+    if (currentLevel.length % 2 !== 0) {
+      currentLevel.push(ZERO_FELT);
+    }
     for (let i = 0; i < currentLevel.length; i += 2) {
       const left = currentLevel[i];
       if (!left) {
@@ -43,7 +81,7 @@ export function computePolicyMerkle(
           "Unexpected empty merkle node while hashing policy tree."
         );
       }
-      const right = currentLevel[i + 1] ?? left;
+      const right = currentLevel[i + 1] ?? ZERO_FELT;
       nextLevel.push(hashPair(left, right));
     }
     currentLevel = nextLevel;
@@ -58,4 +96,61 @@ export function computePolicyMerkle(
     leaves,
     root,
   };
+}
+
+export function computePolicyMerkleProofs(
+  policies: readonly CanonicalSessionPolicy[]
+): PolicyMerkleProof[] {
+  if (policies.length === 0) {
+    throw new SessionProtocolError(
+      "Cannot compute policy merkle proofs for an empty policy set."
+    );
+  }
+
+  const leaves = policies.map(hashPolicyLeaf);
+  const proofs = leaves.map(() => [] as string[]);
+  let currentLevel = leaves.slice();
+  let currentIndices: Array<number | null> = leaves.map((_, index) => index);
+
+  while (currentLevel.length > 1) {
+    const nextLevel: string[] = [];
+    const nextIndices: Array<number | null> = [];
+
+    if (currentLevel.length % 2 !== 0) {
+      currentLevel.push(ZERO_FELT);
+      currentIndices.push(null);
+    }
+
+    for (let i = 0; i < currentLevel.length; i += 2) {
+      const left = currentLevel[i];
+      if (!left) {
+        throw new SessionProtocolError(
+          "Unexpected empty merkle node while building policy proofs."
+        );
+      }
+      const right = currentLevel[i + 1] ?? ZERO_FELT;
+      const leftIndex = currentIndices[i] ?? null;
+      const rightIndex = currentIndices[i + 1] ?? null;
+
+      if (leftIndex !== null) {
+        proofs[leftIndex]?.push(right);
+      }
+      if (rightIndex !== null) {
+        proofs[rightIndex]?.push(left);
+      }
+
+      nextLevel.push(hashPair(left, right));
+      nextIndices.push(leftIndex);
+    }
+
+    currentLevel = nextLevel;
+    currentIndices = nextIndices;
+  }
+
+  return policies.map((policy, index) => ({
+    contractAddress: policy.contractAddress,
+    selector: policySelector(policy),
+    leaf: leaves[index] ?? "0x0",
+    proof: proofs[index] ?? [],
+  }));
 }

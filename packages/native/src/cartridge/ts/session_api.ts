@@ -62,6 +62,8 @@ export interface BuildSessionUrlOptions {
   publicKey: string;
   policies: readonly CanonicalSessionPolicy[];
   rpcUrl: string;
+  preset?: string;
+  needsSessionCreation?: boolean;
   redirectUrl?: string;
   redirectQueryName?: string;
 }
@@ -174,7 +176,11 @@ async function fetchWithTimeout(
     return fetchFn(input, init);
   }
 
-  const maybeAbortController = (globalThis as unknown as { AbortController?: new () => { signal: unknown; abort(): void } }).AbortController;
+  const maybeAbortController = (
+    globalThis as unknown as {
+      AbortController?: new () => { signal: unknown; abort(): void };
+    }
+  ).AbortController;
   if (typeof maybeAbortController === "function") {
     const controller = new maybeAbortController();
     const timeoutId = setTimeout(() => {
@@ -268,9 +274,7 @@ function readBoolean(value: unknown): boolean | undefined {
   return undefined;
 }
 
-function normalizeSessionRegistration(
-  session: unknown
-): SessionRegistration {
+function normalizeSessionRegistration(session: unknown): SessionRegistration {
   const record = asRecord(session);
   if (!record) {
     throw new SessionProtocolError(
@@ -322,7 +326,11 @@ function normalizeSessionRegistration(
     record.session_key_guid,
     record.id
   );
-  const chainId = firstNonEmptyString(record.chainId, record.chainID, record.chain_id);
+  const chainId = firstNonEmptyString(
+    record.chainId,
+    record.chainID,
+    record.chain_id
+  );
   const appId = firstNonEmptyString(record.appId, record.appID, record.app_id);
   const isRevoked = readBoolean(record.isRevoked ?? record.is_revoked);
 
@@ -376,6 +384,8 @@ export function buildCartridgeSessionUrl({
   publicKey,
   policies,
   rpcUrl,
+  preset,
+  needsSessionCreation,
   redirectUrl,
   redirectQueryName = DEFAULT_REDIRECT_QUERY_NAME,
 }: BuildSessionUrlOptions): string {
@@ -385,6 +395,14 @@ export function buildCartridgeSessionUrl({
     policies: JSON.stringify(policiesToSessionUrlShape(policies)),
     rpc_url: rpcUrl,
   });
+
+  if (preset) {
+    params.set("preset", preset);
+  }
+
+  if (needsSessionCreation) {
+    params.set("needs_session_creation", "true");
+  }
 
   if (redirectUrl) {
     params.set("redirect_uri", redirectUrl);
