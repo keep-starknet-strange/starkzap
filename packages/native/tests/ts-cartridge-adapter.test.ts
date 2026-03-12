@@ -36,6 +36,67 @@ describe("cartridge ts adapter", () => {
     );
   });
 
+  it("uses pure TS V3 cartridge_addExecuteOutsideTransaction by default", async () => {
+    const fetchImpl = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      statusText: "OK",
+      json: async () => ({
+        result: { transaction_hash: "0xdeadbeef" },
+      }),
+    });
+    const adapter = createCartridgeTsAdapter({
+      openSession: async () => ({
+        status: "success",
+        encodedSession: ENCODED_SESSION,
+      }),
+      fetchImpl,
+    });
+
+    const handle = await adapter.connect({
+      rpcUrl: "https://api.cartridge.gg/x/starknet/sepolia",
+      chainId: "0x534e5f5345504f4c4941",
+      policies: [{ target: "0x1", method: "create_game" }],
+    });
+
+    const tx = await handle.account.executePaymasterTransaction([
+      {
+        contractAddress:
+          "0x0000000000000000000000000000000000000000000000000000000000000001",
+        entrypoint: "create_game",
+        calldata: [],
+      },
+    ] as Call[]);
+
+    expect(tx.transaction_hash).toBe("0xdeadbeef");
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+
+    const [url, init] = fetchImpl.mock.calls[0] as [
+      string,
+      { body?: string } | undefined,
+    ];
+    expect(url).toBe("https://api.cartridge.gg/x/starknet/sepolia");
+
+    const body = JSON.parse(String(init?.body ?? "{}")) as {
+      method?: string;
+      params?: {
+        address?: string;
+        outside_execution?: {
+          caller?: string;
+          nonce?: string[];
+        };
+        signature?: string[];
+      };
+    };
+    expect(body.method).toBe("cartridge_addExecuteOutsideTransaction");
+    expect(body.params?.address).toBe(
+      "0x0000000000000000000000000000000000000000000000000000000000000abc"
+    );
+    expect(body.params?.outside_execution?.caller).toBe("0x414e595f43414c4c4552");
+    expect(body.params?.outside_execution?.nonce?.[1]).toBe("0x1");
+    expect(body.params?.signature?.[0]).toBe("0x73657373696f6e2d746f6b656e");
+  });
+
   it("throws when policies are missing or empty", async () => {
     const adapter = createCartridgeTsAdapter({
       openSession: async () => ({
@@ -204,6 +265,77 @@ describe("cartridge ts adapter", () => {
     expect(executeFromOutside).toHaveBeenCalledTimes(1);
     expect(execute).toHaveBeenCalledTimes(1);
     expect(await handle.username?.()).toBe("player1");
+  });
+
+  it("falls back to execute when outside execution returns SNIP-9 compatibility error", async () => {
+    const executeFromOutside = vi
+      .fn()
+      .mockRejectedValue(new Error("Account is not compatible with SNIP-9"));
+    const execute = vi
+      .fn()
+      .mockResolvedValue({ transaction_hash: "0xfeedbeef" });
+
+    const adapter = createCartridgeTsAdapter({
+      openSession: async () => ({
+        status: "success",
+        encodedSession: ENCODED_SESSION,
+      }),
+      executeFromOutside,
+      execute,
+    });
+
+    const handle = await adapter.connect({
+      rpcUrl: "https://api.cartridge.gg/x/starknet/sepolia",
+      chainId: "0x534e5f5345504f4c4941",
+      policies: [{ target: "0x1", method: "create_game" }],
+    });
+
+    const tx = await handle.account.executePaymasterTransaction([
+      {
+        contractAddress:
+          "0x0000000000000000000000000000000000000000000000000000000000000001",
+        entrypoint: "create_game",
+        calldata: [],
+      },
+    ] as Call[]);
+
+    expect(tx.transaction_hash).toBe("0xfeedbeef");
+    expect(executeFromOutside).toHaveBeenCalledTimes(1);
+    expect(execute).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not fallback to user-pays execution by default when outside execution fails", async () => {
+    const executeFromOutside = vi
+      .fn()
+      .mockRejectedValue(
+        new Error(
+          "Failed to check if nonce is valid: Requested entrypoint does not exist"
+        )
+      );
+    const adapter = createCartridgeTsAdapter({
+      openSession: async () => ({
+        status: "success",
+        encodedSession: ENCODED_SESSION,
+      }),
+      executeFromOutside,
+    });
+
+    const handle = await adapter.connect({
+      rpcUrl: "https://api.cartridge.gg/x/starknet/sepolia",
+      chainId: "0x534e5f5345504f4c4941",
+      policies: [{ target: "0x1", method: "create_game" }],
+    });
+
+    await expect(
+      handle.account.executePaymasterTransaction([
+        {
+          contractAddress:
+            "0x0000000000000000000000000000000000000000000000000000000000000001",
+          entrypoint: "create_game",
+          calldata: [],
+        },
+      ] as Call[])
+    ).rejects.toThrow(/entrypoint does not exist/i);
   });
 
   it("register helper wires adapter into the registry", () => {

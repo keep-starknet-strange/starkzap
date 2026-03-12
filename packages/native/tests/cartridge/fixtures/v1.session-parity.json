@@ -3,15 +3,15 @@
   "guidVectors": [
     {
       "privateKey": "0x1",
-      "expectedGuid": "0x2ef6054c87de43adb2299e6996182a8b11414b15606ac63f1ef433c96ea81c5"
+      "expectedGuid": "0x78e6eccfb97cea1b4ca2e0735d0db7cd9e33a316378391e58e7f3ed107062c2"
     },
     {
       "privateKey": "0x1234",
-      "expectedGuid": "0x60d6dda42a1098d140dde02808adaa635cd3ffd015c9c8220f8f18b1777b8d9"
+      "expectedGuid": "0x58ac893dc948983bdef06631ed29f9644aafe39f7be720f0f9d5f90a252bfed"
     },
     {
       "privateKey": "0xabcde",
-      "expectedGuid": "0x7b525ecaf1516c18062a2c94596aa97175e7d0426a7ed6d88ee46cdfc74265f"
+      "expectedGuid": "0x461fe0fe58df6fff095ca2235bd5c9b93cd247c3c2f864cef362ec17850cfd3"
     }
   ],
   "policyVectors": [
@@ -45,7 +45,7 @@
           "entrypoint": "play_move"
         }
       ],
-      "expectedMerkleRoot": "0xdf3fc35241b2377e6e50d31bb73701aba1ac815d2c3cefde5dd808a129fa28"
+      "expectedMerkleRoot": "0x6ae6996f601f89b494729b1e796ed31989e05c8c4a6aae33ff5bf12d8eceaee"
     }
   ],
   "sessionVectors": [

@@ -11,6 +11,7 @@ export interface TsSessionExecutionContext {
   calls: Call[];
   details?: TsSessionExecutionDetails;
   rpcUrl: string;
+  chainId: string;
   session: SessionRegistration;
   sessionPrivateKey: string;
   policyRoot: string;
@@ -27,6 +28,7 @@ export type TsExecute = (
 
 export interface TsSessionAccountOptions {
   rpcUrl: string;
+  chainId: string;
   session: SessionRegistration;
   sessionPrivateKey: string;
   policyRoot: string;
@@ -46,6 +48,12 @@ function shouldFallbackToExecute(error: unknown): boolean {
   const message = toMessage(error).toLowerCase();
   return (
     message.includes("outside") ||
+    message.includes("snip-9") ||
+    message.includes("nonce is valid") ||
+    message.includes("outside_execution_nonce") ||
+    message.includes("is_valid_outside_execution_nonce") ||
+    message.includes("requested entrypoint does not exist") ||
+    message.includes("entrypoint does not exist") ||
     message.includes("authorization") ||
     message.includes("not implemented") ||
     message.includes("manual execution")
@@ -54,6 +62,7 @@ function shouldFallbackToExecute(error: unknown): boolean {
 
 export class TsSessionAccount {
   private readonly rpcUrl: string;
+  private readonly chainId: string;
   private readonly session: SessionRegistration;
   private readonly sessionPrivateKey: string;
   private readonly policyRoot: string;
@@ -63,6 +72,7 @@ export class TsSessionAccount {
 
   constructor(options: TsSessionAccountOptions) {
     this.rpcUrl = options.rpcUrl;
+    this.chainId = options.chainId;
     this.session = options.session;
     this.sessionPrivateKey = options.sessionPrivateKey;
     this.policyRoot = options.policyRoot;
@@ -105,11 +115,15 @@ export class TsSessionAccount {
       calls,
       ...(details ? { details } : {}),
       rpcUrl: this.rpcUrl,
+      chainId: this.chainId,
       session: this.session,
       sessionPrivateKey: this.sessionPrivateKey,
       policyRoot: this.policyRoot,
       sessionKeyGuid: this.sessionKeyGuid,
     };
+
+    let outsideExecutionError: unknown;
+    let didFallbackFromOutside = false;
 
     if (this.executeFromOutsideImpl) {
       try {
@@ -118,11 +132,17 @@ export class TsSessionAccount {
         if (!shouldFallbackToExecute(error)) {
           throw error;
         }
+        outsideExecutionError = error;
+        didFallbackFromOutside = true;
       }
     }
 
     if (this.executeImpl) {
       return this.executeImpl(context);
+    }
+
+    if (didFallbackFromOutside) {
+      throw outsideExecutionError;
     }
 
     throw new SessionProtocolError(

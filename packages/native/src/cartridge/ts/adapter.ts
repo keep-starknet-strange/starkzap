@@ -1,18 +1,13 @@
-import {
-  Account,
-  RpcProvider,
-  ec,
-  encode,
-  stark,
-  type Call,
-  type PaymasterDetails,
-} from "starknet";
+import { ec, encode, stark, type Call } from "starknet";
 import type {
   CartridgeNativeAdapter,
   CartridgeNativeConnectArgs,
 } from "@/cartridge/types";
 import { deriveSessionSignerGuid } from "@/cartridge/ts/guid";
-import { computePolicyMerkle } from "@/cartridge/ts/merkle";
+import {
+  computePolicyMerkle,
+  computePolicyMerkleProofs,
+} from "@/cartridge/ts/merkle";
 import { canonicalizeSessionPolicies } from "@/cartridge/ts/policy";
 import {
   buildCartridgeSessionUrl,
@@ -32,6 +27,10 @@ import {
   type TsExecuteFromOutside,
   type TsSessionExecutionDetails,
 } from "@/cartridge/ts/session_account";
+import {
+  buildSignedOutsideExecutionV3,
+  createPolicyProofIndex,
+} from "@/cartridge/ts/outside_execution_v3";
 
 const DEFAULT_CARTRIDGE_URL = "https://x.cartridge.gg";
 const DEFAULT_CARTRIDGE_API_URL = "https://api.cartridge.gg";
@@ -81,28 +80,36 @@ export interface CreateCartridgeTsAdapterOptions {
   logger?: Pick<Console, "info" | "warn" | "error">;
 }
 
-const accountCache = new Map<string, Account>();
-
-function getOrCreateAccount(
-  rpcUrl: string,
-  address: string,
-  signer: string
-): Account {
-  const key = `${rpcUrl}:${address}:${signer}`;
-  const cached = accountCache.get(key);
-  if (cached) {
-    return cached;
+function ensureFetch(fetchImpl?: FetchLike): FetchLike {
+  if (fetchImpl) {
+    return fetchImpl;
   }
+  if (typeof fetch === "function") {
+    return fetch as unknown as FetchLike;
+  }
+  throw new SessionProtocolError(
+    "No fetch implementation available for Cartridge V3 outside execution."
+  );
+}
 
-  const account = new Account({
-    provider: new RpcProvider({
-      nodeUrl: rpcUrl,
-    }),
-    address,
-    signer,
-  });
-  accountCache.set(key, account);
-  return account;
+function asRecord(value: unknown): Record<string, unknown> | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return null;
+  }
+  return value as Record<string, unknown>;
+}
+
+function readJsonRpcErrorMessage(payload: unknown): string | null {
+  const record = asRecord(payload);
+  const errorRecord = asRecord(record?.error);
+  if (!errorRecord) {
+    return null;
+  }
+  const message = errorRecord.message;
+  if (typeof message === "string" && message.trim()) {
+    return message.trim();
+  }
+  return "Cartridge RPC returned an unknown error.";
 }
 
 async function resolveSessionRegistration(
@@ -202,16 +209,24 @@ export function createCartridgeTsAdapter(
         args.policies ?? []
       );
       const { root: policyRoot } = computePolicyMerkle(canonicalPolicies);
+      const policyProofIndex = createPolicyProofIndex(
+        computePolicyMerkleProofs(canonicalPolicies)
+      );
       const sessionKeyGuid = deriveSessionSignerGuid(formattedPrivateKey);
       const sessionUrl = buildCartridgeSessionUrl({
         baseUrl: args.url || options.cartridgeUrl || DEFAULT_CARTRIDGE_URL,
         publicKey: sessionPublicKey,
         policies: canonicalPolicies,
         rpcUrl: args.rpcUrl,
+        ...(args.preset ? { preset: args.preset } : {}),
+        ...(args.forceNewSession ? { needsSessionCreation: true } : {}),
         ...(args.redirectUrl ? { redirectUrl: args.redirectUrl } : {}),
         redirectQueryName:
           options.redirectQueryName ?? DEFAULT_REDIRECT_QUERY_NAME,
       });
+      options.logger?.info?.(
+        `[starkzap] cartridge-ts session request url=${sessionUrl}`
+      );
 
       const session = await resolveSessionRegistration(
         args,
@@ -219,29 +234,88 @@ export function createCartridgeTsAdapter(
         sessionKeyGuid,
         options
       );
+      options.logger?.info?.(
+        `[starkzap] cartridge-ts session resolved address=${session.address} rpc=${args.rpcUrl}`
+      );
 
       const tsSessionAccount = new TsSessionAccount({
         rpcUrl: args.rpcUrl,
+        chainId: args.chainId,
         session,
         sessionPrivateKey: formattedPrivateKey,
         policyRoot,
         sessionKeyGuid,
-        ...(options.executeFromOutside
-          ? { executeFromOutside: options.executeFromOutside }
-          : {}),
-        execute:
-          options.execute ??
-          (async ({ calls, details, rpcUrl, session, sessionPrivateKey }) => {
-            const account = getOrCreateAccount(
-              rpcUrl,
-              session.address,
-              sessionPrivateKey
+        executeFromOutside:
+          options.executeFromOutside ??
+          (async ({
+            calls,
+            chainId,
+            details,
+            rpcUrl,
+            session,
+            sessionPrivateKey,
+          }) => {
+            const { outsideExecution, signature } = buildSignedOutsideExecutionV3(
+              {
+                calls,
+                ...(details ? { details } : {}),
+                chainId,
+                session,
+                sessionPrivateKey,
+                policyRoot,
+                sessionKeyGuid,
+                policyProofIndex,
+              }
             );
-            const paymasterDetails = (details ?? {
-              feeMode: { mode: "sponsored" },
-            }) as PaymasterDetails;
-            return account.executePaymasterTransaction(calls, paymasterDetails);
+
+            options.logger?.info?.(
+              "[starkzap] cartridge-ts executing via cartridge_addExecuteOutsideTransaction (pure TS V3)"
+            );
+
+            const fetchFn = ensureFetch(options.fetchImpl);
+            const response = await fetchFn(rpcUrl, {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({
+                id: 1,
+                jsonrpc: "2.0",
+                method: "cartridge_addExecuteOutsideTransaction",
+                params: {
+                  address: session.address,
+                  outside_execution: outsideExecution,
+                  signature,
+                },
+              }),
+            });
+
+            if (!response.ok) {
+              throw new SessionProtocolError(
+                `cartridge_addExecuteOutsideTransaction failed with HTTP ${response.status} ${response.statusText}.`
+              );
+            }
+
+            const payload = await response.json();
+            const errorMessage = readJsonRpcErrorMessage(payload);
+            if (errorMessage) {
+              throw new SessionProtocolError(
+                `cartridge_addExecuteOutsideTransaction failed: ${errorMessage}`
+              );
+            }
+
+            const payloadRecord = asRecord(payload);
+            const result = payloadRecord?.result;
+            const txHash = extractTransactionHash(result);
+            if (!txHash) {
+              throw new SessionProtocolError(
+                "cartridge_addExecuteOutsideTransaction returned an invalid response (missing transaction hash)."
+              );
+            }
+
+            return { transaction_hash: txHash };
           }),
+        ...(options.execute ? { execute: options.execute } : {}),
       });
 
       return {

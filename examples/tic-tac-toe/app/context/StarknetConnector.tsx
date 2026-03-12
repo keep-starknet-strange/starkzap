@@ -1,4 +1,5 @@
 import type { CartridgeNativeAdapter, WalletInterface } from "@starkzap/native";
+import * as Linking from "expo-linking";
 import * as WebBrowser from "expo-web-browser";
 import React, {
   createContext,
@@ -35,6 +36,8 @@ type StarkZapNativeModule = typeof import("@starkzap/native") & {
   }) => CartridgeNativeAdapter;
 };
 
+WebBrowser.maybeCompleteAuthSession();
+
 const DEFAULT_NETWORK: StarknetNetwork = "SN_SEPOLIA";
 const DEFAULT_TIC_TAC_TOE_CONTRACT_ADDRESS =
   "0x03727da24037502a3e38ac980239982e3974c8ca78bd87ab5963a7a8690fd8e8";
@@ -66,8 +69,6 @@ function toSdkNetwork(
   }
 }
 
-const DEFAULT_REDIRECT_URL = "tictactoe://cartridge/callback";
-
 function toErrorMessage(error: unknown): string {
   if (error instanceof Error) {
     return error.message;
@@ -83,29 +84,23 @@ function resolveCartridgeRpc(network: StarknetNetwork): string {
   return CARTRIDGE_RPC_BY_NETWORK[network];
 }
 
-function resolveCartridgeRedirectUrl(): string {
+function resolveCartridgeRedirectUrl(): string | undefined {
   const configured = process.env.EXPO_PUBLIC_CARTRIDGE_REDIRECT_URL?.trim();
   if (configured) {
     return configured;
   }
-  return DEFAULT_REDIRECT_URL;
-}
 
-function extractEncodedSessionFromAuthUrl(
-  callbackUrl: string,
-  queryName: string = "startapp"
-): string | null {
   try {
-    const parsed = new URL(callbackUrl);
-    const value = parsed.searchParams.get(queryName);
-    return value && value.length > 0 ? value : null;
+    const generated = Linking.createURL("cartridge/callback");
+    return generated.trim().length > 0 ? generated : undefined;
   } catch {
-    return null;
+    return undefined;
   }
 }
 
 function createTsCartridgeAdapter(
-  native: StarkZapNativeModule
+  native: StarkZapNativeModule,
+  defaultRedirectUrl?: string
 ): CartridgeNativeAdapter {
   if (typeof native.createCartridgeTsAdapter !== "function") {
     throw new Error(
@@ -115,29 +110,37 @@ function createTsCartridgeAdapter(
 
   return native.createCartridgeTsAdapter({
     logger: console,
-    sessionRegistrationTimeoutMs: 90_000,
+    sessionRegistrationTimeoutMs: 180_000,
     sessionRequestTimeoutMs: 10_000,
     openSession: async ({
       url,
       redirectUrl,
-      redirectQueryName,
+      redirectQueryName: _redirectQueryName,
     }: CartridgeTsOpenSessionArgs): Promise<CartridgeTsOpenSessionResult> => {
-      const callbackTarget = redirectUrl || resolveCartridgeRedirectUrl();
-      const result = await WebBrowser.openAuthSessionAsync(url, callbackTarget);
-      if (result.type !== "success") {
-        return {
-          status: result.type === "cancel" ? "cancel" : "dismiss",
-        };
+      const callbackUrl = redirectUrl ?? defaultRedirectUrl;
+      if (callbackUrl) {
+        const authResult = await WebBrowser.openAuthSessionAsync(
+          url,
+          callbackUrl
+        );
+
+        if (authResult.type === "success") {
+          return {
+            status: "success",
+            ...("url" in authResult && authResult.url
+              ? { callbackUrl: authResult.url }
+              : {}),
+          };
+        }
+        if (authResult.type === "cancel") {
+          return { status: "cancel" };
+        }
+        return { status: "dismiss" };
       }
-      const encodedSession = extractEncodedSessionFromAuthUrl(
-        result.url,
-        redirectQueryName
-      );
-      return {
-        status: "success",
-        ...(encodedSession ? { encodedSession } : {}),
-        callbackUrl: result.url,
-      };
+
+      // Fallback for runtimes where redirect callbacks are unavailable.
+      await WebBrowser.openBrowserAsync(url);
+      return {};
     },
   });
 }
@@ -154,7 +157,9 @@ function loadNativeModule(): Promise<StarkZapNativeModule> {
 let didRegisterCartridgeAdapter = false;
 let adapterRegistrationPromise: Promise<void> | null = null;
 
-async function ensureCartridgeAdapterRegistered(): Promise<void> {
+async function ensureCartridgeAdapterRegistered(
+  defaultRedirectUrl?: string
+): Promise<void> {
   if (didRegisterCartridgeAdapter) {
     return;
   }
@@ -164,7 +169,7 @@ async function ensureCartridgeAdapterRegistered(): Promise<void> {
 
   adapterRegistrationPromise = (async () => {
     const native = await loadNativeModule();
-    const adapter = createTsCartridgeAdapter(native);
+    const adapter = createTsCartridgeAdapter(native, defaultRedirectUrl);
     native.registerCartridgeNativeAdapter(adapter);
     didRegisterCartridgeAdapter = true;
   })();
@@ -218,6 +223,7 @@ export const StarknetConnectorProvider: React.FC<{
 }> = ({ children }) => {
   const network = normalizeNetwork(process.env.EXPO_PUBLIC_STARKNET_NETWORK);
   const cartridgeRpc = resolveCartridgeRpc(network);
+  const cartridgeRedirectUrl = resolveCartridgeRedirectUrl();
   const [wallet, setWallet] = useState<WalletInterface | null>(null);
   const [account, setAccount] = useState<StarknetAccount | null>(null);
   const [connecting, setConnecting] = useState(false);
@@ -233,7 +239,7 @@ export const StarknetConnectorProvider: React.FC<{
         network: toSdkNetwork(network),
         rpcUrl: cartridgeRpc,
       });
-      await ensureCartridgeAdapterRegistered();
+      await ensureCartridgeAdapterRegistered(cartridgeRedirectUrl);
       const policies = getTicTacToePolicies();
       const onboard = await sdk.onboard({
         strategy: "cartridge",
@@ -246,9 +252,9 @@ export const StarknetConnectorProvider: React.FC<{
           ...(process.env.EXPO_PUBLIC_CARTRIDGE_URL
             ? { url: process.env.EXPO_PUBLIC_CARTRIDGE_URL }
             : { url: "https://x.cartridge.gg" }),
-          ...(process.env.EXPO_PUBLIC_CARTRIDGE_REDIRECT_URL
-            ? { redirectUrl: process.env.EXPO_PUBLIC_CARTRIDGE_REDIRECT_URL }
-            : { redirectUrl: DEFAULT_REDIRECT_URL }),
+          ...(cartridgeRedirectUrl
+            ? { redirectUrl: cartridgeRedirectUrl }
+            : {}),
         },
       });
 
@@ -262,7 +268,7 @@ export const StarknetConnectorProvider: React.FC<{
     } finally {
       setConnecting(false);
     }
-  }, [cartridgeRpc, network]);
+  }, [cartridgeRedirectUrl, cartridgeRpc, network]);
 
   const disconnectAccount = useCallback(async () => {
     setError(null);
