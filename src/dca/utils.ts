@@ -1,4 +1,5 @@
 import {
+  assertAmountMatchesToken,
   resolveWalletAddress,
   type Address,
   type AddressInput,
@@ -41,6 +42,21 @@ export function assertDcaContext(
   );
 }
 
+export function validateDcaCreateAmounts(request: DcaCreateRequest): void {
+  assertAmountMatchesToken(request.sellAmount, request.sellToken);
+  assertAmountMatchesToken(request.sellAmountPerCycle, request.sellToken);
+
+  if (!request.sellAmount.isPositive()) {
+    throw new Error("DCA sellAmount must be greater than zero");
+  }
+  if (!request.sellAmountPerCycle.isPositive()) {
+    throw new Error("DCA sellAmountPerCycle must be greater than zero");
+  }
+  if (request.sellAmountPerCycle.toBase() > request.sellAmount.toBase()) {
+    throw new Error("DCA sellAmountPerCycle cannot exceed sellAmount");
+  }
+}
+
 function resolveAddressOrDefault(
   value: AddressInput | undefined,
   fallback: Address
@@ -55,42 +71,62 @@ export function hydrateDcaCreateInput(
   input: DcaCreateInput,
   walletAddress: Address
 ): DcaCreateRequest {
-  return {
+  const request: DcaCreateRequest = {
     sellToken: input.sellToken,
     buyToken: input.buyToken,
     sellAmount: input.sellAmount,
     sellAmountPerCycle: input.sellAmountPerCycle,
     frequency: input.frequency,
     traderAddress: resolveAddressOrDefault(input.traderAddress, walletAddress),
-    ...(input.pricingStrategy && { pricingStrategy: input.pricingStrategy }),
   };
+
+  if (input.pricingStrategy) {
+    request.pricingStrategy = input.pricingStrategy;
+  }
+
+  return request;
 }
 
 export function hydrateDcaOrdersInput(
   input: DcaOrdersInput,
   walletAddress: Address
 ): DcaOrdersRequest {
-  return {
+  const request: DcaOrdersRequest = {
     traderAddress: resolveAddressOrDefault(input.traderAddress, walletAddress),
-    ...(input.status && { status: input.status }),
-    ...(input.page != null && { page: input.page }),
-    ...(input.size != null && { size: input.size }),
-    ...(input.sort && { sort: input.sort }),
   };
+
+  if (input.status) {
+    request.status = input.status;
+  }
+  if (input.page != null) {
+    request.page = input.page;
+  }
+  if (input.size != null) {
+    request.size = input.size;
+  }
+  if (input.sort) {
+    request.sort = input.sort;
+  }
+
+  return request;
 }
 
 export function hydrateDcaCancelInput(input: DcaCancelInput): DcaCancelRequest {
-  const hasOrderId = input.orderId != null && input.orderId.length > 0;
-  const hasOrderAddress = input.orderAddress != null;
+  const orderId = input.orderId;
+  const orderAddress = input.orderAddress;
 
-  if (!hasOrderId && !hasOrderAddress) {
+  if ((orderId == null || orderId.length === 0) && orderAddress == null) {
     throw new Error("DCA cancel requires either orderId or orderAddress");
   }
 
-  return {
-    ...(hasOrderId && { orderId: input.orderId }),
-    ...(hasOrderAddress && {
-      orderAddress: resolveWalletAddress(input.orderAddress!),
-    }),
-  };
+  const request: DcaCancelRequest = {};
+
+  if (orderId != null && orderId.length > 0) {
+    request.orderId = orderId;
+  }
+  if (orderAddress != null) {
+    request.orderAddress = resolveWalletAddress(orderAddress);
+  }
+
+  return request;
 }

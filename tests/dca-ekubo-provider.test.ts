@@ -108,6 +108,34 @@ describe("EkuboDcaProvider", () => {
     });
   });
 
+  it("validates amount relationships before querying Ekubo", async () => {
+    const fetchMock = vi.fn();
+    const provider = new EkuboDcaProvider({
+      apiBase: "https://mock-ekubo",
+      fetcher: fetchMock as unknown as typeof fetch,
+    });
+    const context = {
+      chainId: ChainId.SEPOLIA,
+      provider: {
+        getBlock: vi.fn(),
+      } as unknown as RpcProvider,
+      walletAddress: fromAddress("0xabc"),
+    };
+
+    await expect(
+      provider.prepareCreate(context, {
+        sellToken,
+        buyToken,
+        sellAmount: Amount.parse("1", sellToken),
+        sellAmountPerCycle: Amount.parse("2", sellToken),
+        frequency: "P1D",
+        traderAddress: context.walletAddress,
+      })
+    ).rejects.toThrow("DCA sellAmountPerCycle cannot exceed sellAmount");
+
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
   it("lists Ekubo orders and enriches them with on-chain order info", async () => {
     const preset = getEkuboDcaPreset(ChainId.SEPOLIA);
     const chainId = BigInt(ChainId.SEPOLIA.toFelt252()).toString();

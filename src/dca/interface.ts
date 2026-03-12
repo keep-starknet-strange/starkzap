@@ -136,6 +136,12 @@ export interface DcaCyclePreviewRequest {
   slippageBps?: bigint;
 }
 
+/**
+ * Advanced provider runtime context.
+ *
+ * App code should usually call `wallet.dca()` helpers instead of constructing
+ * provider contexts directly.
+ */
 export interface DcaProviderContext {
   chainId: ChainId;
   provider: RpcProvider;
@@ -156,6 +162,12 @@ export interface DcaExecutionContext {
   getSwapProvider(providerId: string): SwapProvider;
 }
 
+/**
+ * Advanced extension point for protocol-specific DCA adapters.
+ *
+ * Most apps should use the wallet-facing `DcaClientInterface` instead of
+ * calling providers directly.
+ */
 export interface DcaProvider {
   readonly id: string;
   supportsChain(chainId: ChainId): boolean;
@@ -178,8 +190,10 @@ export interface DcaClientInterface extends DcaProviderResolver {
   setDefaultProvider(providerId: string): void;
   listProviders(): string[];
   getOrders(request?: DcaOrdersInput): Promise<DcaOrdersPage>;
+  /** Advanced API for batching or custom execution flows. */
   prepareCreate(request: DcaCreateInput): Promise<PreparedDcaAction>;
   create(request: DcaCreateInput, options?: ExecuteOptions): Promise<Tx>;
+  /** Advanced API for batching or custom execution flows. */
   prepareCancel(request: DcaCancelInput): Promise<PreparedDcaAction>;
   cancel(request: DcaCancelInput, options?: ExecuteOptions): Promise<Tx>;
   previewCycle(request: DcaCyclePreviewRequest): Promise<SwapQuote>;

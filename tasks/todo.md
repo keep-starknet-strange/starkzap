@@ -1,3 +1,57 @@
+# Task: AVNU Adapter Readability Cleanup (2026-03-12)
+
+## Plan
+- [x] Replace remaining inline conditional-spread request builders in the AVNU swap/DCA adapters with explicit local payload objects.
+- [x] Remove low-value async wrapper noise where the flow reads more clearly as straight-line code.
+- [x] Add or tighten focused AVNU adapter tests around optional request fields where the cleanup changes the construction path.
+- [x] Run targeted validation and record the review summary.
+
+## Review
+- Simplified the remaining AVNU request/call builders in `src/dca/avnu.ts` and `src/swap/avnu.ts` so they now use typed local payload objects plus direct `if` assignments instead of inline conditional spreads.
+- Replaced a few low-value wrappers with straight-line code:
+  - `AvnuSwapProvider.swap()` now returns `prepareSwap(...)` directly.
+  - `prepareCancel()` and AVNU quote fetching now use explicit request/response locals.
+- Flattened optional AVNU order/trade/pricing mapping in `src/dca/avnu.ts` to avoid the same dense object-construction style in response normalization.
+- Added focused regression coverage in `tests/swap-avnu.test.ts` to assert that `takerAddress` is omitted from both quote and call-builder requests when not provided.
+- Verification:
+  - `rtk vitest run tests/dca-avnu-provider.test.ts tests/swap-avnu.test.ts`
+  - `rtk proxy npm run -s typecheck`
+
+# Task: DCA Module Simplification Pass (2026-03-12)
+
+## Plan
+- [x] Audit `src/dca` and its focused tests to identify indirection, duplicated validation, and dense object construction worth removing.
+- [x] Simplify the wallet-facing DCA client by replacing generic callback-based preparation with direct methods.
+- [x] Extract shared DCA create validation so AVNU and Ekubo keep one source of truth for common rules.
+- [x] Flatten remaining DCA request/result builders where explicit code is clearer than conditional spreads.
+- [x] Run focused DCA validation and record the review summary.
+
+## Review
+- Simplified `src/dca/client.ts` by removing the generic `prepareWithProvider(...)` / `executePrepared(...)` path and making `prepareCreate`, `create`, `prepareCancel`, `cancel`, and `previewCycle` follow direct, explicit control flow.
+- Simplified `src/dca/utils.ts` by extracting shared DCA create amount validation and rewriting the DCA input hydration helpers with typed local request objects instead of conditional spreads.
+- Simplified provider code by reusing the shared validation in `src/dca/avnu.ts` and `src/dca/ekubo.ts`, moving AVNU create payload construction out of the retry callback, removing the last conditional-spread result builders, and reusing Ekubo cancel calldata directly.
+- Added focused regression coverage in `tests/dca-ekubo-provider.test.ts` to verify create validation fails before any Ekubo network call.
+- Verification:
+  - `rtk vitest run tests/dca-avnu-provider.test.ts tests/dca-ekubo-provider.test.ts tests/dca-wallet.test.ts`
+  - `rtk proxy npm run -s typecheck`
+  - `rtk proxy npm run -s build`
+
+# Task: AVNU DCA Orders Request Cleanup (2026-03-12)
+
+## Plan
+- [x] Inspect the AVNU DCA `getOrders` implementation and confirm the local request-shaping pattern.
+- [x] Replace the inline conditional-spread request construction with a clearer explicit request object.
+- [x] Add focused coverage for optional order-list query parameters.
+- [x] Run targeted validation and record the review summary.
+
+## Review
+- Simplified `AvnuDcaProvider.getOrders()` in `src/dca/avnu.ts` by building the AVNU request object explicitly and passing it directly to `getDcaOrders(...)`.
+- Removed the unnecessary `async`/`await` wrapper around the `run` callback while preserving the same fallback/error behavior.
+- Added a focused regression test in `tests/dca-avnu-provider.test.ts` covering `page`, `size`, and `sort` passthrough.
+- Verification:
+  - `rtk vitest run tests/dca-avnu-provider.test.ts`
+  - `rtk proxy npm run -s typecheck`
+
 # Task: DCA Module Using AVNU and EKUBO (2026-03-11)
 
 ## Plan
@@ -789,3 +843,27 @@
 - Verification:
   - `rtk vitest run tests/swap-avnu.test.ts tests/dca-avnu-provider.test.ts tests/swap-ekubo.test.ts tests/dca-ekubo-provider.test.ts tests/dca-wallet.test.ts tests/swap-wallet.test.ts`
   - `rtk proxy npm run -s typecheck`
+
+# Task: Swap Prepare UX Refactor (2026-03-11)
+
+## Plan
+- [x] Compare the wallet-facing swap and DCA APIs against the existing transfer pattern to identify the clearest user-facing model.
+- [x] Add an explicit advanced `prepareSwap(...)` path at the wallet level while keeping `wallet.swap(...)` as the simple execution path.
+- [x] Rename provider preparation semantics toward `prepareSwap(...)` without abruptly breaking existing provider integrations.
+- [x] Clarify advanced/internal extension points in the swap and DCA interfaces.
+- [x] Run focused swap and builder validation plus root typecheck.
+
+## Review
+- Public UX changes:
+  - added `wallet.prepareSwap(...)` as the explicit advanced path in `src/wallet/base.ts` and `src/wallet/interface.ts`
+  - kept `wallet.swap(...)` as the direct execution path, now implemented on top of `prepareSwap(...)`
+- Provider UX cleanup:
+  - `SwapProvider` now prefers `prepareSwap(...)` in `src/swap/interface.ts`
+  - retained legacy provider `swap(...)` compatibility through `prepareSwapWithProvider(...)` in `src/swap/utils.ts`
+  - updated the built-in providers (`src/swap/avnu.ts`, `src/swap/ekubo.ts`) to implement `prepareSwap(...)` and keep `swap(...)` as a compatibility alias
+- Internal clarity:
+  - `TxBuilder.swap(...)` now uses the shared preparation helper instead of hardcoding the legacy provider method name
+  - marked DCA provider/context and DCA prepare methods as advanced extension points in `src/dca/interface.ts`
+- Verification:
+  - `rtk proxy npm run -s typecheck`
+  - `rtk vitest run tests/swap-avnu.test.ts tests/swap-ekubo-provider.test.ts tests/swap-wallet.test.ts tests/tx-builder.test.ts tests/wallet.test.ts tests/dca-wallet.test.ts`
