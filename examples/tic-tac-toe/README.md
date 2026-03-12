@@ -20,7 +20,7 @@ Optional override file:
 
 ```bash
 cd examples/tic-tac-toe
-cp env.example .env
+cp .env.example .env
 ```
 
 Useful env vars:
@@ -28,7 +28,7 @@ Useful env vars:
 - `EXPO_PUBLIC_STARKNET_NETWORK`: `SN_SEPOLIA` or `SN_MAIN`
 - `EXPO_PUBLIC_CARTRIDGE_RPC`
 - `EXPO_PUBLIC_CARTRIDGE_URL`
-- `EXPO_PUBLIC_CARTRIDGE_REDIRECT_URL` (default: `tictactoe://cartridge/callback`)
+- `EXPO_PUBLIC_CARTRIDGE_REDIRECT_URL` (optional override)
 
 ## Install
 
@@ -71,8 +71,8 @@ Platform shortcuts:
 
 - `@starkzap/native` is loaded lazily when connecting Cartridge (not at app bootstrap), which avoids early runtime crashes from transitive modules.
 - Cartridge auth/session is handled by the TS session adapter in `app/context/StarknetConnector.tsx`.
-- Cartridge redirect URL is `EXPO_PUBLIC_CARTRIDGE_REDIRECT_URL` (default: `tictactoe://cartridge/callback`).
-- App scheme is `tictactoe`, so Cartridge redirect URL is `tictactoe://cartridge/callback`.
+- The example uses callback-first auth (`openAuthSessionAsync`) and falls back to browser + polling only if a callback URI is unavailable.
+- Redirect URL is taken from `EXPO_PUBLIC_CARTRIDGE_REDIRECT_URL` when set, otherwise generated via Expo Linking (`Linking.createURL("cartridge/callback")`).
 - Keep a single React Native version in the tree (this app is pinned to `react-native@0.81.5` to match Expo SDK 54).
 - If Metro caches stale resolution after dependency changes, run:
 
