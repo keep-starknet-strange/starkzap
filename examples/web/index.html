@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>X SDK Playground</title>
+    <title>Starkzap Playground</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
@@ -68,6 +68,21 @@
       .subtitle {
         color: var(--text-secondary);
         font-size: 1.1rem;
+      }
+
+      .network-badge {
+        display: inline-block;
+        margin-top: 0.5rem;
+        padding: 0.25rem 0.75rem;
+        font-size: 0.75rem;
+        font-weight: 600;
+        font-family: var(--font-mono);
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        border-radius: 999px;
+        color: var(--accent-primary);
+        border: 1px solid var(--accent-primary);
+        opacity: 0.85;
       }
 
       .card {
@@ -549,8 +564,9 @@
   <body>
     <div class="app">
       <header>
-        <h1>X SDK</h1>
+        <h1>Starkzap</h1>
         <p class="subtitle">Wallet Integration Playground</p>
+        <span id="network-badge" class="network-badge"></span>
       </header>
 
       <!-- Connection Options -->

@@ -224,18 +224,14 @@ await wallet.swap(
 
 ### Network
 
-The app connects to Starknet Sepolia by default. To change the network, edit the constants at the top of `main.ts`:
+The app connects to Starknet Sepolia by default. Set `VITE_NETWORK` to switch:
 
-```typescript
-const RPC_URL = "https://api.cartridge.gg/x/starknet/sepolia/rpc/v0_9";
-
-const sdk = new StarkZap({
-  rpcUrl: RPC_URL,
-  chainId: ChainId.SEPOLIA,
-});
+```bash
+VITE_NETWORK=mainnet    # "mainnet" or "sepolia" (default)
+VITE_RPC_URL=<url>      # Optional custom RPC URL (overrides the default Cartridge RPC)
 ```
 
-For mainnet, change both `RPC_URL` and `ChainId.SEPOLIA` to `ChainId.MAINNET`, and set `AVNU_PAYMASTER_URL` in the server's `.env` to `https://mainnet.paymaster.avnu.fi`.
+For mainnet, also set `AVNU_PAYMASTER_URL` in the server's `.env` to `https://mainnet.paymaster.avnu.fi`.
 
 ### Privy Server URL
 

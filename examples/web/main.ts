@@ -26,13 +26,20 @@ import {
 } from "./bridge";
 
 // Configuration
-const RPC_URL = "https://api.cartridge.gg/x/starknet/sepolia/rpc/v0_9";
+const NETWORK =
+  (import.meta.env.VITE_NETWORK as string | undefined)?.toLowerCase() ===
+  "mainnet"
+    ? "mainnet"
+    : "sepolia";
+const RPC_URL =
+  (import.meta.env.VITE_RPC_URL as string | undefined) ??
+  `https://api.cartridge.gg/x/starknet/${NETWORK}/rpc/v0_9`;
 const PRIVY_SERVER_URL = "http://localhost:3001";
 const DUMMY_POLICY = {
   target: "0x04718f5a0fc34cc1af16a1cdee98ffb20c31f5cd61d6ab07201858f4287c938d", // STRK
   method: "transfer",
 };
-const SDK_CHAIN_ID = ChainId.SEPOLIA;
+const SDK_CHAIN_ID = NETWORK === "mainnet" ? ChainId.MAINNET : ChainId.SEPOLIA;
 const BPS_DENOMINATOR = 10_000n;
 const DEFAULT_SLIPPAGE_BPS = 100n;
 
@@ -80,6 +87,8 @@ let confidential: TongoConfidential | null = null;
 const walletSection = document.getElementById("wallet-section")!;
 const pkForm = document.getElementById("pk-form")!;
 const logContainer = document.getElementById("log")!;
+const networkBadge = document.getElementById("network-badge")!;
+networkBadge.textContent = NETWORK;
 
 const btnCartridge = document.getElementById(
   "btn-cartridge"
@@ -1576,7 +1585,7 @@ btnTongoRefresh.addEventListener("click", async () => {
 // Initial log
 initializeSwapForm();
 populateTongoTokenSelect();
-log(`SDK initialized with RPC: ${RPC_URL}`, "info");
+log(`SDK initialized on ${NETWORK} with RPC: ${RPC_URL}`, "info");
 if (REOWN_PROJECT_ID) {
   log("Bridge enabled (Reown AppKit)", "info");
 }
