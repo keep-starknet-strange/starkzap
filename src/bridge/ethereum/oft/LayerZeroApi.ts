@@ -1,0 +1,169 @@
+import type { ContractTransaction } from "ethers";
+import { Interface } from "ethers";
+import { type EthereumAddress, ExternalChain } from "@/types";
+import { fromEthereumAddress } from "@/types";
+import type { Address, Amount } from "starkzap";
+
+const LAYERZERO_API_BASE = "https://transfer.layerzero-api.com/v1";
+
+export interface LayerZeroQuoteFee {
+  chainKey: string;
+  type: string;
+  description: string;
+  amount: string;
+  address: string;
+}
+
+export interface LayerZeroUserStep {
+  type: string;
+  description: string;
+  chainKey: string;
+  chainType: string;
+  signerAddress: string;
+  transaction: { encoded: ContractTransaction };
+}
+
+export interface LayerZeroQuote {
+  id: string;
+  routeSteps: {
+    type: string;
+    srcChainKey: string;
+    description: string;
+    duration: { estimated: string | null };
+    fees: LayerZeroQuoteFee[];
+  }[];
+  fees: LayerZeroQuoteFee[];
+  duration: { estimated: string | null };
+  feeUsd: string;
+  feePercent: string;
+  srcAmount: string;
+  dstAmount: string;
+  dstAmountMin: string;
+  srcAmountUsd: string;
+  dstAmountUsd: string;
+  userSteps: LayerZeroUserStep[];
+  options: { dstNativeDropAmount: string };
+  expiresAt: string;
+}
+
+interface LayerZeroApiConfig {
+  externalTokenAddress: string;
+  starknetTokenAddress: Address;
+  externalChainKey: ExternalChain;
+  apiKey: string;
+}
+
+interface QuoteRequestParams {
+  srcWalletAddress: string;
+  dstWalletAddress: string;
+  amount: Amount;
+}
+
+export class LayerZeroApi {
+  constructor(
+    private readonly config: LayerZeroApiConfig,
+    private readonly fetcher: typeof fetch = fetch
+  ) {}
+
+  async getDepositQuotes(
+    params: QuoteRequestParams
+  ): Promise<LayerZeroQuote[]> {
+    return this.getQuotes({
+      srcChainKey: this.config.externalChainKey,
+      srcTokenAddress: this.config.externalTokenAddress,
+      dstChainKey: "starknet",
+      dstTokenAddress: this.config.starknetTokenAddress,
+      ...params,
+    });
+  }
+
+  getApprovalTransaction(quotes: LayerZeroQuote[]): ContractTransaction | null {
+    const quote = quotes[0];
+    if (!quote) return null;
+    try {
+      const approveStep = quote.userSteps.find(
+        (step) => step.description === "approve"
+      );
+      return approveStep?.transaction.encoded ?? null;
+    } catch {
+      return null;
+    }
+  }
+
+  getDepositTransaction(quotes: LayerZeroQuote[]): ContractTransaction | null {
+    return this.getBridgeTransaction(quotes);
+  }
+
+  /**
+   * Extract the allowance spender from an approval transaction's calldata.
+   * Parses `approve(address,uint256)` to retrieve the spender argument.
+   */
+  extractSpenderFromApprovalTx(
+    approvalTx: ContractTransaction | null
+  ): EthereumAddress | null {
+    if (!approvalTx?.data) return null;
+    try {
+      const approveInterface = new Interface([
+        "function approve(address spender, uint256 value)",
+      ]);
+      const decoded = approveInterface.parseTransaction({
+        data: approvalTx.data,
+      });
+      const spender = decoded?.args[0] as string | undefined;
+      return spender ? fromEthereumAddress(spender) : null;
+    } catch {
+      return null;
+    }
+  }
+
+  private async getQuotes(params: {
+    srcChainKey: string;
+    srcTokenAddress: string;
+    srcWalletAddress: string;
+    dstChainKey: string;
+    dstTokenAddress: string;
+    dstWalletAddress: string;
+    amount: Amount;
+  }): Promise<LayerZeroQuote[]> {
+    const response = await this.fetcher(`${LAYERZERO_API_BASE}/quotes`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...(this.config.apiKey ? { "x-api-key": this.config.apiKey } : {}),
+      },
+      body: JSON.stringify({
+        ...params,
+        amount: params.amount.toBase().toString(),
+        options: {
+          amountType: "EXACT_SRC_AMOUNT",
+          feeTolerance: { type: "PERCENT", amount: 1 },
+          dstNativeDropAmount: "0",
+        },
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error(
+        `LayerZero API request failed (${response.status}): ${await response.text()}`
+      );
+    }
+
+    const data = (await response.json()) as { quotes: LayerZeroQuote[] };
+    return data.quotes;
+  }
+
+  private getBridgeTransaction(
+    quotes: LayerZeroQuote[]
+  ): ContractTransaction | null {
+    const quote = quotes[0];
+    if (!quote) return null;
+    try {
+      const bridgeStep = quote.userSteps.find(
+        (step) => step.description === "bridge"
+      );
+      return bridgeStep?.transaction.encoded ?? null;
+    } catch {
+      return null;
+    }
+  }
+}

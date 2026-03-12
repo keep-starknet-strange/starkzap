@@ -15,6 +15,7 @@ import type { SignerInterface } from "@/signer";
 import type {
   Address,
   AccountClassConfig,
+  BridgingConfig,
   DeployOptions,
   EnsureReadyOptions,
   ExecuteOptions,
@@ -103,6 +104,7 @@ interface WalletInternals {
   defaultFeeMode: FeeMode;
   defaultTimeBounds?: PaymasterTimeBounds;
   stakingConfig: StakingConfig | undefined;
+  bridgingConfig?: BridgingConfig | undefined;
 }
 
 export class Wallet extends BaseWallet {
@@ -120,7 +122,7 @@ export class Wallet extends BaseWallet {
   private sponsoredDeployLock: Promise<void> | null = null;
 
   private constructor(options: WalletInternals) {
-    super(options.address, options.stakingConfig);
+    super(options.address, options.stakingConfig, options.bridgingConfig);
     this.accountProvider = options.accountProvider;
     this.account = options.account;
     this.provider = options.provider;
@@ -205,6 +207,7 @@ export class Wallet extends BaseWallet {
       defaultFeeMode: feeMode,
       ...(timeBounds && { defaultTimeBounds: timeBounds }),
       stakingConfig: options.config.staking,
+      bridgingConfig: options.config.bridging,
     });
 
     if (swapProviders?.length) {

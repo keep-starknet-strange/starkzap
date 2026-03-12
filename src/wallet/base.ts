@@ -2,6 +2,7 @@ import type { WalletInterface } from "@/wallet/interface";
 import {
   type Address,
   Amount,
+  type BridgingConfig,
   BridgeToken,
   type ChainId,
   type DeployOptions,
@@ -91,22 +92,25 @@ export abstract class BaseWallet implements WalletInterface {
   private stakingMap: Map<Address, Staking> = new Map();
   private stakingInFlight: Map<Address, Promise<Staking>> = new Map();
 
-  private readonly bridging = new BridgeOperator(this);
+  private readonly bridging: BridgeOperator;
 
   /**
    * Creates a new BaseWallet instance.
    * @param address - The Starknet address of this wallet
    * @param stakingConfig - Optional staking configuration for staking operations
+   * @param bridgingConfig - Optional bridging configuration (API keys for cross-chain protocols)
    * @param defaultSwapProvider - Optional default swap provider used by `getQuote(request)` and `swap(request)`
    */
   protected constructor(
     address: Address,
     stakingConfig: StakingConfig | undefined,
+    bridgingConfig?: BridgingConfig,
     defaultSwapProvider?: SwapProvider,
     defaultLendingProvider?: LendingProvider
   ) {
     this.address = address;
     this.stakingConfig = stakingConfig;
+    this.bridging = new BridgeOperator(this, bridgingConfig);
     this.swapProviders = new Map();
     const provider = defaultSwapProvider ?? new AvnuSwapProvider();
     this.registerSwapProvider(provider, true);

@@ -8,6 +8,7 @@ import {
 } from "starknet";
 import { Tx } from "@/tx";
 import {
+  type BridgingConfig,
   ChainId,
   getChainId,
   type DeployOptions,
@@ -143,9 +144,10 @@ export class CartridgeWallet extends BaseWallet {
     chainId: ChainId,
     classHash: string,
     stakingConfig: StakingConfig | undefined,
+    bridgingConfig: BridgingConfig | undefined,
     options: CartridgeWalletOptions = {}
   ) {
-    super(fromAddress(walletAccount.address), stakingConfig);
+    super(fromAddress(walletAccount.address), stakingConfig, bridgingConfig);
     this.controller = controller;
     this.walletAccount = walletAccount;
     this.provider = provider;
@@ -161,7 +163,8 @@ export class CartridgeWallet extends BaseWallet {
    */
   static async create(
     options: CartridgeWalletOptions = {},
-    stakingConfig?: StakingConfig | undefined
+    stakingConfig?: StakingConfig | undefined,
+    bridgingConfig?: BridgingConfig | undefined
   ): Promise<CartridgeWallet> {
     const { default: Controller, toSessionPolicies } =
       await loadCartridgeControllerModule();
@@ -243,6 +246,7 @@ export class CartridgeWallet extends BaseWallet {
       chainId,
       classHash,
       stakingConfig,
+      bridgingConfig,
       options
     );
   }

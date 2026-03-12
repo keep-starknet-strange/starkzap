@@ -18,10 +18,11 @@ import {
 } from "@/connect";
 import type { WalletInterface } from "@/wallet";
 import type { BridgeOperatorInterface } from "@/bridge/operator/BridgeOperatorInterface";
-import type { Address, EthereumAddress } from "@/types";
+import type { Address, BridgingConfig, EthereumAddress } from "@/types";
 import type { Amount } from "starkzap";
 import { CCTPBridge } from "@/bridge/ethereum/cctp/CCTPBridge";
 import { LordsBridge } from "@/bridge/ethereum/lords/LordsBridge";
+import { OftBridge } from "@/bridge/ethereum/oft/OftBridge";
 import type { EthereumDepositFeeEstimation } from "@/bridge/ethereum/types";
 import type { TransactionResponse } from "ethers";
 
@@ -34,7 +35,10 @@ export type BridgeType<T extends BridgeToken> = BridgeInterface<
 export class BridgeOperator implements BridgeOperatorInterface {
   private cache = new BridgeCache();
 
-  constructor(private readonly starknetWallet: WalletInterface) {}
+  constructor(
+    private readonly starknetWallet: WalletInterface,
+    private readonly bridgingConfig?: BridgingConfig
+  ) {}
 
   public async deposit<T extends BridgeToken>(
     recipient: Address,
@@ -139,6 +143,17 @@ export class BridgeOperator implements BridgeOperatorInterface {
         return new CanonicalEthereumBridge(token, walletConfig, starknetWallet);
       case Protocol.CCTP:
         return new CCTPBridge(token, walletConfig, starknetWallet);
+      case Protocol.OFT:
+      case Protocol.OFT_MIGRATED: {
+        const apiKey = this.bridgingConfig?.layerZeroApiKey;
+        if (!apiKey) {
+          throw new Error(
+            "OFT bridging requires a LayerZero API key. " +
+              'Set "bridging.layerZeroApiKey" in the SDK configuration.'
+          );
+        }
+        return new OftBridge(token, walletConfig, starknetWallet, apiKey);
+      }
       default:
         throw new Error(`Unsupported protocol "${token.protocol}".`);
     }

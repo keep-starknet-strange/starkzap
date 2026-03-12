@@ -28,3 +28,8 @@ export type EthereumDepositFeeEstimation = ApprovalFeeEstimation & {
 export type CCTPDepositFeeEstimation = EthereumDepositFeeEstimation & {
   fastTransferBpFee: number;
 };
+
+export type OftDepositFeeEstimation = EthereumDepositFeeEstimation & {
+  /** LayerZero interchain fee (in ETH, included in msg.value of the deposit tx). */
+  interchainFee: Amount;
+};

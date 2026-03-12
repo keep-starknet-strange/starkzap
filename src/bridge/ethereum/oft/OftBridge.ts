@@ -1,0 +1,197 @@
+import { EthereumBridge } from "@/bridge/ethereum/EthereumBridge";
+import type { BridgeDepositOptions } from "@/bridge/types/BridgeInterface";
+import type {
+  EthereumWalletConfig,
+  OftDepositFeeEstimation,
+} from "@/bridge/ethereum/types";
+import type { Address } from "@/types";
+import {
+  Amount,
+  type EthereumAddress,
+  EthereumBridgeToken,
+  ExternalChain,
+  fromAddress,
+} from "@/types";
+import type { WalletInterface } from "@/wallet";
+import type { ContractTransaction, TransactionResponse } from "ethers";
+import { FeeErrorCause } from "@/types/errors";
+import { LayerZeroApi } from "@/bridge/ethereum/oft/LayerZeroApi";
+import {
+  DEFAULT_OFT_DEPOSIT_GAS_REQUIREMENT,
+  DEFAULT_OFT_MIN_AMOUNT,
+  OFT_MIN_AMOUNT_BY_TOKEN_ID,
+} from "@/bridge/ethereum/oft/constants";
+
+const DUMMY_SN_ADDRESS = fromAddress(
+  "0x023123100123103023123acb1231231231231031231ca123f23123123123100a"
+);
+const DUMMY_ETH_ADDRESS = "0x0000000000000000000000000000000000000001";
+
+export class OftBridge extends EthereumBridge<OftDepositFeeEstimation> {
+  private readonly layerZeroApi: LayerZeroApi;
+  private cachedSpender: EthereumAddress | null | undefined;
+  private dummyDepositTxPromise: Promise<ContractTransaction | null> | null =
+    null;
+
+  constructor(
+    bridgeToken: EthereumBridgeToken,
+    config: EthereumWalletConfig,
+    starknetWallet: WalletInterface,
+    apiKey: string
+  ) {
+    super(bridgeToken, config, starknetWallet, []);
+
+    const chainId = starknetWallet.getChainId();
+    if (!chainId.isMainnet()) {
+      throw new Error(
+        "OFT bridging is only supported on Starknet Mainnet. " +
+          "The LayerZero Value Transfer API does not support testnets."
+      );
+    }
+
+    this.layerZeroApi = new LayerZeroApi({
+      externalTokenAddress: bridgeToken.address,
+      starknetTokenAddress: bridgeToken.starknetAddress,
+      externalChainKey: ExternalChain.ETHEREUM,
+      apiKey,
+    });
+  }
+
+  async deposit(
+    recipient: Address,
+    amount: Amount,
+    _options?: BridgeDepositOptions
+  ): Promise<TransactionResponse> {
+    await this.approveSpendingOf(amount);
+
+    const signerAddress = await this.config.signer.getAddress();
+    const quotes = await this.layerZeroApi.getDepositQuotes({
+      srcWalletAddress: signerAddress,
+      dstWalletAddress: recipient,
+      amount: amount,
+    });
+
+    const depositTx = this.layerZeroApi.getDepositTransaction(quotes);
+    if (!depositTx) {
+      throw new Error(
+        "Failed to get OFT deposit transaction from LayerZero API."
+      );
+    }
+
+    const response = await this.execute(depositTx);
+    this.clearCachedAllowance();
+    return response;
+  }
+
+  async getDepositFeeEstimate(
+    _options?: BridgeDepositOptions
+  ): Promise<OftDepositFeeEstimation> {
+    const [allowance, dummyDepositTx, approvalFeeEstimation] =
+      await Promise.all([
+        this.getAllowance(),
+        this.getDummyDepositTx(),
+        this.estimateApprovalFee(),
+      ]);
+
+    const { approvalFee, approvalFeeError } = approvalFeeEstimation;
+
+    const interchainFee = this.ethAmount(
+      BigInt(dummyDepositTx?.value?.toString() ?? "0")
+    );
+
+    let l1Fee: Amount;
+    let l1FeeError: FeeErrorCause | undefined;
+
+    const needsFallback = allowance !== null && allowance.isZero();
+    if (needsFallback || !dummyDepositTx) {
+      const feeDecimal =
+        DEFAULT_OFT_DEPOSIT_GAS_REQUIREMENT *
+        (await this.getEthereumGasPrice());
+      l1Fee = this.ethAmount(feeDecimal);
+      if (!dummyDepositTx) {
+        l1FeeError = FeeErrorCause.GENERIC_L1_FEE_ERROR;
+      }
+    } else {
+      try {
+        const [gasUnits, gasPrice] = await Promise.all([
+          this.config.provider.estimateGas(dummyDepositTx),
+          this.getEthereumGasPrice(),
+        ]);
+        l1Fee = this.ethAmount(gasUnits * gasPrice);
+      } catch {
+        l1Fee = this.ethAmount(0n);
+        l1FeeError = FeeErrorCause.GENERIC_L1_FEE_ERROR;
+      }
+    }
+
+    return {
+      l1Fee,
+      l1FeeError,
+      l2Fee: interchainFee,
+      interchainFee,
+      approvalFee,
+      approvalFeeError,
+    };
+  }
+
+  protected async getAllowanceSpender(): Promise<EthereumAddress | null> {
+    if (this.cachedSpender !== undefined) {
+      return this.cachedSpender;
+    }
+
+    try {
+      const quotes = await this.layerZeroApi.getDepositQuotes({
+        srcWalletAddress: DUMMY_ETH_ADDRESS,
+        dstWalletAddress: DUMMY_SN_ADDRESS.toString(),
+        amount: this.getOftMinAmount(),
+      });
+
+      const approvalTx = this.layerZeroApi.getApprovalTransaction(quotes);
+      this.cachedSpender =
+        this.layerZeroApi.extractSpenderFromApprovalTx(approvalTx);
+    } catch {
+      this.cachedSpender = null;
+    }
+
+    return this.cachedSpender;
+  }
+
+  protected async getEthereumGasPrice(): Promise<bigint> {
+    const gasData = await this.config.provider.getFeeData();
+    const gasPrice = gasData.gasPrice ?? 0n;
+    const maxFeePerGas = gasData.maxFeePerGas;
+
+    return maxFeePerGas && gasData.maxPriorityFeePerGas
+      ? maxFeePerGas
+      : gasPrice;
+  }
+
+  private getOftMinAmount(): Amount {
+    const amountBase =
+      OFT_MIN_AMOUNT_BY_TOKEN_ID[this.bridgeToken.id] ?? DEFAULT_OFT_MIN_AMOUNT;
+    return Amount.fromRaw(
+      amountBase,
+      this.bridgeToken.decimals,
+      this.bridgeToken.symbol
+    );
+  }
+
+  private getDummyDepositTx(): Promise<ContractTransaction | null> {
+    this.dummyDepositTxPromise ??= this.fetchDummyDepositTx();
+    return this.dummyDepositTxPromise;
+  }
+
+  private async fetchDummyDepositTx(): Promise<ContractTransaction | null> {
+    try {
+      const signerAddress = await this.config.signer.getAddress();
+      const quotes = await this.layerZeroApi.getDepositQuotes({
+        srcWalletAddress: signerAddress,
+        dstWalletAddress: DUMMY_SN_ADDRESS.toString(),
+        amount: this.getOftMinAmount(),
+      });
+      return this.layerZeroApi.getDepositTransaction(quotes);
+    } catch {
+      return null;
+    }
+  }
+}

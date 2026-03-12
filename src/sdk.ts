@@ -429,7 +429,8 @@ export class StarkZap {
         chainId: this.config.chainId,
         ...(explorer && { explorer }),
       },
-      this.config.staking
+      this.config.staking,
+      this.config.bridging
     );
     return wallet as CartridgeWalletInterface;
   }
