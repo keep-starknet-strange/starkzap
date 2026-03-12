@@ -70,7 +70,7 @@ Platform shortcuts:
 ## Notes For Cartridge Onboarding
 
 - `@starkzap/native` is loaded lazily when connecting Cartridge (not at app bootstrap), which avoids early runtime crashes from transitive modules.
-- Cartridge auth/session is handled by the TS session adapter in `app/context/StarknetConnector.tsx`.
+- Cartridge auth/session is handled by the TS session adapter in `app/context/StarknetConnector.tsx`, registered via `registerCartridgeTsAdapter(...)`.
 - The example uses callback-first auth (`openAuthSessionAsync`) and falls back to browser + polling only if a callback URI is unavailable.
 - Redirect URL is taken from `EXPO_PUBLIC_CARTRIDGE_REDIRECT_URL` when set, otherwise generated via Expo Linking (`Linking.createURL("cartridge/callback")`).
 - Keep a single React Native version in the tree (this app is pinned to `react-native@0.81.5` to match Expo SDK 54).
