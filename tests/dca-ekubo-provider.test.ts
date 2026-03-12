@@ -38,6 +38,35 @@ describe("EkuboDcaProvider", () => {
     expect(provider.supportsChain(ChainId.SEPOLIA)).toBe(true);
   });
 
+  it("returns empty indexing pages without querying Ekubo", async () => {
+    const fetchMock = vi.fn();
+    const provider = new EkuboDcaProvider({
+      apiBase: "https://mock-ekubo",
+      fetcher: fetchMock as unknown as typeof fetch,
+    });
+    const context = {
+      chainId: ChainId.SEPOLIA,
+      provider: {} as RpcProvider,
+      walletAddress: fromAddress("0xabc"),
+    };
+
+    const page = await provider.getOrders(context, {
+      traderAddress: context.walletAddress,
+      status: "INDEXING",
+      page: 2,
+      size: 10,
+    });
+
+    expect(page).toEqual({
+      content: [],
+      totalPages: 0,
+      totalElements: 0,
+      size: 10,
+      number: 2,
+    });
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
   it("builds native create calls from Ekubo pool discovery", async () => {
     const preset = getEkuboDcaPreset(ChainId.SEPOLIA);
     const fetchMock = vi.fn().mockResolvedValue(
