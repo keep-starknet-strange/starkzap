@@ -500,9 +500,8 @@ export class TxBuilder {
   /**
    * Fund a confidential account.
    *
-   * Generates ZK proofs and adds the fund call to the batch.
-   * You must include an ERC20 approve call before this
-   * (e.g., via `.approve(token, tongoContract, amount)`).
+   * The provider returns all necessary calls (including ERC20 approve
+   * when required), so no manual approve step is needed.
    *
    * @param confidential - A {@link ConfidentialProvider} instance
    * @param details - Fund parameters (amount, sender)
@@ -511,7 +510,6 @@ export class TxBuilder {
    * @example
    * ```ts
    * wallet.tx()
-   *   .approve(token, tongoContract, amount)
    *   .confidentialFund(confidential, { amount: Amount.fromRaw(100n, token), sender: wallet.address })
    *   .send();
    * ```

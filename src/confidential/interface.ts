@@ -57,8 +57,8 @@ export interface ConfidentialProvider {
   /**
    * Build the Call(s) for funding this confidential account.
    *
-   * The caller is responsible for including an ERC20 approve call
-   * before this in the transaction batch.
+   * The returned array includes any prerequisite calls (e.g. ERC20
+   * approve) so consumers can execute the batch as-is.
    */
   fund(details: ConfidentialFundDetails): Promise<Call[]>;
 

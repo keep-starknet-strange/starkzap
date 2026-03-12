@@ -114,17 +114,13 @@ describe("Confidential (Integration)", () => {
       provider,
     });
 
-    // Fund via tongo-sdk directly (need approve + fund)
-    const tongoAccount = confidential.getTongoAccount();
-    const fundOp = await tongoAccount.fund({
-      amount: 100n,
-      sender: relayer.address,
+    // Fund via the wrapper (approve + fund calls included)
+    const fundCalls = await confidential.fund({
+      amount: Amount.fromRaw(100n, 0),
+      sender: relayer.address as never,
     });
 
-    const response = await relayer.execute([
-      fundOp.approve!,
-      fundOp.toCalldata(),
-    ]);
+    const response = await relayer.execute(fundCalls);
     await provider.waitForTransaction(response.transaction_hash, {
       retryInterval: 500,
     });
@@ -160,26 +156,15 @@ describe("Confidential (Integration)", () => {
       provider,
     });
 
-    // Use populateFund to get calls
+    // fund() returns approve + fund calls
     const calls = await confidential.fund({
       amount: Amount.fromRaw(50n, 0),
       sender: relayer.address as never,
     });
 
-    expect(calls).toHaveLength(1);
-    expect(calls[0]!.contractAddress).toBe(TONGO_CONTRACT);
+    expect(calls.length).toBeGreaterThanOrEqual(1);
 
-    // We also need the approve call — get it from the underlying account
-    const tongoAccount = confidential.getTongoAccount();
-    const fundOp = await tongoAccount.fund({
-      amount: 50n,
-      sender: relayer.address,
-    });
-
-    const response = await relayer.execute([
-      fundOp.approve!,
-      fundOp.toCalldata(),
-    ]);
+    const response = await relayer.execute(calls);
     await provider.waitForTransaction(response.transaction_hash, {
       retryInterval: 500,
     });
@@ -208,16 +193,12 @@ describe("Confidential (Integration)", () => {
       provider,
     });
 
-    // Fund sender via tongo account directly
-    const senderAccount = sender.getTongoAccount();
-    const fundOp = await senderAccount.fund({
-      amount: 100n,
-      sender: relayer.address,
+    // Fund sender via the wrapper
+    const fundCalls = await sender.fund({
+      amount: Amount.fromRaw(100n, 0),
+      sender: relayer.address as never,
     });
-    const fundResponse = await relayer.execute([
-      fundOp.approve!,
-      fundOp.toCalldata(),
-    ]);
+    const fundResponse = await relayer.execute(fundCalls);
     await provider.waitForTransaction(fundResponse.transaction_hash, {
       retryInterval: 500,
     });
@@ -268,13 +249,12 @@ describe("Confidential (Integration)", () => {
     });
 
     // Fund sender
-    const senderAccount = sender.getTongoAccount();
-    const fundOp = await senderAccount.fund({
-      amount: 100n,
-      sender: relayer.address,
+    const fundCalls = await sender.fund({
+      amount: Amount.fromRaw(100n, 0),
+      sender: relayer.address as never,
     });
     await relayer
-      .execute([fundOp.approve!, fundOp.toCalldata()])
+      .execute(fundCalls)
       .then((r) =>
         provider.waitForTransaction(r.transaction_hash, { retryInterval: 500 })
       );

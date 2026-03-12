@@ -35,10 +35,9 @@ import type {
  *   provider: wallet.getProvider(),
  * });
  *
- * // Fund confidential account (approve + fund in one tx)
+ * // Fund confidential account (approve is included automatically)
  * const amount = Amount.fromRaw(100n, token);
  * const tx = await wallet.tx()
- *   .approve(token, TONGO_CONTRACT, amount)
  *   .confidentialFund(confidential, { amount, sender: wallet.address })
  *   .send();
  *
@@ -105,10 +104,10 @@ export class TongoConfidential implements ConfidentialProvider {
   }
 
   /**
-   * Build the Call for funding this confidential account.
+   * Build the Calls for funding this confidential account.
    *
-   * The caller is responsible for including an ERC20 approve call
-   * before this in the transaction batch.
+   * The returned array includes the ERC20 approve call (when required)
+   * followed by the fund call, so consumers can execute the batch as-is.
    */
   async fund(details: ConfidentialFundDetails): Promise<Call[]> {
     const op = await this.account.fund({
@@ -116,7 +115,10 @@ export class TongoConfidential implements ConfidentialProvider {
       sender: details.sender,
       ...(details.feeTo !== undefined && { fee_to_sender: details.feeTo }),
     });
-    return [op.toCalldata()];
+    const calls: Call[] = [];
+    if (op.approve) calls.push(op.approve);
+    calls.push(op.toCalldata());
+    return calls;
   }
 
   /**

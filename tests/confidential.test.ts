@@ -13,6 +13,7 @@ import { Amount } from "@/types/amount";
 // ─── Mock tongo-sdk ─────────────────────────────────────────────────────────
 
 const {
+  approveCall,
   fundCall,
   transferCall,
   withdrawCall,
@@ -21,6 +22,11 @@ const {
   mockTongoAccount,
   MockAccount,
 } = vi.hoisted(() => {
+  const approveCall: Call = {
+    contractAddress: "0xTOKEN",
+    entrypoint: "approve",
+    calldata: ["0xTONGO", "0x64"],
+  };
   const fundCall: Call = {
     contractAddress: "0xTONGO",
     entrypoint: "fund",
@@ -56,7 +62,9 @@ const {
     nonce: vi.fn().mockResolvedValue(1n),
     erc20ToTongo: vi.fn().mockResolvedValue(200n),
     tongoToErc20: vi.fn().mockResolvedValue(50n),
-    fund: vi.fn().mockResolvedValue({ toCalldata: () => fundCall }),
+    fund: vi
+      .fn()
+      .mockResolvedValue({ approve: approveCall, toCalldata: () => fundCall }),
     transfer: vi.fn().mockResolvedValue({ toCalldata: () => transferCall }),
     withdraw: vi.fn().mockResolvedValue({ toCalldata: () => withdrawCall }),
     ragequit: vi.fn().mockResolvedValue({ toCalldata: () => ragequitCall }),
@@ -68,6 +76,7 @@ const {
   });
 
   return {
+    approveCall,
     fundCall,
     transferCall,
     withdrawCall,
@@ -155,18 +164,31 @@ describe("TongoConfidential", () => {
   });
 
   describe("fund", () => {
-    it("should return fund call from tongo account", async () => {
+    it("should return approve + fund calls from tongo account", async () => {
       const c = createConfidential();
       const details: ConfidentialFundDetails = {
         amount: Amount.fromRaw(100n, 0),
         sender: "0xSENDER" as never,
       };
       const calls = await c.fund(details);
-      expect(calls).toEqual([fundCall]);
+      expect(calls).toEqual([approveCall, fundCall]);
       expect(mockTongoAccount.fund).toHaveBeenCalledWith({
         amount: 100n,
         sender: "0xSENDER",
       });
+    });
+
+    it("should omit approve call when not provided", async () => {
+      mockTongoAccount.fund.mockResolvedValueOnce({
+        approve: undefined,
+        toCalldata: () => fundCall,
+      });
+      const c = createConfidential();
+      const calls = await c.fund({
+        amount: Amount.fromRaw(100n, 0),
+        sender: "0xSENDER" as never,
+      });
+      expect(calls).toEqual([fundCall]);
     });
 
     it("should pass fee_to_sender when feeTo is set", async () => {
