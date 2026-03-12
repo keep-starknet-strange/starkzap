@@ -25,16 +25,16 @@ const AUTHORIZATION_BY_REGISTERED = shortFelt("authorization-by-registered");
 const GUARDIAN_PRIVATE_KEY = shortFelt("CARTRIDGE_GUARDIAN");
 
 const STARKNET_DOMAIN_TYPE_HASH = selectorFelt(
-  "\"StarknetDomain\"(\"name\":\"shortstring\",\"version\":\"shortstring\",\"chainId\":\"shortstring\",\"revision\":\"shortstring\")"
+  '"StarknetDomain"("name":"shortstring","version":"shortstring","chainId":"shortstring","revision":"shortstring")'
 );
 const CALL_TYPE_HASH = selectorFelt(
-  "\"Call\"(\"To\":\"ContractAddress\",\"Selector\":\"selector\",\"Calldata\":\"felt*\")"
+  '"Call"("To":"ContractAddress","Selector":"selector","Calldata":"felt*")'
 );
 const OUTSIDE_EXECUTION_TYPE_HASH = selectorFelt(
-  "\"OutsideExecution\"(\"Caller\":\"ContractAddress\",\"Nonce\":\"(felt,u128)\",\"Execute After\":\"u128\",\"Execute Before\":\"u128\",\"Calls\":\"Call*\")\"Call\"(\"To\":\"ContractAddress\",\"Selector\":\"selector\",\"Calldata\":\"felt*\")"
+  '"OutsideExecution"("Caller":"ContractAddress","Nonce":"(felt,u128)","Execute After":"u128","Execute Before":"u128","Calls":"Call*")"Call"("To":"ContractAddress","Selector":"selector","Calldata":"felt*")'
 );
 const SESSION_TYPE_HASH = selectorFelt(
-  "\"Session\"(\"Expires At\":\"timestamp\",\"Allowed Methods\":\"merkletree\",\"Metadata\":\"string\",\"Session Key\":\"felt\")"
+  '"Session"("Expires At":"timestamp","Allowed Methods":"merkletree","Metadata":"string","Session Key":"felt")'
 );
 
 const OUTSIDE_EXECUTION_DOMAIN_NAME = shortFelt("Account.execute_from_outside");
@@ -135,11 +135,17 @@ function toUintBigInt(
     }
     return trimmed.startsWith("0x") ? BigInt(trimmed) : BigInt(trimmed);
   } catch (error) {
-    throw new SessionProtocolError(`Invalid unsigned integer for ${fieldName}`, error);
+    throw new SessionProtocolError(
+      `Invalid unsigned integer for ${fieldName}`,
+      error
+    );
   }
 }
 
-function feltFromValue(value: string | number | bigint, fieldName: string): string {
+function feltFromValue(
+  value: string | number | bigint,
+  fieldName: string
+): string {
   const parsed = toUintBigInt(value, fieldName);
   return normalizeFelt(parsed);
 }
@@ -181,7 +187,9 @@ function normalizeChainId(chainId: string): string {
   return shortFelt(trimmed);
 }
 
-function normalizeExecutionCalls(calls: readonly Call[]): NormalizedExecutionCall[] {
+function normalizeExecutionCalls(
+  calls: readonly Call[]
+): NormalizedExecutionCall[] {
   if (calls.length === 0) {
     throw new SessionProtocolError(
       "At least one call is required for executeFromOutside V3."
@@ -295,7 +303,9 @@ function hashOutsideExecutionMessage(
   contractAddress: string
 ): string {
   const callHashes = outsideExecution.calls.map(hashCallStruct);
-  const callHashesHash = normalizeFelt(hash.computePoseidonHashOnElements(callHashes));
+  const callHashesHash = normalizeFelt(
+    hash.computePoseidonHashOnElements(callHashes)
+  );
 
   const outsideExecutionStructHash = normalizeFelt(
     hash.computePoseidonHashOnElements([
@@ -316,7 +326,11 @@ function hashOutsideExecutionMessage(
     TWO_FELT
   );
 
-  return hashMessageRev1(domainHash, contractAddress, outsideExecutionStructHash);
+  return hashMessageRev1(
+    domainHash,
+    contractAddress,
+    outsideExecutionStructHash
+  );
 }
 
 function hashSessionStruct(session: SessionStruct): string {
@@ -343,10 +357,17 @@ function hashSessionMessage(
     chainId,
     ONE_FELT
   );
-  return hashMessageRev1(domainHash, contractAddress, hashSessionStruct(session));
+  return hashMessageRev1(
+    domainHash,
+    contractAddress,
+    hashSessionStruct(session)
+  );
 }
 
-function signStarknet(messageHash: string, privateKey: string): StarknetSignerSignature {
+function signStarknet(
+  messageHash: string,
+  privateKey: string
+): StarknetSignerSignature {
   try {
     const normalizedPrivateKey = encode.addHexPrefix(privateKey.trim());
     const signature = ec.starkCurve.sign(messageHash, normalizedPrivateKey);
@@ -356,7 +377,10 @@ function signStarknet(messageHash: string, privateKey: string): StarknetSignerSi
       s: normalizeFelt(signature.s),
     };
   } catch (error) {
-    throw new SessionProtocolError("Failed to sign outside execution payload.", error);
+    throw new SessionProtocolError(
+      "Failed to sign outside execution payload.",
+      error
+    );
   }
 }
 
@@ -385,7 +409,9 @@ function serializeSessionStruct(session: SessionStruct): string[] {
   ];
 }
 
-function serializeStarknetSignerSignature(signature: StarknetSignerSignature): string[] {
+function serializeStarknetSignerSignature(
+  signature: StarknetSignerSignature
+): string[] {
   // SignerSignature::Starknet((StarknetSigner, StarknetSignature))
   return [ZERO_FELT, signature.pubkey, signature.r, signature.s];
 }
@@ -415,7 +441,10 @@ function normalizeSessionStruct(
   return {
     expiresAt: feltFromValue(session.expiresAt, "session.expiresAt"),
     allowedPoliciesRoot: feltFromValue(policyRoot, "policyRoot"),
-    metadataHash: feltFromValue(session.metadataHash ?? ZERO_FELT, "session.metadataHash"),
+    metadataHash: feltFromValue(
+      session.metadataHash ?? ZERO_FELT,
+      "session.metadataHash"
+    ),
     sessionKeyGuid: feltFromValue(
       session.sessionKeyGuid || fallbackSessionKeyGuid,
       "session.sessionKeyGuid"
@@ -462,8 +491,14 @@ export function buildSignedOutsideExecutionV3({
   const outsideExecution: RpcOutsideExecutionV3 = {
     caller: OUTSIDE_EXECUTION_CALLER_ANY,
     nonce: [normalizeFelt(stark.randomAddress()), ONE_FELT],
-    execute_after: feltFromValue(executeAfter, "outsideExecution.execute_after"),
-    execute_before: feltFromValue(executeBefore, "outsideExecution.execute_before"),
+    execute_after: feltFromValue(
+      executeAfter,
+      "outsideExecution.execute_after"
+    ),
+    execute_before: feltFromValue(
+      executeBefore,
+      "outsideExecution.execute_before"
+    ),
     calls: normalizedCalls.map((call) => ({
       to: call.contractAddress,
       selector: call.selector,
@@ -479,12 +514,25 @@ export function buildSignedOutsideExecutionV3({
     feltChainId,
     sessionAddress
   );
-  const sessionStruct = normalizeSessionStruct(session, policyRoot, sessionKeyGuid);
-  const sessionHash = hashSessionMessage(sessionStruct, feltChainId, sessionAddress);
-  const sessionTokenHash = normalizeFelt(hash.computePoseidonHash(txHash, sessionHash));
+  const sessionStruct = normalizeSessionStruct(
+    session,
+    policyRoot,
+    sessionKeyGuid
+  );
+  const sessionHash = hashSessionMessage(
+    sessionStruct,
+    feltChainId,
+    sessionAddress
+  );
+  const sessionTokenHash = normalizeFelt(
+    hash.computePoseidonHash(txHash, sessionHash)
+  );
 
   const sessionSignature = signStarknet(sessionTokenHash, sessionPrivateKey);
-  const guardianSignature = signStarknet(sessionTokenHash, GUARDIAN_PRIVATE_KEY);
+  const guardianSignature = signStarknet(
+    sessionTokenHash,
+    GUARDIAN_PRIVATE_KEY
+  );
 
   const sessionAuthorization = [
     AUTHORIZATION_BY_REGISTERED,
