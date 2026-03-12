@@ -20,7 +20,7 @@ function normalizeFelt(value: string): string {
 
 const POLICY_CALL_TYPE_HASH = normalizeFelt(
   hash.getSelectorFromName(
-    "\"Allowed Method\"(\"Contract Address\":\"ContractAddress\",\"selector\":\"selector\")"
+    '"Allowed Method"("Contract Address":"ContractAddress","selector":"selector")'
   )
 );
 
