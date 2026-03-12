@@ -21,6 +21,7 @@ import type {
   DcaTrade,
   PreparedDcaAction,
 } from "@/dca/interface";
+import { validateDcaCreateAmounts } from "@/dca/utils";
 import {
   DEFAULT_AVNU_API_BASES,
   normalizeAvnuCalls,
@@ -60,31 +61,23 @@ function toPricingStrategy(
     return {};
   }
 
-  return {
-    tokenToMinAmount:
-      minBuyAmountBase != null
-        ? `0x${minBuyAmountBase.toString(16)}`
-        : undefined,
-    tokenToMaxAmount:
-      maxBuyAmountBase != null
-        ? `0x${maxBuyAmountBase.toString(16)}`
-        : undefined,
+  const pricingStrategy: PricingStrategy = {
+    tokenToMinAmount: undefined,
+    tokenToMaxAmount: undefined,
   };
+
+  if (minBuyAmountBase != null) {
+    pricingStrategy.tokenToMinAmount = `0x${minBuyAmountBase.toString(16)}`;
+  }
+  if (maxBuyAmountBase != null) {
+    pricingStrategy.tokenToMaxAmount = `0x${maxBuyAmountBase.toString(16)}`;
+  }
+
+  return pricingStrategy;
 }
 
 function validateCreateRequest(request: DcaCreateRequest): void {
-  assertAmountMatchesToken(request.sellAmount, request.sellToken);
-  assertAmountMatchesToken(request.sellAmountPerCycle, request.sellToken);
-
-  if (!request.sellAmount.isPositive()) {
-    throw new Error("DCA sellAmount must be greater than zero");
-  }
-  if (!request.sellAmountPerCycle.isPositive()) {
-    throw new Error("DCA sellAmountPerCycle must be greater than zero");
-  }
-  if (request.sellAmountPerCycle.toBase() > request.sellAmount.toBase()) {
-    throw new Error("DCA sellAmountPerCycle cannot exceed sellAmount");
-  }
+  validateDcaCreateAmounts(request);
 
   const minBuyAmount = request.pricingStrategy?.minBuyAmount;
   const maxBuyAmount = request.pricingStrategy?.maxBuyAmount;
@@ -99,45 +92,49 @@ function validateCreateRequest(request: DcaCreateRequest): void {
 function mapPricingStrategy(
   strategy: AvnuDcaOrder["pricingStrategy"]
 ): DcaPricingStrategy {
-  const minBuyAmountBase =
-    "tokenToMinAmount" in strategy && strategy.tokenToMinAmount
-      ? BigInt(strategy.tokenToMinAmount)
-      : undefined;
-  const maxBuyAmountBase =
-    "tokenToMaxAmount" in strategy && strategy.tokenToMaxAmount
-      ? BigInt(strategy.tokenToMaxAmount)
-      : undefined;
+  const pricingStrategy: DcaPricingStrategy = {};
 
-  if (minBuyAmountBase == null && maxBuyAmountBase == null) {
-    return {};
+  if ("tokenToMinAmount" in strategy && strategy.tokenToMinAmount) {
+    pricingStrategy.minBuyAmountBase = BigInt(strategy.tokenToMinAmount);
+  }
+  if ("tokenToMaxAmount" in strategy && strategy.tokenToMaxAmount) {
+    pricingStrategy.maxBuyAmountBase = BigInt(strategy.tokenToMaxAmount);
   }
 
-  return {
-    ...(minBuyAmountBase != null && { minBuyAmountBase }),
-    ...(maxBuyAmountBase != null && { maxBuyAmountBase }),
-  };
+  return pricingStrategy;
 }
 
 function mapTrade(trade: AvnuDcaTrade): DcaTrade {
-  return {
+  const mappedTrade: DcaTrade = {
     sellAmountBase: trade.sellAmount,
-    ...(trade.sellAmountInUsd != null && {
-      sellAmountInUsd: trade.sellAmountInUsd,
-    }),
-    ...(trade.buyAmount != null && { buyAmountBase: trade.buyAmount }),
-    ...(trade.buyAmountInUsd != null && {
-      buyAmountInUsd: trade.buyAmountInUsd,
-    }),
     expectedTradeDate: trade.expectedTradeDate,
-    ...(trade.actualTradeDate && { actualTradeDate: trade.actualTradeDate }),
     status: trade.status,
-    ...(trade.txHash && { txHash: trade.txHash }),
-    ...(trade.errorReason && { errorReason: trade.errorReason }),
   };
+
+  if (trade.sellAmountInUsd != null) {
+    mappedTrade.sellAmountInUsd = trade.sellAmountInUsd;
+  }
+  if (trade.buyAmount != null) {
+    mappedTrade.buyAmountBase = trade.buyAmount;
+  }
+  if (trade.buyAmountInUsd != null) {
+    mappedTrade.buyAmountInUsd = trade.buyAmountInUsd;
+  }
+  if (trade.actualTradeDate) {
+    mappedTrade.actualTradeDate = trade.actualTradeDate;
+  }
+  if (trade.txHash) {
+    mappedTrade.txHash = trade.txHash;
+  }
+  if (trade.errorReason) {
+    mappedTrade.errorReason = trade.errorReason;
+  }
+
+  return mappedTrade;
 }
 
 function mapOrder(order: AvnuDcaOrder): DcaOrder {
-  return {
+  const mappedOrder: DcaOrder = {
     id: order.id,
     providerId: "avnu",
     blockNumber: order.blockNumber,
@@ -152,7 +149,6 @@ function mapOrder(order: AvnuDcaOrder): DcaOrder {
     buyTokenAddress: fromAddress(order.buyTokenAddress),
     startDate: order.startDate,
     endDate: order.endDate,
-    ...(order.closeDate && { closeDate: order.closeDate }),
     frequency: order.frequency,
     iterations: order.iterations,
     status: order.status,
@@ -165,6 +161,12 @@ function mapOrder(order: AvnuDcaOrder): DcaOrder {
     pendingTradesCount: order.pendingTradesCount,
     trades: order.trades.map(mapTrade),
   };
+
+  if (order.closeDate) {
+    mappedOrder.closeDate = order.closeDate;
+  }
+
+  return mappedOrder;
 }
 
 export class AvnuDcaProvider implements DcaProvider {
@@ -189,24 +191,29 @@ export class AvnuDcaProvider implements DcaProvider {
     context: DcaProviderContext,
     request: DcaOrdersRequest
   ): Promise<DcaOrdersPage> {
+    const avnuRequest: Parameters<typeof getDcaOrders>[0] = {
+      traderAddress: request.traderAddress,
+    };
+
+    if (request.status) {
+      avnuRequest.status = request.status as AvnuDcaOrderStatus;
+    }
+    if (request.page != null) {
+      avnuRequest.page = request.page;
+    }
+    if (request.size != null) {
+      avnuRequest.size = request.size;
+    }
+    if (request.sort) {
+      avnuRequest.sort = request.sort;
+    }
+
     const page = await withAvnuApiBaseFallback({
       apiBasesByChain: this.apiBases,
       chainId: context.chainId,
       feature: "DCA",
       action: "get DCA orders",
-      run: async (baseUrl) =>
-        await getDcaOrders(
-          {
-            traderAddress: request.traderAddress,
-            ...(request.status && {
-              status: request.status as AvnuDcaOrderStatus,
-            }),
-            ...(request.page != null && { page: request.page }),
-            ...(request.size != null && { size: request.size }),
-            ...(request.sort && { sort: request.sort }),
-          },
-          { baseUrl }
-        ),
+      run: (baseUrl) => getDcaOrders(avnuRequest, { baseUrl }),
     });
 
     return {
@@ -220,6 +227,17 @@ export class AvnuDcaProvider implements DcaProvider {
     request: DcaCreateRequest
   ): Promise<PreparedDcaAction> {
     validateCreateRequest(request);
+    const createRequest: Parameters<typeof createDcaToCalls>[0] = {
+      sellTokenAddress: request.sellToken.address,
+      buyTokenAddress: request.buyToken.address,
+      sellAmount: `0x${request.sellAmount.toBase().toString(16)}`,
+      sellAmountPerCycle: `0x${request.sellAmountPerCycle
+        .toBase()
+        .toString(16)}`,
+      frequency: request.frequency as unknown as Duration,
+      pricingStrategy: toPricingStrategy(request.pricingStrategy),
+      traderAddress: request.traderAddress,
+    };
 
     const calls = await withAvnuApiBaseFallback({
       apiBasesByChain: this.apiBases,
@@ -227,20 +245,7 @@ export class AvnuDcaProvider implements DcaProvider {
       feature: "DCA",
       action: "prepare DCA create",
       run: async (baseUrl) => {
-        const response = await createDcaToCalls(
-          {
-            sellTokenAddress: request.sellToken.address,
-            buyTokenAddress: request.buyToken.address,
-            sellAmount: `0x${request.sellAmount.toBase().toString(16)}`,
-            sellAmountPerCycle: `0x${request.sellAmountPerCycle
-              .toBase()
-              .toString(16)}`,
-            frequency: request.frequency as unknown as Duration,
-            pricingStrategy: toPricingStrategy(request.pricingStrategy),
-            traderAddress: request.traderAddress,
-          },
-          { baseUrl }
-        );
+        const response = await createDcaToCalls(createRequest, { baseUrl });
 
         return normalizeAvnuCalls(
           response.calls,
@@ -270,11 +275,14 @@ export class AvnuDcaProvider implements DcaProvider {
       chainId: context.chainId,
       feature: "DCA",
       action: "prepare DCA cancel",
-      run: async (baseUrl) =>
-        normalizeAvnuCalls(
-          (await cancelDcaToCalls(orderAddress, { baseUrl })).calls,
+      run: async (baseUrl) => {
+        const response = await cancelDcaToCalls(orderAddress, { baseUrl });
+
+        return normalizeAvnuCalls(
+          response.calls,
           "AVNU DCA cancel returned no calls"
-        ),
+        );
+      },
     });
 
     return {

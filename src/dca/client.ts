@@ -1,11 +1,10 @@
 import { resolveWalletAddress, type ExecuteOptions } from "@/types";
 import type { Tx } from "@/tx";
+import type { SwapInput, SwapQuote } from "@/swap";
 import type {
   DcaCancelInput,
-  DcaCancelRequest,
   DcaClientInterface,
   DcaCreateInput,
-  DcaCreateRequest,
   DcaCyclePreviewRequest,
   DcaExecutionContext,
   DcaOrdersInput,
@@ -43,11 +42,7 @@ export class DcaClient implements DcaClientInterface {
   }
 
   setDefaultProvider(providerId: string): void {
-    if (!this.providers.has(providerId)) {
-      throw new Error(
-        `Unknown DCA provider "${providerId}". Registered providers: ${this.listProviders().join(", ")}`
-      );
-    }
+    this.getDcaProvider(providerId);
     this.defaultProviderId = providerId;
   }
 
@@ -74,59 +69,75 @@ export class DcaClient implements DcaClientInterface {
 
   async getOrders(request: DcaOrdersInput = {}): Promise<DcaOrdersPage> {
     const provider = this.resolveRequestProvider(request.provider);
-    return await provider.getOrders(
+    return provider.getOrders(
       this.providerContext(),
       hydrateDcaOrdersInput(request, this.context.address)
     );
   }
 
   async prepareCreate(request: DcaCreateInput): Promise<PreparedDcaAction> {
-    return await this.prepareWithProvider(
-      request,
-      hydrateDcaCreateInput,
-      (provider, context, hydrated) => provider.prepareCreate(context, hydrated)
+    const provider = this.resolveRequestProvider(request.provider);
+    const prepared = await provider.prepareCreate(
+      this.providerContext(),
+      hydrateDcaCreateInput(request, this.context.address)
     );
+
+    this.assertPreparedCalls(prepared, provider.id);
+    return prepared;
   }
 
   async create(request: DcaCreateInput, options?: ExecuteOptions): Promise<Tx> {
-    return await this.executePrepared(this.prepareCreate(request), options);
+    const prepared = await this.prepareCreate(request);
+    return this.context.execute(prepared.calls, options);
   }
 
   async prepareCancel(request: DcaCancelInput): Promise<PreparedDcaAction> {
-    return await this.prepareWithProvider(
-      request,
-      hydrateDcaCancelInput,
-      (provider, context, hydrated) => provider.prepareCancel(context, hydrated)
+    const provider = this.resolveRequestProvider(request.provider);
+    const prepared = await provider.prepareCancel(
+      this.providerContext(),
+      hydrateDcaCancelInput(request)
     );
+
+    this.assertPreparedCalls(prepared, provider.id);
+    return prepared;
   }
 
   async cancel(request: DcaCancelInput, options?: ExecuteOptions): Promise<Tx> {
-    return await this.executePrepared(this.prepareCancel(request), options);
+    const prepared = await this.prepareCancel(request);
+    return this.context.execute(prepared.calls, options);
   }
 
-  async previewCycle(request: DcaCyclePreviewRequest) {
+  async previewCycle(request: DcaCyclePreviewRequest): Promise<SwapQuote> {
     const takerAddress =
       request.traderAddress != null
         ? resolveWalletAddress(request.traderAddress)
         : undefined;
-    const swapInput = {
+    const swapInput: SwapInput = {
       tokenIn: request.sellToken,
       tokenOut: request.buyToken,
       amountIn: request.sellAmountPerCycle,
-      ...(request.swapProvider != null && { provider: request.swapProvider }),
-      ...(request.chainId != null && { chainId: request.chainId }),
-      ...(takerAddress != null && { takerAddress }),
-      ...(request.slippageBps != null && {
-        slippageBps: request.slippageBps,
-      }),
     };
+
+    if (request.swapProvider != null) {
+      swapInput.provider = request.swapProvider;
+    }
+    if (request.chainId != null) {
+      swapInput.chainId = request.chainId;
+    }
+    if (takerAddress != null) {
+      swapInput.takerAddress = takerAddress;
+    }
+    if (request.slippageBps != null) {
+      swapInput.slippageBps = request.slippageBps;
+    }
+
     const { provider, request: resolvedRequest } = resolveSwapInput(swapInput, {
       walletChainId: this.context.getChainId(),
       takerAddress: this.context.address,
       providerResolver: this.context,
     });
 
-    return await provider.getQuote(resolvedRequest);
+    return provider.getQuote(resolvedRequest);
   }
 
   private resolveRequestProvider(source: DcaProvider | string | undefined) {
@@ -141,38 +152,6 @@ export class DcaClient implements DcaClientInterface {
       provider: this.context.getProvider(),
       walletAddress: this.context.address,
     };
-  }
-
-  private async prepareWithProvider<
-    TInput extends { provider?: DcaProvider | string },
-    TRequest extends DcaCreateRequest | DcaCancelRequest,
-  >(
-    request: TInput,
-    hydrate: (
-      request: TInput,
-      walletAddress: DcaProviderContext["walletAddress"]
-    ) => TRequest,
-    prepare: (
-      provider: DcaProvider,
-      context: DcaProviderContext,
-      hydrated: TRequest
-    ) => Promise<PreparedDcaAction>
-  ): Promise<PreparedDcaAction> {
-    const provider = this.resolveRequestProvider(request.provider);
-    const prepared = await prepare(
-      provider,
-      this.providerContext(),
-      hydrate(request, this.context.address)
-    );
-    this.assertPreparedCalls(prepared, provider.id);
-    return prepared;
-  }
-
-  private async executePrepared(
-    preparedPromise: Promise<PreparedDcaAction>,
-    options?: ExecuteOptions
-  ): Promise<Tx> {
-    return await this.context.execute((await preparedPromise).calls, options);
   }
 
   private assertPreparedCalls(

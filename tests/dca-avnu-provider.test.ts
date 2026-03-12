@@ -144,6 +144,33 @@ describe("AvnuDcaProvider", () => {
     });
   });
 
+  it("forwards optional pagination and sort params when provided", async () => {
+    avnuMocks.getDcaOrders.mockResolvedValue(makeOrdersPage());
+
+    const provider = new AvnuDcaProvider({
+      apiBases: {
+        SN_SEPOLIA: ["https://mock-sepolia.avnu.fi"],
+      },
+    });
+
+    await provider.getOrders(context, {
+      traderAddress,
+      page: 2,
+      size: 25,
+      sort: "timestamp,desc",
+    });
+
+    expect(avnuMocks.getDcaOrders).toHaveBeenCalledWith(
+      {
+        traderAddress,
+        page: 2,
+        size: 25,
+        sort: "timestamp,desc",
+      },
+      { baseUrl: "https://mock-sepolia.avnu.fi" }
+    );
+  });
+
   it("builds DCA creation calls and encodes amounts as hex", async () => {
     avnuMocks.createDcaToCalls.mockResolvedValue({
       chainId: "SN_SEPOLIA",

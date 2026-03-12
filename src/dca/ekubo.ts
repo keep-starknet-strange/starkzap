@@ -1,10 +1,5 @@
 import { CallData, cairo, type Call } from "starknet";
-import {
-  assertAmountMatchesToken,
-  fromAddress,
-  type Address,
-  type ChainId,
-} from "@/types";
+import { fromAddress, type Address, type ChainId } from "@/types";
 import type {
   DcaCancelRequest,
   DcaCreateRequest,
@@ -15,6 +10,7 @@ import type {
   DcaProviderContext,
   PreparedDcaAction,
 } from "@/dca/interface";
+import { validateDcaCreateAmounts } from "@/dca/utils";
 import {
   getEkuboChainLiteral,
   getEkuboErrorMessageFromPayload,
@@ -404,18 +400,7 @@ function parseOrderInfosResult(
 }
 
 function validateCreateRequest(request: DcaCreateRequest): void {
-  assertAmountMatchesToken(request.sellAmount, request.sellToken);
-  assertAmountMatchesToken(request.sellAmountPerCycle, request.sellToken);
-
-  if (!request.sellAmount.isPositive()) {
-    throw new Error("DCA sellAmount must be greater than zero");
-  }
-  if (!request.sellAmountPerCycle.isPositive()) {
-    throw new Error("DCA sellAmountPerCycle must be greater than zero");
-  }
-  if (request.sellAmountPerCycle.toBase() > request.sellAmount.toBase()) {
-    throw new Error("DCA sellAmountPerCycle cannot exceed sellAmount");
-  }
+  validateDcaCreateAmounts(request);
   if (request.pricingStrategy) {
     throw new Error("Ekubo DCA does not support pricingStrategy constraints");
   }
@@ -544,7 +529,7 @@ export class EkuboDcaProvider implements DcaProvider {
             ? "CLOSED"
             : "ACTIVE";
 
-        return {
+        const order: DcaOrder = {
           id: orderId,
           providerId: this.id,
           blockNumber: 0,
@@ -559,7 +544,6 @@ export class EkuboDcaProvider implements DcaProvider {
           buyTokenAddress: parsedOrderId.orderKey.buyToken,
           startDate,
           endDate,
-          ...(status === "CLOSED" && { closeDate: endDate }),
           frequency: "CONTINUOUS",
           iterations: 1,
           status,
@@ -572,6 +556,12 @@ export class EkuboDcaProvider implements DcaProvider {
           pendingTradesCount: status === "ACTIVE" ? 1 : 0,
           trades: [],
         };
+
+        if (status === "CLOSED") {
+          order.closeDate = endDate;
+        }
+
+        return order;
       }
     );
 
@@ -634,13 +624,14 @@ export class EkuboDcaProvider implements DcaProvider {
 
     const order = decodeEkuboOrderId(request.orderId);
     const info = await this.getOrderInfo(context, order);
+    const orderCalldata = toOrderInfoCalldata(order);
     const calls: Call[] = [];
 
     if (info.purchasedAmount > 0n) {
       calls.push({
         contractAddress: order.positions,
         entrypoint: "withdraw_proceeds_from_sale_to_self",
-        calldata: toOrderInfoCalldata(order),
+        calldata: orderCalldata,
       });
     }
 
@@ -648,7 +639,7 @@ export class EkuboDcaProvider implements DcaProvider {
       calls.push({
         contractAddress: order.positions,
         entrypoint: "decrease_sale_rate_to_self",
-        calldata: [...toOrderInfoCalldata(order), info.saleRate.toString()],
+        calldata: [...orderCalldata, info.saleRate.toString()],
       });
     }
 
