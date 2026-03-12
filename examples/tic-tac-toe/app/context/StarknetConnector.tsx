@@ -1,4 +1,4 @@
-import type { CartridgeNativeAdapter, WalletInterface } from "@starkzap/native";
+import type { WalletInterface } from "@starkzap/native";
 import * as Linking from "expo-linking";
 import * as WebBrowser from "expo-web-browser";
 import React, {
@@ -26,14 +26,14 @@ type CartridgeTsOpenSessionResult = {
 };
 
 type StarkZapNativeModule = typeof import("@starkzap/native") & {
-  createCartridgeTsAdapter: (options?: {
+  registerCartridgeTsAdapter: (options?: {
     logger?: Pick<Console, "info" | "warn" | "error">;
     sessionRegistrationTimeoutMs?: number;
     sessionRequestTimeoutMs?: number;
     openSession?: (
       args: CartridgeTsOpenSessionArgs
     ) => Promise<CartridgeTsOpenSessionResult>;
-  }) => CartridgeNativeAdapter;
+  }) => unknown;
 };
 
 WebBrowser.maybeCompleteAuthSession();
@@ -98,17 +98,17 @@ function resolveCartridgeRedirectUrl(): string | undefined {
   }
 }
 
-function createTsCartridgeAdapter(
+function registerTsCartridgeAdapter(
   native: StarkZapNativeModule,
   defaultRedirectUrl?: string
-): CartridgeNativeAdapter {
-  if (typeof native.createCartridgeTsAdapter !== "function") {
+): void {
+  if (typeof native.registerCartridgeTsAdapter !== "function") {
     throw new Error(
-      "Installed @starkzap/native build does not expose createCartridgeTsAdapter(). Rebuild @starkzap/native before running the app."
+      "Installed @starkzap/native build does not expose registerCartridgeTsAdapter(). Rebuild @starkzap/native before running the app."
     );
   }
 
-  return native.createCartridgeTsAdapter({
+  native.registerCartridgeTsAdapter({
     logger: console,
     sessionRegistrationTimeoutMs: 180_000,
     sessionRequestTimeoutMs: 10_000,
@@ -169,8 +169,7 @@ async function ensureCartridgeAdapterRegistered(
 
   adapterRegistrationPromise = (async () => {
     const native = await loadNativeModule();
-    const adapter = createTsCartridgeAdapter(native, defaultRedirectUrl);
-    native.registerCartridgeNativeAdapter(adapter);
+    registerTsCartridgeAdapter(native, defaultRedirectUrl);
     didRegisterCartridgeAdapter = true;
   })();
 
