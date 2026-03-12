@@ -79,10 +79,9 @@ export class LordsBridge extends CanonicalEthereumBridge {
   }
 
   /**
-   * The LORDS bridge contract accepts the L1→L2 messaging fee as an explicit
-   * argument (`fee` = 1 wei) rather than requiring the caller to attach it as
-   * `msg.value`. Since LORDS is always an ERC-20 (never native ETH), there is
-   * also no bridged ETH amount to include. Therefore, no ETH value is needed.
+   * `prepareDepositTransactionDetails` (the only call site for now) is
+   * completely overridden, but it is a good practise to maintain that no eth
+   * are spent.
    */
   protected override async getEthDepositValue(
     _recipient: Address,
