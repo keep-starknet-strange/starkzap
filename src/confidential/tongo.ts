@@ -10,6 +10,7 @@ import type {
   ConfidentialRagequitDetails,
   ConfidentialRolloverDetails,
   ConfidentialState,
+  ConfidentialRecipient,
 } from "@/confidential/types";
 
 /**
@@ -63,6 +64,11 @@ export class TongoConfidential implements ConfidentialProvider {
   /** The Tongo address (base58-encoded public key) for this account. */
   get address(): string {
     return this.account.tongoAddress();
+  }
+
+  /** The public key used to receive confidential transfers to this account. */
+  get recipientId(): ConfidentialRecipient {
+    return this.account.publicKey;
   }
 
   /**

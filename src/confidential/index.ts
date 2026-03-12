@@ -7,5 +7,6 @@ export type {
   ConfidentialWithdrawDetails,
   ConfidentialRagequitDetails,
   ConfidentialRolloverDetails,
+  ConfidentialRecipient,
   ConfidentialState,
 } from "@/confidential/types";

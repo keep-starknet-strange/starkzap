@@ -48,6 +48,7 @@ const {
   };
 
   const mockTongoAccount = {
+    publicKey: { x: 42n, y: 99n },
     tongoAddress: vi.fn().mockReturnValue("mockBase58Address"),
     state: vi
       .fn()
@@ -107,6 +108,13 @@ describe("TongoConfidential", () => {
       const c = createConfidential();
       expect(c.address).toBe("mockBase58Address");
       expect(mockTongoAccount.tongoAddress).toHaveBeenCalled();
+    });
+  });
+
+  describe("recipientId", () => {
+    it("should return the account public key", () => {
+      const c = createConfidential();
+      expect(c.recipientId).toEqual({ x: 42n, y: 99n });
     });
   });
 

@@ -223,10 +223,9 @@ describe("Confidential (Integration)", () => {
     });
 
     // Transfer using populateTransfer
-    const receiverAccount = receiver.getTongoAccount();
     const transferCalls = await sender.transfer({
       amount: Amount.fromRaw(23n, 0),
-      to: receiverAccount.publicKey,
+      to: receiver.recipientId,
       sender: relayer.address as never,
     });
 
@@ -281,10 +280,9 @@ describe("Confidential (Integration)", () => {
       );
 
     // Transfer to receiver
-    const receiverAccount = receiver.getTongoAccount();
     const transferCalls = await sender.transfer({
       amount: Amount.fromRaw(30n, 0),
-      to: receiverAccount.publicKey,
+      to: receiver.recipientId,
       sender: relayer.address as never,
     });
     await relayer

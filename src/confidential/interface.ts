@@ -5,6 +5,7 @@ import type {
   ConfidentialTransferDetails,
   ConfidentialWithdrawDetails,
   ConfidentialState,
+  ConfidentialRecipient,
 } from "@/confidential/types";
 
 /**
@@ -20,6 +21,14 @@ export interface ConfidentialProvider {
 
   /** The confidential account address (format is provider-specific). */
   readonly address: string;
+
+  /**
+   * The identity used to receive confidential transfers to this account.
+   *
+   * Pass this value as the `to` field of {@link ConfidentialTransferDetails}
+   * when sending funds to this account.
+   */
+  readonly recipientId: ConfidentialRecipient;
 
   /**
    * Get the decrypted confidential account state.

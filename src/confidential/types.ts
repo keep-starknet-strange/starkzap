@@ -2,6 +2,14 @@ import type { BigNumberish, RpcProvider } from "starknet";
 import type { Address } from "@/types";
 import type { Amount } from "@/types/amount";
 
+/**
+ * The identity used to address a confidential account as a transfer recipient.
+ *
+ * For elliptic-curve-based protocols (e.g. Tongo), this is the public key
+ * as `{x, y}` coordinates on the curve.
+ */
+export type ConfidentialRecipient = { x: BigNumberish; y: BigNumberish };
+
 /** Configuration for creating a Confidential instance. */
 export interface ConfidentialConfig {
   /** The Tongo private key (separate from the Starknet wallet key). */
@@ -26,8 +34,8 @@ export interface ConfidentialFundDetails {
 export interface ConfidentialTransferDetails {
   /** Amount to transfer. */
   amount: Amount;
-  /** Recipient's Tongo public key (as {x, y} coordinates). */
-  to: { x: BigNumberish; y: BigNumberish };
+  /** Recipient's confidential account identity (provider-specific). */
+  to: ConfidentialRecipient;
   /** The Starknet sender address. */
   sender: Address;
   /** Optional fee paid to sender (for relayed txs). */
