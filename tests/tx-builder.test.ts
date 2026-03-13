@@ -658,6 +658,23 @@ describe("TxBuilder", () => {
           .calls()
       ).rejects.toThrow('DCA action "create" returned no calls');
     });
+
+    it("should throw when DCA cancel returns no calls", async () => {
+      const wallet = createMockWallet({
+        dca: vi.fn().mockReturnValue({
+          prepareCreate: vi.fn(),
+          prepareCancel: vi.fn().mockResolvedValue({ calls: [] }),
+        }),
+      });
+
+      await expect(
+        new TxBuilder(wallet)
+          .dcaCancel({
+            orderId: "ekubo-v1:0x1:7:0x111:0x222:300:1710000000:1710086400",
+          })
+          .calls()
+      ).rejects.toThrow('DCA action "cancel" returned no calls');
+    });
   });
 
   // ============================================================
