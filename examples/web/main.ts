@@ -11,7 +11,9 @@ import {
   BraavosPreset,
   DevnetPreset,
   TongoConfidential,
+  ExternalChain,
   type Eip1193Provider,
+  type SolanaSigner,
   type WalletInterface,
   type AccountClassConfig,
   type SwapProvider,
@@ -40,6 +42,9 @@ const DUMMY_POLICY = {
   method: "transfer",
 };
 const SDK_CHAIN_ID = NETWORK === "mainnet" ? ChainId.MAINNET : ChainId.SEPOLIA;
+const ALCHEMY_API_KEY = import.meta.env.VITE_ALCHEMY_API_KEY as
+  | string
+  | undefined;
 const BPS_DENOMINATOR = 10_000n;
 const DEFAULT_SLIPPAGE_BPS = 100n;
 
@@ -76,6 +81,20 @@ const presetTokens = Object.values(getPresets(SDK_CHAIN_ID)).sort((a, b) =>
 const sdk = new StarkZap({
   rpcUrl: RPC_URL,
   chainId: SDK_CHAIN_ID,
+  ...(ALCHEMY_API_KEY
+    ? {
+        bridging: {
+          ethereumRpcUrl:
+            NETWORK === "mainnet"
+              ? `https://eth-mainnet.g.alchemy.com/v2/${ALCHEMY_API_KEY}`
+              : `https://eth-sepolia.g.alchemy.com/v2/${ALCHEMY_API_KEY}`,
+          solanaRpcUrl:
+            NETWORK === "mainnet"
+              ? `https://solana-mainnet.g.alchemy.com/v2/${ALCHEMY_API_KEY}`
+              : undefined,
+        },
+      }
+    : {}),
 });
 
 // Current wallet
@@ -503,21 +522,27 @@ function renderBridge(): void {
   const s = bridgeController.getState();
 
   // Direction button
+  const selectedChain = s.selectedToken?.chain ?? "External";
   bridgeDirectionBtn.innerHTML =
     s.direction === "to-starknet"
-      ? "Ethereum &rarr; Starknet"
-      : "Starknet &rarr; Ethereum";
+      ? `${selectedChain} &rarr; Starknet`
+      : `Starknet &rarr; ${selectedChain}`;
 
-  // Eth wallet address + chain
-  if (s.connectedEthWallet) {
-    const addr = s.connectedEthWallet.address;
-    bridgeEthAddress.textContent = `${addr.slice(0, 6)}...${addr.slice(-4)} (chain ${s.connectedEthWallet.chainId})`;
-    bridgeEthAddress.title = addr;
+  // External wallet addresses
+  const ethAddr = s.connectedEthWallet?.address;
+  const solAddr = s.connectedSolWallet?.address;
+  const parts: string[] = [];
+  if (ethAddr) parts.push(`ETH: ${ethAddr.slice(0, 6)}...${ethAddr.slice(-4)}`);
+  if (solAddr) parts.push(`SOL: ${solAddr.slice(0, 4)}...${solAddr.slice(-4)}`);
+
+  if (parts.length > 0) {
+    bridgeEthAddress.textContent = parts.join(" | ");
+    bridgeEthAddress.title = [ethAddr, solAddr].filter(Boolean).join(" / ");
     btnAppkitConnect.textContent = "Change Wallet";
   } else {
     bridgeEthAddress.textContent = "";
     bridgeEthAddress.title = "";
-    btnAppkitConnect.textContent = "Connect Ethereum Wallet";
+    btnAppkitConnect.textContent = "Connect Wallet";
   }
 
   // Populate token select
@@ -526,7 +551,8 @@ function renderBridge(): void {
   for (const token of s.tokens) {
     const opt = document.createElement("option");
     opt.value = token.id;
-    opt.textContent = `${token.symbol} (${token.name})`;
+    const chainTag = token.chain === ExternalChain.SOLANA ? "[SOL]" : "[ETH]";
+    opt.textContent = `${chainTag} ${token.symbol} (${token.name})`;
     bridgeTokenSelect.appendChild(opt);
   }
   if (s.selectedToken && s.tokens.some((t) => t.id === s.selectedToken!.id)) {
@@ -558,8 +584,11 @@ function renderBridge(): void {
   // Refresh button
   btnBridgeRefresh.disabled = s.refreshing || !s.selectedToken;
 
-  // Allowance
-  if (s.direction === "to-starknet") {
+  // Allowance (not applicable for Solana tokens)
+  const showAllowance =
+    s.direction === "to-starknet" &&
+    s.selectedToken?.chain !== ExternalChain.SOLANA;
+  if (showAllowance) {
     bridgeAllowanceRow.classList.remove("hidden");
     if (s.allowanceLoading) {
       bridgeAllowanceEl.textContent = "Loading...";
@@ -596,9 +625,14 @@ function renderBridge(): void {
 
   // Deposit button
   const hasAmount = bridgeAmountInput.value.trim().length > 0;
+  const hasExternalWallet =
+    (s.selectedToken?.chain === ExternalChain.SOLANA &&
+      s.connectedSolWallet != null) ||
+    (s.selectedToken?.chain !== ExternalChain.SOLANA &&
+      s.connectedEthWallet != null);
   const canDeposit =
     s.direction === "to-starknet" &&
-    s.connectedEthWallet != null &&
+    hasExternalWallet &&
     s.selectedToken != null &&
     hasAmount;
   btnBridgeDeposit.disabled = !canDeposit;
@@ -1494,42 +1528,70 @@ btnBridgeDeposit.addEventListener("click", () => {
 
 // Subscribe to AppKit account and network changes.
 // Account and network are separate subscriptions; we store latest
-// values and reconcile in a shared sync function.
-let appKitProvider: Eip1193Provider | null = null;
+// values and reconcile in shared sync functions.
+let appKitEthProvider: Eip1193Provider | null = null;
+let appKitSolSigner: SolanaSigner | null = null;
 
 function syncEthWalletFromAppKit(): void {
   if (!bridgeController || !appKit) return;
 
-  const address = appKit.getAddress();
+  const address = appKit.getAddress("eip155");
   const chainId = appKit.getChainId();
   const isConnected = appKit.getIsConnectedState();
 
-  if (isConnected && address && chainId && appKitProvider) {
+  if (isConnected && address && chainId && appKitEthProvider) {
     bridgeController.connectEthereumWallet(
-      appKitProvider,
+      appKitEthProvider,
       address,
       String(chainId)
     );
-  } else if (!isConnected) {
+  } else if (!isConnected || !appKitEthProvider) {
     bridgeController.disconnectEthWallet();
   }
 }
 
+function syncSolWalletFromAppKit(): void {
+  if (!bridgeController || !appKit) return;
+
+  const address = appKit.getAddress("solana");
+  const chainId = appKit.getChainId();
+  const isConnected = appKit.getIsConnectedState();
+
+  if (isConnected && address && chainId && appKitSolSigner) {
+    bridgeController.connectSolanaWallet(
+      appKitSolSigner,
+      address,
+      String(chainId)
+    );
+  } else if (!isConnected || !appKitSolSigner) {
+    bridgeController.disconnectSolWallet();
+  }
+}
+
+function syncWalletsFromAppKit(): void {
+  syncEthWalletFromAppKit();
+  syncSolWalletFromAppKit();
+}
+
 if (appKit) {
   appKit.subscribeProviders((providers) => {
-    appKitProvider =
+    appKitEthProvider =
       (providers[
         "eip155" as keyof typeof providers
       ] as unknown as Eip1193Provider) ?? null;
-    syncEthWalletFromAppKit();
+    appKitSolSigner =
+      (providers[
+        "solana" as keyof typeof providers
+      ] as unknown as SolanaSigner) ?? null;
+    syncWalletsFromAppKit();
   });
 
   appKit.subscribeAccount(() => {
-    syncEthWalletFromAppKit();
+    syncWalletsFromAppKit();
   });
 
   appKit.subscribeNetwork(() => {
-    syncEthWalletFromAppKit();
+    syncWalletsFromAppKit();
   });
 }
 

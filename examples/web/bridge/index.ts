@@ -2,13 +2,16 @@ import {
   Amount,
   type BridgeToken,
   ConnectedEthereumWallet,
+  ConnectedSolanaWallet,
   type CCTPDepositFeeEstimation,
   type Eip1193Provider,
+  type SolanaSigner,
   Erc20,
   type EthereumDepositFeeEstimation,
-  EthereumBridgeToken,
+  type SolanaDepositFeeEstimation,
   ExternalChain,
   fromEthereumAddress,
+  fromSolanaAddress,
   Protocol,
   type StarkZap,
   type ChainId,
@@ -16,7 +19,13 @@ import {
 } from "starkzap";
 import { createAppKit, type AppKit } from "@reown/appkit";
 import { EthersAdapter } from "@reown/appkit-adapter-ethers";
-import { sepolia, mainnet } from "@reown/appkit/networks";
+import { SolanaAdapter } from "@reown/appkit-adapter-solana";
+import {
+  sepolia,
+  mainnet,
+  solana,
+  solanaTestnet,
+} from "@reown/appkit/networks";
 
 type LogFn = (
   message: string,
@@ -29,6 +38,7 @@ export interface BridgeState {
   tokens: BridgeToken[];
   selectedToken: BridgeToken | null;
   connectedEthWallet: ConnectedEthereumWallet | undefined;
+  connectedSolWallet: ConnectedSolanaWallet | undefined;
   starknetBalance: string | null;
   starknetBalanceLoading: boolean;
   externalBalance: string | null;
@@ -36,7 +46,7 @@ export interface BridgeState {
   externalBalanceLoading: boolean;
   allowance: string | null;
   allowanceLoading: boolean;
-  feeEstimate: EthereumDepositFeeEstimation | null;
+  feeEstimate: EthereumDepositFeeEstimation | SolanaDepositFeeEstimation | null;
   feeLoading: boolean;
   fastTransfer: boolean;
   tokensLoading: boolean;
@@ -50,6 +60,7 @@ function initialState(): BridgeState {
     tokens: [],
     selectedToken: null,
     connectedEthWallet: undefined,
+    connectedSolWallet: undefined,
     starknetBalance: null,
     starknetBalanceLoading: false,
     externalBalance: null,
@@ -68,10 +79,11 @@ function initialState(): BridgeState {
 
 export function initializeAppKit(projectId: string): AppKit {
   const ethersAdapter = new EthersAdapter();
+  const solanaAdapter = new SolanaAdapter();
 
   return createAppKit({
-    adapters: [ethersAdapter],
-    networks: [mainnet, sepolia],
+    adapters: [ethersAdapter, solanaAdapter],
+    networks: [mainnet, sepolia, solana, solanaTestnet],
     projectId,
     metadata: {
       name: "StarkZap Web Example",
@@ -149,6 +161,42 @@ export class BridgeController {
     this.render();
   }
 
+  connectSolanaWallet(
+    signer: SolanaSigner,
+    address: string,
+    walletChainId: string
+  ): void {
+    try {
+      const wallet = ConnectedSolanaWallet.from(
+        {
+          chain: ExternalChain.SOLANA,
+          signer,
+          address: fromSolanaAddress(address),
+          chainId: walletChainId,
+        },
+        this.chainId
+      );
+      this.state.connectedSolWallet = wallet;
+      this.log(
+        `Solana wallet connected: ${address.slice(0, 4)}...${address.slice(-4)}`,
+        "success"
+      );
+      this.render();
+      this.fetchTokens();
+    } catch (err) {
+      this.log(`Failed to connect Solana wallet: ${err}`, "error");
+    }
+  }
+
+  disconnectSolWallet(): void {
+    this.state.connectedSolWallet = undefined;
+    this.state.externalBalance = null;
+    this.state.externalBalanceUnit = null;
+    this.state.feeEstimate = null;
+    this.log("Solana wallet disconnected", "info");
+    this.render();
+  }
+
   setDirection(dir: "to-starknet" | "from-starknet"): void {
     this.state.direction = dir;
     this.state.starknetBalance = null;
@@ -206,7 +254,14 @@ export class BridgeController {
     this.render();
 
     try {
-      const tokens = await this.sdk.getBridgingTokens(ExternalChain.ETHEREUM);
+      const chains: ExternalChain[] = [];
+      if (this.state.connectedEthWallet) chains.push(ExternalChain.ETHEREUM);
+      if (this.state.connectedSolWallet) chains.push(ExternalChain.SOLANA);
+
+      const results = await Promise.all(
+        chains.map((chain) => this.sdk.getBridgingTokens(chain))
+      );
+      const tokens = results.flat();
       this.state.tokens = tokens;
       this.state.tokensLoading = false;
       this.log(`Loaded ${tokens.length} bridge tokens`, "success");
@@ -217,6 +272,14 @@ export class BridgeController {
       this.log(`Failed to load bridge tokens: ${err}`, "error");
       this.render();
     }
+  }
+
+  private externalWalletFor(token: BridgeToken) {
+    if (token.chain === ExternalChain.ETHEREUM)
+      return this.state.connectedEthWallet;
+    if (token.chain === ExternalChain.SOLANA)
+      return this.state.connectedSolWallet;
+    return undefined;
   }
 
   private starknetErc20(token: BridgeToken): Erc20 {
@@ -258,10 +321,13 @@ export class BridgeController {
   }
 
   async fetchExternalBalance(): Promise<void> {
-    const { selectedToken, connectedEthWallet } = this.state;
+    const { selectedToken } = this.state;
     const wallet = this.starknetWallet;
+    const extWallet = selectedToken
+      ? this.externalWalletFor(selectedToken)
+      : undefined;
 
-    if (!selectedToken || !wallet || !connectedEthWallet) {
+    if (!selectedToken || !wallet || !extWallet) {
       this.state.externalBalance = null;
       this.state.externalBalanceUnit = null;
       this.render();
@@ -273,8 +339,9 @@ export class BridgeController {
 
     try {
       const balance = await wallet.getDepositBalance(
-        selectedToken as EthereumBridgeToken,
-        connectedEthWallet
+        selectedToken,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- externalWalletFor() guarantees type match
+        extWallet as any
       );
       this.state.externalBalance = balance ? balance.toFormatted(true) : null;
       this.state.externalBalanceUnit = balance ? balance.toUnit() : null;
@@ -310,13 +377,16 @@ export class BridgeController {
   }
 
   async fetchAllowance(): Promise<void> {
-    const { selectedToken, direction, connectedEthWallet } = this.state;
+    const { selectedToken, direction } = this.state;
     const wallet = this.starknetWallet;
+    const extWallet = selectedToken
+      ? this.externalWalletFor(selectedToken)
+      : undefined;
 
     if (
       !selectedToken ||
       direction !== "to-starknet" ||
-      !connectedEthWallet ||
+      !extWallet ||
       !wallet
     ) {
       this.state.allowance = null;
@@ -329,8 +399,9 @@ export class BridgeController {
 
     try {
       const allowance = await wallet.getAllowance(
-        selectedToken as EthereumBridgeToken,
-        connectedEthWallet
+        selectedToken,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- externalWalletFor() guarantees type match
+        extWallet as any
       );
       this.state.allowance = allowance ? allowance.toFormatted(true) : null;
     } catch (err) {
@@ -343,16 +414,17 @@ export class BridgeController {
   }
 
   async fetchFeeEstimate(): Promise<void> {
-    const { selectedToken, direction, connectedEthWallet, fastTransfer } =
-      this.state;
+    const { selectedToken, direction, fastTransfer } = this.state;
     const wallet = this.starknetWallet;
+    const extWallet = selectedToken
+      ? this.externalWalletFor(selectedToken)
+      : undefined;
 
     if (
       !wallet ||
       !selectedToken ||
       direction !== "to-starknet" ||
-      selectedToken.chain !== ExternalChain.ETHEREUM ||
-      !connectedEthWallet
+      !extWallet
     ) {
       this.state.feeEstimate = null;
       this.render();
@@ -364,8 +436,9 @@ export class BridgeController {
 
     try {
       const estimate = await wallet.getDepositFeeEstimate(
-        selectedToken as EthereumBridgeToken,
-        connectedEthWallet,
+        selectedToken,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- externalWalletFor() guarantees type match
+        extWallet as any,
         { fastTransfer }
       );
       this.state.feeEstimate = estimate;
@@ -379,10 +452,13 @@ export class BridgeController {
   }
 
   async deposit(amountStr: string): Promise<void> {
-    const { selectedToken, connectedEthWallet, fastTransfer } = this.state;
+    const { selectedToken, fastTransfer } = this.state;
     const wallet = this.starknetWallet;
+    const extWallet = selectedToken
+      ? this.externalWalletFor(selectedToken)
+      : undefined;
 
-    if (!wallet || !selectedToken || !connectedEthWallet) {
+    if (!wallet || !selectedToken || !extWallet) {
       this.log("Missing wallet or token for deposit", "error");
       return;
     }
@@ -402,8 +478,9 @@ export class BridgeController {
       const txResponse = await wallet.deposit(
         wallet.address,
         depositAmount,
-        selectedToken as EthereumBridgeToken,
-        connectedEthWallet,
+        selectedToken,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- externalWalletFor() guarantees type match
+        extWallet as any,
         { fastTransfer }
       );
       this.log(`Deposit tx sent: ${txResponse.hash}`, "success");
@@ -415,27 +492,46 @@ export class BridgeController {
   isCCTP(): boolean {
     return this.state.selectedToken?.protocol === Protocol.CCTP;
   }
+
+  isSolana(): boolean {
+    return this.state.selectedToken?.chain === ExternalChain.SOLANA;
+  }
+}
+
+function isEthereumFee(
+  estimate: EthereumDepositFeeEstimation | SolanaDepositFeeEstimation
+): estimate is EthereumDepositFeeEstimation {
+  return "l1Fee" in estimate;
 }
 
 export function formatFeeEstimate(
-  estimate: EthereumDepositFeeEstimation
+  estimate: EthereumDepositFeeEstimation | SolanaDepositFeeEstimation
 ): string {
   const lines: string[] = [];
 
-  lines.push(
-    `L1 Gas: ${estimate.l1Fee.toFormatted(false)}${estimate.l1FeeError ? " (est.)" : ""}`
-  );
-  lines.push(
-    `L2 Msg: ${estimate.l2Fee.toFormatted(false)}${estimate.l2FeeError ? " (est.)" : ""}`
-  );
-  lines.push(
-    `Approval: ${estimate.approvalFee.toFormatted(false)}${estimate.approvalFeeError ? " (est.)" : ""}`
-  );
-
-  const cctp = estimate as CCTPDepositFeeEstimation;
-  if (cctp.fastTransferBpFee !== undefined) {
+  if (isEthereumFee(estimate)) {
     lines.push(
-      `Fast Transfer Fee: ${(cctp.fastTransferBpFee / 100).toFixed(2)}%`
+      `L1 Gas: ${estimate.l1Fee.toFormatted(false)}${estimate.l1FeeError ? " (est.)" : ""}`
+    );
+    lines.push(
+      `L2 Msg: ${estimate.l2Fee.toFormatted(false)}${estimate.l2FeeError ? " (est.)" : ""}`
+    );
+    lines.push(
+      `Approval: ${estimate.approvalFee.toFormatted(false)}${estimate.approvalFeeError ? " (est.)" : ""}`
+    );
+
+    const cctp = estimate as CCTPDepositFeeEstimation;
+    if (cctp.fastTransferBpFee !== undefined) {
+      lines.push(
+        `Fast Transfer Fee: ${(cctp.fastTransferBpFee / 100).toFixed(2)}%`
+      );
+    }
+  } else {
+    lines.push(
+      `Local Fee: ${estimate.localFee.toFormatted(false)}${estimate.localFeeError ? " (est.)" : ""}`
+    );
+    lines.push(
+      `Interchain Fee: ${estimate.interchainFee.toFormatted(false)}${estimate.interchainFeeError ? " (est.)" : ""}`
     );
   }
 

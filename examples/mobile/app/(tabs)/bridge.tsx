@@ -16,6 +16,7 @@ import {
   type Eip1193Provider,
   ExternalChain,
   fromEthereumAddress,
+  fromSolanaAddress,
   Protocol,
   type SolanaProvider,
 } from "@starkzap/native";
@@ -144,7 +145,7 @@ export default function BridgeScreen() {
       options = {
         chain: ExternalChain.SOLANA,
         provider: walletProvider as unknown as SolanaProvider,
-        address: connectedAccount.address,
+        address: fromSolanaAddress(connectedAccount.address),
         chainId: connectedAccount.chainId,
       };
     }

@@ -1,19 +1,35 @@
 import type { FeeErrorCause } from "@/types/errors";
-import type { SolanaProvider } from "@/connect";
-import type { Connection } from "@solana/web3.js";
+import type { SolanaAddress } from "@/types";
+import type {
+  Connection,
+  Transaction,
+  VersionedTransaction,
+} from "@solana/web3.js";
+import type { Amount } from "starkzap";
+
+/**
+ * Signer interface for Solana transactions.
+ *
+ * Compatible with the Reown AppKit Solana provider's
+ * `signAndSendTransaction` method.
+ */
+export interface SolanaSigner {
+  signAndSendTransaction(
+    transaction: Transaction | VersionedTransaction
+  ): Promise<string>;
+}
 
 export type SolanaWalletConfig = {
-  signer: SolanaProvider;
+  address: SolanaAddress;
+  signer: SolanaSigner;
   connection: Connection;
 };
 
 export type HyperlaneFeeEstimate = {
-  localFee: bigint;
-  interchainFee: bigint;
+  localFee: Amount;
+  interchainFee: Amount;
   localFeeError?: FeeErrorCause;
   interchainFeeError?: FeeErrorCause;
 };
 
-export type SolanaDepositFeeEstimation = HyperlaneFeeEstimate & {
-  feeUnit: "sol";
-};
+export type SolanaDepositFeeEstimation = HyperlaneFeeEstimate;
