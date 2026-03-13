@@ -4,6 +4,7 @@ import { CallData, cairo, type Call } from "starknet";
 import {
   getEkuboChainLiteral,
   getEkuboErrorMessageFromPayload,
+  isRecord,
 } from "@/utils/ekubo";
 
 export const DEFAULT_EKUBO_API_BASE = "https://prod-api-quoter.ekubo.org";
@@ -40,10 +41,6 @@ export interface EkuboQuoteResponse {
   total_calculated: string;
   price_impact: number | null;
   splits: EkuboQuoteSplit[];
-}
-
-function isObjectRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null;
 }
 
 export function getEkuboQuoterChainId(chainId: ChainId): string {
@@ -130,7 +127,7 @@ function percentToBps(value: number | null): bigint | null {
 }
 
 export function parseEkuboQuoteResponse(payload: unknown): EkuboQuoteResponse {
-  if (!isObjectRecord(payload)) {
+  if (!isRecord(payload)) {
     throw new Error("Ekubo quote response is malformed");
   }
 
@@ -155,7 +152,7 @@ export function parseEkuboQuoteResponse(payload: unknown): EkuboQuoteResponse {
   }
 
   const splits = splitsRaw.map((split): EkuboQuoteSplit => {
-    if (!isObjectRecord(split) || !Array.isArray(split.route)) {
+    if (!isRecord(split) || !Array.isArray(split.route)) {
       throw new Error("Ekubo split is malformed");
     }
     if (
@@ -166,7 +163,7 @@ export function parseEkuboQuoteResponse(payload: unknown): EkuboQuoteResponse {
     }
 
     const route = split.route.map((step): EkuboRouteStep => {
-      if (!isObjectRecord(step) || !isObjectRecord(step.pool_key)) {
+      if (!isRecord(step) || !isRecord(step.pool_key)) {
         throw new Error("Ekubo route step is malformed");
       }
       const poolKey = step.pool_key;
