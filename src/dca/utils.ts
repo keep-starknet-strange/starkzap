@@ -112,30 +112,29 @@ export function hydrateDcaOrdersInput(
 }
 
 export function hydrateDcaCancelInput(input: DcaCancelInput): DcaCancelRequest {
-  const orderId = input.orderId;
-  const orderAddress = input.orderAddress;
-  const hasOrderId = orderId != null && orderId.length > 0;
+  const orderId =
+    input.orderId != null && input.orderId.length > 0
+      ? input.orderId
+      : undefined;
+  const orderAddress =
+    input.orderAddress != null
+      ? resolveWalletAddress(input.orderAddress)
+      : undefined;
 
-  if (!hasOrderId && orderAddress == null) {
-    throw new Error("DCA cancel requires either orderId or orderAddress");
-  }
-
-  if (hasOrderId && orderAddress != null) {
+  if (orderId && orderAddress) {
     return {
       orderId,
-      orderAddress: resolveWalletAddress(orderAddress),
+      orderAddress,
     };
   }
 
-  if (hasOrderId) {
+  if (orderId) {
     return { orderId };
   }
 
-  if (orderAddress == null) {
-    throw new Error("DCA cancel requires either orderId or orderAddress");
+  if (orderAddress) {
+    return { orderAddress };
   }
 
-  return {
-    orderAddress: resolveWalletAddress(orderAddress),
-  };
+  throw new Error("DCA cancel requires either orderId or orderAddress");
 }
