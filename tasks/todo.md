@@ -1,3 +1,178 @@
+# Task: Complexity Review for Active `feat/dca` Swap API Changes (2026-03-13)
+
+## Plan
+- [x] Review the active swap, wallet, tx-builder, and test edits for unnecessary abstraction or readability cost.
+- [x] Simplify any confirmed complexity while preserving behavior with no unreleased legacy compatibility.
+- [x] Re-run focused validation on the affected paths.
+- [x] Record the review outcome, changes, and any residual trade-offs.
+
+## Review
+- Confirmed complexity issue:
+  - `src/tx/builder.ts` was still duplicating swap provider resolution and fallback execution even after `wallet.prepareSwap(...)` had been introduced as the wallet-owned abstraction for that exact work. That made the builder know too much about swap internals and forced `tests/tx-builder.test.ts` to duplicate wallet-level provider-resolution behavior.
+- Simplifications made:
+  - `src/tx/builder.ts`
+    - `swap(...)` now delegates directly to `wallet.prepareSwap(...)` through the existing `queuePreparedCalls(...)` path instead of re-resolving providers itself.
+    - This keeps swap request normalization and execution preparation in one place: the wallet layer.
+  - `tests/tx-builder.test.ts`
+    - Simplified builder swap tests to assert delegation and error propagation at the builder boundary instead of re-testing wallet/provider resolution rules already covered in `tests/swap-wallet.test.ts`.
+  - `tests/swap-wallet.test.ts`
+    - Consolidated coverage around the single provider contract: `prepareSwap(...)`.
+  - `src/swap/utils.ts`
+    - Replaced the remaining conditional-spread request builder in `hydrateSwapRequest(...)` with an explicit local object plus direct assignment.
+    - Removed the now-unnecessary `prepareSwapWithProvider(...)` compatibility helper entirely.
+  - `src/swap/ekubo.ts`
+    - Replaced the inline conditional-spread call builder with an explicit local request object.
+  - `src/swap/interface.ts`, `src/swap/avnu.ts`, `src/swap/ekubo.ts`, `src/wallet/base.ts`
+    - Removed the unreleased provider-level `swap(...)` compatibility path so `SwapProvider` now has one required preparation method: `prepareSwap(...)`.
+- Outcome:
+  - After these changes, I do not see a remaining confirmed “overly complex” issue in the active swap API edits.
+  - The public shape is now cleaner: wallet owns swap preparation, builder consumes the wallet API, and the provider contract now has one clear preparation method instead of two parallel paths.
+  - After the user clarified that provider-level `swap(...)` was never released, I removed that path outright instead of keeping a compatibility shim.
+- Validation:
+  - `rtk vitest run tests/swap-wallet.test.ts tests/tx-builder.test.ts tests/swap-avnu.test.ts tests/swap-ekubo-provider.test.ts tests/dca-wallet.test.ts tests/wallet.test.ts` -> `PASS (111) FAIL (0)`
+  - `rtk proxy npm run -s typecheck` -> pass
+  - `rtk proxy npm run -s lint` -> pass
+  - `rtk proxy npx prettier --check src/swap/interface.ts src/swap/utils.ts src/swap/avnu.ts src/swap/ekubo.ts src/wallet/base.ts tests/swap-wallet.test.ts tests/tx-builder.test.ts tests/wallet.test.ts tests/dca-wallet.test.ts tasks/todo.md tasks/lessons.md` -> pass
+  - `rtk proxy git diff --check` -> pass
+- Residual trade-off:
+  - None from compatibility: the old provider-level `swap(...)` path is removed because it never shipped.
+
+# Task: Branch Merge Readiness for `feat/dca` (2026-03-13)
+
+## Plan
+- [x] Refresh or confirm the `main` baseline used for merge-readiness checks.
+- [x] Review the committed and uncommitted `feat/dca` delta for correctness, API consistency, and merge risk.
+- [x] Run targeted and broad validation needed to prove merge readiness.
+- [x] Fix any merge blockers with minimal, scoped changes and re-run verification.
+- [x] Record the final readiness verdict, evidence, and any residual risks.
+
+## Review
+- Baseline:
+  - Refreshed remotes with `rtk git fetch --all --prune`.
+  - Current merge target after refresh: `main`, `origin/main`, and `upstream/main` all point to `81356be` (`feat: support read-only address queries for balance and staking position (#61)`).
+  - `feat/dca` points to `b69fa43` and is strictly ahead of `main` by 8 commits with no commits missing from `main`, so the branch tip is mergeable onto the refreshed `main` baseline without a rebase/merge sync step.
+- Code review outcome:
+  - The active worktree changes on top of `feat/dca` are a focused swap API cleanup: providers now prefer `prepareSwap(...)`, wallet/tx-builder expose the same prepared-swap path, and compatibility is preserved through a shared fallback helper that still accepts older provider implementations exposing only `swap(...)`.
+  - I did not find a confirmed correctness regression in the reviewed swap/wallet/tx-builder changes after checking the call sites and provider implementations.
+  - The only concrete merge blocker found was formatting drift in `tests/swap-avnu.test.ts`; I fixed it with Prettier so CI format check is now clean.
+- Validation:
+  - `rtk vitest run tests/swap-avnu.test.ts tests/swap-ekubo-provider.test.ts tests/swap-wallet.test.ts tests/tx-builder.test.ts tests/dca-avnu-provider.test.ts tests/dca-ekubo-provider.test.ts tests/dca-wallet.test.ts` -> `PASS (106) FAIL (0)`
+  - `rtk proxy npm run -s typecheck` -> pass
+  - `rtk proxy npm run -s build` -> pass
+  - `rtk proxy npx prettier --check .` -> pass after formatting `tests/swap-avnu.test.ts`
+  - `rtk proxy npm run -s lint` -> pass
+  - `rtk vitest run --project unit` -> `PASS (430) FAIL (0)`
+  - `rtk proxy npm run -s build:all` -> pass
+  - `rtk proxy npm run -s build --workspace examples/web` -> pass (Vite chunk-size warnings only)
+  - `rtk proxy npm run -s build --workspace examples/flappy-bird` -> pass (Vite chunk-size warnings only)
+  - `rtk proxy npx expo export --platform ios --output-dir /tmp/mobile-ios-build` in `examples/mobile` -> pass
+  - `rtk proxy npx expo export --platform android --output-dir /tmp/mobile-android-build` in `examples/mobile` -> pass
+  - `rtk proxy git diff --check` -> pass
+- Residual notes:
+  - The example and mobile builds emit non-fatal bundle-size / package export warnings (`@noble/hashes/crypto.js` subpath fallback warnings during Expo export), but they do not fail the build in this branch and are not introduced by the final formatting fix.
+  - The worktree is still dirty because the reviewed branch changes are not all committed yet. Functionally the branch content validates cleanly, but the user will still need to commit the remaining worktree diff before actually merging.
+
+# Task: Ekubo DCA Module Simplification (2026-03-12)
+
+## Plan
+- [x] Audit `src/dca/ekubo.ts` against adjacent Ekubo and DCA modules to separate protocol-required complexity from readability debt.
+- [x] Extract Ekubo DCA parsing/encoding/time helpers into a dedicated helper module so `src/dca/ekubo.ts` focuses on provider orchestration.
+- [x] Keep public behavior unchanged and preserve existing tests while tightening any helper-oriented coverage if needed.
+- [x] Run focused validation and record the review summary.
+
+## Review
+- `src/dca/ekubo.ts` was carrying two kinds of complexity at once: real provider orchestration plus low-level Ekubo response parsing, order-id encoding/decoding, time alignment, and order normalization. The file is now focused on provider flow, while the low-level protocol machinery lives in `src/dca/ekubo.helpers.ts`.
+- The provider surface and behavior are unchanged:
+  - `EkuboDcaProvider`, `EkuboDcaProviderOptions`, `ekuboDcaPresets`, and `getEkuboDcaPreset(...)` still live in `src/dca/ekubo.ts`.
+  - create/list/cancel logic still uses the same API endpoints, order id format, on-chain reads, and calldata layout.
+- Readability improvements:
+  - `getOrders()` now reads as fetch page -> build descriptors -> fetch order infos -> map to SDK orders.
+  - `prepareCancel()` now delegates call construction to a focused `buildCancelCalls(...)` helper instead of mixing decode/read/build logic inline.
+  - `src/dca/ekubo.ts` dropped from 807 lines to 411 lines.
+- Added focused regression coverage in `tests/dca-ekubo-provider.test.ts` for the `INDEXING` short-circuit so the no-network early return stays covered after the refactor.
+- Verification:
+  - `rtk vitest run tests/dca-ekubo-provider.test.ts tests/dca-avnu-provider.test.ts tests/dca-wallet.test.ts`
+  - `rtk proxy npm run -s typecheck`
+  - `rtk proxy npm run -s build`
+  - `rtk proxy npx prettier --check src/dca/ekubo.ts src/dca/ekubo.helpers.ts tests/dca-ekubo-provider.test.ts tasks/todo.md`
+
+# Task: PR #62 Latest Changes Review (2026-03-12)
+
+## Plan
+- [x] Refresh `upstream/pr-62` and verify the new head against the last reviewed `aeb4a22`.
+- [x] Review only the new commits and changed files for correctness, regressions, and API consistency.
+- [x] Attempt targeted validation on the refreshed head where feasible.
+- [x] Record findings or explicitly note if the latest changes resolved the prior concerns cleanly.
+
+## Review
+- Latest reviewed head: `8d7001e` (`refactor: include approve call in fund() return value`).
+- New commits since the previous review (`aeb4a22`):
+  - `fad7fcc` (`refactor: expose recipientId on ConfidentialProvider interface`)
+  - `8d7001e` (`refactor: include approve call in fund() return value`)
+- Scope reviewed:
+  - `src/confidential/index.ts`
+  - `src/confidential/interface.ts`
+  - `src/confidential/tongo.ts`
+  - `src/confidential/types.ts`
+  - `src/tx/builder.ts`
+  - `tests/confidential.test.ts`
+  - `tests/integration/confidential.test.ts`
+- Outcome:
+  - No new confirmed correctness or regression findings on latest head `8d7001e`.
+  - The two follow-up commits address the previously posted concerns by exposing `recipientId` on the public provider surface and returning the full fund call batch (including approve when present) from `fund()`.
+  - Residual API note only: `ConfidentialRecipient` is still structurally fixed to `{x, y}`, so the public interface remains elliptic-curve-oriented even though the docs describe it as provider-specific / protocol-agnostic.
+- Validation notes:
+  - `rtk proxy npm run -s typecheck` still fails in the isolated worktree because `tsc` is not installed there.
+  - `rtk proxy npm ci --ignore-scripts` still does not complete cleanly in this environment; earlier checks on both `upstream/main` and PR 62 hit the same pre-existing lockfile sync problem (`Missing: bufferutil@4.1.0 from lock file`), so that remains a baseline issue rather than a new PR regression.
+
+# Task: PR #62 Re-review (Latest Head, Round 2)
+
+## Plan
+- [x] Refresh `upstream/pr-62` from GitHub and verify the exact head SHA now under review.
+- [x] Re-read the latest diff against `upstream/main`, focusing on correctness, API consistency, and regression risk.
+- [x] Inspect affected tests and run targeted validation on the refreshed PR head where feasible.
+- [x] Record confirmed findings, or explicitly note if the latest head closes prior issues.
+
+## Review
+- Latest reviewed head: `aeb4a22` (`merge: resolve conflicts with upstream/main (lending module)`).
+- Ref refresh:
+  - `rtk git fetch upstream pull/62/head:refs/remotes/upstream/pr-62`
+  - `rtk git ls-remote upstream pull/62/head`
+  - `rtk git fetch upstream main:refs/remotes/upstream/main`
+- Scope after refreshing the base branch:
+  - `package.json`
+  - `package-lock.json`
+
+  - `src/confidential/**`
+  - `src/tx/builder.ts`
+  - confidential and tx-builder tests
+- Confirmed findings posted on PR:
+  - Missing approve metadata in the public Tongo funding wrapper: https://github.com/keep-starknet-strange/starkzap/pull/62#discussion_r2925142798
+  - Provider-agnostic confidential API still requires Tongo-specific recipient data: https://github.com/keep-starknet-strange/starkzap/pull/62#discussion_r2925142685
+- Validation notes:
+  - `rtk proxy npm run -s typecheck` failed in the isolated worktree because `tsc` was not installed there.
+  - `rtk proxy npm ci --ignore-scripts` fails on both `upstream/main` and `upstream/pr-62` with the same pre-existing lockfile sync error (`Missing: bufferutil@4.1.0 from lock file`), so that install failure is not PR-specific.
+
+# Task: PR #62 Code Review (2026-03-12)
+
+## Plan
+- [x] Fetch the latest `upstream/pr-62` ref and verify the review head.
+- [x] Review the confidential/Tongo, tx-builder, and merged lending diffs against `upstream/main`.
+- [x] Attempt focused validation in an isolated PR worktree.
+- [x] Record confirmed findings with precise file references.
+
+## Review
+- Latest reviewed head: `aeb4a22` (`merge: resolve conflicts with upstream/main (lending module)`).
+- Validation:
+  - `rtk git fetch upstream pull/62/head:refs/remotes/upstream/pr-62`
+  - `rtk git worktree add --detach /private/tmp/starkzap-pr62-latest upstream/pr-62`
+  - Attempted `rtk vitest run tests/confidential.test.ts tests/tx-builder.test.ts tests/lending-vesu-provider.test.ts tests/lending-wallet.test.ts`
+  - Attempted `npm run -s typecheck`
+  - Validation was blocked in the isolated worktree because it did not have a local toolchain install available (`tsc` was not on PATH there, and the worktree had no `node_modules` tree).
+- Findings:
+  - `src/confidential/tongo.ts`: Tongo is wired to a single STRK ERC20 at contract deployment time, but the public SDK surface accepts any `Amount` and even documents a generic `token` approve flow, so callers can build approvals/fund/withdraw flows with the wrong token or decimals and get malformed/confusing behavior with no SDK-side validation.
+  - `src/confidential/types.ts`: `ConfidentialTransferDetails.to` is Tongo's `{x,y}` public-key shape even though `ConfidentialProvider` advertises a protocol-agnostic `address: string`; the integration test has to drop down to `getTongoAccount().publicKey`, so the generic interface is not actually sufficient to perform transfers.
+
 # Task: AVNU Adapter Readability Cleanup (2026-03-12)
 
 ## Plan
@@ -867,3 +1042,152 @@
 - Verification:
   - `rtk proxy npm run -s typecheck`
   - `rtk vitest run tests/swap-avnu.test.ts tests/swap-ekubo-provider.test.ts tests/swap-wallet.test.ts tests/tx-builder.test.ts tests/wallet.test.ts tests/dca-wallet.test.ts`
+
+# Task: PR #51 Delta Summary (2026-03-12)
+
+## Plan
+- [x] Refresh `upstream/pr-51` and `upstream/main` to confirm the exact current head.
+- [x] Compare the current PR 51 head against the last reviewed SHA `ed63f9b`.
+- [x] Record the post-review delta and summarize the net changes.
+
+## Review
+- Last reviewed head: `ed63f9b` (`feat(payment): add step-by-step guide for creating payment sessions and modal integration`).
+- Current head after refresh: `abaf02d` (`ci(workflow): remove unnecessary build step for Chainrails Next.js example`).
+- New commits since the last review:
+  - `4a37557` `feat(payment): add session token storage and getter/setter methods`
+  - `abaf02d` `ci(workflow): remove unnecessary build step for Chainrails Next.js example`
+- Net changes since the last review:
+  - removed the entire `examples/chainrails-nextjs-example/` workspace from the PR
+  - removed the CI build step for that example from `.github/workflows/ci.yml`
+  - updated payment docs to describe settlement specifically in USDC on Starknet instead of a generic preferred-token claim
+  - changed `src/payment/payment.ts` so `Payment` only configures Chainrails when a non-empty API key is provided
+  - added in-memory session token storage on `Payment`, with `getSessionToken()` / `setSessionToken()` and automatic storage after `createSession()`
+  - changed `src/payment/modal.ts` to lazy-import `@chainrails/vanilla` inside `.pay()` instead of importing it eagerly
+- Verification:
+  - `rtk git fetch upstream pull/51/head:refs/remotes/upstream/pr-51`
+  - `rtk git fetch upstream main:refs/remotes/upstream/main`
+  - `rtk git log --oneline ed63f9b..remotes/upstream/pr-51`
+  - `rtk git diff --stat ed63f9b..remotes/upstream/pr-51`
+
+# Task: PR #51 Current-Head Issue Check (2026-03-12)
+
+## Plan
+- [x] Review the latest `upstream/pr-51` diff against `upstream/main`.
+- [x] Re-validate the previously risky payment/session/runtime paths on the latest head.
+- [x] Record remaining confirmed issues and resolved prior findings.
+
+## Review
+- Reviewed head: `abaf02d` (`ci(workflow): remove unnecessary build step for Chainrails Next.js example`).
+- Resolved since the earlier review:
+  - the broken Next.js example workspace was removed from the PR
+  - the CI build step for that example was removed
+  - `sdk.payment()` browser fallback no longer clears the configured Chainrails API key
+  - `payment.modal().pay()` no longer eagerly imports `@chainrails/vanilla` before the browser guard
+- Remaining confirmed issue:
+  - `src/payment/payment.ts` stores the session token only in `Payment.currentSessionToken`, but none of the session-scoped helpers consume that stored token or push it into the underlying Chainrails SDK. `createSession()` sets local state at lines 149-154, yet `getSessionQuotes()`, `createSessionIntent()`, `getSessionIntents()`, `triggerSessionProcessing()`, and `getSessionClientInfo()` still delegate directly to `crapi.*ForSession(...)` at lines 227-230, 250-253, 289-290, 315-318, and 391-392. The installed Chainrails SDK sends `Authorization: Bearer Chainrails.getSessionToken() || Chainrails.getApiKey()` and `createSession()` does not update that global token, so the new local getter/setter does not make the documented “current session” flow work.
+- Verification:
+  - `rtk vitest run tests/payment.test.ts` -> `PASS (24) FAIL (0)`
+  - `rtk proxy npm run -s typecheck`
+  - `node --import tsx -e "import { Payment } from './src/payment/payment.ts'; import { Chainrails, crapi } from '@chainrails/sdk'; crapi.auth.getSessionToken = async () => ({ sessionToken: 'sess_123', amount: '25.00' }); const payment = new Payment({ apiKey: 'real_key' }); await payment.createSession({ recipient: '0x1', token: 'USDC', destinationChain: 'STARKNET', amount: '25.00' }); console.log(JSON.stringify({ storedToken: payment.getSessionToken(), chainrailsToken: Chainrails.getSessionToken(), apiKey: Chainrails.getApiKey() }));"` -> `{"storedToken":"sess_123","chainrailsToken":"","apiKey":"real_key"}`
+- Testing gap:
+  - `tests/payment.test.ts` still does not exercise `getSessionQuotes`, `createSessionIntent`, `getSessionIntents`, `triggerSessionProcessing`, or `getSessionClientInfo`, so the remaining broken session-token handoff is not covered.
+
+# Task: PR #51 Payment API Ergonomics Review (2026-03-12)
+
+## Plan
+- [x] Inspect the public payment entrypoints, exported types, tests, and docs from a consumer point of view.
+- [x] Identify places where the interface is inconsistent, misleading, or harder to use than the rest of the SDK.
+- [x] Record the confirmed ergonomics findings with concrete examples.
+
+## Review
+- Scope reviewed:
+  - `src/payment/payment.ts`
+  - `src/payment/types.ts`
+  - `src/sdk.ts`
+  - `mintlify-docs/build/consumer-app-sdk/payment.mdx`
+  - `tests/payment.test.ts`
+- Findings:
+  - The payment API is not consistently "easy to use" because it mixes two naming models. Session and quote helpers use StarkZap-style camelCase (`destinationChain`, `sourceChain`), while intent creation and returned intent objects expose raw backend snake_case fields (`source_chain`, `destination_chain`, `refund_address`, `intent_status`, `fees_in_usd`). A user has to switch conventions mid-flow instead of learning one SDK-native shape.
+  - The session workflow is not a coherent high-level interface. `createSession()` suggests a bound session object, but the follow-up helpers do not present one predictable model: `getSessionQuotes(input)`, `createSessionIntent(input)`, `getSessionIntents(address)`, `triggerSessionProcessing(intentAddress)`, and `getSessionClientInfo()` all use different parameter patterns, and the stored session token is still not wired into those calls.
+  - The primary payment guide contains incorrect example shapes, so even a careful user following the docs will hit friction quickly. `getAllQuotes()` is documented like it returns an array, `getBestQuote()` is documented with a nonexistent top-level `bridge` field, `getSupportedBridges()` is documented like it returns a raw array instead of an object, and `getClientInfo()` is documented with `clientId` even though the actual type uses `id`.
+- Verification:
+  - `rtk vitest run tests/payment.test.ts`
+  - `rtk proxy npm run -s typecheck`
+  - type/reference spot checks against:
+    - `node_modules/@chainrails/sdk/dist/src/Quotes/types.d.ts`
+    - `node_modules/@chainrails/sdk/dist/src/Router/types.d.ts`
+    - `node_modules/@chainrails/sdk/dist/src/Client/types.d.ts`
+
+# Task: PR #51 Ergonomics Comment Posting (2026-03-12)
+
+## Plan
+- [x] Check existing PR 51 comments from `0xLucqs` to avoid reposting feedback that was already on the thread.
+- [x] Post only the newly confirmed ergonomics/docs comments.
+- [x] Verify the comment count and capture the posted links.
+
+## Review
+- Existing comments from `0xLucqs` before posting: `8`
+- Reused existing session-flow comment instead of duplicating it.
+- Posted new comments:
+  - `src/payment/types.ts`
+    - https://github.com/keep-starknet-strange/starkzap/pull/51#discussion_r2925446562
+  - `mintlify-docs/build/consumer-app-sdk/payment.mdx`
+    - https://github.com/keep-starknet-strange/starkzap/pull/51#discussion_r2925446409
+- Verification:
+  - `gh api 'repos/keep-starknet-strange/starkzap/pulls/51/comments?per_page=100' --jq 'map(select(.user.login=="0xLucqs")) | length'` -> `10`
+  - `gh api 'repos/keep-starknet-strange/starkzap/pulls/51/comments?per_page=100' --jq 'map(select(.id==2925446562 or .id==2925446409)) | map({id, html_url, path})'`
+
+# Task: Issue #58 Verification (Read-Only Address Queries)
+
+## Plan
+- [x] Confirm the local definition of issue 58 from repository history and affected files.
+- [x] Verify the current branch still supports raw address inputs for read-only ERC20 balance queries.
+- [x] Verify the current branch still supports raw address inputs for read-only staking position queries.
+- [x] If verification finds a regression, implement the minimal fix and re-run targeted tests.
+- [x] Record the final result and evidence in the review section.
+
+## Review
+- Issue context from local history:
+  - Local branch `codex/fix-issue-58-readonly-address`
+  - `upstream/main` commit `81356be` (`feat: support read-only address queries for balance and staking position (#61)`)
+- Target behavior under verification:
+  - `Erc20.balanceOf(...)` accepts wallet objects, branded addresses, and raw address-like inputs.
+  - `Staking.getPosition(...)` accepts wallet objects, branded addresses, and raw address-like inputs.
+- Verification evidence:
+  - Current branch is descended from `upstream/main` commit `81356be`, which contains the read-only address-query support.
+  - Targeted tests passed on the current branch: `rtk vitest run tests/erc20.test.ts tests/staking-readonly.test.ts`
+  - Result: `PASS (21) FAIL (0)`
+- Conclusion:
+  - No regression found for issue 58 on the current branch.
+  - No implementation change was required beyond recording verification.
+
+# Task: PR #78 Review (2026-03-13)
+
+## Plan
+- [x] Refresh `upstream/pr-78` and pin the review to the fetched head SHA.
+- [x] Compare `upstream/pr-78` against `upstream/main` and inspect all changed files for correctness, regression risk, and API consistency.
+- [x] Run targeted validation where feasible to confirm or falsify suspected issues.
+- [x] Record the review outcome and evidence in this file.
+
+## Review
+- Latest reviewed head: `3db5204` (`feat: isolate example cleanups and wallet interface updates`).
+- Scope reviewed:
+  - `src/wallet/interface.ts`
+  - `examples/flappy-bird/starknet.ts`
+  - `examples/flappy-bird/tsconfig.json`
+  - `examples/flappy-bird/README.md`
+  - `examples/mobile/.env.example`
+  - `examples/mobile/README.md`
+- Confirmed finding:
+  - The new `examples/flappy-bird/tsconfig.json` still does not produce a clean type-check for the example because it includes `vite.config.ts`, and that file is not type-safe under the installed Vite 7 types. On the PR head, `./node_modules/typescript/bin/tsc --noEmit -p examples/flappy-bird/tsconfig.json` fails with:
+    - `examples/flappy-bird/vite.config.ts(8,5): error TS2769: No overload matches this call.`
+    - `Type 'true' has no properties in common with type 'ServerOptions<typeof IncomingMessage, typeof ServerResponse>'.`
+  - Correction to earlier validation: the temporary `username()` error was a false positive caused by my first isolated setup resolving `starkzap` to the local workspace's stale `dist` declarations instead of the PR worktree. Re-running with `starkzap` resolved to `/tmp/starkzap-pr78` removes that error.
+- Validation:
+  - `rtk git fetch upstream pull/78/head:refs/remotes/upstream/pr-78`
+  - `rtk git fetch upstream main:refs/remotes/upstream/main`
+  - `rtk proxy npm run -s typecheck` in `/tmp/starkzap-pr78` -> pass
+  - `rtk vitest run tests/cartridge.test.ts` in `/tmp/starkzap-pr78` -> `PASS (17) FAIL (0)`
+  - `rtk proxy npm run -s build` in `/tmp/starkzap-pr78` -> pass
+  - `rtk proxy ./node_modules/typescript/bin/tsc --noEmit -p examples/flappy-bird/tsconfig.json` in `/tmp/starkzap-pr78` with `starkzap` resolving to the PR worktree -> fails only with the Vite config error above
+  - `rtk proxy npm run -s build` in `/tmp/starkzap-pr78/examples/flappy-bird` -> pass
