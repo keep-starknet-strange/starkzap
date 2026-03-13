@@ -17,7 +17,7 @@ import {
   TokenStandard,
 } from "@hyperlane-xyz/sdk";
 import type { Address as HyperlaneAddress } from "@hyperlane-xyz/utils";
-import type { ChainId } from "starkzap";
+import type { ChainId } from "@/types";
 import type { SolanaWalletConfig } from "@/bridge";
 import type { WalletInterface } from "@/wallet";
 import type { ChainIdLiteral, SolanaBridgeToken } from "@/types";

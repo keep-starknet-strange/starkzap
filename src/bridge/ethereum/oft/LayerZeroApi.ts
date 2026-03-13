@@ -2,7 +2,7 @@ import type { ContractTransaction } from "ethers";
 import { Interface } from "ethers";
 import { type EthereumAddress, ExternalChain } from "@/types";
 import { fromEthereumAddress } from "@/types";
-import type { Address, Amount } from "starkzap";
+import type { Address, Amount } from "@/types";
 
 const LAYERZERO_API_BASE = "https://transfer.layerzero-api.com/v1";
 

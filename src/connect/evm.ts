@@ -6,7 +6,7 @@ import {
 } from "@/types";
 import type { EthereumWalletConfig } from "@/bridge";
 import { BrowserProvider } from "ethers";
-import type { ChainId } from "starkzap";
+import type { ChainId } from "@/types";
 
 function assertEip1193Provider(provider: unknown): Eip1193Provider {
   if (

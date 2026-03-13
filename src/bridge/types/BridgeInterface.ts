@@ -1,11 +1,11 @@
 import {
+  type Address,
   Amount,
   type BridgeDepositFeeEstimation,
   type ExternalAddress,
   type ExternalTransactionResponse,
 } from "@/types";
 import type { WalletInterface } from "@/wallet";
-import type { Address } from "starkzap";
 
 /**
  * Protocol-specific options for bridge deposit operations.

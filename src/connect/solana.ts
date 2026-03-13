@@ -1,6 +1,6 @@
 import { assertNonEmptyString, describeValue } from "@/connect/utils";
 import { ExternalChain, type SolanaAddress } from "@/types";
-import type { ChainId } from "starkzap";
+import type { ChainId } from "@/types";
 import type { SolanaProvider } from "@/bridge/solana/types";
 
 export type { SolanaProvider } from "@/bridge/solana/types";

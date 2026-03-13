@@ -5,7 +5,7 @@ import type {
   Transaction,
   VersionedTransaction,
 } from "@solana/web3.js";
-import type { Amount } from "starkzap";
+import type { Amount } from "@/types";
 
 /**
  * Provider interface for Solana transactions.

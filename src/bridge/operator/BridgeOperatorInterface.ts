@@ -1,8 +1,8 @@
 import { BridgeToken } from "@/types/bridge/bridge-token";
 import { type ConnectedExternalWallet } from "@/connect";
-import type { Amount } from "starkzap";
 import type {
   Address,
+  Amount,
   BridgeDepositFeeEstimation,
   ExternalTransactionResponse,
 } from "@/types";

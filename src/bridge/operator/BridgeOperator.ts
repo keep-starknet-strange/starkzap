@@ -8,6 +8,7 @@ import { CanonicalEthereumBridge } from "@/bridge/ethereum/canonical/CanonicalEt
 import { Protocol } from "@/types/bridge/protocol";
 import {
   ConnectedEthereumWallet,
+  ConnectedSolanaWallet,
   type ConnectedExternalWallet,
   SolanaNetwork,
 } from "@/connect";
@@ -15,18 +16,15 @@ import type { WalletInterface } from "@/wallet";
 import type { BridgeOperatorInterface } from "@/bridge/operator/BridgeOperatorInterface";
 import {
   type Address,
+  type Amount,
   type BridgeDepositFeeEstimation,
   type BridgingConfig,
   type EthereumAddress,
   ExternalChain,
   type ExternalTransactionResponse,
   type SolanaAddress,
-} from "@/types";
-import {
-  type Amount,
-  ConnectedSolanaWallet,
   SolanaBridgeToken,
-} from "starkzap";
+} from "@/types";
 import { CCTPBridge } from "@/bridge/ethereum/cctp/CCTPBridge";
 import { LordsBridge } from "@/bridge/ethereum/lords/LordsBridge";
 import { OftBridge } from "@/bridge/ethereum/oft/OftBridge";

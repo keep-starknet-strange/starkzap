@@ -1,4 +1,4 @@
-import type { ChainId } from "starkzap";
+import type { ChainId } from "@/types";
 import {
   ETH_FAST_TRANSFER_FEE_BP,
   ETHEREUM_DOMAIN_ID,

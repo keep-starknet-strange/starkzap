@@ -3,6 +3,7 @@ import type {
   BridgeInterface,
 } from "@/bridge/types/BridgeInterface";
 import {
+  type Address,
   Amount,
   type BridgeDepositFeeEstimation,
   type EthereumAddress,
@@ -35,7 +36,6 @@ import {
 } from "@/types/errors";
 import type { WalletInterface } from "@/wallet";
 import CANONICAL_BRIDGE_ABI from "@/abi/ethereum/canonicalBridge.json";
-import type { Address } from "starkzap";
 
 export abstract class EthereumBridge implements BridgeInterface<EthereumAddress> {
   public static readonly ALLOWANCE_CACHE_TTL = 60_000;

@@ -1,6 +1,6 @@
 import type { PreparedTransactionRequest, Provider, Signer } from "ethers";
 import type { FeeErrorCause } from "@/types/errors";
-import type { Amount } from "starkzap";
+import type { Amount } from "@/types";
 
 export type EthereumWalletConfig = {
   signer: Signer;

@@ -1,5 +1,6 @@
 import type { BridgeInterface } from "@/bridge/types/BridgeInterface";
 import {
+  type Address,
   Amount,
   type ExternalTransactionResponse,
   type SolanaAddress,
@@ -11,7 +12,6 @@ import type {
   SolanaWalletConfig,
 } from "@/bridge/solana/types";
 import type { WalletInterface } from "@/wallet";
-import type { Address } from "starkzap";
 import {
   MultiProtocolProvider,
   type SolanaWeb3Transaction,

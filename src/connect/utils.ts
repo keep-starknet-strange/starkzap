@@ -1,4 +1,4 @@
-import type { ChainId } from "starkzap";
+import type { ChainId } from "@/types";
 
 export function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;

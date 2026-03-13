@@ -11,7 +11,7 @@ import {
 } from "@/types";
 import { ethereumAddress } from "@/bridge/ethereum/EtherToken";
 import { type ContractTransaction, toBigInt } from "ethers";
-import { type Address, Amount } from "starkzap";
+import { type Address, Amount } from "@/types";
 import { RPC, uint256 } from "starknet";
 import { FeeErrorCause } from "@/types/errors";
 
