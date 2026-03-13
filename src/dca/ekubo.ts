@@ -395,7 +395,7 @@ export class EkuboDcaProvider implements DcaProvider {
 
       return payload;
     } catch (error) {
-      if (controller?.signal.aborted) {
+      if (error instanceof Error && error.name === "AbortError") {
         throw new EkuboDcaProviderError(
           `Ekubo ${requestLabel} request timed out after ${DEFAULT_EKUBO_REQUEST_TIMEOUT_MS}ms`
         );
