@@ -126,7 +126,7 @@ function getEkuboOrderStatus(params: {
 }
 
 export function assertNonNegativeInteger(value: number, label: string): void {
-  if (!Number.isInteger(value) || value < 0) {
+  if (!Number.isSafeInteger(value) || value < 0) {
     throw new Error(`Invalid ${label}: ${value}`);
   }
 }
@@ -342,7 +342,7 @@ export function toOrderInfoCalldata(order: ParsedEkuboOrderId): string[] {
 }
 
 export function parseOrderInfoResult(result: string[]): EkuboOnChainOrderInfo {
-  if (result.length < 3) {
+  if (result.length !== 3) {
     throw new Error("Ekubo order info response is malformed");
   }
 
@@ -493,7 +493,9 @@ export function toEkuboDcaOrder(params: {
   };
 
   if (status === "CLOSED") {
-    order.closeDate = endDate;
+    order.closeDate = new Date(
+      Math.min(parsedOrderId.orderKey.endTime, params.nowSeconds) * 1000
+    );
   }
 
   return order;

@@ -38,6 +38,14 @@ import {
 } from "@/utils/ekubo";
 
 const MAX_U32 = 2n ** 32n - 1n;
+const DEFAULT_EKUBO_REQUEST_TIMEOUT_MS = 10_000;
+
+class EkuboDcaProviderError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "EkuboDcaProviderError";
+  }
+}
 
 interface EkuboDcaConfig {
   positions: Address;
@@ -364,18 +372,41 @@ export class EkuboDcaProvider implements DcaProvider {
     path: string,
     requestLabel: string
   ): Promise<unknown> {
-    const response = await this.fetcher(`${this.apiBase}${path}`);
-    const payload = await response.json().catch(() => null);
+    const controller =
+      typeof AbortController !== "undefined" ? new AbortController() : null;
+    const timeoutHandle = controller
+      ? setTimeout(() => controller.abort(), DEFAULT_EKUBO_REQUEST_TIMEOUT_MS)
+      : null;
 
-    if (!response.ok) {
-      const errorMessage = getEkuboErrorMessageFromPayload(payload);
-      const errorSuffix = errorMessage ? `: ${errorMessage}` : "";
-      throw new Error(
-        `Ekubo ${requestLabel} request failed (${response.status})${errorSuffix}`
+    try {
+      const response = await this.fetcher(
+        `${this.apiBase}${path}`,
+        controller ? { signal: controller.signal } : undefined
       );
-    }
+      const payload = await response.json().catch(() => null);
 
-    return payload;
+      if (!response.ok) {
+        const errorMessage = getEkuboErrorMessageFromPayload(payload);
+        const errorSuffix = errorMessage ? `: ${errorMessage}` : "";
+        throw new EkuboDcaProviderError(
+          `Ekubo ${requestLabel} request failed (${response.status})${errorSuffix}`
+        );
+      }
+
+      return payload;
+    } catch (error) {
+      if (controller?.signal.aborted) {
+        throw new EkuboDcaProviderError(
+          `Ekubo ${requestLabel} request timed out after ${DEFAULT_EKUBO_REQUEST_TIMEOUT_MS}ms`
+        );
+      }
+
+      throw error;
+    } finally {
+      if (timeoutHandle) {
+        clearTimeout(timeoutHandle);
+      }
+    }
   }
 
   private async getOrderInfos(
