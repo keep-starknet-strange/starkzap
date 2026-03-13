@@ -32,7 +32,7 @@ import {
   updateTransactionToast,
 } from "@/components/Toast";
 import { swapProviders } from "@/swaps";
-import { dcaProviders } from "@/dca";
+import { getDcaProviders } from "@/dca";
 
 // Privy server URL - change this to your server URL
 export const PRIVY_SERVER_URL = process.env.EXPO_PUBLIC_PRIVY_SERVER_URL ?? "";
@@ -839,6 +839,7 @@ export const useWalletStore = create<WalletState>((set, get) => ({
     addLog(`Connecting with ${selectedPreset} account...`);
 
     try {
+      const dcaProviders = getDcaProviders();
       const signer = new StarkSigner(privateKey.trim());
       const onboard = await sdk.onboard({
         strategy: OnboardStrategy.Signer,
@@ -886,6 +887,7 @@ export const useWalletStore = create<WalletState>((set, get) => ({
     addLog(`Connecting with Privy (${email})...`);
 
     try {
+      const dcaProviders = getDcaProviders();
       const onboard = await sdk.onboard({
         strategy: OnboardStrategy.Privy,
         deploy: "never",

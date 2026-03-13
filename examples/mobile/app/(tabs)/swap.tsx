@@ -36,7 +36,7 @@ import {
   getSwapProviderLabel,
   swapProviders,
 } from "@/swaps";
-import { dcaProviders } from "@/dca";
+import { getDcaProviders } from "@/dca";
 import {
   Amount,
   type ChainId,
@@ -276,7 +276,7 @@ export default function SwapScreen() {
           .dca()
           .listProviders()
           .map((providerId) => wallet.dca().getDcaProvider(providerId))
-      : dcaProviders;
+      : getDcaProviders();
 
     return registeredProviders.filter(
       (provider, index, providers) =>
