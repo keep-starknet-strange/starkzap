@@ -3,9 +3,13 @@ import type { RpcProvider } from "starknet";
 import { Amount, ChainId, fromAddress, type Token } from "@/types";
 import { EkuboDcaProvider, getEkuboDcaPreset } from "@/dca/ekubo";
 import {
+  assertNonNegativeInteger,
   parseEkuboOrdersResponse,
+  parseOrderInfoResult,
   parseEkuboPoolsResponse,
   parsePositiveBigInt,
+  toEkuboDcaOrder,
+  type EkuboOrderDescriptor,
 } from "@/dca/ekubo.helpers";
 
 const sellToken: Token = {
@@ -34,6 +38,7 @@ describe("EkuboDcaProvider", () => {
   afterEach(() => {
     vi.restoreAllMocks();
     vi.unstubAllGlobals();
+    vi.useRealTimers();
   });
 
   it("supports mainnet and sepolia", () => {
@@ -112,7 +117,10 @@ describe("EkuboDcaProvider", () => {
     });
 
     expect(fetchMock).toHaveBeenCalledWith(
-      `https://mock-ekubo/pair/${BigInt(ChainId.SEPOLIA.toFelt252()).toString()}/${sellToken.address}/${buyToken.address}/pools`
+      `https://mock-ekubo/pair/${BigInt(ChainId.SEPOLIA.toFelt252()).toString()}/${sellToken.address}/${buyToken.address}/pools`,
+      expect.objectContaining({
+        signal: expect.any(AbortSignal),
+      })
     );
     expect(prepared.providerId).toBe("ekubo");
     expect(prepared.orderAddress).toBe(preset.positions);
@@ -226,7 +234,10 @@ describe("EkuboDcaProvider", () => {
     });
 
     expect(fetchMock).toHaveBeenCalledWith(
-      `https://mock-ekubo/twap/orders/${context.walletAddress}?chainId=${chainId}&page=1&pageSize=50&state=opened`
+      `https://mock-ekubo/twap/orders/${context.walletAddress}?chainId=${chainId}&page=1&pageSize=50&state=opened`,
+      expect.objectContaining({
+        signal: expect.any(AbortSignal),
+      })
     );
     expect(callContract).toHaveBeenCalledWith({
       contractAddress: preset.positions,
@@ -333,6 +344,12 @@ describe("EkuboDcaProvider", () => {
     );
   });
 
+  it("rejects unsafe numeric metadata fields", () => {
+    expect(() =>
+      assertNonNegativeInteger(Number.MAX_SAFE_INTEGER + 1, "page")
+    ).toThrow(`Invalid page: ${Number.MAX_SAFE_INTEGER + 1}`);
+  });
+
   it("rejects malformed order payloads with missing required string fields", () => {
     expect(() =>
       parseEkuboOrdersResponse({
@@ -379,6 +396,12 @@ describe("EkuboDcaProvider", () => {
     ).toThrow("Invalid extension");
   });
 
+  it("rejects malformed order info tuples with extra fields", () => {
+    expect(() => parseOrderInfoResult(["1", "2", "3", "4"])).toThrow(
+      "Ekubo order info response is malformed"
+    );
+  });
+
   it("rejects cancel order ids for a different positions contract", async () => {
     const callContract = vi.fn();
     const provider = new EkuboDcaProvider();
@@ -399,5 +422,94 @@ describe("EkuboDcaProvider", () => {
     );
 
     expect(callContract).not.toHaveBeenCalled();
+  });
+
+  it("caps closeDate at now for early-closed future-dated orders", () => {
+    const preset = getEkuboDcaPreset(ChainId.SEPOLIA);
+    const descriptor: EkuboOrderDescriptor = {
+      apiOrder: {
+        key: {
+          sell_token: sellToken.address,
+          buy_token: buyToken.address,
+          fee: "300",
+          start_time: 1_900_000_000,
+          end_time: 1_900_086_400,
+        },
+        total_proceeds_withdrawn: "0",
+        sale_rate: "0",
+        last_collect_proceeds: null,
+        total_amount_sold: "0",
+      },
+      orderId: `ekubo-v1:${preset.positions}:7:${sellToken.address}:${buyToken.address}:300:1900000000:1900086400`,
+      parsedOrderId: {
+        positions: preset.positions,
+        tokenId: 7n,
+        orderKey: {
+          sellToken: sellToken.address,
+          buyToken: buyToken.address,
+          fee: 300n,
+          startTime: 1_900_000_000,
+          endTime: 1_900_086_400,
+        },
+      },
+    };
+
+    const order = toEkuboDcaOrder({
+      descriptor,
+      info: {
+        saleRate: 0n,
+        remainingSellAmount: 5_000_000n,
+        purchasedAmount: 0n,
+      },
+      traderAddress: fromAddress("0xabc"),
+      providerId: "ekubo",
+      nowSeconds: 1_900_000_100,
+    });
+
+    expect(order.status).toBe("CLOSED");
+    expect(order.closeDate?.getTime()).toBe(1_900_000_100_000);
+    expect(order.closeDate!.getTime()).toBeLessThan(order.endDate.getTime());
+  });
+
+  it("times out stalled Ekubo API requests", async () => {
+    vi.useFakeTimers();
+
+    const fetchMock = vi.fn().mockImplementation(
+      (_url: string, init?: RequestInit) =>
+        new Promise((_resolve, reject) => {
+          init?.signal?.addEventListener("abort", () => {
+            const error = new Error("aborted");
+            error.name = "AbortError";
+            reject(error);
+          });
+        })
+    );
+    const provider = new EkuboDcaProvider({
+      apiBase: "https://mock-ekubo",
+      fetcher: fetchMock as unknown as typeof fetch,
+    });
+    const context = {
+      chainId: ChainId.SEPOLIA,
+      provider: {
+        getBlock: vi.fn().mockResolvedValue({
+          timestamp: 1_000,
+        }),
+      } as unknown as RpcProvider,
+      walletAddress: fromAddress("0xabc"),
+    };
+
+    const promise = expect(
+      provider.prepareCreate(context, {
+        sellToken,
+        buyToken,
+        sellAmount: Amount.parse("5", sellToken),
+        sellAmountPerCycle: Amount.parse("1", sellToken),
+        frequency: "P1D",
+        traderAddress: context.walletAddress,
+      })
+    ).rejects.toThrow("Ekubo pair pools request timed out after 10000ms");
+
+    await vi.advanceTimersByTimeAsync(10_000);
+    await promise;
   });
 });

@@ -85,6 +85,7 @@ const sdk = new StarkZap({
 let wallet: WalletInterface | null = null;
 let walletType: "cartridge" | "privatekey" | "privy" | null = null;
 let confidential: TongoConfidential | null = null;
+let dcaOrdersRequestId = 0;
 
 // DOM Elements
 const walletSection = document.getElementById("wallet-section")!;
@@ -548,13 +549,59 @@ function initializeSwapForm(): void {
 }
 
 function clearDcaPreview(): void {
-  dcaPreviewEl.innerHTML = "";
+  dcaPreviewEl.replaceChildren();
   dcaPreviewEl.classList.add("hidden");
 }
 
 function clearDcaPricingBounds(): void {
   dcaMinBuyInput.value = "";
   dcaMaxBuyInput.value = "";
+}
+
+function createQuoteRow(label: string, value: string): HTMLDivElement {
+  const row = document.createElement("div");
+  row.className = "quote-row";
+
+  const labelEl = document.createElement("span");
+  labelEl.className = "quote-label";
+  labelEl.textContent = label;
+
+  const valueEl = document.createElement("span");
+  valueEl.className = "quote-value";
+  valueEl.textContent = value;
+
+  row.append(labelEl, valueEl);
+  return row;
+}
+
+function createOrderMeta(label: string, value: string): HTMLDivElement {
+  const meta = document.createElement("div");
+  meta.className = "order-meta";
+
+  const labelEl = document.createElement("span");
+  labelEl.className = "order-meta-label";
+  labelEl.textContent = label;
+
+  const valueEl = document.createElement("span");
+  valueEl.className = "order-meta-value";
+  valueEl.textContent = value;
+
+  meta.append(labelEl, valueEl);
+  return meta;
+}
+
+function getDcaStatusBadgeClass(status: DcaOrder["status"]): string {
+  if (status === "ACTIVE") {
+    return "status-deployed";
+  }
+  if (status === "INDEXING") {
+    return "status-checking";
+  }
+  return "status-not-deployed";
+}
+
+function resetDcaRefreshButton(): void {
+  setButtonLoading(btnDcaRefresh, false, "Refresh Orders");
 }
 
 function renderDcaPreview(params: {
@@ -578,19 +625,22 @@ function renderDcaPreview(params: {
   const routeCalls =
     params.routeCallCount != null ? `${params.routeCallCount}` : "n/a";
 
-  dcaPreviewEl.innerHTML = `
-    <div class="quote-row"><span class="quote-label">Preview Source</span><span class="quote-value">${params.previewProviderId.toUpperCase()}</span></div>
-    <div class="quote-row"><span class="quote-label">Cycle Sell</span><span class="quote-value">${params.sellAmountPerCycle.toFormatted(true)}</span></div>
-    <div class="quote-row"><span class="quote-label">Estimated Cycle Buy</span><span class="quote-value">${amountOut.toFormatted(true)}</span></div>
-    <div class="quote-row"><span class="quote-label">Price Impact</span><span class="quote-value">${priceImpactText}</span></div>
-    <div class="quote-row"><span class="quote-label">Route Calls</span><span class="quote-value">${routeCalls}</span></div>
-    <div class="quote-row"><span class="quote-label">Recurring Backend</span><span class="quote-value">${params.dcaProviderId.toUpperCase()}</span></div>
-  `;
+  dcaPreviewEl.replaceChildren(
+    createQuoteRow("Preview Source", params.previewProviderId.toUpperCase()),
+    createQuoteRow("Cycle Sell", params.sellAmountPerCycle.toFormatted(true)),
+    createQuoteRow("Estimated Cycle Buy", amountOut.toFormatted(true)),
+    createQuoteRow("Price Impact", priceImpactText),
+    createQuoteRow("Route Calls", routeCalls),
+    createQuoteRow("Recurring Backend", params.dcaProviderId.toUpperCase())
+  );
   dcaPreviewEl.classList.remove("hidden");
 }
 
 function renderEmptyDcaOrders(message: string): void {
-  dcaOrdersEl.innerHTML = `<div class="orders-empty">${message}</div>`;
+  const emptyState = document.createElement("div");
+  emptyState.className = "orders-empty";
+  emptyState.textContent = message;
+  dcaOrdersEl.replaceChildren(emptyState);
 }
 
 function describeTokenAddress(address: string): string {
@@ -676,7 +726,7 @@ function renderDcaOrders(orders: DcaOrder[]): void {
     return;
   }
 
-  dcaOrdersEl.innerHTML = "";
+  dcaOrdersEl.replaceChildren();
 
   for (const order of orders) {
     const card = document.createElement("div");
@@ -684,43 +734,49 @@ function renderDcaOrders(orders: DcaOrder[]): void {
 
     const orderHeader = document.createElement("div");
     orderHeader.className = "order-header";
-    orderHeader.innerHTML = `
-      <div>
-        <div class="order-title">${describeTokenAddress(order.sellTokenAddress)} -> ${describeTokenAddress(order.buyTokenAddress)}</div>
-        <div class="order-subtitle">${getDcaBackendLabel(order.providerId)} · ${truncateAddress(order.orderAddress)} · ${order.timestamp.toLocaleString()}</div>
-      </div>
-      <span class="status-badge ${order.status === "ACTIVE" ? "status-deployed" : order.status === "INDEXING" ? "status-checking" : "status-not-deployed"}">${order.status}</span>
-    `;
+    const orderHeaderInfo = document.createElement("div");
+    const orderTitle = document.createElement("div");
+    orderTitle.className = "order-title";
+    orderTitle.textContent = `${describeTokenAddress(order.sellTokenAddress)} -> ${describeTokenAddress(order.buyTokenAddress)}`;
+
+    const orderSubtitle = document.createElement("div");
+    orderSubtitle.className = "order-subtitle";
+    orderSubtitle.textContent = `${getDcaBackendLabel(order.providerId)} · ${truncateAddress(order.orderAddress)} · ${order.timestamp.toLocaleString()}`;
+
+    orderHeaderInfo.append(orderTitle, orderSubtitle);
+
+    const statusBadge = document.createElement("span");
+    statusBadge.className = `status-badge ${getDcaStatusBadgeClass(order.status)}`;
+    statusBadge.textContent = order.status;
+
+    orderHeader.append(orderHeaderInfo, statusBadge);
     card.appendChild(orderHeader);
 
     const orderGrid = document.createElement("div");
     orderGrid.className = "order-grid";
-    orderGrid.innerHTML = `
-      <div class="order-meta">
-        <span class="order-meta-label">Total Sell</span>
-        <span class="order-meta-value">${formatTokenAmount(order.sellAmountBase, order.sellTokenAddress)}</span>
-      </div>
-      <div class="order-meta">
-        <span class="order-meta-label">Sell / Cycle</span>
-        <span class="order-meta-value">${formatTokenAmount(order.sellAmountPerCycleBase, order.sellTokenAddress)}</span>
-      </div>
-      <div class="order-meta">
-        <span class="order-meta-label">Bought So Far</span>
-        <span class="order-meta-value">${formatTokenAmount(order.amountBoughtBase, order.buyTokenAddress)}</span>
-      </div>
-      <div class="order-meta">
-        <span class="order-meta-label">Frequency</span>
-        <span class="order-meta-value">${formatDcaFrequency(order)}</span>
-      </div>
-      <div class="order-meta">
-        <span class="order-meta-label">Progress</span>
-        <span class="order-meta-value">${order.executedTradesCount}/${order.iterations} executed</span>
-      </div>
-      <div class="order-meta">
-        <span class="order-meta-label">Status Detail</span>
-        <span class="order-meta-value">${order.pendingTradesCount} pending · ${order.cancelledTradesCount} cancelled</span>
-      </div>
-    `;
+    orderGrid.append(
+      createOrderMeta(
+        "Total Sell",
+        formatTokenAmount(order.sellAmountBase, order.sellTokenAddress)
+      ),
+      createOrderMeta(
+        "Sell / Cycle",
+        formatTokenAmount(order.sellAmountPerCycleBase, order.sellTokenAddress)
+      ),
+      createOrderMeta(
+        "Bought So Far",
+        formatTokenAmount(order.amountBoughtBase, order.buyTokenAddress)
+      ),
+      createOrderMeta("Frequency", formatDcaFrequency(order)),
+      createOrderMeta(
+        "Progress",
+        `${order.executedTradesCount}/${order.iterations} executed`
+      ),
+      createOrderMeta(
+        "Status Detail",
+        `${order.pendingTradesCount} pending · ${order.cancelledTradesCount} cancelled`
+      )
+    );
     card.appendChild(orderGrid);
 
     if (order.status !== "CLOSED") {
@@ -965,43 +1021,61 @@ function buildDcaInput() {
 }
 
 async function refreshDcaOrders(silent = false): Promise<void> {
-  if (!wallet) {
+  const requestId = ++dcaOrdersRequestId;
+  const currentWallet = wallet;
+  if (!currentWallet) {
     renderEmptyDcaOrders("Connect a wallet to load DCA orders.");
     return;
   }
 
-  const providerId = dcaProviderSelect.value;
-  if (!providerId || !dcaProvidersById.has(providerId)) {
+  const currentProvider = dcaProviderSelect.value;
+  if (!currentProvider || !dcaProvidersById.has(currentProvider)) {
     renderEmptyDcaOrders("Select a DCA backend to load orders.");
     return;
   }
+
+  const isCurrentRequest = (): boolean =>
+    requestId === dcaOrdersRequestId &&
+    wallet === currentWallet &&
+    dcaProviderSelect.value === currentProvider &&
+    dcaProvidersById.has(currentProvider);
 
   if (!silent) {
     setButtonLoading(btnDcaRefresh, true);
   }
 
   try {
-    const page = await wallet.dca().getOrders({
-      provider: providerId,
+    const page = await currentWallet.dca().getOrders({
+      provider: currentProvider,
       size: DCA_ORDER_PAGE_SIZE,
     });
+    if (!isCurrentRequest()) {
+      return;
+    }
+
     renderDcaOrders(page.content);
     if (!silent) {
       log(
-        `Loaded ${page.content.length} ${providerId.toUpperCase()} DCA orders`,
+        `Loaded ${page.content.length} ${currentProvider.toUpperCase()} DCA orders`,
         "success"
       );
     }
   } catch (err) {
+    if (!isCurrentRequest()) {
+      return;
+    }
+
     renderEmptyDcaOrders("Unable to load DCA orders right now.");
     if (!silent) {
       log(`DCA order refresh failed: ${err}`, "error");
     }
   } finally {
-    if (!silent) {
-      setButtonLoading(btnDcaRefresh, false, "Refresh Orders");
+    if (isCurrentRequest()) {
+      if (!silent) {
+        setButtonLoading(btnDcaRefresh, false, "Refresh Orders");
+      }
+      updateDcaButtons();
     }
-    updateDcaButtons();
   }
 }
 
@@ -1020,6 +1094,7 @@ function log(
 
 // UI State
 function showConnected() {
+  resetDcaRefreshButton();
   walletSection.classList.add("visible");
   const labels: Record<string, string> = {
     cartridge: "Cartridge Wallet",
@@ -1034,6 +1109,7 @@ function showConnected() {
 }
 
 function showDisconnected() {
+  resetDcaRefreshButton();
   walletSection.classList.remove("visible");
   pkForm.classList.add("hidden");
   privyForm.classList.add("hidden");
@@ -1982,6 +2058,7 @@ swapSponsoredInput.addEventListener("change", () => {
 });
 
 dcaProviderSelect.addEventListener("change", () => {
+  resetDcaRefreshButton();
   clearDcaPricingBounds();
   clearDcaPreview();
   void refreshDcaOrders(true);
