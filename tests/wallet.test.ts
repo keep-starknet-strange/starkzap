@@ -141,7 +141,7 @@ describe("Wallet", () => {
           amountOutBase: 2_000_000n,
           provider: "ekubo",
         }),
-        swap: vi.fn(),
+        prepareSwap: vi.fn(),
       };
 
       const wallet = await sdk.connectWallet({

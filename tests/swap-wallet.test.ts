@@ -104,7 +104,7 @@ describe("BaseWallet swap abstraction", () => {
       id: "provider",
       supportsChain: () => true,
       getQuote: async () => quote,
-      swap: async () => ({
+      prepareSwap: async () => ({
         calls: [swapCall],
         quote,
       }),
@@ -121,7 +121,39 @@ describe("BaseWallet swap abstraction", () => {
     expect(response).toEqual(quote);
   });
 
-  it("executes provider swap calls with options", async () => {
+  it("prepares swap calls without executing them", async () => {
+    const wallet = new TestWallet();
+    const amountIn = Amount.parse("50", mockToken);
+    const quote = {
+      amountInBase: amountIn.toBase(),
+      amountOutBase: amountIn.toBase(),
+    } as const;
+    const provider: SwapProvider = {
+      id: "provider",
+      supportsChain: () => true,
+      getQuote: async () => quote,
+      prepareSwap: async () => ({
+        calls: [swapCall],
+        quote,
+      }),
+    };
+
+    const prepared = await wallet.prepareSwap({
+      provider,
+      chainId: ChainId.SEPOLIA,
+      tokenIn: mockToken,
+      tokenOut: mockToken,
+      amountIn,
+    });
+
+    expect(prepared).toEqual({
+      calls: [swapCall],
+      quote,
+    });
+    expect(wallet.executeSpy).not.toHaveBeenCalled();
+  });
+
+  it("executes provider prepareSwap calls with options", async () => {
     const wallet = new TestWallet();
     const amountIn = Amount.parse("50", mockToken);
     const options: ExecuteOptions = { feeMode: "sponsored" };
@@ -133,7 +165,7 @@ describe("BaseWallet swap abstraction", () => {
         amountInBase: amountIn.toBase(),
         amountOutBase: amountIn.toBase(),
       }),
-      swap: async () => ({
+      prepareSwap: async () => ({
         calls: [swapCall],
         quote: {
           amountInBase: amountIn.toBase(),
@@ -157,7 +189,7 @@ describe("BaseWallet swap abstraction", () => {
     expect(tx).toEqual({ hash: "0xtx" });
   });
 
-  it("throws when provider swap returns no calls", async () => {
+  it("throws when provider prepareSwap returns no calls", async () => {
     const wallet = new TestWallet();
     const amountIn = Amount.parse("50", mockToken);
 
@@ -168,7 +200,7 @@ describe("BaseWallet swap abstraction", () => {
         amountInBase: amountIn.toBase(),
         amountOutBase: amountIn.toBase(),
       }),
-      swap: async () => ({
+      prepareSwap: async () => ({
         calls: [],
         quote: {
           amountInBase: amountIn.toBase(),
@@ -188,7 +220,7 @@ describe("BaseWallet swap abstraction", () => {
     ).rejects.toThrow('Swap provider "provider" returned no calls');
   });
 
-  it("propagates provider swap errors", async () => {
+  it("propagates provider prepareSwap errors", async () => {
     const wallet = new TestWallet();
     const amountIn = Amount.parse("50", mockToken);
 
@@ -199,7 +231,7 @@ describe("BaseWallet swap abstraction", () => {
         amountInBase: amountIn.toBase(),
         amountOutBase: amountIn.toBase(),
       }),
-      swap: async () => {
+      prepareSwap: async () => {
         throw new Error("provider failed");
       },
     };
@@ -226,7 +258,7 @@ describe("BaseWallet swap abstraction", () => {
       id: "default",
       supportsChain: () => true,
       getQuote: vi.fn().mockResolvedValue(quote),
-      swap: vi.fn(),
+      prepareSwap: vi.fn(),
     };
     const wallet = new TestWallet(provider);
 
@@ -251,7 +283,7 @@ describe("BaseWallet swap abstraction", () => {
         amountOutBase: amountIn.toBase(),
         provider: "default",
       }),
-      swap: vi.fn(),
+      prepareSwap: vi.fn(),
     };
     const wallet = new TestWallet(provider);
 
@@ -278,7 +310,7 @@ describe("BaseWallet swap abstraction", () => {
       id: "default",
       supportsChain: () => true,
       getQuote: vi.fn(),
-      swap: vi.fn().mockResolvedValue({
+      prepareSwap: vi.fn().mockResolvedValue({
         calls: [swapCall],
         quote: {
           amountInBase: amountIn.toBase(),
@@ -298,7 +330,7 @@ describe("BaseWallet swap abstraction", () => {
       options
     );
 
-    expect(provider.swap).toHaveBeenCalledTimes(1);
+    expect(provider.prepareSwap).toHaveBeenCalledTimes(1);
     expect(wallet.executeSpy).toHaveBeenCalledWith([swapCall], options);
     expect(tx).toEqual({ hash: "0xtx" });
   });
@@ -312,7 +344,7 @@ describe("BaseWallet swap abstraction", () => {
         amountInBase: amountIn.toBase(),
         amountOutBase: 1n,
       }),
-      swap: vi.fn(),
+      prepareSwap: vi.fn(),
     };
     const ekuboProvider: SwapProvider = {
       id: "ekubo",
@@ -321,7 +353,7 @@ describe("BaseWallet swap abstraction", () => {
         amountInBase: amountIn.toBase(),
         amountOutBase: 2n,
       }),
-      swap: vi.fn(),
+      prepareSwap: vi.fn(),
     };
     const wallet = new TestWallet(avnuProvider);
 
@@ -349,7 +381,7 @@ describe("BaseWallet swap abstraction", () => {
         amountInBase: amountIn.toBase(),
         amountOutBase: amountIn.toBase(),
       }),
-      swap: vi.fn().mockResolvedValue({
+      prepareSwap: vi.fn().mockResolvedValue({
         calls: [swapCall],
         quote: {
           amountInBase: amountIn.toBase(),
@@ -376,7 +408,7 @@ describe("BaseWallet swap abstraction", () => {
     });
 
     expect(provider.getQuote).toHaveBeenCalledTimes(1);
-    expect(provider.swap).toHaveBeenCalledTimes(1);
+    expect(provider.prepareSwap).toHaveBeenCalledTimes(1);
     expect(quote.amountOutBase).toBe(amountIn.toBase());
     expect(tx).toEqual({ hash: "0xtx" });
   });
@@ -390,7 +422,7 @@ describe("BaseWallet swap abstraction", () => {
         amountInBase: amountIn.toBase(),
         amountOutBase: amountIn.toBase(),
       }),
-      swap: vi.fn(),
+      prepareSwap: vi.fn(),
     };
     const wallet = new TestWallet(defaultProvider);
 
@@ -413,7 +445,7 @@ describe("BaseWallet swap abstraction", () => {
       id: "ekubo",
       supportsChain: () => true,
       getQuote: vi.fn(),
-      swap: vi.fn(),
+      prepareSwap: vi.fn(),
     };
     const wallet = new TestWallet(provider);
 
@@ -433,7 +465,7 @@ describe("BaseWallet swap abstraction", () => {
       id: "unsupported",
       supportsChain: () => false,
       getQuote: vi.fn(),
-      swap: vi.fn(),
+      prepareSwap: vi.fn(),
     };
     const wallet = new TestWallet(provider);
 

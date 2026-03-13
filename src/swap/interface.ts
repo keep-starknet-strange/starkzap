@@ -60,9 +60,10 @@ export type PreparedSwap = {
 };
 
 /**
- * High-level provider contract for multi-protocol swap integrations.
+ * Advanced provider contract for multi-protocol swap integrations.
  *
- * Implement this interface for each protocol (Ekubo, AVNU, etc.).
+ * App code should usually call `wallet.getQuote(...)`, `wallet.prepareSwap(...)`,
+ * or `wallet.swap(...)` instead of talking to providers directly.
  */
 export type SwapProvider = {
   /** Stable provider identifier (e.g. `"ekubo"`) */
@@ -71,6 +72,8 @@ export type SwapProvider = {
   supportsChain(chainId: ChainId): boolean;
   /** Fetch a provider quote for the request */
   getQuote(request: SwapRequest): Promise<SwapQuote>;
-  /** Build a prepared swap (calls + quote) from protocol-specific routing logic */
-  swap(request: SwapRequest): Promise<PreparedSwap>;
+  /**
+   * Build a prepared swap (calls + quote) from protocol-specific routing logic.
+   */
+  prepareSwap(request: SwapRequest): Promise<PreparedSwap>;
 };

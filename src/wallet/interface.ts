@@ -12,7 +12,7 @@ import type { Erc20 } from "@/erc20";
 import type { Staking } from "@/staking";
 import type { LendingClient } from "@/lending";
 import type { DcaClient } from "@/dca";
-import type { SwapInput, SwapQuote, SwapProvider } from "@/swap";
+import type { PreparedSwap, SwapInput, SwapQuote, SwapProvider } from "@/swap";
 import type {
   Address,
   Amount,
@@ -103,7 +103,7 @@ export interface WalletInterface {
   lending(): LendingClient;
 
   /**
-   * Access DCA helpers for recurring AVNU orders and per-cycle swap previews.
+   * Access DCA helpers for protocol-native recurring orders and per-cycle swap previews.
    */
   dca(): DcaClient;
 
@@ -114,6 +114,14 @@ export interface WalletInterface {
    * If omitted, uses the wallet default provider.
    */
   getQuote(request: SwapInput): Promise<SwapQuote>;
+
+  /**
+   * Prepare a swap without executing it.
+   *
+   * Advanced API for batching, simulation, or custom execution flows.
+   * Most apps should prefer `wallet.swap(...)`.
+   */
+  prepareSwap(request: SwapInput): Promise<PreparedSwap>;
 
   /**
    * Execute a swap.

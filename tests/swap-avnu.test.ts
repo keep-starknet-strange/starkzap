@@ -92,7 +92,7 @@ describe("AvnuSwapProvider", () => {
     );
   });
 
-  it("builds swap calls and includes slippage", async () => {
+  it("builds prepared swap calls and includes slippage", async () => {
     avnuMocks.getQuotes.mockResolvedValue([
       makeQuote({
         quoteId: "q-42",
@@ -117,7 +117,7 @@ describe("AvnuSwapProvider", () => {
       },
     });
 
-    const prepared = await provider.swap({
+    const prepared = await provider.prepareSwap({
       chainId: ChainId.MAINNET,
       takerAddress,
       tokenIn,
@@ -143,6 +143,53 @@ describe("AvnuSwapProvider", () => {
         slippage: 0.01,
         executeApprove: true,
         takerAddress,
+      },
+      { baseUrl: "https://mock-main.avnu.fi" }
+    );
+  });
+
+  it("omits takerAddress from AVNU requests when no taker is provided", async () => {
+    avnuMocks.getQuotes.mockResolvedValue([
+      makeQuote({ quoteId: "q-no-taker" }),
+    ]);
+    avnuMocks.quoteToCalls.mockResolvedValue({
+      chainId: "SN_MAIN",
+      calls: [
+        {
+          contractAddress: "0x123",
+          entrypoint: "swap",
+          calldata: ["0x1"],
+        },
+      ],
+    });
+
+    const provider = new AvnuSwapProvider({
+      apiBases: {
+        SN_MAIN: ["https://mock-main.avnu.fi"],
+      },
+    });
+
+    await provider.prepareSwap({
+      chainId: ChainId.MAINNET,
+      tokenIn,
+      tokenOut,
+      amountIn: Amount.parse("1", tokenIn),
+    });
+
+    expect(avnuMocks.getQuotes).toHaveBeenCalledWith(
+      {
+        sellTokenAddress: tokenIn.address,
+        buyTokenAddress: tokenOut.address,
+        sellAmount: 1000000n,
+        size: 5,
+      },
+      { baseUrl: "https://mock-main.avnu.fi" }
+    );
+    expect(avnuMocks.quoteToCalls).toHaveBeenCalledWith(
+      {
+        quoteId: "q-no-taker",
+        slippage: 0.01,
+        executeApprove: true,
       },
       { baseUrl: "https://mock-main.avnu.fi" }
     );
@@ -230,7 +277,7 @@ describe("AvnuSwapProvider", () => {
     });
 
     await expect(
-      provider.swap({
+      provider.prepareSwap({
         chainId: ChainId.MAINNET,
         tokenIn,
         tokenOut,
