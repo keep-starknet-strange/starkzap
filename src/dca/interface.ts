@@ -13,6 +13,7 @@ import type { Tx } from "@/tx";
 export type DcaOrderStatus = "INDEXING" | "ACTIVE" | "CLOSED";
 export type DcaTradeStatus = "CANCELLED" | "PENDING" | "SUCCEEDED";
 export type DcaAction = "create" | "cancel";
+export type DcaFrequency = string;
 
 export interface DcaPricingStrategyInput {
   minBuyAmount?: Amount;
@@ -52,7 +53,7 @@ export interface DcaOrder {
   startDate: Date;
   endDate: Date;
   closeDate?: Date;
-  frequency: string;
+  frequency: DcaFrequency;
   iterations: number;
   status: DcaOrderStatus;
   pricingStrategy: DcaPricingStrategy;
@@ -86,7 +87,7 @@ export interface DcaCreateRequest {
   buyToken: Token;
   sellAmount: Amount;
   sellAmountPerCycle: Amount;
-  frequency: string;
+  frequency: DcaFrequency;
   traderAddress: Address;
   pricingStrategy?: DcaPricingStrategyInput;
 }
@@ -99,16 +100,37 @@ export interface DcaCreateInput extends Omit<
   traderAddress?: AddressInput;
 }
 
-export interface DcaCancelRequest {
-  orderId?: string;
+interface DcaCancelRequestByOrderId {
+  orderId: string;
   orderAddress?: Address;
 }
 
-export interface DcaCancelInput {
-  provider?: DcaProvider | string;
+interface DcaCancelRequestByOrderAddress {
   orderId?: string;
+  orderAddress: Address;
+}
+
+export type DcaCancelRequest =
+  | DcaCancelRequestByOrderId
+  | DcaCancelRequestByOrderAddress;
+
+interface DcaCancelInputBase {
+  provider?: DcaProvider | string;
+}
+
+interface DcaCancelInputByOrderId extends DcaCancelInputBase {
+  orderId: string;
   orderAddress?: AddressInput;
 }
+
+interface DcaCancelInputByOrderAddress extends DcaCancelInputBase {
+  orderId?: string;
+  orderAddress: AddressInput;
+}
+
+export type DcaCancelInput =
+  | DcaCancelInputByOrderId
+  | DcaCancelInputByOrderAddress;
 
 export interface DcaOrdersRequest {
   traderAddress: Address;

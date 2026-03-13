@@ -2,6 +2,11 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type { RpcProvider } from "starknet";
 import { Amount, ChainId, fromAddress, type Token } from "@/types";
 import { EkuboDcaProvider, getEkuboDcaPreset } from "@/dca/ekubo";
+import {
+  parseEkuboOrdersResponse,
+  parseEkuboPoolsResponse,
+  parsePositiveBigInt,
+} from "@/dca/ekubo.helpers";
 
 const sellToken: Token = {
   name: "USD Coin",
@@ -320,5 +325,79 @@ describe("EkuboDcaProvider", () => {
         },
       ],
     });
+  });
+
+  it("preserves negative bigint validation errors", () => {
+    expect(() => parsePositiveBigInt("-1", "tokenId")).toThrow(
+      "tokenId cannot be negative"
+    );
+  });
+
+  it("rejects malformed order payloads with missing required string fields", () => {
+    expect(() =>
+      parseEkuboOrdersResponse({
+        orders: [
+          {
+            chain_id: BigInt(ChainId.SEPOLIA.toFelt252()).toString(),
+            nft_address: getEkuboDcaPreset(ChainId.SEPOLIA).positionsNft,
+            token_id: "7",
+            orders: [
+              {
+                key: {
+                  buy_token: buyToken.address,
+                  fee: "300",
+                  start_time: 1_900_000_000,
+                  end_time: 1_900_086_400,
+                },
+                total_proceeds_withdrawn: "0",
+                sale_rate: "1200",
+                last_collect_proceeds: null,
+                total_amount_sold: "1000000",
+              },
+            ],
+          },
+        ],
+        pagination: {
+          page: 1,
+          pageSize: 50,
+          totalPages: 1,
+          totalItems: 1,
+        },
+      })
+    ).toThrow("Invalid sell_token");
+  });
+
+  it("rejects malformed pool payloads with missing required string fields", () => {
+    expect(() =>
+      parseEkuboPoolsResponse({
+        topPools: [
+          {
+            fee: "300",
+          },
+        ],
+      })
+    ).toThrow("Invalid extension");
+  });
+
+  it("rejects cancel order ids for a different positions contract", async () => {
+    const callContract = vi.fn();
+    const provider = new EkuboDcaProvider();
+    const context = {
+      chainId: ChainId.SEPOLIA,
+      provider: {
+        callContract,
+      } as unknown as RpcProvider,
+      walletAddress: fromAddress("0xabc"),
+    };
+
+    await expect(
+      provider.prepareCancel(context, {
+        orderId: `ekubo-v1:0x1234:7:${sellToken.address}:${buyToken.address}:300:1710000000:1710086400`,
+      })
+    ).rejects.toThrow(
+      "Ekubo DCA orderId does not match the positions contract for the current chain"
+    );
+
+    expect(callContract).not.toHaveBeenCalled();
   });
 });
