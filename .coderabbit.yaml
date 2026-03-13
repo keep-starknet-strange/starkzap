@@ -58,7 +58,7 @@ reviews:
     # Most useful for this repo: rely on GitHub Actions + eslint + secret scanners.
     github-checks:
       enabled: true
-      timeout_ms: 1200000
+      timeout_ms: 900000
     eslint:
       enabled: true
     actionlint:
