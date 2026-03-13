@@ -13,7 +13,7 @@ import {
   fromSolanaAddress,
   Protocol,
   type SolanaDepositFeeEstimation,
-  type SolanaSigner,
+  type SolanaProvider,
   type StarkZap,
   type WalletInterface,
 } from "starkzap";
@@ -162,7 +162,7 @@ export class BridgeController {
   }
 
   connectSolanaWallet(
-    signer: SolanaSigner,
+    signer: SolanaProvider,
     address: string,
     walletChainId: string
   ): void {
@@ -170,7 +170,7 @@ export class BridgeController {
       const wallet = ConnectedSolanaWallet.from(
         {
           chain: ExternalChain.SOLANA,
-          signer,
+          provider: signer,
           address: fromSolanaAddress(address),
           chainId: walletChainId,
         },

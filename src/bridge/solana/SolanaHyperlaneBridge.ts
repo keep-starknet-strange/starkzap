@@ -77,7 +77,7 @@ export class SolanaHyperlaneBridge implements BridgeInterface<SolanaAddress> {
     let lastSignature = "";
 
     for (const tx of transactions) {
-      lastSignature = await this.config.signer.signAndSendTransaction(
+      lastSignature = await this.config.provider.signAndSendTransaction(
         tx.transaction
       );
     }

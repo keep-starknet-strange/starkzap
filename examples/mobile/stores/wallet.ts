@@ -658,16 +658,22 @@ export const useWalletStore = create<WalletState>((set, get) => ({
       bridgeSelectedToken,
       bridgeDirection,
       connectedEthWallet,
+      connectedSolWallet,
       bridgeFastTransfer,
       addLog,
     } = get();
 
+    if (!wallet || !bridgeSelectedToken || bridgeDirection !== "to-starknet") {
+      set({ bridgeDepositFeeEstimate: null, bridgeDepositFeeLoading: false });
+      return;
+    }
+
+    const isEthereum = bridgeSelectedToken.chain === ExternalChain.ETHEREUM;
+    const isSolana = bridgeSelectedToken.chain === ExternalChain.SOLANA;
+
     if (
-      !wallet ||
-      !bridgeSelectedToken ||
-      bridgeDirection !== "to-starknet" ||
-      bridgeSelectedToken.chain !== ExternalChain.ETHEREUM ||
-      !connectedEthWallet
+      (isEthereum && !connectedEthWallet) ||
+      (isSolana && !connectedSolWallet)
     ) {
       set({ bridgeDepositFeeEstimate: null, bridgeDepositFeeLoading: false });
       return;
@@ -676,11 +682,24 @@ export const useWalletStore = create<WalletState>((set, get) => ({
     set({ bridgeDepositFeeLoading: true });
 
     try {
-      const estimate = await wallet.getDepositFeeEstimate(
-        bridgeSelectedToken as EthereumBridgeToken,
-        connectedEthWallet,
-        { fastTransfer: bridgeFastTransfer }
-      );
+      let estimate: BridgeDepositFeeEstimation;
+
+      if (isEthereum && connectedEthWallet) {
+        estimate = await wallet.getDepositFeeEstimate(
+          bridgeSelectedToken as EthereumBridgeToken,
+          connectedEthWallet,
+          { fastTransfer: bridgeFastTransfer }
+        );
+      } else if (isSolana && connectedSolWallet) {
+        estimate = await wallet.getDepositFeeEstimate(
+          bridgeSelectedToken as SolanaBridgeToken,
+          connectedSolWallet
+        );
+      } else {
+        set({ bridgeDepositFeeEstimate: null, bridgeDepositFeeLoading: false });
+        return;
+      }
+
       set({
         bridgeDepositFeeEstimate: estimate,
         bridgeDepositFeeLoading: false,
@@ -758,8 +777,13 @@ export const useWalletStore = create<WalletState>((set, get) => ({
           bridgeSelectedToken.chain === ExternalChain.SOLANA &&
           connectedSolWallet
         ) {
-          throw new Error("Not supported yet");
-          // addLog(`Deposit tx sent: ${txSignature}`);
+          const txResponse = await wallet.deposit(
+            wallet.address,
+            depositAmount,
+            bridgeSelectedToken as SolanaBridgeToken,
+            connectedSolWallet
+          );
+          addLog(`Deposit tx sent: ${txResponse.hash}`);
         }
       } catch (err) {
         const errStr = String(err);

@@ -9,6 +9,7 @@ import { Protocol } from "@/types/bridge/protocol";
 import {
   ConnectedEthereumWallet,
   type ConnectedExternalWallet,
+  SolanaNetwork,
 } from "@/connect";
 import type { WalletInterface } from "@/wallet";
 import type { BridgeOperatorInterface } from "@/bridge/operator/BridgeOperatorInterface";
@@ -30,6 +31,7 @@ import { CCTPBridge } from "@/bridge/ethereum/cctp/CCTPBridge";
 import { LordsBridge } from "@/bridge/ethereum/lords/LordsBridge";
 import { OftBridge } from "@/bridge/ethereum/oft/OftBridge";
 import { SolanaHyperlaneBridge } from "@/bridge/solana/SolanaHyperlaneBridge";
+import { clusterApiUrl, Connection } from "@solana/web3.js";
 
 export class BridgeOperator implements BridgeOperatorInterface {
   private cache = new BridgeCache();
@@ -171,9 +173,19 @@ export class BridgeOperator implements BridgeOperatorInterface {
     externalWallet: ConnectedSolanaWallet,
     starknetWallet: WalletInterface
   ): Promise<BridgeInterface<SolanaAddress>> {
-    const walletConfig = externalWallet.toSolanaWalletConfig(
-      this.bridgingConfig?.solanaRpcUrl
-    );
+    const cluster =
+      externalWallet.network === SolanaNetwork.MAINNET
+        ? "mainnet-beta"
+        : "testnet";
+    const endpoint =
+      this.bridgingConfig?.solanaRpcUrl ?? clusterApiUrl(cluster);
+    const connection = new Connection(endpoint);
+
+    const walletConfig = {
+      address: externalWallet.address,
+      provider: externalWallet.provider,
+      connection,
+    };
 
     switch (token.protocol) {
       case Protocol.HYPERLANE:

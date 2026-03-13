@@ -13,7 +13,7 @@ import {
   TongoConfidential,
   ExternalChain,
   type Eip1193Provider,
-  type SolanaSigner,
+  type SolanaProvider,
   type WalletInterface,
   type AccountClassConfig,
   type SwapProvider,
@@ -1530,7 +1530,7 @@ btnBridgeDeposit.addEventListener("click", () => {
 // Account and network are separate subscriptions; we store latest
 // values and reconcile in shared sync functions.
 let appKitEthProvider: Eip1193Provider | null = null;
-let appKitSolSigner: SolanaSigner | null = null;
+let appKitSolSigner: SolanaProvider | null = null;
 
 function syncEthWalletFromAppKit(): void {
   if (!bridgeController || !appKit) return;
@@ -1575,14 +1575,8 @@ function syncWalletsFromAppKit(): void {
 
 if (appKit) {
   appKit.subscribeProviders((providers) => {
-    appKitEthProvider =
-      (providers[
-        "eip155" as keyof typeof providers
-      ] as unknown as Eip1193Provider) ?? null;
-    appKitSolSigner =
-      (providers[
-        "solana" as keyof typeof providers
-      ] as unknown as SolanaSigner) ?? null;
+    appKitEthProvider = providers["eip155"] as Eip1193Provider | null;
+    appKitSolSigner = providers["solana"] as SolanaProvider | null;
     syncWalletsFromAppKit();
   });
 

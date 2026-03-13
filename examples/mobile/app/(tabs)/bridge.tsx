@@ -14,10 +14,12 @@ import {
   type CCTPDepositFeeEstimation,
   type ConnectExternalWalletOptions,
   type Eip1193Provider,
+  type EthereumDepositFeeEstimation,
   ExternalChain,
   fromEthereumAddress,
   fromSolanaAddress,
   Protocol,
+  type SolanaDepositFeeEstimation,
   type SolanaProvider,
 } from "@starkzap/native";
 
@@ -110,6 +112,7 @@ export default function BridgeScreen() {
     bridgeSelectedToken,
     bridgeDirection,
     connectedEthWallet,
+    connectedSolWallet,
     bridgeFastTransfer,
     fetchBridgeDepositFeeEstimate,
   ]);
@@ -175,6 +178,7 @@ export default function BridgeScreen() {
 
   const isDepositExternal = bridgeDirection === "to-starknet";
   const isCCTP = bridgeSelectedToken?.protocol === Protocol.CCTP;
+  const isSolanaToken = bridgeSelectedToken?.chain === ExternalChain.SOLANA;
 
   const [amountInput, setAmountInput] = useState("");
   const [isBridging, setIsBridging] = useState(false);
@@ -693,53 +697,91 @@ export default function BridgeScreen() {
                 </ThemedText>
               </View>
             ) : bridgeDepositFeeEstimate ? (
-              <>
-                <View style={styles.feeRow}>
-                  <ThemedText
-                    style={[styles.feeLabel, { color: textSecondary }]}
-                  >
-                    L1 Gas Fee
-                  </ThemedText>
-                  <ThemedText style={styles.feeValue}>
-                    {bridgeDepositFeeEstimate.l1FeeError ??
-                      bridgeDepositFeeEstimate.l1Fee.toFormatted()}
-                  </ThemedText>
-                </View>
-                <View style={styles.feeRow}>
-                  <ThemedText
-                    style={[styles.feeLabel, { color: textSecondary }]}
-                  >
-                    L2 Message Fee
-                  </ThemedText>
-                  <ThemedText style={styles.feeValue}>
-                    {bridgeDepositFeeEstimate.l2FeeError ??
-                      bridgeDepositFeeEstimate.l2Fee.toFormatted()}
-                  </ThemedText>
-                </View>
-                <View style={styles.feeRow}>
-                  <ThemedText
-                    style={[styles.feeLabel, { color: textSecondary }]}
-                  >
-                    Approval Fee
-                  </ThemedText>
-                  <ThemedText style={styles.feeValue}>
-                    {bridgeDepositFeeEstimate.approvalFeeError ??
-                      bridgeDepositFeeEstimate.approvalFee.toFormatted()}
-                  </ThemedText>
-                </View>
-                {isCCTP && "fastTransferBpFee" in bridgeDepositFeeEstimate ? (
-                  <View style={styles.feeRow}>
-                    <ThemedText
-                      style={[styles.feeLabel, { color: textSecondary }]}
-                    >
-                      CCTP Fee
-                    </ThemedText>
-                    <ThemedText style={styles.feeValue}>
-                      {`${((bridgeDepositFeeEstimate as CCTPDepositFeeEstimation).fastTransferBpFee / 100).toFixed(2)}%`}
-                    </ThemedText>
-                  </View>
-                ) : null}
-              </>
+              isSolanaToken ? (
+                (() => {
+                  const solFee =
+                    bridgeDepositFeeEstimate as SolanaDepositFeeEstimation;
+                  return (
+                    <>
+                      <View style={styles.feeRow}>
+                        <ThemedText
+                          style={[styles.feeLabel, { color: textSecondary }]}
+                        >
+                          Local Fee
+                        </ThemedText>
+                        <ThemedText style={styles.feeValue}>
+                          {solFee.localFeeError ??
+                            solFee.localFee.toFormatted()}
+                        </ThemedText>
+                      </View>
+                      <View style={styles.feeRow}>
+                        <ThemedText
+                          style={[styles.feeLabel, { color: textSecondary }]}
+                        >
+                          Interchain Fee
+                        </ThemedText>
+                        <ThemedText style={styles.feeValue}>
+                          {solFee.interchainFeeError ??
+                            solFee.interchainFee.toFormatted()}
+                        </ThemedText>
+                      </View>
+                    </>
+                  );
+                })()
+              ) : (
+                (() => {
+                  const ethFee =
+                    bridgeDepositFeeEstimate as EthereumDepositFeeEstimation;
+                  return (
+                    <>
+                      <View style={styles.feeRow}>
+                        <ThemedText
+                          style={[styles.feeLabel, { color: textSecondary }]}
+                        >
+                          L1 Gas Fee
+                        </ThemedText>
+                        <ThemedText style={styles.feeValue}>
+                          {ethFee.l1FeeError ?? ethFee.l1Fee.toFormatted()}
+                        </ThemedText>
+                      </View>
+                      <View style={styles.feeRow}>
+                        <ThemedText
+                          style={[styles.feeLabel, { color: textSecondary }]}
+                        >
+                          L2 Message Fee
+                        </ThemedText>
+                        <ThemedText style={styles.feeValue}>
+                          {ethFee.l2FeeError ?? ethFee.l2Fee.toFormatted()}
+                        </ThemedText>
+                      </View>
+                      <View style={styles.feeRow}>
+                        <ThemedText
+                          style={[styles.feeLabel, { color: textSecondary }]}
+                        >
+                          Approval Fee
+                        </ThemedText>
+                        <ThemedText style={styles.feeValue}>
+                          {ethFee.approvalFeeError ??
+                            ethFee.approvalFee.toFormatted()}
+                        </ThemedText>
+                      </View>
+                      {isCCTP &&
+                      "fastTransferBpFee" in bridgeDepositFeeEstimate ? (
+                        <View style={styles.feeRow}>
+                          <ThemedText
+                            style={[styles.feeLabel, { color: textSecondary }]}
+                          >
+                            CCTP Fee
+                          </ThemedText>
+                          <ThemedText style={styles.feeValue}>
+                            {`${((bridgeDepositFeeEstimate as CCTPDepositFeeEstimation).fastTransferBpFee / 100).toFixed(2)}%`}
+                          </ThemedText>
+                        </View>
+                      ) : null}
+                    </>
+                  );
+                })()
+              )
             ) : (
               <ThemedText style={[styles.feeLabel, { color: textSecondary }]}>
                 —

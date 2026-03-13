@@ -1,29 +1,30 @@
 import { assertNonEmptyString, describeValue } from "@/connect/utils";
 import { ExternalChain, type SolanaAddress } from "@/types";
 import type { ChainId } from "starkzap";
-import type { SolanaSigner, SolanaWalletConfig } from "@/bridge/solana/types";
-import { clusterApiUrl, Connection } from "@solana/web3.js";
+import type { SolanaProvider } from "@/bridge/solana/types";
 
-export type { SolanaSigner } from "@/bridge/solana/types";
-
-const SOLANA_MAINNET_GENESIS = "5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp";
-const SOLANA_TESTNET_GENESIS = "4uhcVJyU9pJkvQyS88uRDiswHXSCkY3z";
+export type { SolanaProvider } from "@/bridge/solana/types";
 
 export interface ConnectSolanaWalletOptions {
   chain: ExternalChain.SOLANA;
-  signer: SolanaSigner;
+  provider: SolanaProvider;
   address: SolanaAddress;
   chainId: string;
 }
 
-function assertSolanaSigner(signer: unknown): SolanaSigner {
+export enum SolanaNetwork {
+  MAINNET = "5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp",
+  TESTNET = "4uhcVJyU9pJkvQyS88uRDiswHXSCkY3z",
+}
+
+function assertSolanaProvider(signer: unknown): SolanaProvider {
   if (
     typeof signer === "object" &&
     signer !== null &&
     "signAndSendTransaction" in signer &&
     typeof signer.signAndSendTransaction === "function"
   ) {
-    return signer as SolanaSigner;
+    return signer as SolanaProvider;
   }
 
   throw new Error(
@@ -36,40 +37,34 @@ export class ConnectedSolanaWallet {
 
   private constructor(
     readonly address: SolanaAddress,
-    readonly chainId: string,
-    readonly signer: SolanaSigner
+    readonly provider: SolanaProvider,
+    readonly network: SolanaNetwork
   ) {}
-
-  public toSolanaWalletConfig(rpcUrl?: string): SolanaWalletConfig {
-    const cluster =
-      this.chainId === SOLANA_MAINNET_GENESIS ? "mainnet-beta" : "testnet";
-    const endpoint = rpcUrl ?? clusterApiUrl(cluster);
-    const connection = new Connection(endpoint);
-    return { address: this.address, signer: this.signer, connection };
-  }
 
   public static from(
     options: ConnectSolanaWalletOptions,
     starknetChain: ChainId
   ): ConnectedSolanaWallet {
     const chainId = assertNonEmptyString(options.chainId, "chainId");
-    const signer = assertSolanaSigner(options.signer);
+    const signer = assertSolanaProvider(options.provider);
 
-    if (chainId === SOLANA_MAINNET_GENESIS && !starknetChain.isMainnet()) {
+    let network: SolanaNetwork;
+    if (chainId === SolanaNetwork.MAINNET) {
+      network = SolanaNetwork.MAINNET;
+    } else if (chainId === SolanaNetwork.TESTNET) {
+      network = SolanaNetwork.TESTNET;
+    } else {
+      throw new Error(`Unsupported chainId ${chainId} for Solana`);
+    }
+
+    if (network === SolanaNetwork.MAINNET && !starknetChain.isMainnet()) {
       throw new Error("Solana mainnet cannot be used with Starknet Sepolia.");
     }
 
-    if (chainId === SOLANA_TESTNET_GENESIS && !starknetChain.isSepolia()) {
+    if (network === SolanaNetwork.TESTNET && !starknetChain.isSepolia()) {
       throw new Error("Solana testnet cannot be used with Starknet Mainnet.");
     }
 
-    if (
-      chainId !== SOLANA_MAINNET_GENESIS &&
-      chainId !== SOLANA_TESTNET_GENESIS
-    ) {
-      throw new Error("Can connect only mainnet or testnet on Solana.");
-    }
-
-    return new ConnectedSolanaWallet(options.address, chainId, signer);
+    return new ConnectedSolanaWallet(options.address, signer, network);
   }
 }

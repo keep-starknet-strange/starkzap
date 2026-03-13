@@ -1,4 +1,4 @@
-import { describeValue, normalizeChainId } from "@/connect/utils";
+import { describeValue } from "@/connect/utils";
 import {
   type EthereumAddress,
   ExternalChain,
@@ -41,28 +41,35 @@ export interface ConnectEthereumWalletOptions {
   chainId: string | number;
 }
 
+export enum EthereumNetwork {
+  MAINNET = 1,
+  SEPOLIA = 11155111,
+}
+
 export class ConnectedEthereumWallet {
   readonly chain = ExternalChain.ETHEREUM;
 
   private constructor(
     readonly address: EthereumAddress,
-    readonly chainId: number,
-    readonly provider: Eip1193Provider
+    readonly provider: Eip1193Provider,
+    readonly network: EthereumNetwork
   ) {}
 
   public async toEthWalletConfig(): Promise<EthereumWalletConfig> {
+    // Safeguard check. The provider
     const ethChainIdRaw = await this.provider.request<string>({
       method: "eth_chainId",
     });
     const ethChainId = Number(BigInt(ethChainIdRaw));
+    const networkId: number = this.network;
 
-    if (ethChainId !== this.chainId) {
+    if (ethChainId !== networkId) {
       throw new Error(
-        `Cannot create Ethereum Bridge. Expected ethereum chain id to be ${this.chainId} but got ${ethChainId}.`
+        `Cannot create Ethereum Bridge. Expected ethereum chain id to be ${networkId} but got ${ethChainId}.`
       );
     }
 
-    const provider = new BrowserProvider(this.provider, this.chainId);
+    const provider = new BrowserProvider(this.provider, networkId);
     const signer = await provider.getSigner(this.address);
     return { provider, signer };
   }
@@ -72,9 +79,34 @@ export class ConnectedEthereumWallet {
     starknetChain: ChainId
   ): ConnectedEthereumWallet {
     const address = fromEthereumAddress(options.address);
-    const chainId = normalizeChainId(starknetChain, options.chainId);
     const provider = assertEip1193Provider(options.provider);
 
-    return new ConnectedEthereumWallet(address, chainId, provider);
+    const numericChainId =
+      typeof options.chainId === "string"
+        ? Number(options.chainId)
+        : options.chainId;
+
+    if (!Number.isFinite(numericChainId) || numericChainId <= 0) {
+      throw new Error(`Invalid EVM chain ID: ${String(options.chainId)}`);
+    }
+
+    let network: EthereumNetwork;
+    if (numericChainId === EthereumNetwork.MAINNET) {
+      network = EthereumNetwork.MAINNET;
+    } else if (numericChainId === EthereumNetwork.SEPOLIA) {
+      network = EthereumNetwork.SEPOLIA;
+    } else {
+      throw new Error(`Unsupported chainId ${numericChainId} for Solana`);
+    }
+
+    if (network === EthereumNetwork.MAINNET && !starknetChain.isMainnet()) {
+      throw new Error(`EVM chain id expected to be mainnet.`);
+    }
+
+    if (network === EthereumNetwork.SEPOLIA && !starknetChain.isSepolia()) {
+      throw new Error("EVM chain id expected to be sepolia.");
+    }
+
+    return new ConnectedEthereumWallet(address, provider, network);
   }
 }

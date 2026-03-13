@@ -1,6 +1,6 @@
 import type { BridgeInterface } from "@/bridge/types/BridgeInterface";
 import { BridgeToken } from "@/types";
-import type { ConnectedExternalWallet } from "@/connect";
+import { type ConnectedExternalWallet } from "@/connect";
 
 export class BridgeCache {
   private readonly cache = new Map<
@@ -40,6 +40,6 @@ export class BridgeCache {
   }
 
   private key(token: BridgeToken, wallet: ConnectedExternalWallet): string {
-    return `${wallet.chainId}:${wallet.address}:${token.address}`;
+    return `${wallet.network.toString()}:${wallet.address}:${token.address}`;
   }
 }

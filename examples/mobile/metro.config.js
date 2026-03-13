@@ -11,7 +11,7 @@ config.resolver.nodeModulesPaths = [
   path.resolve(__dirname, "node_modules"),
   path.resolve(workspaceRoot, "node_modules"),
 ];
-const STUBS = new Set(["fs", "path", "net", "tls"]);
+const STUBS = new Set(["assert", "fs", "path", "net", "tls"]);
 const EMPTY_MODULE = { type: "empty" };
 config.resolver.resolveRequest = (context, moduleName, platform) => {
   if (STUBS.has(moduleName)) {

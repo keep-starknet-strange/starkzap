@@ -8,12 +8,12 @@ import type {
 import type { Amount } from "starkzap";
 
 /**
- * Signer interface for Solana transactions.
+ * Provider interface for Solana transactions.
  *
  * Compatible with the Reown AppKit Solana provider's
  * `signAndSendTransaction` method.
  */
-export interface SolanaSigner {
+export interface SolanaProvider {
   signAndSendTransaction(
     transaction: Transaction | VersionedTransaction
   ): Promise<string>;
@@ -21,7 +21,7 @@ export interface SolanaSigner {
 
 export type SolanaWalletConfig = {
   address: SolanaAddress;
-  signer: SolanaSigner;
+  provider: SolanaProvider;
   connection: Connection;
 };
 
