@@ -2,12 +2,12 @@ import {
   cancelDcaToCalls,
   createDcaToCalls,
   getDcaOrders,
+  DcaOrderStatus as AvnuDcaOrderStatus,
   type DcaOrder as AvnuDcaOrder,
-  type DcaOrderStatus as AvnuDcaOrderStatus,
   type DcaTrade as AvnuDcaTrade,
   type PricingStrategy,
 } from "@avnu/avnu-sdk";
-import type { Duration } from "moment";
+import moment from "moment";
 import { assertAmountMatchesToken, fromAddress, type ChainId } from "@/types";
 import type {
   DcaCancelRequest,
@@ -15,6 +15,7 @@ import type {
   DcaOrder,
   DcaOrdersRequest,
   DcaOrdersPage,
+  DcaOrderStatus,
   DcaPricingStrategy,
   DcaProvider,
   DcaProviderContext,
@@ -28,6 +29,12 @@ import {
   supportsAvnuChain,
   withAvnuApiBaseFallback,
 } from "@/utils/avnu";
+
+const DCA_STATUS_TO_AVNU: Record<DcaOrderStatus, AvnuDcaOrderStatus> = {
+  INDEXING: AvnuDcaOrderStatus.INDEXING,
+  ACTIVE: AvnuDcaOrderStatus.ACTIVE,
+  CLOSED: AvnuDcaOrderStatus.CLOSED,
+};
 
 export interface AvnuDcaProviderOptions {
   /** Optional API base override per chain. */
@@ -196,7 +203,7 @@ export class AvnuDcaProvider implements DcaProvider {
     };
 
     if (request.status) {
-      avnuRequest.status = request.status as AvnuDcaOrderStatus;
+      avnuRequest.status = DCA_STATUS_TO_AVNU[request.status];
     }
     if (request.page != null) {
       avnuRequest.page = request.page;
@@ -234,7 +241,7 @@ export class AvnuDcaProvider implements DcaProvider {
       sellAmountPerCycle: `0x${request.sellAmountPerCycle
         .toBase()
         .toString(16)}`,
-      frequency: request.frequency as unknown as Duration,
+      frequency: moment.duration(request.frequency),
       pricingStrategy: toPricingStrategy(request.pricingStrategy),
       traderAddress: request.traderAddress,
     };

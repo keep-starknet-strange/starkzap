@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { RpcProvider } from "starknet";
+import moment from "moment";
 import { Amount, ChainId, fromAddress, type Token } from "@/types";
 
 const avnuMocks = vi.hoisted(() => ({
@@ -11,6 +12,11 @@ const avnuMocks = vi.hoisted(() => ({
 vi.mock("@avnu/avnu-sdk", () => ({
   BASE_URL: "https://starknet.api.avnu.fi",
   SEPOLIA_BASE_URL: "https://sepolia.api.avnu.fi",
+  DcaOrderStatus: {
+    INDEXING: "INDEXING",
+    ACTIVE: "ACTIVE",
+    CLOSED: "CLOSED",
+  },
   getDcaOrders: avnuMocks.getDcaOrders,
   createDcaToCalls: avnuMocks.createDcaToCalls,
   cancelDcaToCalls: avnuMocks.cancelDcaToCalls,
@@ -210,7 +216,7 @@ describe("AvnuDcaProvider", () => {
         buyTokenAddress: buyToken.address,
         sellAmount: `0x${sellAmount.toBase().toString(16)}`,
         sellAmountPerCycle: `0x${sellAmountPerCycle.toBase().toString(16)}`,
-        frequency: "P1D",
+        frequency: expect.objectContaining(moment.duration("P1D")),
         pricingStrategy: {
           tokenToMinAmount: `0x${minBuyAmount.toBase().toString(16)}`,
           tokenToMaxAmount: undefined,
