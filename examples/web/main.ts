@@ -552,6 +552,11 @@ function clearDcaPreview(): void {
   dcaPreviewEl.classList.add("hidden");
 }
 
+function clearDcaPricingBounds(): void {
+  dcaMinBuyInput.value = "";
+  dcaMaxBuyInput.value = "";
+}
+
 function renderDcaPreview(params: {
   dcaProviderId: string;
   previewProviderId: string;
@@ -1977,6 +1982,7 @@ swapSponsoredInput.addEventListener("change", () => {
 });
 
 dcaProviderSelect.addEventListener("change", () => {
+  clearDcaPricingBounds();
   clearDcaPreview();
   void refreshDcaOrders(true);
   updateDcaButtons();

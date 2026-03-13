@@ -1,6 +1,5 @@
 import { AvnuDcaProvider, EkuboDcaProvider, type DcaProvider } from "starkzap";
 
-export const dcaProviders: DcaProvider[] = [
-  new AvnuDcaProvider(),
-  new EkuboDcaProvider(),
-];
+export function getDcaProviders(): DcaProvider[] {
+  return [new AvnuDcaProvider(), new EkuboDcaProvider()];
+}
