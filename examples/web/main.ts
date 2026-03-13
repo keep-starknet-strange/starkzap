@@ -879,7 +879,12 @@ function renderDcaOrders(orders: DcaOrder[]): void {
       ),
       createOrderMeta(
         "Sell / Cycle",
-        formatTokenAmount(order.sellAmountPerCycleBase, order.sellTokenAddress)
+        order.sellAmountPerCycleBase != null
+          ? formatTokenAmount(
+              order.sellAmountPerCycleBase,
+              order.sellTokenAddress
+            )
+          : "Continuous"
       ),
       createOrderMeta(
         "Bought So Far",

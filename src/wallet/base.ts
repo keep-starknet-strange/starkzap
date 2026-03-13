@@ -32,7 +32,12 @@ import { Staking } from "@/staking";
 import type { PreparedSwap, SwapInput, SwapQuote, SwapProvider } from "@/swap";
 import { AvnuSwapProvider } from "@/swap";
 import { resolveSwapInput } from "@/swap/utils";
-import { AvnuDcaProvider, DcaClient, type DcaProvider } from "@/dca";
+import {
+  AvnuDcaProvider,
+  DcaClient,
+  type DcaClientInterface,
+  type DcaProvider,
+} from "@/dca";
 import {
   LendingClient,
   type LendingProvider,
@@ -221,7 +226,7 @@ export abstract class BaseWallet implements WalletInterface {
   /**
    * Access DCA helpers for protocol-native recurring orders and per-cycle swap previews.
    */
-  dca(): DcaClient {
+  dca(): DcaClientInterface {
     return this.dcaClient;
   }
 
