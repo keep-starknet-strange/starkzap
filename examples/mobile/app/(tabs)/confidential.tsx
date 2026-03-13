@@ -32,6 +32,22 @@ import type { ChainId } from "@starkzap/native";
 
 // Tongo contract addresses per token
 // Full list: https://docs.tongo.cash/protocol/contracts.html
+interface TongoToken {
+  symbol: string;
+  address: string;
+  decimals: number;
+}
+
+const TOKEN_DECIMALS: Record<string, number> = {
+  STRK: 18,
+  ETH: 18,
+  DAI: 18,
+  USDC: 6,
+  "USDC.e": 6,
+  USDT: 6,
+  WBTC: 8,
+};
+
 const TONGO_CONTRACTS_SEPOLIA: Record<string, string> = {
   STRK: "0x408163bfcfc2d76f34b444cb55e09dace5905cf84c0884e4637c2c0f06ab6ed",
   ETH: "0x2cf0dc1d9e8c7731353dd15e6f2f22140120ef2d27116b982fa4fed87f6fef5",
@@ -48,13 +64,15 @@ const TONGO_CONTRACTS_MAINNET: Record<string, string> = {
   DAI: "0x511741b1ad1777b4ad59fbff49d64b8eb188e2aeb4fc72438278a589d8a10d8",
 };
 
-function getTongoContracts(
-  chainId: ChainId
-): { symbol: string; address: string }[] {
+function getTongoContracts(chainId: ChainId): TongoToken[] {
   const map = chainId.isSepolia()
     ? TONGO_CONTRACTS_SEPOLIA
     : TONGO_CONTRACTS_MAINNET;
-  return Object.entries(map).map(([symbol, address]) => ({ symbol, address }));
+  return Object.entries(map).map(([symbol, address]) => ({
+    symbol,
+    address,
+    decimals: TOKEN_DECIMALS[symbol] ?? 18,
+  }));
 }
 
 function cropAddress(addr: string): string {
@@ -151,9 +169,9 @@ export default function ConfidentialScreen() {
       // Convert tongo units to human-readable ERC20 amounts
       const balErc20 = await tongo.toPublicUnits(state.balance);
       const pendErc20 = await tongo.toPublicUnits(state.pending);
-      const sym = tongoContracts[selectedTokenIdx]?.symbol;
-      const balFmt = Amount.fromRaw(balErc20, 18, sym).toFormatted();
-      const pendFmt = Amount.fromRaw(pendErc20, 18, sym).toFormatted();
+      const { symbol: sym, decimals } = selected;
+      const balFmt = Amount.fromRaw(balErc20, decimals, sym).toFormatted();
+      const pendFmt = Amount.fromRaw(pendErc20, decimals, sym).toFormatted();
       setBalanceDisplay(balFmt);
       setPendingDisplay(pendFmt);
 
@@ -176,9 +194,17 @@ export default function ConfidentialScreen() {
 
       const balErc20 = await confidential.toPublicUnits(state.balance);
       const pendErc20 = await confidential.toPublicUnits(state.pending);
-      const sym = tongoContracts[selectedTokenIdx]?.symbol;
-      const balFmt = Amount.fromRaw(balErc20, 18, sym).toFormatted();
-      const pendFmt = Amount.fromRaw(pendErc20, 18, sym).toFormatted();
+      const selected = tongoContracts[selectedTokenIdx];
+      const balFmt = Amount.fromRaw(
+        balErc20,
+        selected?.decimals ?? 18,
+        selected?.symbol
+      ).toFormatted();
+      const pendFmt = Amount.fromRaw(
+        pendErc20,
+        selected?.decimals ?? 18,
+        selected?.symbol
+      ).toFormatted();
       setBalanceDisplay(balFmt);
       setPendingDisplay(pendFmt);
 
@@ -190,14 +216,15 @@ export default function ConfidentialScreen() {
     } finally {
       setIsRefreshing(false);
     }
-  }, [confidential, addLog]);
+  }, [confidential, tongoContracts, selectedTokenIdx, addLog]);
 
   const handleFund = useCallback(async () => {
     if (!wallet || !confidential || !fundAmount.trim()) return;
     setIsFunding(true);
     addLog(`Funding confidential account with ${fundAmount}...`);
     try {
-      const amount = Amount.parse(fundAmount.trim(), 18);
+      const selected = tongoContracts[selectedTokenIdx];
+      const amount = Amount.parse(fundAmount.trim(), selected?.decimals ?? 18);
       const tx = await wallet
         .tx()
         .confidentialFund(confidential, {
@@ -215,7 +242,15 @@ export default function ConfidentialScreen() {
     } finally {
       setIsFunding(false);
     }
-  }, [wallet, confidential, fundAmount, addLog, handleRefreshState]);
+  }, [
+    wallet,
+    confidential,
+    fundAmount,
+    tongoContracts,
+    selectedTokenIdx,
+    addLog,
+    handleRefreshState,
+  ]);
 
   const handleTransfer = useCallback(async () => {
     if (
@@ -229,7 +264,11 @@ export default function ConfidentialScreen() {
     setIsTransferring(true);
     addLog(`Confidential transfer of ${transferAmount}...`);
     try {
-      const amount = Amount.parse(transferAmount.trim(), 18);
+      const selected = tongoContracts[selectedTokenIdx];
+      const amount = Amount.parse(
+        transferAmount.trim(),
+        selected?.decimals ?? 18
+      );
       const tx = await wallet
         .tx()
         .confidentialTransfer(confidential, {
@@ -256,6 +295,8 @@ export default function ConfidentialScreen() {
     transferAmount,
     transferToX,
     transferToY,
+    tongoContracts,
+    selectedTokenIdx,
     addLog,
     handleRefreshState,
   ]);
@@ -271,7 +312,11 @@ export default function ConfidentialScreen() {
     setIsWithdrawing(true);
     addLog(`Withdrawing ${withdrawAmount} from confidential account...`);
     try {
-      const amount = Amount.parse(withdrawAmount.trim(), 18);
+      const selected = tongoContracts[selectedTokenIdx];
+      const amount = Amount.parse(
+        withdrawAmount.trim(),
+        selected?.decimals ?? 18
+      );
       const tx = await wallet
         .tx()
         .confidentialWithdraw(confidential, {
@@ -296,6 +341,8 @@ export default function ConfidentialScreen() {
     confidential,
     withdrawAmount,
     withdrawTo,
+    tongoContracts,
+    selectedTokenIdx,
     addLog,
     handleRefreshState,
   ]);
