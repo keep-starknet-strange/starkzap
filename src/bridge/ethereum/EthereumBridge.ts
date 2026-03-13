@@ -4,6 +4,7 @@ import type {
 } from "@/bridge/types/BridgeInterface";
 import {
   Amount,
+  type BridgeDepositFeeEstimation,
   type EthereumAddress,
   EthereumBridgeToken,
   type ExternalTransactionResponse,
@@ -36,10 +37,7 @@ import type { WalletInterface } from "@/wallet";
 import CANONICAL_BRIDGE_ABI from "@/abi/ethereum/canonicalBridge.json";
 import type { Address } from "starkzap";
 
-export abstract class EthereumBridge<Fee = unknown> implements BridgeInterface<
-  EthereumAddress,
-  Fee
-> {
+export abstract class EthereumBridge implements BridgeInterface<EthereumAddress> {
   public static readonly ALLOWANCE_CACHE_TTL = 60_000;
   public static readonly GAS_LIMIT_SAFE_MULTIPLIER = 1.5;
 
@@ -74,7 +72,9 @@ export abstract class EthereumBridge<Fee = unknown> implements BridgeInterface<
     options?: BridgeDepositOptions
   ): Promise<ExternalTransactionResponse>;
 
-  abstract getDepositFeeEstimate(_options?: BridgeDepositOptions): Promise<Fee>;
+  abstract getDepositFeeEstimate(
+    _options?: BridgeDepositOptions
+  ): Promise<BridgeDepositFeeEstimation>;
 
   async getAvailableDepositBalance(account: EthereumAddress): Promise<Amount> {
     return this.token.balanceOf(account);

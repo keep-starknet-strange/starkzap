@@ -1,4 +1,9 @@
-import { Amount, type ExternalTransactionResponse } from "@/types";
+import {
+  Amount,
+  type BridgeDepositFeeEstimation,
+  type ExternalAddress,
+  type ExternalTransactionResponse,
+} from "@/types";
 import type { WalletInterface } from "@/wallet";
 import type { Address } from "starkzap";
 
@@ -22,7 +27,7 @@ export interface BridgeDepositOptions {
   fastTransfer?: boolean;
 }
 
-export interface BridgeInterface<ExternalAddress = unknown, Fee = unknown> {
+export interface BridgeInterface<A extends ExternalAddress = ExternalAddress> {
   readonly starknetWallet: WalletInterface;
 
   deposit(
@@ -31,9 +36,11 @@ export interface BridgeInterface<ExternalAddress = unknown, Fee = unknown> {
     options?: BridgeDepositOptions
   ): Promise<ExternalTransactionResponse>;
 
-  getDepositFeeEstimate(options?: BridgeDepositOptions): Promise<Fee>;
+  getDepositFeeEstimate(
+    options?: BridgeDepositOptions
+  ): Promise<BridgeDepositFeeEstimation>;
 
-  getAvailableDepositBalance(account: ExternalAddress): Promise<Amount>;
+  getAvailableDepositBalance(account: A): Promise<Amount>;
 
   getAllowance(): Promise<Amount | null>;
 }

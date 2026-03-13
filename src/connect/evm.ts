@@ -4,7 +4,6 @@ import {
   ExternalChain,
   fromEthereumAddress,
 } from "@/types";
-import type { ConnectedExternalWallet } from "@/connect/index";
 import type { EthereumWalletConfig } from "@/bridge";
 import { BrowserProvider } from "ethers";
 import type { ChainId } from "starkzap";
@@ -42,7 +41,7 @@ export interface ConnectEthereumWalletOptions {
   chainId: string | number;
 }
 
-export class ConnectedEthereumWallet implements ConnectedExternalWallet<EthereumAddress> {
+export class ConnectedEthereumWallet {
   readonly chain = ExternalChain.ETHEREUM;
 
   private constructor(

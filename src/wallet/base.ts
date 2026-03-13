@@ -2,6 +2,7 @@ import type { WalletInterface } from "@/wallet/interface";
 import {
   type Address,
   Amount,
+  type BridgeDepositFeeEstimation,
   BridgeToken,
   type BridgingConfig,
   type ChainId,
@@ -39,7 +40,6 @@ import {
 import { BridgeOperator } from "@/bridge";
 import type { BridgeDepositOptions } from "@/bridge/types/BridgeInterface";
 import type { ConnectedExternalWallet } from "..";
-import type { AddressFor, FeeEstimationFor } from "@/bridge/types/generics";
 
 const MAX_ERC20_CACHE_SIZE = 128;
 const MAX_STAKING_CACHE_SIZE = 128;
@@ -755,11 +755,11 @@ export abstract class BaseWallet implements WalletInterface {
   // Bridging delegated methods
   // ============================================================
 
-  deposit<T extends BridgeToken>(
+  deposit(
     recipient: Address,
     amount: Amount,
-    token: T,
-    externalWallet: ConnectedExternalWallet<AddressFor<T>>,
+    token: BridgeToken,
+    externalWallet: ConnectedExternalWallet,
     options?: BridgeDepositOptions
   ): Promise<ExternalTransactionResponse> {
     return this.bridging.deposit(
@@ -771,25 +771,25 @@ export abstract class BaseWallet implements WalletInterface {
     );
   }
 
-  getDepositBalance<T extends BridgeToken>(
-    token: T,
-    externalWallet: ConnectedExternalWallet<AddressFor<T>>
+  getDepositBalance(
+    token: BridgeToken,
+    externalWallet: ConnectedExternalWallet
   ): Promise<Amount> {
     return this.bridging.getDepositBalance(token, externalWallet);
   }
 
-  getAllowance<T extends BridgeToken>(
-    token: T,
-    externalWallet: ConnectedExternalWallet<AddressFor<T>>
+  getAllowance(
+    token: BridgeToken,
+    externalWallet: ConnectedExternalWallet
   ): Promise<Amount | null> {
     return this.bridging.getAllowance(token, externalWallet);
   }
 
-  getDepositFeeEstimate<T extends BridgeToken>(
-    token: T,
-    externalWallet: ConnectedExternalWallet<AddressFor<T>>,
+  getDepositFeeEstimate(
+    token: BridgeToken,
+    externalWallet: ConnectedExternalWallet,
     options?: BridgeDepositOptions
-  ): Promise<FeeEstimationFor<T>> {
+  ): Promise<BridgeDepositFeeEstimation> {
     return this.bridging.getDepositFeeEstimate(token, externalWallet, options);
   }
 }

@@ -18,7 +18,7 @@ import {
 } from "@/bridge/ethereum/cctp/constants";
 import { EthereumBridge } from "@/bridge/ethereum/EthereumBridge";
 
-export class CCTPBridge extends EthereumBridge<CCTPDepositFeeEstimation> {
+export class CCTPBridge extends EthereumBridge {
   private static readonly MAINNET_TOKEN_MESSENGER = fromEthereumAddress(
     "0x28b5a0e9C621a5BadaA536219b3a228C8168cf5d"
   );

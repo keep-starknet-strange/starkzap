@@ -29,10 +29,7 @@ import {
 // https://github.com/hyperlane-xyz/hyperlane-warp-ui-template/blob/21ac2754c69f69d056a39bcc664531d6118fee0c/src/consts/chains.ts#L68
 const SOLANA_RENT_ESTIMATE = BigInt(Math.round(0.00411336 * 1e9));
 
-export class SolanaHyperlaneBridge implements BridgeInterface<
-  SolanaAddress,
-  SolanaDepositFeeEstimation
-> {
+export class SolanaHyperlaneBridge implements BridgeInterface<SolanaAddress> {
   private readonly multiProvider: MultiProtocolProvider;
   private readonly warpCore: WarpCore;
   private readonly solanaToken: HyperlaneToken;

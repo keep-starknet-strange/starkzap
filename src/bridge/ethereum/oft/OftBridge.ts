@@ -27,7 +27,7 @@ const DUMMY_SN_ADDRESS = fromAddress(
 );
 const DUMMY_ETH_ADDRESS = "0x0000000000000000000000000000000000000001";
 
-export class OftBridge extends EthereumBridge<OftDepositFeeEstimation> {
+export class OftBridge extends EthereumBridge {
   private readonly layerZeroApi: LayerZeroApi;
   private cachedSpender: EthereumAddress | null | undefined;
   private dummyDepositTxPromise: Promise<ContractTransaction | null> | null =

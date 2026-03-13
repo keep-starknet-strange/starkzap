@@ -15,7 +15,7 @@ import { type Address, Amount } from "starkzap";
 import { RPC, uint256 } from "starknet";
 import { FeeErrorCause } from "@/types/errors";
 
-export class CanonicalEthereumBridge extends EthereumBridge<EthereumDepositFeeEstimation> {
+export class CanonicalEthereumBridge extends EthereumBridge {
   private static readonly DUMMY_SN_ADDRESS = fromAddress(
     "0x023123100123103023123acb1231231231231031231ca123f23123123123100a"
   );

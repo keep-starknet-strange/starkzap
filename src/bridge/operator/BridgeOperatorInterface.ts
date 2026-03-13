@@ -1,32 +1,35 @@
 import { BridgeToken } from "@/types/bridge/bridge-token";
 import { type ConnectedExternalWallet } from "@/connect";
 import type { Amount } from "starkzap";
-import type { AddressFor, FeeEstimationFor } from "@/bridge/types/generics";
-import type { Address, ExternalTransactionResponse } from "@/types";
+import type {
+  Address,
+  BridgeDepositFeeEstimation,
+  ExternalTransactionResponse,
+} from "@/types";
 import type { BridgeDepositOptions } from "@/bridge/types/BridgeInterface";
 
 export interface BridgeOperatorInterface {
-  deposit<T extends BridgeToken>(
+  deposit(
     recipient: Address,
     amount: Amount,
-    token: T,
-    externalWallet: ConnectedExternalWallet<AddressFor<T>>,
+    token: BridgeToken,
+    externalWallet: ConnectedExternalWallet,
     options?: BridgeDepositOptions
   ): Promise<ExternalTransactionResponse>;
 
-  getDepositBalance<T extends BridgeToken>(
-    token: T,
-    externalWallet: ConnectedExternalWallet<AddressFor<T>>
+  getDepositBalance(
+    token: BridgeToken,
+    externalWallet: ConnectedExternalWallet
   ): Promise<Amount>;
 
-  getDepositFeeEstimate<T extends BridgeToken>(
-    token: T,
-    externalWallet: ConnectedExternalWallet<AddressFor<T>>,
+  getDepositFeeEstimate(
+    token: BridgeToken,
+    externalWallet: ConnectedExternalWallet,
     options?: BridgeDepositOptions
-  ): Promise<FeeEstimationFor<T>>;
+  ): Promise<BridgeDepositFeeEstimation>;
 
-  getAllowance<T extends BridgeToken>(
-    token: T,
-    externalWallet: ConnectedExternalWallet<AddressFor<T>>
+  getAllowance(
+    token: BridgeToken,
+    externalWallet: ConnectedExternalWallet
   ): Promise<Amount | null>;
 }

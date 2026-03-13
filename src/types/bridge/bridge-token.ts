@@ -4,37 +4,42 @@ import {
   type SolanaBridgeProtocol,
 } from "@/types/bridge/protocol";
 import { ExternalChain } from "@/types/bridge/external-chain";
-import type { Address, EthereumAddress } from "@/types";
+import type {
+  Address,
+  EthereumAddress,
+  ExternalAddress,
+  SolanaAddress,
+} from "@/types";
 
-export interface BridgeTokenParams<TAddress extends string = string> {
+export interface BridgeTokenParams<A extends ExternalAddress> {
   id: string;
   name: string;
   symbol: string;
   decimals: number;
   coingeckoId?: string;
   protocol: Protocol;
-  address: TAddress;
-  l1Bridge: TAddress;
+  address: A;
+  l1Bridge: A;
   starknetAddress: Address;
   starknetBridge: Address;
 }
 
-export abstract class BridgeToken<TAddress extends string = string> {
+export abstract class BridgeToken<A extends ExternalAddress = ExternalAddress> {
   readonly id: string;
   readonly name: string;
   readonly symbol: string;
   readonly coingeckoId?: string;
   readonly decimals: number;
 
-  readonly address: TAddress;
-  readonly bridgeAddress: TAddress;
+  readonly address: A;
+  readonly bridgeAddress: A;
   readonly starknetAddress: Address;
   readonly starknetBridge: Address;
 
   abstract readonly protocol: Protocol;
   abstract readonly chain: ExternalChain;
 
-  protected constructor(params: BridgeTokenParams<TAddress>) {
+  protected constructor(params: BridgeTokenParams<A>) {
     this.id = params.id;
     this.name = params.name;
     this.symbol = params.symbol;
@@ -64,16 +69,15 @@ export class EthereumBridgeToken extends BridgeToken<EthereumAddress> {
   }
 }
 
-export interface SolanaBridgeTokenParams extends BridgeTokenParams<string> {
+export interface SolanaBridgeTokenParams extends BridgeTokenParams<SolanaAddress> {
   protocol: Protocol.HYPERLANE;
 }
 
-export class SolanaBridgeToken extends BridgeToken {
+export class SolanaBridgeToken extends BridgeToken<SolanaAddress> {
   readonly chain: ExternalChain = ExternalChain.SOLANA;
   readonly protocol: SolanaBridgeProtocol = Protocol.HYPERLANE;
 
   constructor(params: SolanaBridgeTokenParams) {
     super({ ...params });
-    this.protocol = params.protocol;
   }
 }

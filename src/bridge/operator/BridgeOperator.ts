@@ -7,22 +7,19 @@ import type {
 import { CanonicalEthereumBridge } from "@/bridge/ethereum/canonical/CanonicalEthereumBridge";
 import { Protocol } from "@/types/bridge/protocol";
 import {
-  type AddressFor,
-  type FeeEstimationFor,
-  isTokenForChain,
-} from "@/bridge/types/generics";
-import {
   ConnectedEthereumWallet,
   type ConnectedExternalWallet,
 } from "@/connect";
 import type { WalletInterface } from "@/wallet";
 import type { BridgeOperatorInterface } from "@/bridge/operator/BridgeOperatorInterface";
-import type {
-  Address,
-  BridgingConfig,
-  EthereumAddress,
-  ExternalTransactionResponse,
-  SolanaAddress,
+import {
+  type Address,
+  type BridgeDepositFeeEstimation,
+  type BridgingConfig,
+  type EthereumAddress,
+  ExternalChain,
+  type ExternalTransactionResponse,
+  type SolanaAddress,
 } from "@/types";
 import {
   type Amount,
@@ -32,14 +29,7 @@ import {
 import { CCTPBridge } from "@/bridge/ethereum/cctp/CCTPBridge";
 import { LordsBridge } from "@/bridge/ethereum/lords/LordsBridge";
 import { OftBridge } from "@/bridge/ethereum/oft/OftBridge";
-import type { EthereumDepositFeeEstimation } from "@/bridge/ethereum/types";
 import { SolanaHyperlaneBridge } from "@/bridge/solana/SolanaHyperlaneBridge";
-import type { SolanaDepositFeeEstimation } from "@/bridge/solana/types";
-
-export type BridgeType<T extends BridgeToken> = BridgeInterface<
-  AddressFor<T>,
-  FeeEstimationFor<T>
->;
 
 export class BridgeOperator implements BridgeOperatorInterface {
   private cache = new BridgeCache();
@@ -49,11 +39,11 @@ export class BridgeOperator implements BridgeOperatorInterface {
     private readonly bridgingConfig?: BridgingConfig
   ) {}
 
-  public async deposit<T extends BridgeToken>(
+  public async deposit(
     recipient: Address,
     amount: Amount,
-    token: T,
-    externalWallet: ConnectedExternalWallet<AddressFor<T>>,
+    token: BridgeToken,
+    externalWallet: ConnectedExternalWallet,
     options?: BridgeDepositOptions
   ): Promise<ExternalTransactionResponse> {
     const bridge = await this.bridge(
@@ -64,9 +54,9 @@ export class BridgeOperator implements BridgeOperatorInterface {
     return bridge.deposit(recipient, amount, options);
   }
 
-  public async getDepositBalance<T extends BridgeToken>(
-    token: T,
-    externalWallet: ConnectedExternalWallet<AddressFor<T>>
+  public async getDepositBalance(
+    token: BridgeToken,
+    externalWallet: ConnectedExternalWallet
   ) {
     const bridge = await this.bridge(
       token,
@@ -76,11 +66,11 @@ export class BridgeOperator implements BridgeOperatorInterface {
     return bridge.getAvailableDepositBalance(externalWallet.address);
   }
 
-  async getDepositFeeEstimate<T extends BridgeToken>(
-    token: T,
-    externalWallet: ConnectedExternalWallet<AddressFor<T>>,
+  async getDepositFeeEstimate(
+    token: BridgeToken,
+    externalWallet: ConnectedExternalWallet,
     options?: BridgeDepositOptions
-  ): Promise<FeeEstimationFor<T>> {
+  ): Promise<BridgeDepositFeeEstimation> {
     const bridge = await this.bridge(
       token,
       externalWallet,
@@ -89,9 +79,9 @@ export class BridgeOperator implements BridgeOperatorInterface {
     return bridge.getDepositFeeEstimate(options);
   }
 
-  public async getAllowance<T extends BridgeToken>(
-    token: T,
-    externalWallet: ConnectedExternalWallet<AddressFor<T>>
+  public async getAllowance(
+    token: BridgeToken,
+    externalWallet: ConnectedExternalWallet
   ) {
     const bridge = await this.bridge(
       token,
@@ -101,11 +91,11 @@ export class BridgeOperator implements BridgeOperatorInterface {
     return bridge.getAllowance();
   }
 
-  private bridge<T extends BridgeToken>(
-    token: T,
-    wallet: ConnectedExternalWallet<AddressFor<T>>,
+  private bridge(
+    token: BridgeToken,
+    wallet: ConnectedExternalWallet,
     starknetWallet: WalletInterface
-  ): Promise<BridgeType<T>> {
+  ): Promise<BridgeInterface> {
     const cached = this.cache.get(token, wallet);
     if (cached) return cached;
 
@@ -114,23 +104,29 @@ export class BridgeOperator implements BridgeOperatorInterface {
     return promise;
   }
 
-  private async createBridge<T extends BridgeToken>(
-    token: T,
-    wallet: ConnectedExternalWallet<AddressFor<T>>,
+  private async createBridge(
+    token: BridgeToken,
+    wallet: ConnectedExternalWallet,
     starknetWallet: WalletInterface
-  ): Promise<BridgeType<T>> {
-    if (isTokenForChain(token, "ethereum")) {
-      return (await this.createEthereumBridge(
-        token,
-        wallet as unknown as ConnectedEthereumWallet,
+  ): Promise<BridgeInterface> {
+    if (token.chain !== wallet.chain) {
+      throw new Error(
+        `Attempting to bridge ${token.name} on ${token.chain} but external connected wallet is on chain ${wallet.chain}. Connect to a ${token.chain} wallet`
+      );
+    }
+
+    if (token.chain == ExternalChain.ETHEREUM) {
+      return await this.createEthereumBridge(
+        token as EthereumBridgeToken,
+        wallet as ConnectedEthereumWallet,
         starknetWallet
-      )) as unknown as BridgeType<T>;
-    } else if (isTokenForChain(token, "solana")) {
-      return (await this.createSolanaBridge(
-        token,
-        wallet as unknown as ConnectedSolanaWallet,
+      );
+    } else if (token.chain == ExternalChain.SOLANA) {
+      return await this.createSolanaBridge(
+        token as SolanaBridgeToken,
+        wallet as ConnectedSolanaWallet,
         starknetWallet
-      )) as unknown as BridgeType<T>;
+      );
     }
 
     throw new Error(`Unsupported chain "${token.chain}".`);
@@ -140,7 +136,7 @@ export class BridgeOperator implements BridgeOperatorInterface {
     token: EthereumBridgeToken,
     externalWallet: ConnectedEthereumWallet,
     starknetWallet: WalletInterface
-  ): Promise<BridgeInterface<EthereumAddress, EthereumDepositFeeEstimation>> {
+  ): Promise<BridgeInterface<EthereumAddress>> {
     const walletConfig = await externalWallet.toEthWalletConfig();
 
     if (token.id === "lords") {
@@ -174,7 +170,7 @@ export class BridgeOperator implements BridgeOperatorInterface {
     token: SolanaBridgeToken,
     externalWallet: ConnectedSolanaWallet,
     starknetWallet: WalletInterface
-  ): Promise<BridgeInterface<SolanaAddress, SolanaDepositFeeEstimation>> {
+  ): Promise<BridgeInterface<SolanaAddress>> {
     const walletConfig = externalWallet.toSolanaWalletConfig(
       this.bridgingConfig?.solanaRpcUrl
     );

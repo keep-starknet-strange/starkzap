@@ -70,3 +70,5 @@ export type SolanaAddress = string & { readonly __type: "SolanaAddress" };
 export function fromSolanaAddress(value: string): SolanaAddress {
   return new PublicKey(value).toBase58() as SolanaAddress;
 }
+
+export type ExternalAddress = EthereumAddress | SolanaAddress;

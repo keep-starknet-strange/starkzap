@@ -1,28 +1,28 @@
 import {
   Amount,
   type BridgeToken,
+  type CCTPDepositFeeEstimation,
+  type ChainId,
   ConnectedEthereumWallet,
   ConnectedSolanaWallet,
-  type CCTPDepositFeeEstimation,
   type Eip1193Provider,
-  type SolanaSigner,
   Erc20,
   type EthereumDepositFeeEstimation,
-  type SolanaDepositFeeEstimation,
   ExternalChain,
   fromEthereumAddress,
   fromSolanaAddress,
   Protocol,
+  type SolanaDepositFeeEstimation,
+  type SolanaSigner,
   type StarkZap,
-  type ChainId,
   type WalletInterface,
 } from "starkzap";
-import { createAppKit, type AppKit } from "@reown/appkit";
+import { type AppKit, createAppKit } from "@reown/appkit";
 import { EthersAdapter } from "@reown/appkit-adapter-ethers";
 import { SolanaAdapter } from "@reown/appkit-adapter-solana";
 import {
-  sepolia,
   mainnet,
+  sepolia,
   solana,
   solanaTestnet,
 } from "@reown/appkit/networks";
@@ -338,11 +338,7 @@ export class BridgeController {
     this.render();
 
     try {
-      const balance = await wallet.getDepositBalance(
-        selectedToken,
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- externalWalletFor() guarantees type match
-        extWallet as any
-      );
+      const balance = await wallet.getDepositBalance(selectedToken, extWallet);
       this.state.externalBalance = balance ? balance.toFormatted(true) : null;
       this.state.externalBalanceUnit = balance ? balance.toUnit() : null;
     } catch (err) {
@@ -398,11 +394,7 @@ export class BridgeController {
     this.render();
 
     try {
-      const allowance = await wallet.getAllowance(
-        selectedToken,
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- externalWalletFor() guarantees type match
-        extWallet as any
-      );
+      const allowance = await wallet.getAllowance(selectedToken, extWallet);
       this.state.allowance = allowance ? allowance.toFormatted(true) : null;
     } catch (err) {
       this.log(`Failed to fetch allowance: ${err}`, "error");
@@ -435,13 +427,11 @@ export class BridgeController {
     this.render();
 
     try {
-      const estimate = await wallet.getDepositFeeEstimate(
+      this.state.feeEstimate = await wallet.getDepositFeeEstimate(
         selectedToken,
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- externalWalletFor() guarantees type match
-        extWallet as any,
+        extWallet,
         { fastTransfer }
       );
-      this.state.feeEstimate = estimate;
     } catch (err) {
       this.log(`Failed to estimate fees: ${err}`, "error");
       this.state.feeEstimate = null;
@@ -479,8 +469,7 @@ export class BridgeController {
         wallet.address,
         depositAmount,
         selectedToken,
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- externalWalletFor() guarantees type match
-        extWallet as any,
+        extWallet,
         { fastTransfer }
       );
       this.log(`Deposit tx sent: ${txResponse.hash}`, "success");

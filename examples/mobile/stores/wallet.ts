@@ -6,6 +6,7 @@ import {
   Amount,
   ArgentPreset,
   BraavosPreset,
+  BridgeDepositFeeEstimation,
   type BridgeToken,
   ChainId,
   type ChainIdLiteral,
@@ -14,7 +15,6 @@ import {
   type ConnectExternalWalletOptions,
   DevnetPreset,
   Erc20,
-  type EthereumDepositFeeEstimation,
   EthereumBridgeToken,
   ExternalChain,
   fromAddress,
@@ -145,7 +145,7 @@ interface WalletState {
   bridgeIsLoading: boolean;
   bridgeError: string | null;
   bridgeLastUpdated: Date | null;
-  bridgeDepositFeeEstimate: EthereumDepositFeeEstimation | null;
+  bridgeDepositFeeEstimate: BridgeDepositFeeEstimation | null;
   bridgeDepositFeeLoading: boolean;
   bridgeFastTransfer: boolean;
 

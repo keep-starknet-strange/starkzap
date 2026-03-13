@@ -1,6 +1,5 @@
 import { assertNonEmptyString, describeValue } from "@/connect/utils";
 import { ExternalChain, type SolanaAddress } from "@/types";
-import type { ConnectedExternalWallet } from "@/connect/index";
 import type { ChainId } from "starkzap";
 import type { SolanaSigner, SolanaWalletConfig } from "@/bridge/solana/types";
 import { clusterApiUrl, Connection } from "@solana/web3.js";
@@ -32,7 +31,7 @@ function assertSolanaSigner(signer: unknown): SolanaSigner {
   );
 }
 
-export class ConnectedSolanaWallet implements ConnectedExternalWallet<SolanaAddress> {
+export class ConnectedSolanaWallet {
   readonly chain = ExternalChain.SOLANA;
 
   private constructor(
@@ -57,11 +56,11 @@ export class ConnectedSolanaWallet implements ConnectedExternalWallet<SolanaAddr
     const signer = assertSolanaSigner(options.signer);
 
     if (chainId === SOLANA_MAINNET_GENESIS && !starknetChain.isMainnet()) {
-      throw new Error("Solana mainnet cannot be used with Starknet testnet.");
+      throw new Error("Solana mainnet cannot be used with Starknet Sepolia.");
     }
 
     if (chainId === SOLANA_TESTNET_GENESIS && !starknetChain.isSepolia()) {
-      throw new Error("Solana testnet cannot be used with Starknet mainnet.");
+      throw new Error("Solana testnet cannot be used with Starknet Mainnet.");
     }
 
     if (

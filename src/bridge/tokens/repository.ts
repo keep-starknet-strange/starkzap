@@ -1,12 +1,12 @@
 import { assertSafeHttpUrl } from "@/utils";
-import { Protocol, type EthereumBridgeProtocol } from "@/types/bridge/protocol";
+import { type EthereumBridgeProtocol, Protocol } from "@/types/bridge/protocol";
 import { ExternalChain } from "@/types/bridge/external-chain";
 import {
   type BridgeToken,
   EthereumBridgeToken,
   SolanaBridgeToken,
 } from "@/types/bridge/bridge-token";
-import { fromAddress, fromEthereumAddress } from "@/types";
+import { fromAddress, fromEthereumAddress, fromSolanaAddress } from "@/types";
 
 export type BridgeTokenApiEnv = "mainnet" | "testnet";
 
@@ -164,8 +164,8 @@ function parseToken(token: BridgeTokenApiRecord): BridgeToken {
       symbol: requiredString(token, "symbol"),
       decimals: requiredNumber(token, "decimals"),
       protocol: Protocol.HYPERLANE,
-      address: requiredString(token, "l1_token_address"),
-      l1Bridge: requiredString(token, "l1_bridge_address"),
+      address: fromSolanaAddress(requiredString(token, "l1_token_address")),
+      l1Bridge: fromSolanaAddress(requiredString(token, "l1_bridge_address")),
       starknetAddress: fromAddress(requiredString(token, "l2_token_address")),
       starknetBridge: fromAddress(requiredString(token, "l2_bridge_address")),
     });
