@@ -9,7 +9,10 @@
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "infoPlist": {
+        "LSApplicationQueriesSchemes": ["phantom", "solflare"]
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -39,7 +42,8 @@
           }
         }
       ],
-      "expo-secure-store"
+      "expo-secure-store",
+      "./plugins/android-wallet-queries"
     ],
     "experiments": {
       "typedRoutes": true,
