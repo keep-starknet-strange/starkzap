@@ -29,7 +29,7 @@ import type {
 } from "starknet";
 import { Erc20 } from "@/erc20";
 import { Staking } from "@/staking";
-import type { SwapInput, SwapProvider, SwapQuote } from "@/swap";
+import type { PreparedSwap, SwapInput, SwapQuote, SwapProvider } from "@/swap";
 import { AvnuSwapProvider } from "@/swap";
 import { resolveSwapInput } from "@/swap/utils";
 import { AvnuDcaProvider, DcaClient, type DcaProvider } from "@/dca";
@@ -95,6 +95,8 @@ export abstract class BaseWallet implements WalletInterface {
   /**
    * Creates a new BaseWallet instance.
    * @param options - Wallet configuration options
+   *
+   * `defaultSwapProvider` is used by `getQuote(request)`, `prepareSwap(request)`, and `swap(request)`.
    */
   protected constructor(options: {
     address: Address;
@@ -239,20 +241,30 @@ export abstract class BaseWallet implements WalletInterface {
   }
 
   /**
+   * Prepare a swap without executing it.
+   *
+   * Advanced API for batching, simulation, or custom execution flows.
+   * Most apps should prefer `wallet.swap(...)`.
+   */
+  async prepareSwap(request: SwapInput): Promise<PreparedSwap> {
+    const { provider, request: resolvedRequest } = resolveSwapInput(request, {
+      walletChainId: this.getChainId(),
+      takerAddress: this.address,
+      providerResolver: this,
+    });
+    const prepared = await provider.prepareSwap(resolvedRequest);
+    this.assertSwapCalls(prepared.calls, `provider "${provider.id}"`);
+    return prepared;
+  }
+
+  /**
    * Execute a swap.
    *
    * Set `request.provider` to a provider instance or provider id.
    * If omitted, uses the wallet default provider.
    */
   async swap(request: SwapInput, options?: ExecuteOptions): Promise<Tx> {
-    const { provider, request: resolvedRequest } = resolveSwapInput(request, {
-      walletChainId: this.getChainId(),
-      takerAddress: this.address,
-      providerResolver: this,
-    });
-    const prepared = await provider.swap(resolvedRequest);
-    this.assertSwapCalls(prepared.calls, `provider "${provider.id}"`);
-    return await this.execute(prepared.calls, options);
+    return await this.execute((await this.prepareSwap(request)).calls, options);
   }
 
   registerSwapProvider(provider: SwapProvider, makeDefault = false): void {

@@ -21,14 +21,19 @@ export function hydrateSwapRequest(
   input: SwapInput,
   walletContext: { chainId: ChainId; takerAddress: Address }
 ): SwapRequest {
-  return {
+  const request: SwapRequest = {
     chainId: input.chainId ?? walletContext.chainId,
     takerAddress: input.takerAddress ?? walletContext.takerAddress,
     tokenIn: input.tokenIn,
     tokenOut: input.tokenOut,
     amountIn: input.amountIn,
-    ...(input.slippageBps != null && { slippageBps: input.slippageBps }),
   };
+
+  if (input.slippageBps != null) {
+    request.slippageBps = input.slippageBps;
+  }
+
+  return request;
 }
 
 export function assertSwapContext(

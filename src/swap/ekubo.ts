@@ -80,18 +80,23 @@ export class EkuboSwapProvider implements SwapProvider {
     return toEkuboSwapQuote({ quote, amountInBase });
   }
 
-  async swap(request: SwapRequest): Promise<PreparedSwap> {
+  async prepareSwap(request: SwapRequest): Promise<PreparedSwap> {
     const { quote, amountInBase } = await this.fetchQuoteForRequest(request);
 
     const preset = getEkuboPreset(request.chainId);
-    const calls = buildEkuboSwapCalls({
+    const swapCallRequest: Parameters<typeof buildEkuboSwapCalls>[0] = {
       quote,
       tokenIn: request.tokenIn,
       tokenOut: request.tokenOut,
       amountInBase,
       extensionRouter: preset.extensionRouter,
-      ...(request.slippageBps != null && { slippageBps: request.slippageBps }),
-    });
+    };
+
+    if (request.slippageBps != null) {
+      swapCallRequest.slippageBps = request.slippageBps;
+    }
+
+    const calls = buildEkuboSwapCalls(swapCallRequest);
 
     return {
       calls,
@@ -102,7 +107,6 @@ export class EkuboSwapProvider implements SwapProvider {
       }),
     };
   }
-
   private async fetchQuoteForRequest(
     request: SwapRequest
   ): Promise<{ quote: EkuboQuoteResponse; amountInBase: bigint }> {

@@ -95,7 +95,7 @@ describe("EkuboSwapProvider", () => {
     );
   });
 
-  it("builds swap calls from quote response", async () => {
+  it("builds prepared swap calls from quote response", async () => {
     const fetchMock = vi
       .fn()
       .mockResolvedValue(jsonResponse(singleRouteQuote()));
@@ -105,7 +105,7 @@ describe("EkuboSwapProvider", () => {
       apiBase: "https://mock-ekubo",
     });
 
-    const prepared = await provider.swap({
+    const prepared = await provider.prepareSwap({
       chainId: ChainId.SEPOLIA,
       tokenIn,
       tokenOut,
@@ -144,7 +144,7 @@ describe("EkuboSwapProvider", () => {
     });
 
     await expect(
-      provider.swap({
+      provider.prepareSwap({
         chainId: ChainId.SEPOLIA,
         tokenIn,
         tokenOut,

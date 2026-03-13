@@ -83,7 +83,7 @@ function createSwapProvider(
       amountOutBase: 200000000000000000n,
       provider: id,
     }),
-    swap: vi.fn(),
+    prepareSwap: vi.fn(),
     ...overrides,
   };
 }

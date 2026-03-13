@@ -50,16 +50,18 @@ function toSwapQuote(params: {
   quote: Quote;
   routeCallCount?: number;
 }): SwapQuote {
-  const quote: SwapQuote = {
+  const normalizedQuote: SwapQuote = {
     amountInBase: params.quote.sellAmount,
     amountOutBase: params.quote.buyAmount,
     priceImpactBps: percentToBps(params.quote.priceImpact ?? null),
     provider: "avnu",
   };
+
   if (params.routeCallCount != null) {
-    quote.routeCallCount = params.routeCallCount;
+    normalizedQuote.routeCallCount = params.routeCallCount;
   }
-  return quote;
+
+  return normalizedQuote;
 }
 
 export class AvnuSwapProvider implements SwapProvider {
@@ -90,21 +92,23 @@ export class AvnuSwapProvider implements SwapProvider {
     return toSwapQuote({ quote });
   }
 
-  async swap(request: SwapRequest): Promise<PreparedSwap> {
+  async prepareSwap(request: SwapRequest): Promise<PreparedSwap> {
     const { quote, apiBase } = await this.fetchQuoteForRequest(request);
 
     const slippage = bpsToPercent(request.slippageBps ?? DEFAULT_SLIPPAGE_BPS);
-    const result = await quoteToCalls(
-      {
-        quoteId: quote.quoteId,
-        slippage,
-        executeApprove: true,
-        ...(request.takerAddress != null && {
-          takerAddress: request.takerAddress,
-        }),
-      },
-      { baseUrl: apiBase }
-    );
+    const quoteToCallsRequest: Parameters<typeof quoteToCalls>[0] = {
+      quoteId: quote.quoteId,
+      slippage,
+      executeApprove: true,
+    };
+
+    if (request.takerAddress != null) {
+      quoteToCallsRequest.takerAddress = request.takerAddress;
+    }
+
+    const result = await quoteToCalls(quoteToCallsRequest, {
+      baseUrl: apiBase,
+    });
     const calls = normalizeAvnuCalls(
       result.calls as Call[],
       "AVNU build returned no calls"
@@ -118,17 +122,25 @@ export class AvnuSwapProvider implements SwapProvider {
       }),
     };
   }
-
   private fetchQuoteForRequest(request: SwapRequest) {
-    return this.fetchQuote({
+    const quoteRequest: {
+      chainId: ChainId;
+      tokenInAddress: string;
+      tokenOutAddress: string;
+      amountInBase: bigint;
+      takerAddress?: Address;
+    } = {
       chainId: request.chainId,
       tokenInAddress: request.tokenIn.address,
       tokenOutAddress: request.tokenOut.address,
       amountInBase: request.amountIn.toBase(),
-      ...(request.takerAddress != null && {
-        takerAddress: request.takerAddress,
-      }),
-    });
+    };
+
+    if (request.takerAddress != null) {
+      quoteRequest.takerAddress = request.takerAddress;
+    }
+
+    return this.fetchQuote(quoteRequest);
   }
 
   private async fetchQuote(params: {
@@ -138,24 +150,24 @@ export class AvnuSwapProvider implements SwapProvider {
     amountInBase: bigint;
     takerAddress?: Address;
   }): Promise<{ quote: Quote; apiBase: string }> {
-    return await withAvnuApiBaseFallback({
+    return withAvnuApiBaseFallback({
       apiBasesByChain: this.apiBases,
       chainId: params.chainId,
       feature: "quote",
       action: "quote",
       run: async (apiBase) => {
-        const quotes = await getQuotes(
-          {
-            sellTokenAddress: params.tokenInAddress,
-            buyTokenAddress: params.tokenOutAddress,
-            sellAmount: params.amountInBase,
-            size: this.quotesPageSize,
-            ...(params.takerAddress != null && {
-              takerAddress: params.takerAddress,
-            }),
-          },
-          { baseUrl: apiBase }
-        );
+        const quotesRequest: Parameters<typeof getQuotes>[0] = {
+          sellTokenAddress: params.tokenInAddress,
+          buyTokenAddress: params.tokenOutAddress,
+          sellAmount: params.amountInBase,
+          size: this.quotesPageSize,
+        };
+
+        if (params.takerAddress != null) {
+          quotesRequest.takerAddress = params.takerAddress;
+        }
+
+        const quotes = await getQuotes(quotesRequest, { baseUrl: apiBase });
 
         if (!quotes.length) {
           throw new Error("AVNU quote returned no routes");
