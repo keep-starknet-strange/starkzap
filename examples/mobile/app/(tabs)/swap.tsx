@@ -2234,10 +2234,12 @@ export default function SwapScreen() {
                           Per cycle
                         </ThemedText>
                         <ThemedText style={styles.orderFactValue}>
-                          {formatTokenAmount(
-                            order.sellAmountPerCycleBase,
-                            orderSellToken
-                          )}
+                          {order.sellAmountPerCycleBase != null
+                            ? formatTokenAmount(
+                                order.sellAmountPerCycleBase,
+                                orderSellToken
+                              )
+                            : "Continuous"}
                         </ThemedText>
                       </View>
                       <View style={styles.orderFactRow}>

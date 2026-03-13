@@ -40,15 +40,15 @@ export interface DcaTrade {
 export interface DcaOrder {
   id: string;
   providerId: string;
-  blockNumber: number;
+  blockNumber?: number;
   timestamp: Date;
   traderAddress: Address;
   orderAddress: Address;
-  creationTransactionHash: string;
-  orderClassHash: string;
+  creationTransactionHash?: string;
+  orderClassHash?: string;
   sellTokenAddress: Address;
   sellAmountBase: bigint;
-  sellAmountPerCycleBase: bigint;
+  sellAmountPerCycleBase?: bigint;
   buyTokenAddress: Address;
   startDate: Date;
   endDate: Date;

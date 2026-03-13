@@ -11,7 +11,7 @@ import type { TxBuilder } from "@/tx/builder";
 import type { Erc20 } from "@/erc20";
 import type { Staking } from "@/staking";
 import type { LendingClient } from "@/lending";
-import type { DcaClient } from "@/dca";
+import type { DcaClientInterface } from "@/dca";
 import type { PreparedSwap, SwapInput, SwapQuote, SwapProvider } from "@/swap";
 import type {
   Address,
@@ -105,7 +105,7 @@ export interface WalletInterface {
   /**
    * Access DCA helpers for protocol-native recurring orders and per-cycle swap previews.
    */
-  dca(): DcaClient;
+  dca(): DcaClientInterface;
 
   /**
    * Fetch a quote.
