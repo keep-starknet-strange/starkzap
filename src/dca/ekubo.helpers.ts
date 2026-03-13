@@ -1,5 +1,6 @@
 import { fromAddress, type Address, type ChainId } from "@/types";
 import type { DcaOrder, DcaOrderStatus } from "@/dca/interface";
+import { isRecord } from "@/utils/ekubo";
 
 export const DEFAULT_EKUBO_DCA_API_BASE = "https://prod-api.ekubo.org";
 export const MINIMUM_START_DELAY_SECONDS = 64;
@@ -72,10 +73,6 @@ export interface EkuboOrderDescriptor {
   apiOrder: EkuboApiOrder;
   orderId: string;
   parsedOrderId: ParsedEkuboOrderId;
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null;
 }
 
 function parseRequiredNumber(value: unknown, label: string): number {
@@ -281,7 +278,13 @@ export function alignEkuboTime(now: number, target: number): number {
     now + MINIMUM_START_DELAY_SECONDS
   );
 
+  const MAX_ALIGNMENT_ITERATIONS = 100;
+  let iterations = 0;
   while (true) {
+    if (++iterations > MAX_ALIGNMENT_ITERATIONS) {
+      throw new Error("Ekubo time alignment failed to converge");
+    }
+
     const step = getEkuboTimeStep(now, candidate);
     const remainder = candidate % step;
     if (remainder === 0) {
@@ -467,15 +470,11 @@ export function toEkuboDcaOrder(params: {
   const order: DcaOrder = {
     id: orderId,
     providerId: params.providerId,
-    blockNumber: 0,
     timestamp: startDate,
     traderAddress: params.traderAddress,
     orderAddress: parsedOrderId.positions,
-    creationTransactionHash: "",
-    orderClassHash: "",
     sellTokenAddress: parsedOrderId.orderKey.sellToken,
     sellAmountBase,
-    sellAmountPerCycleBase: sellAmountBase,
     buyTokenAddress: parsedOrderId.orderKey.buyToken,
     startDate,
     endDate,
