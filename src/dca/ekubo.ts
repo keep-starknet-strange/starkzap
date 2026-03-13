@@ -218,7 +218,14 @@ export class EkuboDcaProvider implements DcaProvider {
       throw new Error("Ekubo DCA cancel requires an orderId from getOrders()");
     }
 
+    const preset = this.getPreset(context.chainId);
     const order = decodeEkuboOrderId(request.orderId);
+    if (order.positions !== preset.positions) {
+      throw new Error(
+        "Ekubo DCA orderId does not match the positions contract for the current chain"
+      );
+    }
+
     const info = await this.getOrderInfo(context, order);
     const calls = this.buildCancelCalls(order, info);
     if (calls.length === 0) {

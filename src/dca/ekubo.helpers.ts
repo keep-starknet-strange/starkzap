@@ -87,6 +87,14 @@ function parseRequiredNumber(value: unknown, label: string): number {
   return value;
 }
 
+function parseRequiredString(value: unknown, label: string): string {
+  if (typeof value !== "string" || value.length === 0) {
+    throw new Error(`Invalid ${label}`);
+  }
+
+  return value;
+}
+
 function getEkuboTimeStep(now: number, time: number): number {
   if (time <= now + EKUBO_TIME_SPACING_SECONDS) {
     return EKUBO_TIME_SPACING_SECONDS;
@@ -134,16 +142,19 @@ export function toEkuboApiChainId(chainId: ChainId): string {
 }
 
 export function parsePositiveBigInt(value: unknown, label: string): bigint {
-  try {
-    const parsed = BigInt(String(value));
-    if (parsed < 0n) {
-      throw new Error(`${label} cannot be negative`);
-    }
+  let parsed: bigint;
 
-    return parsed;
+  try {
+    parsed = BigInt(String(value));
   } catch {
     throw new Error(`Invalid ${label}`);
   }
+
+  if (parsed < 0n) {
+    throw new Error(`${label} cannot be negative`);
+  }
+
+  return parsed;
 }
 
 export function parseEkuboOrdersResponse(
@@ -163,9 +174,9 @@ export function parseEkuboOrdersResponse(
     }
 
     return {
-      chain_id: String(group.chain_id),
-      nft_address: String(group.nft_address),
-      token_id: String(group.token_id),
+      chain_id: parseRequiredString(group.chain_id, "chain_id"),
+      nft_address: parseRequiredString(group.nft_address, "nft_address"),
+      token_id: parseRequiredString(group.token_id, "token_id"),
       orders: group.orders.map((order): EkuboApiOrder => {
         if (!isRecord(order) || !isRecord(order.key)) {
           throw new Error("Ekubo TWAP order is malformed");
@@ -173,14 +184,17 @@ export function parseEkuboOrdersResponse(
 
         return {
           key: {
-            sell_token: String(order.key.sell_token),
-            buy_token: String(order.key.buy_token),
-            fee: String(order.key.fee),
+            sell_token: parseRequiredString(order.key.sell_token, "sell_token"),
+            buy_token: parseRequiredString(order.key.buy_token, "buy_token"),
+            fee: parseRequiredString(order.key.fee, "fee"),
             start_time: parseRequiredNumber(order.key.start_time, "start_time"),
             end_time: parseRequiredNumber(order.key.end_time, "end_time"),
           },
-          total_proceeds_withdrawn: String(order.total_proceeds_withdrawn),
-          sale_rate: String(order.sale_rate),
+          total_proceeds_withdrawn: parseRequiredString(
+            order.total_proceeds_withdrawn,
+            "total_proceeds_withdrawn"
+          ),
+          sale_rate: parseRequiredString(order.sale_rate, "sale_rate"),
           last_collect_proceeds:
             order.last_collect_proceeds == null
               ? null
@@ -188,7 +202,10 @@ export function parseEkuboOrdersResponse(
                   order.last_collect_proceeds,
                   "last_collect_proceeds"
                 ),
-          total_amount_sold: String(order.total_amount_sold),
+          total_amount_sold: parseRequiredString(
+            order.total_amount_sold,
+            "total_amount_sold"
+          ),
         };
       }),
     };
@@ -220,8 +237,8 @@ export function parseEkuboPoolsResponse(
       }
 
       return {
-        fee: String(pool.fee),
-        extension: String(pool.extension),
+        fee: parseRequiredString(pool.fee, "fee"),
+        extension: parseRequiredString(pool.extension, "extension"),
       };
     }),
   };
