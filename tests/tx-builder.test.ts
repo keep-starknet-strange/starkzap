@@ -606,6 +606,8 @@ describe("TxBuilder", () => {
   describe("dca", () => {
     it("should resolve DCA create calls via wallet.dca()", async () => {
       const wallet = createMockWallet();
+      const dcaManager = wallet.dca();
+      (wallet.dca as ReturnType<typeof vi.fn>).mockClear();
       const sellAmount = Amount.parse("100", mockUSDC);
       const sellAmountPerCycle = Amount.parse("10", mockUSDC);
       const request = {
@@ -619,21 +621,19 @@ describe("TxBuilder", () => {
       const calls = await new TxBuilder(wallet).dcaCreate(request).calls();
 
       expect(wallet.dca).toHaveBeenCalledTimes(1);
-      const dcaManager = (wallet.dca as ReturnType<typeof vi.fn>).mock
-        .results[0]!.value;
       expect(dcaManager.prepareCreate).toHaveBeenCalledWith(request);
       expect(calls).toEqual([dcaCreateCall]);
     });
 
     it("should resolve DCA cancel calls via wallet.dca()", async () => {
       const wallet = createMockWallet();
+      const dcaManager = wallet.dca();
+      (wallet.dca as ReturnType<typeof vi.fn>).mockClear();
       const request = { orderAddress: "0x123" };
 
       const calls = await new TxBuilder(wallet).dcaCancel(request).calls();
 
       expect(wallet.dca).toHaveBeenCalledTimes(1);
-      const dcaManager = (wallet.dca as ReturnType<typeof vi.fn>).mock
-        .results[0]!.value;
       expect(dcaManager.prepareCancel).toHaveBeenCalledWith(request);
       expect(calls).toEqual([dcaCancelCall]);
     });
