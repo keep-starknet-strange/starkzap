@@ -18,7 +18,7 @@ cd packages/mcp-server
 npm install
 npm run build
 
-# Read-only mode (balance checks, fee estimates, and pool position if staking is configured)
+# Read-only mode (balance checks, call building, fee estimates, and pool position if staking is configured)
 STARKNET_PRIVATE_KEY=0x... node dist/index.js --network mainnet
 
 # Enable transfers and staking writes
@@ -66,16 +66,16 @@ This server handles real funds. The following protections are built in:
 
 ### CLI Arguments
 
-| Argument                 | Default                | Description                                                                                               |
-| ------------------------ | ---------------------- | --------------------------------------------------------------------------------------------------------- |
-| `--network`              | `mainnet`              | Network preset: `mainnet` or `sepolia` (validated at startup)                                             |
-| `--max-amount`           | `1000`                 | Max tokens per individual amount-bearing operation                                                        |
-| `--max-batch-amount`     | `same as --max-amount` | Max total tokens across one `starkzap_transfer` batch call                                                |
-| `--rate-limit-rpm`       | `0` (disabled)         | Global MCP tool-call rate limit per minute                                                                |
-| `--read-rate-limit-rpm`  | `0` (disabled)         | Optional read-only bucket (`starkzap_get_balance`, `starkzap_get_pool_position`, `starkzap_estimate_fee`) |
-| `--write-rate-limit-rpm` | `0` (disabled)         | Optional state-changing bucket (transfer/staking/deploy/execute)                                          |
-| `--enable-write`         | off                    | Enable state-changing tools (transfer, stake, deploy)                                                     |
-| `--enable-execute`       | off                    | Enable only the unrestricted `starkzap_execute` tool                                                      |
+| Argument                 | Default                | Description                                                                                                                       |
+| ------------------------ | ---------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| `--network`              | `mainnet`              | Network preset: `mainnet` or `sepolia` (validated at startup)                                                                     |
+| `--max-amount`           | `1000`                 | Max tokens per individual amount-bearing operation                                                                                |
+| `--max-batch-amount`     | `same as --max-amount` | Max total tokens across one `starkzap_transfer` batch call                                                                        |
+| `--rate-limit-rpm`       | `0` (disabled)         | Global MCP tool-call rate limit per minute                                                                                        |
+| `--read-rate-limit-rpm`  | `0` (disabled)         | Optional read-only bucket (`starkzap_get_balance`, `starkzap_get_pool_position`, `starkzap_estimate_fee`, `starkzap_build_calls`) |
+| `--write-rate-limit-rpm` | `0` (disabled)         | Optional state-changing bucket (transfer/staking/deploy/execute)                                                                  |
+| `--enable-write`         | off                    | Enable state-changing tools (transfer, stake, deploy)                                                                             |
+| `--enable-execute`       | off                    | Enable only the unrestricted `starkzap_execute` tool                                                                              |
 
 ## MCP Client Configuration
 
@@ -135,6 +135,7 @@ const mcpServer = new McpServerStdio({
 | `starkzap_get_balance`    | Get ERC20 token balance (human-readable + raw)              |
 | `starkzap_transfer`       | Transfer tokens to one or more recipients                   |
 | `starkzap_execute`        | Execute raw contract calls atomically                       |
+| `starkzap_build_calls`    | Build and normalize contract calls without execution        |
 | `starkzap_deploy_account` | Deploy the account contract on-chain                        |
 | `starkzap_estimate_fee`   | Estimate gas cost for contract calls                        |
 

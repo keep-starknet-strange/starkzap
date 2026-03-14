@@ -22,7 +22,7 @@ import {
   ListToolsRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js";
 import { z } from "zod";
-import { Amount, fromAddress, StarkSDK, StarkSigner } from "starkzap";
+import { Amount, fromAddress, StarkSigner, StarkZap } from "starkzap";
 import type { Address, Token, Wallet } from "starkzap";
 import {
   assertStakingPoolShape,
@@ -257,7 +257,7 @@ const poolClassHashInFlight = new Map<Address, Promise<string>>();
 // ---------------------------------------------------------------------------
 // SDK + wallet singleton (lazy init)
 // ---------------------------------------------------------------------------
-let sdkSingleton: StarkSDK | undefined;
+let sdkSingleton: StarkZap | undefined;
 let walletSingleton: Wallet | undefined;
 let walletInitPromise: Promise<Wallet> | undefined;
 let walletInitFailureCount = 0;
@@ -276,7 +276,7 @@ const sdkConfig = Object.freeze({
   }),
 });
 
-function getSdk(): StarkSDK {
+function getSdk(): StarkZap {
   if (sdkInitBackoffUntilMs > nowMs()) {
     const retryInMs = sdkInitBackoffUntilMs - nowMs();
     throw new Error(
@@ -285,7 +285,7 @@ function getSdk(): StarkSDK {
   }
   if (!sdkSingleton) {
     try {
-      sdkSingleton = new StarkSDK(sdkConfig);
+      sdkSingleton = new StarkZap(sdkConfig);
       sdkInitFailureCount = 0;
       sdkInitBackoffUntilMs = 0;
     } catch (error) {
@@ -575,6 +575,104 @@ function parseAmountWithContext(
       `Invalid ${context} amount "${literal}" for ${token.symbol}. ${reason}`
     );
   }
+}
+
+const ENTRYPOINT_IDENTIFIER_REGEX = /^[a-zA-Z_][a-zA-Z0-9_]*$/;
+const CALLDATA_ITEM_REGEX = /^(0x[0-9a-fA-F]{1,64}|[0-9]+)$/;
+
+function normalizeCalldataItemForResponse(
+  value: unknown,
+  path: string
+): string {
+  if (typeof value === "string") {
+    if (value.length > 256) {
+      throw new Error(`Invalid ${path}: value exceeds 256 characters.`);
+    }
+    if (!CALLDATA_ITEM_REGEX.test(value)) {
+      throw new Error(
+        `Invalid ${path}: must be a felt-like hex (0x...) or decimal string.`
+      );
+    }
+    return value;
+  }
+  if (typeof value === "bigint") {
+    if (value < 0n) {
+      throw new Error(`Invalid ${path}: bigint values must be non-negative.`);
+    }
+    const normalized = value.toString();
+    if (normalized.length > 256) {
+      throw new Error(`Invalid ${path}: value exceeds 256 characters.`);
+    }
+    return normalized;
+  }
+  if (typeof value === "number") {
+    if (!Number.isSafeInteger(value) || value < 0) {
+      throw new Error(
+        `Invalid ${path}: number values must be non-negative safe integers.`
+      );
+    }
+    const normalized = value.toString();
+    if (normalized.length > 256) {
+      throw new Error(`Invalid ${path}: value exceeds 256 characters.`);
+    }
+    return normalized;
+  }
+  throw new Error(
+    `Invalid ${path}: unsupported calldata type "${typeof value}".`
+  );
+}
+
+function normalizeCallForResponse(
+  value: unknown,
+  index: number
+): { contractAddress: Address; entrypoint: string; calldata: string[] } {
+  const callPath = `calls_${index}`;
+  if (!isRecord(value)) {
+    throw new Error(`Invalid ${callPath} returned by SDK: expected object.`);
+  }
+  const contractAddressRaw = value.contractAddress;
+  if (typeof contractAddressRaw !== "string") {
+    throw new Error(
+      `Invalid ${callPath}.contractAddress returned by SDK: expected string.`
+    );
+  }
+  const contractAddress = validateAddressOrThrow(
+    contractAddressRaw,
+    `${callPath}.contractAddress`
+  );
+  const entrypoint = value.entrypoint;
+  if (
+    typeof entrypoint !== "string" ||
+    entrypoint.length > 64 ||
+    !ENTRYPOINT_IDENTIFIER_REGEX.test(entrypoint)
+  ) {
+    throw new Error(
+      `Invalid ${callPath}.entrypoint returned by SDK: expected Cairo identifier.`
+    );
+  }
+  const calldataRaw = value.calldata;
+  const calldataValues =
+    calldataRaw === undefined || calldataRaw === null ? [] : calldataRaw;
+  if (!Array.isArray(calldataValues)) {
+    throw new Error(
+      `Invalid ${callPath}.calldata returned by SDK: expected array.`
+    );
+  }
+  if (calldataValues.length > 2048) {
+    throw new Error(
+      `Invalid ${callPath}.calldata returned by SDK: maximum 2048 items.`
+    );
+  }
+  return {
+    contractAddress,
+    entrypoint,
+    calldata: calldataValues.map((item, calldataIndex) =>
+      normalizeCalldataItemForResponse(
+        item,
+        `${callPath}_calldata_${calldataIndex}`
+      )
+    ),
+  };
 }
 
 function assertOverallFeeIsBigInt(fee: unknown): asserts fee is {
@@ -1473,6 +1571,37 @@ async function handleTool(
       });
     }
 
+    case "starkzap_build_calls": {
+      const parsed = args as z.infer<typeof schemas.starkzap_build_calls>;
+      const contractAddresses = validateAddressBatch(
+        parsed.calls.map((call) => call.contractAddress),
+        "contract",
+        "calls.contractAddress"
+      );
+      const requestedCalls = parsed.calls.map((call, index) => ({
+        contractAddress: contractAddresses[index],
+        entrypoint: call.entrypoint,
+        calldata: call.calldata ?? [],
+      }));
+      const txBuilder = wallet.tx();
+      txBuilder.add(...requestedCalls);
+      const builtCalls = await withTimeout("Build calls query", () =>
+        txBuilder.calls()
+      );
+      if (builtCalls.length !== requestedCalls.length) {
+        throw new Error(
+          `Invalid build calls response from SDK: expected ${requestedCalls.length} calls, received ${builtCalls.length}.`
+        );
+      }
+      const normalizedCalls = builtCalls.map((call, index) =>
+        normalizeCallForResponse(call, index)
+      );
+      return ok({
+        callCount: normalizedCalls.length,
+        calls: normalizedCalls,
+      });
+    }
+
     case "starkzap_deploy_account": {
       const parsed = args as z.infer<typeof schemas.starkzap_deploy_account>;
       const provider = wallet.getProvider();
@@ -1842,7 +1971,7 @@ interface TestingHooks {
   cleanupWalletAndSdkResources(): Promise<void>;
   trackedTransactions(): { active: string[]; timedOut: string[] };
   setNowProvider(provider: () => number): void;
-  setSdkSingleton(value: StarkSDK | undefined): void;
+  setSdkSingleton(value: StarkZap | undefined): void;
   setWalletSingleton(value: Wallet | undefined): void;
   getSdkConfig(): Record<string, unknown>;
   resetState(): void;
@@ -1873,7 +2002,7 @@ const testingHooks: TestingHooks = {
   setNowProvider(provider: () => number) {
     nowProvider = provider;
   },
-  setSdkSingleton(value: StarkSDK | undefined) {
+  setSdkSingleton(value: StarkZap | undefined) {
     sdkSingleton = value;
   },
   setWalletSingleton(value: Wallet | undefined) {

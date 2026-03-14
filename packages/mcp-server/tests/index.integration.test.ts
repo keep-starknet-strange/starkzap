@@ -440,6 +440,107 @@ describe("index integration hardening", () => {
     expect(response.content[0]?.text).toContain("Operation failed. Reference:");
   });
 
+  it("builds and normalizes raw calls via tx builder without execution", async () => {
+    const txBuilder = {
+      add: vi.fn().mockImplementation(() => txBuilder),
+      calls: vi.fn().mockResolvedValue([
+        {
+          contractAddress: "0x1",
+          entrypoint: "transfer",
+          calldata: [1n, "0x2", 3],
+        },
+      ]),
+    };
+    testing.setWalletSingleton({
+      tx: vi.fn().mockReturnValue(txBuilder),
+    } as unknown as Wallet);
+
+    const response = await testing.handleCallToolRequest({
+      params: {
+        name: "starkzap_build_calls",
+        arguments: {
+          calls: [
+            {
+              contractAddress: "0x1",
+              entrypoint: "transfer",
+              calldata: ["1", "0x2", "3"],
+            },
+          ],
+        },
+      },
+    });
+
+    expect(response.isError).not.toBe(true);
+    const payload = JSON.parse(response.content[0]?.text ?? "{}") as {
+      callCount: number;
+      calls: Array<{
+        contractAddress: string;
+        entrypoint: string;
+        calldata: string[];
+      }>;
+    };
+    expect(payload.callCount).toBe(1);
+    expect(payload.calls[0]).toEqual({
+      contractAddress: fromAddress("0x1"),
+      entrypoint: "transfer",
+      calldata: ["1", "0x2", "3"],
+    });
+    expect(txBuilder.add).toHaveBeenCalledTimes(1);
+    expect(txBuilder.calls).toHaveBeenCalledTimes(1);
+  });
+
+  it("rejects malformed tx builder call payloads from SDK", async () => {
+    const txBuilder = {
+      add: vi.fn().mockImplementation(() => txBuilder),
+      calls: vi.fn().mockResolvedValue([
+        {
+          contractAddress: "0x1",
+          entrypoint: "transfer",
+          calldata: [{}],
+        },
+      ]),
+    };
+    testing.setWalletSingleton({
+      tx: vi.fn().mockReturnValue(txBuilder),
+    } as unknown as Wallet);
+
+    const response = await testing.handleCallToolRequest({
+      params: {
+        name: "starkzap_build_calls",
+        arguments: {
+          calls: [{ contractAddress: "0x1", entrypoint: "transfer" }],
+        },
+      },
+    });
+
+    expect(response.isError).toBe(true);
+    expect(response.content[0]?.text).toContain("Invalid calls_0_calldata_0");
+  });
+
+  it("rejects tx builder call-count mismatches", async () => {
+    const txBuilder = {
+      add: vi.fn().mockImplementation(() => txBuilder),
+      calls: vi.fn().mockResolvedValue([]),
+    };
+    testing.setWalletSingleton({
+      tx: vi.fn().mockReturnValue(txBuilder),
+    } as unknown as Wallet);
+
+    const response = await testing.handleCallToolRequest({
+      params: {
+        name: "starkzap_build_calls",
+        arguments: {
+          calls: [{ contractAddress: "0x1", entrypoint: "transfer" }],
+        },
+      },
+    });
+
+    expect(response.isError).toBe(true);
+    expect(response.content[0]?.text).toContain(
+      "Invalid build calls response from SDK"
+    );
+  });
+
   it("rejects malformed commission percent in pool position responses", async () => {
     testing.setWalletSingleton({
       getPoolPosition: vi.fn().mockResolvedValue({

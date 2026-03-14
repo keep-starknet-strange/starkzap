@@ -337,6 +337,22 @@ export const schemas = {
       .max(10, "Maximum 10 calls per batch"),
     sponsored: z.boolean().optional(),
   }),
+  starkzap_build_calls: z
+    .object({
+      calls: z
+        .array(
+          z
+            .object({
+              contractAddress: addressSchema,
+              entrypoint: entrypointSchema,
+              calldata: calldataSchema,
+            })
+            .strict()
+        )
+        .min(1)
+        .max(10, "Maximum 10 calls per build batch"),
+    })
+    .strict(),
   starkzap_deploy_account: z.object({
     sponsored: z.boolean().optional(),
   }),
@@ -510,6 +526,52 @@ export function buildTools(maxAmount: string, maxBatchAmount: string): Tool[] {
           sponsored: {
             type: "boolean",
             description: "Use paymaster for gasless tx (default: false)",
+          },
+        },
+        required: ["calls"],
+      },
+    },
+    {
+      name: "starkzap_build_calls",
+      description:
+        "Build and normalize one or more raw contract calls without executing. Useful for deterministic multicall composition and preflight inspection. Maximum 10 calls per build batch.",
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: true,
+      },
+      inputSchema: {
+        type: "object" as const,
+        additionalProperties: false,
+        properties: {
+          calls: {
+            type: "array",
+            minItems: 1,
+            maxItems: 10,
+            items: {
+              type: "object",
+              additionalProperties: false,
+              properties: {
+                contractAddress: {
+                  type: "string",
+                  description: "Contract address",
+                },
+                entrypoint: {
+                  type: "string",
+                  maxLength: 64,
+                  pattern: "^[a-zA-Z_][a-zA-Z0-9_]*$",
+                  description: "Function name to call",
+                },
+                calldata: {
+                  type: "array",
+                  maxItems: 2048,
+                  items: { type: "string" },
+                  description: "Calldata as array of strings",
+                },
+              },
+              required: ["contractAddress", "entrypoint"],
+            },
           },
         },
         required: ["calls"],
@@ -742,6 +804,7 @@ export const READ_ONLY_TOOLS = new Set([
   "starkzap_get_balance",
   "starkzap_get_pool_position",
   "starkzap_estimate_fee",
+  "starkzap_build_calls",
 ]);
 
 export const STAKING_TOOLS = new Set([
