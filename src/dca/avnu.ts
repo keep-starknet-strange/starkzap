@@ -68,19 +68,14 @@ function toPricingStrategy(
     return {};
   }
 
-  const pricingStrategy: PricingStrategy = {
-    tokenToMinAmount: undefined,
-    tokenToMaxAmount: undefined,
-  };
-
-  if (minBuyAmountBase != null) {
-    pricingStrategy.tokenToMinAmount = `0x${minBuyAmountBase.toString(16)}`;
-  }
-  if (maxBuyAmountBase != null) {
-    pricingStrategy.tokenToMaxAmount = `0x${maxBuyAmountBase.toString(16)}`;
-  }
-
-  return pricingStrategy;
+  return {
+    ...(minBuyAmountBase != null && {
+      tokenToMinAmount: `0x${minBuyAmountBase.toString(16)}`,
+    }),
+    ...(maxBuyAmountBase != null && {
+      tokenToMaxAmount: `0x${maxBuyAmountBase.toString(16)}`,
+    }),
+  } as PricingStrategy;
 }
 
 function validateCreateRequest(request: DcaCreateRequest): void {
