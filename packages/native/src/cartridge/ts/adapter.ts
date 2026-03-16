@@ -139,7 +139,10 @@ async function resolveEffectivePolicies(
     );
   }
 
-  if (args.preset && (!hasManualPolicies || !args.shouldOverridePresetPolicies)) {
+  if (
+    args.preset &&
+    (!hasManualPolicies || !args.shouldOverridePresetPolicies)
+  ) {
     const fetchFn = ensureFetch(options.fetchImpl);
     const resolvedPolicies = await (
       options.resolvePresetPolicies ?? resolvePresetPolicies
@@ -280,11 +283,8 @@ export function createCartridgeTsAdapter(
       const sessionPrivateKey = stark.randomAddress();
       const formattedPrivateKey = encode.addHexPrefix(sessionPrivateKey);
       const sessionPublicKey = ec.starkCurve.getStarkKey(sessionPrivateKey);
-      const {
-        effectivePolicies,
-        sessionUrlPolicies,
-        sessionUrlPreset,
-      } = await resolveEffectivePolicies(args, options);
+      const { effectivePolicies, sessionUrlPolicies, sessionUrlPreset } =
+        await resolveEffectivePolicies(args, options);
       const canonicalPolicies = canonicalizeSessionPolicies(effectivePolicies);
       const { root: policyRoot } = computePolicyMerkle(canonicalPolicies);
       const policyProofIndex = createPolicyProofIndex(
@@ -402,7 +402,7 @@ export function createCartridgeTsAdapter(
         ...(options.execute ? { execute: options.execute } : {}),
       });
 
-        return {
+      return {
         account: {
           address: tsSessionAccount.address(),
           execute: async (
