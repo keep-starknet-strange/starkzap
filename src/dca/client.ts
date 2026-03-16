@@ -1,6 +1,6 @@
 import { resolveWalletAddress, type ExecuteOptions } from "@/types";
 import type { Tx } from "@/tx";
-import type { SwapInput, SwapQuote } from "@/swap";
+import type { SwapQuote } from "@/swap";
 import type {
   DcaCancelInput,
   DcaClientInterface,
@@ -112,30 +112,25 @@ export class DcaClient implements DcaClientInterface {
       request.traderAddress != null
         ? resolveWalletAddress(request.traderAddress)
         : undefined;
-    const swapInput: SwapInput = {
-      tokenIn: request.sellToken,
-      tokenOut: request.buyToken,
-      amountIn: request.sellAmountPerCycle,
-    };
 
-    if (request.swapProvider != null) {
-      swapInput.provider = request.swapProvider;
-    }
-    if (request.chainId != null) {
-      swapInput.chainId = request.chainId;
-    }
-    if (takerAddress != null) {
-      swapInput.takerAddress = takerAddress;
-    }
-    if (request.slippageBps != null) {
-      swapInput.slippageBps = request.slippageBps;
-    }
-
-    const { provider, request: resolvedRequest } = resolveSwapInput(swapInput, {
-      walletChainId: this.context.getChainId(),
-      takerAddress: this.context.address,
-      providerResolver: this.context,
-    });
+    const { provider, request: resolvedRequest } = resolveSwapInput(
+      {
+        tokenIn: request.sellToken,
+        tokenOut: request.buyToken,
+        amountIn: request.sellAmountPerCycle,
+        ...(request.swapProvider != null && { provider: request.swapProvider }),
+        ...(request.chainId != null && { chainId: request.chainId }),
+        ...(takerAddress != null && { takerAddress }),
+        ...(request.slippageBps != null && {
+          slippageBps: request.slippageBps,
+        }),
+      },
+      {
+        walletChainId: this.context.getChainId(),
+        takerAddress: this.context.address,
+        providerResolver: this.context,
+      }
+    );
 
     return provider.getQuote(resolvedRequest);
   }
@@ -149,7 +144,7 @@ export class DcaClient implements DcaClientInterface {
   private providerContext(): DcaProviderContext {
     return {
       chainId: this.context.getChainId(),
-      provider: this.context.getProvider(),
+      rpcProvider: this.context.getProvider(),
       walletAddress: this.context.address,
     };
   }

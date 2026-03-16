@@ -80,7 +80,7 @@ export function hydrateDcaCreateInput(
     traderAddress: resolveAddressOrDefault(input.traderAddress, walletAddress),
   };
 
-  if (input.pricingStrategy) {
+  if (input.pricingStrategy != null) {
     request.pricingStrategy = input.pricingStrategy;
   }
 
@@ -95,7 +95,7 @@ export function hydrateDcaOrdersInput(
     traderAddress: resolveAddressOrDefault(input.traderAddress, walletAddress),
   };
 
-  if (input.status) {
+  if (input.status != null) {
     request.status = input.status;
   }
   if (input.page != null) {
@@ -104,7 +104,7 @@ export function hydrateDcaOrdersInput(
   if (input.size != null) {
     request.size = input.size;
   }
-  if (input.sort) {
+  if (input.sort != null) {
     request.sort = input.sort;
   }
 
