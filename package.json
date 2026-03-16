@@ -30,10 +30,14 @@
     }
   },
   "peerDependencies": {
-    "@cartridge/controller": "^0.13.9"
+    "@cartridge/controller": "^0.13.9",
+    "@fatsolutions/tongo-sdk": "^1.3.2"
   },
   "peerDependenciesMeta": {
     "@cartridge/controller": {
+      "optional": true
+    },
+    "@fatsolutions/tongo-sdk": {
       "optional": true
     },
     "react-native-get-random-values": {
@@ -81,6 +85,7 @@
   "devDependencies": {
     "@0no-co/graphql.web": "^1.2.0",
     "@cartridge/controller": "^0.13.9",
+    "@fatsolutions/tongo-sdk": "^1.3.2",
     "@eslint/js": "^9.39.2",
     "@vitest/coverage-v8": "^4.0.17",
     "bestzip": "^2.2.1",
@@ -102,7 +107,6 @@
   },
   "dependencies": {
     "@avnu/avnu-sdk": "^4.1.0-rc.0",
-    "@fatsolutions/tongo-sdk": "^1.3.2",
     "starknet": "^9.2.1"
   }
 }
