@@ -12,8 +12,13 @@ export {
   registerCartridgeNativeAdapter,
 } from "@/cartridge/registry";
 export type {
+  CartridgeContractPolicy,
+  CartridgePolicies,
   CartridgePolicy,
+  CartridgePolicyMethod,
+  CartridgePolicyPredicate,
   CartridgeNativeAdapter,
   CartridgeNativeConnectArgs,
+  CartridgeSessionPolicies,
   CartridgeNativeSessionHandle,
 } from "@/cartridge/types";

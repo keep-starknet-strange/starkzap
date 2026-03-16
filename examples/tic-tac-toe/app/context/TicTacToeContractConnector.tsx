@@ -169,11 +169,6 @@ export const TicTacToeProvider: React.FC<{ children: React.ReactNode }> = ({
         const tx = await wallet.execute([call]);
         const txHash = tx.hash || null;
         if (!txHash) return null;
-        try {
-          await tx.wait();
-        } catch {
-          // Ignore wait errors and still return hash for optimistic UI updates.
-        }
         return txHash;
       } catch (e) {
         if (__DEV__) console.error("play_move error", e);

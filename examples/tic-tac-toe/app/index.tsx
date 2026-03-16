@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -18,6 +18,12 @@ import AccountGate from "@/components/AccountGate";
 import { addAddressPadding } from "starknet";
 
 type CellValue = "X" | "O" | null;
+type PendingMove = {
+  gameId: number;
+  cell: number;
+  symbol: "X" | "O";
+  isPending: boolean;
+};
 
 function normalizeAddress(value: string | undefined | null): string {
   const raw = (value || "").trim();
@@ -63,14 +69,25 @@ function isBoardFull(board: CellValue[]): boolean {
   return board.every((v) => v !== null);
 }
 
+function bitsToBoard(xBits: number, oBits: number): CellValue[] {
+  const arr: CellValue[] = Array(9).fill(null);
+  for (let i = 0; i < 9; i++) {
+    if ((xBits & (1 << i)) !== 0) arr[i] = "X";
+    else if ((oBits & (1 << i)) !== 0) arr[i] = "O";
+  }
+  return arr;
+}
+
 export default function PlayScreen() {
-  const { account, disconnectAccount } = useStarknetConnector();
+  const { account, disconnectAccount, waitForTransaction } =
+    useStarknetConnector();
   const [opponentAddress, setOpponentAddress] = useState("");
   const [board, setBoard] = useState<CellValue[]>(Array(9).fill(null));
   const [currentPlayer, setCurrentPlayer] = useState<"X" | "O">("X");
   const [myRole, setMyRole] = useState<"X" | "O" | null>(null);
   const [gameStarted, setGameStarted] = useState(false);
   const [creatingGame, setCreatingGame] = useState(false);
+  const [pendingMove, setPendingMove] = useState<PendingMove | null>(null);
   const {
     createGame,
     playMove,
@@ -85,6 +102,18 @@ export default function PlayScreen() {
   const colorScheme = useColorScheme() ?? "light";
   const tint = Colors[colorScheme].tint;
 
+  const boardWithPendingMove = useMemo(() => {
+    if (!pendingMove || pendingMove.gameId !== currentGameId) {
+      return board;
+    }
+    if (board[pendingMove.cell] === pendingMove.symbol) {
+      return board;
+    }
+    const nextBoard = board.slice();
+    nextBoard[pendingMove.cell] = pendingMove.symbol;
+    return nextBoard;
+  }, [board, currentGameId, pendingMove]);
+
   const { winner, line: winningLine } = useMemo(
     () => calculateWinner(board),
     [board]
@@ -96,19 +125,76 @@ export default function PlayScreen() {
   );
 
   const myAddress = normalizeAddress(account?.address || "");
+  const activePendingMove =
+    pendingMove?.gameId === currentGameId ? pendingMove : null;
+
+  const syncGame = useCallback(
+    async (gameId: number): Promise<boolean> => {
+      const game = await getGame(gameId);
+      if (!game) {
+        return false;
+      }
+
+      const nextBoard = bitsToBoard(game.x_bits, game.o_bits);
+      setBoard(nextBoard);
+      setCurrentPlayer(game.turn === 0 ? "X" : "O");
+
+      const me = myAddress;
+      const playerX = normalizeAddress(game.player_x || "");
+      const playerO = normalizeAddress(game.player_o || "");
+      const role = me === playerX ? "X" : me === playerO ? "O" : null;
+      setMyRole(role);
+
+      setPendingMove((current) => {
+        if (!current || current.gameId !== gameId) {
+          return current;
+        }
+        return nextBoard[current.cell] === current.symbol ? null : current;
+      });
+
+      return true;
+    },
+    [getGame, myAddress]
+  );
+
+  const submitMove = useCallback(
+    async (gameId: number, cell: number, symbol: "X" | "O") => {
+      const txHash = await playMove(gameId, cell);
+      if (!txHash) {
+        setPendingMove((current) => {
+          if (
+            current?.gameId === gameId &&
+            current.cell === cell &&
+            current.symbol === symbol
+          ) {
+            return null;
+          }
+          return current;
+        });
+        return;
+      }
+
+      const didConfirm = await waitForTransaction(txHash);
+      if (didConfirm) {
+        setPendingMove((current) => {
+          if (
+            current?.gameId === gameId &&
+            current.cell === cell &&
+            current.symbol === symbol
+          ) {
+            return { ...current, isPending: false };
+          }
+          return current;
+        });
+        await syncGame(gameId);
+      }
+    },
+    [playMove, syncGame, waitForTransaction]
+  );
 
   // Poll game state while a game is selected.
   useEffect(() => {
     if (currentGameId == null) return;
-
-    const bitsToBoard = (xBits: number, oBits: number): CellValue[] => {
-      const arr: CellValue[] = Array(9).fill(null);
-      for (let i = 0; i < 9; i++) {
-        if ((xBits & (1 << i)) !== 0) arr[i] = "X";
-        else if ((oBits & (1 << i)) !== 0) arr[i] = "O";
-      }
-      return arr;
-    };
 
     let cancelled = false;
     let inFlight = false;
@@ -116,15 +202,7 @@ export default function PlayScreen() {
       if (cancelled || inFlight) return;
       inFlight = true;
       try {
-        const game = await getGame(currentGameId);
-        if (cancelled || !game) return;
-        setBoard(bitsToBoard(game.x_bits, game.o_bits));
-        setCurrentPlayer(game.turn === 0 ? "X" : "O");
-        const me = myAddress;
-        const playerX = normalizeAddress(game.player_x || "");
-        const playerO = normalizeAddress(game.player_o || "");
-        const role = me === playerX ? "X" : me === playerO ? "O" : null;
-        setMyRole(role);
+        await syncGame(currentGameId);
       } catch {
         // Ignore polling errors and try again on next interval.
       } finally {
@@ -141,7 +219,7 @@ export default function PlayScreen() {
       cancelled = true;
       clearInterval(intervalId);
     };
-  }, [currentGameId, getGame, myAddress]);
+  }, [currentGameId, syncGame]);
 
   async function handleStartGame() {
     if (!opponentAddress.trim() || creatingGame) return;
@@ -153,6 +231,7 @@ export default function PlayScreen() {
         setBoard(Array(9).fill(null));
         setCurrentPlayer("X");
         setMyRole("X");
+        setPendingMove(null);
         setGameStarted(true);
       } else {
         if (__DEV__) console.log("createGame returned null (no tx hash)");
@@ -166,24 +245,31 @@ export default function PlayScreen() {
     const id = parseInt(joinGameId.trim(), 10);
     if (Number.isNaN(id) || id < 0) return;
     loadGame(id);
+    setPendingMove(null);
     setGameStarted(true);
     setJoinGameId(id.toString());
   }
 
   function handleCellPress(index: number) {
-    if (!gameStarted || winner) return;
+    if (
+      !gameStarted ||
+      winner ||
+      currentGameId == null ||
+      !isMyTurn ||
+      activePendingMove
+    ) {
+      return;
+    }
     if (__DEV__)
       console.log("cell pressed", index, { currentGameId, isMyTurn });
-    setBoard((prev) => {
-      if (index == null || prev[index] !== null) return prev;
-      const next = prev.slice();
-      next[index] = currentPlayer;
-      return next;
+    if (board[index] !== null) return;
+    setPendingMove({
+      gameId: currentGameId,
+      cell: index,
+      symbol: currentPlayer,
+      isPending: true,
     });
-    setCurrentPlayer((p) => (p === "X" ? "O" : "X"));
-    if (currentGameId != null) {
-      playMove(currentGameId, index);
-    }
+    void submitMove(currentGameId, index, currentPlayer);
   }
 
   function handleNewGame() {
@@ -192,21 +278,26 @@ export default function PlayScreen() {
     setBoard(Array(9).fill(null));
     setCurrentPlayer("X");
     setMyRole(null);
+    setPendingMove(null);
   }
 
-  const statusText = winner
-    ? `Winner: ${winner}`
-    : isDraw
-      ? "Draw"
-      : creatingGame
-        ? "Waiting for game to be created…"
-        : gameStarted
-          ? myRole
-            ? isMyTurn
-              ? `Your turn (${myRole})`
-              : `Opponent's turn (${currentPlayer})`
-            : "Waiting for players"
-          : "Enter an address to start";
+  const statusText = creatingGame
+    ? "Waiting for game to be created…"
+    : activePendingMove?.isPending
+      ? "Waiting for move confirmation…"
+      : activePendingMove
+        ? "Move confirmed. Syncing board…"
+        : winner
+          ? `Winner: ${winner}`
+          : isDraw
+            ? "Draw"
+            : gameStarted
+              ? myRole
+                ? isMyTurn
+                  ? `Your turn (${myRole})`
+                  : `Opponent's turn (${currentPlayer})`
+                : "Waiting for players"
+              : "Enter an address to start";
   if (!account?.address) {
     return <AccountGate />;
   }
@@ -403,14 +494,24 @@ export default function PlayScreen() {
         )}
 
         <View style={styles.statusRow}>
-          <Text style={styles.status}>{statusText}</Text>
+          <View style={styles.statusContent}>
+            <Text style={styles.status}>{statusText}</Text>
+            {activePendingMove?.isPending ? (
+              <ActivityIndicator color={tint} />
+            ) : null}
+          </View>
         </View>
 
         <TicTacToeBoard
-          board={board}
+          board={boardWithPendingMove}
           onCellPress={handleCellPress}
-          disabled={!gameStarted || !!winner || !isMyTurn}
+          disabled={
+            !gameStarted || !!winner || !isMyTurn || !!activePendingMove
+          }
           winningLine={winningLine ?? undefined}
+          pendingCellIndex={
+            activePendingMove?.isPending ? activePendingMove.cell : null
+          }
           style={styles.board}
         />
 
@@ -548,6 +649,11 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
+  },
+  statusContent: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
   },
   status: {
     fontSize: 16,
