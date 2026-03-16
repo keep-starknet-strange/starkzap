@@ -33,7 +33,7 @@
     "typecheck": "npm run build --prefix ../.. && tsc --noEmit"
   },
   "dependencies": {
-    "starkzap": "^1.0.0"
+    "starkzap": "file:../.."
   },
   "peerDependencies": {
     "@ethersproject/shims": "^5.7.0",

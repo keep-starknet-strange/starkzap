@@ -1,5 +1,7 @@
 "use strict";
 
+const path = require("path");
+
 // Packages whose CJS bundles contain require("fs") / require("path") etc.
 // Resolving with the "import" condition picks the ESM entry where those
 // requires are wrapped in __require() — a CJS-interop helper that Metro
@@ -18,16 +20,22 @@ const DISABLE_EXPORTS = (name) =>
 const POLYFILLS = [
   "react-native-get-random-values",
   "fast-text-encoding",
-  "buffer",
+  "buffer/",
   "@ethersproject/shims",
 ];
 
-function resolvePolyfills() {
+function resolvePolyfills(projectRoot) {
   const resolved = [];
   const missing = [];
   for (const mod of POLYFILLS) {
     try {
-      resolved.push(require.resolve(mod));
+      const resolved_path = require.resolve(mod, { paths: [projectRoot] });
+      // Ignore Node built-in identifiers (e.g. "buffer") that aren't real file paths.
+      if (path.isAbsolute(resolved_path)) {
+        resolved.push(resolved_path);
+      } else {
+        missing.push(mod);
+      }
     } catch {
       missing.push(mod);
     }
@@ -75,7 +83,8 @@ function resolvePolyfills() {
  */
 function withStarkzap(config) {
   // --- Polyfills -----------------------------------------------------------
-  const polyfills = resolvePolyfills();
+  const projectRoot = config.projectRoot || process.cwd();
+  const polyfills = resolvePolyfills(projectRoot);
   if (polyfills.length > 0) {
     config.serializer = config.serializer || {};
     const origFn = config.serializer.getModulesRunBeforeMainModule;

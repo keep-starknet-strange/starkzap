@@ -36,7 +36,7 @@ export default defineConfig(
     },
   },
   {
-    files: ["**/*.cjs"],
+    files: ["packages/native/metro.cjs"],
     languageOptions: {
       sourceType: "commonjs",
       globals: {
@@ -48,6 +48,9 @@ export default defineConfig(
         console: "readonly",
         process: "readonly",
       },
+    },
+    rules: {
+      "@typescript-eslint/no-require-imports": "off",
     },
   },
   {

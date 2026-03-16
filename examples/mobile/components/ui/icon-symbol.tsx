@@ -38,6 +38,7 @@ const MAPPING = {
     family: "material-community",
     name: "bridge",
   },
+  "lock.shield.fill": { family: "material-community", name: "shield-lock" },
 } as IconMapping;
 
 /**
