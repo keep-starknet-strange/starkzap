@@ -14,16 +14,13 @@
       "import": "./dist/index.js",
       "default": "./dist/index.js"
     },
-    "./polyfills": {
-      "types": "./dist/polyfills/index.d.ts",
-      "react-native": "./dist/polyfills/index.js",
-      "import": "./dist/polyfills/index.js",
-      "default": "./dist/polyfills/index.js"
+    "./metro": {
+      "require": "./metro.cjs"
     }
   },
   "files": [
     "dist",
-    "scripts/check-optional-peers.cjs"
+    "metro.cjs"
   ],
   "sideEffects": [
     "./dist/polyfills/install.js"
@@ -32,7 +29,6 @@
     "access": "public"
   },
   "scripts": {
-    "postinstall": "node scripts/check-optional-peers.cjs",
     "build": "npm run build --prefix ../.. && tsc && tsc-alias",
     "typecheck": "npm run build --prefix ../.. && tsc --noEmit"
   },
@@ -41,18 +37,8 @@
   },
   "peerDependencies": {
     "@ethersproject/shims": "^5.7.0",
+    "buffer": "^6.0.3",
     "fast-text-encoding": "^1.0.6",
     "react-native-get-random-values": "^1.11.0"
-  },
-  "peerDependenciesMeta": {
-    "@ethersproject/shims": {
-      "optional": true
-    },
-    "fast-text-encoding": {
-      "optional": true
-    },
-    "react-native-get-random-values": {
-      "optional": true
-    }
   }
 }

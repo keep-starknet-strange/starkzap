@@ -36,6 +36,21 @@ export default defineConfig(
     },
   },
   {
+    files: ["**/*.cjs"],
+    languageOptions: {
+      sourceType: "commonjs",
+      globals: {
+        require: "readonly",
+        module: "readonly",
+        exports: "readonly",
+        __dirname: "readonly",
+        __filename: "readonly",
+        console: "readonly",
+        process: "readonly",
+      },
+    },
+  },
+  {
     rules: {
       // Allow unused variables with underscore prefix
       "@typescript-eslint/no-unused-vars": [
