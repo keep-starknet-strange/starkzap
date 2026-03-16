@@ -1210,7 +1210,11 @@ function log(
   const time = new Date().toLocaleTimeString("en-US", { hour12: false });
   const entry = document.createElement("div");
   entry.className = `log-entry ${type}`;
-  entry.innerHTML = `<span class="log-time">${time}</span>${message}`;
+  const timeSpan = document.createElement("span");
+  timeSpan.className = "log-time";
+  timeSpan.textContent = time;
+  entry.appendChild(timeSpan);
+  entry.appendChild(document.createTextNode(message));
   logContainer.appendChild(entry);
   logContainer.scrollTop = logContainer.scrollHeight;
 }
