@@ -2,6 +2,11 @@
 
 const path = require("path");
 
+// Every Node built-in module name (assert, http, fs, stream, …).
+const ALL_NODE_BUILTINS = new Set(
+  require("module").builtinModules.map((m) => m.replace(/^node:/, ""))
+);
+
 // Packages whose CJS bundles contain require("fs") / require("path") etc.
 // Resolving with the "import" condition picks the ESM entry where those
 // requires are wrapped in __require() — a CJS-interop helper that Metro
@@ -85,6 +90,22 @@ function withStarkzap(config) {
   // --- Polyfills -----------------------------------------------------------
   const projectRoot = config.projectRoot || process.cwd();
   const polyfills = resolvePolyfills(projectRoot);
+
+  // Detect which Node built-in names have real npm polyfill packages installed
+  // (e.g. "events", "buffer", "util"). Those must NOT be stubbed — Metro
+  // should resolve them to the npm package. Everything else gets { type: "empty" }.
+  // We resolve "<mod>/package.json" instead of "<mod>" because require.resolve
+  // returns the bare built-in name (e.g. "events") for Node built-ins, which
+  // isn't an absolute path. Resolving package.json forces filesystem lookup.
+  const hasNpmPackage = new Set();
+  for (const mod of ALL_NODE_BUILTINS) {
+    try {
+      require.resolve(mod + "/package.json", { paths: [projectRoot] });
+      hasNpmPackage.add(mod);
+    } catch {
+      // No npm package — will be stubbed.
+    }
+  }
   if (polyfills.length > 0) {
     config.serializer = config.serializer || {};
     const origFn = config.serializer.getModulesRunBeforeMainModule;
@@ -99,6 +120,13 @@ function withStarkzap(config) {
   const prev = config.resolver.resolveRequest;
 
   config.resolver.resolveRequest = (context, moduleName, platform) => {
+    const bare = moduleName.startsWith("node:")
+      ? moduleName.slice(5)
+      : moduleName;
+    if (ALL_NODE_BUILTINS.has(bare) && !hasNpmPackage.has(bare)) {
+      return { type: "empty" };
+    }
+
     if (FORCE_ESM.has(moduleName)) {
       return context.resolveRequest(
         {
