@@ -114,7 +114,7 @@ export class ConnectedEthereumWallet {
     } else if (numericChainId === EthereumNetwork.SEPOLIA) {
       network = EthereumNetwork.SEPOLIA;
     } else {
-      throw new Error(`Unsupported chainId ${numericChainId} for Solana`);
+      throw new Error(`Unsupported chainId ${numericChainId} for Ethereum`);
     }
 
     if (network === EthereumNetwork.MAINNET && !starknetChain.isMainnet()) {

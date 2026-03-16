@@ -29,11 +29,7 @@ import {
   isError,
   type TransactionRequest,
 } from "ethers";
-import {
-  FeeErrorCause,
-  StarkzapTransactionError,
-  TransactionErrorCause,
-} from "@/types/errors";
+import { FeeErrorCause, TransactionErrorCause } from "@/types/errors";
 import type { WalletInterface } from "@/wallet";
 import CANONICAL_BRIDGE_ABI from "@/abi/ethereum/canonicalBridge.json";
 
@@ -128,7 +124,7 @@ export abstract class EthereumBridge implements BridgeInterface<EthereumAddress>
     const response = await this.execute(tx);
     const receipt = await response.wait();
     if (!receipt?.status) {
-      throw new StarkzapTransactionError(TransactionErrorCause.APPROVE_FAILED);
+      throw new Error(TransactionErrorCause.APPROVE_FAILED);
     }
 
     await this.updateAllowanceFromReceipt(receipt);
@@ -143,13 +139,11 @@ export abstract class EthereumBridge implements BridgeInterface<EthereumAddress>
       )) as ContractTransactionResponse;
     } catch (e) {
       if (isError(e, "ACTION_REJECTED")) {
-        throw new StarkzapTransactionError(TransactionErrorCause.USER_REJECTED);
+        throw new Error(TransactionErrorCause.USER_REJECTED);
       }
 
       if (isError(e, "INSUFFICIENT_FUNDS")) {
-        throw new StarkzapTransactionError(
-          TransactionErrorCause.INSUFFICIENT_BALANCE
-        );
+        throw new Error(TransactionErrorCause.INSUFFICIENT_BALANCE);
       }
 
       // TODO be more specific with other ethers errors

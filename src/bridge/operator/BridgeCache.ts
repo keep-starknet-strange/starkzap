@@ -36,7 +36,14 @@ export class BridgeCache {
   ): void {
     const key = this.key(token, wallet);
 
-    this.cache.set(key, { wallet, bridge });
+    const guarded = bridge.catch((error) => {
+      if (this.cache.get(key)?.bridge === guarded) {
+        this.cache.delete(key);
+      }
+      throw error;
+    });
+
+    this.cache.set(key, { wallet, bridge: guarded });
   }
 
   private key(token: BridgeToken, wallet: ConnectedExternalWallet): string {

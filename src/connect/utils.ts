@@ -1,5 +1,3 @@
-import type { ChainId } from "@/types";
-
 export function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
 }
@@ -34,30 +32,4 @@ export function assertNonEmptyString(
     throw new Error(`${fieldName} must be a non-empty string.`);
   }
   return value;
-}
-
-export function normalizeChainId(
-  starknetChain: ChainId,
-  chainId: number | string
-): number {
-  const numericChainId =
-    typeof chainId === "string" ? Number(chainId) : chainId;
-
-  if (!Number.isFinite(numericChainId) || numericChainId <= 0) {
-    throw new Error(`Invalid EVM chain ID: ${String(chainId)}`);
-  }
-
-  if (numericChainId === 1 && !starknetChain.isMainnet()) {
-    throw new Error(`EVM chain id expected to be mainnet.`);
-  }
-
-  if (numericChainId === 11155111 && !starknetChain.isSepolia()) {
-    throw new Error("EVM chain id expected to be sepolia.");
-  }
-
-  if (numericChainId !== 1 && numericChainId !== 11155111) {
-    throw new Error("EVM chain id expected to be mainnet or sepolia.");
-  }
-
-  return numericChainId;
 }

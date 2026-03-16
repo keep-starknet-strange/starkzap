@@ -41,7 +41,7 @@ export class CCTPFees {
     fastTransfer?: boolean
   ): Promise<number> {
     try {
-      const feeData = this.getFees(direction, chainId);
+      const feeData = await this.getFees(direction, chainId);
 
       if (!Array.isArray(feeData)) {
         return this.getFallbackFee(direction, fastTransfer);
@@ -51,7 +51,7 @@ export class CCTPFees {
 
       const fee = feeData.find((f) => f.finalityThreshold === targetThreshold);
 
-      if (fee && typeof fee.minimumFee === "number") {
+      if (fee) {
         return fee.minimumFee;
       }
 

@@ -39,7 +39,7 @@ import {
 } from "@/lending";
 import { BridgeOperator } from "@/bridge";
 import type { BridgeDepositOptions } from "@/bridge/types/BridgeInterface";
-import type { ConnectedExternalWallet } from "..";
+import type { ConnectedExternalWallet } from "@/connect";
 
 const MAX_ERC20_CACHE_SIZE = 128;
 const MAX_STAKING_CACHE_SIZE = 128;

@@ -1,12 +1,3 @@
-export class StarkzapTransactionError extends Error {
-  private readonly cause: TransactionErrorCause;
-
-  constructor(cause: TransactionErrorCause, message?: string) {
-    super(message);
-    this.cause = cause;
-  }
-}
-
 export enum TransactionErrorCause {
   USER_REJECTED = "USER_REJECTED",
   INSUFFICIENT_BALANCE = "INSUFFICIENT_BALANCE",

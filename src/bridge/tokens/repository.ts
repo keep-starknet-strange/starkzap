@@ -249,9 +249,7 @@ export class BridgeTokenRepository {
     now: number
   ): Promise<BridgeToken[]> {
     const url = new URL(this.apiUrl);
-    if (query.env) {
-      url.searchParams.set("env", query.env);
-    }
+    url.searchParams.set("env", query.env ?? DEFAULT_ENV);
     if (query.chain) {
       url.searchParams.set("chain", query.chain);
     }

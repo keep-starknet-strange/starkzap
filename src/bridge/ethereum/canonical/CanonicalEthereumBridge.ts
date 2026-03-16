@@ -114,7 +114,7 @@ export class CanonicalEthereumBridge extends EthereumBridge {
       args: [
         this.bridgeToken.address.toString(),
         amount.toBase().toString(),
-        recipient,
+        recipient.toString(),
       ],
       transaction: {
         from: signer,

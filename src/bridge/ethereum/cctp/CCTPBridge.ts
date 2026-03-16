@@ -167,7 +167,7 @@ export class CCTPBridge extends EthereumBridge {
     );
 
     return {
-      to: this.getAllowanceSpender(),
+      to: await this.getAllowanceSpender(),
       data: calldata,
     };
   }

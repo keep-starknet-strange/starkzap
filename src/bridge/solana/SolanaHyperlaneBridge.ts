@@ -74,6 +74,10 @@ export class SolanaHyperlaneBridge implements BridgeInterface<SolanaAddress> {
       recipient,
     })) as SolanaWeb3Transaction[];
 
+    if (transactions.length === 0) {
+      throw new Error("Hyperlane returned no deposit transactions.");
+    }
+
     let lastSignature = "";
 
     for (const tx of transactions) {
