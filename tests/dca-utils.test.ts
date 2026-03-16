@@ -37,7 +37,7 @@ describe("dca utils", () => {
     });
 
     it("rejects empty cancel requests", () => {
-      expect(() => hydrateDcaCancelInput({ orderId: "" } as never)).toThrow(
+      expect(() => hydrateDcaCancelInput({ orderId: "" })).toThrow(
         "DCA cancel requires either orderId or orderAddress"
       );
     });

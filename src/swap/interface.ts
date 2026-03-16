@@ -65,6 +65,17 @@ export type PreparedSwap = {
  * App code should usually call `wallet.getQuote(...)`, `wallet.prepareSwap(...)`,
  * or `wallet.swap(...)` instead of talking to providers directly.
  */
+/**
+ * Resolver for registered swap providers.
+ *
+ * Extracted so that non-swap modules (e.g. DCA cycle preview) can depend on
+ * swap provider resolution without importing the full swap client.
+ */
+export interface SwapProviderResolver {
+  getDefaultSwapProvider(): SwapProvider;
+  getSwapProvider(providerId: string): SwapProvider;
+}
+
 export type SwapProvider = {
   /** Stable provider identifier (e.g. `"ekubo"`) */
   readonly id: string;

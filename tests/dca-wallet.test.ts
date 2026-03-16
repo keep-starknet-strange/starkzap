@@ -54,7 +54,7 @@ function createDcaProvider(overrides: Partial<DcaProvider> = {}): DcaProvider {
       totalPages: 0,
       totalElements: 0,
       size: 10,
-      number: 0,
+      pageNumber: 0,
     }),
     prepareCreate: vi.fn().mockResolvedValue({
       providerId: "avnu",
@@ -187,7 +187,7 @@ describe("BaseWallet DCA abstraction", () => {
     expect(provider.getOrders).toHaveBeenCalledWith(
       {
         chainId: ChainId.SEPOLIA,
-        provider: wallet.getProvider(),
+        rpcProvider: wallet.getProvider(),
         walletAddress: wallet.address,
       },
       {
@@ -235,7 +235,7 @@ describe("BaseWallet DCA abstraction", () => {
     expect(provider.prepareCancel).toHaveBeenCalledWith(
       {
         chainId: ChainId.SEPOLIA,
-        provider: wallet.getProvider(),
+        rpcProvider: wallet.getProvider(),
         walletAddress: wallet.address,
       },
       {
@@ -259,7 +259,7 @@ describe("BaseWallet DCA abstraction", () => {
     expect(provider.prepareCancel).toHaveBeenCalledWith(
       {
         chainId: ChainId.SEPOLIA,
-        provider: wallet.getProvider(),
+        rpcProvider: wallet.getProvider(),
         walletAddress: wallet.address,
       },
       {

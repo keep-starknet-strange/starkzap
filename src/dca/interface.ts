@@ -7,12 +7,16 @@ import type {
   ExecuteOptions,
   Token,
 } from "@/types";
-import type { SwapProvider, SwapQuote } from "@/swap";
+import type { SwapProvider, SwapProviderResolver, SwapQuote } from "@/swap";
 import type { Tx } from "@/tx";
 
 export type DcaOrderStatus = "INDEXING" | "ACTIVE" | "CLOSED";
 export type DcaTradeStatus = "CANCELLED" | "PENDING" | "SUCCEEDED";
 export type DcaAction = "create" | "cancel";
+/**
+ * ISO 8601 duration string (e.g. `"PT12H"`, `"P1D"`, `"P1W"`).
+ * Parsed by providers via {@link parseIsoDurationSeconds}.
+ */
 export type DcaFrequency = string;
 
 export interface DcaPricingStrategyInput {
@@ -71,7 +75,7 @@ export interface DcaOrdersPage {
   totalPages: number;
   totalElements: number;
   size: number;
-  number: number;
+  pageNumber: number;
 }
 
 export interface PreparedDcaAction {
@@ -100,37 +104,16 @@ export interface DcaCreateInput extends Omit<
   traderAddress?: AddressInput;
 }
 
-interface DcaCancelRequestByOrderId {
-  orderId: string;
+export interface DcaCancelRequest {
+  orderId?: string;
   orderAddress?: Address;
 }
 
-interface DcaCancelRequestByOrderAddress {
-  orderId?: string;
-  orderAddress: Address;
-}
-
-export type DcaCancelRequest =
-  | DcaCancelRequestByOrderId
-  | DcaCancelRequestByOrderAddress;
-
-interface DcaCancelInputBase {
+export interface DcaCancelInput {
   provider?: DcaProvider | string;
-}
-
-interface DcaCancelInputByOrderId extends DcaCancelInputBase {
-  orderId: string;
+  orderId?: string;
   orderAddress?: AddressInput;
 }
-
-interface DcaCancelInputByOrderAddress extends DcaCancelInputBase {
-  orderId?: string;
-  orderAddress: AddressInput;
-}
-
-export type DcaCancelInput =
-  | DcaCancelInputByOrderId
-  | DcaCancelInputByOrderAddress;
 
 export interface DcaOrdersRequest {
   traderAddress: Address;
@@ -166,7 +149,7 @@ export interface DcaCyclePreviewRequest {
  */
 export interface DcaProviderContext {
   chainId: ChainId;
-  provider: RpcProvider;
+  rpcProvider: RpcProvider;
   walletAddress: Address;
 }
 
@@ -175,13 +158,11 @@ export interface DcaProviderResolver {
   getDcaProvider(providerId: string): DcaProvider;
 }
 
-export interface DcaExecutionContext {
+export interface DcaExecutionContext extends SwapProviderResolver {
   readonly address: Address;
   getChainId(): ChainId;
   getProvider(): RpcProvider;
   execute(calls: Call[], options?: ExecuteOptions): Promise<Tx>;
-  getDefaultSwapProvider(): SwapProvider;
-  getSwapProvider(providerId: string): SwapProvider;
 }
 
 /**
