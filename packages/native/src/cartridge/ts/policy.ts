@@ -34,7 +34,10 @@ function normalizeContractAddress(rawAddress: string, context: string): string {
   try {
     return addAddressPadding(trimmed.toLowerCase());
   } catch (error) {
-    throw new SessionProtocolError(`${context} has an invalid address: ${rawAddress}`, error);
+    throw new SessionProtocolError(
+      `${context} has an invalid address: ${rawAddress}`,
+      error
+    );
   }
 }
 
@@ -125,7 +128,10 @@ function normalizeMethodForUrl(
 
   const spender = normalizeOptionalString(method.spender);
   if (spender) {
-    normalized.spender = normalizeContractAddress(spender, `${context} spender`);
+    normalized.spender = normalizeContractAddress(
+      spender,
+      `${context} spender`
+    );
   }
   if (method.amount !== undefined && method.amount !== null) {
     normalized.amount =
@@ -231,7 +237,7 @@ export function hasPoliciesInput(
   }
   return Boolean(
     (policies.contracts && Object.keys(policies.contracts).length > 0) ||
-      (policies.messages && policies.messages.length > 0)
+    (policies.messages && policies.messages.length > 0)
   );
 }
 
