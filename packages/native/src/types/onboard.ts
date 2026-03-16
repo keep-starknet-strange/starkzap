@@ -1,5 +1,6 @@
 import type { FeeMode, OnboardOptions as CoreOnboardOptions } from "starkzap";
 import type { PaymasterTimeBounds } from "starknet";
+import type { CartridgePolicies } from "@/cartridge/types";
 
 type CoreCartridgeOnboardOptions = Extract<
   CoreOnboardOptions,
@@ -15,7 +16,10 @@ type CoreCartridgeConfig = NonNullable<
   CoreCartridgeOnboardOptions["cartridge"]
 >;
 
-export interface NativeOnboardCartridgeConfig extends CoreCartridgeConfig {
+export interface NativeOnboardCartridgeConfig
+  extends Omit<CoreCartridgeConfig, "policies"> {
+  policies?: CartridgePolicies;
+  shouldOverridePresetPolicies?: boolean;
   redirectUrl?: string;
   forceNewSession?: boolean;
 }

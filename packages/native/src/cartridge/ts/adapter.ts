@@ -8,7 +8,10 @@ import {
   computePolicyMerkle,
   computePolicyMerkleProofs,
 } from "@/cartridge/ts/merkle";
-import { canonicalizeSessionPolicies } from "@/cartridge/ts/policy";
+import {
+  canonicalizeSessionPolicies,
+  hasPoliciesInput,
+} from "@/cartridge/ts/policy";
 import {
   buildCartridgeSessionUrl,
   extractEncodedSessionFromUrl,
@@ -16,6 +19,7 @@ import {
   type SessionRegistration,
   waitForSessionSubscription,
 } from "@/cartridge/ts/session_api";
+import { resolvePresetPolicies } from "@/cartridge/ts/preset";
 import {
   SessionProtocolError,
   SessionRejectedError,
@@ -65,6 +69,7 @@ export interface OpenSessionResult {
 export interface CreateCartridgeTsAdapterOptions {
   cartridgeUrl?: string;
   cartridgeApiUrl?: string;
+  presetConfigBaseUrl?: string;
   redirectQueryName?: string;
   sessionRegistrationTimeoutMs?: number;
   sessionRequestTimeoutMs?: number;
@@ -74,6 +79,12 @@ export interface CreateCartridgeTsAdapterOptions {
     sessionKeyGuid: string;
     fetchImpl?: FetchLike;
   }) => Promise<SessionRegistration>;
+  resolvePresetPolicies?: (args: {
+    preset: string;
+    chainId: string;
+    fetchImpl: FetchLike;
+    presetBaseUrl?: string;
+  }) => Promise<import("@/cartridge/types").CartridgeSessionPolicies>;
   fetchImpl?: FetchLike;
   executeFromOutside?: TsExecuteFromOutside;
   execute?: TsExecute;
@@ -110,6 +121,70 @@ function readJsonRpcErrorMessage(payload: unknown): string | null {
     return message.trim();
   }
   return "Cartridge RPC returned an unknown error.";
+}
+
+async function resolveEffectivePolicies(
+  args: CartridgeNativeConnectArgs,
+  options: CreateCartridgeTsAdapterOptions
+): Promise<{
+  effectivePolicies: NonNullable<CartridgeNativeConnectArgs["policies"]>;
+  sessionUrlPolicies?: CartridgeNativeConnectArgs["policies"];
+  sessionUrlPreset?: string;
+}> {
+  const hasManualPolicies = hasPoliciesInput(args.policies);
+
+  if (!hasManualPolicies && !args.preset) {
+    throw new SessionProtocolError(
+      "Cartridge TS adapter requires either policies or a preset."
+    );
+  }
+
+  if (args.preset && (!hasManualPolicies || !args.shouldOverridePresetPolicies)) {
+    const fetchFn = ensureFetch(options.fetchImpl);
+    const resolvedPolicies = await (
+      options.resolvePresetPolicies ?? resolvePresetPolicies
+    )({
+      preset: args.preset,
+      chainId: args.chainId,
+      fetchImpl: fetchFn,
+      ...(options.presetConfigBaseUrl && {
+        presetBaseUrl: options.presetConfigBaseUrl,
+      }),
+    });
+
+    if (!hasPoliciesInput(resolvedPolicies)) {
+      throw new SessionProtocolError(
+        `Preset "${args.preset}" did not resolve to any policies for chain ${args.chainId}.`
+      );
+    }
+
+    return {
+      effectivePolicies: resolvedPolicies,
+      sessionUrlPreset: args.preset,
+    };
+  }
+
+  if (!args.policies || !hasManualPolicies) {
+    throw new SessionProtocolError(
+      "Manual Cartridge policies were selected but no policies were provided."
+    );
+  }
+
+  return {
+    effectivePolicies: args.policies,
+    sessionUrlPolicies: args.policies,
+  };
+}
+
+function extractJsonRpcErrorTransactionHash(payload: unknown): string | null {
+  const record = asRecord(payload);
+  const errorRecord = asRecord(record?.error);
+  const errorData = errorRecord?.data;
+  return (
+    extractTransactionHash(errorData) ??
+    extractTransactionHash(asRecord(errorData)?.result) ??
+    null
+  );
 }
 
 async function resolveSessionRegistration(
@@ -205,9 +280,12 @@ export function createCartridgeTsAdapter(
       const sessionPrivateKey = stark.randomAddress();
       const formattedPrivateKey = encode.addHexPrefix(sessionPrivateKey);
       const sessionPublicKey = ec.starkCurve.getStarkKey(sessionPrivateKey);
-      const canonicalPolicies = canonicalizeSessionPolicies(
-        args.policies ?? []
-      );
+      const {
+        effectivePolicies,
+        sessionUrlPolicies,
+        sessionUrlPreset,
+      } = await resolveEffectivePolicies(args, options);
+      const canonicalPolicies = canonicalizeSessionPolicies(effectivePolicies);
       const { root: policyRoot } = computePolicyMerkle(canonicalPolicies);
       const policyProofIndex = createPolicyProofIndex(
         computePolicyMerkleProofs(canonicalPolicies)
@@ -216,9 +294,9 @@ export function createCartridgeTsAdapter(
       const sessionUrl = buildCartridgeSessionUrl({
         baseUrl: args.url || options.cartridgeUrl || DEFAULT_CARTRIDGE_URL,
         publicKey: sessionPublicKey,
-        policies: canonicalPolicies,
+        ...(sessionUrlPolicies ? { policies: sessionUrlPolicies } : {}),
         rpcUrl: args.rpcUrl,
-        ...(args.preset ? { preset: args.preset } : {}),
+        ...(sessionUrlPreset ? { preset: sessionUrlPreset } : {}),
         ...(args.forceNewSession ? { needsSessionCreation: true } : {}),
         ...(args.redirectUrl ? { redirectUrl: args.redirectUrl } : {}),
         redirectQueryName:
@@ -298,6 +376,13 @@ export function createCartridgeTsAdapter(
             const payload = await response.json();
             const errorMessage = readJsonRpcErrorMessage(payload);
             if (errorMessage) {
+              const txHash = extractJsonRpcErrorTransactionHash(payload);
+              if (txHash) {
+                options.logger?.warn?.(
+                  `[starkzap] cartridge-ts recovered tx hash from cartridge_addExecuteOutsideTransaction error payload txHash=${txHash} message=${errorMessage}`
+                );
+                return { transaction_hash: txHash };
+              }
               throw new SessionProtocolError(
                 `cartridge_addExecuteOutsideTransaction failed: ${errorMessage}`
               );
@@ -317,10 +402,10 @@ export function createCartridgeTsAdapter(
         ...(options.execute ? { execute: options.execute } : {}),
       });
 
-      return {
+        return {
         account: {
           address: tsSessionAccount.address(),
-          executePaymasterTransaction: async (
+          execute: async (
             calls: Call[],
             details?: TsSessionExecutionDetails
           ) => {

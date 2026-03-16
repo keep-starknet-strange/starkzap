@@ -1,5 +1,10 @@
 import React from "react";
-import { Pressable, StyleSheet, ViewStyle } from "react-native";
+import {
+  ActivityIndicator,
+  Pressable,
+  StyleSheet,
+  ViewStyle,
+} from "react-native";
 import { Text, View } from "@/components/Themed";
 import Colors from "@/constants/Colors";
 import { useColorScheme } from "@/components/useColorScheme";
@@ -12,14 +17,17 @@ export type TicTacToeBoardProps = {
   disabled?: boolean;
   winningLine?: number[] | null;
   currentPlayer?: "X" | "O";
+  pendingCellIndex?: number | null;
   style?: ViewStyle;
 };
 
 export default function TicTacToeBoard(props: TicTacToeBoardProps) {
-  const { board, onCellPress, disabled, winningLine, style } = props;
+  const { board, onCellPress, disabled, winningLine, pendingCellIndex, style } =
+    props;
   const colorScheme = useColorScheme() ?? "light";
   const lineColor = Colors[colorScheme].boardLine as string;
   const winBg = Colors[colorScheme].winHighlight as string;
+  const tint = Colors[colorScheme].tint as string;
 
   return (
     <View
@@ -34,6 +42,7 @@ export default function TicTacToeBoard(props: TicTacToeBoardProps) {
           const showRightBorder = colIndex < 2;
           const showBottomBorder = rowIndex < 2;
           const isWinning = winningLine?.includes(index);
+          const isPending = pendingCellIndex === index;
           const value = board[index];
           const symbolColor =
             value === "X"
@@ -67,9 +76,18 @@ export default function TicTacToeBoard(props: TicTacToeBoardProps) {
                   : null,
               ]}
             >
-              <Text style={[styles.symbol, { color: symbolColor }]}>
-                {value ?? ""}
-              </Text>
+              <View style={styles.cellContent}>
+                <Text style={[styles.symbol, { color: symbolColor }]}>
+                  {value ?? ""}
+                </Text>
+                {isPending ? (
+                  <ActivityIndicator
+                    size="small"
+                    color={tint}
+                    style={styles.pendingIndicator}
+                  />
+                ) : null}
+              </View>
             </Pressable>
           );
         })}
@@ -96,8 +114,15 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
+  cellContent: {
+    alignItems: "center",
+    justifyContent: "center",
+  },
   symbol: {
     fontSize: 40,
     fontWeight: "700",
+  },
+  pendingIndicator: {
+    marginTop: 8,
   },
 });
