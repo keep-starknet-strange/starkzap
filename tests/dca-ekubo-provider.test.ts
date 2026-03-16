@@ -56,7 +56,7 @@ describe("EkuboDcaProvider", () => {
     });
     const context = {
       chainId: ChainId.SEPOLIA,
-      provider: {} as RpcProvider,
+      rpcProvider: {} as RpcProvider,
       walletAddress: fromAddress("0xabc"),
     };
 
@@ -72,7 +72,7 @@ describe("EkuboDcaProvider", () => {
       totalPages: 0,
       totalElements: 0,
       size: 10,
-      number: 2,
+      pageNumber: 2,
     });
     expect(fetchMock).not.toHaveBeenCalled();
   });
@@ -99,7 +99,7 @@ describe("EkuboDcaProvider", () => {
     });
     const context = {
       chainId: ChainId.SEPOLIA,
-      provider: {
+      rpcProvider: {
         getBlock: vi.fn().mockResolvedValue({
           timestamp: 1_000,
         }),
@@ -158,7 +158,7 @@ describe("EkuboDcaProvider", () => {
     });
     const context = {
       chainId: ChainId.SEPOLIA,
-      provider: {
+      rpcProvider: {
         getBlock: vi.fn(),
       } as unknown as RpcProvider,
       walletAddress: fromAddress("0xabc"),
@@ -222,8 +222,9 @@ describe("EkuboDcaProvider", () => {
     });
     const context = {
       chainId: ChainId.SEPOLIA,
-      provider: {
+      rpcProvider: {
         callContract,
+        getBlock: vi.fn().mockResolvedValue({ timestamp: 1_900_000_050 }),
       } as unknown as RpcProvider,
       walletAddress: fromAddress("0xabc"),
     };
@@ -256,7 +257,7 @@ describe("EkuboDcaProvider", () => {
       totalPages: 1,
       totalElements: 1,
       size: 50,
-      number: 0,
+      pageNumber: 0,
     });
     expect(page.content[0]).toMatchObject({
       providerId: "ekubo",
@@ -280,7 +281,7 @@ describe("EkuboDcaProvider", () => {
     const provider = new EkuboDcaProvider();
     const context = {
       chainId: ChainId.SEPOLIA,
-      provider: {
+      rpcProvider: {
         callContract,
       } as unknown as RpcProvider,
       walletAddress: fromAddress("0xabc"),
@@ -407,7 +408,7 @@ describe("EkuboDcaProvider", () => {
     const provider = new EkuboDcaProvider();
     const context = {
       chainId: ChainId.SEPOLIA,
-      provider: {
+      rpcProvider: {
         callContract,
       } as unknown as RpcProvider,
       walletAddress: fromAddress("0xabc"),
@@ -490,7 +491,7 @@ describe("EkuboDcaProvider", () => {
     });
     const context = {
       chainId: ChainId.SEPOLIA,
-      provider: {
+      rpcProvider: {
         getBlock: vi.fn().mockResolvedValue({
           timestamp: 1_000,
         }),

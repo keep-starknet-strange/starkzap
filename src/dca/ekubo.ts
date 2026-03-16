@@ -40,13 +40,6 @@ import {
 const MAX_U32 = 2n ** 32n - 1n;
 const DEFAULT_EKUBO_REQUEST_TIMEOUT_MS = 10_000;
 
-class EkuboDcaProviderError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = "EkuboDcaProviderError";
-  }
-}
-
 interface EkuboDcaConfig {
   positions: Address;
   positionsNft: Address;
@@ -141,7 +134,7 @@ export class EkuboDcaProvider implements DcaProvider {
         totalPages: 0,
         totalElements: 0,
         size,
-        number: request.page ?? 0,
+        pageNumber: request.page ?? 0,
       };
     }
 
@@ -157,7 +150,7 @@ export class EkuboDcaProvider implements DcaProvider {
       context,
       descriptors.map((item) => item.parsedOrderId)
     );
-    const nowSeconds = Math.floor(Date.now() / 1000);
+    const nowSeconds = await this.getCurrentBlockTimestamp(context);
 
     const content = descriptors.map((descriptor, index) =>
       toEkuboDcaOrder({
@@ -174,7 +167,7 @@ export class EkuboDcaProvider implements DcaProvider {
       totalPages: page.pagination.totalPages,
       totalElements: page.pagination.totalItems,
       size: page.pagination.pageSize,
-      number: page.pagination.page - 1,
+      pageNumber: page.pagination.page - 1,
     };
   }
 
@@ -362,7 +355,7 @@ export class EkuboDcaProvider implements DcaProvider {
   private async getCurrentBlockTimestamp(
     context: DcaProviderContext
   ): Promise<number> {
-    const latestBlock = await context.provider.getBlock("latest");
+    const latestBlock = await context.rpcProvider.getBlock("latest");
     const timestamp = latestBlock.timestamp;
     assertNonNegativeInteger(timestamp, "latest block timestamp");
     return timestamp;
@@ -388,7 +381,7 @@ export class EkuboDcaProvider implements DcaProvider {
       if (!response.ok) {
         const errorMessage = getEkuboErrorMessageFromPayload(payload);
         const errorSuffix = errorMessage ? `: ${errorMessage}` : "";
-        throw new EkuboDcaProviderError(
+        throw new Error(
           `Ekubo ${requestLabel} request failed (${response.status})${errorSuffix}`
         );
       }
@@ -396,7 +389,7 @@ export class EkuboDcaProvider implements DcaProvider {
       return payload;
     } catch (error) {
       if (error instanceof Error && error.name === "AbortError") {
-        throw new EkuboDcaProviderError(
+        throw new Error(
           `Ekubo ${requestLabel} request timed out after ${DEFAULT_EKUBO_REQUEST_TIMEOUT_MS}ms`
         );
       }
@@ -422,7 +415,7 @@ export class EkuboDcaProvider implements DcaProvider {
       throw new Error("Ekubo order batch spans multiple positions contracts");
     }
 
-    const result = await context.provider.callContract({
+    const result = await context.rpcProvider.callContract({
       contractAddress: firstPositions,
       entrypoint: "get_orders_info",
       calldata: [
@@ -438,7 +431,7 @@ export class EkuboDcaProvider implements DcaProvider {
     context: DcaProviderContext,
     order: ParsedEkuboOrderId
   ): Promise<EkuboOnChainOrderInfo> {
-    const result = await context.provider.callContract({
+    const result = await context.rpcProvider.callContract({
       contractAddress: order.positions,
       entrypoint: "get_order_info",
       calldata: toOrderInfoCalldata(order),

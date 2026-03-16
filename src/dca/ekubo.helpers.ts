@@ -359,25 +359,36 @@ export function parseOrderInfoResult(result: string[]): EkuboOnChainOrderInfo {
   };
 }
 
+/**
+ * Parse the result of `get_orders_info`.
+ *
+ * The on-chain response always includes a leading array-length prefix followed
+ * by 3 felt252 values per order (saleRate, remainingSellAmount, purchasedAmount).
+ * Total expected length: `expected * 3 + 1`.
+ */
 export function parseOrderInfosResult(
   result: string[],
   expected: number
 ): EkuboOnChainOrderInfo[] {
   const values = result.map((item) => String(item));
-  const explicitLength =
-    values.length === expected * 3 + 1 ? Number(values[0]) : null;
-  const offset = explicitLength == null ? 0 : 1;
+  const expectedLength = expected * 3 + 1;
 
-  if (
-    (explicitLength != null && explicitLength !== expected) ||
-    values.length !== expected * 3 + offset
-  ) {
-    throw new Error("Ekubo order infos response is malformed");
+  if (values.length !== expectedLength) {
+    throw new Error(
+      `Ekubo order infos response is malformed: expected ${expectedLength} values, got ${values.length}`
+    );
+  }
+
+  const declaredLength = Number(values[0]);
+  if (declaredLength !== expected) {
+    throw new Error(
+      `Ekubo order infos length mismatch: header says ${declaredLength}, expected ${expected}`
+    );
   }
 
   const infos: EkuboOnChainOrderInfo[] = [];
   for (let index = 0; index < expected; index += 1) {
-    const baseIndex = offset + index * 3;
+    const baseIndex = 1 + index * 3;
     infos.push(parseOrderInfoResult(values.slice(baseIndex, baseIndex + 3)));
   }
 
