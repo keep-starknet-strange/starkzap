@@ -16,8 +16,10 @@ type CoreCartridgeConfig = NonNullable<
   CoreCartridgeOnboardOptions["cartridge"]
 >;
 
-export interface NativeOnboardCartridgeConfig
-  extends Omit<CoreCartridgeConfig, "policies"> {
+export interface NativeOnboardCartridgeConfig extends Omit<
+  CoreCartridgeConfig,
+  "policies"
+> {
   policies?: CartridgePolicies;
   shouldOverridePresetPolicies?: boolean;
   redirectUrl?: string;

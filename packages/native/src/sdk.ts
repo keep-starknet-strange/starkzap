@@ -27,7 +27,7 @@ function hasProvidedPolicies(policies: CartridgePolicies | undefined): boolean {
   }
   return Boolean(
     (policies.contracts && Object.keys(policies.contracts).length > 0) ||
-      (policies.messages && policies.messages.length > 0)
+    (policies.messages && policies.messages.length > 0)
   );
 }
 
