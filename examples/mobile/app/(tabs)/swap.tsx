@@ -12,17 +12,25 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { router } from "expo-router";
-import * as Clipboard from "expo-clipboard";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { usePrivy } from "@privy-io/expo";
 
 import { LogsFAB } from "@/components/LogsFAB";
 import { ThemedText } from "@/components/themed-text";
+import { WalletHeader } from "@/components/wallet-header";
+import { SponsoredToggle } from "@/components/sponsored-toggle";
 import {
   showTransactionToast,
   updateTransactionToast,
 } from "@/components/Toast";
 import { useThemeColor } from "@/hooks/use-theme-color";
+import {
+  useDcaState,
+  getCuratedDcaTokens,
+  getDefaultDcaPair,
+  getExplorerUrl,
+  getDcaProviderLabel,
+} from "@/hooks/use-dca-state";
 import {
   getStrkToken,
   getTokensForNetwork,
@@ -37,161 +45,14 @@ import {
   swapProviders,
 } from "@/swaps";
 import { getDcaProviders } from "@/dca";
-import {
-  Amount,
-  type ChainId,
-  type DcaProvider,
-  type DcaOrder,
-  type SwapProvider,
-  type Token,
-} from "@starkzap/native";
+import { DcaPanel } from "@/components/dca-panel";
+import { Amount, type SwapProvider, type Token } from "@starkzap/native";
 
 const WBTC_LOGO_FALLBACK =
   "https://altcoinsbox.com/wp-content/uploads/2023/01/wbtc-wrapped-bitcoin-logo.png";
-const DCA_ORDER_PAGE_SIZE = 6;
-const DCA_FREQUENCY_OPTIONS = [
-  { value: "PT12H", label: "12h" },
-  { value: "P1D", label: "Daily" },
-  { value: "P3D", label: "3d" },
-  { value: "P1W", label: "Weekly" },
-] as const;
 
 type ScreenMode = "swap" | "dca";
 type TokenPickerMode = "swap-from" | "swap-to" | "dca-from" | "dca-to";
-type DcaFrequencyValue = (typeof DCA_FREQUENCY_OPTIONS)[number]["value"];
-
-interface DcaPreviewState {
-  amountOutBase: bigint;
-  priceImpactBps?: bigint | null;
-  providerId: string;
-  routeCallCount?: number;
-}
-
-function cropAddress(addr: string): string {
-  if (addr.length <= 10) return addr;
-  return `${addr.slice(0, 5)}...${addr.slice(-5)}`;
-}
-
-function getExplorerUrl(txHash: string, chainId: ChainId): string {
-  const baseUrl =
-    chainId.toLiteral() === "SN_SEPOLIA"
-      ? "https://sepolia.voyager.online/tx"
-      : "https://voyager.online/tx";
-  return `${baseUrl}/${txHash}`;
-}
-
-function getPreferredDcaPreviewProviderId(
-  providers: readonly SwapProvider[]
-): string | null {
-  if (!providers.length) {
-    return null;
-  }
-  return (
-    providers.find((provider) => provider.id === "ekubo")?.id ??
-    providers[0]!.id
-  );
-}
-
-function getPreferredDcaProviderId(
-  providers: readonly DcaProvider[]
-): string | null {
-  if (!providers.length) {
-    return null;
-  }
-  return (
-    providers.find((provider) => provider.id === "avnu")?.id ?? providers[0]!.id
-  );
-}
-
-function getDcaProviderLabel(providerId: string): string {
-  return providerId.toUpperCase();
-}
-
-function getCuratedDcaTokens(
-  tokens: readonly Token[],
-  chainId: ChainId
-): Token[] {
-  const preferredSymbols =
-    chainId.toLiteral() === "SN_SEPOLIA"
-      ? ["STRK", "USDC.e", "USDC", "ETH", "WBTC"]
-      : ["STRK", "USDC", "USDT", "DAI", "ETH", "WBTC"];
-
-  const selected: Token[] = [];
-  for (const symbol of preferredSymbols) {
-    const token = tokens.find((item) => item.symbol === symbol);
-    if (
-      token &&
-      !selected.some((current) => current.address === token.address)
-    ) {
-      selected.push(token);
-    }
-  }
-
-  if (selected.length >= 2) {
-    return selected;
-  }
-
-  return tokens.slice(0, Math.min(tokens.length, 6));
-}
-
-function getDefaultDcaPair(
-  tokens: readonly Token[],
-  chainId: ChainId
-): { buyToken: Token; sellToken: Token } {
-  const fallback = tokens[0];
-  if (!fallback) {
-    throw new Error("No DCA tokens available for this network");
-  }
-
-  const sellToken = tokens.find((token) => token.symbol === "STRK") ?? fallback;
-  const preferredOutputSymbols =
-    chainId.toLiteral() === "SN_SEPOLIA"
-      ? ["USDC.e", "USDC", "ETH"]
-      : ["USDC", "USDT", "DAI", "ETH"];
-
-  for (const symbol of preferredOutputSymbols) {
-    const buyToken = tokens.find((token) => token.symbol === symbol);
-    if (buyToken && buyToken.address !== sellToken.address) {
-      return { buyToken, sellToken };
-    }
-  }
-
-  const buyToken =
-    tokens.find((token) => token.address !== sellToken.address) ?? sellToken;
-  return { buyToken, sellToken };
-}
-
-function getDcaFrequencyLabel(frequency: string): string {
-  if (frequency === "CONTINUOUS") {
-    return "Continuous";
-  }
-  return (
-    DCA_FREQUENCY_OPTIONS.find((option) => option.value === frequency)?.label ??
-    frequency
-  );
-}
-
-function formatDateStamp(date: Date): string {
-  const year = date.getFullYear();
-  const month = `${date.getMonth() + 1}`.padStart(2, "0");
-  const day = `${date.getDate()}`.padStart(2, "0");
-  return `${year}-${month}-${day}`;
-}
-
-function formatTokenAmount(amountBase: bigint, token: Token | null): string {
-  if (!token) {
-    return amountBase.toString();
-  }
-  return Amount.fromRaw(amountBase, token.decimals, token.symbol).toFormatted(
-    true
-  );
-}
-
-function buildDcaCancelInput(order: DcaOrder) {
-  return order.providerId === "ekubo"
-    ? { provider: order.providerId, orderId: order.id }
-    : { provider: order.providerId, orderAddress: order.orderAddress };
-}
 
 function TinyTokenLogo({ token }: { token: Token }) {
   const [imageError, setImageError] = useState(false);
@@ -346,11 +207,6 @@ export default function SwapScreen() {
   const [selectedIntegrationId, setSelectedIntegrationId] = useState<
     string | null
   >(null);
-  const [selectedDcaProviderId, setSelectedDcaProviderId] = useState<
-    string | null
-  >(null);
-  const [selectedDcaPreviewProviderId, setSelectedDcaPreviewProviderId] =
-    useState<string | null>(null);
   const [fromToken, setFromToken] = useState<Token>(strkToken);
   const [toToken, setToToken] = useState<Token>(
     preferredOutputToken ??
@@ -360,31 +216,30 @@ export default function SwapScreen() {
   const [amount, setAmount] = useState("");
   const [quoteError, setQuoteError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [dcaSellToken, setDcaSellToken] = useState<Token>(
-    dcaDefaultPair.sellToken
-  );
-  const [dcaBuyToken, setDcaBuyToken] = useState<Token>(
-    dcaDefaultPair.buyToken
-  );
-  const [dcaTotalAmount, setDcaTotalAmount] = useState("");
-  const [dcaCycleAmount, setDcaCycleAmount] = useState("");
-  const [dcaFrequency, setDcaFrequency] = useState<DcaFrequencyValue>("P1D");
-  const [dcaPreview, setDcaPreview] = useState<DcaPreviewState | null>(null);
-  const [dcaError, setDcaError] = useState<string | null>(null);
-  const [dcaOrdersError, setDcaOrdersError] = useState<string | null>(null);
-  const [dcaOrders, setDcaOrders] = useState<DcaOrder[]>([]);
-  const [isDcaPreviewing, setIsDcaPreviewing] = useState(false);
-  const [isDcaSubmitting, setIsDcaSubmitting] = useState(false);
-  const [isRefreshingDcaOrders, setIsRefreshingDcaOrders] = useState(false);
-  const [cancellingDcaOrderId, setCancellingDcaOrderId] = useState<
-    string | null
-  >(null);
   const [useSponsored, setUseSponsored] = useState(
     preferSponsored && Boolean(paymasterNodeUrl)
   );
   const [showTokenPicker, setShowTokenPicker] = useState(false);
   const [pickerMode, setPickerMode] = useState<TokenPickerMode>("swap-from");
   const [tokenSearch, setTokenSearch] = useState("");
+
+  const canUseSponsored = Boolean(paymasterNodeUrl);
+
+  // DCA state hook
+  const dca = useDcaState({
+    wallet,
+    chainId,
+    addLog,
+    fetchBalances,
+    getBalance,
+    availableIntegrations,
+    availableDcaProviders,
+    dcaTokens,
+    dcaDefaultPair,
+    useSponsored,
+    canUseSponsored,
+    screenMode,
+  });
 
   useEffect(() => {
     if (!availableIntegrations.length) {
@@ -402,43 +257,6 @@ export default function SwapScreen() {
     }
   }, [availableIntegrations, selectedIntegrationId]);
 
-  useEffect(() => {
-    if (!availableDcaProviders.length) {
-      setSelectedDcaProviderId(null);
-      return;
-    }
-
-    if (
-      !selectedDcaProviderId ||
-      !availableDcaProviders.some(
-        (provider) => provider.id === selectedDcaProviderId
-      )
-    ) {
-      setSelectedDcaProviderId(
-        getPreferredDcaProviderId(availableDcaProviders)
-      );
-    }
-  }, [availableDcaProviders, selectedDcaProviderId]);
-
-  useEffect(() => {
-    const preferredPreviewProviderId = getPreferredDcaPreviewProviderId(
-      availableIntegrations
-    );
-    if (!preferredPreviewProviderId) {
-      setSelectedDcaPreviewProviderId(null);
-      return;
-    }
-
-    if (
-      !selectedDcaPreviewProviderId ||
-      !availableIntegrations.some(
-        (integration) => integration.id === selectedDcaPreviewProviderId
-      )
-    ) {
-      setSelectedDcaPreviewProviderId(preferredPreviewProviderId);
-    }
-  }, [availableIntegrations, selectedDcaPreviewProviderId]);
-
   const selectedIntegration = useMemo<SwapProvider | null>(() => {
     if (!availableIntegrations.length) {
       return null;
@@ -449,27 +267,6 @@ export default function SwapScreen() {
       ) ?? availableIntegrations[0]!
     );
   }, [availableIntegrations, selectedIntegrationId]);
-
-  const selectedDcaPreviewProvider = useMemo<SwapProvider | null>(() => {
-    if (!availableIntegrations.length || !selectedDcaPreviewProviderId) {
-      return null;
-    }
-    return (
-      availableIntegrations.find(
-        (integration) => integration.id === selectedDcaPreviewProviderId
-      ) ?? null
-    );
-  }, [availableIntegrations, selectedDcaPreviewProviderId]);
-  const selectedDcaProvider = useMemo<DcaProvider | null>(() => {
-    if (!availableDcaProviders.length || !selectedDcaProviderId) {
-      return null;
-    }
-    return (
-      availableDcaProviders.find(
-        (provider) => provider.id === selectedDcaProviderId
-      ) ?? null
-    );
-  }, [availableDcaProviders, selectedDcaProviderId]);
 
   useEffect(() => {
     if (!integrationTokens.length) {
@@ -499,32 +296,6 @@ export default function SwapScreen() {
       return fallbackToToken;
     });
   }, [integrationTokens, preferredOutputToken, primaryTokens, strkToken]);
-
-  useEffect(() => {
-    if (!dcaTokens.length) {
-      return;
-    }
-
-    setDcaSellToken((current) => {
-      const currentExists = dcaTokens.some(
-        (token) => token.address === current.address
-      );
-      return currentExists ? current : dcaDefaultPair.sellToken;
-    });
-
-    setDcaBuyToken((current) => {
-      const currentExists = dcaTokens.some(
-        (token) => token.address === current.address
-      );
-      if (
-        currentExists &&
-        current.address !== dcaDefaultPair.sellToken.address
-      ) {
-        return current;
-      }
-      return dcaDefaultPair.buyToken;
-    });
-  }, [dcaDefaultPair.buyToken, dcaDefaultPair.sellToken, dcaTokens]);
 
   const borderColor = useThemeColor({}, "border");
   const primaryColor = useThemeColor({}, "primary");
@@ -562,68 +333,6 @@ export default function SwapScreen() {
     }
   }, [amount, amountParseError, fromToken]);
 
-  const dcaSellBalance = getBalance(dcaSellToken);
-  const dcaTotalAmountNumber = parseFloat(dcaTotalAmount) || 0;
-  const dcaSellBalanceNumber = parseFloat(dcaSellBalance?.toUnit() ?? "0") || 0;
-  const dcaExceedsBalance =
-    dcaTotalAmountNumber > 0 &&
-    !!dcaSellBalance &&
-    dcaTotalAmountNumber > dcaSellBalanceNumber;
-  const dcaSameToken = dcaSellToken.address === dcaBuyToken.address;
-  const dcaTotalAmountError = useMemo(() => {
-    if (!dcaTotalAmount.trim()) {
-      return null;
-    }
-    try {
-      const parsedAmount = Amount.parse(dcaTotalAmount, dcaSellToken);
-      if (parsedAmount.toBase() <= 0n) {
-        return "Total amount must be greater than zero";
-      }
-      return null;
-    } catch (error) {
-      return error instanceof Error ? error.message : String(error);
-    }
-  }, [dcaSellToken, dcaTotalAmount]);
-  const parsedDcaTotalAmount = useMemo(() => {
-    if (!dcaTotalAmount.trim() || dcaTotalAmountError) {
-      return null;
-    }
-    try {
-      return Amount.parse(dcaTotalAmount, dcaSellToken);
-    } catch {
-      return null;
-    }
-  }, [dcaSellToken, dcaTotalAmount, dcaTotalAmountError]);
-  const dcaCycleAmountError = useMemo(() => {
-    if (!dcaCycleAmount.trim()) {
-      return null;
-    }
-    try {
-      const parsedAmount = Amount.parse(dcaCycleAmount, dcaSellToken);
-      if (parsedAmount.toBase() <= 0n) {
-        return "Per-cycle amount must be greater than zero";
-      }
-      return null;
-    } catch (error) {
-      return error instanceof Error ? error.message : String(error);
-    }
-  }, [dcaCycleAmount, dcaSellToken]);
-  const parsedDcaCycleAmount = useMemo(() => {
-    if (!dcaCycleAmount.trim() || dcaCycleAmountError) {
-      return null;
-    }
-    try {
-      return Amount.parse(dcaCycleAmount, dcaSellToken);
-    } catch {
-      return null;
-    }
-  }, [dcaCycleAmount, dcaCycleAmountError, dcaSellToken]);
-  const dcaCycleExceedsTotal =
-    !!parsedDcaTotalAmount &&
-    !!parsedDcaCycleAmount &&
-    parsedDcaCycleAmount.toBase() > parsedDcaTotalAmount.toBase();
-
-  const canUseSponsored = Boolean(paymasterNodeUrl);
   const canSubmit =
     !!wallet &&
     !!selectedIntegration &&
@@ -632,45 +341,6 @@ export default function SwapScreen() {
     !sameToken &&
     !exceedsBalance &&
     !amountParseError;
-  const canPreviewDca =
-    !!wallet &&
-    !!selectedDcaProvider &&
-    !!selectedDcaPreviewProvider &&
-    !!parsedDcaCycleAmount &&
-    !isDcaPreviewing &&
-    !dcaSameToken &&
-    !dcaCycleAmountError;
-  const canCreateDca =
-    !!wallet &&
-    !!selectedDcaProvider &&
-    !isDcaSubmitting &&
-    !!parsedDcaTotalAmount &&
-    !!parsedDcaCycleAmount &&
-    !dcaSameToken &&
-    !dcaExceedsBalance &&
-    !dcaCycleExceedsTotal &&
-    !dcaTotalAmountError &&
-    !dcaCycleAmountError;
-  const dcaPreviewProviderLabel = useMemo(() => {
-    if (!dcaPreview) {
-      return null;
-    }
-
-    const matchingProvider = availableIntegrations.find(
-      (provider) => provider.id === dcaPreview.providerId
-    );
-    if (matchingProvider) {
-      return getSwapProviderLabel(matchingProvider);
-    }
-
-    return dcaPreview.providerId.toUpperCase();
-  }, [availableIntegrations, dcaPreview]);
-  const dcaBackendLabel = useMemo(() => {
-    if (!selectedDcaProvider) {
-      return null;
-    }
-    return getDcaProviderLabel(selectedDcaProvider.id);
-  }, [selectedDcaProvider]);
 
   const clearTokenPicker = useCallback(() => {
     setTokenSearch("");
@@ -694,58 +364,6 @@ export default function SwapScreen() {
     );
   }, [activePickerTokens, tokenSearch]);
 
-  const refreshDcaOrders = useCallback(
-    async (silent = false) => {
-      if (!wallet) {
-        return;
-      }
-
-      setIsRefreshingDcaOrders(true);
-      if (!silent) {
-        setDcaOrdersError(null);
-      }
-
-      try {
-        if (!selectedDcaProviderId) {
-          setDcaOrders([]);
-          setDcaOrdersError("Select a DCA backend to load orders");
-          return;
-        }
-
-        const page = await wallet.dca().getOrders({
-          provider: selectedDcaProviderId,
-          size: DCA_ORDER_PAGE_SIZE,
-        });
-        setDcaOrders(page.content);
-        setDcaOrdersError(null);
-        if (!silent) {
-          addLog(
-            `Loaded ${page.content.length} ${selectedDcaProviderId.toUpperCase()} DCA orders`
-          );
-        }
-      } catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
-        setDcaOrdersError(message);
-        addLog(`DCA orders refresh failed: ${message}`);
-      } finally {
-        setIsRefreshingDcaOrders(false);
-      }
-    },
-    [addLog, selectedDcaProviderId, wallet]
-  );
-
-  useEffect(() => {
-    if (screenMode !== "dca" || !wallet) {
-      return;
-    }
-    void refreshDcaOrders(true);
-  }, [chainId, refreshDcaOrders, screenMode, selectedDcaProviderId, wallet]);
-
-  useEffect(() => {
-    setDcaPreview(null);
-    setDcaError(null);
-  }, [chainId]);
-
   const handleRefresh = useCallback(async () => {
     if (!wallet) {
       return;
@@ -753,9 +371,9 @@ export default function SwapScreen() {
 
     await fetchBalances(wallet, chainId);
     if (screenMode === "dca") {
-      await refreshDcaOrders(true);
+      await dca.refreshDcaOrders(true);
     }
-  }, [chainId, fetchBalances, refreshDcaOrders, screenMode, wallet]);
+  }, [chainId, dca, fetchBalances, screenMode, wallet]);
 
   const handleDisconnect = useCallback(async () => {
     clearBalances();
@@ -767,39 +385,19 @@ export default function SwapScreen() {
     router.replace("/");
   }, [clearBalances, disconnect, logout, resetNetworkConfig, walletType]);
 
-  const handleCopyAddress = useCallback(async () => {
-    if (!wallet) return;
-    await Clipboard.setStringAsync(wallet.address);
-    addLog("Wallet address copied");
-  }, [addLog, wallet]);
-
-  const handleSelectScreenMode = useCallback((nextMode: ScreenMode) => {
-    setScreenMode(nextMode);
-    setQuoteError(null);
-    setDcaError(null);
-  }, []);
+  const handleSelectScreenMode = useCallback(
+    (nextMode: ScreenMode) => {
+      setScreenMode(nextMode);
+      setQuoteError(null);
+      dca.setDcaError(null);
+    },
+    [dca]
+  );
 
   const handleSelectIntegration = useCallback((integrationId: string) => {
     setSelectedIntegrationId(integrationId);
     setQuoteError(null);
   }, []);
-
-  const handleSelectDcaProvider = useCallback((providerId: string) => {
-    setSelectedDcaProviderId(providerId);
-    setDcaOrders([]);
-    setDcaPreview(null);
-    setDcaError(null);
-    setDcaOrdersError(null);
-  }, []);
-
-  const handleSelectDcaPreviewProvider = useCallback(
-    (integrationId: string) => {
-      setSelectedDcaPreviewProviderId(integrationId);
-      setDcaPreview(null);
-      setDcaError(null);
-    },
-    []
-  );
 
   const handleOpenTokenPicker = useCallback((mode: TokenPickerMode) => {
     setPickerMode(mode);
@@ -841,31 +439,31 @@ export default function SwapScreen() {
           break;
         }
         case "dca-from": {
-          setDcaSellToken(token);
-          if (token.address === dcaBuyToken.address) {
+          dca.setDcaSellToken(token);
+          if (token.address === dca.dcaBuyToken.address) {
             const alternative = pickerTokens.find(
               (candidate) => candidate.address !== token.address
             );
             if (alternative) {
-              setDcaBuyToken(alternative);
+              dca.setDcaBuyToken(alternative);
             }
           }
-          setDcaPreview(null);
-          setDcaError(null);
+          dca.setDcaPreview(null);
+          dca.setDcaError(null);
           break;
         }
         case "dca-to": {
-          setDcaBuyToken(token);
-          if (token.address === dcaSellToken.address) {
+          dca.setDcaBuyToken(token);
+          if (token.address === dca.dcaSellToken.address) {
             const alternative = pickerTokens.find(
               (candidate) => candidate.address !== token.address
             );
             if (alternative) {
-              setDcaSellToken(alternative);
+              dca.setDcaSellToken(alternative);
             }
           }
-          setDcaPreview(null);
-          setDcaError(null);
+          dca.setDcaPreview(null);
+          dca.setDcaError(null);
           break;
         }
       }
@@ -874,8 +472,7 @@ export default function SwapScreen() {
     },
     [
       clearTokenPicker,
-      dcaBuyToken.address,
-      dcaSellToken.address,
+      dca,
       dcaTokens,
       fromToken.address,
       pickerMode,
@@ -890,28 +487,9 @@ export default function SwapScreen() {
     setQuoteError(null);
   }, [fromToken, toToken]);
 
-  const handleFlipDcaTokens = useCallback(() => {
-    setDcaSellToken(dcaBuyToken);
-    setDcaBuyToken(dcaSellToken);
-    setDcaPreview(null);
-    setDcaError(null);
-  }, [dcaBuyToken, dcaSellToken]);
-
   const handleAmountChange = useCallback((value: string) => {
     setAmount(value);
     setQuoteError(null);
-  }, []);
-
-  const handleDcaTotalAmountChange = useCallback((value: string) => {
-    setDcaTotalAmount(value);
-    setDcaPreview(null);
-    setDcaError(null);
-  }, []);
-
-  const handleDcaCycleAmountChange = useCallback((value: string) => {
-    setDcaCycleAmount(value);
-    setDcaPreview(null);
-    setDcaError(null);
   }, []);
 
   const handleSwapSubmit = useCallback(async () => {
@@ -986,208 +564,6 @@ export default function SwapScreen() {
     wallet,
   ]);
 
-  const handlePreviewDca = useCallback(async () => {
-    if (!wallet || !parsedDcaCycleAmount || !selectedDcaPreviewProviderId) {
-      return;
-    }
-
-    setDcaPreview(null);
-    setDcaError(null);
-    setIsDcaPreviewing(true);
-
-    try {
-      addLog(
-        `Previewing ${selectedDcaPreviewProviderId.toUpperCase()} DCA cycle ${dcaCycleAmount} ${dcaSellToken.symbol} -> ${dcaBuyToken.symbol}`
-      );
-
-      const quote = await wallet.dca().previewCycle({
-        buyToken: dcaBuyToken,
-        sellAmountPerCycle: parsedDcaCycleAmount,
-        sellToken: dcaSellToken,
-        swapProvider: selectedDcaPreviewProviderId,
-      });
-
-      setDcaPreview({
-        amountOutBase: quote.amountOutBase,
-        priceImpactBps: quote.priceImpactBps,
-        providerId: quote.provider ?? selectedDcaPreviewProviderId,
-        routeCallCount: quote.routeCallCount,
-      });
-
-      addLog(
-        `DCA cycle preview received: ${Amount.fromRaw(
-          quote.amountOutBase,
-          dcaBuyToken.decimals,
-          dcaBuyToken.symbol
-        ).toFormatted(true)}`
-      );
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      setDcaError(message);
-      addLog(`DCA preview failed: ${message}`);
-    } finally {
-      setIsDcaPreviewing(false);
-    }
-  }, [
-    addLog,
-    dcaBuyToken,
-    dcaCycleAmount,
-    dcaSellToken,
-    parsedDcaCycleAmount,
-    selectedDcaPreviewProviderId,
-    wallet,
-  ]);
-
-  const handleCreateDca = useCallback(async () => {
-    if (
-      !wallet ||
-      !parsedDcaTotalAmount ||
-      !parsedDcaCycleAmount ||
-      !selectedDcaProviderId
-    ) {
-      return;
-    }
-
-    setDcaError(null);
-    setIsDcaSubmitting(true);
-
-    try {
-      const wantsSponsored = useSponsored && canUseSponsored;
-      addLog(
-        `Creating ${selectedDcaProviderId.toUpperCase()} DCA order ${dcaTotalAmount} ${dcaSellToken.symbol} total / ${dcaCycleAmount} per cycle into ${dcaBuyToken.symbol} (${dcaFrequency})`
-      );
-
-      const tx = await wallet.dca().create(
-        {
-          provider: selectedDcaProviderId,
-          buyToken: dcaBuyToken,
-          frequency: dcaFrequency,
-          sellAmount: parsedDcaTotalAmount,
-          sellAmountPerCycle: parsedDcaCycleAmount,
-          sellToken: dcaSellToken,
-        },
-        wantsSponsored ? { feeMode: "sponsored" } : undefined
-      );
-
-      addLog(`DCA create tx submitted: ${tx.hash.slice(0, 10)}...`);
-      addLog(
-        wantsSponsored
-          ? "DCA transaction submitted in sponsored mode"
-          : "DCA transaction submitted in user_pays mode"
-      );
-
-      showTransactionToast(
-        {
-          txHash: tx.hash,
-          title: `Creating ${dcaSellToken.symbol} DCA`,
-          subtitle: `${dcaCycleAmount} / cycle into ${dcaBuyToken.symbol}`,
-          explorerUrl: getExplorerUrl(tx.hash, chainId),
-        },
-        true
-      );
-
-      addLog("Waiting for DCA confirmation...");
-      await tx.wait();
-
-      updateTransactionToast({
-        txHash: tx.hash,
-        title: "DCA Created",
-        subtitle: `${dcaSellToken.symbol} -> ${dcaBuyToken.symbol} confirmed`,
-        explorerUrl: getExplorerUrl(tx.hash, chainId),
-      });
-
-      addLog("DCA order created");
-      await fetchBalances(wallet, chainId);
-      await refreshDcaOrders(true);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      setDcaError(message);
-      addLog(`DCA creation failed: ${message}`);
-    } finally {
-      setIsDcaSubmitting(false);
-    }
-  }, [
-    addLog,
-    canUseSponsored,
-    chainId,
-    dcaBuyToken,
-    dcaCycleAmount,
-    dcaFrequency,
-    dcaSellToken,
-    dcaTotalAmount,
-    fetchBalances,
-    parsedDcaCycleAmount,
-    parsedDcaTotalAmount,
-    refreshDcaOrders,
-    selectedDcaProviderId,
-    useSponsored,
-    wallet,
-  ]);
-
-  const handleCancelDcaOrder = useCallback(
-    async (order: DcaOrder) => {
-      if (!wallet) {
-        return;
-      }
-
-      setCancellingDcaOrderId(order.id);
-      setDcaError(null);
-
-      try {
-        const wantsSponsored = useSponsored && canUseSponsored;
-        addLog(
-          `Cancelling ${getDcaProviderLabel(order.providerId)} DCA order ${cropAddress(order.orderAddress)}`
-        );
-
-        const tx = await wallet
-          .dca()
-          .cancel(
-            buildDcaCancelInput(order),
-            wantsSponsored ? { feeMode: "sponsored" } : undefined
-          );
-
-        showTransactionToast(
-          {
-            txHash: tx.hash,
-            title: "Cancelling DCA",
-            subtitle: cropAddress(order.orderAddress),
-            explorerUrl: getExplorerUrl(tx.hash, chainId),
-          },
-          true
-        );
-
-        addLog("Waiting for cancel confirmation...");
-        await tx.wait();
-
-        updateTransactionToast({
-          txHash: tx.hash,
-          title: "DCA Cancelled",
-          subtitle: cropAddress(order.orderAddress),
-          explorerUrl: getExplorerUrl(tx.hash, chainId),
-        });
-
-        addLog(`DCA order cancelled: ${cropAddress(order.orderAddress)}`);
-        await fetchBalances(wallet, chainId);
-        await refreshDcaOrders(true);
-      } catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
-        setDcaError(message);
-        addLog(`DCA cancel failed: ${message}`);
-      } finally {
-        setCancellingDcaOrderId(null);
-      }
-    },
-    [
-      addLog,
-      canUseSponsored,
-      chainId,
-      fetchBalances,
-      refreshDcaOrders,
-      useSponsored,
-      wallet,
-    ]
-  );
-
   if (!wallet) {
     return null;
   }
@@ -1200,7 +576,7 @@ export default function SwapScreen() {
         showsVerticalScrollIndicator={true}
         refreshControl={
           <RefreshControl
-            refreshing={isLoadingBalances || isRefreshingDcaOrders}
+            refreshing={isLoadingBalances || dca.isRefreshingDcaOrders}
             onRefresh={handleRefresh}
             tintColor={primaryColor}
           />
@@ -1214,8 +590,8 @@ export default function SwapScreen() {
             >
               {screenMode === "swap"
                 ? "Spot execution through the configured swap providers."
-                : selectedDcaProvider
-                  ? `${getDcaProviderLabel(selectedDcaProvider.id)} recurring backend with configurable cycle preview routing.`
+                : dca.selectedDcaProvider
+                  ? `${getDcaProviderLabel(dca.selectedDcaProvider.id)} recurring backend with configurable cycle preview routing.`
                   : "Recurring orders with configurable backend and cycle preview routing."}
             </ThemedText>
           </View>
@@ -1270,27 +646,7 @@ export default function SwapScreen() {
             <View
               style={[styles.card, { backgroundColor: cardBg, borderColor }]}
             >
-              <View style={styles.addressRow}>
-                <ThemedText
-                  style={[styles.addressLabel, { color: textSecondary }]}
-                >
-                  Wallet
-                </ThemedText>
-                <TouchableOpacity
-                  style={[
-                    styles.addressButton,
-                    { backgroundColor: borderColor },
-                  ]}
-                  onPress={handleCopyAddress}
-                  activeOpacity={0.88}
-                >
-                  <ThemedText
-                    style={[styles.addressText, { color: textSecondary }]}
-                  >
-                    {cropAddress(wallet.address)}
-                  </ThemedText>
-                </TouchableOpacity>
-              </View>
+              <WalletHeader walletAddress={wallet.address} addLog={addLog} />
 
               <View style={styles.fieldSection}>
                 <ThemedText
@@ -1366,7 +722,8 @@ export default function SwapScreen() {
                 <ThemedText
                   style={[styles.balanceText, { color: textSecondary }]}
                 >
-                  Balance: {fromBalance ? fromBalance.toFormatted(true) : "—"}
+                  Balance:{" "}
+                  {fromBalance ? fromBalance.toFormatted(true) : "\u2014"}
                 </ThemedText>
               </View>
 
@@ -1465,67 +822,13 @@ export default function SwapScreen() {
                 automatically.
               </ThemedText>
 
-              <View style={styles.sponsoredRow}>
-                <ThemedText
-                  style={[styles.fieldLabel, { color: textSecondary }]}
-                >
-                  Sponsored
-                </ThemedText>
-                <View
-                  style={[
-                    styles.sponsoredSwitch,
-                    (!canUseSponsored || isSubmitting) &&
-                      styles.sponsoredSwitchDisabled,
-                  ]}
-                  pointerEvents={
-                    !canUseSponsored || isSubmitting ? "none" : "auto"
-                  }
-                >
-                  <TouchableOpacity
-                    style={[
-                      styles.sponsoredSegment,
-                      !useSponsored && styles.sponsoredSegmentSelected,
-                    ]}
-                    onPress={() => setUseSponsored(false)}
-                    disabled={!canUseSponsored || isSubmitting}
-                    activeOpacity={0.88}
-                  >
-                    <ThemedText
-                      style={[
-                        styles.sponsoredText,
-                        !useSponsored && styles.sponsoredTextSelected,
-                      ]}
-                    >
-                      Off
-                    </ThemedText>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={[
-                      styles.sponsoredSegment,
-                      useSponsored && styles.sponsoredSegmentSelected,
-                    ]}
-                    onPress={() => setUseSponsored(true)}
-                    disabled={!canUseSponsored || isSubmitting}
-                    activeOpacity={0.88}
-                  >
-                    <ThemedText
-                      style={[
-                        styles.sponsoredText,
-                        useSponsored && styles.sponsoredTextSelected,
-                      ]}
-                    >
-                      On
-                    </ThemedText>
-                  </TouchableOpacity>
-                </View>
-              </View>
-              {!canUseSponsored && (
-                <ThemedText
-                  style={[styles.callsHint, { color: textSecondary }]}
-                >
-                  Paymaster not configured
-                </ThemedText>
-              )}
+              <SponsoredToggle
+                useSponsored={useSponsored}
+                setUseSponsored={setUseSponsored}
+                canUseSponsored={canUseSponsored}
+                disabled={isSubmitting}
+              />
+
               {sameToken && (
                 <ThemedText style={styles.errorText}>
                   From and To tokens must be different
@@ -1570,774 +873,18 @@ export default function SwapScreen() {
             </ThemedText>
           </>
         ) : (
-          <>
-            <View
-              style={[styles.card, { backgroundColor: cardBg, borderColor }]}
-            >
-              <View style={styles.addressRow}>
-                <ThemedText
-                  style={[styles.addressLabel, { color: textSecondary }]}
-                >
-                  Wallet
-                </ThemedText>
-                <TouchableOpacity
-                  style={[
-                    styles.addressButton,
-                    { backgroundColor: borderColor },
-                  ]}
-                  onPress={handleCopyAddress}
-                  activeOpacity={0.88}
-                >
-                  <ThemedText
-                    style={[styles.addressText, { color: textSecondary }]}
-                  >
-                    {cropAddress(wallet.address)}
-                  </ThemedText>
-                </TouchableOpacity>
-              </View>
-
-              <View style={styles.fieldSection}>
-                <ThemedText
-                  style={[styles.fieldLabel, { color: textSecondary }]}
-                >
-                  Recurring Backend
-                </ThemedText>
-                <View style={styles.integrationRow}>
-                  {availableDcaProviders.map((provider) => {
-                    const selected = selectedDcaProvider?.id === provider.id;
-                    return (
-                      <TouchableOpacity
-                        key={provider.id}
-                        style={[
-                          styles.integrationPill,
-                          { borderColor },
-                          selected && styles.integrationPillSelected,
-                        ]}
-                        onPress={() => handleSelectDcaProvider(provider.id)}
-                        activeOpacity={0.88}
-                      >
-                        <ThemedText
-                          style={[
-                            styles.integrationPillText,
-                            selected
-                              ? styles.integrationPillTextSelected
-                              : { color: textSecondary },
-                          ]}
-                        >
-                          {getDcaProviderLabel(provider.id)}
-                        </ThemedText>
-                      </TouchableOpacity>
-                    );
-                  })}
-                </View>
-                <ThemedText
-                  style={[styles.callsHint, { color: textSecondary }]}
-                >
-                  {selectedDcaProvider?.id === "ekubo"
-                    ? "Ekubo creates a native continuous TWAMM order."
-                    : "Avnu creates a discrete recurring order with optional min/max guards."}
-                </ThemedText>
-              </View>
-
-              <View style={styles.fieldSection}>
-                <ThemedText
-                  style={[styles.fieldLabel, { color: textSecondary }]}
-                >
-                  Preview Source
-                </ThemedText>
-                <View style={styles.integrationRow}>
-                  {availableIntegrations.map((integration) => {
-                    const selected =
-                      selectedDcaPreviewProvider?.id === integration.id;
-                    return (
-                      <TouchableOpacity
-                        key={integration.id}
-                        style={[
-                          styles.integrationPill,
-                          { borderColor },
-                          selected && styles.integrationPillSelected,
-                        ]}
-                        onPress={() =>
-                          handleSelectDcaPreviewProvider(integration.id)
-                        }
-                        activeOpacity={0.88}
-                      >
-                        <ThemedText
-                          style={[
-                            styles.integrationPillText,
-                            selected
-                              ? styles.integrationPillTextSelected
-                              : { color: textSecondary },
-                          ]}
-                        >
-                          {getSwapProviderLabel(integration)}
-                        </ThemedText>
-                      </TouchableOpacity>
-                    );
-                  })}
-                </View>
-                <ThemedText
-                  style={[styles.callsHint, { color: textSecondary }]}
-                >
-                  The selected source only affects the single-cycle preview.
-                </ThemedText>
-                {!availableIntegrations.length && (
-                  <ThemedText style={styles.errorText}>
-                    No preview integrations are configured for this network
-                  </ThemedText>
-                )}
-              </View>
-
-              <View style={styles.fieldSection}>
-                <ThemedText
-                  style={[styles.fieldLabel, { color: textSecondary }]}
-                >
-                  Sell Token
-                </ThemedText>
-                <TouchableOpacity
-                  style={[styles.tokenRow, { borderColor }]}
-                  onPress={() => handleOpenTokenPicker("dca-from")}
-                  activeOpacity={0.88}
-                >
-                  <View style={styles.tokenRowLeft}>
-                    <TinyTokenLogo token={dcaSellToken} />
-                    <View style={styles.tokenTextStack}>
-                      <ThemedText style={styles.tokenSymbol}>
-                        {dcaSellToken.symbol}
-                      </ThemedText>
-                      <ThemedText
-                        style={[styles.tokenName, { color: textSecondary }]}
-                      >
-                        {dcaSellToken.name}
-                      </ThemedText>
-                    </View>
-                  </View>
-                  <ThemedText
-                    style={[styles.chevronText, { color: textSecondary }]}
-                  >
-                    ▼
-                  </ThemedText>
-                </TouchableOpacity>
-                <ThemedText
-                  style={[styles.balanceText, { color: textSecondary }]}
-                >
-                  Balance:{" "}
-                  {dcaSellBalance ? dcaSellBalance.toFormatted(true) : "—"}
-                </ThemedText>
-              </View>
-
-              <TouchableOpacity
-                style={[styles.flipButton, { backgroundColor: borderColor }]}
-                onPress={handleFlipDcaTokens}
-                activeOpacity={0.88}
-              >
-                <Ionicons name="swap-vertical" size={16} color={primaryColor} />
-              </TouchableOpacity>
-
-              <View style={styles.fieldSection}>
-                <ThemedText
-                  style={[styles.fieldLabel, { color: textSecondary }]}
-                >
-                  Buy Token
-                </ThemedText>
-                <TouchableOpacity
-                  style={[styles.tokenRow, { borderColor }]}
-                  onPress={() => handleOpenTokenPicker("dca-to")}
-                  activeOpacity={0.88}
-                >
-                  <View style={styles.tokenRowLeft}>
-                    <TinyTokenLogo token={dcaBuyToken} />
-                    <View style={styles.tokenTextStack}>
-                      <ThemedText style={styles.tokenSymbol}>
-                        {dcaBuyToken.symbol}
-                      </ThemedText>
-                      <ThemedText
-                        style={[styles.tokenName, { color: textSecondary }]}
-                      >
-                        {dcaBuyToken.name}
-                      </ThemedText>
-                    </View>
-                  </View>
-                  <ThemedText
-                    style={[styles.chevronText, { color: textSecondary }]}
-                  >
-                    ▼
-                  </ThemedText>
-                </TouchableOpacity>
-              </View>
-
-              <View style={styles.fieldSection}>
-                <ThemedText
-                  style={[styles.fieldLabel, { color: textSecondary }]}
-                >
-                  Total Sell Amount
-                </ThemedText>
-                <View style={[styles.amountRow, { borderColor }]}>
-                  <TextInput
-                    style={[
-                      styles.amountInput,
-                      { color: dcaExceedsBalance ? "#e53935" : primaryColor },
-                    ]}
-                    value={dcaTotalAmount}
-                    onChangeText={handleDcaTotalAmountChange}
-                    placeholder="0.0"
-                    placeholderTextColor={textSecondary}
-                    keyboardType="decimal-pad"
-                  />
-                  {dcaSellBalance && (
-                    <TouchableOpacity
-                      style={[
-                        styles.maxButton,
-                        { backgroundColor: borderColor },
-                      ]}
-                      onPress={() =>
-                        handleDcaTotalAmountChange(dcaSellBalance.toUnit())
-                      }
-                      activeOpacity={0.88}
-                    >
-                      <ThemedText
-                        style={[styles.maxButtonText, { color: primaryColor }]}
-                      >
-                        MAX
-                      </ThemedText>
-                    </TouchableOpacity>
-                  )}
-                </View>
-                {dcaExceedsBalance && (
-                  <ThemedText style={styles.errorText}>
-                    Total amount exceeds {dcaSellToken.symbol} balance
-                  </ThemedText>
-                )}
-                {dcaTotalAmountError && (
-                  <ThemedText style={styles.errorText}>
-                    {dcaTotalAmountError}
-                  </ThemedText>
-                )}
-              </View>
-
-              <View style={styles.fieldSection}>
-                <ThemedText
-                  style={[styles.fieldLabel, { color: textSecondary }]}
-                >
-                  Per Cycle
-                </ThemedText>
-                <View style={[styles.amountRow, { borderColor }]}>
-                  <TextInput
-                    style={[styles.amountInput, { color: primaryColor }]}
-                    value={dcaCycleAmount}
-                    onChangeText={handleDcaCycleAmountChange}
-                    placeholder="0.0"
-                    placeholderTextColor={textSecondary}
-                    keyboardType="decimal-pad"
-                  />
-                </View>
-                {dcaCycleAmountError && (
-                  <ThemedText style={styles.errorText}>
-                    {dcaCycleAmountError}
-                  </ThemedText>
-                )}
-                {dcaCycleExceedsTotal && (
-                  <ThemedText style={styles.errorText}>
-                    Per-cycle amount must be less than or equal to the total
-                  </ThemedText>
-                )}
-              </View>
-
-              <View style={styles.fieldSection}>
-                <ThemedText
-                  style={[styles.fieldLabel, { color: textSecondary }]}
-                >
-                  Frequency
-                </ThemedText>
-                <View style={styles.integrationRow}>
-                  {DCA_FREQUENCY_OPTIONS.map((option) => {
-                    const selected = dcaFrequency === option.value;
-                    return (
-                      <TouchableOpacity
-                        key={option.value}
-                        style={[
-                          styles.integrationPill,
-                          { borderColor },
-                          selected && styles.integrationPillSelected,
-                        ]}
-                        onPress={() => {
-                          setDcaFrequency(option.value);
-                          setDcaPreview(null);
-                          setDcaError(null);
-                        }}
-                        activeOpacity={0.88}
-                      >
-                        <ThemedText
-                          style={[
-                            styles.integrationPillText,
-                            selected
-                              ? styles.integrationPillTextSelected
-                              : { color: textSecondary },
-                          ]}
-                        >
-                          {option.label}
-                        </ThemedText>
-                      </TouchableOpacity>
-                    );
-                  })}
-                </View>
-              </View>
-
-              <View style={styles.sponsoredRow}>
-                <ThemedText
-                  style={[styles.fieldLabel, { color: textSecondary }]}
-                >
-                  Sponsored
-                </ThemedText>
-                <View
-                  style={[
-                    styles.sponsoredSwitch,
-                    (!canUseSponsored ||
-                      isDcaSubmitting ||
-                      cancellingDcaOrderId != null) &&
-                      styles.sponsoredSwitchDisabled,
-                  ]}
-                  pointerEvents={
-                    !canUseSponsored ||
-                    isDcaSubmitting ||
-                    cancellingDcaOrderId != null
-                      ? "none"
-                      : "auto"
-                  }
-                >
-                  <TouchableOpacity
-                    style={[
-                      styles.sponsoredSegment,
-                      !useSponsored && styles.sponsoredSegmentSelected,
-                    ]}
-                    onPress={() => setUseSponsored(false)}
-                    disabled={
-                      !canUseSponsored ||
-                      isDcaSubmitting ||
-                      cancellingDcaOrderId != null
-                    }
-                    activeOpacity={0.88}
-                  >
-                    <ThemedText
-                      style={[
-                        styles.sponsoredText,
-                        !useSponsored && styles.sponsoredTextSelected,
-                      ]}
-                    >
-                      Off
-                    </ThemedText>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={[
-                      styles.sponsoredSegment,
-                      useSponsored && styles.sponsoredSegmentSelected,
-                    ]}
-                    onPress={() => setUseSponsored(true)}
-                    disabled={
-                      !canUseSponsored ||
-                      isDcaSubmitting ||
-                      cancellingDcaOrderId != null
-                    }
-                    activeOpacity={0.88}
-                  >
-                    <ThemedText
-                      style={[
-                        styles.sponsoredText,
-                        useSponsored && styles.sponsoredTextSelected,
-                      ]}
-                    >
-                      On
-                    </ThemedText>
-                  </TouchableOpacity>
-                </View>
-              </View>
-
-              {!canUseSponsored && (
-                <ThemedText
-                  style={[styles.callsHint, { color: textSecondary }]}
-                >
-                  Paymaster not configured
-                </ThemedText>
-              )}
-              {dcaSameToken && (
-                <ThemedText style={styles.errorText}>
-                  Sell and buy tokens must be different
-                </ThemedText>
-              )}
-              {dcaError && (
-                <ThemedText style={styles.errorText}>{dcaError}</ThemedText>
-              )}
-
-              {dcaPreview && (
-                <View
-                  style={[styles.previewCard, { backgroundColor: borderColor }]}
-                >
-                  <View style={styles.previewRow}>
-                    <ThemedText
-                      style={[styles.previewLabel, { color: textSecondary }]}
-                    >
-                      Source
-                    </ThemedText>
-                    <ThemedText style={styles.previewValue}>
-                      {dcaPreviewProviderLabel ?? "Preview"}
-                    </ThemedText>
-                  </View>
-                  <View style={styles.previewRow}>
-                    <ThemedText
-                      style={[styles.previewLabel, { color: textSecondary }]}
-                    >
-                      Backend
-                    </ThemedText>
-                    <ThemedText style={styles.previewValue}>
-                      {dcaBackendLabel ?? "DCA"}
-                    </ThemedText>
-                  </View>
-                  <View style={styles.previewRow}>
-                    <ThemedText
-                      style={[styles.previewLabel, { color: textSecondary }]}
-                    >
-                      Sell
-                    </ThemedText>
-                    <ThemedText style={styles.previewValue}>
-                      {parsedDcaCycleAmount?.toFormatted(true) ?? "—"}
-                    </ThemedText>
-                  </View>
-                  <View style={styles.previewRow}>
-                    <ThemedText
-                      style={[styles.previewLabel, { color: textSecondary }]}
-                    >
-                      Est. Buy
-                    </ThemedText>
-                    <ThemedText style={styles.previewValue}>
-                      {Amount.fromRaw(
-                        dcaPreview.amountOutBase,
-                        dcaBuyToken.decimals,
-                        dcaBuyToken.symbol
-                      ).toFormatted(true)}
-                    </ThemedText>
-                  </View>
-                  <View style={styles.previewRow}>
-                    <ThemedText
-                      style={[styles.previewLabel, { color: textSecondary }]}
-                    >
-                      Price Impact
-                    </ThemedText>
-                    <ThemedText style={styles.previewValue}>
-                      {dcaPreview.priceImpactBps == null
-                        ? "n/a"
-                        : `${(Number(dcaPreview.priceImpactBps) / 100).toFixed(2)}%`}
-                    </ThemedText>
-                  </View>
-                  <View style={styles.previewRow}>
-                    <ThemedText
-                      style={[styles.previewLabel, { color: textSecondary }]}
-                    >
-                      Route Calls
-                    </ThemedText>
-                    <ThemedText style={styles.previewValue}>
-                      {dcaPreview.routeCallCount != null
-                        ? `${dcaPreview.routeCallCount}`
-                        : "n/a"}
-                    </ThemedText>
-                  </View>
-                </View>
-              )}
-
-              <View style={styles.actionRow}>
-                <TouchableOpacity
-                  style={[
-                    styles.secondaryButton,
-                    { borderColor },
-                    !canPreviewDca && styles.buttonDisabled,
-                  ]}
-                  onPress={handlePreviewDca}
-                  disabled={!canPreviewDca}
-                  activeOpacity={0.85}
-                >
-                  {isDcaPreviewing ? (
-                    <ActivityIndicator size="small" color={primaryColor} />
-                  ) : (
-                    <ThemedText
-                      style={[
-                        styles.secondaryButtonText,
-                        { color: primaryColor },
-                      ]}
-                    >
-                      Preview Cycle
-                    </ThemedText>
-                  )}
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[
-                    styles.primaryActionButton,
-                    canCreateDca
-                      ? { backgroundColor: "#000" }
-                      : { backgroundColor: borderColor },
-                    !canCreateDca && styles.buttonDisabled,
-                  ]}
-                  onPress={handleCreateDca}
-                  disabled={!canCreateDca}
-                  activeOpacity={0.85}
-                >
-                  {isDcaSubmitting ? (
-                    <ActivityIndicator
-                      size="small"
-                      color={canCreateDca ? "#fff" : primaryColor}
-                    />
-                  ) : (
-                    <ThemedText
-                      style={[
-                        styles.primaryActionButtonText,
-                        { color: canCreateDca ? "#fff" : primaryColor },
-                      ]}
-                    >
-                      Create DCA
-                    </ThemedText>
-                  )}
-                </TouchableOpacity>
-              </View>
-            </View>
-
-            <View
-              style={[
-                styles.card,
-                styles.ordersCard,
-                { backgroundColor: cardBg, borderColor },
-              ]}
-            >
-              <View style={styles.ordersHeader}>
-                <View style={styles.ordersHeaderText}>
-                  <ThemedText style={styles.ordersTitle}>DCA Orders</ThemedText>
-                  <ThemedText
-                    style={[styles.ordersSubtitle, { color: textSecondary }]}
-                  >
-                    {selectedDcaProvider
-                      ? `Refresh the latest ${getDcaProviderLabel(selectedDcaProvider.id)} orders for this wallet.`
-                      : "Select a DCA backend to load orders."}
-                  </ThemedText>
-                </View>
-                <TouchableOpacity
-                  style={[
-                    styles.inlineButton,
-                    { borderColor },
-                    isRefreshingDcaOrders && styles.buttonDisabled,
-                  ]}
-                  onPress={() => void refreshDcaOrders()}
-                  disabled={isRefreshingDcaOrders}
-                  activeOpacity={0.88}
-                >
-                  {isRefreshingDcaOrders ? (
-                    <ActivityIndicator size="small" color={primaryColor} />
-                  ) : (
-                    <ThemedText
-                      style={[styles.inlineButtonText, { color: primaryColor }]}
-                    >
-                      Refresh
-                    </ThemedText>
-                  )}
-                </TouchableOpacity>
-              </View>
-
-              {dcaOrdersError && (
-                <ThemedText style={styles.errorText}>
-                  {dcaOrdersError}
-                </ThemedText>
-              )}
-
-              {!dcaOrders.length &&
-                !isRefreshingDcaOrders &&
-                !dcaOrdersError && (
-                  <ThemedText
-                    style={[styles.emptyStateText, { color: textSecondary }]}
-                  >
-                    {selectedDcaProvider
-                      ? `No ${getDcaProviderLabel(selectedDcaProvider.id)} DCA orders yet. Create one above to start recurring buys.`
-                      : "Select a DCA backend to load orders."}
-                  </ThemedText>
-                )}
-
-              {dcaOrders.map((order) => {
-                const orderSellToken =
-                  tokenMetadataByAddress.get(order.sellTokenAddress) ?? null;
-                const orderBuyToken =
-                  tokenMetadataByAddress.get(order.buyTokenAddress) ?? null;
-                const isActiveOrder = order.status === "ACTIVE";
-                const isCancelling = cancellingDcaOrderId === order.id;
-
-                return (
-                  <View
-                    key={order.id}
-                    style={[styles.orderItem, { borderColor }]}
-                  >
-                    <View style={styles.orderHeader}>
-                      <View style={styles.orderHeaderLeft}>
-                        <ThemedText style={styles.orderPairText}>
-                          {(orderSellToken?.symbol ?? "SELL") +
-                            " -> " +
-                            (orderBuyToken?.symbol ?? "BUY")}
-                        </ThemedText>
-                        <ThemedText
-                          style={[
-                            styles.orderAddressText,
-                            { color: textSecondary },
-                          ]}
-                        >
-                          {getDcaProviderLabel(order.providerId)} ·{" "}
-                          {cropAddress(order.orderAddress)}
-                        </ThemedText>
-                      </View>
-                      <View
-                        style={[
-                          styles.orderStatusPill,
-                          isActiveOrder
-                            ? styles.orderStatusPillActive
-                            : { backgroundColor: borderColor },
-                        ]}
-                      >
-                        <ThemedText
-                          style={[
-                            styles.orderStatusText,
-                            isActiveOrder
-                              ? styles.orderStatusTextActive
-                              : { color: primaryColor },
-                          ]}
-                        >
-                          {order.status}
-                        </ThemedText>
-                      </View>
-                    </View>
-
-                    <View style={styles.orderFacts}>
-                      <View style={styles.orderFactRow}>
-                        <ThemedText
-                          style={[
-                            styles.orderFactLabel,
-                            { color: textSecondary },
-                          ]}
-                        >
-                          Total
-                        </ThemedText>
-                        <ThemedText style={styles.orderFactValue}>
-                          {formatTokenAmount(
-                            order.sellAmountBase,
-                            orderSellToken
-                          )}
-                        </ThemedText>
-                      </View>
-                      <View style={styles.orderFactRow}>
-                        <ThemedText
-                          style={[
-                            styles.orderFactLabel,
-                            { color: textSecondary },
-                          ]}
-                        >
-                          Per cycle
-                        </ThemedText>
-                        <ThemedText style={styles.orderFactValue}>
-                          {order.sellAmountPerCycleBase != null
-                            ? formatTokenAmount(
-                                order.sellAmountPerCycleBase,
-                                orderSellToken
-                              )
-                            : "Continuous"}
-                        </ThemedText>
-                      </View>
-                      <View style={styles.orderFactRow}>
-                        <ThemedText
-                          style={[
-                            styles.orderFactLabel,
-                            { color: textSecondary },
-                          ]}
-                        >
-                          Bought
-                        </ThemedText>
-                        <ThemedText style={styles.orderFactValue}>
-                          {formatTokenAmount(
-                            order.amountBoughtBase,
-                            orderBuyToken
-                          )}
-                        </ThemedText>
-                      </View>
-                      <View style={styles.orderFactRow}>
-                        <ThemedText
-                          style={[
-                            styles.orderFactLabel,
-                            { color: textSecondary },
-                          ]}
-                        >
-                          Frequency
-                        </ThemedText>
-                        <ThemedText style={styles.orderFactValue}>
-                          {getDcaFrequencyLabel(order.frequency)}
-                        </ThemedText>
-                      </View>
-                      <View style={styles.orderFactRow}>
-                        <ThemedText
-                          style={[
-                            styles.orderFactLabel,
-                            { color: textSecondary },
-                          ]}
-                        >
-                          Created
-                        </ThemedText>
-                        <ThemedText style={styles.orderFactValue}>
-                          {formatDateStamp(order.timestamp)}
-                        </ThemedText>
-                      </View>
-                      <View style={styles.orderFactRow}>
-                        <ThemedText
-                          style={[
-                            styles.orderFactLabel,
-                            { color: textSecondary },
-                          ]}
-                        >
-                          Trades
-                        </ThemedText>
-                        <ThemedText style={styles.orderFactValue}>
-                          {order.executedTradesCount} done /{" "}
-                          {order.pendingTradesCount} pending /{" "}
-                          {order.cancelledTradesCount} cancelled
-                        </ThemedText>
-                      </View>
-                    </View>
-
-                    {isActiveOrder && (
-                      <TouchableOpacity
-                        style={[
-                          styles.cancelButton,
-                          { borderColor },
-                          isCancelling && styles.buttonDisabled,
-                        ]}
-                        onPress={() => void handleCancelDcaOrder(order)}
-                        disabled={isCancelling}
-                        activeOpacity={0.88}
-                      >
-                        {isCancelling ? (
-                          <ActivityIndicator
-                            size="small"
-                            color={primaryColor}
-                          />
-                        ) : (
-                          <ThemedText
-                            style={[
-                              styles.cancelButtonText,
-                              { color: primaryColor },
-                            ]}
-                          >
-                            Cancel Order
-                          </ThemedText>
-                        )}
-                      </TouchableOpacity>
-                    )}
-                  </View>
-                );
-              })}
-            </View>
-
-            <ThemedText style={[styles.hint, { color: textSecondary }]}>
-              Pull down to refresh balances and DCA orders
-            </ThemedText>
-          </>
+          <DcaPanel
+            dca={dca}
+            walletAddress={wallet.address}
+            addLog={addLog}
+            availableIntegrations={availableIntegrations}
+            availableDcaProviders={availableDcaProviders}
+            useSponsored={useSponsored}
+            setUseSponsored={setUseSponsored}
+            canUseSponsored={canUseSponsored}
+            onOpenTokenPicker={handleOpenTokenPicker}
+            tokenMetadataByAddress={tokenMetadataByAddress}
+          />
         )}
       </ScrollView>
 
@@ -2422,7 +969,7 @@ export default function SwapScreen() {
                             { color: textSecondary },
                           ]}
                         >
-                          {balance ? balance.toFormatted(true) : "—"}
+                          {balance ? balance.toFormatted(true) : "\u2014"}
                         </ThemedText>
                       </View>
                     </View>
@@ -2449,32 +996,6 @@ export default function SwapScreen() {
 }
 
 const styles = StyleSheet.create({
-  actionRow: {
-    flexDirection: "row",
-    gap: 10,
-    marginTop: 6,
-    width: "100%",
-  },
-  addressButton: {
-    borderRadius: 999,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-  },
-  addressLabel: {
-    fontSize: 12,
-    fontWeight: "600",
-    letterSpacing: 0.5,
-    textTransform: "uppercase",
-  },
-  addressRow: {
-    alignItems: "center",
-    flexDirection: "row",
-    justifyContent: "space-between",
-  },
-  addressText: {
-    fontSize: 12,
-    fontWeight: "600",
-  },
   amountInput: {
     flex: 1,
     fontSize: 18,
@@ -2496,18 +1017,6 @@ const styles = StyleSheet.create({
   },
   callsHint: {
     fontSize: 11,
-  },
-  cancelButton: {
-    alignItems: "center",
-    borderRadius: 10,
-    borderWidth: 1,
-    justifyContent: "center",
-    minHeight: 40,
-    marginTop: 6,
-  },
-  cancelButtonText: {
-    fontSize: 12,
-    fontWeight: "700",
   },
   card: {
     borderRadius: 16,
@@ -2532,10 +1041,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: "600",
     textDecorationLine: "underline",
-  },
-  emptyStateText: {
-    fontSize: 12,
-    lineHeight: 18,
   },
   errorText: {
     color: "#e53935",
@@ -2582,19 +1087,6 @@ const styles = StyleSheet.create({
     marginTop: 12,
     textAlign: "center",
     width: "100%",
-  },
-  inlineButton: {
-    alignItems: "center",
-    borderRadius: 999,
-    borderWidth: 1,
-    justifyContent: "center",
-    minHeight: 34,
-    minWidth: 86,
-    paddingHorizontal: 12,
-  },
-  inlineButtonText: {
-    fontSize: 12,
-    fontWeight: "700",
   },
   integrationPill: {
     borderRadius: 999,
@@ -2687,157 +1179,7 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: "700",
   },
-  orderAddressText: {
-    fontSize: 11,
-  },
-  orderFactLabel: {
-    fontSize: 11,
-  },
-  orderFactRow: {
-    alignItems: "center",
-    flexDirection: "row",
-    justifyContent: "space-between",
-  },
-  orderFactValue: {
-    flex: 1,
-    fontSize: 11,
-    fontWeight: "600",
-    marginLeft: 12,
-    textAlign: "right",
-  },
-  orderFacts: {
-    gap: 6,
-  },
-  orderHeader: {
-    alignItems: "flex-start",
-    flexDirection: "row",
-    justifyContent: "space-between",
-  },
-  orderHeaderLeft: {
-    flex: 1,
-    gap: 4,
-  },
-  orderItem: {
-    borderRadius: 14,
-    borderWidth: 1,
-    gap: 12,
-    padding: 14,
-  },
-  orderPairText: {
-    fontSize: 14,
-    fontWeight: "700",
-  },
-  ordersCard: {
-    marginTop: 14,
-  },
-  ordersHeader: {
-    alignItems: "center",
-    flexDirection: "row",
-    gap: 12,
-    justifyContent: "space-between",
-  },
-  ordersHeaderText: {
-    flex: 1,
-    gap: 4,
-  },
-  ordersSubtitle: {
-    fontSize: 12,
-    lineHeight: 18,
-  },
-  ordersTitle: {
-    fontSize: 16,
-    fontWeight: "700",
-  },
-  orderStatusPill: {
-    borderRadius: 999,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-  },
-  orderStatusPillActive: {
-    backgroundColor: "#000",
-  },
-  orderStatusText: {
-    fontSize: 10,
-    fontWeight: "700",
-    textTransform: "uppercase",
-  },
-  orderStatusTextActive: {
-    color: "#fff",
-  },
-  previewCard: {
-    borderRadius: 12,
-    gap: 10,
-    padding: 12,
-  },
-  previewLabel: {
-    fontSize: 11,
-    textTransform: "uppercase",
-  },
-  previewRow: {
-    alignItems: "center",
-    flexDirection: "row",
-    justifyContent: "space-between",
-  },
-  previewValue: {
-    fontSize: 12,
-    fontWeight: "700",
-  },
-  primaryActionButton: {
-    alignItems: "center",
-    borderRadius: 12,
-    flex: 1,
-    justifyContent: "center",
-    minHeight: 48,
-  },
-  primaryActionButtonText: {
-    fontSize: 14,
-    fontWeight: "700",
-  },
   scrollView: { flex: 1 },
-  secondaryButton: {
-    alignItems: "center",
-    borderRadius: 12,
-    borderWidth: 1,
-    flex: 1,
-    justifyContent: "center",
-    minHeight: 48,
-  },
-  secondaryButtonText: {
-    fontSize: 14,
-    fontWeight: "700",
-  },
-  sponsoredRow: {
-    alignItems: "center",
-    flexDirection: "row",
-    justifyContent: "space-between",
-  },
-  sponsoredSegment: {
-    borderRadius: 999,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-  },
-  sponsoredSegmentSelected: {
-    backgroundColor: "#000",
-  },
-  sponsoredSwitch: {
-    backgroundColor: "#e5e5e5",
-    borderRadius: 999,
-    flexDirection: "row",
-    gap: 2,
-    padding: 2,
-  },
-  sponsoredSwitchDisabled: {
-    opacity: 0.5,
-  },
-  sponsoredText: {
-    color: "#111",
-    fontSize: 11,
-    fontWeight: "700",
-    textTransform: "uppercase",
-  },
-  sponsoredTextSelected: {
-    color: "#fff",
-  },
   submitButton: {
     alignItems: "center",
     borderRadius: 12,
