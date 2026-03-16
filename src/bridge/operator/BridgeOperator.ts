@@ -28,8 +28,6 @@ import {
 import { CCTPBridge } from "@/bridge/ethereum/cctp/CCTPBridge";
 import { LordsBridge } from "@/bridge/ethereum/lords/LordsBridge";
 import { OftBridge } from "@/bridge/ethereum/oft/OftBridge";
-import { SolanaHyperlaneBridge } from "@/bridge/solana/SolanaHyperlaneBridge";
-import { clusterApiUrl, Connection } from "@solana/web3.js";
 
 export class BridgeOperator implements BridgeOperatorInterface {
   private cache = new BridgeCache();
@@ -137,7 +135,9 @@ export class BridgeOperator implements BridgeOperatorInterface {
     externalWallet: ConnectedEthereumWallet,
     starknetWallet: WalletInterface
   ): Promise<BridgeInterface<EthereumAddress>> {
-    const walletConfig = await externalWallet.toEthWalletConfig();
+    const walletConfig = await externalWallet.toEthWalletConfig(
+      this.bridgingConfig?.ethereumRpcUrl
+    );
 
     if (token.id === "lords") {
       return new LordsBridge(token, walletConfig, starknetWallet);
@@ -171,6 +171,16 @@ export class BridgeOperator implements BridgeOperatorInterface {
     externalWallet: ConnectedSolanaWallet,
     starknetWallet: WalletInterface
   ): Promise<BridgeInterface<SolanaAddress>> {
+    // SolanaHyperlaneBridge and @solana/web3.js are loaded lazily in
+    // to avoid pulling Node.js-only transitive dependencies
+    // (@hyperlane-xyz/sdk → ethereumjs-util → assert, etc.)
+    // into clients that require polyfill.
+    const [{ SolanaHyperlaneBridge }, { clusterApiUrl, Connection }] =
+      await Promise.all([
+        import("@/bridge/solana/SolanaHyperlaneBridge"),
+        import("@solana/web3.js"),
+      ]);
+
     const cluster =
       externalWallet.network === SolanaNetwork.MAINNET
         ? "mainnet-beta"

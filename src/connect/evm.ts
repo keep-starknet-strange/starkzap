@@ -5,7 +5,7 @@ import {
   fromEthereumAddress,
 } from "@/types";
 import type { EthereumWalletConfig } from "@/bridge";
-import { BrowserProvider } from "ethers";
+import { BrowserProvider, JsonRpcProvider } from "ethers";
 import type { ChainId } from "@/types";
 
 function assertEip1193Provider(provider: unknown): Eip1193Provider {
@@ -55,8 +55,9 @@ export class ConnectedEthereumWallet {
     readonly network: EthereumNetwork
   ) {}
 
-  public async toEthWalletConfig(): Promise<EthereumWalletConfig> {
-    // Safeguard check. The provider
+  public async toEthWalletConfig(
+    ethereumRpcUrl?: string | undefined
+  ): Promise<EthereumWalletConfig> {
     const ethChainIdRaw = await this.provider.request<string>({
       method: "eth_chainId",
     });
@@ -69,8 +70,25 @@ export class ConnectedEthereumWallet {
       );
     }
 
-    const provider = new BrowserProvider(this.provider, networkId);
-    const signer = await provider.getSigner(this.address);
+    const browserProvider = new BrowserProvider(this.provider, networkId);
+    const signer = await browserProvider.getSigner(this.address);
+
+    let provider;
+    if (ethereumRpcUrl) {
+      const rpcProvider = new JsonRpcProvider(ethereumRpcUrl, networkId);
+      const rpcNetwork = await rpcProvider.getNetwork();
+      const rpcChainId = Number(rpcNetwork.chainId);
+
+      if (rpcChainId !== networkId) {
+        throw new Error(
+          `Custom Ethereum RPC URL is on chain ${rpcChainId} but the connected wallet is on chain ${networkId}.`
+        );
+      }
+      provider = rpcProvider;
+    } else {
+      provider = browserProvider;
+    }
+
     return { provider, signer };
   }
 
