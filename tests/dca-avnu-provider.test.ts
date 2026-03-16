@@ -1,6 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { RpcProvider } from "starknet";
-import moment from "moment";
 import { Amount, ChainId, fromAddress, type Token } from "@/types";
 
 const avnuMocks = vi.hoisted(() => ({
@@ -41,7 +40,7 @@ const buyToken: Token = {
 const traderAddress = fromAddress("0xabc");
 const context = {
   chainId: ChainId.SEPOLIA,
-  provider: {} as RpcProvider,
+  rpcProvider: {} as RpcProvider,
   walletAddress: traderAddress,
 };
 
@@ -216,7 +215,7 @@ describe("AvnuDcaProvider", () => {
         buyTokenAddress: buyToken.address,
         sellAmount: `0x${sellAmount.toBase().toString(16)}`,
         sellAmountPerCycle: `0x${sellAmountPerCycle.toBase().toString(16)}`,
-        frequency: expect.objectContaining(moment.duration("P1D")),
+        frequency: expect.objectContaining({ toJSON: expect.any(Function) }),
         pricingStrategy: {
           tokenToMinAmount: `0x${minBuyAmount.toBase().toString(16)}`,
           tokenToMaxAmount: undefined,

@@ -7,7 +7,7 @@ import {
   type DcaTrade as AvnuDcaTrade,
   type PricingStrategy,
 } from "@avnu/avnu-sdk";
-import moment from "moment";
+import type { Duration } from "moment";
 import { assertAmountMatchesToken, fromAddress, type ChainId } from "@/types";
 import type {
   DcaCancelRequest,
@@ -29,6 +29,10 @@ import {
   supportsAvnuChain,
   withAvnuApiBaseFallback,
 } from "@/utils/avnu";
+
+function toHexAmount(value: bigint): string {
+  return `0x${value.toString(16)}`;
+}
 
 const DCA_STATUS_TO_AVNU: Record<DcaOrderStatus, AvnuDcaOrderStatus> = {
   INDEXING: AvnuDcaOrderStatus.INDEXING,
@@ -70,10 +74,10 @@ function toPricingStrategy(
 
   return {
     ...(minBuyAmountBase != null && {
-      tokenToMinAmount: `0x${minBuyAmountBase.toString(16)}`,
+      tokenToMinAmount: toHexAmount(minBuyAmountBase),
     }),
     ...(maxBuyAmountBase != null && {
-      tokenToMaxAmount: `0x${maxBuyAmountBase.toString(16)}`,
+      tokenToMaxAmount: toHexAmount(maxBuyAmountBase),
     }),
   } as PricingStrategy;
 }
@@ -219,8 +223,11 @@ export class AvnuDcaProvider implements DcaProvider {
     });
 
     return {
-      ...page,
       content: page.content.map(mapOrder),
+      totalPages: page.totalPages,
+      totalElements: page.totalElements,
+      size: page.size,
+      pageNumber: page.number,
     };
   }
 
@@ -232,11 +239,12 @@ export class AvnuDcaProvider implements DcaProvider {
     const createRequest: Parameters<typeof createDcaToCalls>[0] = {
       sellTokenAddress: request.sellToken.address,
       buyTokenAddress: request.buyToken.address,
-      sellAmount: `0x${request.sellAmount.toBase().toString(16)}`,
-      sellAmountPerCycle: `0x${request.sellAmountPerCycle
-        .toBase()
-        .toString(16)}`,
-      frequency: moment.duration(request.frequency),
+      sellAmount: toHexAmount(request.sellAmount.toBase()),
+      sellAmountPerCycle: toHexAmount(request.sellAmountPerCycle.toBase()),
+      frequency: {
+        toJSON: () => request.frequency,
+        toISOString: () => request.frequency,
+      } as Duration,
       pricingStrategy: toPricingStrategy(request.pricingStrategy),
       traderAddress: request.traderAddress,
     };
