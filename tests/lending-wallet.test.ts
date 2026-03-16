@@ -27,7 +27,7 @@ class TestWallet extends BaseWallet {
   readonly preflightSpy = vi.fn();
 
   constructor(defaultLendingProvider?: LendingProvider) {
-    super(fromAddress("0xCAFE"), undefined, undefined, defaultLendingProvider);
+    super({ address: fromAddress("0xCAFE"), defaultLendingProvider });
     this.executeSpy.mockResolvedValue({ hash: "0xtx" } as Tx);
     this.preflightSpy.mockResolvedValue({ ok: true as const });
   }

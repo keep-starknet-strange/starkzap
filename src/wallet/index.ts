@@ -122,7 +122,11 @@ export class Wallet extends BaseWallet {
   private sponsoredDeployLock: Promise<void> | null = null;
 
   private constructor(options: WalletInternals) {
-    super(options.address, options.stakingConfig, options.bridgingConfig);
+    super({
+      address: options.address,
+      stakingConfig: options.stakingConfig,
+      bridgingConfig: options.bridgingConfig,
+    });
     this.accountProvider = options.accountProvider;
     this.account = options.account;
     this.provider = options.provider;

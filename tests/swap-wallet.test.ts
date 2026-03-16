@@ -37,7 +37,7 @@ class TestWallet extends BaseWallet {
   readonly executeSpy = vi.fn<(...args: unknown[]) => Promise<Tx>>();
 
   constructor(defaultSwapProvider?: SwapProvider) {
-    super(fromAddress("0xCAFE"), undefined, defaultSwapProvider);
+    super({ address: fromAddress("0xCAFE"), defaultSwapProvider });
     this.executeSpy.mockResolvedValue({ hash: "0xtx" } as Tx);
   }
 

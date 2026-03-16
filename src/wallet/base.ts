@@ -59,7 +59,7 @@ const MAX_STAKING_CACHE_SIZE = 128;
  * ```ts
  * class CustomWallet extends BaseWallet {
  *   constructor(address: Address, private account: Account) {
- *     super(address, undefined);
+ *     super({ address });
  *   }
  *
  *   async isDeployed(): Promise<boolean> {
@@ -93,23 +93,20 @@ export abstract class BaseWallet implements WalletInterface {
 
   /**
    * Creates a new BaseWallet instance.
-   * @param address - The Starknet address of this wallet
-   * @param stakingConfig - Optional staking configuration for staking operations
-   * @param bridgingConfig - Optional bridging configuration (API keys for cross-chain protocols)
-   * @param defaultSwapProvider - Optional default swap provider used by `getQuote(request)` and `swap(request)`
+   * @param options - Wallet configuration options
    */
-  protected constructor(
-    address: Address,
-    stakingConfig: StakingConfig | undefined,
-    bridgingConfig?: BridgingConfig,
-    defaultSwapProvider?: SwapProvider,
-    defaultLendingProvider?: LendingProvider
-  ) {
-    this.address = address;
-    this.stakingConfig = stakingConfig;
-    this.bridging = new BridgeOperator(this, bridgingConfig);
+  protected constructor(options: {
+    address: Address;
+    stakingConfig?: StakingConfig | undefined;
+    bridgingConfig?: BridgingConfig | undefined;
+    defaultSwapProvider?: SwapProvider | undefined;
+    defaultLendingProvider?: LendingProvider | undefined;
+  }) {
+    this.address = options.address;
+    this.stakingConfig = options.stakingConfig;
+    this.bridging = new BridgeOperator(this, options.bridgingConfig);
     this.swapProviders = new Map();
-    const provider = defaultSwapProvider ?? new AvnuSwapProvider();
+    const provider = options.defaultSwapProvider ?? new AvnuSwapProvider();
     this.registerSwapProvider(provider, true);
     this.lendingClient = new LendingClient(
       {
@@ -119,7 +116,7 @@ export abstract class BaseWallet implements WalletInterface {
         execute: (calls, options) => this.execute(calls, options),
         preflight: (options) => this.preflight(options),
       },
-      defaultLendingProvider ?? new VesuLendingProvider()
+      options.defaultLendingProvider ?? new VesuLendingProvider()
     );
   }
 

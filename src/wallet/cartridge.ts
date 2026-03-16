@@ -147,7 +147,11 @@ export class CartridgeWallet extends BaseWallet {
     bridgingConfig: BridgingConfig | undefined,
     options: CartridgeWalletOptions = {}
   ) {
-    super(fromAddress(walletAccount.address), stakingConfig, bridgingConfig);
+    super({
+      address: fromAddress(walletAccount.address),
+      stakingConfig,
+      bridgingConfig,
+    });
     this.controller = controller;
     this.walletAccount = walletAccount;
     this.provider = provider;
