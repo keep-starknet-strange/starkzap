@@ -6,14 +6,53 @@ import type {
   TypedData,
 } from "starknet";
 
-export type CartridgePolicy = { target: string; method: string };
+export interface CartridgePolicyPredicate {
+  address: string;
+  entrypoint: string;
+}
+
+export interface CartridgePolicyMethod {
+  name?: string;
+  description?: string;
+  entrypoint: string;
+  isEnabled?: boolean;
+  isRequired?: boolean;
+  isPaymastered?: boolean | CartridgePolicyPredicate;
+  spender?: string;
+  amount?: string | number | bigint;
+  // Accept doc/config variants and normalize internally.
+  is_enabled?: boolean;
+  is_required?: boolean;
+  is_paymastered?: boolean;
+  predicate?: CartridgePolicyPredicate;
+}
+
+export interface CartridgeContractPolicy {
+  name?: string;
+  description?: string;
+  methods: CartridgePolicyMethod[];
+}
+
+export interface CartridgeSessionPolicies {
+  contracts?: Record<string, CartridgeContractPolicy>;
+  messages?: Array<Record<string, unknown>>;
+}
+
+export interface CartridgePolicy {
+  target: string;
+  method: string;
+  description?: string;
+}
+
+export type CartridgePolicies = CartridgePolicy[] | CartridgeSessionPolicies;
 
 export interface CartridgeNativeConnectArgs {
   rpcUrl: string;
   chainId: string;
-  /** Session policies (required, non-empty). At least one policy is required. */
-  policies: CartridgePolicy[];
+  /** Session policies. Required unless `preset` resolves policies for the active chain. */
+  policies?: CartridgePolicies;
   preset?: string;
+  shouldOverridePresetPolicies?: boolean;
   url?: string;
   redirectUrl?: string;
   forceNewSession?: boolean;
@@ -21,7 +60,7 @@ export interface CartridgeNativeConnectArgs {
 
 export interface CartridgeNativeAccountLike {
   address: string;
-  executePaymasterTransaction: (
+  execute: (
     calls: Call[],
     details?: {
       feeMode: { mode: "sponsored" };

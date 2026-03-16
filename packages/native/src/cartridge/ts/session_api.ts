@@ -4,7 +4,7 @@ import {
   SessionRejectedError,
   SessionTimeoutError,
 } from "@/cartridge/ts/errors";
-import type { CanonicalSessionPolicy } from "@/cartridge/ts/policy";
+import type { CartridgePolicies } from "@/cartridge/types";
 import { policiesToSessionUrlShape } from "@/cartridge/ts/policy";
 
 const DEFAULT_REDIRECT_QUERY_NAME = "startapp";
@@ -60,7 +60,7 @@ export interface SessionRegistration {
 export interface BuildSessionUrlOptions {
   baseUrl: string;
   publicKey: string;
-  policies: readonly CanonicalSessionPolicy[];
+  policies?: CartridgePolicies;
   rpcUrl: string;
   preset?: string;
   needsSessionCreation?: boolean;
@@ -392,12 +392,21 @@ export function buildCartridgeSessionUrl({
   const normalizedBaseUrl = baseUrl.replace(/\/+$/, "");
   const params = new URLSearchParams({
     public_key: publicKey,
-    policies: JSON.stringify(policiesToSessionUrlShape(policies)),
     rpc_url: rpcUrl,
   });
 
+  if (policies) {
+    params.set("policies", JSON.stringify(policiesToSessionUrlShape(policies)));
+  }
+
   if (preset) {
     params.set("preset", preset);
+  }
+
+  if (!policies && !preset) {
+    throw new SessionProtocolError(
+      "Cartridge session URL requires either policies or a preset."
+    );
   }
 
   if (needsSessionCreation) {

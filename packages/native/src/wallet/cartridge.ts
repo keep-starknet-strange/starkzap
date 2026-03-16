@@ -167,7 +167,7 @@ export class NativeCartridgeWallet extends BaseWallet {
       throw new Error(unsupportedUserPaysMessage());
     }
     const timeBounds = options.timeBounds ?? this.defaultTimeBounds;
-    const response = await this.session.account.executePaymasterTransaction(
+    const response = await this.session.account.execute(
       calls,
       sponsoredDetails(timeBounds)
     );

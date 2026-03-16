@@ -15,7 +15,7 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.zackwilldev.app"
+      "bundleIdentifier": "com.tictactoe.app"
     },
     "android": {
       "adaptiveIcon": {
@@ -24,7 +24,7 @@
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
-      "package": "com.zackwilldev.app"
+      "package": "com.tictactoe.app"
     },
     "web": {
       "bundler": "metro",

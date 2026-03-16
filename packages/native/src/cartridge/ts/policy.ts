@@ -1,5 +1,12 @@
 import { addAddressPadding } from "starknet";
-import type { CartridgePolicy } from "@/cartridge/types";
+import type {
+  CartridgeContractPolicy,
+  CartridgePolicies,
+  CartridgePolicy,
+  CartridgePolicyMethod,
+  CartridgePolicyPredicate,
+  CartridgeSessionPolicies,
+} from "@/cartridge/types";
 import { SessionProtocolError } from "@/cartridge/ts/errors";
 
 export interface CanonicalSessionPolicy {
@@ -7,7 +14,128 @@ export interface CanonicalSessionPolicy {
   entrypoint: string;
 }
 
-export function canonicalizeSessionPolicies(
+function asRecord(value: unknown): Record<string, unknown> | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return null;
+  }
+  return value as Record<string, unknown>;
+}
+
+function hasMessages(policies: CartridgeSessionPolicies): boolean {
+  return Array.isArray(policies.messages) && policies.messages.length > 0;
+}
+
+function normalizeContractAddress(rawAddress: string, context: string): string {
+  const trimmed = rawAddress.trim();
+  if (!trimmed) {
+    throw new SessionProtocolError(`${context} is missing a contract address.`);
+  }
+
+  try {
+    return addAddressPadding(trimmed.toLowerCase());
+  } catch (error) {
+    throw new SessionProtocolError(`${context} has an invalid address: ${rawAddress}`, error);
+  }
+}
+
+function normalizeOptionalString(value: unknown): string | undefined {
+  if (typeof value !== "string") {
+    return undefined;
+  }
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : undefined;
+}
+
+function normalizeOptionalBoolean(value: unknown): boolean | undefined {
+  return typeof value === "boolean" ? value : undefined;
+}
+
+function normalizePredicate(
+  value: unknown,
+  context: string
+): CartridgePolicyPredicate {
+  const record = asRecord(value);
+  const rawAddress = typeof record?.address === "string" ? record.address : "";
+  const rawEntrypoint =
+    typeof record?.entrypoint === "string" ? record.entrypoint.trim() : "";
+
+  if (!rawAddress || !rawEntrypoint) {
+    throw new SessionProtocolError(
+      `${context} predicate must include both address and entrypoint.`
+    );
+  }
+
+  return {
+    address: normalizeContractAddress(rawAddress, `${context} predicate`),
+    entrypoint: rawEntrypoint,
+  };
+}
+
+function normalizeMethodForUrl(
+  method: CartridgePolicyMethod,
+  context: string
+): CartridgePolicyMethod {
+  const entrypoint = normalizeOptionalString(method.entrypoint);
+  if (!entrypoint) {
+    throw new SessionProtocolError(`${context} is missing an entrypoint.`);
+  }
+
+  const normalized: CartridgePolicyMethod = { entrypoint };
+  const name = normalizeOptionalString(method.name);
+  if (name) {
+    normalized.name = name;
+  }
+  const description = normalizeOptionalString(method.description);
+  if (description) {
+    normalized.description = description;
+  }
+
+  const isEnabled = normalizeOptionalBoolean(
+    method.isEnabled ?? method.is_enabled
+  );
+  if (isEnabled !== undefined) {
+    normalized.isEnabled = isEnabled;
+  }
+
+  const isRequired = normalizeOptionalBoolean(
+    method.isRequired ?? method.is_required
+  );
+  if (isRequired !== undefined) {
+    normalized.isRequired = isRequired;
+  }
+
+  const rawIsPaymastered = method.isPaymastered ?? method.is_paymastered;
+  const rawPredicate =
+    method.predicate ??
+    (typeof rawIsPaymastered === "object" && rawIsPaymastered
+      ? rawIsPaymastered
+      : undefined);
+
+  if (typeof rawIsPaymastered === "boolean") {
+    normalized.isPaymastered = rawIsPaymastered;
+  }
+  if (rawPredicate !== undefined) {
+    if (rawIsPaymastered === false) {
+      throw new SessionProtocolError(
+        `${context} cannot define a predicate when isPaymastered is false.`
+      );
+    }
+    normalized.isPaymastered = normalizePredicate(rawPredicate, context);
+  }
+
+  const spender = normalizeOptionalString(method.spender);
+  if (spender) {
+    normalized.spender = normalizeContractAddress(spender, `${context} spender`);
+  }
+  if (method.amount !== undefined && method.amount !== null) {
+    normalized.amount =
+      typeof method.amount === "bigint" ? String(method.amount) : method.amount;
+  }
+
+  return normalized;
+}
+
+function canonicalPoliciesFromArray(
   policies: readonly CartridgePolicy[]
 ): CanonicalSessionPolicy[] {
   if (policies.length === 0) {
@@ -16,7 +144,7 @@ export function canonicalizeSessionPolicies(
     );
   }
 
-  const normalized = policies.map((policy, index) => {
+  return policies.map((policy, index) => {
     const rawTarget = String(policy.target ?? "").trim();
     const rawMethod = String(policy.method ?? "").trim();
 
@@ -31,21 +159,88 @@ export function canonicalizeSessionPolicies(
       );
     }
 
-    let contractAddress = rawTarget.toLowerCase();
-    try {
-      contractAddress = addAddressPadding(contractAddress);
-    } catch (error) {
-      throw new SessionProtocolError(
-        `Invalid policy target address at index ${index}: ${rawTarget}`,
-        error
-      );
-    }
-
     return {
-      contractAddress,
+      contractAddress: normalizeContractAddress(
+        rawTarget,
+        `Policy at index ${index}`
+      ),
       entrypoint: rawMethod,
     };
   });
+}
+
+function canonicalPoliciesFromSessionPolicies(
+  policies: CartridgeSessionPolicies
+): CanonicalSessionPolicy[] {
+  if (hasMessages(policies)) {
+    throw new SessionProtocolError(
+      "Typed-data message policies are not yet supported by the Cartridge TS adapter."
+    );
+  }
+
+  const contracts = policies.contracts ?? {};
+  const canonical: CanonicalSessionPolicy[] = [];
+
+  for (const [rawAddress, contract] of Object.entries(contracts)) {
+    const contractAddress = normalizeContractAddress(
+      rawAddress,
+      "Session policy contract"
+    );
+    const methods = Array.isArray(contract.methods) ? contract.methods : [];
+
+    methods.forEach((method, index) => {
+      const normalizedMethod = normalizeMethodForUrl(
+        method,
+        `Policy ${contractAddress}#${index}`
+      );
+
+      if (
+        normalizedMethod.entrypoint === "approve" &&
+        (normalizedMethod.spender !== undefined ||
+          normalizedMethod.amount !== undefined)
+      ) {
+        throw new SessionProtocolError(
+          "Approval policies with spender/amount are not yet supported by the Cartridge TS adapter merkle implementation."
+        );
+      }
+
+      canonical.push({
+        contractAddress,
+        entrypoint: normalizedMethod.entrypoint,
+      });
+    });
+  }
+
+  if (canonical.length === 0) {
+    throw new SessionProtocolError(
+      "Session policies cannot be empty for Cartridge TS adapter."
+    );
+  }
+
+  return canonical;
+}
+
+export function hasPoliciesInput(
+  policies: CartridgePolicies | undefined
+): boolean {
+  if (!policies) {
+    return false;
+  }
+  if (Array.isArray(policies)) {
+    return policies.length > 0;
+  }
+  return Boolean(
+    (policies.contracts && Object.keys(policies.contracts).length > 0) ||
+      (policies.messages && policies.messages.length > 0)
+  );
+}
+
+export function canonicalizeSessionPolicies(
+  policies: CartridgePolicies
+): CanonicalSessionPolicy[] {
+  const normalized = Array.isArray(policies)
+    ? canonicalPoliciesFromArray(policies)
+    : canonicalPoliciesFromSessionPolicies(policies);
 
   return normalized.sort((a, b) => {
     const addressSort = a.contractAddress.localeCompare(b.contractAddress);
@@ -57,10 +252,73 @@ export function canonicalizeSessionPolicies(
 }
 
 export function policiesToSessionUrlShape(
-  policies: readonly CanonicalSessionPolicy[]
-): Array<{ target: string; method: string }> {
-  return policies.map((policy) => ({
-    target: policy.contractAddress,
-    method: policy.entrypoint,
-  }));
+  policies: CartridgePolicies
+): CartridgePolicies {
+  if (Array.isArray(policies)) {
+    return policies.map((policy, index) => {
+      const target = normalizeContractAddress(
+        String(policy.target ?? ""),
+        `Policy at index ${index}`
+      );
+      const method = String(policy.method ?? "").trim();
+      if (!method) {
+        throw new SessionProtocolError(
+          `Policy at index ${index} is missing an entrypoint method.`
+        );
+      }
+
+      const normalizedPolicy: CartridgePolicy = {
+        target,
+        method,
+      };
+      const description = normalizeOptionalString(policy.description);
+      if (description) {
+        normalizedPolicy.description = description;
+      }
+
+      return normalizedPolicy;
+    });
+  }
+
+  if (hasMessages(policies)) {
+    throw new SessionProtocolError(
+      "Typed-data message policies are not yet supported by the Cartridge TS adapter."
+    );
+  }
+
+  const normalizedContracts = Object.fromEntries(
+    Object.entries(policies.contracts ?? {}).map(([rawAddress, contract]) => {
+      const contractAddress = normalizeContractAddress(
+        rawAddress,
+        "Session policy contract"
+      );
+
+      return [
+        contractAddress,
+        (() => {
+          const normalizedContract: CartridgeContractPolicy = {
+            methods: (contract.methods ?? []).map((method, index) =>
+              normalizeMethodForUrl(
+                method,
+                `Policy ${contractAddress}#${index}`
+              )
+            ),
+          };
+          const name = normalizeOptionalString(contract.name);
+          if (name) {
+            normalizedContract.name = name;
+          }
+          const description = normalizeOptionalString(contract.description);
+          if (description) {
+            normalizedContract.description = description;
+          }
+          return normalizedContract;
+        })(),
+      ];
+    })
+  );
+
+  return {
+    contracts: normalizedContracts,
+  };
 }

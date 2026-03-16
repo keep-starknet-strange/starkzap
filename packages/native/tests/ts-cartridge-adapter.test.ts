@@ -99,6 +99,53 @@ describe("cartridge ts adapter", () => {
     expect(body.params?.signature?.[0]).toBe("0x73657373696f6e2d746f6b656e");
   });
 
+  it("recovers a transaction hash from JSON-RPC error data when Cartridge includes one", async () => {
+    const fetchImpl = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      statusText: "OK",
+      json: async () => ({
+        error: {
+          message: "Transaction execution error",
+          data: {
+            transaction_hash: "0xdeadbeef",
+          },
+        },
+      }),
+    });
+    const logger = {
+      info: vi.fn(),
+      warn: vi.fn(),
+      error: vi.fn(),
+    };
+    const adapter = createCartridgeTsAdapter({
+      openSession: async () => ({
+        status: "success",
+        encodedSession: ENCODED_SESSION,
+      }),
+      fetchImpl,
+      logger,
+    });
+
+    const handle = await adapter.connect({
+      rpcUrl: "https://api.cartridge.gg/x/starknet/sepolia",
+      chainId: "0x534e5f5345504f4c4941",
+      policies: [{ target: "0x1", method: "create_game" }],
+    });
+
+    const tx = await handle.account.executePaymasterTransaction([
+      {
+        contractAddress:
+          "0x0000000000000000000000000000000000000000000000000000000000000001",
+        entrypoint: "create_game",
+        calldata: [],
+      },
+    ] as Call[]);
+
+    expect(tx.transaction_hash).toBe("0xdeadbeef");
+    expect(logger.warn).toHaveBeenCalledTimes(1);
+  });
+
   it("throws when policies are missing or empty", async () => {
     const adapter = createCartridgeTsAdapter({
       openSession: async () => ({

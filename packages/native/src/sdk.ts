@@ -13,7 +13,23 @@ import type {
 } from "@/types/onboard";
 import { getCartridgeNativeAdapterOrThrow } from "@/cartridge/registry";
 import { NativeCartridgeWallet } from "@/wallet/cartridge";
-import type { CartridgeNativeConnectArgs } from "@/cartridge/types";
+import type {
+  CartridgeNativeConnectArgs,
+  CartridgePolicies,
+} from "@/cartridge/types";
+
+function hasProvidedPolicies(policies: CartridgePolicies | undefined): boolean {
+  if (!policies) {
+    return false;
+  }
+  if (Array.isArray(policies)) {
+    return policies.length > 0;
+  }
+  return Boolean(
+    (policies.contracts && Object.keys(policies.contracts).length > 0) ||
+      (policies.messages && policies.messages.length > 0)
+  );
+}
 
 export class StarkZap extends CoreStarkZap {
   constructor(config: SDKConfig) {
@@ -35,9 +51,9 @@ export class StarkZap extends CoreStarkZap {
     const adapter = getCartridgeNativeAdapterOrThrow();
 
     const policies = options.policies;
-    if (!policies || policies.length === 0) {
+    if (!hasProvidedPolicies(policies) && !options.preset) {
       throw new Error(
-        "policies are required and cannot be empty for Cartridge session connection. Provide at least one policy, e.g. [{ target: '0x...', method: 'create_game' }]."
+        "Cartridge session connection requires either non-empty policies or a preset that resolves policies for the active chain."
       );
     }
 
@@ -49,8 +65,11 @@ export class StarkZap extends CoreStarkZap {
     const args: CartridgeNativeConnectArgs = {
       rpcUrl,
       chainId: chainId.toFelt252(),
-      policies,
+      ...(policies ? { policies } : {}),
       ...(options.preset && { preset: options.preset }),
+      ...(options.shouldOverridePresetPolicies !== undefined && {
+        shouldOverridePresetPolicies: options.shouldOverridePresetPolicies,
+      }),
       ...(options.url && { url: options.url }),
       ...(options.redirectUrl && { redirectUrl: options.redirectUrl }),
       ...(options.forceNewSession !== undefined && {
