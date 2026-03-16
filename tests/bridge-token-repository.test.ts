@@ -46,8 +46,8 @@ function mockApiResponse() {
       decimals: 9,
       l2_token_address:
         "0x0437d8f4f4e3eb7022f4b96f4f58f949bc2ad2f0b6f7eb02d4f9a5f8f4d3f001",
-      l1_token_address: "0x4444444444444444444444444444444444444444",
-      l1_bridge_address: "0x5555555555555555555555555555555555555555",
+      l1_token_address: "tESy5CjdMHg24ZQcMqH51wNC61F2pSa4zzLmZnpep5d",
+      l1_bridge_address: "9kenaf2JDRGSHRdLn4YjK2apJfu3yHGkowtF2CevzE7t",
       l2_bridge_address:
         "0x06a8f05b3860ab846b6e8bfc3160b7bb3a0bae41fd3fcfab65a896f0570e3e32",
     },
