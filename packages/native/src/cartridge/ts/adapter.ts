@@ -366,7 +366,7 @@ export function createCartridgeTsAdapter(
           options.redirectQueryName ?? DEFAULT_REDIRECT_QUERY_NAME,
       });
       options.logger?.info?.(
-        `[starkzap] cartridge-ts session request url=${sessionUrl}`
+        "[starkzap] cartridge-ts session request URL generated"
       );
 
       const session = await resolveSessionRegistration(
@@ -376,7 +376,7 @@ export function createCartridgeTsAdapter(
         options
       );
       options.logger?.info?.(
-        `[starkzap] cartridge-ts session resolved address=${session.address} rpc=${args.rpcUrl}`
+        `[starkzap] cartridge-ts session resolved address=${session.address}`
       );
 
       const tsSessionAccount = new TsSessionAccount({
