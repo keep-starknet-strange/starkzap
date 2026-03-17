@@ -12,24 +12,9 @@ import type {
   NativeOnboardCartridgeConfig,
 } from "@/types/onboard";
 import { getCartridgeNativeAdapterOrThrow } from "@/cartridge/registry";
+import { hasPoliciesInput } from "@/cartridge/ts/policy";
 import { NativeCartridgeWallet } from "@/wallet/cartridge";
-import type {
-  CartridgeNativeConnectArgs,
-  CartridgePolicies,
-} from "@/cartridge/types";
-
-function hasProvidedPolicies(policies: CartridgePolicies | undefined): boolean {
-  if (!policies) {
-    return false;
-  }
-  if (Array.isArray(policies)) {
-    return policies.length > 0;
-  }
-  return Boolean(
-    (policies.contracts && Object.keys(policies.contracts).length > 0) ||
-    (policies.messages && policies.messages.length > 0)
-  );
-}
+import type { CartridgeNativeConnectArgs } from "@/cartridge/types";
 
 export class StarkZap extends CoreStarkZap {
   constructor(config: SDKConfig) {
@@ -51,7 +36,7 @@ export class StarkZap extends CoreStarkZap {
     const adapter = getCartridgeNativeAdapterOrThrow();
 
     const policies = options.policies;
-    if (!hasProvidedPolicies(policies) && !options.preset) {
+    if (!hasPoliciesInput(policies) && !options.preset) {
       throw new Error(
         "Cartridge session connection requires either non-empty policies or a preset that resolves policies for the active chain."
       );
