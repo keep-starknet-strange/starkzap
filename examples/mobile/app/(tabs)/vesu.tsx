@@ -324,8 +324,6 @@ function MetricsGrid(props: { card: VesuMarketCard }) {
 function PositionHealthCard(props: {
   currentStatus: string;
   health: LendingHealth | null;
-  projectedHealth: LendingHealth | null;
-  projectedStatus: string;
   collateralAmount: string;
   debtAmount: string;
   isRefreshing: boolean;
@@ -335,7 +333,6 @@ function PositionHealthCard(props: {
   const borderColor = useThemeColor({}, "border");
   const primaryColor = useThemeColor({}, "primary");
   const textSecondary = useThemeColor({}, "textSecondary");
-  const backgroundColor = useThemeColor({}, "background");
 
   return (
     <>
@@ -402,24 +399,6 @@ function PositionHealthCard(props: {
           </ThemedText>
         </View>
       </View>
-
-      {props.projectedHealth && (
-        <View style={[styles.projectedCard, { backgroundColor, borderColor }]}>
-          <ThemedText style={styles.cardTitle}>
-            Projected After Preview
-          </ThemedText>
-          <ThemedText style={[styles.smallText, { color: textSecondary }]}>
-            {props.projectedStatus} · {formatVesuLtv(props.projectedHealth)}
-          </ThemedText>
-          <ThemedText style={[styles.smallText, { color: textSecondary }]}>
-            Collateral{" "}
-            {formatVesuUsdValue(props.projectedHealth.collateralValue)}
-          </ThemedText>
-          <ThemedText style={[styles.smallText, { color: textSecondary }]}>
-            Debt {formatVesuUsdValue(props.projectedHealth.debtValue)}
-          </ThemedText>
-        </View>
-      )}
     </>
   );
 }
@@ -522,13 +501,9 @@ export default function VesuScreen() {
   // Position state
   const [position, setPosition] = useState<LendingPosition | null>(null);
   const [health, setHealth] = useState<LendingHealth | null>(null);
-  const [projectedHealth, setProjectedHealth] = useState<LendingHealth | null>(
-    null
-  );
   const [maxBorrowAmount, setMaxBorrowAmount] = useState<bigint | null>(null);
   const [isRefreshingPosition, setIsRefreshingPosition] = useState(false);
   const [positionError, setPositionError] = useState<string | null>(null);
-  const [quoteError, setQuoteError] = useState<string | null>(null);
 
   // Form state — consolidated for borrow/repay
   const [vaultAction, setVaultAction] = useState<VaultAction>("deposit");
@@ -539,7 +514,6 @@ export default function VesuScreen() {
   const [collateralAmount, setCollateralAmount] = useState("");
   const [useExistingSupply, setUseExistingSupply] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isQuoting, setIsQuoting] = useState(false);
   const [isMarketSheetOpen, setIsMarketSheetOpen] = useState(false);
   const [marketSheetTab, setMarketSheetTab] =
     useState<MarketSheetTab>("supply");
@@ -569,16 +543,12 @@ export default function VesuScreen() {
     setVaultAmount("");
     setDebtAmount("");
     setCollateralAmount("");
-    setProjectedHealth(null);
-    setQuoteError(null);
   }, []);
 
   // Reset form amounts when switching borrow/repay
   useEffect(() => {
     setDebtAmount("");
     setCollateralAmount("");
-    setProjectedHealth(null);
-    setQuoteError(null);
   }, [positionAction]);
 
   const handleOpenMarket = useCallback(
@@ -720,7 +690,6 @@ export default function VesuScreen() {
 
   // Position display values
   const currentStatus = getVesuHealthStatus(health, position);
-  const projectedStatus = getVesuHealthStatus(projectedHealth, position);
   const currentCollateralAmount = amountFromBase(
     position?.collateralAmount,
     selectedCollateralToken
@@ -896,8 +865,7 @@ export default function VesuScreen() {
 
   const handleRefresh = useCallback(async () => {
     if (!wallet) return;
-    setProjectedHealth(null);
-    setQuoteError(null);
+
     await Promise.all([
       fetchBalances(wallet, chainId),
       loadMarkets(),
@@ -929,10 +897,7 @@ export default function VesuScreen() {
   useEffect(() => {
     handleCloseMarket();
   }, [chainId, handleCloseMarket]);
-  useEffect(() => {
-    setProjectedHealth(null);
-    setQuoteError(null);
-  }, [
+  useEffect(() => {}, [
     marketSheetTab,
     positionAction,
     selectedCollateralToken?.address,
@@ -948,96 +913,6 @@ export default function VesuScreen() {
   // -----------------------------------------------------------------------
   // Actions
   // -----------------------------------------------------------------------
-
-  const handlePreview = useCallback(async () => {
-    if (
-      !wallet ||
-      !selectedDebtAsset ||
-      !selectedCollateralToken ||
-      !isVesuSupported
-    )
-      return;
-
-    const commonRequest = {
-      provider: VESU_PROVIDER_ID,
-      ...(selectedVaultAsset?.poolAddress
-        ? { poolAddress: selectedVaultAsset.poolAddress }
-        : {}),
-      collateralToken: selectedCollateralToken,
-      debtToken: selectedDebtAsset.token,
-    };
-
-    const parsedDebt = parseAmountInput(debtAmount, selectedDebtAsset.token);
-    const parsedCollateral = parseAmountInput(
-      collateralAmount,
-      selectedCollateralToken
-    );
-    if (!parsedDebt) {
-      setQuoteError("Enter a valid debt amount first");
-      return;
-    }
-
-    setIsQuoting(true);
-    setQuoteError(null);
-    try {
-      const quote = await wallet.lending().quoteHealth({
-        action:
-          positionAction === "borrow"
-            ? {
-                action: "borrow",
-                request: {
-                  ...commonRequest,
-                  amount: parsedDebt,
-                  ...(parsedCollateral
-                    ? { collateralAmount: parsedCollateral }
-                    : {}),
-                },
-              }
-            : {
-                action: "repay",
-                request: {
-                  ...commonRequest,
-                  amount: parsedDebt,
-                  ...(parsedCollateral
-                    ? {
-                        collateralAmount: parsedCollateral,
-                        withdrawCollateral: true,
-                      }
-                    : {}),
-                },
-              },
-        health: commonRequest,
-        feeMode: getExecuteOptions(useSponsored, canUseSponsored).feeMode,
-      });
-
-      setHealth(quote.current);
-      setProjectedHealth(quote.projected ?? null);
-      if (!quote.simulation.ok) {
-        setQuoteError(quote.simulation.reason);
-      } else {
-        addLog(`Vesu ${positionAction} preview succeeded`);
-      }
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      setQuoteError(message);
-      setProjectedHealth(null);
-      addLog(`Vesu preview failed: ${message}`);
-    } finally {
-      setIsQuoting(false);
-    }
-  }, [
-    addLog,
-    canUseSponsored,
-    collateralAmount,
-    debtAmount,
-    isVesuSupported,
-    positionAction,
-    selectedCollateralToken,
-    selectedDebtAsset,
-    selectedVaultAsset,
-    useSponsored,
-    wallet,
-  ]);
 
   const handleVaultSubmit = useCallback(async () => {
     if (!wallet || !selectedVaultAsset) return;
@@ -1236,7 +1111,7 @@ export default function VesuScreen() {
       });
       setDebtAmount("");
       setCollateralAmount("");
-      setProjectedHealth(null);
+
       await Promise.all([
         fetchBalances(wallet, chainId),
         loadMarkets(),
@@ -1287,16 +1162,6 @@ export default function VesuScreen() {
     !!vaultAmount.trim() &&
     !vaultAmountError &&
     !isSubmitting;
-  const canPreviewPosition =
-    !!selectedDebtAsset &&
-    !!selectedCollateralToken &&
-    !isSubmitting &&
-    !isQuoting &&
-    !isRefreshingPosition &&
-    !!debtAmount.trim() &&
-    !debtAmountError &&
-    !collateralAmountError &&
-    (!borrowRequiresCollateralInput || !!collateralAmount.trim());
   const canSubmitPosition =
     !!selectedDebtAsset &&
     !!selectedCollateralToken &&
@@ -1777,8 +1642,6 @@ export default function VesuScreen() {
                       <PositionHealthCard
                         currentStatus={currentStatus}
                         health={health}
-                        projectedHealth={projectedHealth}
-                        projectedStatus={projectedStatus}
                         collateralAmount={currentCollateralAmount}
                         debtAmount={currentDebtAmount}
                         isRefreshing={isRefreshingPosition}
@@ -1978,18 +1841,6 @@ export default function VesuScreen() {
                         />
                       )}
 
-                      {quoteError && (
-                        <ThemedText style={styles.errorText}>
-                          {quoteError}
-                        </ThemedText>
-                      )}
-
-                      <SecondaryButton
-                        label="Preview Health"
-                        enabled={canPreviewPosition}
-                        loading={isQuoting}
-                        onPress={() => void handlePreview()}
-                      />
                       <SubmitButton
                         label={borrowSubmitLabel}
                         enabled={canSubmitPosition}
@@ -2180,7 +2031,6 @@ const styles = StyleSheet.create({
   metricCard: { flex: 1, gap: 4 },
   metricLabel: { fontSize: 11, textTransform: "uppercase", letterSpacing: 0.4 },
   metricValueBold: { fontSize: 16, fontWeight: "700" },
-  projectedCard: { borderWidth: 1, borderRadius: 12, padding: 12, gap: 4 },
   amountLabelRow: {
     flexDirection: "row",
     justifyContent: "space-between",
