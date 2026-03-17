@@ -273,14 +273,56 @@ export class VesuLendingProvider implements LendingProvider {
       request,
       "borrow"
     );
-    const collateralAmount = request.collateralAmount?.toBase() ?? 0n;
-    const collateralDenomination = request.collateralDenomination ?? "assets";
     const debtAmount = request.amount.toBase();
     const debtDenomination = request.debtDenomination ?? "assets";
     const calls: Call[] = [];
 
-    assertAssetsDenomination("borrow", "collateral", collateralDenomination);
     assertAssetsDenomination("borrow", "debt", debtDenomination);
+
+    // Determine collateral: explicit amount, or withdraw from earn position
+    let collateralAmount = request.collateralAmount?.toBase() ?? 0n;
+    const collateralDenomination = request.collateralDenomination ?? "assets";
+    assertAssetsDenomination("borrow", "collateral", collateralDenomination);
+
+    if (request.useEarnPosition) {
+      const earnBalance = await this.readEarnBalance(
+        context,
+        poolAddress,
+        request.collateralToken,
+        user
+      );
+      if (earnBalance > 0n) {
+        const vTokenAddress = await this.resolveVTokenAddress(
+          context,
+          poolAddress,
+          request.collateralToken.address
+        );
+
+        // Get vToken shares to redeem all
+        const balanceResult = await context.provider.callContract({
+          contractAddress: vTokenAddress,
+          entrypoint: "balance_of",
+          calldata: CallData.compile([user]),
+        });
+        const shares = parseU256(balanceResult, 0, "vtoken_balance");
+
+        if (shares > 0n) {
+          // Redeem all vToken shares → underlying tokens go to user wallet
+          calls.push({
+            contractAddress: vTokenAddress,
+            entrypoint: "redeem",
+            calldata: CallData.compile([
+              uint256.bnToUint256(shares),
+              user,
+              user,
+            ]),
+          });
+
+          // Use the full earn balance as collateral
+          collateralAmount = collateralAmount + earnBalance;
+        }
+      }
+    }
 
     if (collateralAmount > 0n && collateralDenomination === "assets") {
       calls.push(

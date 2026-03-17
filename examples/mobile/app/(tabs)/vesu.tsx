@@ -537,6 +537,7 @@ export default function VesuScreen() {
   const [vaultAmount, setVaultAmount] = useState("");
   const [debtAmount, setDebtAmount] = useState("");
   const [collateralAmount, setCollateralAmount] = useState("");
+  const [useExistingSupply, setUseExistingSupply] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isQuoting, setIsQuoting] = useState(false);
   const [isMarketSheetOpen, setIsMarketSheetOpen] = useState(false);
@@ -1193,6 +1194,9 @@ export default function VesuScreen() {
                 ...(parsedCollateral
                   ? { collateralAmount: parsedCollateral }
                   : {}),
+                ...(useExistingSupply && depositedBalance != null
+                  ? { useEarnPosition: true }
+                  : {}),
               },
               options
             )
@@ -1841,6 +1845,82 @@ export default function VesuScreen() {
                         onSelect={setPositionAction}
                       />
 
+                      {positionAction === "borrow" &&
+                        depositedBalance != null && (
+                          <View
+                            style={[
+                              styles.toggleRow,
+                              { backgroundColor: `${primaryColor}10` },
+                            ]}
+                          >
+                            <View style={styles.toggleLabel}>
+                              <Ionicons
+                                name="layers-outline"
+                                size={18}
+                                color={primaryColor}
+                              />
+                              <ThemedText
+                                style={[
+                                  styles.toggleLabelText,
+                                  { color: primaryColor },
+                                ]}
+                              >
+                                Use existing supply
+                              </ThemedText>
+                            </View>
+                            <View style={styles.toggleButtons}>
+                              <TouchableOpacity
+                                style={[
+                                  styles.toggleButton,
+                                  {
+                                    borderColor,
+                                    backgroundColor: useExistingSupply
+                                      ? primaryColor
+                                      : "transparent",
+                                  },
+                                ]}
+                                onPress={() => setUseExistingSupply(true)}
+                              >
+                                <ThemedText
+                                  style={{
+                                    fontSize: 12,
+                                    fontWeight: "600",
+                                    color: useExistingSupply
+                                      ? "#fff"
+                                      : textSecondary,
+                                  }}
+                                >
+                                  YES
+                                </ThemedText>
+                              </TouchableOpacity>
+                              <TouchableOpacity
+                                style={[
+                                  styles.toggleButton,
+                                  {
+                                    borderColor,
+                                    backgroundColor: !useExistingSupply
+                                      ? primaryColor
+                                      : "transparent",
+                                  },
+                                ]}
+                                onPress={() => setUseExistingSupply(false)}
+                              >
+                                <ThemedText
+                                  style={{
+                                    fontSize: 12,
+                                    fontWeight: "600",
+                                    color: !useExistingSupply
+                                      ? "#fff"
+                                      : textSecondary,
+                                  }}
+                                >
+                                  NO
+                                </ThemedText>
+                              </TouchableOpacity>
+                            </View>
+                          </View>
+                        )}
+
                       <AmountField
                         label={
                           positionAction === "borrow"
@@ -1865,32 +1945,38 @@ export default function VesuScreen() {
                         }
                       />
 
-                      <AmountField
-                        label={
-                          positionAction === "borrow"
-                            ? "Additional Collateral (optional)"
-                            : "Collateral to Withdraw"
-                        }
-                        hint={
-                          positionAction === "borrow"
-                            ? `Wallet ${vaultBalance?.toFormatted(true) ?? EMPTY_STATE_LABEL}${depositedBalance ? ` · Deposited ${depositedBalance.toFormatted(true)}` : ""}`
-                            : `Position ${amountFromBase(position?.collateralAmount, selectedCollateralToken)}`
-                        }
-                        value={collateralAmount}
-                        error={collateralAmountError}
-                        onChangeText={setCollateralAmount}
-                        maxValue={
-                          positionAction === "borrow"
-                            ? vaultBalance?.toUnit()
-                            : selectedCollateralToken &&
-                                position?.collateralAmount != null
-                              ? Amount.fromRaw(
-                                  position.collateralAmount,
-                                  selectedCollateralToken
-                                ).toUnit()
-                              : undefined
-                        }
-                      />
+                      {!(
+                        positionAction === "borrow" &&
+                        useExistingSupply &&
+                        depositedBalance != null
+                      ) && (
+                        <AmountField
+                          label={
+                            positionAction === "borrow"
+                              ? "Additional Collateral (optional)"
+                              : "Collateral to Withdraw"
+                          }
+                          hint={
+                            positionAction === "borrow"
+                              ? `Wallet ${vaultBalance?.toFormatted(true) ?? EMPTY_STATE_LABEL}${depositedBalance ? ` · Deposited ${depositedBalance.toFormatted(true)}` : ""}`
+                              : `Position ${amountFromBase(position?.collateralAmount, selectedCollateralToken)}`
+                          }
+                          value={collateralAmount}
+                          error={collateralAmountError}
+                          onChangeText={setCollateralAmount}
+                          maxValue={
+                            positionAction === "borrow"
+                              ? vaultBalance?.toUnit()
+                              : selectedCollateralToken &&
+                                  position?.collateralAmount != null
+                                ? Amount.fromRaw(
+                                    position.collateralAmount,
+                                    selectedCollateralToken
+                                  ).toUnit()
+                                : undefined
+                          }
+                        />
+                      )}
 
                       {quoteError && (
                         <ThemedText style={styles.errorText}>
@@ -2236,5 +2322,31 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: "700",
     color: "#15803d",
+  },
+  toggleRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    borderRadius: 12,
+    padding: 12,
+  },
+  toggleLabel: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  toggleLabelText: {
+    fontSize: 13,
+    fontWeight: "700",
+  },
+  toggleButtons: {
+    flexDirection: "row",
+    gap: 4,
+  },
+  toggleButton: {
+    borderRadius: 8,
+    borderWidth: 1,
+    paddingHorizontal: 14,
+    paddingVertical: 6,
   },
 });
