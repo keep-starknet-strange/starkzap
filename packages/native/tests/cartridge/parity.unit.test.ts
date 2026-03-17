@@ -77,6 +77,38 @@ describe("cartridge ts parity fixtures", () => {
     ).toThrow("missing an entrypoint method");
   });
 
+  it("PAR-006 canonical policy ordering matches controller.c for mixed-case entrypoints", () => {
+    const canonical = canonicalizeSessionPolicies([
+      { target: "0x1", method: "approve" },
+      { target: "0x01", method: "Approve" },
+      { target: "0x001", method: "0xabc" },
+      { target: "0x0001", method: "0xABC" },
+    ]);
+
+    expect(canonical).toEqual([
+      {
+        contractAddress:
+          "0x0000000000000000000000000000000000000000000000000000000000000001",
+        entrypoint: "0xABC",
+      },
+      {
+        contractAddress:
+          "0x0000000000000000000000000000000000000000000000000000000000000001",
+        entrypoint: "0xabc",
+      },
+      {
+        contractAddress:
+          "0x0000000000000000000000000000000000000000000000000000000000000001",
+        entrypoint: "Approve",
+      },
+      {
+        contractAddress:
+          "0x0000000000000000000000000000000000000000000000000000000000000001",
+        entrypoint: "approve",
+      },
+    ]);
+  });
+
   it("PAR-101 session URL includes required query payload", () => {
     const canonical = canonicalizeSessionPolicies([
       { target: "0xabc", method: "play_move" },

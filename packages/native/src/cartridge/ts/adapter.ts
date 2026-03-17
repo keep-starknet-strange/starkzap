@@ -270,6 +270,9 @@ async function resolveSessionRegistration(
         defaultSessionKeyGuid: sessionKeyGuid,
       });
     } catch (error) {
+      if (error instanceof SessionRejectedError) {
+        throw error;
+      }
       if (error instanceof SessionProtocolError) {
         options.logger?.warn?.(
           `[starkzap] cartridge-ts ${source} payload parse failed (${error.message}); falling back to subscription polling`

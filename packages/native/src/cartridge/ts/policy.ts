@@ -14,6 +14,79 @@ export interface CanonicalSessionPolicy {
   entrypoint: string;
 }
 
+function asciiLowerCodeAt(value: string, index: number): number {
+  const code = value.charCodeAt(index);
+  if (code >= 65 && code <= 90) {
+    return code + 32;
+  }
+  return code;
+}
+
+function compareAsciiCaseInsensitive(a: string, b: string): number {
+  const limit = Math.min(a.length, b.length);
+  for (let index = 0; index < limit; index += 1) {
+    const left = asciiLowerCodeAt(a, index);
+    const right = asciiLowerCodeAt(b, index);
+    if (left < right) {
+      return -1;
+    }
+    if (left > right) {
+      return 1;
+    }
+  }
+
+  if (a.length < b.length) {
+    return -1;
+  }
+  if (a.length > b.length) {
+    return 1;
+  }
+  return 0;
+}
+
+function compareLexically(a: string, b: string): number {
+  const limit = Math.min(a.length, b.length);
+  for (let index = 0; index < limit; index += 1) {
+    const left = a.charCodeAt(index);
+    const right = b.charCodeAt(index);
+    if (left < right) {
+      return -1;
+    }
+    if (left > right) {
+      return 1;
+    }
+  }
+
+  if (a.length < b.length) {
+    return -1;
+  }
+  if (a.length > b.length) {
+    return 1;
+  }
+  return 0;
+}
+
+function compareControllerCanonicalPolicy(
+  a: CanonicalSessionPolicy,
+  b: CanonicalSessionPolicy
+): number {
+  // Mirror controller.c: address cmp, then ASCII-case-insensitive entrypoint cmp, then exact cmp.
+  const addressSort = compareLexically(a.contractAddress, b.contractAddress);
+  if (addressSort !== 0) {
+    return addressSort;
+  }
+
+  const entrypointSort = compareAsciiCaseInsensitive(
+    a.entrypoint,
+    b.entrypoint
+  );
+  if (entrypointSort !== 0) {
+    return entrypointSort;
+  }
+
+  return compareLexically(a.entrypoint, b.entrypoint);
+}
+
 function asRecord(value: unknown): Record<string, unknown> | null {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
     return null;
@@ -248,13 +321,7 @@ export function canonicalizeSessionPolicies(
     ? canonicalPoliciesFromArray(policies)
     : canonicalPoliciesFromSessionPolicies(policies);
 
-  return normalized.sort((a, b) => {
-    const addressSort = a.contractAddress.localeCompare(b.contractAddress);
-    if (addressSort !== 0) {
-      return addressSort;
-    }
-    return a.entrypoint.localeCompare(b.entrypoint);
-  });
+  return normalized.sort(compareControllerCanonicalPolicy);
 }
 
 export function policiesToSessionUrlShape(
