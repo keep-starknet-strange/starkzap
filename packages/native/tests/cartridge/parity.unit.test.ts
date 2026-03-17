@@ -5,12 +5,13 @@ import { describe, expect, it } from "vitest";
 import { deriveSessionSignerGuid } from "@/cartridge/ts/guid";
 import { canonicalizeSessionPolicies } from "@/cartridge/ts/policy";
 import { computePolicyMerkle } from "@/cartridge/ts/merkle";
+import { SessionProtocolError } from "@/cartridge/ts/errors";
 import {
   buildCartridgeSessionUrl,
   extractEncodedSessionFromUrl,
   parseSessionFromEncodedRedirect,
 } from "@/cartridge/ts/session_api";
-import type { CartridgePolicy } from "@/cartridge/types";
+import type { CartridgePolicies, CartridgePolicy } from "@/cartridge/types";
 
 type FixtureFile = {
   guidVectors: Array<{
@@ -153,6 +154,33 @@ describe("cartridge ts parity fixtures", () => {
     const parsed = new URL(url);
     expect(parsed.searchParams.get("preset")).toBe("tic-tac-toe");
     expect(parsed.searchParams.get("needs_session_creation")).toBe("true");
+  });
+
+  it("PAR-101c malformed contract methods payloads fail with a protocol error", () => {
+    const malformedPolicies = {
+      contracts: {
+        "0xabc": {
+          methods: "create_game",
+        },
+      },
+    } as unknown as CartridgePolicies;
+
+    expect(() =>
+      buildCartridgeSessionUrl({
+        baseUrl: "https://x.cartridge.gg",
+        publicKey: "0x1234",
+        policies: malformedPolicies,
+        rpcUrl: "https://api.cartridge.gg/x/starknet/sepolia",
+      })
+    ).toThrow(SessionProtocolError);
+    expect(() =>
+      buildCartridgeSessionUrl({
+        baseUrl: "https://x.cartridge.gg",
+        publicKey: "0x1234",
+        policies: malformedPolicies,
+        rpcUrl: "https://api.cartridge.gg/x/starknet/sepolia",
+      })
+    ).toThrow("Policy contract.methods must be an array.");
   });
 
   it("PAR-102 redirect payload parsing matches fixture vectors", () => {
