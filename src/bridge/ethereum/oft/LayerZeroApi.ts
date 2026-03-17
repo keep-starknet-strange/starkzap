@@ -60,10 +60,22 @@ interface QuoteRequestParams {
 }
 
 export class LayerZeroApi {
+  private readonly fetcher: typeof fetch;
+
   constructor(
     private readonly config: LayerZeroApiConfig,
-    private readonly fetcher: typeof fetch = fetch
-  ) {}
+    fetcher?: typeof fetch
+  ) {
+    if (fetcher) {
+      this.fetcher = fetcher;
+    } else if (typeof globalThis.fetch === "function") {
+      this.fetcher = globalThis.fetch.bind(globalThis) as typeof fetch;
+    } else {
+      throw new Error(
+        "No fetch implementation available. Provide fetcher in LayerZeroApi."
+      );
+    }
+  }
 
   async getDepositQuotes(
     params: QuoteRequestParams

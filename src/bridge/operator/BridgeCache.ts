@@ -2,14 +2,15 @@ import type { BridgeInterface } from "@/bridge/types/BridgeInterface";
 import { BridgeToken } from "@/types";
 import { type ConnectedExternalWallet } from "@/connect";
 
+const MAX_BRIDGE_CACHE_SIZE = 128;
+
+type BridgeCacheEntry = {
+  wallet: ConnectedExternalWallet;
+  bridge: Promise<BridgeInterface>;
+};
+
 export class BridgeCache {
-  private readonly cache = new Map<
-    string,
-    {
-      wallet: ConnectedExternalWallet;
-      bridge: Promise<BridgeInterface>;
-    }
-  >();
+  private readonly cache = new Map<string, BridgeCacheEntry>();
 
   public get(
     token: BridgeToken,
@@ -26,6 +27,7 @@ export class BridgeCache {
       return undefined;
     }
 
+    this.touch(key, entry);
     return entry.bridge;
   }
 
@@ -43,10 +45,36 @@ export class BridgeCache {
       throw error;
     });
 
+    if (this.cache.has(key)) {
+      this.cache.delete(key);
+    } else if (this.cache.size >= MAX_BRIDGE_CACHE_SIZE) {
+      this.evictOldest();
+    }
+
     this.cache.set(key, { wallet, bridge: guarded });
   }
 
+  private evictOldest(): void {
+    const oldest = this.cache.keys().next().value;
+    if (oldest !== undefined) {
+      this.cache.delete(oldest);
+    }
+  }
+
+  private touch(key: string, entry: BridgeCacheEntry): void {
+    this.cache.delete(key);
+    this.cache.set(key, entry);
+  }
+
   private key(token: BridgeToken, wallet: ConnectedExternalWallet): string {
-    return `${wallet.network.toString()}:${wallet.address}:${token.address}`;
+    return [
+      wallet.chain,
+      wallet.network.toString(),
+      wallet.address,
+      token.chain,
+      token.protocol,
+      token.id,
+      token.address,
+    ].join(":");
   }
 }

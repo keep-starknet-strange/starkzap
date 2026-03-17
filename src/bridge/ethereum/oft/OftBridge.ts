@@ -26,12 +26,17 @@ const DUMMY_SN_ADDRESS = fromAddress(
   "0x023123100123103023123acb1231231231231031231ca123f23123123123100a"
 );
 const DUMMY_ETH_ADDRESS = "0x0000000000000000000000000000000000000001";
+const DUMMY_DEPOSIT_TX_CACHE_TTL_MS = 60_000;
+
+type DummyDepositTxCache = {
+  promise: Promise<ContractTransaction | null>;
+  createdAt: number;
+};
 
 export class OftBridge extends EthereumBridge {
   private readonly layerZeroApi: LayerZeroApi;
   private cachedSpender: EthereumAddress | null | undefined;
-  private dummyDepositTxPromise: Promise<ContractTransaction | null> | null =
-    null;
+  private dummyDepositTxCache: DummyDepositTxCache | null = null;
 
   constructor(
     bridgeToken: EthereumBridgeToken,
@@ -80,6 +85,7 @@ export class OftBridge extends EthereumBridge {
 
     const response = await this.execute(depositTx);
     this.clearCachedAllowance();
+    this.clearDummyDepositTxCache();
     return { hash: response.hash };
   }
 
@@ -150,7 +156,10 @@ export class OftBridge extends EthereumBridge {
       this.cachedSpender =
         this.layerZeroApi.extractSpenderFromApprovalTx(approvalTx);
     } catch {
-      this.cachedSpender = null;
+      // Do not cache transient API failures as "no spender";
+      // allow subsequent calls to retry spender discovery.
+      this.cachedSpender = undefined;
+      return null;
     }
 
     return this.cachedSpender;
@@ -177,8 +186,22 @@ export class OftBridge extends EthereumBridge {
   }
 
   private getDummyDepositTx(): Promise<ContractTransaction | null> {
-    this.dummyDepositTxPromise ??= this.fetchDummyDepositTx();
-    return this.dummyDepositTxPromise;
+    const now = Date.now();
+    const cached = this.dummyDepositTxCache;
+    if (cached && now - cached.createdAt < DUMMY_DEPOSIT_TX_CACHE_TTL_MS) {
+      return cached.promise;
+    }
+
+    const promise = this.fetchDummyDepositTx().then((tx) => {
+      // Retry quickly after transient failures rather than pinning null for the full TTL.
+      if (!tx && this.dummyDepositTxCache?.promise === promise) {
+        this.dummyDepositTxCache = null;
+      }
+      return tx;
+    });
+
+    this.dummyDepositTxCache = { promise, createdAt: now };
+    return promise;
   }
 
   private async fetchDummyDepositTx(): Promise<ContractTransaction | null> {
@@ -193,5 +216,9 @@ export class OftBridge extends EthereumBridge {
     } catch {
       return null;
     }
+  }
+
+  private clearDummyDepositTxCache(): void {
+    this.dummyDepositTxCache = null;
   }
 }

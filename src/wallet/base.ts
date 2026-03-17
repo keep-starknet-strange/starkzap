@@ -752,6 +752,35 @@ export abstract class BaseWallet implements WalletInterface {
   // Bridging delegated methods
   // ============================================================
 
+  /**
+   * Bridge tokens from an external chain into Starknet.
+   *
+   * Uses the connected external wallet to execute the L1/source-chain deposit
+   * transaction. For ERC20 tokens, allowance approval is handled automatically
+   * when required by the selected bridge protocol.
+   *
+   * @param recipient - Starknet address to receive bridged funds
+   * @param amount - Amount to bridge
+   * @param token - Bridge token descriptor (chain, protocol, bridge contracts)
+   * @param externalWallet - Connected external wallet on the token source chain
+   * @param options - Optional bridge/protocol-specific deposit options
+   * @returns External transaction response containing the source-chain tx hash
+   *
+   * @throws Error if token chain and external wallet chain do not match
+   * @throws Error if protocol-specific configuration is missing
+   * @throws Error if the external transaction is rejected or fails
+   *
+   * @example
+   * ```ts
+   * const tx = await wallet.deposit(
+   *   wallet.address,
+   *   Amount.parse("25", USDC),
+   *   bridgeToken,
+   *   externalWallet
+   * );
+   * console.log(tx.hash);
+   * ```
+   */
   deposit(
     recipient: Address,
     amount: Amount,
@@ -768,6 +797,25 @@ export abstract class BaseWallet implements WalletInterface {
     );
   }
 
+  /**
+   * Get the currently available external balance that can be deposited.
+   *
+   * Reads the available source-chain balance for the provided bridge token
+   * and connected external wallet.
+   *
+   * @param token - Bridge token descriptor to query
+   * @param externalWallet - Connected external wallet on the token source chain
+   * @returns Available deposit balance on the external chain
+   *
+   * @throws Error if token chain and external wallet chain do not match
+   * @throws Error if the bridge protocol is unsupported for the token
+   *
+   * @example
+   * ```ts
+   * const available = await wallet.getDepositBalance(bridgeToken, externalWallet);
+   * console.log(available.toFormatted());
+   * ```
+   */
   getDepositBalance(
     token: BridgeToken,
     externalWallet: ConnectedExternalWallet
@@ -775,6 +823,27 @@ export abstract class BaseWallet implements WalletInterface {
     return this.bridging.getDepositBalance(token, externalWallet);
   }
 
+  /**
+   * Get the ERC20 allowance granted to the bridge spender on the external chain.
+   *
+   * Returns `null` when allowance is not applicable (for example, native token
+   * flows or protocols that do not expose a spender).
+   *
+   * @param token - Bridge token descriptor to query
+   * @param externalWallet - Connected external wallet on the token source chain
+   * @returns Current allowance, or `null` if allowance is not applicable
+   *
+   * @throws Error if token chain and external wallet chain do not match
+   * @throws Error if spender discovery or provider calls fail
+   *
+   * @example
+   * ```ts
+   * const allowance = await wallet.getAllowance(bridgeToken, externalWallet);
+   * if (allowance) {
+   *   console.log(allowance.toFormatted());
+   * }
+   * ```
+   */
   getAllowance(
     token: BridgeToken,
     externalWallet: ConnectedExternalWallet
@@ -782,6 +851,26 @@ export abstract class BaseWallet implements WalletInterface {
     return this.bridging.getAllowance(token, externalWallet);
   }
 
+  /**
+   * Estimate bridging fees on the source chain and destination messaging layer.
+   *
+   * This includes protocol-specific components such as approval fee,
+   * source-chain execution fee, and interchain/L2 delivery fee.
+   *
+   * @param token - Bridge token descriptor to estimate for
+   * @param externalWallet - Connected external wallet on the token source chain
+   * @param options - Optional bridge/protocol-specific estimation options
+   * @returns Detailed bridge fee estimation for the current route
+   *
+   * @throws Error if token chain and external wallet chain do not match
+   * @throws Error if required bridge configuration is missing
+   *
+   * @example
+   * ```ts
+   * const fees = await wallet.getDepositFeeEstimate(bridgeToken, externalWallet);
+   * console.log(fees.l1Fee.toFormatted(), fees.l2Fee.toFormatted());
+   * ```
+   */
   getDepositFeeEstimate(
     token: BridgeToken,
     externalWallet: ConnectedExternalWallet,

@@ -113,13 +113,13 @@ export class BridgeOperator implements BridgeOperatorInterface {
       );
     }
 
-    if (token.chain == ExternalChain.ETHEREUM) {
+    if (token.chain === ExternalChain.ETHEREUM) {
       return await this.createEthereumBridge(
         token as EthereumBridgeToken,
         wallet as ConnectedEthereumWallet,
         starknetWallet
       );
-    } else if (token.chain == ExternalChain.SOLANA) {
+    } else if (token.chain === ExternalChain.SOLANA) {
       return await this.createSolanaBridge(
         token as SolanaBridgeToken,
         wallet as ConnectedSolanaWallet,

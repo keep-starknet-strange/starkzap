@@ -182,6 +182,17 @@ function cloneTokens(tokens: BridgeToken[]): BridgeToken[] {
   return [...tokens];
 }
 
+function assertArrayPayload(payload: unknown): BridgeTokenApiRecord[] {
+  if (Array.isArray(payload)) {
+    return payload as BridgeTokenApiRecord[];
+  }
+
+  const received = payload === null ? "null" : typeof payload;
+  throw new Error(
+    `Invalid bridge tokens API response: expected a top-level array, received ${received}.`
+  );
+}
+
 export class BridgeTokenRepository {
   private readonly apiUrl: string;
   private readonly cacheTtlMs: number;
@@ -233,7 +244,7 @@ export class BridgeTokenRepository {
       return cloneTokens(await inFlight);
     }
 
-    const request = this.fetchAndCache(query, key, now);
+    const request = this.fetchAndCache(query, key);
     this.inflight.set(key, request);
 
     try {
@@ -245,8 +256,7 @@ export class BridgeTokenRepository {
 
   private async fetchAndCache(
     query: BridgeTokenQuery,
-    key: string,
-    now: number
+    key: string
   ): Promise<BridgeToken[]> {
     const url = new URL(this.apiUrl);
     url.searchParams.set("env", query.env ?? DEFAULT_ENV);
@@ -265,7 +275,7 @@ export class BridgeTokenRepository {
       );
     }
 
-    const payload: BridgeTokenApiRecord[] = await response.json();
+    const payload = assertArrayPayload(await response.json());
     const tokens = payload
       .filter((token) => {
         return !token.hidden && !token.deprecated;
@@ -282,7 +292,7 @@ export class BridgeTokenRepository {
 
     this.cache.set(key, {
       tokens,
-      expiresAt: now + this.cacheTtlMs,
+      expiresAt: this.now() + this.cacheTtlMs,
     });
 
     return tokens;

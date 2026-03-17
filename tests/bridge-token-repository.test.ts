@@ -98,6 +98,23 @@ function mockApiResponse() {
 }
 
 describe("BridgeTokenRepository", () => {
+  it("should throw a clear error when API payload is not a top-level array", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      statusText: "OK",
+      json: async () => ({ tokens: mockApiResponse() }),
+    });
+
+    const repository = new BridgeTokenRepository({
+      fetchFn: fetchMock as unknown as typeof fetch,
+    });
+
+    await expect(repository.getTokens()).rejects.toThrow(
+      "Invalid bridge tokens API response: expected a top-level array, received object."
+    );
+  });
+
   it("should map API tokens into protocol-specific token classes", async () => {
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,
@@ -169,6 +186,35 @@ describe("BridgeTokenRepository", () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
 
     now = BRIDGE_TOKEN_CACHE_TTL_MS;
+    await repository.getTokens({ env: "mainnet" });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("should start cache TTL at cache write time after fetch resolves", async () => {
+    let now = 0;
+    const fetchMock = vi.fn().mockImplementation(async () => {
+      now += 500;
+      return {
+        ok: true,
+        status: 200,
+        statusText: "OK",
+        json: async () => mockApiResponse(),
+      };
+    });
+
+    const repository = new BridgeTokenRepository({
+      fetchFn: fetchMock as unknown as typeof fetch,
+      now: () => now,
+    });
+
+    await repository.getTokens({ env: "mainnet" });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+
+    now = BRIDGE_TOKEN_CACHE_TTL_MS + 499;
+    await repository.getTokens({ env: "mainnet" });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+
+    now = BRIDGE_TOKEN_CACHE_TTL_MS + 500;
     await repository.getTokens({ env: "mainnet" });
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });

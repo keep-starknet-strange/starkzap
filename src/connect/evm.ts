@@ -24,14 +24,10 @@ function assertEip1193Provider(provider: unknown): Eip1193Provider {
 }
 
 export interface Eip1193Provider {
-  request<T = unknown>(
-    args: {
-      method: string;
-      params?: unknown[] | Record<string, unknown> | object | undefined;
-    },
-    chain?: string | undefined,
-    expiry?: number | undefined
-  ): Promise<T>;
+  request<T = unknown>(args: {
+    method: string;
+    params?: unknown[] | Record<string, unknown> | object | undefined;
+  }): Promise<T>;
 }
 
 export interface ConnectEthereumWalletOptions {
@@ -118,11 +114,11 @@ export class ConnectedEthereumWallet {
     }
 
     if (network === EthereumNetwork.MAINNET && !starknetChain.isMainnet()) {
-      throw new Error(`EVM chain id expected to be mainnet.`);
+      throw new Error(`Ethereum Mainnet cannot be used with Starknet Sepolia.`);
     }
 
     if (network === EthereumNetwork.SEPOLIA && !starknetChain.isSepolia()) {
-      throw new Error("EVM chain id expected to be sepolia.");
+      throw new Error("Ethereum Sepolia cannot be used with Starknet Mainnet.");
     }
 
     return new ConnectedEthereumWallet(address, provider, network);

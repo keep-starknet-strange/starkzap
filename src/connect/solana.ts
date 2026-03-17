@@ -58,11 +58,11 @@ export class ConnectedSolanaWallet {
     }
 
     if (network === SolanaNetwork.MAINNET && !starknetChain.isMainnet()) {
-      throw new Error("Solana mainnet cannot be used with Starknet Sepolia.");
+      throw new Error("Solana Mainnet cannot be used with Starknet Sepolia.");
     }
 
     if (network === SolanaNetwork.TESTNET && !starknetChain.isSepolia()) {
-      throw new Error("Solana testnet cannot be used with Starknet Mainnet.");
+      throw new Error("Solana Testnet cannot be used with Starknet Mainnet.");
     }
 
     return new ConnectedSolanaWallet(options.address, signer, network);
