@@ -1557,7 +1557,7 @@ btnBridgeDeposit.addEventListener("click", () => {
 let appKitEthProvider: Eip1193Provider | null = null;
 let appKitSolSigner: SolanaProvider | null = null;
 
-function syncEthWalletFromAppKit(): void {
+async function syncEthWalletFromAppKit(): Promise<void> {
   if (!bridgeController || !appKit) return;
 
   const address = appKit.getAddress("eip155");
@@ -1565,7 +1565,7 @@ function syncEthWalletFromAppKit(): void {
   const isConnected = appKit.getIsConnectedState();
 
   if (isConnected && address && chainId && appKitEthProvider) {
-    bridgeController.connectEthereumWallet(
+    await bridgeController.connectEthereumWallet(
       appKitEthProvider,
       address,
       String(chainId)
@@ -1593,8 +1593,8 @@ function syncSolWalletFromAppKit(): void {
   }
 }
 
-function syncWalletsFromAppKit(): void {
-  syncEthWalletFromAppKit();
+async function syncWalletsFromAppKit(): Promise<void> {
+  await syncEthWalletFromAppKit();
   syncSolWalletFromAppKit();
 }
 
@@ -1602,15 +1602,15 @@ if (appKit) {
   appKit.subscribeProviders((providers) => {
     appKitEthProvider = providers["eip155"] as Eip1193Provider | null;
     appKitSolSigner = providers["solana"] as SolanaProvider | null;
-    syncWalletsFromAppKit();
+    void syncWalletsFromAppKit();
   });
 
   appKit.subscribeAccount(() => {
-    syncWalletsFromAppKit();
+    void syncWalletsFromAppKit();
   });
 
   appKit.subscribeNetwork(() => {
-    syncWalletsFromAppKit();
+    void syncWalletsFromAppKit();
   });
 }
 

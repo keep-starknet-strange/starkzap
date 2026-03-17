@@ -1,12 +1,9 @@
 import { describeValue } from "@/connect/utils";
-import {
-  type EthereumAddress,
-  ExternalChain,
-  fromEthereumAddress,
-} from "@/types";
+import { type EthereumAddress, ExternalChain } from "@/types";
 import type { EthereumWalletConfig } from "@/bridge";
-import { BrowserProvider, JsonRpcProvider } from "ethers";
 import type { ChainId } from "@/types";
+import { loadEthers } from "@/connect/ethersRuntime";
+import { fromEthereumAddress } from "@/connect/ethersRuntime";
 
 function assertEip1193Provider(provider: unknown): Eip1193Provider {
   if (
@@ -33,7 +30,7 @@ export interface Eip1193Provider {
 export interface ConnectEthereumWalletOptions {
   chain: ExternalChain.ETHEREUM;
   provider: Eip1193Provider;
-  address: EthereumAddress;
+  address: string;
   chainId: string | number;
 }
 
@@ -54,6 +51,9 @@ export class ConnectedEthereumWallet {
   public async toEthWalletConfig(
     ethereumRpcUrl?: string | undefined
   ): Promise<EthereumWalletConfig> {
+    const ethers = await loadEthers(
+      "ConnectedEthereumWallet.toEthWalletConfig"
+    );
     const ethChainIdRaw = await this.provider.request<string>({
       method: "eth_chainId",
     });
@@ -66,12 +66,15 @@ export class ConnectedEthereumWallet {
       );
     }
 
-    const browserProvider = new BrowserProvider(this.provider, networkId);
+    const browserProvider = new ethers.BrowserProvider(
+      this.provider,
+      networkId
+    );
     const signer = await browserProvider.getSigner(this.address);
 
     let provider;
     if (ethereumRpcUrl) {
-      const rpcProvider = new JsonRpcProvider(ethereumRpcUrl, networkId);
+      const rpcProvider = new ethers.JsonRpcProvider(ethereumRpcUrl, networkId);
       const rpcNetwork = await rpcProvider.getNetwork();
       const rpcChainId = Number(rpcNetwork.chainId);
 
@@ -88,11 +91,12 @@ export class ConnectedEthereumWallet {
     return { provider, signer };
   }
 
-  public static from(
+  public static async from(
     options: ConnectEthereumWalletOptions,
     starknetChain: ChainId
-  ): ConnectedEthereumWallet {
-    const address = fromEthereumAddress(options.address);
+  ): Promise<ConnectedEthereumWallet> {
+    const ethers = await loadEthers("ConnectedEthereumWallet.from");
+    const address = fromEthereumAddress(options.address, ethers);
     const provider = assertEip1193Provider(options.provider);
 
     const numericChainId =

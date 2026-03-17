@@ -1,8 +1,8 @@
 import type { ContractTransaction } from "ethers";
-import { Interface } from "ethers";
+import { getAddress, Interface } from "ethers";
 import { type EthereumAddress, ExternalChain } from "@/types";
-import { fromEthereumAddress } from "@/types";
 import type { Address, Amount } from "@/types";
+import { fromEthereumAddress } from "@/connect/ethersRuntime";
 
 const LAYERZERO_API_BASE = "https://transfer.layerzero-api.com/v1";
 
@@ -122,7 +122,7 @@ export class LayerZeroApi {
         data: approvalTx.data,
       });
       const spender = decoded?.args[0] as string | undefined;
-      return spender ? fromEthereumAddress(spender) : null;
+      return spender ? fromEthereumAddress(spender, { getAddress }) : null;
     } catch {
       return null;
     }

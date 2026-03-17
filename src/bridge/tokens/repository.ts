@@ -6,7 +6,9 @@ import {
   EthereumBridgeToken,
   SolanaBridgeToken,
 } from "@/types/bridge/bridge-token";
-import { fromAddress, fromEthereumAddress, fromSolanaAddress } from "@/types";
+import { type EthereumAddress, fromAddress, fromSolanaAddress } from "@/types";
+import { loadEthers } from "@/connect/ethersRuntime";
+import { fromEthereumAddress } from "@/connect/ethersRuntime";
 
 export type BridgeTokenApiEnv = "mainnet" | "testnet";
 
@@ -120,11 +122,22 @@ function parseProtocol(protocol: string): Protocol {
 
 const isNonNull = <T>(value: T | null): value is T => value !== null;
 
-function parseToken(token: BridgeTokenApiRecord): BridgeToken {
+type NormalizeEthereumAddress = (value: string) => EthereumAddress;
+
+function parseToken(
+  token: BridgeTokenApiRecord,
+  normalizeEthereumAddress?: NormalizeEthereumAddress
+): BridgeToken {
   const chain = parseChain(requiredString(token, "chain"));
   const protocol = parseProtocol(requiredString(token, "protocol"));
 
   if (chain === ExternalChain.ETHEREUM) {
+    if (!normalizeEthereumAddress) {
+      throw new Error(
+        'Ethereum token parsing requires "ethers" optional peer dependency.'
+      );
+    }
+
     if (
       protocol !== Protocol.CANONICAL &&
       protocol !== Protocol.CCTP &&
@@ -143,8 +156,12 @@ function parseToken(token: BridgeTokenApiRecord): BridgeToken {
       symbol: requiredString(token, "symbol"),
       decimals: requiredNumber(token, "decimals"),
       protocol: protocol as EthereumBridgeProtocol,
-      address: fromEthereumAddress(requiredString(token, "l1_token_address")),
-      l1Bridge: fromEthereumAddress(requiredString(token, "l1_bridge_address")),
+      address: normalizeEthereumAddress(
+        requiredString(token, "l1_token_address")
+      ),
+      l1Bridge: normalizeEthereumAddress(
+        requiredString(token, "l1_bridge_address")
+      ),
       starknetAddress: fromAddress(requiredString(token, "l2_token_address")),
       starknetBridge: fromAddress(requiredString(token, "l2_bridge_address")),
       ...(coingeckoId ? { coingeckoId } : {}),
@@ -276,13 +293,26 @@ export class BridgeTokenRepository {
     }
 
     const payload = assertArrayPayload(await response.json());
+    const hasEthereumRows = payload.some((token) => {
+      return (
+        typeof token.chain === "string" &&
+        token.chain.toLowerCase() === ExternalChain.ETHEREUM
+      );
+    });
+    const ethers = hasEthereumRows
+      ? await loadEthers("Bridge token parsing")
+      : undefined;
+    const normalizeEthereumAddress = ethers
+      ? (value: string) => fromEthereumAddress(value, ethers)
+      : undefined;
+
     const tokens = payload
       .filter((token) => {
         return !token.hidden && !token.deprecated;
       })
       .map((token) => {
         try {
-          return parseToken(token);
+          return parseToken(token, normalizeEthereumAddress);
         } catch (e) {
           console.warn(`Ignoring token ${token.symbol} due to`, e);
           return null;

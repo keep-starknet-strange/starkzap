@@ -4,7 +4,6 @@ import type {
   BridgeDepositOptions,
   BridgeInterface,
 } from "@/bridge/types/BridgeInterface";
-import { CanonicalEthereumBridge } from "@/bridge/ethereum/canonical/CanonicalEthereumBridge";
 import { Protocol } from "@/types/bridge/protocol";
 import {
   ConnectedEthereumWallet,
@@ -25,9 +24,7 @@ import {
   type SolanaAddress,
   SolanaBridgeToken,
 } from "@/types";
-import { CCTPBridge } from "@/bridge/ethereum/cctp/CCTPBridge";
-import { LordsBridge } from "@/bridge/ethereum/lords/LordsBridge";
-import { OftBridge } from "@/bridge/ethereum/oft/OftBridge";
+import { loadEthers } from "@/connect/ethersRuntime";
 
 export class BridgeOperator implements BridgeOperatorInterface {
   private cache = new BridgeCache();
@@ -135,19 +132,28 @@ export class BridgeOperator implements BridgeOperatorInterface {
     externalWallet: ConnectedEthereumWallet,
     starknetWallet: WalletInterface
   ): Promise<BridgeInterface<EthereumAddress>> {
+    await loadEthers("Ethereum bridge operations");
     const walletConfig = await externalWallet.toEthWalletConfig(
       this.bridgingConfig?.ethereumRpcUrl
     );
 
     if (token.id === "lords") {
+      const { LordsBridge } =
+        await import("@/bridge/ethereum/lords/LordsBridge");
       return new LordsBridge(token, walletConfig, starknetWallet);
     }
 
     switch (token.protocol) {
-      case Protocol.CANONICAL:
+      case Protocol.CANONICAL: {
+        const { CanonicalEthereumBridge } =
+          await import("@/bridge/ethereum/canonical/CanonicalEthereumBridge");
         return new CanonicalEthereumBridge(token, walletConfig, starknetWallet);
-      case Protocol.CCTP:
+      }
+      case Protocol.CCTP: {
+        const { CCTPBridge } =
+          await import("@/bridge/ethereum/cctp/CCTPBridge");
         return new CCTPBridge(token, walletConfig, starknetWallet);
+      }
       case Protocol.OFT:
       case Protocol.OFT_MIGRATED: {
         const apiKey = this.bridgingConfig?.layerZeroApiKey;
@@ -157,6 +163,7 @@ export class BridgeOperator implements BridgeOperatorInterface {
               'Set "bridging.layerZeroApiKey" in the SDK configuration.'
           );
         }
+        const { OftBridge } = await import("@/bridge/ethereum/oft/OftBridge");
         return new OftBridge(token, walletConfig, starknetWallet, apiKey);
       }
       default:

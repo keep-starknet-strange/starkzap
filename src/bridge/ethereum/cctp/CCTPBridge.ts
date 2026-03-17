@@ -4,12 +4,11 @@ import {
   type EthereumAddress,
   type ExternalTransactionResponse,
   fromAddress,
-  fromEthereumAddress,
 } from "@/types";
 import type { BridgeDepositOptions } from "@/bridge/types/BridgeInterface";
 import type { CCTPDepositFeeEstimation } from "@/bridge";
 import { ERC20EthereumToken } from "@/bridge/ethereum/EtherToken";
-import { Interface, type TransactionRequest } from "ethers";
+import { getAddress, Interface, type TransactionRequest } from "ethers";
 import { FeeErrorCause } from "@/types/errors";
 import { BridgeDirection, CCTPFees } from "@/bridge/ethereum/cctp/CCTPFees";
 import {
@@ -17,13 +16,16 @@ import {
   STARKNET_DOMAIN_ID,
 } from "@/bridge/ethereum/cctp/constants";
 import { EthereumBridge } from "@/bridge/ethereum/EthereumBridge";
+import { fromEthereumAddress } from "@/connect/ethersRuntime";
 
 export class CCTPBridge extends EthereumBridge {
   private static readonly MAINNET_TOKEN_MESSENGER = fromEthereumAddress(
-    "0x28b5a0e9C621a5BadaA536219b3a228C8168cf5d"
+    "0x28b5a0e9C621a5BadaA536219b3a228C8168cf5d",
+    { getAddress }
   );
   private static readonly SEPOLIA_TOKEN_MESSENGER = fromEthereumAddress(
-    "0x8FE6B999Dc680CcFDD5Bf7EB0974218be2542DAA"
+    "0x8FE6B999Dc680CcFDD5Bf7EB0974218be2542DAA",
+    { getAddress }
   );
 
   private static DEFAULT_CCTP_DEPOSIT_GAS = 104_581n;

@@ -9,7 +9,6 @@ import {
   Erc20,
   type EthereumDepositFeeEstimation,
   ExternalChain,
-  fromEthereumAddress,
   fromSolanaAddress,
   Protocol,
   type SolanaDepositFeeEstimation,
@@ -124,17 +123,17 @@ export class BridgeController {
     }
   }
 
-  connectEthereumWallet(
+  async connectEthereumWallet(
     provider: Eip1193Provider,
     address: string,
     walletChainId: string
-  ): void {
+  ): Promise<void> {
     try {
-      const wallet = ConnectedEthereumWallet.from(
+      const wallet = await ConnectedEthereumWallet.from(
         {
           chain: ExternalChain.ETHEREUM,
           provider,
-          address: fromEthereumAddress(address),
+          address: address,
           chainId: walletChainId,
         },
         this.chainId

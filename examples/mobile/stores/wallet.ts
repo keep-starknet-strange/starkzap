@@ -156,7 +156,9 @@ interface WalletState {
   setCustomChainId: (chainId: ChainIdLiteral) => void;
   confirmNetworkConfig: () => void;
   resetNetworkConfig: () => void;
-  connectExternalWallet: (options: ConnectExternalWalletOptions) => void;
+  connectExternalWallet: (
+    options: ConnectExternalWalletOptions
+  ) => Promise<void>;
   disconnectExternalWallets: () => void;
   setBridgeExternalChain: (chain: ExternalChain) => void;
   toggleBridgeDirection: () => void;
@@ -399,12 +401,12 @@ export const useWalletStore = create<WalletState>((set, get) => ({
     addLog("Network configuration reset");
   },
 
-  connectExternalWallet: (options: ConnectExternalWalletOptions) => {
+  connectExternalWallet: async (options: ConnectExternalWalletOptions) => {
     const { chainId, addLog } = get();
 
     try {
       if (options.chain === ExternalChain.ETHEREUM) {
-        const wallet = ConnectedEthereumWallet.from(options, chainId);
+        const wallet = await ConnectedEthereumWallet.from(options, chainId);
         set({ connectedEthWallet: wallet });
         addLog(
           `${options.chain} wallet connected: ${truncateAddress(wallet.address)}`

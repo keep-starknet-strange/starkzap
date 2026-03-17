@@ -9,7 +9,6 @@ import {
   type EthereumAddress,
   EthereumBridgeToken,
   type ExternalTransactionResponse,
-  fromEthereumAddress,
 } from "@/types";
 import {
   type EthereumTokenInterface,
@@ -23,6 +22,7 @@ import {
 import type { InterfaceAbi } from "ethers";
 import {
   Contract,
+  getAddress,
   type ContractTransaction,
   type ContractTransactionReceipt,
   type ContractTransactionResponse,
@@ -32,6 +32,7 @@ import {
 import { FeeErrorCause, TransactionErrorCause } from "@/types/errors";
 import type { WalletInterface } from "@/wallet";
 import CANONICAL_BRIDGE_ABI from "@/abi/ethereum/canonicalBridge.json";
+import { fromEthereumAddress } from "@/connect/ethersRuntime";
 
 export abstract class EthereumBridge implements BridgeInterface<EthereumAddress> {
   public static readonly ALLOWANCE_CACHE_TTL = 60_000;
@@ -88,7 +89,7 @@ export abstract class EthereumBridge implements BridgeInterface<EthereumAddress>
     ) {
       const signerAddress = await this.config.signer.getAddress();
       const allowance = await this.token.allowance(
-        fromEthereumAddress(signerAddress),
+        fromEthereumAddress(signerAddress, { getAddress }),
         allowanceSpender
       );
       this.setCachedAllowance(allowance);

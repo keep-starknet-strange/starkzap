@@ -1,13 +1,13 @@
 import { describe, expect, it } from "vitest";
 import { BridgeCache } from "@/bridge/operator/BridgeCache";
-import {
-  ExternalChain,
-  Protocol,
-  type BridgeToken,
-  fromEthereumAddress,
-} from "@/types";
+import { ExternalChain, Protocol, type BridgeToken } from "@/types";
+import { fromEthereumAddress } from "@/connect/ethersRuntime";
 import type { ConnectedExternalWallet } from "@/connect";
 import type { BridgeInterface } from "@/bridge/types/BridgeInterface";
+import { getAddress } from "ethers";
+
+const normalizeEthereumAddress = (value: string) =>
+  fromEthereumAddress(value, { getAddress });
 
 function mockToken(
   overrides: Partial<
@@ -51,7 +51,7 @@ function randomEthereumAddressWithIndex(index: number) {
     Math.floor(Math.random() * 16).toString(16)
   ).join("");
 
-  return fromEthereumAddress(`0x${randomPrefix}${suffix}`);
+  return normalizeEthereumAddress(`0x${randomPrefix}${suffix}`);
 }
 
 describe("BridgeCache", () => {
@@ -62,7 +62,7 @@ describe("BridgeCache", () => {
       id: "usdc",
       chain: ExternalChain.ETHEREUM,
       protocol: Protocol.CANONICAL,
-      address: fromEthereumAddress(
+      address: normalizeEthereumAddress(
         "0xcea4d3660f2a915177bbda67f7f6d1da29f3f682"
       ),
     });
@@ -87,7 +87,7 @@ describe("BridgeCache", () => {
       id: "usdc",
       chain: ExternalChain.ETHEREUM,
       protocol: Protocol.CANONICAL,
-      address: fromEthereumAddress(
+      address: normalizeEthereumAddress(
         "0xdc6b3a9f651ec03b0ba8a0f30d302ae4d56f066f"
       ),
     });
@@ -156,7 +156,7 @@ describe("BridgeCache", () => {
       id: "usdc",
       chain: ExternalChain.ETHEREUM,
       protocol: Protocol.CANONICAL,
-      address: fromEthereumAddress(
+      address: normalizeEthereumAddress(
         "0x2E57CD88C8bf6D7dA3f0eaE096dFeF6E2998020a"
       ),
     });
@@ -164,7 +164,7 @@ describe("BridgeCache", () => {
       id: "usdc",
       chain: ExternalChain.SOLANA,
       protocol: Protocol.HYPERLANE,
-      address: fromEthereumAddress(
+      address: normalizeEthereumAddress(
         "0x359592B2727993bBE57E7e22CbFf424dC3395f7f"
       ),
     });
@@ -195,7 +195,7 @@ describe("BridgeCache", () => {
       id: "usdc",
       chain: ExternalChain.ETHEREUM,
       protocol: Protocol.CANONICAL,
-      address: fromEthereumAddress(
+      address: normalizeEthereumAddress(
         "0xd1B14a3C22c4DE9836eEAD138C8FDFaC370D16B0"
       ),
     });
@@ -203,7 +203,7 @@ describe("BridgeCache", () => {
       id: "usdc",
       chain: ExternalChain.ETHEREUM,
       protocol: Protocol.OFT_MIGRATED,
-      address: fromEthereumAddress(
+      address: normalizeEthereumAddress(
         "0x433f18a35BD83765EB309fb321b1eD36A7CB3289"
       ),
     });

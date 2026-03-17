@@ -1,5 +1,4 @@
 import { type BigNumberish, validateAndParseAddress } from "starknet";
-import { getAddress } from "ethers";
 import { PublicKey } from "@solana/web3.js";
 
 /**
@@ -42,16 +41,6 @@ export function resolveWalletAddress(value: AddressInput): Address {
  * regular strings, while remaining a string at runtime.
  */
 export type EthereumAddress = string & { readonly __type: "EthereumAddress" };
-
-/**
- * Parse and checksum-validate an Ethereum address.
- * @param value - The address string to parse
- * @returns The checksummed address
- * @throws If the value is not a valid Ethereum address
- */
-export function fromEthereumAddress(value: string): EthereumAddress {
-  return getAddress(value) as EthereumAddress;
-}
 
 /**
  * Branded type for Solana addresses.

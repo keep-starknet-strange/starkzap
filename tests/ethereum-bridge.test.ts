@@ -1,7 +1,12 @@
 import { describe, expect, it, vi } from "vitest";
 import { EthereumBridge } from "@/bridge/ethereum/EthereumBridge";
-import { Amount, fromEthereumAddress } from "@/types";
+import { Amount } from "@/types";
 import { TransactionErrorCause } from "@/types/errors";
+import { fromEthereumAddress } from "@/connect/ethersRuntime";
+import { getAddress } from "ethers";
+
+const normalizeEthereumAddress = (value: string) =>
+  fromEthereumAddress(value, { getAddress });
 
 type BridgeForApprove = {
   approveSpendingOf(amount: Amount): Promise<void>;
@@ -27,7 +32,7 @@ describe("EthereumBridge", () => {
     const bridge = Object.create(
       EthereumBridge.prototype
     ) as unknown as BridgeForApprove;
-    const spender = fromEthereumAddress(
+    const spender = normalizeEthereumAddress(
       "0x1111111111111111111111111111111111111111"
     );
     const requestedAmount = Amount.fromRaw(100n, 6, "USDC");

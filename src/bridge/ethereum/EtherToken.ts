@@ -1,17 +1,14 @@
-import {
-  Amount,
-  type EthereumAddress,
-  EthereumBridgeToken,
-  fromEthereumAddress,
-} from "@/types";
+import { Amount, type EthereumAddress, EthereumBridgeToken } from "@/types";
 import {
   Contract,
   type ContractTransaction,
+  getAddress,
   type Provider,
   type Signer,
 } from "ethers";
 import ERC20_ABI from "@/abi/ethereum/erc20.json";
 import { type EthereumWalletConfig } from "@/bridge/ethereum/types";
+import { fromEthereumAddress } from "@/connect/ethersRuntime";
 
 export async function ethereumAddress(
   contract: Contract
@@ -19,10 +16,10 @@ export async function ethereumAddress(
   const target = contract.target;
 
   if (typeof target === "string") {
-    return fromEthereumAddress(target);
+    return fromEthereumAddress(target, { getAddress });
   } else {
     const address = await target.getAddress();
-    return fromEthereumAddress(address);
+    return fromEthereumAddress(address, { getAddress });
   }
 }
 
