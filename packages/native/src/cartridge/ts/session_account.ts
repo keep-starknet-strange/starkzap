@@ -37,26 +37,70 @@ export interface TsSessionAccountOptions {
   execute?: TsExecute;
 }
 
+const EXECUTE_FALLBACK_ERROR_CODES = new Set([
+  "OUTSIDE_EXECUTION",
+  "OUTSIDE_EXECUTION_AUTHORIZATION_FAILED",
+  "OUTSIDE_EXECUTION_MANUAL_EXECUTION_REQUIRED",
+  "OUTSIDE_EXECUTION_NOT_SUPPORTED",
+  "OUTSIDE_EXECUTION_UNSUPPORTED",
+]);
+
+const EXECUTE_FALLBACK_MESSAGE_PATTERNS = [
+  /\baccount is not compatible with snip-9\b/i,
+  /\bmanual execution required\b/i,
+  /(?:^|:\s*)(?:outside execution )?authorization failed(?:[.!)]|\s|$)/i,
+  /(?:^|:\s*)not implemented:\s*(outside execution|execute_from_outside|snip-9)(?:[.!)]|\s|$)/i,
+  /\bfailed to check if nonce is valid\b/i,
+  /\boutside_execution_nonce\b/i,
+  /\bis_valid_outside_execution_nonce\b/i,
+  /(?:^|:\s*)requested entrypoint does not exist(?:[.!)]|\s|$)/i,
+  /(?:^|:\s*)entrypoint does not exist(?:[.!)]|\s|$)/i,
+];
+
+function asRecord(value: unknown): Record<string, unknown> | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return null;
+  }
+  return value as Record<string, unknown>;
+}
+
 function toMessage(error: unknown): string {
   if (error instanceof Error) {
     return error.message;
   }
+  const record = asRecord(error);
+  if (record && typeof record.message === "string") {
+    return record.message;
+  }
   return String(error);
 }
 
+function toCode(error: unknown, depth = 0): string | null {
+  if (depth > 2) {
+    return null;
+  }
+
+  const record = asRecord(error);
+  if (!record) {
+    return null;
+  }
+
+  if (typeof record.code === "string" && record.code.trim()) {
+    return record.code.trim().toUpperCase();
+  }
+
+  return record.cause !== undefined ? toCode(record.cause, depth + 1) : null;
+}
+
 function shouldFallbackToExecute(error: unknown): boolean {
-  const message = toMessage(error).toLowerCase();
-  return (
-    message.includes("outside") ||
-    message.includes("snip-9") ||
-    message.includes("nonce is valid") ||
-    message.includes("outside_execution_nonce") ||
-    message.includes("is_valid_outside_execution_nonce") ||
-    message.includes("requested entrypoint does not exist") ||
-    message.includes("entrypoint does not exist") ||
-    message.includes("authorization") ||
-    message.includes("not implemented") ||
-    message.includes("manual execution")
+  const code = toCode(error);
+  if (code && EXECUTE_FALLBACK_ERROR_CODES.has(code)) {
+    return true;
+  }
+
+  const message = toMessage(error).trim();
+  return EXECUTE_FALLBACK_MESSAGE_PATTERNS.some((pattern) =>
+    pattern.test(message)
   );
 }
 

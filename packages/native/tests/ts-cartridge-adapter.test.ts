@@ -10,8 +10,10 @@ import {
 } from "@/cartridge/ts";
 import {
   SessionProtocolError,
+  SessionRejectedError,
   SessionTimeoutError,
 } from "@/cartridge/ts/errors";
+import * as sessionApi from "@/cartridge/ts/session_api";
 
 const ENCODED_SESSION =
   "eyJ1c2VybmFtZSI6InBsYXllcjEiLCJhZGRyZXNzIjoiMHhhYmMiLCJvd25lckd1aWQiOiIweDEyMyIsImV4cGlyZXNBdCI6IjQ3MDI0NDQ4MDAiLCJndWFyZGlhbktleUd1aWQiOiIweDAiLCJtZXRhZGF0YUhhc2giOiIweDAiLCJzZXNzaW9uS2V5R3VpZCI6IjB4OTk5In0=";
@@ -22,6 +24,7 @@ describe("cartridge ts adapter", () => {
   });
 
   afterEach(() => {
+    vi.restoreAllMocks();
     vi.useRealTimers();
   });
 
@@ -362,6 +365,41 @@ describe("cartridge ts adapter", () => {
     expect(handle.account.address).toBe(
       "0x0000000000000000000000000000000000000000000000000000000000000abc"
     );
+  });
+
+  it("rethrows terminal redirect rejections without falling back", async () => {
+    vi.spyOn(sessionApi, "parseSessionFromEncodedRedirect").mockImplementation(
+      () => {
+        throw new SessionRejectedError(
+          "Cartridge session is revoked and cannot be used."
+        );
+      }
+    );
+    const subscribeSession = vi.fn();
+    const logger = {
+      info: vi.fn(),
+      warn: vi.fn(),
+      error: vi.fn(),
+    };
+    const adapter = createCartridgeTsAdapter({
+      openSession: async () => ({
+        status: "success",
+        encodedSession: ENCODED_SESSION,
+      }),
+      subscribeSession,
+      logger,
+    });
+
+    await expect(
+      adapter.connect({
+        rpcUrl: "https://api.cartridge.gg/x/starknet/sepolia",
+        chainId: "0x534e5f5345504f4c4941",
+        policies: [{ target: "0x1", method: "create_game" }],
+      })
+    ).rejects.toThrow(SessionRejectedError);
+
+    expect(subscribeSession).not.toHaveBeenCalled();
+    expect(logger.warn).not.toHaveBeenCalled();
   });
 
   it("uses locally derived session key guid when redirect payload omits sessionKeyGuid", async () => {
