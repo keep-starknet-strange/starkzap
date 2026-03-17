@@ -353,6 +353,56 @@ export function getAvailableVesuCollateralAssets(
   });
 }
 
+/**
+ * Returns borrowable assets from the same pool, excluding the collateral asset.
+ */
+export function getAvailableVesuDebtAssets(
+  options: VesuAssetOption[],
+  collateralAsset: VesuAssetOption | null
+): VesuAssetOption[] {
+  const uniqueByAddress = new Map<string, VesuAssetOption>();
+  for (const option of options) {
+    if (!option.canBorrow) continue;
+    if (
+      collateralAsset?.poolAddress &&
+      option.poolAddress &&
+      option.poolAddress !== collateralAsset.poolAddress
+    ) {
+      continue;
+    }
+    if (
+      collateralAsset &&
+      option.token.address === collateralAsset.token.address
+    ) {
+      continue;
+    }
+    if (!uniqueByAddress.has(option.token.address)) {
+      uniqueByAddress.set(option.token.address, option);
+    }
+  }
+
+  return Array.from(uniqueByAddress.values()).sort((left, right) => {
+    const leftPriority = getAssetPriority(left.token.symbol);
+    const rightPriority = getAssetPriority(right.token.symbol);
+    if (leftPriority !== rightPriority) {
+      return leftPriority - rightPriority;
+    }
+    return left.token.symbol.localeCompare(right.token.symbol);
+  });
+}
+
+export function getDefaultVesuDebtAsset(
+  options: VesuAssetOption[],
+  collateralAsset: VesuAssetOption | null
+): VesuAssetOption | null {
+  return (
+    getPreferredOption(
+      getAvailableVesuDebtAssets(options, collateralAsset),
+      DEFAULT_VESU_DEBT_SYMBOLS
+    ) ?? null
+  );
+}
+
 export function getDefaultVesuCollateralAsset(
   options: VesuAssetOption[],
   debtAsset: VesuAssetOption | null

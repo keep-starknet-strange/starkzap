@@ -47,8 +47,8 @@ import {
   buildVesuMarketCards,
   formatVesuLtv,
   formatVesuUsdValue,
-  getAvailableVesuCollateralAssets,
-  getDefaultVesuCollateralAsset,
+  getAvailableVesuDebtAssets,
+  getDefaultVesuDebtAsset,
   getVesuHealthStatus,
   getVesuPoolLabel,
   getVesuPoolVisual,
@@ -112,13 +112,6 @@ function getExecuteOptions(
     feeMode:
       useSponsored && canUseSponsored ? FEE_MODE_SPONSORED : FEE_MODE_USER_PAYS,
   };
-}
-
-function describeCollateralOption(option: VesuAssetOption): string {
-  const poolLabel = getVesuPoolLabel(option.poolAddress);
-  return option.source === "market"
-    ? `${poolLabel} · Collateral asset`
-    : "Fallback collateral asset";
 }
 
 async function fetchVesuApiMarkets(
@@ -519,7 +512,7 @@ export default function VesuScreen() {
   const [selectedVaultAssetKey, setSelectedVaultAssetKey] = useState<
     string | null
   >(null);
-  const [selectedCollateralAssetKey, setSelectedCollateralAssetKey] = useState<
+  const [selectedBorrowAssetKey, setSelectedBorrowAssetKey] = useState<
     string | null
   >(null);
 
@@ -589,7 +582,7 @@ export default function VesuScreen() {
   const handleOpenMarket = useCallback(
     (option: VesuAssetOption, initialTab: MarketSheetTab = "supply") => {
       setSelectedVaultAssetKey(option.key);
-      setSelectedCollateralAssetKey(null);
+      setSelectedBorrowAssetKey(null);
       setVaultAction("deposit");
       setPositionAction("borrow");
       setMarketSheetTab(
@@ -605,7 +598,7 @@ export default function VesuScreen() {
     setIsMarketSheetOpen(false);
     setMarketSheetTab("supply");
     setSelectedVaultAssetKey(null);
-    setSelectedCollateralAssetKey(null);
+    setSelectedBorrowAssetKey(null);
     setPosition(null);
     setHealth(null);
     setPositionError(null);
@@ -667,21 +660,18 @@ export default function VesuScreen() {
         : null,
     [assetOptions, selectedVaultAssetKey]
   );
+  // In the borrow tab, the vault asset IS the collateral
+  const selectedCollateralToken = selectedVaultAsset?.token ?? null;
+  const debtOptions = useMemo(
+    () => getAvailableVesuDebtAssets(assetOptions, selectedVaultAsset),
+    [assetOptions, selectedVaultAsset]
+  );
   const selectedDebtAsset = useMemo(
-    () => (selectedVaultAsset?.canBorrow ? selectedVaultAsset : null),
-    [selectedVaultAsset]
-  );
-  const collateralOptions = useMemo(
-    () => getAvailableVesuCollateralAssets(assetOptions, selectedDebtAsset),
-    [assetOptions, selectedDebtAsset]
-  );
-  const selectedCollateralAsset = useMemo(
     () =>
-      collateralOptions.find((o) => o.key === selectedCollateralAssetKey) ??
-      getDefaultVesuCollateralAsset(collateralOptions, selectedDebtAsset),
-    [collateralOptions, selectedCollateralAssetKey, selectedDebtAsset]
+      debtOptions.find((o) => o.key === selectedBorrowAssetKey) ??
+      getDefaultVesuDebtAsset(debtOptions, selectedVaultAsset),
+    [debtOptions, selectedBorrowAssetKey, selectedVaultAsset]
   );
-  const selectedCollateralToken = selectedCollateralAsset?.token ?? null;
   const selectedMarketCard = useMemo(
     () =>
       selectedVaultAssetKey
@@ -693,9 +683,6 @@ export default function VesuScreen() {
   // Balances
   const vaultBalance = selectedVaultAsset
     ? getBalance(selectedVaultAsset.token)
-    : null;
-  const collateralWalletBalance = selectedCollateralToken
-    ? getBalance(selectedCollateralToken)
     : null;
   const debtWalletBalance = selectedDebtAsset
     ? getBalance(selectedDebtAsset.token)
@@ -741,14 +728,14 @@ export default function VesuScreen() {
     selectedDebtAsset?.token ?? null
   );
 
-  const collateralDropdownOptions = useMemo<DropdownOption[]>(
+  const debtDropdownOptions = useMemo<DropdownOption[]>(
     () =>
-      collateralOptions.map((o) => ({
+      debtOptions.map((o) => ({
         key: o.key,
         label: o.token.symbol,
-        description: describeCollateralOption(o),
+        description: `${getVesuPoolLabel(o.poolAddress)} · Borrowable`,
       })),
-    [collateralOptions]
+    [debtOptions]
   );
 
   // Track a submitted transaction
@@ -808,8 +795,8 @@ export default function VesuScreen() {
 
     const request = {
       provider: VESU_PROVIDER_ID,
-      ...(selectedDebtAsset.poolAddress
-        ? { poolAddress: selectedDebtAsset.poolAddress }
+      ...(selectedVaultAsset?.poolAddress
+        ? { poolAddress: selectedVaultAsset.poolAddress }
         : {}),
       collateralToken: selectedCollateralToken,
       debtToken: selectedDebtAsset.token,
@@ -837,6 +824,7 @@ export default function VesuScreen() {
     isVesuSupported,
     selectedCollateralToken,
     selectedDebtAsset,
+    selectedVaultAsset,
     wallet,
   ]);
 
@@ -945,9 +933,9 @@ export default function VesuScreen() {
     debtAmount,
   ]);
   useEffect(() => {
-    if (marketSheetTab === "borrow" && !selectedMarketCard?.option.canBorrow)
+    if (marketSheetTab === "borrow" && debtOptions.length === 0)
       setMarketSheetTab("supply");
-  }, [marketSheetTab, selectedMarketCard]);
+  }, [debtOptions.length, marketSheetTab]);
 
   // -----------------------------------------------------------------------
   // Actions
@@ -964,8 +952,8 @@ export default function VesuScreen() {
 
     const commonRequest = {
       provider: VESU_PROVIDER_ID,
-      ...(selectedDebtAsset.poolAddress
-        ? { poolAddress: selectedDebtAsset.poolAddress }
+      ...(selectedVaultAsset?.poolAddress
+        ? { poolAddress: selectedVaultAsset.poolAddress }
         : {}),
       collateralToken: selectedCollateralToken,
       debtToken: selectedDebtAsset.token,
@@ -1038,6 +1026,7 @@ export default function VesuScreen() {
     positionAction,
     selectedCollateralToken,
     selectedDebtAsset,
+    selectedVaultAsset,
     useSponsored,
     wallet,
   ]);
@@ -1169,8 +1158,8 @@ export default function VesuScreen() {
 
     const commonRequest = {
       provider: VESU_PROVIDER_ID,
-      ...(selectedDebtAsset.poolAddress
-        ? { poolAddress: selectedDebtAsset.poolAddress }
+      ...(selectedVaultAsset?.poolAddress
+        ? { poolAddress: selectedVaultAsset.poolAddress }
         : {}),
       collateralToken: selectedCollateralToken,
       debtToken: selectedDebtAsset.token,
@@ -1262,6 +1251,7 @@ export default function VesuScreen() {
     refreshPosition,
     selectedCollateralToken,
     selectedDebtAsset,
+    selectedVaultAsset,
     trackTransaction,
     useSponsored,
     wallet,
@@ -1273,12 +1263,14 @@ export default function VesuScreen() {
   // Validation flags
   // -----------------------------------------------------------------------
   const hasBorrowExposure = hasVesuExposure(position);
+  const hasDeposit = !!depositedBalance;
   const borrowRequiresCollateralInput =
     marketSheetTab === "borrow" &&
     positionAction === "borrow" &&
     !!selectedDebtAsset &&
     !isRefreshingPosition &&
-    !hasBorrowExposure;
+    !hasBorrowExposure &&
+    !hasDeposit;
   const canSubmitVault =
     !!selectedVaultAsset &&
     !!vaultAmount.trim() &&
@@ -1677,7 +1669,7 @@ export default function VesuScreen() {
                   {(["supply", "borrow"] as const).map((tab) => {
                     const isActive = marketSheetTab === tab;
                     const isDisabled =
-                      tab === "borrow" && !selectedMarketCard.option.canBorrow;
+                      tab === "borrow" && debtOptions.length === 0;
                     return (
                       <TouchableOpacity
                         key={tab}
@@ -1763,153 +1755,150 @@ export default function VesuScreen() {
                 )}
 
                 {/* Borrow tab content */}
-                {marketSheetTab === "borrow" &&
-                  selectedMarketCard.option.canBorrow && (
-                    <>
+                {marketSheetTab === "borrow" && debtOptions.length > 0 && (
+                  <>
+                    <View
+                      style={[
+                        styles.card,
+                        { backgroundColor: cardBg, borderColor },
+                      ]}
+                    >
+                      <PositionHealthCard
+                        currentStatus={currentStatus}
+                        health={health}
+                        projectedHealth={projectedHealth}
+                        projectedStatus={projectedStatus}
+                        collateralAmount={currentCollateralAmount}
+                        debtAmount={currentDebtAmount}
+                        isRefreshing={isRefreshingPosition}
+                        positionError={positionError}
+                        onRefresh={() => void refreshPosition()}
+                      />
+                    </View>
+
+                    {borrowRequiresCollateralInput && (
                       <View
                         style={[
-                          styles.card,
-                          { backgroundColor: cardBg, borderColor },
+                          styles.noticeCard,
+                          { backgroundColor, borderColor },
                         ]}
                       >
-                        <PositionHealthCard
-                          currentStatus={currentStatus}
-                          health={health}
-                          projectedHealth={projectedHealth}
-                          projectedStatus={projectedStatus}
-                          collateralAmount={currentCollateralAmount}
-                          debtAmount={currentDebtAmount}
-                          isRefreshing={isRefreshingPosition}
-                          positionError={positionError}
-                          onRefresh={() => void refreshPosition()}
-                        />
-                      </View>
-
-                      {borrowRequiresCollateralInput && (
-                        <View
+                        <ThemedText style={{ fontSize: 14, fontWeight: "700" }}>
+                          Deposit collateral first
+                        </ThemedText>
+                        <ThemedText
                           style={[
-                            styles.noticeCard,
-                            { backgroundColor, borderColor },
+                            { fontSize: 13, lineHeight: 18 },
+                            { color: textSecondary },
                           ]}
                         >
-                          <ThemedText
-                            style={{ fontSize: 14, fontWeight: "700" }}
-                          >
-                            Deposit collateral first
-                          </ThemedText>
-                          <ThemedText
-                            style={[
-                              { fontSize: 13, lineHeight: 18 },
-                              { color: textSecondary },
-                            ]}
-                          >
-                            This market needs collateral before you can borrow.
-                            Pick a same-pool collateral asset below.
-                          </ThemedText>
-                        </View>
+                          Supply {selectedMarketCard.option.token.symbol} in the
+                          Supply tab first, then come back to borrow against it.
+                        </ThemedText>
+                      </View>
+                    )}
+
+                    <View
+                      style={[
+                        styles.card,
+                        { backgroundColor: cardBg, borderColor },
+                      ]}
+                    >
+                      <ThemedText style={styles.cardTitle}>
+                        {positionAction === "borrow"
+                          ? `Borrow against ${selectedMarketCard.option.token.symbol}`
+                          : "Repay Debt"}
+                      </ThemedText>
+
+                      <DropdownField
+                        label={
+                          positionAction === "borrow"
+                            ? "Token to Borrow"
+                            : "Token to Repay"
+                        }
+                        placeholder="No borrowable assets"
+                        valueLabel={selectedDebtAsset?.token.symbol ?? null}
+                        valueDescription={
+                          selectedDebtAsset
+                            ? `${getVesuPoolLabel(selectedDebtAsset.poolAddress)} · Borrowable`
+                            : undefined
+                        }
+                        options={debtDropdownOptions}
+                        onSelect={setSelectedBorrowAssetKey}
+                      />
+
+                      <ActionPills
+                        actions={POSITION_ACTIONS}
+                        labels={{ borrow: "Borrow", repay: "Repay" }}
+                        selected={positionAction}
+                        onSelect={setPositionAction}
+                      />
+
+                      <AmountField
+                        label={
+                          positionAction === "borrow"
+                            ? "Amount to Borrow"
+                            : "Amount to Repay"
+                        }
+                        hint={`Wallet ${debtWalletBalance?.toFormatted(true) ?? EMPTY_STATE_LABEL}`}
+                        value={debtAmount}
+                        error={debtAmountError}
+                        onChangeText={setDebtAmount}
+                        maxValue={
+                          positionAction === "repay"
+                            ? debtWalletBalance?.toUnit()
+                            : undefined
+                        }
+                      />
+
+                      <AmountField
+                        label={
+                          positionAction === "borrow"
+                            ? "Additional Collateral (optional)"
+                            : "Collateral to Withdraw"
+                        }
+                        hint={
+                          positionAction === "borrow"
+                            ? `Wallet ${vaultBalance?.toFormatted(true) ?? EMPTY_STATE_LABEL}${depositedBalance ? ` · Deposited ${depositedBalance.toFormatted(true)}` : ""}`
+                            : `Position ${amountFromBase(position?.collateralAmount, selectedCollateralToken)}`
+                        }
+                        value={collateralAmount}
+                        error={collateralAmountError}
+                        onChangeText={setCollateralAmount}
+                        maxValue={
+                          positionAction === "borrow"
+                            ? vaultBalance?.toUnit()
+                            : selectedCollateralToken &&
+                                position?.collateralAmount != null
+                              ? Amount.fromRaw(
+                                  position.collateralAmount,
+                                  selectedCollateralToken
+                                ).toUnit()
+                              : undefined
+                        }
+                      />
+
+                      {quoteError && (
+                        <ThemedText style={styles.errorText}>
+                          {quoteError}
+                        </ThemedText>
                       )}
 
-                      <View
-                        style={[
-                          styles.card,
-                          { backgroundColor: cardBg, borderColor },
-                        ]}
-                      >
-                        <ThemedText style={styles.cardTitle}>
-                          {positionAction === "borrow"
-                            ? `Borrow ${selectedMarketCard.option.token.symbol}`
-                            : `Repay ${selectedMarketCard.option.token.symbol}`}
-                        </ThemedText>
-
-                        <DropdownField
-                          label="Collateral Asset"
-                          placeholder="No Vesu collateral assets"
-                          valueLabel={
-                            selectedCollateralAsset?.token.symbol ?? null
-                          }
-                          valueDescription={
-                            selectedCollateralAsset
-                              ? describeCollateralOption(
-                                  selectedCollateralAsset
-                                )
-                              : undefined
-                          }
-                          options={collateralDropdownOptions}
-                          onSelect={setSelectedCollateralAssetKey}
-                        />
-
-                        <ActionPills
-                          actions={POSITION_ACTIONS}
-                          labels={{ borrow: "Borrow", repay: "Repay" }}
-                          selected={positionAction}
-                          onSelect={setPositionAction}
-                        />
-
-                        <AmountField
-                          label={
-                            positionAction === "borrow"
-                              ? "Collateral to Add"
-                              : "Collateral to Withdraw"
-                          }
-                          hint={
-                            positionAction === "borrow"
-                              ? `Wallet ${collateralWalletBalance?.toFormatted(true) ?? EMPTY_STATE_LABEL}`
-                              : `Position ${amountFromBase(position?.collateralAmount, selectedCollateralToken)}`
-                          }
-                          value={collateralAmount}
-                          error={collateralAmountError}
-                          onChangeText={setCollateralAmount}
-                          maxValue={
-                            positionAction === "borrow"
-                              ? collateralWalletBalance?.toUnit()
-                              : selectedCollateralToken &&
-                                  position?.collateralAmount != null
-                                ? Amount.fromRaw(
-                                    position.collateralAmount,
-                                    selectedCollateralToken
-                                  ).toUnit()
-                                : undefined
-                          }
-                        />
-
-                        <AmountField
-                          label={
-                            positionAction === "borrow"
-                              ? "Debt to Borrow"
-                              : "Debt to Repay"
-                          }
-                          hint={`Wallet ${debtWalletBalance?.toFormatted(true) ?? EMPTY_STATE_LABEL}`}
-                          value={debtAmount}
-                          error={debtAmountError}
-                          onChangeText={setDebtAmount}
-                          maxValue={
-                            positionAction === "repay"
-                              ? debtWalletBalance?.toUnit()
-                              : undefined
-                          }
-                        />
-
-                        {quoteError && (
-                          <ThemedText style={styles.errorText}>
-                            {quoteError}
-                          </ThemedText>
-                        )}
-
-                        <SecondaryButton
-                          label="Preview Health"
-                          enabled={canPreviewPosition}
-                          loading={isQuoting}
-                          onPress={() => void handlePreview()}
-                        />
-                        <SubmitButton
-                          label={borrowSubmitLabel}
-                          enabled={canSubmitPosition}
-                          loading={isSubmitting}
-                          onPress={() => void handlePositionSubmit()}
-                        />
-                      </View>
-                    </>
-                  )}
+                      <SecondaryButton
+                        label="Preview Health"
+                        enabled={canPreviewPosition}
+                        loading={isQuoting}
+                        onPress={() => void handlePreview()}
+                      />
+                      <SubmitButton
+                        label={borrowSubmitLabel}
+                        enabled={canSubmitPosition}
+                        loading={isSubmitting}
+                        onPress={() => void handlePositionSubmit()}
+                      />
+                    </View>
+                  </>
+                )}
               </ScrollView>
             </>
           )}
