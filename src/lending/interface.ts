@@ -173,6 +173,12 @@ export interface LendingUserPositionsRequest {
   user?: Address;
 }
 
+export interface LendingMaxBorrowRequest extends LendingRequestBase {
+  collateralToken: Token;
+  debtToken: Token;
+  user?: Address;
+}
+
 export interface LendingProvider {
   readonly id: string;
   supportsChain(chainId: ChainId): boolean;
@@ -214,4 +220,8 @@ export interface LendingProvider {
     context: LendingProviderContext,
     request: LendingUserPositionsRequest
   ): Promise<LendingUserPosition[]>;
+  getMaxBorrowAmount?(
+    context: LendingProviderContext,
+    request: LendingMaxBorrowRequest
+  ): Promise<bigint>;
 }

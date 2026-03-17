@@ -11,6 +11,7 @@ import type {
   LendingProvider,
   LendingProviderContext,
   LendingRepayRequest,
+  LendingMaxBorrowRequest,
   LendingUserPosition,
   LendingUserPositionsRequest,
   LendingWithdrawMaxRequest,
@@ -629,6 +630,55 @@ export class VesuLendingProvider implements LendingProvider {
     }
 
     return result;
+  }
+
+  async getMaxBorrowAmount(
+    context: LendingProviderContext,
+    request: LendingMaxBorrowRequest
+  ): Promise<bigint> {
+    const { poolAddress, user } = this.resolveRequestContext(context, request);
+
+    const [health, collateralPrice, debtPrice, maxLtv] = await Promise.all([
+      this.getHealth(context, {
+        collateralToken: request.collateralToken,
+        debtToken: request.debtToken,
+        poolAddress,
+        user,
+      }),
+      this.readAssetPrice(
+        context,
+        poolAddress,
+        request.collateralToken.address
+      ),
+      this.readAssetPrice(context, poolAddress, request.debtToken.address),
+      this.readPairMaxLtv(
+        context,
+        poolAddress,
+        request.collateralToken.address,
+        request.debtToken.address
+      ),
+    ]);
+
+    if (!collateralPrice.isValid || !debtPrice.isValid) {
+      return 0n;
+    }
+    if (debtPrice.value === 0n) {
+      return 0n;
+    }
+
+    // maxBorrowValue = collateralValue * maxLtv / SCALE - debtValue
+    const maxBorrowValue =
+      (health.collateralValue * maxLtv) / VESU_SCALE - health.debtValue;
+
+    if (maxBorrowValue <= 0n) {
+      return 0n;
+    }
+
+    // Convert value back to debt token amount: amount = value * tokenScale / price
+    const debtScale = tokenScale(request.debtToken.decimals);
+    const maxBorrowAmount = (maxBorrowValue * debtScale) / debtPrice.value;
+
+    return maxBorrowAmount;
   }
 
   private async readAssetPrice(

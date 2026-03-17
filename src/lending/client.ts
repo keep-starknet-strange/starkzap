@@ -7,6 +7,7 @@ import type {
   LendingHealthQuote,
   LendingHealthQuoteRequest,
   LendingMarketsRequest,
+  LendingMaxBorrowRequest,
   LendingMarket,
   LendingPosition,
   LendingPositionRequest,
@@ -103,6 +104,19 @@ export class LendingClient {
       );
     }
     return await provider.getPositions(this.providerContext(), {
+      user: request.user ?? this.context.address,
+    });
+  }
+
+  async getMaxBorrowAmount(request: LendingMaxBorrowRequest): Promise<bigint> {
+    const provider = this.resolveRequestProvider(request.provider);
+    if (!provider.getMaxBorrowAmount) {
+      throw new Error(
+        `Lending provider "${provider.id}" does not support max borrow queries`
+      );
+    }
+    return await provider.getMaxBorrowAmount(this.providerContext(), {
+      ...stripProvider(request),
       user: request.user ?? this.context.address,
     });
   }
