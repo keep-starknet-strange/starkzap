@@ -72,6 +72,12 @@ interface NormalizedExecutionCall {
   calldata: string[];
 }
 
+interface NormalizedExecutionCallTarget {
+  contractAddress: string;
+  entrypoint: string;
+  selector: string;
+}
+
 interface SessionStruct {
   expiresAt: string;
   allowedPoliciesRoot: string;
@@ -187,6 +193,40 @@ function normalizeChainId(chainId: string): string {
   return shortFelt(trimmed);
 }
 
+function rawContractAddressFromCall(call: Call): string {
+  return String(
+    (call as unknown as { contractAddress?: unknown }).contractAddress ?? ""
+  );
+}
+
+function rawEntrypointFromCall(call: Call): string {
+  return String((call as unknown as { entrypoint?: unknown }).entrypoint ?? "");
+}
+
+function normalizeExecutionCallTarget(
+  call: Call
+): NormalizedExecutionCallTarget {
+  const entrypoint = rawEntrypointFromCall(call).trim();
+  return {
+    contractAddress: normalizeContractAddress(rawContractAddressFromCall(call)),
+    entrypoint,
+    selector: selectorFromEntrypoint(entrypoint),
+  };
+}
+
+function normalizeExecutionCall(call: Call): NormalizedExecutionCall {
+  const target = normalizeExecutionCallTarget(call);
+  const calldata = CallData.toHex(call.calldata ?? []).map((felt) =>
+    normalizeFelt(felt)
+  );
+
+  return {
+    contractAddress: target.contractAddress,
+    selector: target.selector,
+    calldata,
+  };
+}
+
 function normalizeExecutionCalls(
   calls: readonly Call[]
 ): NormalizedExecutionCall[] {
@@ -196,23 +236,7 @@ function normalizeExecutionCalls(
     );
   }
 
-  return calls.map((call) => {
-    const rawContractAddress = String(
-      (call as unknown as { contractAddress?: unknown }).contractAddress ?? ""
-    );
-    const rawEntrypoint = String(
-      (call as unknown as { entrypoint?: unknown }).entrypoint ?? ""
-    );
-    const calldata = CallData.toHex(call.calldata ?? []).map((felt) =>
-      normalizeFelt(felt)
-    );
-
-    return {
-      contractAddress: normalizeContractAddress(rawContractAddress),
-      selector: selectorFromEntrypoint(rawEntrypoint),
-      calldata,
-    };
-  });
+  return calls.map(normalizeExecutionCall);
 }
 
 export function createPolicyProofIndex(
@@ -233,6 +257,19 @@ export function createPolicyProofIndex(
 
 function policyKey(contractAddress: string, selector: string): string {
   return `${normalizeContractAddress(contractAddress)}:${normalizeFelt(selector)}`;
+}
+
+export function listCallsMissingPolicyProofs(
+  calls: readonly Call[],
+  policyProofIndex: ReadonlyMap<string, string[]>
+): string[] {
+  return calls.flatMap((call) => {
+    const target = normalizeExecutionCallTarget(call);
+    const key = policyKey(target.contractAddress, target.selector);
+    return policyProofIndex.has(key)
+      ? []
+      : [`${target.contractAddress}#${target.entrypoint}`];
+  });
 }
 
 function resolveCallProofs(

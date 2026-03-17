@@ -15,7 +15,7 @@ import { useColorScheme } from "@/components/useColorScheme";
 import { useTicTacToe } from "@/app/context/TicTacToeContractConnector";
 import { useStarknetConnector } from "@/app/context/StarknetConnector";
 import AccountGate from "@/components/AccountGate";
-import { addAddressPadding } from "starknet";
+import { normalizeAddress } from "@/utils/address";
 
 type CellValue = "X" | "O" | null;
 type PendingMove = {
@@ -24,24 +24,6 @@ type PendingMove = {
   symbol: "X" | "O";
   isPending: boolean;
 };
-
-function normalizeAddress(value: string | undefined | null): string {
-  const raw = (value || "").trim();
-  if (!raw) {
-    return "";
-  }
-
-  try {
-    return addAddressPadding(raw.toLowerCase());
-  } catch {
-    try {
-      const hex = `0x${BigInt(raw).toString(16)}`;
-      return addAddressPadding(hex.toLowerCase());
-    } catch {
-      return raw.toLowerCase();
-    }
-  }
-}
 
 function calculateWinner(board: CellValue[]): {
   winner: "X" | "O" | null;
@@ -124,7 +106,10 @@ export default function PlayScreen() {
     [currentPlayer, myRole]
   );
 
-  const myAddress = normalizeAddress(account?.address || "");
+  const myAddress = useMemo(
+    () => normalizeAddress(account?.address || ""),
+    [account?.address]
+  );
   const activePendingMove =
     pendingMove?.gameId === currentGameId ? pendingMove : null;
 

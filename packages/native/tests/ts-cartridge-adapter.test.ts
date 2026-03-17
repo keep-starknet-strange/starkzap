@@ -113,6 +113,52 @@ describe("cartridge ts adapter", () => {
     expect(body.params?.signature?.[0]).toBe("0x73657373696f6e2d746f6b656e");
   });
 
+  it("throws a clear error before RPC when calls are missing policy proofs", async () => {
+    const fetchImpl = vi.fn();
+    const adapter = createCartridgeTsAdapter({
+      openSession: async () => ({
+        status: "success",
+        encodedSession: ENCODED_SESSION,
+      }),
+      fetchImpl,
+    });
+
+    const handle = await adapter.connect({
+      rpcUrl: "https://api.cartridge.gg/x/starknet/sepolia",
+      chainId: "0x534e5f5345504f4c4941",
+      policies: [{ target: "0x1", method: "create_game" }],
+    });
+
+    const error = await handle.account
+      .execute(
+        [
+          {
+            contractAddress:
+              "0x0000000000000000000000000000000000000000000000000000000000000001",
+            entrypoint: "join_game",
+            calldata: [],
+          },
+          {
+            contractAddress:
+              "0x0000000000000000000000000000000000000000000000000000000000000002",
+            entrypoint: "create_game",
+            calldata: [],
+          },
+        ] as Call[],
+        { feeMode: { mode: "sponsored" } }
+      )
+      .then(
+        () => null,
+        (caught) => caught
+      );
+
+    expect(error).toBeInstanceOf(SessionProtocolError);
+    expect((error as Error).message).toBe(
+      "Cannot execute from outside because session policy proofs are missing for: 0x0000000000000000000000000000000000000000000000000000000000000001#join_game, 0x0000000000000000000000000000000000000000000000000000000000000002#create_game."
+    );
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
   it("clears the outside execution timeout after a successful fetch", async () => {
     vi.useFakeTimers();
 

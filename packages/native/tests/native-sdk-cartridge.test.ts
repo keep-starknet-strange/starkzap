@@ -27,10 +27,7 @@ function makeAdapter() {
 
 function makeSdk(): StarkZap {
   const sdk = new StarkZap({ network: "sepolia" });
-  // Avoid network I/O from inherited chain validation helper.
-  (
-    sdk as unknown as { ensureProviderChainMatchesConfig: () => Promise<void> }
-  ).ensureProviderChainMatchesConfig = async () => {};
+  // Stub the inherited chain validation lookup to keep tests offline.
   vi.spyOn(sdk.getProvider(), "getChainId").mockResolvedValue(
     ChainId.SEPOLIA.toFelt252()
   );

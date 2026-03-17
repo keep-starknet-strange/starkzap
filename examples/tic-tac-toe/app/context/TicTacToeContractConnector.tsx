@@ -1,5 +1,6 @@
 import React, { createContext, useCallback, useContext, useState } from "react";
-import { addAddressPadding, type Call } from "starknet";
+import { type Call } from "starknet";
+import { normalizeAddress } from "@/utils/address";
 import { useStarknetConnector } from "./StarknetConnector";
 
 const DEFAULT_TIC_TAC_TOE_CONTRACT_ADDRESS =
@@ -39,24 +40,6 @@ type TicTacToeContextType = {
 const TicTacToeContext = createContext<TicTacToeContextType | undefined>(
   undefined
 );
-
-function normalizeAddress(value: string | undefined | null): string {
-  const raw = (value || "").trim();
-  if (!raw) {
-    return "";
-  }
-
-  try {
-    return addAddressPadding(raw.toLowerCase());
-  } catch {
-    try {
-      const asHex = `0x${BigInt(raw).toString(16)}`;
-      return addAddressPadding(asHex.toLowerCase());
-    } catch {
-      return raw.toLowerCase();
-    }
-  }
-}
 
 export const useTicTacToe = () => {
   const ctx = useContext(TicTacToeContext);
@@ -163,7 +146,7 @@ export const TicTacToeProvider: React.FC<{ children: React.ReactNode }> = ({
         const call: Call = {
           contractAddress,
           entrypoint: "play_move",
-          calldata: [gameId, cell],
+          calldata: [String(gameId), String(cell)],
         };
         if (!wallet) return null;
         const tx = await wallet.execute([call]);
