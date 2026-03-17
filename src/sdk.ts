@@ -1,7 +1,7 @@
 import { RpcProvider, type Call, type PaymasterTimeBounds } from "starknet";
 import { ChainId, getChainId, type SDKConfig } from "@/types/config";
 import type { ConnectWalletOptions, FeeMode } from "@/types/wallet";
-import { networks, type NetworkPreset } from "@/network";
+import { networks, type NetworkPreset, type NetworkName } from "@/network";
 import { Wallet } from "@/wallet";
 import type { WalletInterface } from "@/wallet/interface";
 import type { Address, Token, Pool } from "@/types";
@@ -93,10 +93,17 @@ export class StarkZap {
     // Get network preset if specified
     let networkPreset: NetworkPreset | undefined;
     if (config.network) {
-      networkPreset =
-        typeof config.network === "string"
-          ? networks[config.network]
-          : config.network;
+      if (typeof config.network === "string") {
+        const trimmed = config.network.trim() as NetworkName;
+        networkPreset = networks[trimmed];
+        if (!networkPreset) {
+          throw new Error(
+            `Invalid network "${config.network.replace(/\s/g, "\\n")}". Valid options: ${Object.keys(networks).join(", ")}`
+          );
+        }
+      } else {
+        networkPreset = config.network;
+      }
     }
 
     // Resolve rpcUrl (explicit > network preset)
