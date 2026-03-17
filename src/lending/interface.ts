@@ -92,6 +92,8 @@ export interface LendingBorrowRequest extends LendingRequestBase {
   collateralAmount?: Amount;
   collateralDenomination?: LendingAmountDenomination;
   debtDenomination?: LendingAmountDenomination;
+  /** Withdraw from earn position (vault) and use as collateral for this borrow. */
+  useEarnPosition?: boolean;
 }
 
 export interface LendingRepayRequest extends LendingRequestBase {
