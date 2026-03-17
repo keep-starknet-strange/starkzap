@@ -25,6 +25,7 @@ import {
   type LendingHealth,
   type LendingMarket,
   type LendingPosition,
+  type LendingUserPosition,
   type Token,
   type Tx,
 } from "@starkzap/native";
@@ -504,6 +505,9 @@ export default function VesuScreen() {
     string | null
   >(null);
 
+  // User positions (from Vesu indexer API)
+  const [userPositions, setUserPositions] = useState<LendingUserPosition[]>([]);
+
   // Position state
   const [position, setPosition] = useState<LendingPosition | null>(null);
   const [health, setHealth] = useState<LendingHealth | null>(null);
@@ -660,6 +664,20 @@ export default function VesuScreen() {
   const debtWalletBalance = selectedDebtAsset
     ? getBalance(selectedDebtAsset.token)
     : null;
+
+  // Deposited balance from Vesu indexer
+  const depositedBalance = useMemo(() => {
+    if (!selectedVaultAsset) return null;
+    const pos = userPositions.find(
+      (p) =>
+        p.type === "earn" &&
+        p.collateral.token.address === selectedVaultAsset.token.address &&
+        (!selectedVaultAsset.poolAddress ||
+          p.pool.id === selectedVaultAsset.poolAddress)
+    );
+    if (!pos) return null;
+    return Amount.fromRaw(pos.collateral.amount, pos.collateral.token);
+  }, [selectedVaultAsset, userPositions]);
 
   // Errors
   const vaultAmountError = getAmountError(
@@ -824,6 +842,26 @@ export default function VesuScreen() {
     }
   }, [addLog, chainId, isVesuSupported, wallet]);
 
+  const loadUserPositions = useCallback(async () => {
+    if (!wallet || !isVesuSupported) {
+      setUserPositions([]);
+      return;
+    }
+    try {
+      const positions = await wallet
+        .lending()
+        .getPositions({ provider: VESU_PROVIDER_ID });
+      setUserPositions(positions);
+      if (positions.length > 0) {
+        addLog(`Loaded ${positions.length} Vesu position(s)`);
+      }
+    } catch (e) {
+      addLog(
+        `Vesu positions fetch failed: ${e instanceof Error ? e.message : String(e)}`
+      );
+    }
+  }, [addLog, isVesuSupported, wallet]);
+
   const handleRefresh = useCallback(async () => {
     if (!wallet) return;
     setProjectedHealth(null);
@@ -832,8 +870,16 @@ export default function VesuScreen() {
       fetchBalances(wallet, chainId),
       loadMarkets(),
       refreshPosition(),
+      loadUserPositions(),
     ]);
-  }, [chainId, fetchBalances, loadMarkets, refreshPosition, wallet]);
+  }, [
+    chainId,
+    fetchBalances,
+    loadMarkets,
+    loadUserPositions,
+    refreshPosition,
+    wallet,
+  ]);
 
   // Effects
   useEffect(() => {
@@ -842,6 +888,9 @@ export default function VesuScreen() {
   useEffect(() => {
     if (wallet) void loadMarkets();
   }, [loadMarkets, wallet]);
+  useEffect(() => {
+    if (wallet) void loadUserPositions();
+  }, [loadUserPositions, wallet]);
   useEffect(() => {
     if (wallet) void refreshPosition();
   }, [refreshPosition, wallet]);
@@ -1001,6 +1050,7 @@ export default function VesuScreen() {
         fetchBalances(wallet, chainId),
         loadMarkets(),
         refreshPosition(),
+        loadUserPositions(),
       ]);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
@@ -1014,6 +1064,7 @@ export default function VesuScreen() {
     chainId,
     fetchBalances,
     loadMarkets,
+    loadUserPositions,
     refreshPosition,
     selectedVaultAsset,
     trackTransaction,
@@ -1314,6 +1365,54 @@ export default function VesuScreen() {
                 <ThemedText style={styles.errorText}>{marketError}</ThemedText>
               )}
 
+              {userPositions.length > 0 && (
+                <View style={{ marginTop: 8, gap: 6 }}>
+                  <ThemedText style={[styles.label, { color: textSecondary }]}>
+                    My Positions
+                  </ThemedText>
+                  {userPositions.map((pos, idx) => {
+                    const colAmt = Amount.fromRaw(
+                      pos.collateral.amount,
+                      pos.collateral.token
+                    );
+                    return (
+                      <View
+                        key={idx}
+                        style={[
+                          styles.positionRow,
+                          { backgroundColor: borderColor },
+                        ]}
+                      >
+                        <ThemedText style={styles.positionLabel}>
+                          {pos.type === "earn" ? "Deposit" : "Collateral"}
+                          {pos.pool.name ? ` · ${pos.pool.name}` : ""}
+                        </ThemedText>
+                        <ThemedText style={styles.positionValue}>
+                          {colAmt.toFormatted(true)}{" "}
+                          {pos.collateral.token.symbol}
+                        </ThemedText>
+                        {pos.debt && (
+                          <>
+                            <ThemedText
+                              style={[styles.positionLabel, { marginTop: 2 }]}
+                            >
+                              Debt
+                            </ThemedText>
+                            <ThemedText style={styles.positionValue}>
+                              {Amount.fromRaw(
+                                pos.debt.amount,
+                                pos.debt.token
+                              ).toFormatted(true)}{" "}
+                              {pos.debt.token.symbol}
+                            </ThemedText>
+                          </>
+                        )}
+                      </View>
+                    );
+                  })}
+                </View>
+              )}
+
               {marketCards.length > 0 ? (
                 <View style={styles.marketCardGrid}>
                   {marketCards.map((card) => (
@@ -1565,8 +1664,8 @@ export default function VesuScreen() {
                       label="Amount"
                       hint={
                         vaultAction === "deposit"
-                          ? `Wallet ${vaultBalance?.toFormatted(true) ?? EMPTY_STATE_LABEL}`
-                          : "Use Withdraw Max to redeem your full Vesu position"
+                          ? `Wallet ${vaultBalance?.toFormatted(true) ?? EMPTY_STATE_LABEL}${depositedBalance ? ` · Deposited ${depositedBalance.toFormatted(true)}` : ""}`
+                          : `Deposited ${depositedBalance?.toFormatted(true) ?? EMPTY_STATE_LABEL} · Use Withdraw Max to redeem all`
                       }
                       value={vaultAmount}
                       error={vaultAmountError}
@@ -2035,4 +2134,7 @@ const styles = StyleSheet.create({
   tabButtonActive: { backgroundColor: "#000" },
   tabText: { fontSize: 14, fontWeight: "700" },
   noticeCard: { borderWidth: 1, borderRadius: 14, padding: 14, gap: 6 },
+  positionRow: { borderRadius: 10, padding: 10, gap: 2 },
+  positionLabel: { fontSize: 11, fontWeight: "600", opacity: 0.6 },
+  positionValue: { fontSize: 14, fontWeight: "700" },
 });

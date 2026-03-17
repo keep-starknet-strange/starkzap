@@ -401,6 +401,9 @@ const btnLendingRepay = document.getElementById(
 const btnLendingPosition = document.getElementById(
   "btn-lending-position"
 ) as HTMLButtonElement;
+const btnLendingMyPositions = document.getElementById(
+  "btn-lending-my-positions"
+) as HTMLButtonElement;
 const lendingPositionEl = document.getElementById("lending-position")!;
 
 // Preset mapping
@@ -2835,6 +2838,48 @@ async function lendingViewPosition() {
   }
 }
 
+async function lendingMyPositions() {
+  if (!wallet) return;
+
+  setButtonLoading(btnLendingMyPositions, true);
+  try {
+    log("Fetching all Vesu positions...", "info");
+    const positions = await wallet.lending().getPositions();
+
+    if (positions.length === 0) {
+      lendingPositionEl.innerHTML = `<div class="quote-row"><span class="quote-label">No positions found</span></div>`;
+      lendingPositionEl.classList.remove("hidden");
+      log("No Vesu positions found", "info");
+      return;
+    }
+
+    const rows = positions.map((p) => {
+      const col = p.collateral;
+      const colFormatted = Amount.fromRaw(col.amount, col.token).toFormatted(
+        true
+      );
+      let row = `<div class="quote-row"><span class="quote-label">${p.type === "earn" ? "Deposit" : "Collateral"} (${p.pool.name ?? truncateAddress(p.pool.id)})</span><span class="quote-value">${colFormatted} ${col.token.symbol}</span></div>`;
+      if (p.debt) {
+        const debtFormatted = Amount.fromRaw(
+          p.debt.amount,
+          p.debt.token
+        ).toFormatted(true);
+        row += `<div class="quote-row"><span class="quote-label">Debt</span><span class="quote-value">${debtFormatted} ${p.debt.token.symbol}</span></div>`;
+      }
+      return row;
+    });
+
+    lendingPositionEl.innerHTML = rows.join("");
+    lendingPositionEl.classList.remove("hidden");
+    log(`Loaded ${positions.length} position(s)`, "success");
+  } catch (err) {
+    log(`Positions query failed: ${err}`, "error");
+    lendingPositionEl.classList.add("hidden");
+  } finally {
+    setButtonLoading(btnLendingMyPositions, false, "My Positions");
+  }
+}
+
 // Lending event listeners
 btnLendingDeposit.addEventListener("click", lendingDeposit);
 btnLendingWithdraw.addEventListener("click", lendingWithdraw);
@@ -2842,6 +2887,7 @@ btnLendingWithdrawMax.addEventListener("click", lendingWithdrawMax);
 btnLendingBorrow.addEventListener("click", lendingBorrow);
 btnLendingRepay.addEventListener("click", lendingRepay);
 btnLendingPosition.addEventListener("click", lendingViewPosition);
+btnLendingMyPositions.addEventListener("click", lendingMyPositions);
 
 // Initial log
 initializeSwapForm();

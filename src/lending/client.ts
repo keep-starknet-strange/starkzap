@@ -13,6 +13,8 @@ import type {
   LendingProvider,
   LendingProviderContext,
   LendingRepayRequest,
+  LendingUserPosition,
+  LendingUserPositionsRequest,
   LendingWithdrawMaxRequest,
   LendingWithdrawRequest,
   PreparedLendingAction,
@@ -89,6 +91,20 @@ export class LendingClient {
     return await this.resolveRequestProvider(request.provider).getMarkets(
       this.context.getChainId()
     );
+  }
+
+  async getPositions(
+    request: LendingUserPositionsRequest = {}
+  ): Promise<LendingUserPosition[]> {
+    const provider = this.resolveRequestProvider(request.provider);
+    if (!provider.getPositions) {
+      throw new Error(
+        `Lending provider "${provider.id}" does not support position queries`
+      );
+    }
+    return await provider.getPositions(this.providerContext(), {
+      user: request.user ?? this.context.address,
+    });
   }
 
   async prepareDeposit(

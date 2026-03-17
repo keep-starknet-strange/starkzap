@@ -152,6 +152,27 @@ export interface LendingMarketsRequest {
   provider?: LendingProvider | string;
 }
 
+export type LendingUserPositionType = "earn" | "borrow";
+
+export interface LendingTokenBalance {
+  token: Token;
+  amount: bigint;
+  usdValue?: bigint;
+}
+
+export interface LendingUserPosition {
+  type: LendingUserPositionType;
+  pool: { id: Address; name?: string };
+  collateral: LendingTokenBalance;
+  collateralShares?: LendingTokenBalance;
+  debt?: LendingTokenBalance;
+}
+
+export interface LendingUserPositionsRequest {
+  provider?: LendingProvider | string;
+  user?: Address;
+}
+
 export interface LendingProvider {
   readonly id: string;
   supportsChain(chainId: ChainId): boolean;
@@ -189,4 +210,8 @@ export interface LendingProvider {
     request: LendingHealthQuoteRequest,
     current: LendingHealth
   ): Promise<LendingHealth | null>;
+  getPositions?(
+    context: LendingProviderContext,
+    request: LendingUserPositionsRequest
+  ): Promise<LendingUserPosition[]>;
 }
