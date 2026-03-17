@@ -23,10 +23,11 @@ function decodeFelt252ToAscii(felt252: string): string {
 
     let decoded = "";
     for (let i = 0; i < normalizedHex.length; i += 2) {
-      const byte = Number.parseInt(normalizedHex.slice(i, i + 2), 16);
-      if (!Number.isFinite(byte) || byte === 0) {
-        continue;
+      const byteHex = normalizedHex.slice(i, i + 2);
+      if (!/^[0-9a-fA-F]{2}$/.test(byteHex)) {
+        throw new Error(`Invalid felt252 byte: "${byteHex}"`);
       }
+      const byte = Number.parseInt(byteHex, 16);
       decoded += String.fromCharCode(byte);
     }
     return decoded;
