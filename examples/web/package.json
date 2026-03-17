@@ -12,9 +12,14 @@
   },
   "dependencies": {
     "@cartridge/controller": "^0.13.9",
-    "@reown/appkit": "^1.7.0",
-    "@reown/appkit-adapter-ethers": "^1.7.0",
-    "@reown/appkit-adapter-solana": "^1.8.19",
+    "@hyperlane-xyz/registry": "^19.4.0",
+    "@hyperlane-xyz/sdk": "^14.4.0",
+    "@hyperlane-xyz/utils": "^14.4.0",
+    "@reown/appkit": "1.8.19",
+    "@reown/appkit-adapter-ethers": "1.8.19",
+    "@reown/appkit-adapter-solana": "1.8.19",
+    "@solana/web3.js": "^1.98.4",
+    "ethers": "^6.16.0",
     "starkzap": "file:../.."
   },
   "devDependencies": {

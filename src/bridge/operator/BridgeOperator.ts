@@ -204,7 +204,11 @@ export class BridgeOperator implements BridgeOperatorInterface {
 
     switch (token.protocol) {
       case Protocol.HYPERLANE:
-        return new SolanaHyperlaneBridge(token, walletConfig, starknetWallet);
+        return await SolanaHyperlaneBridge.create(
+          token,
+          walletConfig,
+          starknetWallet
+        );
       default:
         throw new Error(
           `Unsupported protocol "${token.protocol}" for ${token.chain} chain.`

@@ -12,12 +12,11 @@ import type {
   SolanaWalletConfig,
 } from "@/bridge/solana/types";
 import type { WalletInterface } from "@/wallet";
-import {
+import type {
   MultiProtocolProvider,
-  type SolanaWeb3Transaction,
+  SolanaWeb3Transaction,
   Token as HyperlaneToken,
   TokenAmount,
-  TokenStandard,
   WarpCore,
 } from "@hyperlane-xyz/sdk";
 import {
@@ -25,51 +24,83 @@ import {
   hyperlaneChainName,
   setupMultiProtocolProvider,
 } from "@/bridge/solana/registry";
+import {
+  loadHyperlane,
+  type HyperlaneRuntime,
+} from "@/bridge/solana/hyperlaneRuntime";
 
 // https://github.com/hyperlane-xyz/hyperlane-warp-ui-template/blob/21ac2754c69f69d056a39bcc664531d6118fee0c/src/consts/chains.ts#L68
 const SOLANA_RENT_ESTIMATE = BigInt(Math.round(0.00411336 * 1e9));
 
 export class SolanaHyperlaneBridge implements BridgeInterface<SolanaAddress> {
-  private readonly multiProvider: MultiProtocolProvider;
-  private readonly warpCore: WarpCore;
-  private readonly solanaToken: HyperlaneToken;
-  private readonly starknetChain: string;
-  private readonly solanaChain: string;
-
-  constructor(
+  private constructor(
     private readonly bridgeToken: SolanaBridgeToken,
     private readonly config: SolanaWalletConfig,
-    readonly starknetWallet: WalletInterface
-  ) {
-    const chainId = starknetWallet.getChainId();
-    this.multiProvider = setupMultiProtocolProvider(config, starknetWallet);
+    readonly starknetWallet: WalletInterface,
+    private readonly hyperlane: HyperlaneRuntime,
+    private readonly multiProvider: MultiProtocolProvider,
+    private readonly warpCore: WarpCore,
+    private readonly solanaToken: HyperlaneToken,
+    private readonly starknetChain: string,
+    private readonly solanaChain: string
+  ) {}
 
-    this.solanaToken = bridgeTokenToHyperlaneToken(
+  public static async create(
+    bridgeToken: SolanaBridgeToken,
+    config: SolanaWalletConfig,
+    starknetWallet: WalletInterface
+  ): Promise<SolanaHyperlaneBridge> {
+    const hyperlane = await loadHyperlane("Solana bridge operations");
+    const chainId = starknetWallet.getChainId();
+    const multiProvider = setupMultiProtocolProvider(
+      config,
+      starknetWallet,
+      hyperlane
+    );
+
+    const solanaToken = bridgeTokenToHyperlaneToken(
       bridgeToken,
       chainId,
-      "solana"
+      "solana",
+      hyperlane
     );
     const starknetToken = bridgeTokenToHyperlaneToken(
       bridgeToken,
       chainId,
-      "starknet"
+      "starknet",
+      hyperlane
     );
-    this.warpCore = new WarpCore(this.multiProvider, [
-      this.solanaToken,
-      starknetToken,
-    ]);
 
-    this.starknetChain = hyperlaneChainName(chainId, "starknet");
-    this.solanaChain = hyperlaneChainName(chainId, "solana");
+    const WarpCoreCtor = hyperlane.sdk.WarpCore;
+    const warpCore = new WarpCoreCtor(multiProvider, [
+      solanaToken,
+      starknetToken,
+    ]) as WarpCore;
+
+    return new SolanaHyperlaneBridge(
+      bridgeToken,
+      config,
+      starknetWallet,
+      hyperlane,
+      multiProvider,
+      warpCore,
+      solanaToken,
+      hyperlaneChainName(chainId, "starknet"),
+      hyperlaneChainName(chainId, "solana")
+    );
   }
 
   async deposit(
     recipient: Address,
     amount: Amount
   ): Promise<ExternalTransactionResponse> {
+    const TokenAmountCtor = this.hyperlane.sdk.TokenAmount;
     const transactions = (await this.warpCore.getTransferRemoteTxs({
       destination: this.starknetChain,
-      originTokenAmount: new TokenAmount(amount.toBase(), this.solanaToken),
+      originTokenAmount: new TokenAmountCtor(
+        amount.toBase(),
+        this.solanaToken
+      ) as TokenAmount,
       sender: this.config.address,
       recipient,
     })) as SolanaWeb3Transaction[];
@@ -139,19 +170,22 @@ export class SolanaHyperlaneBridge implements BridgeInterface<SolanaAddress> {
         sender: this.config.address,
       });
 
-      return { interchainFee: quote.plus(SOLANA_RENT_ESTIMATE) };
+      return { interchainFee: quote.plus(SOLANA_RENT_ESTIMATE) as TokenAmount };
     } catch {
-      const zeroToken = new HyperlaneToken({
+      const HyperlaneTokenCtor = this.hyperlane.sdk.Token;
+      const TokenAmountCtor = this.hyperlane.sdk.TokenAmount;
+      const TokenStandard = this.hyperlane.sdk.TokenStandard;
+      const zeroToken = new HyperlaneTokenCtor({
         symbol: "SOL",
         name: "Solana",
         decimals: 9,
         chainName: this.solanaChain,
         addressOrDenom: "native",
         standard: TokenStandard.SealevelHypNative,
-      });
+      }) as HyperlaneToken;
 
       return {
-        interchainFee: new TokenAmount(0n, zeroToken),
+        interchainFee: new TokenAmountCtor(0n, zeroToken) as TokenAmount,
         interchainFeeError: FeeErrorCause.GENERIC_L1_FEE_ERROR,
       };
     }
@@ -169,12 +203,17 @@ export class SolanaHyperlaneBridge implements BridgeInterface<SolanaAddress> {
         interchainFee,
       });
 
+      const TokenAmountCtor = this.hyperlane.sdk.TokenAmount;
       return {
-        localFee: new TokenAmount(BigInt(fee), this.solanaToken),
+        localFee: new TokenAmountCtor(
+          BigInt(fee),
+          this.solanaToken
+        ) as TokenAmount,
       };
     } catch {
+      const TokenAmountCtor = this.hyperlane.sdk.TokenAmount;
       return {
-        localFee: new TokenAmount(0n, interchainFee.token),
+        localFee: new TokenAmountCtor(0n, interchainFee.token) as TokenAmount,
         localFeeError: FeeErrorCause.GENERIC_L1_FEE_ERROR,
       };
     }
