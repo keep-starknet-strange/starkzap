@@ -13,7 +13,10 @@ import type {
 } from "@/types/onboard";
 import { getCartridgeNativeAdapterOrThrow } from "@/cartridge/registry";
 import { hasPoliciesInput } from "@/cartridge/ts/policy";
-import { NativeCartridgeWallet } from "@/wallet/cartridge";
+import {
+  NativeCartridgeWallet,
+  validateSupportedCartridgeFeeMode,
+} from "@/wallet/cartridge";
 import type { CartridgeNativeConnectArgs } from "@/cartridge/types";
 
 export class StarkZap extends CoreStarkZap {
@@ -25,6 +28,7 @@ export class StarkZap extends CoreStarkZap {
     options: ConnectCartridgeOptions = {}
   ): Promise<Awaited<ReturnType<CoreStarkZap["connectCartridge"]>>> {
     await this.ensureProviderChainMatchesConfig();
+    const feeMode = validateSupportedCartridgeFeeMode(options.feeMode);
 
     const adapter = getCartridgeNativeAdapterOrThrow();
 
@@ -61,7 +65,7 @@ export class StarkZap extends CoreStarkZap {
       session,
       provider,
       chainId,
-      ...(options.feeMode && { feeMode: options.feeMode }),
+      ...(feeMode && { feeMode }),
       ...(options.timeBounds && { timeBounds: options.timeBounds }),
       ...((options.explorer ?? internals.explorer) && {
         explorer: options.explorer ?? internals.explorer,
@@ -82,7 +86,7 @@ export class StarkZap extends CoreStarkZap {
     }
 
     const deploy = options.deploy ?? "never";
-    const feeMode = options.feeMode;
+    const feeMode = validateSupportedCartridgeFeeMode(options.feeMode);
     const timeBounds = options.timeBounds;
     const shouldEnsureReady = deploy !== "never";
 

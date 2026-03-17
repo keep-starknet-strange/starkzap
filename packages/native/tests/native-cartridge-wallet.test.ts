@@ -42,8 +42,24 @@ describe("NativeCartridgeWallet", () => {
       feeMode: "sponsored",
     });
     expect(tx.hash).toBe("0xfeed");
+    expect(wallet.getFeeMode()).toBe("sponsored");
     expect(session.account.execute).toHaveBeenCalledTimes(1);
     expect(wallet.getAccount()).toBeInstanceOf(Account);
+  });
+
+  it("rejects unsupported default fee mode during creation", async () => {
+    const unsupportedFeeMode = "user_pays" as unknown as "sponsored";
+
+    await expect(
+      NativeCartridgeWallet.create({
+        session,
+        provider,
+        chainId: ChainId.SEPOLIA,
+        feeMode: unsupportedFeeMode,
+      })
+    ).rejects.toThrow("supports sponsored session execution only");
+
+    expect(provider.getClassHashAt).not.toHaveBeenCalled();
   });
 
   it("rejects user_pays execution", async () => {

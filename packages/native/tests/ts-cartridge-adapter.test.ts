@@ -13,6 +13,7 @@ import {
   SessionRejectedError,
   SessionTimeoutError,
 } from "@/cartridge/ts/errors";
+import { TsSessionAccount } from "@/cartridge/ts/session_account";
 import * as sessionApi from "@/cartridge/ts/session_api";
 
 const ENCODED_SESSION =
@@ -238,24 +239,23 @@ describe("cartridge ts adapter", () => {
       policies: [{ target: "0x1", method: "create_game" }],
     });
 
-    const executePromise = handle.account.execute(
-      [
-        {
-          contractAddress:
-            "0x0000000000000000000000000000000000000000000000000000000000000001",
-          entrypoint: "create_game",
-          calldata: [],
-        },
-      ] as Call[],
-      { feeMode: { mode: "sponsored" } }
-    );
+    const executePromise = handle.account
+      .execute(
+        [
+          {
+            contractAddress:
+              "0x0000000000000000000000000000000000000000000000000000000000000001",
+            entrypoint: "create_game",
+            calldata: [],
+          },
+        ] as Call[],
+        { feeMode: { mode: "sponsored" } }
+      )
+      .catch((caught) => caught);
 
     await vi.advanceTimersByTimeAsync(25);
 
-    const error = await executePromise.then(
-      () => null,
-      (caught) => caught
-    );
+    const error = await executePromise;
 
     expect(error).toBeInstanceOf(SessionTimeoutError);
     expect(error).toBeInstanceOf(Error);
@@ -521,6 +521,102 @@ describe("cartridge ts adapter", () => {
     expect(executeFromOutside).toHaveBeenCalledTimes(1);
     expect(execute).toHaveBeenCalledTimes(1);
     expect(await handle.username?.()).toBe("player1");
+  });
+
+  it("invalidates the returned session execute closure after disconnect", async () => {
+    const executeFromOutside = vi
+      .fn()
+      .mockResolvedValue({ transaction_hash: "0xfeedbeef" });
+    const adapter = createCartridgeTsAdapter({
+      openSession: async () => ({
+        status: "success",
+        encodedSession: ENCODED_SESSION,
+      }),
+      executeFromOutside,
+    });
+
+    const handle = await adapter.connect({
+      rpcUrl: "https://api.cartridge.gg/x/starknet/sepolia",
+      chainId: "0x534e5f5345504f4c4941",
+      policies: [{ target: "0x1", method: "create_game" }],
+    });
+
+    const firstTx = await handle.account.execute(
+      [
+        {
+          contractAddress:
+            "0x0000000000000000000000000000000000000000000000000000000000000001",
+          entrypoint: "create_game",
+          calldata: [],
+        },
+      ] as Call[],
+      { feeMode: { mode: "sponsored" } }
+    );
+
+    expect(firstTx.transaction_hash).toBe("0xfeedbeef");
+
+    await handle.disconnect?.();
+
+    await expect(
+      handle.account.execute(
+        [
+          {
+            contractAddress:
+              "0x0000000000000000000000000000000000000000000000000000000000000001",
+            entrypoint: "create_game",
+            calldata: [],
+          },
+        ] as Call[],
+        { feeMode: { mode: "sponsored" } }
+      )
+    ).rejects.toThrow(
+      "Cartridge TS session has been disconnected and cannot execute transactions."
+    );
+
+    expect(executeFromOutside).toHaveBeenCalledTimes(1);
+  });
+
+  it("runs lower-level cleanup when the session account exposes one", async () => {
+    const close = vi.fn().mockResolvedValue(undefined);
+    const closeDescriptor = Object.getOwnPropertyDescriptor(
+      TsSessionAccount.prototype,
+      "close"
+    );
+    Object.defineProperty(TsSessionAccount.prototype, "close", {
+      configurable: true,
+      value: close,
+    });
+
+    try {
+      const adapter = createCartridgeTsAdapter({
+        openSession: async () => ({
+          status: "success",
+          encodedSession: ENCODED_SESSION,
+        }),
+        execute: async () => ({ transaction_hash: "0xfeedbeef" }),
+      });
+
+      const handle = await adapter.connect({
+        rpcUrl: "https://api.cartridge.gg/x/starknet/sepolia",
+        chainId: "0x534e5f5345504f4c4941",
+        policies: [{ target: "0x1", method: "create_game" }],
+      });
+
+      await handle.disconnect?.();
+      await handle.disconnect?.();
+
+      expect(close).toHaveBeenCalledTimes(1);
+    } finally {
+      if (closeDescriptor) {
+        Object.defineProperty(
+          TsSessionAccount.prototype,
+          "close",
+          closeDescriptor
+        );
+      } else {
+        Reflect.deleteProperty(TsSessionAccount.prototype, "close");
+      }
+    }
   });
 
   it("falls back to execute when outside execution returns SNIP-9 compatibility error", async () => {

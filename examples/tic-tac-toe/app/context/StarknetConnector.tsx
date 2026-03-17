@@ -57,10 +57,21 @@ const CARTRIDGE_RPC_BY_NETWORK: Record<StarknetNetwork, string> = {
 };
 
 function normalizeNetwork(value: string | undefined): StarknetNetwork {
+  if (value === undefined || value === "") {
+    return DEFAULT_NETWORK;
+  }
+
   if (value === "SN_MAIN" || value === "SN_SEPOLIA") {
     return value;
   }
-  return DEFAULT_NETWORK;
+
+  const allowedNetworks: readonly StarknetNetwork[] = ["SN_MAIN", "SN_SEPOLIA"];
+
+  throw new Error(
+    `normalizeNetwork received invalid EXPO_PUBLIC_STARKNET_NETWORK "${value}". Allowed StarknetNetwork values: ${allowedNetworks.join(
+      ", "
+    )}. Leave it unset to use DEFAULT_NETWORK (${DEFAULT_NETWORK}).`
+  );
 }
 
 function toSdkNetwork(network: StarknetNetwork): "mainnet" | "sepolia" {
