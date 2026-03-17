@@ -12,14 +12,17 @@ import { Text, View } from "@/components/Themed";
 import TicTacToeBoard from "@/components/TicTacToeBoard";
 import Colors from "@/constants/Colors";
 import { useColorScheme } from "@/components/useColorScheme";
-import { useTicTacToe } from "@/app/context/TicTacToeContractConnector";
+import {
+  type GameId,
+  useTicTacToe,
+} from "@/app/context/TicTacToeContractConnector";
 import { useStarknetConnector } from "@/app/context/StarknetConnector";
 import AccountGate from "@/components/AccountGate";
 import { normalizeAddress } from "@/utils/address";
 
 type CellValue = "X" | "O" | null;
 type PendingMove = {
-  gameId: number;
+  gameId: GameId;
   cell: number;
   symbol: "X" | "O";
   isPending: boolean;
@@ -78,7 +81,7 @@ export default function PlayScreen() {
     loadGame,
     contractAddress,
   } = useTicTacToe();
-  const invitations: { id: number; from: string }[] = [];
+  const invitations: { id: GameId; from: string }[] = [];
   const [joinGameId, setJoinGameId] = useState("");
 
   const colorScheme = useColorScheme() ?? "light";
@@ -114,7 +117,7 @@ export default function PlayScreen() {
     pendingMove?.gameId === currentGameId ? pendingMove : null;
 
   const syncGame = useCallback(
-    async (gameId: number): Promise<boolean> => {
+    async (gameId: GameId): Promise<boolean> => {
       const game = await getGame(gameId);
       if (!game) {
         return false;
@@ -143,7 +146,7 @@ export default function PlayScreen() {
   );
 
   const submitMove = useCallback(
-    async (gameId: number, cell: number, symbol: "X" | "O") => {
+    async (gameId: GameId, cell: number, symbol: "X" | "O") => {
       const txHash = await playMove(gameId, cell);
       if (!txHash) {
         setPendingMove((current) => {
@@ -264,8 +267,8 @@ export default function PlayScreen() {
   }
 
   function handleJoinGame() {
-    const id = parseInt(joinGameId.trim(), 10);
-    if (Number.isNaN(id) || id < 0) return;
+    const id = joinGameId.trim();
+    if (!/^[0-9]+$/.test(id)) return;
     loadGame(id);
     setPendingMove(null);
     setGameStarted(true);

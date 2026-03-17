@@ -66,6 +66,24 @@ function unsupportedUserPaysMessage(): string {
   return 'Cartridge wallet currently supports sponsored session execution only. Use feeMode: "sponsored".';
 }
 
+export type SupportedNativeCartridgeFeeMode = Extract<FeeMode, "sponsored">;
+
+export function validateSupportedCartridgeFeeMode(
+  feeMode?: FeeMode
+): SupportedNativeCartridgeFeeMode | undefined {
+  if (feeMode === undefined || feeMode === "sponsored") {
+    return feeMode;
+  }
+
+  throw new Error(unsupportedUserPaysMessage());
+}
+
+function resolveSupportedCartridgeFeeMode(
+  feeMode?: FeeMode
+): SupportedNativeCartridgeFeeMode {
+  return validateSupportedCartridgeFeeMode(feeMode) ?? "sponsored";
+}
+
 function assertTransactionHashResponse(
   response: unknown
 ): asserts response is { transaction_hash: string } {
@@ -201,7 +219,7 @@ export interface NativeCartridgeWalletOptions {
   chainId: ChainId;
   classHash?: string;
   explorer?: ExplorerConfig;
-  feeMode?: FeeMode;
+  feeMode?: SupportedNativeCartridgeFeeMode;
   timeBounds?: PaymasterTimeBounds;
   staking?: StakingConfig;
 }
@@ -213,7 +231,7 @@ export class NativeCartridgeWallet extends BaseWallet {
   private readonly chainId: ChainId;
   private readonly classHash: string;
   private readonly explorerConfig: ExplorerConfig | undefined;
-  private readonly defaultFeeMode: FeeMode;
+  private readonly defaultFeeMode: SupportedNativeCartridgeFeeMode;
   private readonly defaultTimeBounds: PaymasterTimeBounds | undefined;
   private deployedCache: boolean | null = null;
   private deployedCacheExpiresAt = 0;
@@ -238,6 +256,7 @@ export class NativeCartridgeWallet extends BaseWallet {
   static async create(
     options: NativeCartridgeWalletOptions
   ): Promise<NativeCartridgeWallet> {
+    const feeMode = resolveSupportedCartridgeFeeMode(options.feeMode);
     let classHash = "0x0";
     try {
       classHash = await options.provider.getClassHashAt(
@@ -250,6 +269,7 @@ export class NativeCartridgeWallet extends BaseWallet {
     return new NativeCartridgeWallet({
       ...options,
       classHash,
+      ...(feeMode && { feeMode }),
     });
   }
 
