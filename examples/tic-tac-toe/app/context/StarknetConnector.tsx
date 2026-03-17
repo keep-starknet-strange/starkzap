@@ -8,10 +8,17 @@ import React, {
   useMemo,
   useState,
 } from "react";
+import { TransactionExecutionStatus } from "starknet";
+import type { GetTransactionReceiptResponse } from "starknet";
 
 type StarknetNetwork = "SN_MAIN" | "SN_SEPOLIA" | "SN_DEVNET";
 type StarknetProvider = ReturnType<WalletInterface["getProvider"]>;
 type StarknetAccount = ReturnType<WalletInterface["getAccount"]>;
+type WaitForTransactionResult = {
+  success: boolean;
+  reverted: boolean;
+  receipt?: GetTransactionReceiptResponse;
+};
 
 type CartridgeTsOpenSessionArgs = {
   url: string;
@@ -82,6 +89,37 @@ function resolveCartridgeRpc(network: StarknetNetwork): string {
     return configured;
   }
   return CARTRIDGE_RPC_BY_NETWORK[network];
+}
+
+function isRevertedReceipt(receipt: GetTransactionReceiptResponse): boolean {
+  return receipt.isReverted();
+}
+
+function isRevertedWaitError(error: unknown): error is Error & {
+  response?: { execution_status?: string };
+} {
+  if (!(error instanceof Error)) {
+    return false;
+  }
+
+  const response = (error as { response?: { execution_status?: string } })
+    .response;
+
+  return (
+    response?.execution_status === TransactionExecutionStatus.REVERTED ||
+    error.message.includes(TransactionExecutionStatus.REVERTED)
+  );
+}
+
+async function getReceiptIfAvailable(
+  provider: StarknetProvider,
+  txHash: string
+): Promise<GetTransactionReceiptResponse | undefined> {
+  try {
+    return await provider.getTransactionReceipt(txHash);
+  } catch {
+    return undefined;
+  }
 }
 
 function resolveCartridgeRedirectUrl(): string | undefined {
@@ -200,7 +238,7 @@ type StarknetConnectorContextType = {
   error: string | null;
   connectCartridge: () => Promise<void>;
   disconnectAccount: () => Promise<void>;
-  waitForTransaction: (txHash: string) => Promise<boolean>;
+  waitForTransaction: (txHash: string) => Promise<WaitForTransactionResult>;
 };
 
 const StarknetConnector = createContext<
@@ -287,15 +325,30 @@ export const StarknetConnectorProvider: React.FC<{
   const provider = useMemo(() => wallet?.getProvider() ?? null, [wallet]);
 
   const waitForTransaction = useCallback(
-    async (txHash: string): Promise<boolean> => {
+    async (txHash: string): Promise<WaitForTransactionResult> => {
       if (!provider) {
-        return false;
+        return { success: false, reverted: false };
       }
+
       try {
-        await provider.waitForTransaction(txHash);
-        return true;
-      } catch {
-        return false;
+        const receipt = await provider.waitForTransaction(txHash);
+
+        if (isRevertedReceipt(receipt)) {
+          return { success: false, reverted: true, receipt };
+        }
+
+        return { success: true, reverted: false, receipt };
+      } catch (waitError) {
+        if (!isRevertedWaitError(waitError)) {
+          throw waitError;
+        }
+
+        const receipt = await getReceiptIfAvailable(provider, txHash);
+        return {
+          success: false,
+          reverted: true,
+          ...(receipt ? { receipt } : {}),
+        };
       }
     },
     [provider]

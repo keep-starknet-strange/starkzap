@@ -23,6 +23,7 @@ import { resolvePresetPolicies } from "@/cartridge/ts/preset";
 import {
   SessionProtocolError,
   SessionRejectedError,
+  SessionTimeoutError,
 } from "@/cartridge/ts/errors";
 import {
   extractTransactionHash,
@@ -39,6 +40,7 @@ import {
 const DEFAULT_CARTRIDGE_URL = "https://x.cartridge.gg";
 const DEFAULT_CARTRIDGE_API_URL = "https://api.cartridge.gg";
 const DEFAULT_REDIRECT_QUERY_NAME = "startapp";
+const DEFAULT_EXECUTE_FROM_OUTSIDE_REQUEST_TIMEOUT_MS = 15_000;
 
 type FetchLike = (
   input: string,
@@ -46,6 +48,7 @@ type FetchLike = (
     method?: string;
     headers?: Record<string, string>;
     body?: string;
+    signal?: unknown;
   }
 ) => Promise<{
   ok: boolean;
@@ -73,6 +76,7 @@ export interface CreateCartridgeTsAdapterOptions {
   redirectQueryName?: string;
   sessionRegistrationTimeoutMs?: number;
   sessionRequestTimeoutMs?: number;
+  executeFromOutsideRequestTimeoutMs?: number;
   openSession?: (args: OpenSessionArgs) => Promise<OpenSessionResult>;
   subscribeSession?: (args: {
     cartridgeApiUrl: string;
@@ -101,6 +105,65 @@ function ensureFetch(fetchImpl?: FetchLike): FetchLike {
   throw new SessionProtocolError(
     "No fetch implementation available for Cartridge V3 outside execution."
   );
+}
+
+async function fetchWithTimeout(
+  fetchFn: FetchLike,
+  input: string,
+  init: {
+    method?: string;
+    headers?: Record<string, string>;
+    body?: string;
+  },
+  requestTimeoutMs: number
+): Promise<Awaited<ReturnType<FetchLike>>> {
+  const timeoutMessage = `cartridge_addExecuteOutsideTransaction timed out after ${requestTimeoutMs}ms.`;
+  if (!Number.isFinite(requestTimeoutMs) || requestTimeoutMs <= 0) {
+    return fetchFn(input, init);
+  }
+
+  const maybeAbortController = (
+    globalThis as unknown as {
+      AbortController?: new () => { signal: unknown; abort(): void };
+    }
+  ).AbortController;
+  if (typeof maybeAbortController === "function") {
+    const controller = new maybeAbortController();
+    const timeoutId = setTimeout(() => {
+      controller.abort();
+    }, requestTimeoutMs);
+    try {
+      return await fetchFn(input, {
+        ...init,
+        signal: controller.signal,
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message.toLowerCase() : "";
+      const name = error instanceof Error ? error.name : "";
+      if (name === "AbortError" || message.includes("abort")) {
+        throw new SessionTimeoutError(timeoutMessage, error);
+      }
+      throw error;
+    } finally {
+      clearTimeout(timeoutId);
+    }
+  }
+
+  let timeoutId: ReturnType<typeof setTimeout> | null = null;
+  try {
+    return await Promise.race([
+      fetchFn(input, init),
+      new Promise<never>((_, reject) => {
+        timeoutId = setTimeout(() => {
+          reject(new SessionTimeoutError(timeoutMessage));
+        }, requestTimeoutMs);
+      }),
+    ]);
+  } finally {
+    if (timeoutId !== null) {
+      clearTimeout(timeoutId);
+    }
+  }
 }
 
 function asRecord(value: unknown): Record<string, unknown> | null {
@@ -350,22 +413,28 @@ export function createCartridgeTsAdapter(
             );
 
             const fetchFn = ensureFetch(options.fetchImpl);
-            const response = await fetchFn(rpcUrl, {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-              },
-              body: JSON.stringify({
-                id: 1,
-                jsonrpc: "2.0",
-                method: "cartridge_addExecuteOutsideTransaction",
-                params: {
-                  address: session.address,
-                  outside_execution: outsideExecution,
-                  signature,
+            const response = await fetchWithTimeout(
+              fetchFn,
+              rpcUrl,
+              {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
                 },
-              }),
-            });
+                body: JSON.stringify({
+                  id: 1,
+                  jsonrpc: "2.0",
+                  method: "cartridge_addExecuteOutsideTransaction",
+                  params: {
+                    address: session.address,
+                    outside_execution: outsideExecution,
+                    signature,
+                  },
+                }),
+              },
+              options.executeFromOutsideRequestTimeoutMs ??
+                DEFAULT_EXECUTE_FROM_OUTSIDE_REQUEST_TIMEOUT_MS
+            );
 
             if (!response.ok) {
               throw new SessionProtocolError(

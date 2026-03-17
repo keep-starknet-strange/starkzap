@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Call } from "starknet";
 import {
   clearCartridgeNativeAdapter,
@@ -8,7 +8,10 @@ import {
   createCartridgeTsAdapter,
   registerCartridgeTsAdapter,
 } from "@/cartridge/ts";
-import { SessionProtocolError } from "@/cartridge/ts/errors";
+import {
+  SessionProtocolError,
+  SessionTimeoutError,
+} from "@/cartridge/ts/errors";
 
 const ENCODED_SESSION =
   "eyJ1c2VybmFtZSI6InBsYXllcjEiLCJhZGRyZXNzIjoiMHhhYmMiLCJvd25lckd1aWQiOiIweDEyMyIsImV4cGlyZXNBdCI6IjQ3MDI0NDQ4MDAiLCJndWFyZGlhbktleUd1aWQiOiIweDAiLCJtZXRhZGF0YUhhc2giOiIweDAiLCJzZXNzaW9uS2V5R3VpZCI6IjB4OTk5In0=";
@@ -16,6 +19,10 @@ const ENCODED_SESSION =
 describe("cartridge ts adapter", () => {
   beforeEach(() => {
     clearCartridgeNativeAdapter();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   it("connects with default TS execution path when callbacks are not provided", async () => {
@@ -59,23 +66,27 @@ describe("cartridge ts adapter", () => {
       policies: [{ target: "0x1", method: "create_game" }],
     });
 
-    const tx = await handle.account.executePaymasterTransaction([
-      {
-        contractAddress:
-          "0x0000000000000000000000000000000000000000000000000000000000000001",
-        entrypoint: "create_game",
-        calldata: [],
-      },
-    ] as Call[]);
+    const tx = await handle.account.execute(
+      [
+        {
+          contractAddress:
+            "0x0000000000000000000000000000000000000000000000000000000000000001",
+          entrypoint: "create_game",
+          calldata: [],
+        },
+      ] as Call[],
+      { feeMode: { mode: "sponsored" } }
+    );
 
     expect(tx.transaction_hash).toBe("0xdeadbeef");
     expect(fetchImpl).toHaveBeenCalledTimes(1);
 
     const [url, init] = fetchImpl.mock.calls[0] as [
       string,
-      { body?: string } | undefined,
+      { body?: string; signal?: unknown } | undefined,
     ];
     expect(url).toBe("https://api.cartridge.gg/x/starknet/sepolia");
+    expect(init?.signal).toBeDefined();
 
     const body = JSON.parse(String(init?.body ?? "{}")) as {
       method?: string;
@@ -97,6 +108,112 @@ describe("cartridge ts adapter", () => {
     );
     expect(body.params?.outside_execution?.nonce?.[1]).toBe("0x1");
     expect(body.params?.signature?.[0]).toBe("0x73657373696f6e2d746f6b656e");
+  });
+
+  it("clears the outside execution timeout after a successful fetch", async () => {
+    vi.useFakeTimers();
+
+    const fetchImpl = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      statusText: "OK",
+      json: async () => ({
+        result: { transaction_hash: "0xdeadbeef" },
+      }),
+    });
+    const adapter = createCartridgeTsAdapter({
+      openSession: async () => ({
+        status: "success",
+        encodedSession: ENCODED_SESSION,
+      }),
+      fetchImpl,
+      executeFromOutsideRequestTimeoutMs: 25,
+    });
+
+    const handle = await adapter.connect({
+      rpcUrl: "https://api.cartridge.gg/x/starknet/sepolia",
+      chainId: "0x534e5f5345504f4c4941",
+      policies: [{ target: "0x1", method: "create_game" }],
+    });
+
+    const tx = await handle.account.execute(
+      [
+        {
+          contractAddress:
+            "0x0000000000000000000000000000000000000000000000000000000000000001",
+          entrypoint: "create_game",
+          calldata: [],
+        },
+      ] as Call[],
+      { feeMode: { mode: "sponsored" } }
+    );
+
+    expect(tx.transaction_hash).toBe("0xdeadbeef");
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it("treats aborted outside execution fetches as timeout errors", async () => {
+    vi.useFakeTimers();
+
+    const fetchImpl = vi.fn().mockImplementation(
+      (_url: string, init?: { signal?: AbortSignal }) =>
+        new Promise((_, reject) => {
+          const signal = init?.signal;
+          if (!signal) {
+            reject(new Error("Missing abort signal"));
+            return;
+          }
+          signal.addEventListener(
+            "abort",
+            () => {
+              const error = new Error("The operation was aborted.");
+              error.name = "AbortError";
+              reject(error);
+            },
+            { once: true }
+          );
+        })
+    );
+    const adapter = createCartridgeTsAdapter({
+      openSession: async () => ({
+        status: "success",
+        encodedSession: ENCODED_SESSION,
+      }),
+      fetchImpl,
+      executeFromOutsideRequestTimeoutMs: 25,
+    });
+
+    const handle = await adapter.connect({
+      rpcUrl: "https://api.cartridge.gg/x/starknet/sepolia",
+      chainId: "0x534e5f5345504f4c4941",
+      policies: [{ target: "0x1", method: "create_game" }],
+    });
+
+    const executePromise = handle.account.execute(
+      [
+        {
+          contractAddress:
+            "0x0000000000000000000000000000000000000000000000000000000000000001",
+          entrypoint: "create_game",
+          calldata: [],
+        },
+      ] as Call[],
+      { feeMode: { mode: "sponsored" } }
+    );
+
+    await vi.advanceTimersByTimeAsync(25);
+
+    const error = await executePromise.then(
+      () => null,
+      (caught) => caught
+    );
+
+    expect(error).toBeInstanceOf(SessionTimeoutError);
+    expect(error).toBeInstanceOf(Error);
+    expect((error as Error).message).toBe(
+      "cartridge_addExecuteOutsideTransaction timed out after 25ms."
+    );
+    expect(vi.getTimerCount()).toBe(0);
   });
 
   it("recovers a transaction hash from JSON-RPC error data when Cartridge includes one", async () => {
@@ -133,14 +250,17 @@ describe("cartridge ts adapter", () => {
       policies: [{ target: "0x1", method: "create_game" }],
     });
 
-    const tx = await handle.account.executePaymasterTransaction([
-      {
-        contractAddress:
-          "0x0000000000000000000000000000000000000000000000000000000000000001",
-        entrypoint: "create_game",
-        calldata: [],
-      },
-    ] as Call[]);
+    const tx = await handle.account.execute(
+      [
+        {
+          contractAddress:
+            "0x0000000000000000000000000000000000000000000000000000000000000001",
+          entrypoint: "create_game",
+          calldata: [],
+        },
+      ] as Call[],
+      { feeMode: { mode: "sponsored" } }
+    );
 
     expect(tx.transaction_hash).toBe("0xdeadbeef");
     expect(logger.warn).toHaveBeenCalledTimes(1);
@@ -301,14 +421,17 @@ describe("cartridge ts adapter", () => {
       "0x0000000000000000000000000000000000000000000000000000000000000abc"
     );
 
-    const tx = await handle.account.executePaymasterTransaction([
-      {
-        contractAddress:
-          "0x0000000000000000000000000000000000000000000000000000000000000001",
-        entrypoint: "create_game",
-        calldata: [],
-      },
-    ] as Call[]);
+    const tx = await handle.account.execute(
+      [
+        {
+          contractAddress:
+            "0x0000000000000000000000000000000000000000000000000000000000000001",
+          entrypoint: "create_game",
+          calldata: [],
+        },
+      ] as Call[],
+      { feeMode: { mode: "sponsored" } }
+    );
 
     expect(tx.transaction_hash).toBe("0xfeedbeef");
     expect(executeFromOutside).toHaveBeenCalledTimes(1);
@@ -339,14 +462,17 @@ describe("cartridge ts adapter", () => {
       policies: [{ target: "0x1", method: "create_game" }],
     });
 
-    const tx = await handle.account.executePaymasterTransaction([
-      {
-        contractAddress:
-          "0x0000000000000000000000000000000000000000000000000000000000000001",
-        entrypoint: "create_game",
-        calldata: [],
-      },
-    ] as Call[]);
+    const tx = await handle.account.execute(
+      [
+        {
+          contractAddress:
+            "0x0000000000000000000000000000000000000000000000000000000000000001",
+          entrypoint: "create_game",
+          calldata: [],
+        },
+      ] as Call[],
+      { feeMode: { mode: "sponsored" } }
+    );
 
     expect(tx.transaction_hash).toBe("0xfeedbeef");
     expect(executeFromOutside).toHaveBeenCalledTimes(1);
@@ -376,14 +502,17 @@ describe("cartridge ts adapter", () => {
     });
 
     await expect(
-      handle.account.executePaymasterTransaction([
-        {
-          contractAddress:
-            "0x0000000000000000000000000000000000000000000000000000000000000001",
-          entrypoint: "create_game",
-          calldata: [],
-        },
-      ] as Call[])
+      handle.account.execute(
+        [
+          {
+            contractAddress:
+              "0x0000000000000000000000000000000000000000000000000000000000000001",
+            entrypoint: "create_game",
+            calldata: [],
+          },
+        ] as Call[],
+        { feeMode: { mode: "sponsored" } }
+      )
     ).rejects.toThrow(/entrypoint does not exist/i);
   });
 
