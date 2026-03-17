@@ -55,6 +55,61 @@ function randomEthereumAddressWithIndex(index: number) {
 }
 
 describe("BridgeCache", () => {
+  it("evicts failed bridge promises for the same key", async () => {
+    const cache = new BridgeCache();
+    const wallet = mockWallet({ chain: ExternalChain.ETHEREUM });
+    const token = mockToken({
+      id: "usdc",
+      chain: ExternalChain.ETHEREUM,
+      protocol: Protocol.CANONICAL,
+      address: fromEthereumAddress(
+        "0xcea4d3660f2a915177bbda67f7f6d1da29f3f682"
+      ),
+    });
+
+    const failingPromise = Promise.reject(new Error("bridge creation failed"));
+    cache.set(
+      token,
+      wallet,
+      failingPromise as unknown as Promise<BridgeInterface>
+    );
+
+    const cached = cache.get(token, wallet);
+    expect(cached).toBeDefined();
+    await expect(cached!).rejects.toThrow("bridge creation failed");
+    expect(cache.get(token, wallet)).toBeUndefined();
+  });
+
+  it("does not evict a newer entry when an older promise rejects", async () => {
+    const cache = new BridgeCache();
+    const wallet = mockWallet({ chain: ExternalChain.ETHEREUM });
+    const token = mockToken({
+      id: "usdc",
+      chain: ExternalChain.ETHEREUM,
+      protocol: Protocol.CANONICAL,
+      address: fromEthereumAddress(
+        "0xdc6b3a9f651ec03b0ba8a0f30d302ae4d56f066f"
+      ),
+    });
+
+    let rejectOld: ((reason?: unknown) => void) | undefined;
+    const oldPromise = new Promise<BridgeInterface>((_, reject) => {
+      rejectOld = reject;
+    });
+
+    cache.set(token, wallet, oldPromise);
+    const oldGuarded = cache.get(token, wallet);
+    expect(oldGuarded).toBeDefined();
+
+    cache.set(token, wallet, Promise.resolve({} as unknown as BridgeInterface));
+    const currentGuarded = cache.get(token, wallet);
+    expect(currentGuarded).toBeDefined();
+
+    rejectOld?.(new Error("old failed"));
+    await expect(oldGuarded!).rejects.toThrow("old failed");
+    expect(cache.get(token, wallet)).toBe(currentGuarded);
+  });
+
   it("evicts the least recently used bridge when cache reaches capacity", () => {
     const cache = new BridgeCache();
     const wallet = mockWallet({ chain: ExternalChain.ETHEREUM });
