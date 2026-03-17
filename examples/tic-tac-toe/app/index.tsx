@@ -174,8 +174,26 @@ export default function PlayScreen() {
         return;
       }
 
-      const didConfirm = await waitForTransaction(txHash);
-      if (didConfirm) {
+      try {
+        const txResult = await waitForTransaction(txHash);
+        if (!txResult.success) {
+          if (__DEV__ && txResult.reverted) {
+            console.warn("play_move transaction reverted", txResult.receipt);
+          }
+          setPendingMove((current) => {
+            if (
+              current?.gameId === gameId &&
+              current.cell === cell &&
+              current.symbol === symbol
+            ) {
+              return null;
+            }
+            return current;
+          });
+          await syncGame(gameId);
+          return;
+        }
+
         setPendingMove((current) => {
           if (
             current?.gameId === gameId &&
@@ -187,6 +205,25 @@ export default function PlayScreen() {
           return current;
         });
         await syncGame(gameId);
+      } catch (waitError) {
+        if (__DEV__) {
+          console.warn("Failed waiting for play_move confirmation", waitError);
+        }
+        setPendingMove((current) => {
+          if (
+            current?.gameId === gameId &&
+            current.cell === cell &&
+            current.symbol === symbol
+          ) {
+            return null;
+          }
+          return current;
+        });
+        try {
+          await syncGame(gameId);
+        } catch {
+          // Polling will retry if the immediate sync attempt fails.
+        }
       }
     },
     [playMove, syncGame, waitForTransaction]
@@ -247,7 +284,7 @@ export default function PlayScreen() {
     loadGame(id);
     setPendingMove(null);
     setGameStarted(true);
-    setJoinGameId(id.toString());
+    setJoinGameId("");
   }
 
   function handleCellPress(index: number) {

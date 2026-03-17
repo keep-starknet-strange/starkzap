@@ -1,4 +1,3 @@
-/* global module */
-module.exports = {
+export default {
   dependencies: {},
 };

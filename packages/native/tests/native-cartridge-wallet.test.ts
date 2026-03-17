@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ChainId } from "starkzap";
-import type { Call, RpcProvider } from "starknet";
+import { Account, type Call, type RpcProvider } from "starknet";
 import { NativeCartridgeWallet } from "@/wallet/cartridge";
 import type { CartridgeNativeSessionHandle } from "@/cartridge/types";
 
@@ -14,9 +14,7 @@ function makeSession(): CartridgeNativeSessionHandle {
   return {
     account: {
       address: "0x123",
-      executePaymasterTransaction: vi
-        .fn()
-        .mockResolvedValue({ transaction_hash: "0xfeed" }),
+      execute: vi.fn().mockResolvedValue({ transaction_hash: "0xfeed" }),
       estimateInvokeFee: vi.fn().mockResolvedValue({}),
     },
     disconnect: vi.fn().mockResolvedValue(undefined),
@@ -44,9 +42,8 @@ describe("NativeCartridgeWallet", () => {
       feeMode: "sponsored",
     });
     expect(tx.hash).toBe("0xfeed");
-    expect(session.account.executePaymasterTransaction).toHaveBeenCalledTimes(
-      1
-    );
+    expect(session.account.execute).toHaveBeenCalledTimes(1);
+    expect(wallet.getAccount()).toBeInstanceOf(Account);
   });
 
   it("rejects user_pays execution", async () => {
