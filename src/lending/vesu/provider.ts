@@ -638,26 +638,33 @@ export class VesuLendingProvider implements LendingProvider {
   ): Promise<bigint> {
     const { poolAddress, user } = this.resolveRequestContext(context, request);
 
-    const [health, collateralPrice, debtPrice, maxLtv] = await Promise.all([
-      this.getHealth(context, {
-        collateralToken: request.collateralToken,
-        debtToken: request.debtToken,
-        poolAddress,
-        user,
-      }),
-      this.readAssetPrice(
-        context,
-        poolAddress,
-        request.collateralToken.address
-      ),
-      this.readAssetPrice(context, poolAddress, request.debtToken.address),
-      this.readPairMaxLtv(
-        context,
-        poolAddress,
-        request.collateralToken.address,
-        request.debtToken.address
-      ),
-    ]);
+    const [health, earnBalance, collateralPrice, debtPrice, maxLtv] =
+      await Promise.all([
+        this.getHealth(context, {
+          collateralToken: request.collateralToken,
+          debtToken: request.debtToken,
+          poolAddress,
+          user,
+        }),
+        this.readEarnBalance(
+          context,
+          poolAddress,
+          request.collateralToken,
+          user
+        ),
+        this.readAssetPrice(
+          context,
+          poolAddress,
+          request.collateralToken.address
+        ),
+        this.readAssetPrice(context, poolAddress, request.debtToken.address),
+        this.readPairMaxLtv(
+          context,
+          poolAddress,
+          request.collateralToken.address,
+          request.debtToken.address
+        ),
+      ]);
 
     if (!collateralPrice.isValid || !debtPrice.isValid) {
       return 0n;
@@ -666,9 +673,17 @@ export class VesuLendingProvider implements LendingProvider {
       return 0n;
     }
 
-    // maxBorrowValue = collateralValue * maxLtv / SCALE - debtValue
+    // Total collateral = on-chain borrow position collateral + earn deposit
+    const collateralScale = tokenScale(request.collateralToken.decimals);
+    const earnCollateralValue =
+      earnBalance > 0n
+        ? (earnBalance * collateralPrice.value) / collateralScale
+        : 0n;
+    const totalCollateralValue = health.collateralValue + earnCollateralValue;
+
+    // maxBorrowValue = totalCollateralValue * maxLtv / SCALE - debtValue
     const maxBorrowValue =
-      (health.collateralValue * maxLtv) / VESU_SCALE - health.debtValue;
+      (totalCollateralValue * maxLtv) / VESU_SCALE - health.debtValue;
 
     if (maxBorrowValue <= 0n) {
       return 0n;
@@ -679,6 +694,46 @@ export class VesuLendingProvider implements LendingProvider {
     const maxBorrowAmount = (maxBorrowValue * debtScale) / debtPrice.value;
 
     return maxBorrowAmount;
+  }
+
+  /**
+   * Read a user's earn position balance (underlying assets) from the vToken.
+   * Returns the amount in the collateral token's base units.
+   */
+  private async readEarnBalance(
+    context: LendingProviderContext,
+    poolAddress: Address,
+    collateralToken: Token,
+    user: Address
+  ): Promise<bigint> {
+    try {
+      const vTokenAddress = await this.resolveVTokenAddress(
+        context,
+        poolAddress,
+        collateralToken.address
+      );
+
+      // Get user's vToken share balance
+      const balanceResult = await context.provider.callContract({
+        contractAddress: vTokenAddress,
+        entrypoint: "balance_of",
+        calldata: CallData.compile([user]),
+      });
+      const shares = parseU256(balanceResult, 0, "vtoken_balance");
+      if (shares === 0n) {
+        return 0n;
+      }
+
+      // Convert shares to underlying assets
+      const assetsResult = await context.provider.callContract({
+        contractAddress: vTokenAddress,
+        entrypoint: "convert_to_assets",
+        calldata: CallData.compile([uint256.bnToUint256(shares)]),
+      });
+      return parseU256(assetsResult, 0, "vtoken_assets");
+    } catch {
+      return 0n;
+    }
   }
 
   private async readAssetPrice(
