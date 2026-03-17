@@ -227,18 +227,25 @@ export abstract class EthereumBridge implements BridgeInterface<EthereumAddress>
     const tokenInterface = this.token.getContract()?.interface;
     if (!tokenInterface || !receipt.logs) return;
 
-    // TODO this can be improved to parse logs once
-    const approvalLog = receipt.logs.find((log) => {
-      const parsedLog = tokenInterface.parseLog(log);
-      return (
+    let newAllowance: bigint | null = null;
+    for (const log of receipt.logs) {
+      let parsedLog;
+      try {
+        parsedLog = tokenInterface.parseLog(log);
+      } catch {
+        continue;
+      }
+
+      if (
         parsedLog?.name === "Approval" &&
         typeof parsedLog.args?.value === "bigint"
-      );
-    });
+      ) {
+        newAllowance = parsedLog.args.value;
+        break;
+      }
+    }
 
-    if (approvalLog) {
-      const newAllowance: bigint =
-        tokenInterface.parseLog(approvalLog)!.args.value;
+    if (newAllowance !== null) {
       const amount = await this.token.amount(newAllowance);
       this.setCachedAllowance(amount);
     } else {
