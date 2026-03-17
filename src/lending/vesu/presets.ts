@@ -4,6 +4,7 @@ export interface VesuChainConfig {
   poolFactory?: Address;
   defaultPool?: Address;
   marketsApiUrl?: string;
+  positionsApiUrl?: string;
 }
 
 /**
@@ -21,6 +22,7 @@ export const vesuPresets = {
       "0x0451fe483d5921a2919ddd81d0de6696669bccdacd859f72a4fba7656b97c3b5"
     ),
     marketsApiUrl: "https://api.vesu.xyz/markets",
+    positionsApiUrl: "https://api.vesu.xyz/positions",
   },
   // Testnet pool shared by Vesu team for integration testing.
   // Pool name on-chain: "WBTC Prime Sepolia"

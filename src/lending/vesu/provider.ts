@@ -11,6 +11,8 @@ import type {
   LendingProvider,
   LendingProviderContext,
   LendingRepayRequest,
+  LendingUserPosition,
+  LendingUserPositionsRequest,
   LendingWithdrawMaxRequest,
   LendingWithdrawRequest,
   PreparedLendingAction,
@@ -42,6 +44,30 @@ interface VesuMarketsResponse {
   data?: VesuMarketApiItem[];
 }
 
+interface VesuPositionApiTokenInfo {
+  address?: string;
+  name?: string;
+  symbol?: string;
+  decimals?: number;
+  value?: string;
+  usdPrice?: { value?: string; decimals?: number };
+}
+
+interface VesuPositionApiItem {
+  protocolVersion?: string;
+  pool?: { id?: string; name?: string };
+  type?: string;
+  isDeprecated?: boolean;
+  walletAddress?: string;
+  collateral?: VesuPositionApiTokenInfo;
+  collateralShares?: VesuPositionApiTokenInfo;
+  debt?: VesuPositionApiTokenInfo;
+}
+
+interface VesuPositionsResponse {
+  data?: VesuPositionApiItem[];
+}
+
 export interface VesuLendingProviderOptions {
   fetcher?: typeof fetch;
   chainConfigs?: Partial<
@@ -51,6 +77,7 @@ export interface VesuLendingProviderOptions {
         poolFactory?: Address | string | null;
         defaultPool?: Address | string | null;
         marketsApiUrl?: string | null;
+        positionsApiUrl?: string | null;
       }
     >
   >;
@@ -101,6 +128,13 @@ export class VesuLendingProvider implements LendingProvider {
             : {}
           : base?.marketsApiUrl
             ? { marketsApiUrl: base.marketsApiUrl }
+            : {}),
+        ...(override?.positionsApiUrl !== undefined
+          ? override.positionsApiUrl
+            ? { positionsApiUrl: override.positionsApiUrl }
+            : {}
+          : base?.positionsApiUrl
+            ? { positionsApiUrl: base.positionsApiUrl }
             : {}),
       };
     }
@@ -491,6 +525,110 @@ export class VesuLendingProvider implements LendingProvider {
       collateralValue,
       debtValue,
     };
+  }
+
+  async getPositions(
+    context: LendingProviderContext,
+    request: LendingUserPositionsRequest
+  ): Promise<LendingUserPosition[]> {
+    const config = this.requireChainConfig(context.chainId);
+    if (!config.positionsApiUrl) {
+      return [];
+    }
+
+    const user = request.user ?? context.walletAddress;
+    const url = `${config.positionsApiUrl}?walletAddress=${user}`;
+    const response = await this.fetcher(url);
+    if (!response.ok) {
+      throw new Error(`Vesu positions request failed (${response.status})`);
+    }
+    const payload = (await response.json()) as VesuPositionsResponse;
+    return (payload.data ?? [])
+      .filter(
+        (entry) =>
+          entry.protocolVersion?.toLowerCase() === "v2" &&
+          entry.isDeprecated !== true
+      )
+      .map((entry) => this.toUserPosition(entry))
+      .filter((p): p is LendingUserPosition => p != null);
+  }
+
+  private toUserPosition(
+    entry: VesuPositionApiItem
+  ): LendingUserPosition | null {
+    const collateral = entry.collateral;
+    if (
+      !entry.pool?.id ||
+      !entry.type ||
+      !collateral?.address ||
+      !collateral.symbol ||
+      collateral.decimals == null ||
+      !collateral.value
+    ) {
+      return null;
+    }
+
+    const posType =
+      entry.type === "earn" || entry.type === "borrow" ? entry.type : null;
+    if (!posType) return null;
+
+    const collateralToken: Token = {
+      address: fromAddress(collateral.address),
+      symbol: collateral.symbol,
+      decimals: collateral.decimals,
+      name: collateral.name ?? collateral.symbol,
+    };
+
+    const result: LendingUserPosition = {
+      type: posType,
+      pool: {
+        id: fromAddress(entry.pool.id),
+        ...(entry.pool.name ? { name: entry.pool.name } : {}),
+      },
+      collateral: {
+        token: collateralToken,
+        amount: BigInt(collateral.value),
+        ...(collateral.usdPrice?.value != null
+          ? { usdValue: BigInt(collateral.usdPrice.value) }
+          : {}),
+      },
+    };
+
+    const shares = entry.collateralShares;
+    if (
+      shares?.address &&
+      shares.symbol &&
+      shares.decimals != null &&
+      shares.value
+    ) {
+      result.collateralShares = {
+        token: {
+          address: fromAddress(shares.address),
+          symbol: shares.symbol,
+          decimals: shares.decimals,
+          name: shares.name ?? shares.symbol,
+        },
+        amount: BigInt(shares.value),
+      };
+    }
+
+    const debt = entry.debt;
+    if (debt?.address && debt.symbol && debt.decimals != null && debt.value) {
+      result.debt = {
+        token: {
+          address: fromAddress(debt.address),
+          symbol: debt.symbol,
+          decimals: debt.decimals,
+          name: debt.name ?? debt.symbol,
+        },
+        amount: BigInt(debt.value),
+        ...(debt.usdPrice?.value != null
+          ? { usdValue: BigInt(debt.usdPrice.value) }
+          : {}),
+      };
+    }
+
+    return result;
   }
 
   private async readAssetPrice(
