@@ -25,6 +25,7 @@ import {
   SolanaBridgeToken,
 } from "@/types";
 import { loadEthers } from "@/connect/ethersRuntime";
+import { loadSolanaWeb3 } from "@/connect/solanaWeb3Runtime";
 
 export class BridgeOperator implements BridgeOperatorInterface {
   private cache = new BridgeCache();
@@ -182,19 +183,18 @@ export class BridgeOperator implements BridgeOperatorInterface {
     // to avoid pulling Node.js-only transitive dependencies
     // (@hyperlane-xyz/sdk → ethereumjs-util → assert, etc.)
     // into clients that require polyfill.
-    const [{ SolanaHyperlaneBridge }, { clusterApiUrl, Connection }] =
-      await Promise.all([
-        import("@/bridge/solana/SolanaHyperlaneBridge"),
-        import("@solana/web3.js"),
-      ]);
+    const [{ SolanaHyperlaneBridge }, solanaWeb3] = await Promise.all([
+      import("@/bridge/solana/SolanaHyperlaneBridge"),
+      loadSolanaWeb3("Solana bridge operations"),
+    ]);
 
     const cluster =
       externalWallet.network === SolanaNetwork.MAINNET
         ? "mainnet-beta"
         : "testnet";
     const endpoint =
-      this.bridgingConfig?.solanaRpcUrl ?? clusterApiUrl(cluster);
-    const connection = new Connection(endpoint);
+      this.bridgingConfig?.solanaRpcUrl ?? solanaWeb3.clusterApiUrl(cluster);
+    const connection = new solanaWeb3.Connection(endpoint);
 
     const walletConfig = {
       address: externalWallet.address,

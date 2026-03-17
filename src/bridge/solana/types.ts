@@ -1,11 +1,9 @@
 import type { FeeErrorCause } from "@/types/errors";
 import type { SolanaAddress } from "@/types";
-import type {
-  Connection,
-  Transaction,
-  VersionedTransaction,
-} from "@solana/web3.js";
 import type { Amount } from "@/types";
+
+export type SolanaTransaction = unknown;
+export type SolanaConnection = unknown;
 
 /**
  * Provider interface for Solana transactions.
@@ -14,15 +12,13 @@ import type { Amount } from "@/types";
  * `signAndSendTransaction` method.
  */
 export interface SolanaProvider {
-  signAndSendTransaction(
-    transaction: Transaction | VersionedTransaction
-  ): Promise<string>;
+  signAndSendTransaction(transaction: SolanaTransaction): Promise<string>;
 }
 
 export type SolanaWalletConfig = {
   address: SolanaAddress;
   provider: SolanaProvider;
-  connection: Connection;
+  connection: SolanaConnection;
 };
 
 export type HyperlaneFeeEstimate = {

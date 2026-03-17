@@ -6,9 +6,11 @@ import {
   EthereumBridgeToken,
   SolanaBridgeToken,
 } from "@/types/bridge/bridge-token";
-import { type EthereumAddress, fromAddress, fromSolanaAddress } from "@/types";
+import { type EthereumAddress, type SolanaAddress, fromAddress } from "@/types";
 import { loadEthers } from "@/connect/ethersRuntime";
 import { fromEthereumAddress } from "@/connect/ethersRuntime";
+import { loadSolanaWeb3 } from "@/connect/solanaWeb3Runtime";
+import { fromSolanaAddress } from "@/types/solanaAddress";
 
 export type BridgeTokenApiEnv = "mainnet" | "testnet";
 
@@ -123,10 +125,12 @@ function parseProtocol(protocol: string): Protocol {
 const isNonNull = <T>(value: T | null): value is T => value !== null;
 
 type NormalizeEthereumAddress = (value: string) => EthereumAddress;
+type NormalizeSolanaAddress = (value: string) => SolanaAddress;
 
 function parseToken(
   token: BridgeTokenApiRecord,
-  normalizeEthereumAddress?: NormalizeEthereumAddress
+  normalizeEthereumAddress?: NormalizeEthereumAddress,
+  normalizeSolanaAddress?: NormalizeSolanaAddress
 ): BridgeToken {
   const chain = parseChain(requiredString(token, "chain"));
   const protocol = parseProtocol(requiredString(token, "protocol"));
@@ -169,6 +173,12 @@ function parseToken(
   }
 
   if (chain === ExternalChain.SOLANA) {
+    if (!normalizeSolanaAddress) {
+      throw new Error(
+        'Solana token parsing requires "@solana/web3.js" optional peer dependency.'
+      );
+    }
+
     if (protocol !== Protocol.HYPERLANE) {
       throw new Error(
         `Invalid protocol "${protocol}" for chain "${ExternalChain.SOLANA}"`
@@ -181,8 +191,12 @@ function parseToken(
       symbol: requiredString(token, "symbol"),
       decimals: requiredNumber(token, "decimals"),
       protocol: Protocol.HYPERLANE,
-      address: fromSolanaAddress(requiredString(token, "l1_token_address")),
-      l1Bridge: fromSolanaAddress(requiredString(token, "l1_bridge_address")),
+      address: normalizeSolanaAddress(
+        requiredString(token, "l1_token_address")
+      ),
+      l1Bridge: normalizeSolanaAddress(
+        requiredString(token, "l1_bridge_address")
+      ),
       starknetAddress: fromAddress(requiredString(token, "l2_token_address")),
       starknetBridge: fromAddress(requiredString(token, "l2_bridge_address")),
     });
@@ -299,11 +313,23 @@ export class BridgeTokenRepository {
         token.chain.toLowerCase() === ExternalChain.ETHEREUM
       );
     });
+    const hasSolanaRows = payload.some((token) => {
+      return (
+        typeof token.chain === "string" &&
+        token.chain.toLowerCase() === ExternalChain.SOLANA
+      );
+    });
     const ethers = hasEthereumRows
       ? await loadEthers("Bridge token parsing")
       : undefined;
+    const solanaWeb3 = hasSolanaRows
+      ? await loadSolanaWeb3("Bridge token parsing")
+      : undefined;
     const normalizeEthereumAddress = ethers
       ? (value: string) => fromEthereumAddress(value, ethers)
+      : undefined;
+    const normalizeSolanaAddress = solanaWeb3
+      ? (value: string) => fromSolanaAddress(value, solanaWeb3)
       : undefined;
 
     const tokens = payload
@@ -312,7 +338,11 @@ export class BridgeTokenRepository {
       })
       .map((token) => {
         try {
-          return parseToken(token, normalizeEthereumAddress);
+          return parseToken(
+            token,
+            normalizeEthereumAddress,
+            normalizeSolanaAddress
+          );
         } catch (e) {
           console.warn(`Ignoring token ${token.symbol} due to`, e);
           return null;

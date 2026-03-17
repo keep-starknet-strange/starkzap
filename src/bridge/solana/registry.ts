@@ -90,10 +90,22 @@ export function setupMultiProtocolProvider(
     mailbox?: HyperlaneAddress;
   }>(chains);
 
-  multiProvider.setProvider(hyperlaneChainName(chainId, "solana"), {
+  type SolanaTypedProvider = Extract<
+    Parameters<MultiProtocolProvider["setProvider"]>[1],
+    { type: ProviderType.SolanaWeb3 }
+  >;
+
+  const solanaProvider: SolanaTypedProvider = {
     type: ProviderType.SolanaWeb3,
-    provider: config.connection,
-  });
+    // `connection` is intentionally opaque in public types to avoid exporting
+    // @solana/web3.js symbols in SDK declarations.
+    provider: config.connection as SolanaTypedProvider["provider"],
+  };
+
+  multiProvider.setProvider(
+    hyperlaneChainName(chainId, "solana"),
+    solanaProvider
+  );
 
   return multiProvider;
 }

@@ -2,13 +2,15 @@ import { assertNonEmptyString, describeValue } from "@/connect/utils";
 import { ExternalChain, type SolanaAddress } from "@/types";
 import type { ChainId } from "@/types";
 import type { SolanaProvider } from "@/bridge/solana/types";
+import { loadSolanaWeb3 } from "@/connect/solanaWeb3Runtime";
+import { fromSolanaAddress } from "@/types/solanaAddress";
 
 export type { SolanaProvider } from "@/bridge/solana/types";
 
 export interface ConnectSolanaWalletOptions {
   chain: ExternalChain.SOLANA;
   provider: SolanaProvider;
-  address: SolanaAddress;
+  address: string;
   chainId: string;
 }
 
@@ -41,12 +43,14 @@ export class ConnectedSolanaWallet {
     readonly network: SolanaNetwork
   ) {}
 
-  public static from(
+  public static async from(
     options: ConnectSolanaWalletOptions,
     starknetChain: ChainId
-  ): ConnectedSolanaWallet {
+  ): Promise<ConnectedSolanaWallet> {
+    const solanaWeb3 = await loadSolanaWeb3("ConnectedSolanaWallet.from");
     const chainId = assertNonEmptyString(options.chainId, "chainId");
     const signer = assertSolanaProvider(options.provider);
+    const address = fromSolanaAddress(options.address, solanaWeb3);
 
     let network: SolanaNetwork;
     if (chainId === SolanaNetwork.MAINNET) {
@@ -65,6 +69,6 @@ export class ConnectedSolanaWallet {
       throw new Error("Solana Testnet cannot be used with Starknet Mainnet.");
     }
 
-    return new ConnectedSolanaWallet(options.address, signer, network);
+    return new ConnectedSolanaWallet(address, signer, network);
   }
 }

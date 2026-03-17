@@ -1575,7 +1575,7 @@ async function syncEthWalletFromAppKit(): Promise<void> {
   }
 }
 
-function syncSolWalletFromAppKit(): void {
+async function syncSolWalletFromAppKit(): Promise<void> {
   if (!bridgeController || !appKit) return;
 
   const address = appKit.getAddress("solana");
@@ -1583,7 +1583,7 @@ function syncSolWalletFromAppKit(): void {
   const isConnected = appKit.getIsConnectedState();
 
   if (isConnected && address && chainId && appKitSolSigner) {
-    bridgeController.connectSolanaWallet(
+    await bridgeController.connectSolanaWallet(
       appKitSolSigner,
       address,
       String(chainId)
@@ -1595,7 +1595,7 @@ function syncSolWalletFromAppKit(): void {
 
 async function syncWalletsFromAppKit(): Promise<void> {
   await syncEthWalletFromAppKit();
-  syncSolWalletFromAppKit();
+  await syncSolWalletFromAppKit();
 }
 
 if (appKit) {

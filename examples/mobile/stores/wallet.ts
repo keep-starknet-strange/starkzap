@@ -412,7 +412,7 @@ export const useWalletStore = create<WalletState>((set, get) => ({
           `${options.chain} wallet connected: ${truncateAddress(wallet.address)}`
         );
       } else if (options.chain === ExternalChain.SOLANA) {
-        const wallet = ConnectedSolanaWallet.from(options, chainId);
+        const wallet = await ConnectedSolanaWallet.from(options, chainId);
         set({ connectedSolWallet: wallet });
         addLog(
           `${options.chain} wallet connected: ${truncateAddress(wallet.address)}`

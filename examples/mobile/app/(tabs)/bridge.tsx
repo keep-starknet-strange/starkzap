@@ -16,8 +16,6 @@ import {
   type Eip1193Provider,
   type EthereumDepositFeeEstimation,
   ExternalChain,
-  fromEthereumAddress,
-  fromSolanaAddress,
   Protocol,
   type SolanaDepositFeeEstimation,
   type SolanaProvider,
@@ -141,30 +139,32 @@ export default function BridgeScreen() {
       options = {
         chain: ExternalChain.ETHEREUM,
         provider: walletProvider as Eip1193Provider,
-        address: fromEthereumAddress(connectedAccount.address),
+        address: connectedAccount.address,
         chainId: connectedAccount.chainId,
       };
     } else if (providerType === "solana") {
       options = {
         chain: ExternalChain.SOLANA,
         provider: walletProvider as unknown as SolanaProvider,
-        address: fromSolanaAddress(connectedAccount.address),
+        address: connectedAccount.address,
         chainId: connectedAccount.chainId,
       };
     }
 
     if (options) {
-      try {
-        connectExternalWallet(options);
-      } catch (error) {
-        console.error(error);
+      void (async () => {
+        try {
+          await connectExternalWallet(options);
+        } catch (error) {
+          console.error(error);
 
-        if (options.chain === ExternalChain.ETHEREUM) {
-          disconnect("eip155");
-        } else {
-          disconnect("solana");
+          if (options.chain === ExternalChain.ETHEREUM) {
+            disconnect("eip155");
+          } else {
+            disconnect("solana");
+          }
         }
-      }
+      })();
     }
   }, [
     connectedAccounts,
