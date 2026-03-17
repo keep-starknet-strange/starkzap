@@ -525,6 +525,7 @@ export default function VesuScreen() {
   const [projectedHealth, setProjectedHealth] = useState<LendingHealth | null>(
     null
   );
+  const [maxBorrowAmount, setMaxBorrowAmount] = useState<bigint | null>(null);
   const [isRefreshingPosition, setIsRefreshingPosition] = useState(false);
   const [positionError, setPositionError] = useState<string | null>(null);
   const [quoteError, setQuoteError] = useState<string | null>(null);
@@ -789,6 +790,7 @@ export default function VesuScreen() {
     ) {
       setPosition(null);
       setHealth(null);
+      setMaxBorrowAmount(null);
       setPositionError(null);
       return;
     }
@@ -805,12 +807,17 @@ export default function VesuScreen() {
     setIsRefreshingPosition(true);
     setPositionError(null);
     try {
-      const [nextPosition, nextHealth] = await Promise.all([
+      const [nextPosition, nextHealth, nextMaxBorrow] = await Promise.all([
         wallet.lending().getPosition(request),
         wallet.lending().getHealth(request),
+        wallet
+          .lending()
+          .getMaxBorrowAmount(request)
+          .catch(() => null),
       ]);
       setPosition(nextPosition);
       setHealth(nextHealth);
+      setMaxBorrowAmount(nextMaxBorrow);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       setPositionError(message);
@@ -1847,7 +1854,14 @@ export default function VesuScreen() {
                         maxValue={
                           positionAction === "repay"
                             ? debtWalletBalance?.toUnit()
-                            : undefined
+                            : maxBorrowAmount != null &&
+                                maxBorrowAmount > 0n &&
+                                selectedDebtAsset
+                              ? Amount.fromRaw(
+                                  maxBorrowAmount,
+                                  selectedDebtAsset.token
+                                ).toUnit()
+                              : undefined
                         }
                       />
 
