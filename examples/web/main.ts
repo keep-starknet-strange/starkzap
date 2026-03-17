@@ -361,6 +361,48 @@ if (REOWN_PROJECT_ID) {
   log("VITE_REOWN_PROJECT_ID not set - bridge disabled", "info");
 }
 
+// Lending DOM elements
+const lendingTokenSelect = document.getElementById(
+  "lending-token"
+) as HTMLSelectElement;
+const lendingAmountInput = document.getElementById(
+  "lending-amount"
+) as HTMLInputElement;
+const lendingSponsoredInput = document.getElementById(
+  "lending-sponsored"
+) as HTMLInputElement;
+const btnLendingDeposit = document.getElementById(
+  "btn-lending-deposit"
+) as HTMLButtonElement;
+const btnLendingWithdraw = document.getElementById(
+  "btn-lending-withdraw"
+) as HTMLButtonElement;
+const btnLendingWithdrawMax = document.getElementById(
+  "btn-lending-withdraw-max"
+) as HTMLButtonElement;
+const lendingCollateralTokenSelect = document.getElementById(
+  "lending-collateral-token"
+) as HTMLSelectElement;
+const lendingDebtTokenSelect = document.getElementById(
+  "lending-debt-token"
+) as HTMLSelectElement;
+const lendingCollateralAmountInput = document.getElementById(
+  "lending-collateral-amount"
+) as HTMLInputElement;
+const lendingDebtAmountInput = document.getElementById(
+  "lending-debt-amount"
+) as HTMLInputElement;
+const btnLendingBorrow = document.getElementById(
+  "btn-lending-borrow"
+) as HTMLButtonElement;
+const btnLendingRepay = document.getElementById(
+  "btn-lending-repay"
+) as HTMLButtonElement;
+const btnLendingPosition = document.getElementById(
+  "btn-lending-position"
+) as HTMLButtonElement;
+const lendingPositionEl = document.getElementById("lending-position")!;
+
 // Preset mapping
 const presets: Record<string, AccountClassConfig> = {
   openzeppelin: OpenZeppelinPreset,
@@ -2536,10 +2578,276 @@ btnTongoRefresh.addEventListener("click", async () => {
   setButtonLoading(btnTongoRefresh, false, "Refresh State");
 });
 
+// ---------------------------------------------------------------------------
+// Lending (Vesu)
+// ---------------------------------------------------------------------------
+
+function populateLendingTokens(): void {
+  for (const select of [
+    lendingTokenSelect,
+    lendingCollateralTokenSelect,
+    lendingDebtTokenSelect,
+  ]) {
+    select.innerHTML = "";
+    for (const token of presetTokens) {
+      const opt = document.createElement("option");
+      opt.value = token.address;
+      opt.textContent = tokenOptionLabel(token);
+      select.appendChild(opt);
+    }
+  }
+
+  // Default selections
+  const strk = presetTokens.find((t) => t.symbol === "STRK");
+  const usdc = presetTokens.find(
+    (t) => t.symbol === "USDC" || t.symbol === "USDC.e"
+  );
+  const eth = presetTokens.find((t) => t.symbol === "ETH");
+  if (strk) lendingTokenSelect.value = strk.address;
+  if (strk) lendingCollateralTokenSelect.value = strk.address;
+  if (usdc) lendingDebtTokenSelect.value = usdc.address;
+  else if (eth) lendingDebtTokenSelect.value = eth.address;
+}
+
+function getLendingFeeMode(): { feeMode: "sponsored" | "user_pays" } {
+  return { feeMode: lendingSponsoredInput.checked ? "sponsored" : "user_pays" };
+}
+
+async function lendingDeposit() {
+  if (!wallet) return;
+  const token = getTokenByAddress(lendingTokenSelect.value);
+  if (!token) {
+    log("Select a token", "error");
+    return;
+  }
+  const raw = lendingAmountInput.value.trim();
+  if (!raw) {
+    log("Enter an amount", "error");
+    return;
+  }
+
+  setButtonLoading(btnLendingDeposit, true);
+  try {
+    const amount = Amount.parse(raw, token);
+    log(`Depositing ${amount.toUnit()} ${token.symbol} into Vesu...`, "info");
+    const tx = await wallet
+      .lending()
+      .deposit({ token, amount }, getLendingFeeMode());
+    log(`Deposit tx: ${truncateAddress(tx.hash)}`, "success");
+    await tx.wait();
+    log("Deposit confirmed!", "success");
+  } catch (err) {
+    log(`Deposit failed: ${err}`, "error");
+  } finally {
+    setButtonLoading(btnLendingDeposit, false, "Deposit");
+  }
+}
+
+async function lendingWithdraw() {
+  if (!wallet) return;
+  const token = getTokenByAddress(lendingTokenSelect.value);
+  if (!token) {
+    log("Select a token", "error");
+    return;
+  }
+  const raw = lendingAmountInput.value.trim();
+  if (!raw) {
+    log("Enter an amount", "error");
+    return;
+  }
+
+  setButtonLoading(btnLendingWithdraw, true);
+  try {
+    const amount = Amount.parse(raw, token);
+    log(`Withdrawing ${amount.toUnit()} ${token.symbol} from Vesu...`, "info");
+    const tx = await wallet
+      .lending()
+      .withdraw({ token, amount }, getLendingFeeMode());
+    log(`Withdraw tx: ${truncateAddress(tx.hash)}`, "success");
+    await tx.wait();
+    log("Withdrawal confirmed!", "success");
+  } catch (err) {
+    log(`Withdraw failed: ${err}`, "error");
+  } finally {
+    setButtonLoading(btnLendingWithdraw, false, "Withdraw");
+  }
+}
+
+async function lendingWithdrawMax() {
+  if (!wallet) return;
+  const token = getTokenByAddress(lendingTokenSelect.value);
+  if (!token) {
+    log("Select a token", "error");
+    return;
+  }
+
+  setButtonLoading(btnLendingWithdrawMax, true);
+  try {
+    log(`Withdrawing max ${token.symbol} from Vesu...`, "info");
+    const tx = await wallet
+      .lending()
+      .withdrawMax({ token }, getLendingFeeMode());
+    log(`Withdraw max tx: ${truncateAddress(tx.hash)}`, "success");
+    await tx.wait();
+    log("Withdraw max confirmed!", "success");
+  } catch (err) {
+    log(`Withdraw max failed: ${err}`, "error");
+  } finally {
+    setButtonLoading(btnLendingWithdrawMax, false, "Withdraw Max");
+  }
+}
+
+async function lendingBorrow() {
+  if (!wallet) return;
+  const collateralToken = getTokenByAddress(lendingCollateralTokenSelect.value);
+  const debtToken = getTokenByAddress(lendingDebtTokenSelect.value);
+  if (!collateralToken || !debtToken) {
+    log("Select tokens", "error");
+    return;
+  }
+  const rawDebt = lendingDebtAmountInput.value.trim();
+  if (!rawDebt) {
+    log("Enter a debt amount", "error");
+    return;
+  }
+
+  setButtonLoading(btnLendingBorrow, true);
+  try {
+    const amount = Amount.parse(rawDebt, debtToken);
+    const rawCollateral = lendingCollateralAmountInput.value.trim();
+    const collateralAmount = rawCollateral
+      ? Amount.parse(rawCollateral, collateralToken)
+      : undefined;
+
+    log(
+      `Borrowing ${amount.toUnit()} ${debtToken.symbol} with ${collateralToken.symbol} collateral...`,
+      "info"
+    );
+    const tx = await wallet.lending().borrow(
+      {
+        collateralToken,
+        debtToken,
+        amount,
+        ...(collateralAmount ? { collateralAmount } : {}),
+      },
+      getLendingFeeMode()
+    );
+    log(`Borrow tx: ${truncateAddress(tx.hash)}`, "success");
+    await tx.wait();
+    log("Borrow confirmed!", "success");
+  } catch (err) {
+    log(`Borrow failed: ${err}`, "error");
+  } finally {
+    setButtonLoading(btnLendingBorrow, false, "Borrow");
+  }
+}
+
+async function lendingRepay() {
+  if (!wallet) return;
+  const collateralToken = getTokenByAddress(lendingCollateralTokenSelect.value);
+  const debtToken = getTokenByAddress(lendingDebtTokenSelect.value);
+  if (!collateralToken || !debtToken) {
+    log("Select tokens", "error");
+    return;
+  }
+  const rawDebt = lendingDebtAmountInput.value.trim();
+  if (!rawDebt) {
+    log("Enter a repay amount", "error");
+    return;
+  }
+
+  setButtonLoading(btnLendingRepay, true);
+  try {
+    const amount = Amount.parse(rawDebt, debtToken);
+    const rawCollateral = lendingCollateralAmountInput.value.trim();
+    const collateralAmount = rawCollateral
+      ? Amount.parse(rawCollateral, collateralToken)
+      : undefined;
+
+    log(`Repaying ${amount.toUnit()} ${debtToken.symbol}...`, "info");
+    const tx = await wallet.lending().repay(
+      {
+        collateralToken,
+        debtToken,
+        amount,
+        ...(collateralAmount
+          ? { collateralAmount, withdrawCollateral: true }
+          : {}),
+      },
+      getLendingFeeMode()
+    );
+    log(`Repay tx: ${truncateAddress(tx.hash)}`, "success");
+    await tx.wait();
+    log("Repay confirmed!", "success");
+  } catch (err) {
+    log(`Repay failed: ${err}`, "error");
+  } finally {
+    setButtonLoading(btnLendingRepay, false, "Repay");
+  }
+}
+
+async function lendingViewPosition() {
+  if (!wallet) return;
+  const collateralToken = getTokenByAddress(lendingCollateralTokenSelect.value);
+  const debtToken = getTokenByAddress(lendingDebtTokenSelect.value);
+  if (!collateralToken || !debtToken) {
+    log("Select collateral and debt tokens", "error");
+    return;
+  }
+
+  setButtonLoading(btnLendingPosition, true);
+  try {
+    log(
+      `Fetching Vesu position for ${collateralToken.symbol}/${debtToken.symbol}...`,
+      "info"
+    );
+    const [position, health] = await Promise.all([
+      wallet.lending().getPosition({ collateralToken, debtToken }),
+      wallet.lending().getHealth({ collateralToken, debtToken }),
+    ]);
+
+    const collateralAmt =
+      position.collateralAmount != null
+        ? Amount.fromRaw(
+            position.collateralAmount,
+            collateralToken
+          ).toFormatted(true)
+        : "0";
+    const debtAmt =
+      position.debtAmount != null
+        ? Amount.fromRaw(position.debtAmount, debtToken).toFormatted(true)
+        : "0";
+
+    lendingPositionEl.innerHTML = `
+      <div class="quote-row"><span class="quote-label">Status</span><span class="quote-value">${health.isCollateralized ? "Healthy" : "At risk"}</span></div>
+      <div class="quote-row"><span class="quote-label">Collateral</span><span class="quote-value">${collateralAmt}</span></div>
+      <div class="quote-row"><span class="quote-label">Debt</span><span class="quote-value">${debtAmt}</span></div>
+      <div class="quote-row"><span class="quote-label">Collateral Shares</span><span class="quote-value">${position.collateralShares.toString()}</span></div>
+      <div class="quote-row"><span class="quote-label">Nominal Debt</span><span class="quote-value">${position.nominalDebt.toString()}</span></div>
+    `;
+    lendingPositionEl.classList.remove("hidden");
+    log("Position loaded", "success");
+  } catch (err) {
+    log(`Position query failed: ${err}`, "error");
+    lendingPositionEl.classList.add("hidden");
+  } finally {
+    setButtonLoading(btnLendingPosition, false, "View Position");
+  }
+}
+
+// Lending event listeners
+btnLendingDeposit.addEventListener("click", lendingDeposit);
+btnLendingWithdraw.addEventListener("click", lendingWithdraw);
+btnLendingWithdrawMax.addEventListener("click", lendingWithdrawMax);
+btnLendingBorrow.addEventListener("click", lendingBorrow);
+btnLendingRepay.addEventListener("click", lendingRepay);
+btnLendingPosition.addEventListener("click", lendingViewPosition);
+
 // Initial log
 initializeSwapForm();
 populateTongoTokenSelect();
 initializeDcaForm();
+populateLendingTokens();
 log(`SDK initialized on ${NETWORK} with RPC: ${RPC_URL}`, "info");
 if (REOWN_PROJECT_ID) {
   log("Bridge enabled (Reown AppKit)", "info");

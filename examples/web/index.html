@@ -1156,6 +1156,84 @@
             </div>
           </div>
         </div>
+        <div class="swap-card" id="lending-card">
+          <div class="card-title" style="margin-bottom: 0.75rem">
+            Lending (Vesu)
+          </div>
+
+          <div class="swap-grid">
+            <div class="form-group">
+              <label for="lending-token">Token</label>
+              <select id="lending-token"></select>
+            </div>
+            <div class="form-group">
+              <label for="lending-amount">Amount</label>
+              <input id="lending-amount" type="text" placeholder="0.001" />
+            </div>
+          </div>
+
+          <div class="form-group swap-inline">
+            <input id="lending-sponsored" type="checkbox" />
+            <label for="lending-sponsored" style="margin: 0"
+              >Use sponsored fee mode</label
+            >
+          </div>
+
+          <div class="actions" style="margin-top: 0.75rem">
+            <button id="btn-lending-deposit" class="btn btn-primary">
+              Deposit
+            </button>
+            <button id="btn-lending-withdraw" class="btn btn-secondary">
+              Withdraw
+            </button>
+            <button id="btn-lending-withdraw-max" class="btn btn-secondary">
+              Withdraw Max
+            </button>
+          </div>
+
+          <div class="divider" style="margin: 1rem 0; font-size: 0.8rem">
+            Borrow / Repay
+          </div>
+
+          <div class="swap-grid">
+            <div class="form-group">
+              <label for="lending-collateral-token">Collateral</label>
+              <select id="lending-collateral-token"></select>
+            </div>
+            <div class="form-group">
+              <label for="lending-debt-token">Debt Token</label>
+              <select id="lending-debt-token"></select>
+            </div>
+          </div>
+          <div class="swap-grid">
+            <div class="form-group">
+              <label for="lending-collateral-amount">Collateral Amt</label>
+              <input
+                id="lending-collateral-amount"
+                type="text"
+                placeholder="0.0 (optional)"
+              />
+            </div>
+            <div class="form-group">
+              <label for="lending-debt-amount">Debt Amount</label>
+              <input id="lending-debt-amount" type="text" placeholder="0.001" />
+            </div>
+          </div>
+
+          <div class="actions" style="margin-top: 0.75rem">
+            <button id="btn-lending-borrow" class="btn btn-primary">
+              Borrow
+            </button>
+            <button id="btn-lending-repay" class="btn btn-secondary">
+              Repay
+            </button>
+            <button id="btn-lending-position" class="btn btn-secondary">
+              View Position
+            </button>
+          </div>
+
+          <div id="lending-position" class="quote-box hidden"></div>
+        </div>
       </div>
 
       <!-- Bridge (shown when Starknet wallet connected) -->
