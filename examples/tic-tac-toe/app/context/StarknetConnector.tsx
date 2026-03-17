@@ -11,7 +11,7 @@ import React, {
 import { TransactionExecutionStatus } from "starknet";
 import type { GetTransactionReceiptResponse } from "starknet";
 
-type StarknetNetwork = "SN_MAIN" | "SN_SEPOLIA" | "SN_DEVNET";
+type StarknetNetwork = "SN_MAIN" | "SN_SEPOLIA";
 type StarknetProvider = ReturnType<WalletInterface["getProvider"]>;
 type StarknetAccount = ReturnType<WalletInterface["getAccount"]>;
 type WaitForTransactionResult = {
@@ -43,6 +43,8 @@ type StarkZapNativeModule = typeof import("@starkzap/native") & {
   }) => unknown;
 };
 
+// Complete any pending auth session from a previous redirect.
+// Must be called at module level for Expo WebBrowser auth flow.
 WebBrowser.maybeCompleteAuthSession();
 
 const DEFAULT_NETWORK: StarknetNetwork = "SN_SEPOLIA";
@@ -52,24 +54,19 @@ const DEFAULT_TIC_TAC_TOE_CONTRACT_ADDRESS =
 const CARTRIDGE_RPC_BY_NETWORK: Record<StarknetNetwork, string> = {
   SN_MAIN: "https://api.cartridge.gg/x/starknet/mainnet",
   SN_SEPOLIA: "https://api.cartridge.gg/x/starknet/sepolia",
-  SN_DEVNET: "https://api.cartridge.gg/x/starknet/sepolia",
 };
 
 function normalizeNetwork(value: string | undefined): StarknetNetwork {
-  if (value === "SN_MAIN" || value === "SN_SEPOLIA" || value === "SN_DEVNET") {
+  if (value === "SN_MAIN" || value === "SN_SEPOLIA") {
     return value;
   }
   return DEFAULT_NETWORK;
 }
 
-function toSdkNetwork(
-  network: StarknetNetwork
-): "mainnet" | "sepolia" | "devnet" {
+function toSdkNetwork(network: StarknetNetwork): "mainnet" | "sepolia" {
   switch (network) {
     case "SN_MAIN":
       return "mainnet";
-    case "SN_DEVNET":
-      return "devnet";
     case "SN_SEPOLIA":
     default:
       return "sepolia";

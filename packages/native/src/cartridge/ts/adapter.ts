@@ -35,6 +35,7 @@ import {
 import {
   buildSignedOutsideExecutionV3,
   createPolicyProofIndex,
+  listCallsMissingPolicyProofs,
 } from "@/cartridge/ts/outside_execution_v3";
 
 const DEFAULT_CARTRIDGE_URL = "https://x.cartridge.gg";
@@ -399,6 +400,16 @@ export function createCartridgeTsAdapter(
             session,
             sessionPrivateKey,
           }) => {
+            const missingPolicyProofs = listCallsMissingPolicyProofs(
+              calls,
+              policyProofIndex
+            );
+            if (missingPolicyProofs.length > 0) {
+              throw new SessionProtocolError(
+                `Cannot execute from outside because session policy proofs are missing for: ${missingPolicyProofs.join(", ")}.`
+              );
+            }
+
             const { outsideExecution, signature } =
               buildSignedOutsideExecutionV3({
                 calls,

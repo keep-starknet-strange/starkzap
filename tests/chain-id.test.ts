@@ -18,9 +18,11 @@ describe("ChainId.fromFelt252", () => {
     );
   });
 
-  it("does not ignore null bytes in fallback decoding", () => {
+  it("preserves null bytes when whitespace forces fallback decoding", () => {
+    const decodedWithNullByte = `Unsupported chain ID: "SN_MAIN${String.fromCharCode(0)}"`;
+
     expect(() => ChainId.fromFelt252(" 0x534e5f4d41494e00")).toThrow(
-      /Unsupported chain ID/
+      decodedWithNullByte
     );
   });
 });

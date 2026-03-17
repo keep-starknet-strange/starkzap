@@ -111,13 +111,13 @@ describe("cartridge ts parity fixtures", () => {
   });
 
   it("PAR-101 session URL includes required query payload", () => {
-    const canonical = canonicalizeSessionPolicies([
+    const policies: CartridgePolicy[] = [
       { target: "0xabc", method: "play_move" },
-    ]);
+    ];
     const url = buildCartridgeSessionUrl({
       baseUrl: "https://x.cartridge.gg",
       publicKey: "0x1234",
-      policies: canonical,
+      policies,
       rpcUrl: "https://api.cartridge.gg/x/starknet/sepolia",
       redirectUrl: "tictactoe://cartridge/callback",
       redirectQueryName: "startapp",
@@ -139,13 +139,13 @@ describe("cartridge ts parity fixtures", () => {
   });
 
   it("PAR-101b session URL includes preset and force-new-session when provided", () => {
-    const canonical = canonicalizeSessionPolicies([
+    const policies: CartridgePolicy[] = [
       { target: "0xabc", method: "play_move" },
-    ]);
+    ];
     const url = buildCartridgeSessionUrl({
       baseUrl: "https://x.cartridge.gg",
       publicKey: "0x1234",
-      policies: canonical,
+      policies,
       rpcUrl: "https://api.cartridge.gg/x/starknet/sepolia",
       preset: "tic-tac-toe",
       needsSessionCreation: true,
@@ -154,6 +154,25 @@ describe("cartridge ts parity fixtures", () => {
     const parsed = new URL(url);
     expect(parsed.searchParams.get("preset")).toBe("tic-tac-toe");
     expect(parsed.searchParams.get("needs_session_creation")).toBe("true");
+  });
+
+  it("PAR-101a empty policies and no preset throws protocol error", () => {
+    expect(() =>
+      buildCartridgeSessionUrl({
+        baseUrl: "https://x.cartridge.gg",
+        publicKey: "0x1234",
+        policies: [],
+        rpcUrl: "https://api.cartridge.gg/x/starknet/sepolia",
+      })
+    ).toThrow("Cartridge session URL requires either policies or a preset.");
+    expect(() =>
+      buildCartridgeSessionUrl({
+        baseUrl: "https://x.cartridge.gg",
+        publicKey: "0x1234",
+        policies: { contracts: {} },
+        rpcUrl: "https://api.cartridge.gg/x/starknet/sepolia",
+      })
+    ).toThrow("Cartridge session URL requires either policies or a preset.");
   });
 
   it("PAR-101c malformed contract methods payloads fail with a protocol error", () => {
@@ -246,7 +265,7 @@ describe("cartridge ts parity fixtures", () => {
     expect(parseSessionFromEncodedRedirect(encoded)).toEqual({
       username: "legacy-user",
       address:
-        "0x0982172dc42288d482abd0cd836c0d50f20b9f4717353acf9be577fabb228c8",
+        "0x00982172dc42288d482abd0cd836c0d50f20b9f4717353acf9be577fabb228c8",
       ownerGuid: "0x123",
       expiresAt: "4702444800",
       guardianKeyGuid: "0x0",
