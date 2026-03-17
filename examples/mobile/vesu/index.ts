@@ -134,6 +134,74 @@ export interface VesuApiMarketItem {
   };
 }
 
+// ---------------------------------------------------------------------------
+// Pool API types (api.vesu.xyz/pools/{poolId})
+// ---------------------------------------------------------------------------
+
+export interface VesuPoolAssetConfig {
+  debtFloor?: VesuApiDecimalValue;
+}
+
+export interface VesuPoolAsset {
+  address: string;
+  symbol: string;
+  decimals: number;
+  usdPrice?: VesuApiDecimalValue;
+  config?: VesuPoolAssetConfig;
+}
+
+export interface VesuPoolPair {
+  collateralAssetAddress: string;
+  debtAssetAddress: string;
+  maxLTV?: VesuApiDecimalValue;
+}
+
+export interface VesuPoolData {
+  id: string;
+  name?: string | null;
+  assets: VesuPoolAsset[];
+  pairs: VesuPoolPair[];
+}
+
+const VESU_POOL_API_BASE = "https://api.vesu.xyz/pools";
+
+export async function fetchVesuPoolData(
+  poolAddress: string
+): Promise<VesuPoolData | null> {
+  try {
+    const response = await fetch(
+      `${VESU_POOL_API_BASE}/${poolAddress}?onlyEnabledAssets=true`
+    );
+    if (!response.ok) return null;
+    const payload = (await response.json()) as { data?: VesuPoolData };
+    return payload.data ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Get the debt floor (in USD, 18 decimals) for a specific debt asset in a pool.
+ */
+export function getVesuDebtFloor(
+  pool: VesuPoolData,
+  debtAssetAddress: string
+): bigint | null {
+  const asset = pool.assets.find(
+    (a) => a.address.toLowerCase() === debtAssetAddress.toLowerCase()
+  );
+  if (!asset?.config?.debtFloor?.value) return null;
+  return BigInt(asset.config.debtFloor.value);
+}
+
+/**
+ * Format the debt floor as a USD string (e.g. "$10").
+ */
+export function formatVesuDebtFloor(debtFloor: bigint): string {
+  const usd = Number(debtFloor) / 1e18;
+  return `$${usd.toFixed(usd % 1 === 0 ? 0 : 2)}`;
+}
+
 export interface VesuMarketCard {
   key: string;
   option: VesuAssetOption;
