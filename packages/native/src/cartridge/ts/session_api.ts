@@ -551,6 +551,9 @@ export async function waitForSessionSubscription({
         );
       }
     } catch (error) {
+      if (error instanceof SessionRejectedError) {
+        throw error;
+      }
       lastError = error;
     }
 

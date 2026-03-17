@@ -11,9 +11,7 @@ function makeAdapter() {
   const connect = vi.fn().mockResolvedValue({
     account: {
       address: "0x123",
-      executePaymasterTransaction: vi
-        .fn()
-        .mockResolvedValue({ transaction_hash: "0xabc" }),
+      execute: vi.fn().mockResolvedValue({ transaction_hash: "0xabc" }),
     },
     username: vi.fn().mockResolvedValue("player"),
     disconnect: vi.fn().mockResolvedValue(undefined),
@@ -47,7 +45,7 @@ describe("@starkzap/native cartridge sdk", () => {
   it("throws a deterministic error when adapter is missing", async () => {
     const sdk = makeSdk();
     await expect(sdk.connectCartridge()).rejects.toThrow(
-      "Cartridge native adapter is not registered."
+      "Cartridge adapter is not registered."
     );
   });
 

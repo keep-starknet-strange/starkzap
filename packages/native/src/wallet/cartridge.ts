@@ -11,14 +11,22 @@ import type {
   StakingConfig,
 } from "starkzap";
 import {
+  Account,
   RpcError,
-  type Account,
   type Call,
+  type DeclareSignerDetails,
+  type DeployAccountSignerDetails,
   type EstimateFeeResponseOverhead,
+  type InvocationsSignerDetails,
+  type InvokeFunctionResponse,
   type PaymasterTimeBounds,
   type RpcProvider,
   type Signature,
+  SignerInterface as StarknetSignerInterface,
+  type SimulateTransactionDetails,
+  type SimulateTransactionOverheadResponse,
   type TypedData,
+  type UniversalDetails,
 } from "starknet";
 import type { CartridgeNativeSessionHandle } from "@/cartridge/types";
 
@@ -58,6 +66,135 @@ function unsupportedUserPaysMessage(): string {
   return 'Cartridge wallet currently supports sponsored session execution only. Use feeMode: "sponsored".';
 }
 
+function assertTransactionHashResponse(
+  response: unknown
+): asserts response is { transaction_hash: string } {
+  const record = response as { transaction_hash?: unknown } | null;
+  if (
+    !record ||
+    typeof record !== "object" ||
+    typeof record.transaction_hash !== "string"
+  ) {
+    throw new Error("Cartridge execution did not return a transaction hash.");
+  }
+}
+
+class NativeCartridgeSigner extends StarknetSignerInterface {
+  constructor(private readonly session: CartridgeNativeSessionHandle) {
+    super();
+  }
+
+  async getPubKey(): Promise<string> {
+    throw new Error(
+      "Cartridge session does not expose a Stark public key in this release."
+    );
+  }
+
+  async signMessage(
+    typedData: TypedData,
+    _accountAddress: string
+  ): Promise<Signature> {
+    if (!this.session.account.signMessage) {
+      throw new Error(
+        "Cartridge session does not expose signMessage in this release."
+      );
+    }
+    return this.session.account.signMessage(typedData);
+  }
+
+  async signTransaction(
+    _transactions: Call[],
+    _details: InvocationsSignerDetails
+  ): Promise<Signature> {
+    throw new Error(
+      "Cartridge session does not expose raw invoke signing in this release. Use wallet.execute() or account.execute()."
+    );
+  }
+
+  async signDeployAccountTransaction(
+    _details: DeployAccountSignerDetails
+  ): Promise<Signature> {
+    throw new Error(unsupportedDeployMessage());
+  }
+
+  async signDeclareTransaction(
+    _details: DeclareSignerDetails
+  ): Promise<Signature> {
+    throw new Error(
+      "Cartridge session does not support declare signing in this release."
+    );
+  }
+}
+
+class NativeCartridgeAccount extends Account {
+  private readonly session: CartridgeNativeSessionHandle;
+  private readonly defaultTimeBounds: PaymasterTimeBounds | undefined;
+
+  constructor(options: {
+    session: CartridgeNativeSessionHandle;
+    provider: RpcProvider;
+    defaultTimeBounds?: PaymasterTimeBounds;
+  }) {
+    super({
+      provider: options.provider,
+      address: options.session.account.address,
+      signer: new NativeCartridgeSigner(options.session),
+    });
+    this.session = options.session;
+    this.defaultTimeBounds = options.defaultTimeBounds;
+  }
+
+  override async execute(
+    transactions: Call | Call[],
+    _details?: UniversalDetails
+  ): Promise<InvokeFunctionResponse> {
+    const calls = Array.isArray(transactions) ? transactions : [transactions];
+    const response = await this.session.account.execute(
+      calls,
+      sponsoredDetails(this.defaultTimeBounds)
+    );
+    assertTransactionHashResponse(response);
+    return response;
+  }
+
+  override async estimateInvokeFee(
+    calls: Call | Call[],
+    _details?: UniversalDetails
+  ): Promise<EstimateFeeResponseOverhead> {
+    if (!this.session.account.estimateInvokeFee) {
+      throw new Error(
+        "Cartridge session does not expose estimateInvokeFee in this release."
+      );
+    }
+    return this.session.account.estimateInvokeFee(
+      Array.isArray(calls) ? calls : [calls]
+    );
+  }
+
+  override async simulateTransaction(
+    invocations: Array<{ type: "INVOKE"; payload: Call[] }>,
+    _details?: SimulateTransactionDetails
+  ): Promise<SimulateTransactionOverheadResponse> {
+    if (!this.session.account.simulateTransaction) {
+      throw new Error(
+        "Cartridge session does not expose simulateTransaction in this release."
+      );
+    }
+    return this.session.account.simulateTransaction(
+      invocations
+    ) as Promise<SimulateTransactionOverheadResponse>;
+  }
+
+  override async signMessage(typedData: TypedData): Promise<Signature> {
+    if (!this.session.account.signMessage) {
+      throw new Error(
+        "Cartridge session does not expose signMessage in this release."
+      );
+    }
+    return this.session.account.signMessage(typedData);
+  }
+}
+
 export interface NativeCartridgeWalletOptions {
   session: CartridgeNativeSessionHandle;
   provider: RpcProvider;
@@ -70,6 +207,7 @@ export interface NativeCartridgeWalletOptions {
 }
 
 export class NativeCartridgeWallet extends BaseWallet {
+  private readonly account: Account;
   private readonly session: CartridgeNativeSessionHandle;
   private readonly provider: RpcProvider;
   private readonly chainId: ChainId;
@@ -90,6 +228,11 @@ export class NativeCartridgeWallet extends BaseWallet {
     this.explorerConfig = options.explorer;
     this.defaultFeeMode = options.feeMode ?? "sponsored";
     this.defaultTimeBounds = options.timeBounds;
+    this.account = new NativeCartridgeAccount({
+      session: options.session,
+      provider: options.provider,
+      ...(options.timeBounds && { defaultTimeBounds: options.timeBounds }),
+    });
   }
 
   static async create(
@@ -171,13 +314,7 @@ export class NativeCartridgeWallet extends BaseWallet {
       calls,
       sponsoredDetails(timeBounds)
     );
-    if (
-      !response ||
-      typeof response !== "object" ||
-      typeof response.transaction_hash !== "string"
-    ) {
-      throw new Error("Cartridge execution did not return a transaction hash.");
-    }
+    assertTransactionHashResponse(response);
     return new Tx(
       response.transaction_hash,
       this.provider,
@@ -230,7 +367,7 @@ export class NativeCartridgeWallet extends BaseWallet {
   }
 
   getAccount(): Account {
-    return this.session.account as unknown as Account;
+    return this.account;
   }
 
   getProvider(): RpcProvider {

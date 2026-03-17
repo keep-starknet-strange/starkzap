@@ -13,7 +13,7 @@ function makeAdapter(): CartridgeNativeAdapter {
       return {
         account: {
           address: "0x1",
-          executePaymasterTransaction: async () => ({
+          execute: async () => ({
             transaction_hash: "0xtx",
           }),
         },
@@ -48,7 +48,7 @@ describe("cartridge native adapter registry", () => {
 
   it("throws deterministic error when adapter is missing", () => {
     expect(() => getCartridgeNativeAdapterOrThrow()).toThrow(
-      "Cartridge native adapter is not registered."
+      "Cartridge adapter is not registered."
     );
   });
 });
