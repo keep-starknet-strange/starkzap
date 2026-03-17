@@ -12,12 +12,14 @@ import {
   DevnetPreset,
   TongoConfidential,
   ExternalChain,
+  Protocol,
   type Eip1193Provider,
   type SolanaProvider,
   type WalletInterface,
   type AccountClassConfig,
   type SwapProvider,
   type Token,
+  fromAddress,
 } from "starkzap";
 import { ec, RpcProvider } from "starknet";
 import { getSwapProviders } from "./swaps";
@@ -43,6 +45,9 @@ const DUMMY_POLICY = {
 };
 const SDK_CHAIN_ID = NETWORK === "mainnet" ? ChainId.MAINNET : ChainId.SEPOLIA;
 const ALCHEMY_API_KEY = import.meta.env.VITE_ALCHEMY_API_KEY as
+  | string
+  | undefined;
+const OFT_PUBLIC_KEY = import.meta.env.VITE_OFT_PUBLIC_KEY as
   | string
   | undefined;
 const BPS_DENOMINATOR = 10_000n;
@@ -81,17 +86,20 @@ const presetTokens = Object.values(getPresets(SDK_CHAIN_ID)).sort((a, b) =>
 const sdk = new StarkZap({
   rpcUrl: RPC_URL,
   chainId: SDK_CHAIN_ID,
-  ...(ALCHEMY_API_KEY
+  ...(ALCHEMY_API_KEY || OFT_PUBLIC_KEY
     ? {
         bridging: {
-          ethereumRpcUrl:
-            NETWORK === "mainnet"
-              ? `https://eth-mainnet.g.alchemy.com/v2/${ALCHEMY_API_KEY}`
-              : `https://eth-sepolia.g.alchemy.com/v2/${ALCHEMY_API_KEY}`,
-          solanaRpcUrl:
-            NETWORK === "mainnet"
-              ? `https://solana-mainnet.g.alchemy.com/v2/${ALCHEMY_API_KEY}`
-              : undefined,
+          ...(ALCHEMY_API_KEY && {
+            ethereumRpcUrl:
+              NETWORK === "mainnet"
+                ? `https://eth-mainnet.g.alchemy.com/v2/${ALCHEMY_API_KEY}`
+                : `https://eth-sepolia.g.alchemy.com/v2/${ALCHEMY_API_KEY}`,
+            solanaRpcUrl:
+              NETWORK === "mainnet"
+                ? `https://solana-mainnet.g.alchemy.com/v2/${ALCHEMY_API_KEY}`
+                : undefined,
+          }),
+          ...(OFT_PUBLIC_KEY && { layerZeroApiKey: OFT_PUBLIC_KEY }),
         },
       }
     : {}),
@@ -305,6 +313,23 @@ const presets: Record<string, AccountClassConfig> = {
 
 function tokenOptionLabel(token: Token): string {
   return `${token.symbol} (${token.name})`;
+}
+
+function formatProtocolTag(protocol: Protocol): string {
+  switch (protocol) {
+    case Protocol.CCTP:
+      return "[CCTP]";
+    case Protocol.CANONICAL:
+      return "[Canonical]";
+    case Protocol.OFT:
+      return "[OFT]";
+    case Protocol.OFT_MIGRATED:
+      return "[OFT Migrated]";
+    case Protocol.HYPERLANE:
+      return "[Hyperlane]";
+    default:
+      return `[${String(protocol)}]`;
+  }
 }
 
 function getTokenByAddress(address: string): Token | null {
@@ -551,8 +576,8 @@ function renderBridge(): void {
   for (const token of s.tokens) {
     const opt = document.createElement("option");
     opt.value = token.id;
-    const chainTag = token.chain === ExternalChain.SOLANA ? "[SOL]" : "[ETH]";
-    opt.textContent = `${chainTag} ${token.symbol} (${token.name})`;
+    const protocolTag = formatProtocolTag(token.protocol);
+    opt.textContent = `${protocolTag} ${token.symbol} (${token.name})`;
     bridgeTokenSelect.appendChild(opt);
   }
   if (s.selectedToken && s.tokens.some((t) => t.id === s.selectedToken!.id)) {
@@ -1113,7 +1138,7 @@ async function initializeConfidential() {
     return;
   }
 
-  const contractAddress = tongoTokenSelect.value;
+  const contractAddress = fromAddress(tongoTokenSelect.value);
   if (!contractAddress) {
     log("Select a token", "error");
     return;
@@ -1263,7 +1288,7 @@ async function confidentialWithdraw() {
   if (!wallet || !confidential) return;
 
   const rawAmount = tongoWithdrawAmountInput.value.trim();
-  const toAddress = tongoWithdrawToInput.value.trim();
+  const toAddress = fromAddress(tongoWithdrawToInput.value.trim());
 
   if (!rawAmount) {
     log("Enter an amount to withdraw", "error");
@@ -1335,7 +1360,7 @@ async function confidentialRollover() {
 async function confidentialRagequit() {
   if (!wallet || !confidential) return;
 
-  const toAddress = tongoRagequitToInput.value.trim();
+  const toAddress = fromAddress(tongoRagequitToInput.value.trim());
   if (!toAddress) {
     log("Enter a destination address for ragequit", "error");
     return;

@@ -233,6 +233,15 @@ VITE_RPC_URL=<url>      # Optional custom RPC URL (overrides the default Cartrid
 
 For mainnet, also set `AVNU_PAYMASTER_URL` in the server's `.env` to `https://mainnet.paymaster.avnu.fi`.
 
+### Bridge
+
+For bridging (Ethereum/Solana → Starknet):
+
+```bash
+VITE_ALCHEMY_API_KEY=<key>   # Enables Ethereum/Solana RPC for gas estimation and balance checks
+VITE_OFT_PUBLIC_KEY=<key>    # LayerZero API key for OFT bridge support (mainnet only)
+```
+
 ### Privy Server URL
 
 The Privy server URL defaults to `http://localhost:3001`. Change it in `main.ts` if your server runs elsewhere:
