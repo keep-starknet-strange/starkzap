@@ -485,6 +485,12 @@ export function createCartridgeTsAdapter(
         ...(options.execute ? { execute: options.execute } : {}),
       });
 
+      let isConnected = true;
+      const sessionAccountWithCleanup = tsSessionAccount as TsSessionAccount & {
+        disconnect?: () => Promise<void> | void;
+        close?: () => Promise<void> | void;
+      };
+
       return {
         account: {
           address: tsSessionAccount.address(),
@@ -492,6 +498,11 @@ export function createCartridgeTsAdapter(
             calls: Call[],
             details?: TsSessionExecutionDetails
           ) => {
+            if (!isConnected) {
+              throw new SessionProtocolError(
+                "Cartridge TS session has been disconnected and cannot execute transactions."
+              );
+            }
             const response = await tsSessionAccount.executeWithFallback(
               calls,
               details
@@ -507,9 +518,17 @@ export function createCartridgeTsAdapter(
         },
         username: async () => tsSessionAccount.username(),
         disconnect: async () => {
+          if (!isConnected) {
+            return;
+          }
+          isConnected = false;
           options.logger?.info?.(
             `[starkzap] cartridge-ts disconnect sessionKeyGuid=${sessionKeyGuid}`
           );
+          const disconnectSession =
+            sessionAccountWithCleanup.disconnect?.bind(tsSessionAccount) ??
+            sessionAccountWithCleanup.close?.bind(tsSessionAccount);
+          await disconnectSession?.();
         },
         controller: {
           type: "cartridge-ts-session",

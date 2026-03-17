@@ -77,6 +77,21 @@ describe("@starkzap/native cartridge sdk", () => {
     expect(callArg?.rpcUrl).toContain("sepolia");
   });
 
+  it("rejects unsupported default fee modes before connecting", async () => {
+    const sdk = makeSdk();
+    const { adapter, connect } = makeAdapter();
+    registerCartridgeNativeAdapter(adapter);
+
+    await expect(
+      sdk.connectCartridge({
+        policies: [{ target: "0xaaa", method: "transfer" }],
+        feeMode: "user_pays",
+      })
+    ).rejects.toThrow("supports sponsored session execution only");
+
+    expect(connect).not.toHaveBeenCalled();
+  });
+
   it("defaults cartridge onboard deploy mode to never", async () => {
     const sdk = makeSdk();
     vi.spyOn(sdk.getProvider(), "getClassHashAt").mockRejectedValue(
