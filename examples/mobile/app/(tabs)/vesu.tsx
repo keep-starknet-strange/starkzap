@@ -206,18 +206,23 @@ function MarketCardView(props: {
   isSelected: boolean;
   onPress: () => void;
   width: string;
+  userPosition?: LendingUserPosition | null;
 }) {
   const borderColor = useThemeColor({}, "border");
   const textSecondary = useThemeColor({}, "textSecondary");
   const cardBg = useThemeColor({}, "card");
-  const { card, isSelected } = props;
+  const { card, isSelected, userPosition } = props;
 
   return (
     <TouchableOpacity
       style={[
         styles.marketCard,
         {
-          borderColor: isSelected ? "#000" : borderColor,
+          borderColor: isSelected
+            ? "#000"
+            : userPosition
+              ? "#4ade80"
+              : borderColor,
           backgroundColor: cardBg,
           width: props.width as never,
         },
@@ -246,6 +251,19 @@ function MarketCardView(props: {
           </View>
         )}
       </View>
+
+      {userPosition && (
+        <View style={styles.positionBadge}>
+          <Ionicons name="wallet-outline" size={12} color="#15803d" />
+          <ThemedText style={styles.positionBadgeText}>
+            {Amount.fromRaw(
+              userPosition.collateral.amount,
+              userPosition.collateral.token
+            ).toFormatted(true)}{" "}
+            {userPosition.collateral.token.symbol} deposited
+          </ThemedText>
+        </View>
+      )}
 
       <MetricsGrid card={card} />
 
@@ -622,6 +640,24 @@ export default function VesuScreen() {
       }),
     [allTokens, apiMarkets, assetOptions]
   );
+
+  // Memo: map market card keys to matching earn positions
+  const positionByCardKey = useMemo(() => {
+    const map = new Map<string, LendingUserPosition>();
+    for (const pos of userPositions) {
+      if (pos.type !== "earn") continue;
+      for (const card of marketCards) {
+        if (
+          card.option.token.address === pos.collateral.token.address &&
+          (!card.option.poolAddress || card.option.poolAddress === pos.pool.id)
+        ) {
+          map.set(card.key, pos);
+          break;
+        }
+      }
+    }
+    return map;
+  }, [marketCards, userPositions]);
 
   // Memo: selected assets
   const selectedVaultAsset = useMemo(
@@ -1365,54 +1401,6 @@ export default function VesuScreen() {
                 <ThemedText style={styles.errorText}>{marketError}</ThemedText>
               )}
 
-              {userPositions.length > 0 && (
-                <View style={{ marginTop: 8, gap: 6 }}>
-                  <ThemedText style={[styles.label, { color: textSecondary }]}>
-                    My Positions
-                  </ThemedText>
-                  {userPositions.map((pos, idx) => {
-                    const colAmt = Amount.fromRaw(
-                      pos.collateral.amount,
-                      pos.collateral.token
-                    );
-                    return (
-                      <View
-                        key={idx}
-                        style={[
-                          styles.positionRow,
-                          { backgroundColor: borderColor },
-                        ]}
-                      >
-                        <ThemedText style={styles.positionLabel}>
-                          {pos.type === "earn" ? "Deposit" : "Collateral"}
-                          {pos.pool.name ? ` · ${pos.pool.name}` : ""}
-                        </ThemedText>
-                        <ThemedText style={styles.positionValue}>
-                          {colAmt.toFormatted(true)}{" "}
-                          {pos.collateral.token.symbol}
-                        </ThemedText>
-                        {pos.debt && (
-                          <>
-                            <ThemedText
-                              style={[styles.positionLabel, { marginTop: 2 }]}
-                            >
-                              Debt
-                            </ThemedText>
-                            <ThemedText style={styles.positionValue}>
-                              {Amount.fromRaw(
-                                pos.debt.amount,
-                                pos.debt.token
-                              ).toFormatted(true)}{" "}
-                              {pos.debt.token.symbol}
-                            </ThemedText>
-                          </>
-                        )}
-                      </View>
-                    );
-                  })}
-                </View>
-              )}
-
               {marketCards.length > 0 ? (
                 <View style={styles.marketCardGrid}>
                   {marketCards.map((card) => (
@@ -1425,6 +1413,7 @@ export default function VesuScreen() {
                       }
                       onPress={() => handleOpenMarket(card.option)}
                       width={columnWidth}
+                      userPosition={positionByCardKey.get(card.key)}
                     />
                   ))}
                 </View>
@@ -1603,6 +1592,85 @@ export default function VesuScreen() {
                     )}
                   </View>
                 </View>
+
+                {/* My Position card (from Vesu indexer) */}
+                {selectedMarketCard &&
+                  (() => {
+                    const earnPos = positionByCardKey.get(
+                      selectedMarketCard.key
+                    );
+                    const borrowPos = userPositions.find(
+                      (p) =>
+                        p.type === "borrow" &&
+                        p.collateral.token.address ===
+                          selectedMarketCard.option.token.address &&
+                        (!selectedMarketCard.option.poolAddress ||
+                          p.pool.id === selectedMarketCard.option.poolAddress)
+                    );
+                    if (!earnPos && !borrowPos) return null;
+                    return (
+                      <View
+                        style={[
+                          styles.card,
+                          {
+                            backgroundColor: "#f0fdf4",
+                            borderColor: "#bbf7d0",
+                            gap: 10,
+                          },
+                        ]}
+                      >
+                        <ThemedText
+                          style={[styles.cardTitle, { color: "#15803d" }]}
+                        >
+                          My Position
+                        </ThemedText>
+                        {earnPos && (
+                          <View style={styles.positionDetailRow}>
+                            <ThemedText style={styles.positionDetailLabel}>
+                              Deposited
+                            </ThemedText>
+                            <ThemedText style={styles.positionDetailValue}>
+                              {Amount.fromRaw(
+                                earnPos.collateral.amount,
+                                earnPos.collateral.token
+                              ).toFormatted(true)}{" "}
+                              {earnPos.collateral.token.symbol}
+                            </ThemedText>
+                          </View>
+                        )}
+                        {borrowPos && (
+                          <>
+                            <View style={styles.positionDetailRow}>
+                              <ThemedText style={styles.positionDetailLabel}>
+                                Collateral
+                              </ThemedText>
+                              <ThemedText style={styles.positionDetailValue}>
+                                {Amount.fromRaw(
+                                  borrowPos.collateral.amount,
+                                  borrowPos.collateral.token
+                                ).toFormatted(true)}{" "}
+                                {borrowPos.collateral.token.symbol}
+                              </ThemedText>
+                            </View>
+                            {borrowPos.debt && (
+                              <View style={styles.positionDetailRow}>
+                                <ThemedText style={styles.positionDetailLabel}>
+                                  Debt
+                                </ThemedText>
+                                <ThemedText style={styles.positionDetailValue}>
+                                  {Amount.fromRaw(
+                                    borrowPos.debt.amount,
+                                    borrowPos.debt.token
+                                  ).toFormatted(true)}{" "}
+                                  {borrowPos.debt.token.symbol}
+                                </ThemedText>
+                              </View>
+                            )}
+                          </>
+                        )}
+                      </View>
+                    );
+                  })()}
 
                 {/* Supply / Borrow tab toggle */}
                 <View style={[styles.tabRow, { backgroundColor, borderColor }]}>
@@ -2137,4 +2205,33 @@ const styles = StyleSheet.create({
   positionRow: { borderRadius: 10, padding: 10, gap: 2 },
   positionLabel: { fontSize: 11, fontWeight: "600", opacity: 0.6 },
   positionValue: { fontSize: 14, fontWeight: "700" },
+  positionBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    backgroundColor: "#dcfce7",
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+  },
+  positionBadgeText: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#15803d",
+  },
+  positionDetailRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  positionDetailLabel: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: "#166534",
+  },
+  positionDetailValue: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: "#15803d",
+  },
 });
