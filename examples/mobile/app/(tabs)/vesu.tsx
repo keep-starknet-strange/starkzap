@@ -45,13 +45,10 @@ import { cropAddress, getExplorerUrl } from "@/utils";
 import {
   buildVesuAssetOptions,
   buildVesuMarketCards,
-  fetchVesuPoolData,
-  formatVesuDebtFloor,
   formatVesuLtv,
   formatVesuUsdValue,
   getAvailableVesuDebtAssets,
   getDefaultVesuDebtAsset,
-  getVesuDebtFloor,
   getVesuHealthStatus,
   getVesuPoolLabel,
   getVesuPoolVisual,
@@ -60,7 +57,6 @@ import {
   type VesuApiMarketItem,
   type VesuAssetOption,
   type VesuMarketCard,
-  type VesuPoolData,
 } from "@/vesu";
 
 type VaultAction = "deposit" | "withdraw";
@@ -523,9 +519,6 @@ export default function VesuScreen() {
   // User positions (from Vesu indexer API)
   const [userPositions, setUserPositions] = useState<LendingUserPosition[]>([]);
 
-  // Pool config (from Vesu pool API)
-  const [poolData, setPoolData] = useState<VesuPoolData | null>(null);
-
   // Position state
   const [position, setPosition] = useState<LendingPosition | null>(null);
   const [health, setHealth] = useState<LendingHealth | null>(null);
@@ -710,60 +703,15 @@ export default function VesuScreen() {
     return Amount.fromRaw(pos.collateral.amount, pos.collateral.token);
   }, [selectedVaultAsset, userPositions]);
 
-  // Debt floor from pool config
-  const debtFloor = useMemo(() => {
-    if (!poolData || !selectedDebtAsset) return null;
-    return getVesuDebtFloor(poolData, selectedDebtAsset.token.address);
-  }, [poolData, selectedDebtAsset]);
-
-  const debtFloorLabel =
-    debtFloor != null ? formatVesuDebtFloor(debtFloor) : null;
-
   // Errors
   const vaultAmountError = getAmountError(
     vaultAmount,
     selectedVaultAsset?.token ?? null
   );
-  const debtAmountError = useMemo(() => {
-    const baseError = getAmountError(
-      debtAmount,
-      selectedDebtAsset?.token ?? null
-    );
-    if (baseError) return baseError;
-    // Check debt floor: borrow amount in USD must be >= debtFloor
-    if (
-      positionAction === "borrow" &&
-      debtFloor != null &&
-      debtFloor > 0n &&
-      selectedDebtAsset &&
-      debtAmount.trim()
-    ) {
-      const parsed = parseAmountInput(debtAmount, selectedDebtAsset.token);
-      if (parsed) {
-        const debtAssetInfo = poolData?.assets.find(
-          (a) =>
-            a.address.toLowerCase() ===
-            selectedDebtAsset.token.address.toLowerCase()
-        );
-        if (debtAssetInfo?.usdPrice?.value) {
-          const price = BigInt(debtAssetInfo.usdPrice.value);
-          const scale = 10n ** BigInt(selectedDebtAsset.token.decimals);
-          const borrowUsdValue = (parsed.toBase() * price) / scale;
-          if (borrowUsdValue < debtFloor) {
-            return `Debt must be greater than ${debtFloorLabel}`;
-          }
-        }
-      }
-    }
-    return null;
-  }, [
+  const debtAmountError = getAmountError(
     debtAmount,
-    debtFloor,
-    debtFloorLabel,
-    poolData,
-    positionAction,
-    selectedDebtAsset,
-  ]);
+    selectedDebtAsset?.token ?? null
+  );
   const collateralAmountError = getAmountError(
     collateralAmount,
     selectedCollateralToken
@@ -859,22 +807,17 @@ export default function VesuScreen() {
     setIsRefreshingPosition(true);
     setPositionError(null);
     try {
-      const [nextPosition, nextHealth, nextMaxBorrow, nextPoolData] =
-        await Promise.all([
-          wallet.lending().getPosition(request),
-          wallet.lending().getHealth(request),
-          wallet
-            .lending()
-            .getMaxBorrowAmount(request)
-            .catch(() => null),
-          selectedVaultAsset?.poolAddress
-            ? fetchVesuPoolData(selectedVaultAsset.poolAddress)
-            : Promise.resolve(null),
-        ]);
+      const [nextPosition, nextHealth, nextMaxBorrow] = await Promise.all([
+        wallet.lending().getPosition(request),
+        wallet.lending().getHealth(request),
+        wallet
+          .lending()
+          .getMaxBorrowAmount(request)
+          .catch(() => null),
+      ]);
       setPosition(nextPosition);
       setHealth(nextHealth);
       setMaxBorrowAmount(nextMaxBorrow);
-      setPoolData(nextPoolData);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       setPositionError(message);
