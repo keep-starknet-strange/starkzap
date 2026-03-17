@@ -5,7 +5,10 @@ import {
   SessionTimeoutError,
 } from "@/cartridge/ts/errors";
 import type { CartridgePolicies } from "@/cartridge/types";
-import { policiesToSessionUrlShape } from "@/cartridge/ts/policy";
+import {
+  hasPoliciesInput,
+  policiesToSessionUrlShape,
+} from "@/cartridge/ts/policy";
 
 const DEFAULT_REDIRECT_QUERY_NAME = "startapp";
 const SUBSCRIBE_CREATE_SESSION_QUERY = `query SubscribeCreateSession($sessionKeyGuid: Felt!) {
@@ -395,7 +398,7 @@ export function buildCartridgeSessionUrl({
     rpc_url: rpcUrl,
   });
 
-  if (policies) {
+  if (hasPoliciesInput(policies) && policies) {
     params.set("policies", JSON.stringify(policiesToSessionUrlShape(policies)));
   }
 
@@ -403,7 +406,7 @@ export function buildCartridgeSessionUrl({
     params.set("preset", preset);
   }
 
-  if (!policies && !preset) {
+  if (!hasPoliciesInput(policies) && !preset) {
     throw new SessionProtocolError(
       "Cartridge session URL requires either policies or a preset."
     );

@@ -24,14 +24,7 @@ export class StarkZap extends CoreStarkZap {
   override async connectCartridge(
     options: ConnectCartridgeOptions = {}
   ): Promise<Awaited<ReturnType<CoreStarkZap["connectCartridge"]>>> {
-    const ensureProviderChainMatchesConfig = (
-      this as unknown as {
-        ensureProviderChainMatchesConfig?: () => Promise<void>;
-      }
-    ).ensureProviderChainMatchesConfig;
-    if (typeof ensureProviderChainMatchesConfig === "function") {
-      await ensureProviderChainMatchesConfig.call(this);
-    }
+    await this.ensureProviderChainMatchesConfig();
 
     const adapter = getCartridgeNativeAdapterOrThrow();
 
@@ -120,23 +113,11 @@ export class StarkZap extends CoreStarkZap {
   }
 
   private resolveProviderRpcUrl(): string {
-    const config = (
-      this as unknown as {
-        config?: { rpcUrl?: unknown };
-      }
-    ).config;
-    const configRpcUrl = config?.rpcUrl;
-    if (typeof configRpcUrl === "string" && configRpcUrl.length > 0) {
-      return configRpcUrl;
+    const { rpcUrl } = this.getSdkConfig();
+    if (rpcUrl.length > 0) {
+      return rpcUrl;
     }
 
-    const provider = this.getProvider() as unknown as {
-      channel?: { nodeUrl?: unknown };
-    };
-    const nodeUrl = provider.channel?.nodeUrl;
-    if (typeof nodeUrl === "string" && nodeUrl.length > 0) {
-      return nodeUrl;
-    }
     throw new Error(
       "Unable to resolve RPC URL from the SDK provider for Cartridge."
     );
@@ -146,14 +127,7 @@ export class StarkZap extends CoreStarkZap {
     explorer?: ExplorerConfig;
     staking?: StakingConfig;
   } {
-    const config = (
-      this as unknown as {
-        config?: { explorer?: ExplorerConfig; staking?: StakingConfig };
-      }
-    ).config;
-    if (!config) {
-      return {};
-    }
+    const config = this.getSdkConfig();
     return {
       ...(config.explorer && { explorer: config.explorer }),
       ...(config.staking && { staking: config.staking }),

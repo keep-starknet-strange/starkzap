@@ -403,7 +403,12 @@ export class NativeCartridgeWallet extends BaseWallet {
     if (!this.session.username) {
       return undefined;
     }
-    return this.session.username();
+    try {
+      const result = await this.session.username();
+      return typeof result === "string" ? result : undefined;
+    } catch {
+      return undefined;
+    }
   }
 
   async disconnect(): Promise<void> {
