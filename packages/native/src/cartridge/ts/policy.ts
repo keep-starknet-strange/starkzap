@@ -369,8 +369,19 @@ export function policiesToSessionUrlShape(
       return [
         contractAddress,
         (() => {
+          const methods = contract.methods;
+          if (
+            methods !== undefined &&
+            methods !== null &&
+            !Array.isArray(methods)
+          ) {
+            throw new SessionProtocolError(
+              "Policy contract.methods must be an array."
+            );
+          }
+
           const normalizedContract: CartridgeContractPolicy = {
-            methods: (contract.methods ?? []).map((method, index) =>
+            methods: (methods ?? []).map((method, index) =>
               normalizeMethodForUrl(
                 method,
                 `Policy ${contractAddress}#${index}`
