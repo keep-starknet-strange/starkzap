@@ -265,6 +265,57 @@ describe("cartridge ts adapter", () => {
     expect(vi.getTimerCount()).toBe(0);
   });
 
+  it("times out outside execution fetches that ignore abort signals", async () => {
+    vi.useFakeTimers();
+
+    const fetchImpl = vi
+      .fn()
+      .mockImplementation(() => new Promise<never>(() => undefined));
+    const adapter = createCartridgeTsAdapter({
+      openSession: async () => ({
+        status: "success",
+        encodedSession: ENCODED_SESSION,
+      }),
+      fetchImpl,
+      executeFromOutsideRequestTimeoutMs: 25,
+    });
+
+    const handle = await adapter.connect({
+      rpcUrl: "https://api.cartridge.gg/x/starknet/sepolia",
+      chainId: "0x534e5f5345504f4c4941",
+      policies: [{ target: "0x1", method: "create_game" }],
+    });
+
+    const executePromise = handle.account
+      .execute(
+        [
+          {
+            contractAddress:
+              "0x0000000000000000000000000000000000000000000000000000000000000001",
+            entrypoint: "create_game",
+            calldata: [],
+          },
+        ] as Call[],
+        { feeMode: { mode: "sponsored" } }
+      )
+      .catch((caught) => caught);
+
+    await vi.advanceTimersByTimeAsync(25);
+
+    const error = await executePromise;
+
+    expect(error).toBeInstanceOf(SessionTimeoutError);
+    expect((error as Error).message).toBe(
+      "cartridge_addExecuteOutsideTransaction timed out after 25ms."
+    );
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+    expect(
+      (fetchImpl.mock.calls[0] as [string, { signal?: unknown } | undefined])[1]
+        ?.signal
+    ).toBeDefined();
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
   it("recovers a transaction hash from JSON-RPC error data when Cartridge includes one", async () => {
     const fetchImpl = vi.fn().mockResolvedValue({
       ok: true,

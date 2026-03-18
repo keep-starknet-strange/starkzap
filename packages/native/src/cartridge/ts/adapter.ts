@@ -123,6 +123,28 @@ async function fetchWithTimeout(
     return fetchFn(input, init);
   }
 
+  let timeoutId: ReturnType<typeof setTimeout> | null = null;
+  const createTimeoutPromise = (onTimeout?: () => void) =>
+    new Promise<never>((_, reject) => {
+      timeoutId = setTimeout(() => {
+        try {
+          onTimeout?.();
+        } finally {
+          reject(new SessionTimeoutError(timeoutMessage));
+        }
+      }, requestTimeoutMs);
+    });
+  const invokeFetch = (requestInit: Parameters<FetchLike>[1]) =>
+    Promise.resolve().then(() => fetchFn(input, requestInit));
+  const rethrowTimeoutLikeError = (error: unknown): never => {
+    const message = error instanceof Error ? error.message.toLowerCase() : "";
+    const name = error instanceof Error ? error.name : "";
+    if (name === "AbortError" || message.includes("abort")) {
+      throw new SessionTimeoutError(timeoutMessage, error);
+    }
+    throw error;
+  };
+
   const maybeAbortController = (
     globalThis as unknown as {
       AbortController?: new () => { signal: unknown; abort(): void };
@@ -130,36 +152,27 @@ async function fetchWithTimeout(
   ).AbortController;
   if (typeof maybeAbortController === "function") {
     const controller = new maybeAbortController();
-    const timeoutId = setTimeout(() => {
-      controller.abort();
-    }, requestTimeoutMs);
     try {
-      return await fetchFn(input, {
-        ...init,
-        signal: controller.signal,
-      });
+      return await Promise.race([
+        invokeFetch({
+          ...init,
+          signal: controller.signal,
+        }),
+        createTimeoutPromise(() => {
+          controller.abort();
+        }),
+      ]);
     } catch (error) {
-      const message = error instanceof Error ? error.message.toLowerCase() : "";
-      const name = error instanceof Error ? error.name : "";
-      if (name === "AbortError" || message.includes("abort")) {
-        throw new SessionTimeoutError(timeoutMessage, error);
-      }
-      throw error;
+      rethrowTimeoutLikeError(error);
     } finally {
-      clearTimeout(timeoutId);
+      if (timeoutId !== null) {
+        clearTimeout(timeoutId);
+      }
     }
   }
 
-  let timeoutId: ReturnType<typeof setTimeout> | null = null;
   try {
-    return await Promise.race([
-      fetchFn(input, init),
-      new Promise<never>((_, reject) => {
-        timeoutId = setTimeout(() => {
-          reject(new SessionTimeoutError(timeoutMessage));
-        }, requestTimeoutMs);
-      }),
-    ]);
+    return await Promise.race([invokeFetch(init), createTimeoutPromise()]);
   } finally {
     if (timeoutId !== null) {
       clearTimeout(timeoutId);

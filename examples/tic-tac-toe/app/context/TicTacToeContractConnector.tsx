@@ -37,6 +37,7 @@ type TicTacToeContextType = {
   playMove: (gameId: GameId, cell: number) => Promise<string | null>;
   getGame: (gameId: GameId) => Promise<Game | null>;
   loadGame: (gameId: GameId) => void;
+  clearGame: () => void;
 };
 
 const normalizeGameId = (value: unknown): GameId | null => {
@@ -93,7 +94,13 @@ export const TicTacToeProvider: React.FC<{ children: React.ReactNode }> = ({
         entrypoint: "create_game",
         calldata: [opponentAddress],
       };
-      const tx = await wallet.execute([call]);
+      let tx: Awaited<ReturnType<typeof wallet.execute>>;
+      try {
+        tx = await wallet.execute([call]);
+      } catch (e) {
+        if (__DEV__) console.error("create_game error", e);
+        return null;
+      }
       const txHash = tx.hash || null;
       if (__DEV__) console.log("create_game txHash:", txHash);
       if (!txHash || !provider) return null;
@@ -187,6 +194,10 @@ export const TicTacToeProvider: React.FC<{ children: React.ReactNode }> = ({
     setCurrentGameId(normalizedGameId);
   }, []);
 
+  const clearGame = useCallback(() => {
+    setCurrentGameId(null);
+  }, []);
+
   const getGame = useCallback(
     async (gameId: GameId): Promise<Game | null> => {
       if (!provider || !contractAddress) return null;
@@ -260,6 +271,7 @@ export const TicTacToeProvider: React.FC<{ children: React.ReactNode }> = ({
         playMove,
         getGame,
         loadGame,
+        clearGame,
       }}
     >
       {children}
