@@ -79,6 +79,7 @@ export default function PlayScreen() {
     getGame,
     currentGameId,
     loadGame,
+    clearGame,
     contractAddress,
   } = useTicTacToe();
   const invitations: { id: GameId; from: string }[] = [];
@@ -266,9 +267,22 @@ export default function PlayScreen() {
     }
   }
 
-  function handleJoinGame() {
+  async function handleJoinGame() {
     const id = joinGameId.trim();
     if (!/^[0-9]+$/.test(id)) return;
+
+    try {
+      const didLoad = await syncGame(id);
+      if (!didLoad) {
+        return;
+      }
+    } catch (error) {
+      if (__DEV__) {
+        console.warn("Failed to load joined game", error);
+      }
+      return;
+    }
+
     loadGame(id);
     setPendingMove(null);
     setGameStarted(true);
@@ -298,6 +312,7 @@ export default function PlayScreen() {
   }
 
   function handleNewGame() {
+    clearGame();
     setOpponentAddress("");
     setGameStarted(false);
     setBoard(Array(9).fill(null));
