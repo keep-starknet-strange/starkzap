@@ -245,6 +245,19 @@ const btnLendingMyPositions = document.getElementById(
   "btn-lending-my-positions"
 ) as HTMLButtonElement;
 const lendingPositionEl = document.getElementById("lending-position")!;
+const btnLendingMarkets = document.getElementById(
+  "btn-lending-markets"
+) as HTMLButtonElement;
+const lendingMarketsEl = document.getElementById("lending-markets")!;
+const btnLendingMaxBorrow = document.getElementById(
+  "btn-lending-max-borrow"
+) as HTMLButtonElement;
+const btnLendingHealthQuote = document.getElementById(
+  "btn-lending-health-quote"
+) as HTMLButtonElement;
+const lendingUseEarnInput = document.getElementById(
+  "lending-use-earn"
+) as HTMLInputElement;
 
 // Preset mapping
 const presets: Record<string, AccountClassConfig> = {
@@ -1476,6 +1489,7 @@ async function lendingBorrow() {
         debtToken,
         amount,
         ...(collateralAmount ? { collateralAmount } : {}),
+        ...(lendingUseEarnInput.checked ? { useEarnPosition: true } : {}),
       },
       getLendingFeeMode()
     );
@@ -1624,6 +1638,123 @@ async function lendingMyPositions() {
   }
 }
 
+async function lendingBrowseMarkets() {
+  if (!wallet) return;
+
+  setButtonLoading(btnLendingMarkets, true);
+  try {
+    log("Fetching Vesu markets...", "info");
+    const markets = await wallet.lending().getMarkets();
+
+    if (markets.length === 0) {
+      lendingMarketsEl.innerHTML = `<div class="quote-row"><span class="quote-label">No markets found</span></div>`;
+      lendingMarketsEl.classList.remove("hidden");
+      log("No markets found", "info");
+      return;
+    }
+
+    const rows = markets.map(
+      (m) =>
+        `<div class="quote-row"><span class="quote-label">${m.asset.symbol}</span><span class="quote-value">${truncateAddress(m.poolAddress)} · ${m.canBeBorrowed ? "Borrowable" : "Supply only"}</span></div>`
+    );
+    lendingMarketsEl.innerHTML = rows.join("");
+    lendingMarketsEl.classList.remove("hidden");
+    log(`Loaded ${markets.length} market(s)`, "success");
+  } catch (err) {
+    log(`Markets query failed: ${err}`, "error");
+    lendingMarketsEl.classList.add("hidden");
+  } finally {
+    setButtonLoading(btnLendingMarkets, false, "Browse Markets");
+  }
+}
+
+async function lendingMaxBorrow() {
+  if (!wallet) return;
+  const collateralToken = getTokenByAddress(lendingCollateralTokenSelect.value);
+  const debtToken = getTokenByAddress(lendingDebtTokenSelect.value);
+  if (!collateralToken || !debtToken) {
+    log("Select collateral and debt tokens", "error");
+    return;
+  }
+
+  setButtonLoading(btnLendingMaxBorrow, true);
+  try {
+    log(
+      `Calculating max borrow for ${collateralToken.symbol}/${debtToken.symbol}...`,
+      "info"
+    );
+    const maxAmount = await wallet
+      .lending()
+      .getMaxBorrowAmount({ collateralToken, debtToken });
+    const formatted = Amount.fromRaw(maxAmount, debtToken).toFormatted(true);
+
+    lendingPositionEl.innerHTML = `<div class="quote-row"><span class="quote-label">Max Borrow</span><span class="quote-value">${formatted} ${debtToken.symbol}</span></div>`;
+    lendingPositionEl.classList.remove("hidden");
+    log(`Max borrow: ${formatted} ${debtToken.symbol}`, "success");
+  } catch (err) {
+    log(`Max borrow query failed: ${err}`, "error");
+    lendingPositionEl.classList.add("hidden");
+  } finally {
+    setButtonLoading(btnLendingMaxBorrow, false, "Max Borrow");
+  }
+}
+
+async function lendingHealthQuote() {
+  if (!wallet) return;
+  const collateralToken = getTokenByAddress(lendingCollateralTokenSelect.value);
+  const debtToken = getTokenByAddress(lendingDebtTokenSelect.value);
+  if (!collateralToken || !debtToken) {
+    log("Select collateral and debt tokens", "error");
+    return;
+  }
+  const rawDebt = lendingDebtAmountInput.value.trim();
+  if (!rawDebt) {
+    log("Enter a borrow amount for health quote", "error");
+    return;
+  }
+
+  setButtonLoading(btnLendingHealthQuote, true);
+  try {
+    const amount = Amount.parse(rawDebt, debtToken);
+    const rawCollateral = lendingCollateralAmountInput.value.trim();
+    const collateralAmount = rawCollateral
+      ? Amount.parse(rawCollateral, collateralToken)
+      : undefined;
+
+    log("Quoting health impact...", "info");
+    const quote = await wallet.lending().quoteHealth({
+      action: {
+        action: "borrow",
+        request: {
+          collateralToken,
+          debtToken,
+          amount,
+          ...(collateralAmount ? { collateralAmount } : {}),
+        },
+      },
+      health: { collateralToken, debtToken },
+      ...getLendingFeeMode(),
+    });
+
+    const simStatus = quote.simulation.ok
+      ? "✓ Would succeed"
+      : `✗ Would fail: ${quote.simulation.ok === false ? quote.simulation.reason : ""}`;
+
+    lendingPositionEl.innerHTML = `
+      <div class="quote-row"><span class="quote-label">Current Health</span><span class="quote-value">${quote.current.isCollateralized ? "Healthy" : "At risk"}</span></div>
+      ${quote.projected ? `<div class="quote-row"><span class="quote-label">Projected Health</span><span class="quote-value">${quote.projected.isCollateralized ? "Healthy" : "At risk"}</span></div>` : ""}
+      <div class="quote-row"><span class="quote-label">Simulation</span><span class="quote-value">${simStatus}</span></div>
+    `;
+    lendingPositionEl.classList.remove("hidden");
+    log("Health quote loaded", "success");
+  } catch (err) {
+    log(`Health quote failed: ${err}`, "error");
+    lendingPositionEl.classList.add("hidden");
+  } finally {
+    setButtonLoading(btnLendingHealthQuote, false, "Health Quote");
+  }
+}
+
 // Lending event listeners
 btnLendingDeposit.addEventListener("click", lendingDeposit);
 btnLendingWithdraw.addEventListener("click", lendingWithdraw);
@@ -1632,6 +1763,9 @@ btnLendingBorrow.addEventListener("click", lendingBorrow);
 btnLendingRepay.addEventListener("click", lendingRepay);
 btnLendingPosition.addEventListener("click", lendingViewPosition);
 btnLendingMyPositions.addEventListener("click", lendingMyPositions);
+btnLendingMarkets.addEventListener("click", lendingBrowseMarkets);
+btnLendingMaxBorrow.addEventListener("click", lendingMaxBorrow);
+btnLendingHealthQuote.addEventListener("click", lendingHealthQuote);
 
 // Initial log
 initializeSwapForm();

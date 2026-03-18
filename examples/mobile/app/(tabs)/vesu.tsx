@@ -20,7 +20,6 @@ import { usePrivy } from "@privy-io/expo";
 
 import {
   Amount,
-  type ChainId,
   type ExecuteOptions,
   type LendingHealth,
   type LendingMarket,
@@ -54,7 +53,6 @@ import {
   getVesuPoolVisual,
   hasVesuExposure,
   VESU_PROVIDER_ID,
-  type VesuApiMarketItem,
   type VesuAssetOption,
   type VesuMarketCard,
 } from "@/vesu";
@@ -67,7 +65,6 @@ const FEE_MODE_SPONSORED = "sponsored" as const;
 const FEE_MODE_USER_PAYS = "user_pays" as const;
 const EMPTY_STATE_LABEL = "—";
 const SUPPORTED_VESU_CHAINS = new Set(["SN_MAIN", "SN_SEPOLIA"]);
-const VESU_MARKETS_API_URL = "https://api.vesu.xyz/markets";
 const VAULT_ACTIONS = ["deposit", "withdraw"] as const;
 const POSITION_ACTIONS = ["borrow", "repay"] as const;
 
@@ -112,17 +109,6 @@ function getExecuteOptions(
     feeMode:
       useSponsored && canUseSponsored ? FEE_MODE_SPONSORED : FEE_MODE_USER_PAYS,
   };
-}
-
-async function fetchVesuApiMarkets(
-  chainId: ChainId
-): Promise<VesuApiMarketItem[]> {
-  if (!chainId.isMainnet()) return [];
-  const response = await fetch(VESU_MARKETS_API_URL);
-  if (!response.ok)
-    throw new Error(`Vesu markets request failed (${response.status})`);
-  const payload = (await response.json()) as { data?: VesuApiMarketItem[] };
-  return payload.data ?? [];
 }
 
 // ---------------------------------------------------------------------------
@@ -483,7 +469,6 @@ export default function VesuScreen() {
 
   // Market state
   const [markets, setMarkets] = useState<LendingMarket[]>([]);
-  const [apiMarkets, setApiMarkets] = useState<VesuApiMarketItem[]>([]);
   const [isLoadingMarkets, setIsLoadingMarkets] = useState(false);
   const [marketError, setMarketError] = useState<string | null>(null);
 
@@ -593,17 +578,17 @@ export default function VesuScreen() {
 
   // Memo: asset options and market cards
   const assetOptions = useMemo(
-    () => buildVesuAssetOptions({ chainId, markets, tokens: allTokens }),
-    [allTokens, chainId, markets]
+    () => buildVesuAssetOptions({ markets, tokens: allTokens }),
+    [allTokens, markets]
   );
   const marketCards = useMemo(
     () =>
       buildVesuMarketCards({
         options: assetOptions,
-        apiMarkets,
+        markets,
         knownTokens: allTokens,
       }),
-    [allTokens, apiMarkets, assetOptions]
+    [allTokens, markets, assetOptions]
   );
 
   // Memo: map market card keys to matching earn positions
@@ -816,27 +801,19 @@ export default function VesuScreen() {
     setIsLoadingMarkets(true);
     setMarketError(null);
     try {
-      const [nextMarkets, nextApiMarkets] = await Promise.all([
-        wallet.lending().getMarkets({ provider: VESU_PROVIDER_ID }),
-        fetchVesuApiMarkets(chainId).catch((e) => {
-          addLog(
-            `Vesu stats fetch failed: ${e instanceof Error ? e.message : String(e)}`
-          );
-          return [];
-        }),
-      ]);
+      const nextMarkets = await wallet
+        .lending()
+        .getMarkets({ provider: VESU_PROVIDER_ID });
       setMarkets(nextMarkets);
-      setApiMarkets(nextApiMarkets);
       addLog(
         nextMarkets.length
-          ? `Loaded ${nextMarkets.length} Vesu SDK markets and ${nextApiMarkets.length} Vesu stats entries`
+          ? `Loaded ${nextMarkets.length} Vesu market(s)`
           : "Vesu market discovery returned no metadata; using fallback assets"
       );
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       setMarketError(message);
       setMarkets([]);
-      setApiMarkets([]);
       addLog(`Vesu market discovery failed: ${message}`);
     } finally {
       setIsLoadingMarkets(false);

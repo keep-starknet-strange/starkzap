@@ -1,4 +1,5 @@
 import type {
+  Amount,
   LendingHealth,
   LendingMarket,
   LendingPosition,
@@ -9,11 +10,7 @@ export const VESU_PROVIDER_ID = "vesu" as const;
 
 export const VESU_HEALTH_VALUE_SCALE = 10n ** 18n;
 
-const MAINNET_FALLBACK_ASSETS = [
-  { symbol: "STRK", canBorrow: false },
-  { symbol: "USDC", canBorrow: true },
-] as const;
-const SEPOLIA_FALLBACK_ASSETS = [
+const FALLBACK_ASSETS = [
   { symbol: "STRK", canBorrow: false },
   { symbol: "USDC", canBorrow: true },
 ] as const;
@@ -89,10 +86,6 @@ const DEFAULT_POOL_VISUALS = [
 
 type VesuAssetSource = "market" | "fallback";
 
-interface ChainLike {
-  isSepolia(): boolean;
-}
-
 export interface VesuAssetOption {
   key: string;
   token: Token;
@@ -108,35 +101,14 @@ interface VesuPoolGroup {
   options: VesuAssetOption[];
 }
 
-export interface VesuApiDecimalValue {
-  decimals: number;
-  value: string;
-}
-
-export interface VesuApiMarketItem {
-  address?: string;
-  decimals?: number;
-  name?: string;
-  symbol?: string;
-  pool?: {
-    id?: string;
-    name?: string;
-    isDeprecated?: boolean;
-  };
-  protocolVersion?: string;
-  stats?: {
-    borrowApr?: VesuApiDecimalValue | null;
-    canBeBorrowed?: boolean;
-    currentUtilization?: VesuApiDecimalValue | null;
-    supplyApy?: VesuApiDecimalValue | null;
-    totalDebt?: VesuApiDecimalValue | null;
-    totalSupplied?: VesuApiDecimalValue | null;
-  };
-}
-
 // ---------------------------------------------------------------------------
 // Pool API types (api.vesu.xyz/pools/{poolId})
 // ---------------------------------------------------------------------------
+
+interface VesuApiDecimalValue {
+  decimals: number;
+  value: string;
+}
 
 export interface VesuPoolAssetConfig {
   debtFloor?: VesuApiDecimalValue;
@@ -220,7 +192,6 @@ export interface VesuPoolVisual {
 }
 
 export function buildVesuAssetOptions(params: {
-  chainId: ChainLike;
   markets: LendingMarket[];
   tokens: Token[];
 }): VesuAssetOption[] {
@@ -240,7 +211,7 @@ export function buildVesuAssetOptions(params: {
     });
   }
 
-  for (const fallbackAsset of getFallbackAssets(params.chainId)) {
+  for (const fallbackAsset of FALLBACK_ASSETS) {
     const token = params.tokens.find(
       (candidate) => candidate.symbol === fallbackAsset.symbol
     );
@@ -261,8 +232,8 @@ export function buildVesuAssetOptions(params: {
   }
 
   return Array.from(options.values()).sort((left, right) => {
-    const poolComparison = getPoolSortKey(left.poolAddress).localeCompare(
-      getPoolSortKey(right.poolAddress)
+    const poolComparison = (left.poolAddress ?? "default").localeCompare(
+      right.poolAddress ?? "default"
     );
     if (poolComparison !== 0) {
       return poolComparison;
@@ -289,44 +260,27 @@ function groupVesuAssetOptionsByPool(
     const group = groups.get(key);
     if (group) {
       group.options.push(option);
-      continue;
+    } else {
+      groups.set(key, {
+        key,
+        label: getVesuPoolLabel(option.poolAddress),
+        poolAddress: option.poolAddress,
+        options: [option],
+      });
     }
-
-    groups.set(key, {
-      key,
-      label: getVesuPoolLabel(option.poolAddress),
-      poolAddress: option.poolAddress,
-      options: [option],
-    });
   }
 
-  return Array.from(groups.values()).map((group) => ({
-    ...group,
-    options: [...group.options].sort((left, right) => {
-      const leftPriority = getAssetPriority(left.token.symbol);
-      const rightPriority = getAssetPriority(right.token.symbol);
-      if (leftPriority !== rightPriority) {
-        return leftPriority - rightPriority;
-      }
-      if (left.canBorrow !== right.canBorrow) {
-        return left.canBorrow ? -1 : 1;
-      }
-      return left.token.symbol.localeCompare(right.token.symbol);
-    }),
-  }));
+  return Array.from(groups.values());
 }
 
 export function buildVesuMarketCards(params: {
   options: VesuAssetOption[];
-  apiMarkets: VesuApiMarketItem[];
+  markets: LendingMarket[];
   knownTokens: Token[];
 }): VesuMarketCard[] {
-  const apiByKey = new Map<string, VesuApiMarketItem>();
-  for (const market of params.apiMarkets) {
-    if (!market.pool?.id || !market.address) {
-      continue;
-    }
-    apiByKey.set(`${market.pool.id}:${market.address}`, market);
+  const marketByKey = new Map<string, LendingMarket>();
+  for (const market of params.markets) {
+    marketByKey.set(`${market.poolAddress}:${market.asset.address}`, market);
   }
 
   const tokenLookup = buildKnownTokenLookup(params.knownTokens);
@@ -342,10 +296,10 @@ export function buildVesuMarketCards(params: {
 
   return [...params.options]
     .map((option) => {
-      const apiMarket = apiByKey.get(option.key);
-      const token = resolveDisplayToken(option.token, tokenLookup, apiMarket);
+      const market = marketByKey.get(option.key);
+      const token = resolveDisplayToken(option.token, tokenLookup);
       const poolLabel =
-        apiMarket?.pool?.name?.trim() || getVesuPoolLabel(option.poolAddress);
+        market?.poolName?.trim() || getVesuPoolLabel(option.poolAddress);
       const collateralTokens = (
         collateralByPool.get(option.poolAddress ?? "default") ?? []
       )
@@ -357,27 +311,23 @@ export function buildVesuMarketCards(params: {
         option: {
           ...option,
           token,
-          canBorrow: apiMarket?.stats?.canBeBorrowed ?? option.canBorrow,
+          canBorrow: market?.canBeBorrowed ?? option.canBorrow,
         },
         poolLabel,
-        totalSuppliedLabel: formatVesuCompactUsd(
-          apiMarket?.stats?.totalSupplied
-        ),
-        totalBorrowedLabel: formatVesuCompactUsd(apiMarket?.stats?.totalDebt),
-        supplyAprLabel: formatVesuRate(apiMarket?.stats?.supplyApy),
+        totalSuppliedLabel: formatVesuCompactUsd(market?.stats?.totalSupplied),
+        totalBorrowedLabel: formatVesuCompactUsd(market?.stats?.totalBorrowed),
+        supplyAprLabel: formatVesuRate(market?.stats?.supplyApy),
         borrowAprLabel: option.canBorrow
-          ? formatVesuRate(apiMarket?.stats?.borrowApr)
+          ? formatVesuRate(market?.stats?.borrowApr)
           : "N/A",
         collateralTokens,
       } satisfies VesuMarketCard;
     })
     .sort((left, right) => {
-      const leftValue = decimalValueToNumber(
-        apiByKey.get(left.key)?.stats?.totalSupplied ?? null
-      );
-      const rightValue = decimalValueToNumber(
-        apiByKey.get(right.key)?.stats?.totalSupplied ?? null
-      );
+      const leftSupplied = marketByKey.get(left.key)?.stats?.totalSupplied;
+      const rightSupplied = marketByKey.get(right.key)?.stats?.totalSupplied;
+      const leftValue = amountToNumber(leftSupplied);
+      const rightValue = amountToNumber(rightSupplied);
       if (leftValue !== rightValue) {
         return rightValue - leftValue;
       }
@@ -390,73 +340,57 @@ export function buildVesuMarketCards(params: {
     });
 }
 
+/** Filter options to unique-by-address, same-pool, excluding a counterpart asset. */
+function filterUniquePoolAssets(
+  options: VesuAssetOption[],
+  counterpart: VesuAssetOption | null,
+  extraFilter?: (option: VesuAssetOption) => boolean
+): VesuAssetOption[] {
+  const seen = new Map<string, VesuAssetOption>();
+  for (const option of options) {
+    if (extraFilter && !extraFilter(option)) continue;
+    if (
+      counterpart?.poolAddress &&
+      option.poolAddress &&
+      option.poolAddress !== counterpart.poolAddress
+    )
+      continue;
+    if (counterpart && option.token.address === counterpart.token.address)
+      continue;
+    if (!seen.has(option.token.address)) seen.set(option.token.address, option);
+  }
+  return Array.from(seen.values());
+}
+
+function sortByPriority(
+  options: VesuAssetOption[],
+  priority: (symbol: string) => number
+): VesuAssetOption[] {
+  return options.sort((a, b) => {
+    const p = priority(a.token.symbol) - priority(b.token.symbol);
+    return p !== 0 ? p : a.token.symbol.localeCompare(b.token.symbol);
+  });
+}
+
 export function getAvailableVesuCollateralAssets(
   options: VesuAssetOption[],
   debtAsset: VesuAssetOption | null
 ): VesuAssetOption[] {
-  const uniqueByAddress = new Map<string, VesuAssetOption>();
-  for (const option of options) {
-    if (
-      debtAsset?.poolAddress &&
-      option.poolAddress &&
-      option.poolAddress !== debtAsset.poolAddress
-    ) {
-      continue;
-    }
-    if (debtAsset && option.token.address === debtAsset.token.address) {
-      continue;
-    }
-    if (!uniqueByAddress.has(option.token.address)) {
-      uniqueByAddress.set(option.token.address, option);
-    }
-  }
-
-  return Array.from(uniqueByAddress.values()).sort((left, right) => {
-    const leftPriority = getCollateralPriority(left.token.symbol);
-    const rightPriority = getCollateralPriority(right.token.symbol);
-    if (leftPriority !== rightPriority) {
-      return leftPriority - rightPriority;
-    }
-    return left.token.symbol.localeCompare(right.token.symbol);
-  });
+  return sortByPriority(
+    filterUniquePoolAssets(options, debtAsset),
+    getCollateralPriority
+  );
 }
 
-/**
- * Returns borrowable assets from the same pool, excluding the collateral asset.
- */
+/** Returns borrowable assets from the same pool, excluding the collateral asset. */
 export function getAvailableVesuDebtAssets(
   options: VesuAssetOption[],
   collateralAsset: VesuAssetOption | null
 ): VesuAssetOption[] {
-  const uniqueByAddress = new Map<string, VesuAssetOption>();
-  for (const option of options) {
-    if (!option.canBorrow) continue;
-    if (
-      collateralAsset?.poolAddress &&
-      option.poolAddress &&
-      option.poolAddress !== collateralAsset.poolAddress
-    ) {
-      continue;
-    }
-    if (
-      collateralAsset &&
-      option.token.address === collateralAsset.token.address
-    ) {
-      continue;
-    }
-    if (!uniqueByAddress.has(option.token.address)) {
-      uniqueByAddress.set(option.token.address, option);
-    }
-  }
-
-  return Array.from(uniqueByAddress.values()).sort((left, right) => {
-    const leftPriority = getAssetPriority(left.token.symbol);
-    const rightPriority = getAssetPriority(right.token.symbol);
-    if (leftPriority !== rightPriority) {
-      return leftPriority - rightPriority;
-    }
-    return left.token.symbol.localeCompare(right.token.symbol);
-  });
+  return sortByPriority(
+    filterUniquePoolAssets(options, collateralAsset, (o) => o.canBorrow),
+    getAssetPriority
+  );
 }
 
 export function getDefaultVesuDebtAsset(
@@ -498,10 +432,8 @@ export function formatVesuUsdValue(value: bigint | null | undefined): string {
     .padStart(DISPLAY_DECIMALS, "0")}`;
 }
 
-export function formatVesuCompactUsd(
-  value: VesuApiDecimalValue | null | undefined
-): string {
-  const numeric = decimalValueToNumber(value);
+export function formatVesuCompactUsd(value: Amount | undefined): string {
+  const numeric = amountToNumber(value);
   if (numeric <= 0) {
     return "$0";
   }
@@ -514,17 +446,14 @@ export function formatVesuCompactUsd(
   }).format(numeric);
 }
 
-export function formatVesuRate(
-  value: VesuApiDecimalValue | null | undefined
-): string {
+export function formatVesuRate(value: Amount | undefined): string {
   if (!value) {
     return "N/A";
   }
-  const numeric = decimalValueToNumber(value);
   return new Intl.NumberFormat("en-US", {
     style: "percent",
     maximumFractionDigits: 2,
-  }).format(numeric);
+  }).format(amountToNumber(value));
 }
 
 export function formatVesuLtv(
@@ -646,138 +575,67 @@ function getPreferredOption(
   return options[0] ?? null;
 }
 
-function getFallbackAssets(
-  chainId: ChainLike
-): readonly { symbol: string; canBorrow: boolean }[] {
-  return chainId.isSepolia()
-    ? SEPOLIA_FALLBACK_ASSETS
-    : MAINNET_FALLBACK_ASSETS;
-}
-
-function buildKnownTokenLookup(knownTokens: Token[]): {
+interface TokenLookup {
   byAddress: Map<string, Token>;
   bySymbol: Map<string, Token>;
-  byName: Map<string, Token>;
-} {
+}
+
+function buildKnownTokenLookup(knownTokens: Token[]): TokenLookup {
   const byAddress = new Map<string, Token>();
   const bySymbol = new Map<string, Token>();
-  const byName = new Map<string, Token>();
 
   for (const token of knownTokens) {
     byAddress.set(token.address, token);
-
-    if (!token.metadata?.logoUrl) {
-      continue;
-    }
-
-    const normalizedSymbol = normalizeTokenAlias(token.symbol);
-    if (normalizedSymbol && !bySymbol.has(normalizedSymbol)) {
-      bySymbol.set(normalizedSymbol, token);
-    }
-
-    const normalizedName = normalizeTokenAlias(token.name);
-    if (normalizedName && !byName.has(normalizedName)) {
-      byName.set(normalizedName, token);
+    if (token.metadata?.logoUrl) {
+      const key = normalizeTokenAlias(token.symbol);
+      if (key && !bySymbol.has(key)) bySymbol.set(key, token);
     }
   }
 
-  return { byAddress, bySymbol, byName };
+  return { byAddress, bySymbol };
 }
 
-function resolveDisplayToken(
-  token: Token,
-  tokenLookup: {
-    byAddress: Map<string, Token>;
-    bySymbol: Map<string, Token>;
-    byName: Map<string, Token>;
-  },
-  apiMarket?: VesuApiMarketItem
-): Token {
-  const exactMatch = tokenLookup.byAddress.get(token.address);
-  if (exactMatch?.metadata?.logoUrl) {
-    return exactMatch;
-  }
+function resolveDisplayToken(token: Token, lookup: TokenLookup): Token {
+  const exact = lookup.byAddress.get(token.address);
+  if (exact?.metadata?.logoUrl) return exact;
 
-  const symbolMatch = findTokenByAlias(tokenLookup.bySymbol, [
-    token.symbol,
-    apiMarket?.symbol,
-  ]);
-  if (symbolMatch) {
-    return mergeDisplayTokenMetadata(token, symbolMatch);
-  }
-
-  const nameMatch = findTokenByAlias(tokenLookup.byName, [
-    token.name,
-    apiMarket?.name,
-  ]);
-  if (nameMatch) {
-    return mergeDisplayTokenMetadata(token, nameMatch);
-  }
-
-  return exactMatch ?? token;
-}
-
-function findTokenByAlias(
-  candidates: Map<string, Token>,
-  aliases: (string | undefined)[]
-): Token | null {
-  for (const alias of aliases) {
-    const normalizedAlias = normalizeTokenAlias(alias);
-    if (!normalizedAlias) {
-      continue;
-    }
-    const candidate = candidates.get(normalizedAlias);
-    if (candidate?.metadata?.logoUrl) {
-      return candidate;
+  // Try symbol match for logo metadata
+  const key = normalizeTokenAlias(token.symbol);
+  if (key) {
+    const match = lookup.bySymbol.get(key);
+    if (match?.metadata?.logoUrl) {
+      return {
+        ...token,
+        metadata: { ...token.metadata, logoUrl: match.metadata.logoUrl },
+      };
     }
   }
-  return null;
+
+  return exact ?? token;
 }
 
-function mergeDisplayTokenMetadata(token: Token, source: Token): Token {
-  if (!source.metadata?.logoUrl) {
-    return token;
-  }
-
-  return {
-    ...token,
-    metadata: {
-      ...token.metadata,
-      logoUrl: token.metadata?.logoUrl ?? source.metadata.logoUrl,
-    },
-  };
+function amountToNumber(value: Amount | undefined): number {
+  if (!value) return 0;
+  return Number(value.toUnit());
 }
 
-function getPoolSortKey(
-  poolAddress: LendingMarket["poolAddress"] | undefined
-): string {
-  return poolAddress ?? "default";
+function symbolPriority(symbol: string, order: readonly string[]): number {
+  const index = order.indexOf(symbol);
+  return index === -1 ? order.length : index;
 }
 
-function decimalValueToNumber(
-  value: VesuApiDecimalValue | null | undefined
-): number {
-  if (!value) {
-    return 0;
-  }
-  const divisor = 10 ** value.decimals;
-  return Number(value.value) / divisor;
-}
+const ASSET_PRIORITY_ORDER: string[] = [
+  ...DEFAULT_VESU_DEBT_SYMBOLS,
+  ...DEFAULT_VESU_VAULT_SYMBOLS,
+  ...DEFAULT_VESU_COLLATERAL_SYMBOLS,
+];
 
 function getAssetPriority(symbol: string): number {
-  const fallbackSymbols: string[] = [
-    ...DEFAULT_VESU_DEBT_SYMBOLS,
-    ...DEFAULT_VESU_VAULT_SYMBOLS,
-    ...DEFAULT_VESU_COLLATERAL_SYMBOLS,
-  ];
-  const index = fallbackSymbols.indexOf(symbol);
-  return index === -1 ? fallbackSymbols.length : index;
+  return symbolPriority(symbol, ASSET_PRIORITY_ORDER);
 }
 
 function getCollateralPriority(symbol: string): number {
-  const symbols: string[] = [...DEFAULT_VESU_COLLATERAL_SYMBOLS];
-  const index = symbols.indexOf(symbol);
-  return index === -1 ? symbols.length : index;
+  return symbolPriority(symbol, DEFAULT_VESU_COLLATERAL_SYMBOLS);
 }
 
 function insertThousandsSeparators(value: bigint): string {

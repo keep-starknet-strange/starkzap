@@ -13,13 +13,23 @@ import type { Tx } from "@/tx";
 export type LendingAction = "deposit" | "withdraw" | "borrow" | "repay";
 export type LendingAmountDenomination = "assets" | "native";
 
+export interface LendingMarketStats {
+  supplyApy?: Amount;
+  borrowApr?: Amount;
+  totalSupplied?: Amount;
+  totalBorrowed?: Amount;
+  utilization?: Amount;
+}
+
 export interface LendingMarket {
   protocol: string;
   poolAddress: Address;
+  poolName?: string;
   asset: Token;
   vTokenAddress: Address;
   vTokenSymbol?: string;
   canBeBorrowed?: boolean;
+  stats?: LendingMarketStats;
 }
 
 export interface LendingPosition {

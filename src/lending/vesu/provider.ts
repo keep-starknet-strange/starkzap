@@ -18,16 +18,27 @@ import type {
   LendingWithdrawRequest,
   PreparedLendingAction,
 } from "@/lending/interface";
-import { type Address, type ChainId, fromAddress, type Token } from "@/types";
+import {
+  Amount,
+  type Address,
+  type ChainId,
+  fromAddress,
+  type Token,
+} from "@/types";
 import { CallData, type Call, uint256 } from "starknet";
 import { vesuPresets, type VesuChainConfig } from "@/lending/vesu/presets";
 
 type VesuChain = "SN_MAIN" | "SN_SEPOLIA";
 const VESU_SCALE = 10n ** 18n;
 
+interface VesuApiDecimalValue {
+  value?: string;
+  decimals?: number;
+}
+
 interface VesuMarketApiItem {
   protocolVersion?: string;
-  pool?: { id?: string; isDeprecated?: boolean };
+  pool?: { id?: string; name?: string; isDeprecated?: boolean };
   address?: string;
   name?: string;
   symbol?: string;
@@ -38,6 +49,11 @@ interface VesuMarketApiItem {
   };
   stats?: {
     canBeBorrowed?: boolean;
+    supplyApy?: VesuApiDecimalValue | null;
+    borrowApr?: VesuApiDecimalValue | null;
+    totalSupplied?: VesuApiDecimalValue | null;
+    totalDebt?: VesuApiDecimalValue | null;
+    currentUtilization?: VesuApiDecimalValue | null;
   };
 }
 
@@ -94,50 +110,30 @@ export class VesuLendingProvider implements LendingProvider {
   constructor(options: VesuLendingProviderOptions = {}) {
     this.fetcher = options.fetcher ?? fetch;
 
-    const chainConfigs: Partial<Record<VesuChain, VesuChainConfig>> = {
-      SN_MAIN: { ...vesuPresets.SN_MAIN },
-      SN_SEPOLIA: { ...vesuPresets.SN_SEPOLIA },
-    };
-    for (const literal of ["SN_MAIN", "SN_SEPOLIA"] as const) {
-      const base = chainConfigs[literal];
-      const override = options.chainConfigs?.[literal];
-      if (!base && !override) {
-        continue;
-      }
-      chainConfigs[literal] = {
-        ...(override?.poolFactory === null
-          ? {}
-          : override?.poolFactory != null || base?.poolFactory != null
-            ? {
-                poolFactory: fromAddress(
-                  override?.poolFactory ?? (base?.poolFactory as Address)
-                ),
-              }
-            : {}),
-        ...(override?.defaultPool === null
-          ? {}
-          : override?.defaultPool != null || base?.defaultPool != null
-            ? {
-                defaultPool: fromAddress(
-                  override?.defaultPool ?? (base?.defaultPool as Address)
-                ),
-              }
-            : {}),
-        ...(override?.marketsApiUrl !== undefined
-          ? override.marketsApiUrl
-            ? { marketsApiUrl: override.marketsApiUrl }
-            : {}
-          : base?.marketsApiUrl
-            ? { marketsApiUrl: base.marketsApiUrl }
-            : {}),
-        ...(override?.positionsApiUrl !== undefined
-          ? override.positionsApiUrl
-            ? { positionsApiUrl: override.positionsApiUrl }
-            : {}
-          : base?.positionsApiUrl
-            ? { positionsApiUrl: base.positionsApiUrl }
-            : {}),
-      };
+    const chainConfigs: Partial<Record<VesuChain, VesuChainConfig>> = {};
+    for (const chain of ["SN_MAIN", "SN_SEPOLIA"] as const) {
+      const base: VesuChainConfig = vesuPresets[chain];
+      const ovr = options.chainConfigs?.[chain];
+      if (!base && !ovr) continue;
+
+      // For each field: explicit `null` in override clears it,
+      // `undefined` falls back to base, anything else is used as-is.
+      const pick = <T>(
+        o: T | null | undefined,
+        b: T | undefined
+      ): T | undefined => (o === null ? undefined : o !== undefined ? o : b);
+
+      const merged: VesuChainConfig = {};
+      const pool = pick(ovr?.poolFactory, base?.poolFactory);
+      if (pool != null) merged.poolFactory = fromAddress(pool);
+      const defPool = pick(ovr?.defaultPool, base?.defaultPool);
+      if (defPool != null) merged.defaultPool = fromAddress(defPool);
+      const markets = pick(ovr?.marketsApiUrl, base?.marketsApiUrl);
+      if (markets != null) merged.marketsApiUrl = markets;
+      const positions = pick(ovr?.positionsApiUrl, base?.positionsApiUrl);
+      if (positions != null) merged.positionsApiUrl = positions;
+
+      chainConfigs[chain] = merged;
     }
     this.chainConfigs = chainConfigs;
   }
@@ -1008,9 +1004,19 @@ export class VesuLendingProvider implements LendingProvider {
       return null;
     }
 
+    const stats = entry.stats;
+    const supplyApy = toAmount(stats?.supplyApy);
+    const borrowApr = toAmount(stats?.borrowApr);
+    const totalSupplied = toAmount(stats?.totalSupplied);
+    const totalBorrowed = toAmount(stats?.totalDebt);
+    const utilization = toAmount(stats?.currentUtilization);
+    const hasStats =
+      supplyApy || borrowApr || totalSupplied || totalBorrowed || utilization;
+
     return {
       protocol: this.id,
       poolAddress: fromAddress(entry.pool.id),
+      ...(entry.pool.name ? { poolName: entry.pool.name } : {}),
       asset: {
         address: fromAddress(entry.address),
         symbol: entry.symbol,
@@ -1019,11 +1025,29 @@ export class VesuLendingProvider implements LendingProvider {
       },
       vTokenAddress: fromAddress(entry.vToken.address),
       ...(entry.vToken.symbol ? { vTokenSymbol: entry.vToken.symbol } : {}),
-      ...(entry.stats?.canBeBorrowed != null
-        ? { canBeBorrowed: entry.stats.canBeBorrowed }
+      ...(stats?.canBeBorrowed != null
+        ? { canBeBorrowed: stats.canBeBorrowed }
+        : {}),
+      ...(hasStats
+        ? {
+            stats: {
+              ...(supplyApy ? { supplyApy } : {}),
+              ...(borrowApr ? { borrowApr } : {}),
+              ...(totalSupplied ? { totalSupplied } : {}),
+              ...(totalBorrowed ? { totalBorrowed } : {}),
+              ...(utilization ? { utilization } : {}),
+            },
+          }
         : {}),
     };
   }
+}
+
+function toAmount(
+  v: VesuApiDecimalValue | null | undefined
+): Amount | undefined {
+  if (!v?.value || v.decimals == null) return undefined;
+  return Amount.fromRaw(v.value, v.decimals);
 }
 
 function assertAssetsDenomination(
