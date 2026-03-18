@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { Amount } from "@/types";
 import type {
   LendingHealth,
   LendingMarket,
@@ -44,7 +45,8 @@ function createToken(
 function createMarket(
   token: Token,
   poolAddress: string,
-  canBeBorrowed = true
+  canBeBorrowed = true,
+  extra?: Partial<Pick<LendingMarket, "poolName" | "stats">>
 ): LendingMarket {
   return {
     protocol: "vesu",
@@ -52,16 +54,9 @@ function createMarket(
     asset: token,
     vTokenAddress: `${token.address}-vtoken`,
     canBeBorrowed,
+    ...extra,
   } as unknown as LendingMarket;
 }
-
-const sepoliaChain = {
-  isSepolia: () => true,
-};
-
-const mainnetChain = {
-  isSepolia: () => false,
-};
 
 describe("mobile Vesu helpers", () => {
   it("builds market options with fallback assets for Sepolia", () => {
@@ -70,7 +65,6 @@ describe("mobile Vesu helpers", () => {
     const eth = createToken("ETH", "0xeth");
 
     const options = buildVesuAssetOptions({
-      chainId: sepoliaChain,
       markets: [createMarket(usdc, "0xpool")],
       tokens: [strk, usdc, eth],
     });
@@ -97,7 +91,6 @@ describe("mobile Vesu helpers", () => {
     const usdc = createToken("USDC", "0xusdc", 6);
 
     const options = buildVesuAssetOptions({
-      chainId: mainnetChain,
       markets: [],
       tokens: [strk, usdc],
     });
@@ -123,7 +116,6 @@ describe("mobile Vesu helpers", () => {
   it("preserves different pools instead of collapsing by asset", () => {
     const usdc = createToken("USDC", "0xusdc", 6);
     const options = buildVesuAssetOptions({
-      chainId: mainnetChain,
       markets: [createMarket(usdc, "0xpool-a"), createMarket(usdc, "0xpool-b")],
       tokens: [usdc],
     });
@@ -134,7 +126,7 @@ describe("mobile Vesu helpers", () => {
     ]);
     const cards = buildVesuMarketCards({
       options,
-      apiMarkets: [],
+      markets: [],
       knownTokens: [usdc],
     });
 
@@ -181,10 +173,18 @@ describe("mobile Vesu helpers", () => {
       "https://example.com/usdc.png"
     );
     const eth = createToken("ETH", "0xeth");
+    const usdcMarket = createMarket(usdc, "0xpool-a", true, {
+      poolName: "Genesis Pool",
+      stats: {
+        totalSupplied: Amount.fromRaw("292000000", 2),
+        totalBorrowed: Amount.fromRaw("142000000", 2),
+        supplyApy: Amount.fromRaw("197", 4),
+        borrowApr: Amount.fromRaw("506", 4),
+      },
+    });
     const options = buildVesuAssetOptions({
-      chainId: mainnetChain,
       markets: [
-        createMarket(usdc, "0xpool-a"),
+        usdcMarket,
         createMarket(strk, "0xpool-a", false),
         createMarket(eth, "0xpool-b"),
       ],
@@ -193,18 +193,10 @@ describe("mobile Vesu helpers", () => {
 
     const cards = buildVesuMarketCards({
       options,
-      apiMarkets: [
-        {
-          address: usdc.address,
-          pool: { id: "0xpool-a", name: "Genesis Pool" },
-          stats: {
-            canBeBorrowed: true,
-            totalSupplied: { value: "292000000", decimals: 2 },
-            totalDebt: { value: "142000000", decimals: 2 },
-            supplyApy: { value: "197", decimals: 4 },
-            borrowApr: { value: "506", decimals: 4 },
-          },
-        },
+      markets: [
+        usdcMarket,
+        createMarket(strk, "0xpool-a", false),
+        createMarket(eth, "0xpool-b"),
       ],
       knownTokens: [strk, usdc, eth],
     });
@@ -245,7 +237,6 @@ describe("mobile Vesu helpers", () => {
     const marketStrk = createToken("STRK", "0xmarket-strk");
 
     const options = buildVesuAssetOptions({
-      chainId: mainnetChain,
       markets: [
         createMarket(marketUsdc, "0xpool-a"),
         createMarket(marketStrk, "0xpool-a", false),
@@ -255,7 +246,7 @@ describe("mobile Vesu helpers", () => {
 
     const cards = buildVesuMarketCards({
       options,
-      apiMarkets: [],
+      markets: [],
       knownTokens: [knownUsdc, knownStrk],
     });
 
@@ -320,10 +311,8 @@ describe("mobile Vesu helpers", () => {
     expect(formatVesuUsdValue(1234n * 10n ** 18n + 56n * 10n ** 16n)).toBe(
       "$1,234.56"
     );
-    expect(formatVesuCompactUsd({ value: "230000000", decimals: 2 })).toBe(
-      "$2.3M"
-    );
-    expect(formatVesuRate({ value: "240", decimals: 4 })).toBe("2.4%");
+    expect(formatVesuCompactUsd(Amount.fromRaw("230000000", 2))).toBe("$2.3M");
+    expect(formatVesuRate(Amount.fromRaw("240", 4))).toBe("2.4%");
     expect(formatVesuUsdValue(null)).toBe("—");
     expect(formatVesuLtv(health)).toBe("25.00%");
     expect(

@@ -1189,7 +1189,12 @@
             <button id="btn-lending-withdraw-max" class="btn btn-secondary">
               Withdraw Max
             </button>
+            <button id="btn-lending-markets" class="btn btn-secondary">
+              Browse Markets
+            </button>
           </div>
+
+          <div id="lending-markets" class="quote-box hidden"></div>
 
           <div class="divider" style="margin: 1rem 0; font-size: 0.8rem">
             Borrow / Repay
@@ -1220,6 +1225,13 @@
             </div>
           </div>
 
+          <div class="form-group swap-inline">
+            <input id="lending-use-earn" type="checkbox" />
+            <label for="lending-use-earn" style="margin: 0"
+              >Use existing supply as collateral</label
+            >
+          </div>
+
           <div class="actions" style="margin-top: 0.75rem">
             <button id="btn-lending-borrow" class="btn btn-primary">
               Borrow
@@ -1235,6 +1247,12 @@
           <div class="actions" style="margin-top: 0.5rem">
             <button id="btn-lending-my-positions" class="btn btn-secondary">
               My Positions
+            </button>
+            <button id="btn-lending-max-borrow" class="btn btn-secondary">
+              Max Borrow
+            </button>
+            <button id="btn-lending-health-quote" class="btn btn-secondary">
+              Health Quote
             </button>
           </div>
 
