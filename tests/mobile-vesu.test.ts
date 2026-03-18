@@ -4,6 +4,7 @@ import type {
   LendingHealth,
   LendingMarket,
   LendingPosition,
+  LendingUserPosition,
   Token,
 } from "@/types";
 import {
@@ -20,8 +21,11 @@ import {
   getVesuCloseRepayAmount,
   getVesuHealthStatus,
   getVesuMinimumDepositForBorrow,
+  getVesuPositionBadgeLabel,
   getVesuPoolLabel,
   hasVesuExposure,
+  getVesuRepaySubmissionAmount,
+  getVesuUserPositionForMarket,
   type VesuPoolData,
 } from "../examples/mobile/vesu";
 
@@ -444,5 +448,60 @@ describe("mobile Vesu helpers", () => {
     });
 
     expect(closeRepayAmount).toBe(10_124_196n);
+  });
+
+  it("allows collateral-only repay submissions with a zero debt amount", () => {
+    const strk = createToken("STRK", "0xstrk");
+    const usdc = createToken("USDC", "0xusdc", 6);
+
+    const repayAmount = getVesuRepaySubmissionAmount({
+      debtToken: usdc,
+      collateralAmount: Amount.parse("2", strk),
+      currentDebtAmount: Amount.parse("5", usdc).toBase(),
+      walletDebtBalance: Amount.parse("10", usdc).toBase(),
+    });
+
+    expect(repayAmount?.toBase()).toBe(0n);
+  });
+
+  it("adds the close buffer to full repay submissions when the wallet can cover it", () => {
+    const usdc = createToken("USDC", "0xusdc", 6);
+
+    const repayAmount = getVesuRepaySubmissionAmount({
+      debtToken: usdc,
+      debtAmount: Amount.parse("10.124186", usdc),
+      currentDebtAmount: Amount.parse("10.124186", usdc).toBase(),
+      walletDebtBalance: Amount.parse("20", usdc).toBase(),
+    });
+
+    expect(repayAmount?.toBase()).toBe(10_124_196n);
+  });
+
+  it("matches borrow positions to market cards and labels them as active borrows", () => {
+    const strk = createToken("STRK", "0xstrk");
+    const usdc = createToken("USDC", "0xusdc", 6);
+    const borrowPosition: LendingUserPosition = {
+      type: "borrow",
+      pool: { id: "0xpool" as Token["address"], name: "Pool" },
+      collateral: {
+        token: strk,
+        amount: Amount.parse("4", strk).toBase(),
+      },
+      debt: {
+        token: usdc,
+        amount: Amount.parse("1.5", usdc).toBase(),
+      },
+    };
+
+    const matched = getVesuUserPositionForMarket({
+      userPositions: [borrowPosition],
+      token: strk,
+      poolAddress: "0xpool" as LendingMarket["poolAddress"],
+    });
+
+    expect(matched).toEqual(borrowPosition);
+    expect(getVesuPositionBadgeLabel(borrowPosition)).toContain("Borrowing");
+    expect(getVesuPositionBadgeLabel(borrowPosition)).toContain("1.5");
+    expect(getVesuPositionBadgeLabel(borrowPosition)).toContain("USDC");
   });
 });
