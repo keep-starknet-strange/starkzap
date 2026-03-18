@@ -732,7 +732,7 @@ export class VesuLendingProvider implements LendingProvider {
     const debtScale = tokenScale(request.debtToken.decimals);
     const maxBorrowAmount = (maxBorrowValue * debtScale) / debtPrice.value;
 
-    // Apply 30% safety margin to account for rounding differences between
+    // Apply 1% safety margin to account for rounding differences between
     // our off-chain computation and the on-chain collateralization check.
     return (maxBorrowAmount * 99n) / 100n;
   }
