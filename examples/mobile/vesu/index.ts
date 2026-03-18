@@ -9,6 +9,8 @@ import type {
 export const VESU_PROVIDER_ID = "vesu" as const;
 
 export const VESU_HEALTH_VALUE_SCALE = 10n ** 18n;
+const VESU_BASIS_POINTS_SCALE = 10_000n;
+const VESU_MAX_BORROW_SAFETY_BPS = 9_900n;
 
 const FALLBACK_ASSETS = [
   { symbol: "STRK", canBorrow: false },
@@ -172,6 +174,95 @@ export function getVesuDebtFloor(
 export function formatVesuDebtFloor(debtFloor: bigint): string {
   const usd = Number(debtFloor) / 1e18;
   return `$${usd.toFixed(usd % 1 === 0 ? 0 : 2)}`;
+}
+
+export function getVesuBorrowCapacityForDeposit(params: {
+  pool: VesuPoolData | null | undefined;
+  collateralToken: Token;
+  debtToken: Token;
+  depositAmount?: Amount | null;
+  currentMaxBorrowAmount?: bigint | null;
+}): bigint | null {
+  const baseline = params.currentMaxBorrowAmount ?? 0n;
+  const depositRaw = params.depositAmount?.toBase() ?? 0n;
+  if (depositRaw <= 0n) {
+    return baseline;
+  }
+
+  const collateralPrice = getPoolAssetUsdPrice(
+    params.pool,
+    params.collateralToken
+  );
+  const debtPrice = getPoolAssetUsdPrice(params.pool, params.debtToken);
+  const maxLtv = getPoolPairMaxLtv(
+    params.pool,
+    params.collateralToken.address,
+    params.debtToken.address
+  );
+  if (collateralPrice == null || debtPrice == null || maxLtv == null) {
+    return baseline;
+  }
+
+  const effectiveMaxLtv =
+    (maxLtv * VESU_MAX_BORROW_SAFETY_BPS) / VESU_BASIS_POINTS_SCALE;
+  if (effectiveMaxLtv <= 0n || debtPrice <= 0n) {
+    return baseline;
+  }
+
+  const collateralScale = 10n ** BigInt(params.collateralToken.decimals);
+  const debtScale = 10n ** BigInt(params.debtToken.decimals);
+  const additionalCollateralValue =
+    (depositRaw * collateralPrice) / collateralScale;
+  const additionalBorrowValue =
+    (additionalCollateralValue * effectiveMaxLtv) / VESU_HEALTH_VALUE_SCALE;
+  const additionalBorrowAmount =
+    (additionalBorrowValue * debtScale) / debtPrice;
+
+  return baseline + additionalBorrowAmount;
+}
+
+export function getVesuMinimumDepositForBorrow(params: {
+  pool: VesuPoolData | null | undefined;
+  collateralToken: Token;
+  debtToken: Token;
+  borrowAmount?: Amount | null;
+  currentMaxBorrowAmount?: bigint | null;
+}): bigint | null {
+  const targetBorrow = params.borrowAmount?.toBase() ?? 0n;
+  const baseline = params.currentMaxBorrowAmount ?? 0n;
+  const shortfall = targetBorrow - baseline;
+  if (shortfall <= 0n) {
+    return 0n;
+  }
+
+  const collateralPrice = getPoolAssetUsdPrice(
+    params.pool,
+    params.collateralToken
+  );
+  const debtPrice = getPoolAssetUsdPrice(params.pool, params.debtToken);
+  const maxLtv = getPoolPairMaxLtv(
+    params.pool,
+    params.collateralToken.address,
+    params.debtToken.address
+  );
+  if (collateralPrice == null || debtPrice == null || maxLtv == null) {
+    return null;
+  }
+
+  const effectiveMaxLtv =
+    (maxLtv * VESU_MAX_BORROW_SAFETY_BPS) / VESU_BASIS_POINTS_SCALE;
+  if (effectiveMaxLtv <= 0n || collateralPrice <= 0n) {
+    return null;
+  }
+
+  const collateralScale = 10n ** BigInt(params.collateralToken.decimals);
+  const debtScale = 10n ** BigInt(params.debtToken.decimals);
+  const additionalBorrowValue = ceilDiv(shortfall * debtPrice, debtScale);
+  const requiredCollateralValue = ceilDiv(
+    additionalBorrowValue * VESU_HEALTH_VALUE_SCALE,
+    effectiveMaxLtv
+  );
+  return ceilDiv(requiredCollateralValue * collateralScale, collateralPrice);
 }
 
 export interface VesuMarketCard {
@@ -617,6 +708,53 @@ function resolveDisplayToken(token: Token, lookup: TokenLookup): Token {
 function amountToNumber(value: Amount | undefined): number {
   if (!value) return 0;
   return Number(value.toUnit());
+}
+
+function getPoolAssetUsdPrice(
+  pool: VesuPoolData | null | undefined,
+  token: Token
+): bigint | null {
+  const asset = pool?.assets.find(
+    (candidate) =>
+      candidate.address.toLowerCase() === token.address.toLowerCase()
+  );
+  if (!asset?.usdPrice?.value) {
+    return null;
+  }
+  return normalizeVesuDecimal(asset.usdPrice.value, asset.usdPrice.decimals);
+}
+
+function getPoolPairMaxLtv(
+  pool: VesuPoolData | null | undefined,
+  collateralAssetAddress: string,
+  debtAssetAddress: string
+): bigint | null {
+  const pair = pool?.pairs.find(
+    (candidate) =>
+      candidate.collateralAssetAddress.toLowerCase() ===
+        collateralAssetAddress.toLowerCase() &&
+      candidate.debtAssetAddress.toLowerCase() ===
+        debtAssetAddress.toLowerCase()
+  );
+  if (!pair?.maxLTV?.value) {
+    return null;
+  }
+  return normalizeVesuDecimal(pair.maxLTV.value, pair.maxLTV.decimals);
+}
+
+function normalizeVesuDecimal(value: string, decimals: number): bigint {
+  const raw = BigInt(value);
+  if (decimals === 18) {
+    return raw;
+  }
+  if (decimals > 18) {
+    return raw / 10n ** BigInt(decimals - 18);
+  }
+  return raw * 10n ** BigInt(18 - decimals);
+}
+
+function ceilDiv(dividend: bigint, divisor: bigint): bigint {
+  return (dividend + divisor - 1n) / divisor;
 }
 
 function symbolPriority(symbol: string, order: readonly string[]): number {
