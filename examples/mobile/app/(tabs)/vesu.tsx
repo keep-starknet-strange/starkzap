@@ -53,8 +53,11 @@ import {
   getVesuCloseRepayAmount,
   getVesuHealthStatus,
   getVesuMinimumDepositForBorrow,
+  getVesuPositionBadgeLabel,
   getVesuPoolLabel,
   getVesuPoolVisual,
+  getVesuRepaySubmissionAmount,
+  getVesuUserPositionForMarket,
   hasVesuExposure,
   VESU_PROVIDER_ID,
   type VesuAssetOption,
@@ -272,11 +275,7 @@ function MarketCardView(props: {
         <View style={styles.positionBadge}>
           <Ionicons name="wallet-outline" size={12} color="#15803d" />
           <ThemedText style={styles.positionBadgeText}>
-            {Amount.fromRaw(
-              userPosition.collateral.amount,
-              userPosition.collateral.token
-            ).toFormatted(true)}{" "}
-            {userPosition.collateral.token.symbol} deposited
+            {getVesuPositionBadgeLabel(userPosition)}
           </ThemedText>
         </View>
       )}
@@ -680,19 +679,17 @@ export default function VesuScreen() {
     [allTokens, markets, assetOptions]
   );
 
-  // Memo: map market card keys to matching earn positions
+  // Memo: map market card keys to matching active positions
   const positionByCardKey = useMemo(() => {
     const map = new Map<string, LendingUserPosition>();
-    for (const pos of userPositions) {
-      if (pos.type !== "earn") continue;
-      for (const card of marketCards) {
-        if (
-          card.option.token.address === pos.collateral.token.address &&
-          (!card.option.poolAddress || card.option.poolAddress === pos.pool.id)
-        ) {
-          map.set(card.key, pos);
-          break;
-        }
+    for (const card of marketCards) {
+      const position = getVesuUserPositionForMarket({
+        userPositions,
+        token: card.option.token,
+        poolAddress: card.option.poolAddress,
+      });
+      if (position) {
+        map.set(card.key, position);
       }
     }
     return map;
@@ -854,7 +851,12 @@ export default function VesuScreen() {
           selectedCollateralToken
         )} to support this borrow`
       : null);
-  const debtAmountError = baseDebtAmountError;
+  const debtAmountError =
+    positionAction === "repay" &&
+    (parsedCollateralAmount?.toBase() ?? 0n) > 0n &&
+    parsedDebtAmount?.toBase() === 0n
+      ? null
+      : baseDebtAmountError;
 
   // Position display values
   const currentStatus = getVesuHealthStatus(health, position);
@@ -1387,27 +1389,37 @@ export default function VesuScreen() {
       collateralAmount,
       selectedCollateralToken
     );
-    if (!parsedDebt) {
-      Alert.alert("Vesu", "Enter a valid debt amount first.");
+    const requestedDebtAmount =
+      positionAction === "repay"
+        ? getVesuRepaySubmissionAmount({
+            debtToken: selectedDebtAsset.token,
+            debtAmount: parsedDebt,
+            collateralAmount: parsedCollateral,
+            currentDebtAmount: position?.debtAmount,
+            walletDebtBalance: debtWalletBalance?.toBase(),
+          })
+        : parsedDebt;
+    if (!requestedDebtAmount) {
+      Alert.alert(
+        "Vesu",
+        positionAction === "repay"
+          ? "Enter a debt amount or collateral to withdraw first."
+          : "Enter a valid debt amount first."
+      );
       return;
     }
 
     setIsSubmitting(true);
     try {
       const options = getExecuteOptions(useSponsored, canUseSponsored);
-      const effectiveDebtAmount =
-        positionAction === "repay" &&
-        closeRepayAmount != null &&
-        parsedDebt.toBase() >= (position?.debtAmount ?? 0n) &&
-        (debtWalletBalance?.toBase() ?? 0n) >= closeRepayAmount
-          ? Amount.fromRaw(closeRepayAmount, selectedDebtAsset.token)
-          : parsedDebt;
+      const isCollateralOnlyRepay =
+        positionAction === "repay" && requestedDebtAmount.toBase() === 0n;
       const tx =
         positionAction === "borrow"
           ? await wallet.lending().borrow(
               {
                 ...commonRequest,
-                amount: effectiveDebtAmount,
+                amount: requestedDebtAmount,
                 ...(parsedCollateral
                   ? { collateralAmount: parsedCollateral }
                   : {}),
@@ -1418,7 +1430,7 @@ export default function VesuScreen() {
           : await wallet.lending().repay(
               {
                 ...commonRequest,
-                amount: effectiveDebtAmount,
+                amount: requestedDebtAmount,
                 ...(parsedCollateral
                   ? {
                       collateralAmount: parsedCollateral,
@@ -1435,19 +1447,27 @@ export default function VesuScreen() {
         pendingTitle:
           positionAction === "borrow"
             ? "Opening Vesu Borrow"
-            : "Repaying Vesu Debt",
+            : isCollateralOnlyRepay
+              ? "Withdrawing Vesu Collateral"
+              : "Repaying Vesu Debt",
         pendingSubtitle:
           positionAction === "borrow"
-            ? `Borrowing ${effectiveDebtAmount.toUnit()} ${selectedDebtAsset.token.symbol}`
-            : `Repaying ${effectiveDebtAmount.toUnit()} ${selectedDebtAsset.token.symbol}`,
+            ? `Borrowing ${requestedDebtAmount.toUnit()} ${selectedDebtAsset.token.symbol}`
+            : isCollateralOnlyRepay
+              ? `Withdrawing ${parsedCollateral?.toUnit() ?? "0"} ${selectedCollateralToken.symbol} collateral`
+              : `Repaying ${requestedDebtAmount.toUnit()} ${selectedDebtAsset.token.symbol}`,
         successTitle:
           positionAction === "borrow"
             ? "Vesu Borrow Complete"
-            : "Vesu Repay Complete",
+            : isCollateralOnlyRepay
+              ? "Vesu Collateral Withdraw Complete"
+              : "Vesu Repay Complete",
         successSubtitle:
           positionAction === "borrow"
-            ? `Borrowed ${effectiveDebtAmount.toUnit()} ${selectedDebtAsset.token.symbol}`
-            : `Repaid ${effectiveDebtAmount.toUnit()} ${selectedDebtAsset.token.symbol}`,
+            ? `Borrowed ${requestedDebtAmount.toUnit()} ${selectedDebtAsset.token.symbol}`
+            : isCollateralOnlyRepay
+              ? `Withdrew ${parsedCollateral?.toUnit() ?? "0"} ${selectedCollateralToken.symbol} collateral`
+              : `Repaid ${requestedDebtAmount.toUnit()} ${selectedDebtAsset.token.symbol}`,
       });
       setDebtAmount("");
       setCollateralAmount("");
@@ -1470,7 +1490,6 @@ export default function VesuScreen() {
     addLog,
     canUseSponsored,
     chainId,
-    closeRepayAmount,
     collateralAmount,
     debtAmount,
     debtWalletBalance,
@@ -1506,12 +1525,16 @@ export default function VesuScreen() {
     !!vaultAmount.trim() &&
     !vaultAmountError &&
     !isSubmitting;
+  const hasRepayInput =
+    positionAction === "repay"
+      ? !!debtAmount.trim() || !!collateralAmount.trim()
+      : !!debtAmount.trim();
   const canSubmitPosition =
     !!selectedDebtAsset &&
     !!selectedCollateralToken &&
     !isSubmitting &&
     !isRefreshingPosition &&
-    !!debtAmount.trim() &&
+    hasRepayInput &&
     !debtAmountError &&
     !borrowPercentError &&
     !collateralAmountError &&
@@ -1522,7 +1545,11 @@ export default function VesuScreen() {
     draftMaxBorrowAmount != null &&
     draftMaxBorrowAmount > 0n;
   const borrowSubmitLabel =
-    positionAction === "borrow" ? "Submit Borrow" : "Submit Repay";
+    positionAction === "borrow"
+      ? "Submit Borrow"
+      : !debtAmount.trim() && !!collateralAmount.trim()
+        ? "Submit Collateral Withdraw"
+        : "Submit Repay";
 
   // -----------------------------------------------------------------------
   // Render
@@ -1810,17 +1837,18 @@ export default function VesuScreen() {
                 {/* My Position card (from Vesu indexer) */}
                 {selectedMarketCard &&
                   (() => {
-                    const earnPos = positionByCardKey.get(
-                      selectedMarketCard.key
-                    );
-                    const borrowPos = userPositions.find(
-                      (p) =>
-                        p.type === "borrow" &&
-                        p.collateral.token.address ===
-                          selectedMarketCard.option.token.address &&
-                        (!selectedMarketCard.option.poolAddress ||
-                          p.pool.id === selectedMarketCard.option.poolAddress)
-                    );
+                    const earnPos = getVesuUserPositionForMarket({
+                      userPositions,
+                      token: selectedMarketCard.option.token,
+                      poolAddress: selectedMarketCard.option.poolAddress,
+                      type: "earn",
+                    });
+                    const borrowPos = getVesuUserPositionForMarket({
+                      userPositions,
+                      token: selectedMarketCard.option.token,
+                      poolAddress: selectedMarketCard.option.poolAddress,
+                      type: "borrow",
+                    });
                     if (!earnPos && !borrowPos) return null;
                     return (
                       <View
@@ -2134,7 +2162,7 @@ export default function VesuScreen() {
                         label={
                           positionAction === "borrow"
                             ? "Amount to Borrow"
-                            : "Amount to Repay"
+                            : "Amount to Repay (optional)"
                         }
                         hint={
                           positionAction === "borrow"
@@ -2157,6 +2185,14 @@ export default function VesuScreen() {
                               : undefined
                         }
                       />
+
+                      {positionAction === "repay" && (
+                        <ThemedText
+                          style={[styles.smallText, { color: textSecondary }]}
+                        >
+                          Leave blank to withdraw collateral only.
+                        </ThemedText>
+                      )}
 
                       {positionAction === "repay" &&
                         closeRepayAmount != null &&

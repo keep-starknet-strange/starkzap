@@ -1,9 +1,10 @@
-import type {
+import {
   Amount,
-  LendingHealth,
-  LendingMarket,
-  LendingPosition,
-  Token,
+  type LendingHealth,
+  type LendingMarket,
+  type LendingPosition,
+  type LendingUserPosition,
+  type Token,
 } from "@starkzap/native";
 
 export const VESU_PROVIDER_ID = "vesu" as const;
@@ -276,6 +277,73 @@ export function getVesuCloseRepayAmount(params: {
   }
 
   return debtAmount + getVesuCloseRepayBuffer(params.debtToken.decimals);
+}
+
+export function getVesuRepaySubmissionAmount(params: {
+  debtToken: Token;
+  debtAmount?: Amount | null;
+  collateralAmount?: Amount | null;
+  currentDebtAmount?: bigint | null;
+  walletDebtBalance?: bigint | null;
+}): Amount | null {
+  const requestedDebtAmount = params.debtAmount;
+  if (requestedDebtAmount) {
+    const currentDebtAmount = params.currentDebtAmount ?? 0n;
+    const closeRepayAmount = getVesuCloseRepayAmount({
+      debtAmount: params.currentDebtAmount,
+      debtToken: params.debtToken,
+    });
+    if (
+      closeRepayAmount != null &&
+      requestedDebtAmount.toBase() >= currentDebtAmount &&
+      (params.walletDebtBalance ?? 0n) >= closeRepayAmount
+    ) {
+      return Amount.fromRaw(closeRepayAmount, params.debtToken);
+    }
+    return requestedDebtAmount;
+  }
+
+  if ((params.collateralAmount?.toBase() ?? 0n) > 0n) {
+    return Amount.fromRaw(0n, params.debtToken);
+  }
+
+  return null;
+}
+
+export function getVesuUserPositionForMarket(params: {
+  userPositions: LendingUserPosition[];
+  token: Token;
+  poolAddress?: LendingMarket["poolAddress"];
+  type?: LendingUserPosition["type"];
+}): LendingUserPosition | null {
+  const types = params.type ? [params.type] : (["borrow", "earn"] as const);
+
+  for (const type of types) {
+    const match =
+      params.userPositions.find(
+        (position) =>
+          position.type === type &&
+          position.collateral.token.address === params.token.address &&
+          (!params.poolAddress || position.pool.id === params.poolAddress)
+      ) ?? null;
+    if (match) {
+      return match;
+    }
+  }
+
+  return null;
+}
+
+export function getVesuPositionBadgeLabel(
+  position: LendingUserPosition
+): string {
+  if (position.type === "borrow") {
+    return position.debt
+      ? `Borrowing ${Amount.fromRaw(position.debt.amount, position.debt.token).toUnit()} ${position.debt.token.symbol}`
+      : "Borrow position open";
+  }
+
+  return `${Amount.fromRaw(position.collateral.amount, position.collateral.token).toUnit()} ${position.collateral.token.symbol} deposited`;
 }
 
 export interface VesuMarketCard {
