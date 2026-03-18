@@ -757,6 +757,7 @@ export default function VesuScreen() {
         : {}),
       collateralToken: selectedCollateralToken,
       debtToken: selectedDebtAsset.token,
+      ...(useExistingSupply ? { useEarnPosition: true } : {}),
     };
 
     setIsRefreshingPosition(true);
@@ -787,6 +788,7 @@ export default function VesuScreen() {
     selectedCollateralToken,
     selectedDebtAsset,
     selectedVaultAsset,
+    useExistingSupply,
     wallet,
   ]);
 
@@ -818,7 +820,7 @@ export default function VesuScreen() {
     } finally {
       setIsLoadingMarkets(false);
     }
-  }, [addLog, chainId, isVesuSupported, wallet]);
+  }, [addLog, isVesuSupported, wallet]);
 
   const loadUserPositions = useCallback(async () => {
     if (!wallet || !isVesuSupported) {
@@ -1046,9 +1048,7 @@ export default function VesuScreen() {
                 ...(parsedCollateral
                   ? { collateralAmount: parsedCollateral }
                   : {}),
-                ...(useExistingSupply && depositedBalance != null
-                  ? { useEarnPosition: true }
-                  : {}),
+                ...(useExistingSupply ? { useEarnPosition: true } : {}),
               },
               options
             )
@@ -1116,6 +1116,7 @@ export default function VesuScreen() {
     selectedDebtAsset,
     selectedVaultAsset,
     trackTransaction,
+    useExistingSupply,
     useSponsored,
     wallet,
   ]);
@@ -1126,14 +1127,16 @@ export default function VesuScreen() {
   // Validation flags
   // -----------------------------------------------------------------------
   const hasBorrowExposure = hasVesuExposure(position);
-  const hasDeposit = !!depositedBalance;
+  const hasExistingSupplyCapacity =
+    useExistingSupply && (maxBorrowAmount == null || maxBorrowAmount > 0n);
+  const canBorrowAgainstCurrentCollateral =
+    hasBorrowExposure || hasExistingSupplyCapacity;
   const borrowRequiresCollateralInput =
     marketSheetTab === "borrow" &&
     positionAction === "borrow" &&
     !!selectedDebtAsset &&
     !isRefreshingPosition &&
-    !hasBorrowExposure &&
-    !hasDeposit;
+    !canBorrowAgainstCurrentCollateral;
   const canSubmitVault =
     !!selectedVaultAsset &&
     !!vaultAmount.trim() &&
@@ -1148,6 +1151,10 @@ export default function VesuScreen() {
     !debtAmountError &&
     !collateralAmountError &&
     (!borrowRequiresCollateralInput || !!collateralAmount.trim());
+  const showBorrowCollateralInput =
+    positionAction !== "borrow" ||
+    !useExistingSupply ||
+    borrowRequiresCollateralInput;
   const borrowSubmitLabel =
     positionAction === "borrow"
       ? borrowRequiresCollateralInput
@@ -1685,81 +1692,80 @@ export default function VesuScreen() {
                         onSelect={setPositionAction}
                       />
 
-                      {positionAction === "borrow" &&
-                        depositedBalance != null && (
-                          <View
-                            style={[
-                              styles.toggleRow,
-                              { backgroundColor: `${primaryColor}10` },
-                            ]}
-                          >
-                            <View style={styles.toggleLabel}>
-                              <Ionicons
-                                name="layers-outline"
-                                size={18}
-                                color={primaryColor}
-                              />
-                              <ThemedText
-                                style={[
-                                  styles.toggleLabelText,
-                                  { color: primaryColor },
-                                ]}
-                              >
-                                Use existing supply
-                              </ThemedText>
-                            </View>
-                            <View style={styles.toggleButtons}>
-                              <TouchableOpacity
-                                style={[
-                                  styles.toggleButton,
-                                  {
-                                    borderColor,
-                                    backgroundColor: useExistingSupply
-                                      ? primaryColor
-                                      : "transparent",
-                                  },
-                                ]}
-                                onPress={() => setUseExistingSupply(true)}
-                              >
-                                <ThemedText
-                                  style={{
-                                    fontSize: 12,
-                                    fontWeight: "600",
-                                    color: useExistingSupply
-                                      ? "#fff"
-                                      : textSecondary,
-                                  }}
-                                >
-                                  YES
-                                </ThemedText>
-                              </TouchableOpacity>
-                              <TouchableOpacity
-                                style={[
-                                  styles.toggleButton,
-                                  {
-                                    borderColor,
-                                    backgroundColor: !useExistingSupply
-                                      ? primaryColor
-                                      : "transparent",
-                                  },
-                                ]}
-                                onPress={() => setUseExistingSupply(false)}
-                              >
-                                <ThemedText
-                                  style={{
-                                    fontSize: 12,
-                                    fontWeight: "600",
-                                    color: !useExistingSupply
-                                      ? "#fff"
-                                      : textSecondary,
-                                  }}
-                                >
-                                  NO
-                                </ThemedText>
-                              </TouchableOpacity>
-                            </View>
+                      {positionAction === "borrow" && (
+                        <View
+                          style={[
+                            styles.toggleRow,
+                            { backgroundColor: `${primaryColor}10` },
+                          ]}
+                        >
+                          <View style={styles.toggleLabel}>
+                            <Ionicons
+                              name="layers-outline"
+                              size={18}
+                              color={primaryColor}
+                            />
+                            <ThemedText
+                              style={[
+                                styles.toggleLabelText,
+                                { color: primaryColor },
+                              ]}
+                            >
+                              Use existing supply if available
+                            </ThemedText>
                           </View>
-                        )}
+                          <View style={styles.toggleButtons}>
+                            <TouchableOpacity
+                              style={[
+                                styles.toggleButton,
+                                {
+                                  borderColor,
+                                  backgroundColor: useExistingSupply
+                                    ? primaryColor
+                                    : "transparent",
+                                },
+                              ]}
+                              onPress={() => setUseExistingSupply(true)}
+                            >
+                              <ThemedText
+                                style={{
+                                  fontSize: 12,
+                                  fontWeight: "600",
+                                  color: useExistingSupply
+                                    ? "#fff"
+                                    : textSecondary,
+                                }}
+                              >
+                                YES
+                              </ThemedText>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                              style={[
+                                styles.toggleButton,
+                                {
+                                  borderColor,
+                                  backgroundColor: !useExistingSupply
+                                    ? primaryColor
+                                    : "transparent",
+                                },
+                              ]}
+                              onPress={() => setUseExistingSupply(false)}
+                            >
+                              <ThemedText
+                                style={{
+                                  fontSize: 12,
+                                  fontWeight: "600",
+                                  color: !useExistingSupply
+                                    ? "#fff"
+                                    : textSecondary,
+                                }}
+                              >
+                                NO
+                              </ThemedText>
+                            </TouchableOpacity>
+                          </View>
+                        </View>
+                      )}
 
                       <AmountField
                         label={
@@ -1785,11 +1791,7 @@ export default function VesuScreen() {
                         }
                       />
 
-                      {!(
-                        positionAction === "borrow" &&
-                        useExistingSupply &&
-                        depositedBalance != null
-                      ) && (
+                      {showBorrowCollateralInput && (
                         <AmountField
                           label={
                             positionAction === "borrow"
