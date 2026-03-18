@@ -44,17 +44,21 @@ import { cropAddress, getExplorerUrl } from "@/utils";
 import {
   buildVesuAssetOptions,
   buildVesuMarketCards,
+  fetchVesuPoolData,
   formatVesuLtv,
   formatVesuUsdValue,
   getAvailableVesuDebtAssets,
   getDefaultVesuDebtAsset,
+  getVesuBorrowCapacityForDeposit,
   getVesuHealthStatus,
+  getVesuMinimumDepositForBorrow,
   getVesuPoolLabel,
   getVesuPoolVisual,
   hasVesuExposure,
   VESU_PROVIDER_ID,
   type VesuAssetOption,
   type VesuMarketCard,
+  type VesuPoolData,
 } from "@/vesu";
 
 type VaultAction = "deposit" | "withdraw";
@@ -67,6 +71,7 @@ const EMPTY_STATE_LABEL = "—";
 const SUPPORTED_VESU_CHAINS = new Set(["SN_MAIN", "SN_SEPOLIA"]);
 const VAULT_ACTIONS = ["deposit", "withdraw"] as const;
 const POSITION_ACTIONS = ["borrow", "repay"] as const;
+const PERCENT_SCALE = 10_000n;
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -109,6 +114,37 @@ function getExecuteOptions(
     feeMode:
       useSponsored && canUseSponsored ? FEE_MODE_SPONSORED : FEE_MODE_USER_PAYS,
   };
+}
+
+function parsePercentInput(value: string): bigint | null {
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  if (!/^\d{0,3}(\.\d{0,2})?$/.test(trimmed)) {
+    return null;
+  }
+
+  const [integerPart, fractionPart = ""] = trimmed.split(".");
+  const basisPoints =
+    BigInt(integerPart || "0") * 100n +
+    BigInt((fractionPart + "00").slice(0, 2));
+  return basisPoints <= PERCENT_SCALE ? basisPoints : null;
+}
+
+function getPercentError(value: string): string | null {
+  if (!value.trim()) return null;
+  return parsePercentInput(value) == null
+    ? "Enter a value from 0 to 100"
+    : null;
+}
+
+function formatPercentInput(value: bigint): string {
+  const clamped =
+    value < 0n ? 0n : value > PERCENT_SCALE ? PERCENT_SCALE : value;
+  const integer = clamped / 100n;
+  const fraction = clamped % 100n;
+  return fraction === 0n
+    ? integer.toString()
+    : `${integer}.${fraction.toString().padStart(2, "0")}`.replace(/0+$/, "");
 }
 
 // ---------------------------------------------------------------------------
@@ -443,6 +479,47 @@ function AmountField(props: {
   );
 }
 
+function PercentField(props: {
+  label: string;
+  hint: string;
+  value: string;
+  error: string | null;
+  onChangeText: (v: string) => void;
+}) {
+  const borderColor = useThemeColor({}, "border");
+  const primaryColor = useThemeColor({}, "primary");
+  const textSecondary = useThemeColor({}, "textSecondary");
+
+  return (
+    <View style={{ gap: 8 }}>
+      <View style={styles.amountLabelRow}>
+        <ThemedText style={[styles.label, { color: textSecondary }]}>
+          {props.label}
+        </ThemedText>
+        <ThemedText style={[styles.smallText, { color: textSecondary }]}>
+          {props.hint}
+        </ThemedText>
+      </View>
+      <View style={[styles.amountRow, { borderColor }]}>
+        <TextInput
+          style={[styles.amountInput, { color: primaryColor }]}
+          value={props.value}
+          onChangeText={props.onChangeText}
+          placeholder="0"
+          placeholderTextColor={textSecondary}
+          keyboardType="decimal-pad"
+        />
+        <ThemedText style={[styles.percentSuffix, { color: textSecondary }]}>
+          %
+        </ThemedText>
+      </View>
+      {props.error && (
+        <ThemedText style={styles.errorText}>{props.error}</ThemedText>
+      )}
+    </View>
+  );
+}
+
 // ---------------------------------------------------------------------------
 // Main screen
 // ---------------------------------------------------------------------------
@@ -489,6 +566,9 @@ export default function VesuScreen() {
   const [maxBorrowAmount, setMaxBorrowAmount] = useState<bigint | null>(null);
   const [isRefreshingPosition, setIsRefreshingPosition] = useState(false);
   const [positionError, setPositionError] = useState<string | null>(null);
+  const [selectedPoolData, setSelectedPoolData] = useState<VesuPoolData | null>(
+    null
+  );
 
   // Form state — consolidated for borrow/repay
   const [vaultAction, setVaultAction] = useState<VaultAction>("deposit");
@@ -497,6 +577,10 @@ export default function VesuScreen() {
   const [vaultAmount, setVaultAmount] = useState("");
   const [debtAmount, setDebtAmount] = useState("");
   const [collateralAmount, setCollateralAmount] = useState("");
+  const [borrowPercent, setBorrowPercent] = useState("");
+  const [borrowDriver, setBorrowDriver] = useState<"debt" | "percent" | null>(
+    null
+  );
   const [useExistingSupply, setUseExistingSupply] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isMarketSheetOpen, setIsMarketSheetOpen] = useState(false);
@@ -528,12 +612,16 @@ export default function VesuScreen() {
     setVaultAmount("");
     setDebtAmount("");
     setCollateralAmount("");
+    setBorrowPercent("");
+    setBorrowDriver(null);
   }, []);
 
   // Reset form amounts when switching borrow/repay
   useEffect(() => {
     setDebtAmount("");
     setCollateralAmount("");
+    setBorrowPercent("");
+    setBorrowDriver(null);
   }, [positionAction]);
 
   const handleOpenMarket = useCallback(
@@ -637,6 +725,24 @@ export default function VesuScreen() {
     [marketCards, selectedVaultAssetKey]
   );
 
+  useEffect(() => {
+    if (!selectedVaultAsset?.poolAddress) {
+      setSelectedPoolData(null);
+      return;
+    }
+
+    let cancelled = false;
+    void fetchVesuPoolData(selectedVaultAsset.poolAddress).then((pool) => {
+      if (!cancelled) {
+        setSelectedPoolData(pool);
+      }
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedVaultAsset?.poolAddress]);
+
   // Balances
   const vaultBalance = selectedVaultAsset
     ? getBalance(selectedVaultAsset.token)
@@ -659,19 +765,95 @@ export default function VesuScreen() {
     return Amount.fromRaw(pos.collateral.amount, pos.collateral.token);
   }, [selectedVaultAsset, userPositions]);
 
-  // Errors
+  const parsedDebtAmount = useMemo(
+    () => parseAmountInput(debtAmount, selectedDebtAsset?.token ?? null),
+    [debtAmount, selectedDebtAsset]
+  );
+  const parsedCollateralAmount = useMemo(
+    () => parseAmountInput(collateralAmount, selectedCollateralToken),
+    [collateralAmount, selectedCollateralToken]
+  );
+
+  const hasBorrowExposure = hasVesuExposure(position);
+  const hasExistingSupplyCapacity =
+    useExistingSupply && maxBorrowAmount != null && maxBorrowAmount > 0n;
+  const canBorrowAgainstCurrentCollateral =
+    hasBorrowExposure || hasExistingSupplyCapacity;
+
+  const draftMaxBorrowAmount = useMemo(() => {
+    if (
+      positionAction !== "borrow" ||
+      !selectedCollateralToken ||
+      !selectedDebtAsset
+    ) {
+      return maxBorrowAmount;
+    }
+    return getVesuBorrowCapacityForDeposit({
+      pool: selectedPoolData,
+      collateralToken: selectedCollateralToken,
+      debtToken: selectedDebtAsset.token,
+      depositAmount: parsedCollateralAmount,
+      currentMaxBorrowAmount: maxBorrowAmount,
+    });
+  }, [
+    maxBorrowAmount,
+    parsedCollateralAmount,
+    positionAction,
+    selectedCollateralToken,
+    selectedDebtAsset,
+    selectedPoolData,
+  ]);
+
+  const minimumRequiredDeposit = useMemo(() => {
+    if (
+      positionAction !== "borrow" ||
+      !selectedCollateralToken ||
+      !selectedDebtAsset
+    ) {
+      return 0n;
+    }
+    return getVesuMinimumDepositForBorrow({
+      pool: selectedPoolData,
+      collateralToken: selectedCollateralToken,
+      debtToken: selectedDebtAsset.token,
+      borrowAmount: parsedDebtAmount,
+      currentMaxBorrowAmount: maxBorrowAmount,
+    });
+  }, [
+    maxBorrowAmount,
+    parsedDebtAmount,
+    positionAction,
+    selectedCollateralToken,
+    selectedDebtAsset,
+    selectedPoolData,
+  ]);
+
   const vaultAmountError = getAmountError(
     vaultAmount,
     selectedVaultAsset?.token ?? null
   );
-  const debtAmountError = getAmountError(
+  const baseDebtAmountError = getAmountError(
     debtAmount,
     selectedDebtAsset?.token ?? null
   );
-  const collateralAmountError = getAmountError(
+  const baseCollateralAmountError = getAmountError(
     collateralAmount,
     selectedCollateralToken
   );
+  const borrowPercentError =
+    positionAction === "borrow" ? getPercentError(borrowPercent) : null;
+  const collateralAmountError =
+    baseCollateralAmountError ??
+    (positionAction === "borrow" &&
+    parsedDebtAmount &&
+    minimumRequiredDeposit != null &&
+    (parsedCollateralAmount?.toBase() ?? 0n) < minimumRequiredDeposit
+      ? `Deposit at least ${amountFromBase(
+          minimumRequiredDeposit,
+          selectedCollateralToken
+        )} to support this borrow`
+      : null);
+  const debtAmountError = baseDebtAmountError;
 
   // Position display values
   const currentStatus = getVesuHealthStatus(health, position);
@@ -693,6 +875,146 @@ export default function VesuScreen() {
       })),
     [debtOptions]
   );
+
+  const draftMaxBorrowLabel =
+    draftMaxBorrowAmount != null && selectedDebtAsset
+      ? Amount.fromRaw(
+          draftMaxBorrowAmount,
+          selectedDebtAsset.token
+        ).toFormatted(true)
+      : null;
+  const minimumRequiredDepositLabel =
+    minimumRequiredDeposit != null &&
+    minimumRequiredDeposit > 0n &&
+    selectedCollateralToken
+      ? amountFromBase(minimumRequiredDeposit, selectedCollateralToken)
+      : null;
+
+  const handleDebtAmountChange = useCallback(
+    (value: string) => {
+      setBorrowDriver("debt");
+      setDebtAmount(value);
+
+      if (
+        positionAction !== "borrow" ||
+        !selectedDebtAsset ||
+        draftMaxBorrowAmount == null ||
+        draftMaxBorrowAmount <= 0n
+      ) {
+        setBorrowPercent("");
+        return;
+      }
+
+      const parsed = parseAmountInput(value, selectedDebtAsset.token);
+      if (!parsed) {
+        setBorrowPercent("");
+        return;
+      }
+
+      const ratio =
+        parsed.toBase() >= draftMaxBorrowAmount
+          ? PERCENT_SCALE
+          : (parsed.toBase() * PERCENT_SCALE) / draftMaxBorrowAmount;
+      setBorrowPercent(formatPercentInput(ratio));
+    },
+    [draftMaxBorrowAmount, positionAction, selectedDebtAsset]
+  );
+
+  const handleCollateralAmountChange = useCallback((value: string) => {
+    setCollateralAmount(value);
+  }, []);
+
+  const handleBorrowPercentChange = useCallback(
+    (value: string) => {
+      setBorrowDriver("percent");
+      setBorrowPercent(value);
+
+      const percent = parsePercentInput(value);
+      if (
+        percent == null ||
+        !selectedDebtAsset ||
+        draftMaxBorrowAmount == null ||
+        draftMaxBorrowAmount <= 0n
+      ) {
+        return;
+      }
+
+      setDebtAmount(
+        Amount.fromRaw(
+          (draftMaxBorrowAmount * percent) / PERCENT_SCALE,
+          selectedDebtAsset.token
+        ).toUnit()
+      );
+    },
+    [draftMaxBorrowAmount, selectedDebtAsset]
+  );
+
+  useEffect(() => {
+    if (
+      positionAction !== "borrow" ||
+      borrowDriver !== "percent" ||
+      !selectedDebtAsset ||
+      draftMaxBorrowAmount == null ||
+      draftMaxBorrowAmount <= 0n
+    ) {
+      return;
+    }
+
+    const percent = parsePercentInput(borrowPercent);
+    if (percent == null) {
+      return;
+    }
+
+    const nextDebtAmount = Amount.fromRaw(
+      (draftMaxBorrowAmount * percent) / PERCENT_SCALE,
+      selectedDebtAsset.token
+    ).toUnit();
+    setDebtAmount((current) =>
+      current === nextDebtAmount ? current : nextDebtAmount
+    );
+  }, [
+    borrowDriver,
+    borrowPercent,
+    draftMaxBorrowAmount,
+    positionAction,
+    selectedDebtAsset,
+  ]);
+
+  useEffect(() => {
+    if (
+      positionAction !== "borrow" ||
+      borrowDriver === "percent" ||
+      !selectedDebtAsset ||
+      draftMaxBorrowAmount == null ||
+      draftMaxBorrowAmount <= 0n
+    ) {
+      if (positionAction === "borrow" && borrowDriver !== "percent") {
+        setBorrowPercent((current) => (current ? "" : current));
+      }
+      return;
+    }
+
+    const parsed = parseAmountInput(debtAmount, selectedDebtAsset.token);
+    if (!parsed) {
+      setBorrowPercent((current) => (current ? "" : current));
+      return;
+    }
+
+    const ratio =
+      parsed.toBase() >= draftMaxBorrowAmount
+        ? PERCENT_SCALE
+        : (parsed.toBase() * PERCENT_SCALE) / draftMaxBorrowAmount;
+    const nextPercent = formatPercentInput(ratio);
+    setBorrowPercent((current) =>
+      current === nextPercent ? current : nextPercent
+    );
+  }, [
+    borrowDriver,
+    debtAmount,
+    draftMaxBorrowAmount,
+    positionAction,
+    selectedDebtAsset,
+  ]);
 
   // Track a submitted transaction
   const trackTransaction = useCallback(
@@ -795,7 +1117,6 @@ export default function VesuScreen() {
   const loadMarkets = useCallback(async () => {
     if (!wallet || !isVesuSupported) {
       setMarkets([]);
-      setApiMarkets([]);
       setMarketError(null);
       return;
     }
@@ -876,14 +1197,6 @@ export default function VesuScreen() {
   useEffect(() => {
     handleCloseMarket();
   }, [chainId, handleCloseMarket]);
-  useEffect(() => {}, [
-    marketSheetTab,
-    positionAction,
-    selectedCollateralToken?.address,
-    selectedDebtAsset?.key,
-    collateralAmount,
-    debtAmount,
-  ]);
   useEffect(() => {
     if (marketSheetTab === "borrow" && debtOptions.length === 0)
       setMarketSheetTab("supply");
@@ -1088,6 +1401,8 @@ export default function VesuScreen() {
       });
       setDebtAmount("");
       setCollateralAmount("");
+      setBorrowPercent("");
+      setBorrowDriver(null);
 
       await Promise.all([
         fetchBalances(wallet, chainId),
@@ -1126,17 +1441,13 @@ export default function VesuScreen() {
   // -----------------------------------------------------------------------
   // Validation flags
   // -----------------------------------------------------------------------
-  const hasBorrowExposure = hasVesuExposure(position);
-  const hasExistingSupplyCapacity =
-    useExistingSupply && (maxBorrowAmount == null || maxBorrowAmount > 0n);
-  const canBorrowAgainstCurrentCollateral =
-    hasBorrowExposure || hasExistingSupplyCapacity;
-  const borrowRequiresCollateralInput =
+  const borrowNeedsCollateral =
     marketSheetTab === "borrow" &&
     positionAction === "borrow" &&
     !!selectedDebtAsset &&
     !isRefreshingPosition &&
-    !canBorrowAgainstCurrentCollateral;
+    !canBorrowAgainstCurrentCollateral &&
+    (parsedCollateralAmount?.toBase() ?? 0n) <= 0n;
   const canSubmitVault =
     !!selectedVaultAsset &&
     !!vaultAmount.trim() &&
@@ -1149,18 +1460,16 @@ export default function VesuScreen() {
     !isRefreshingPosition &&
     !!debtAmount.trim() &&
     !debtAmountError &&
+    !borrowPercentError &&
     !collateralAmountError &&
-    (!borrowRequiresCollateralInput || !!collateralAmount.trim());
-  const showBorrowCollateralInput =
-    positionAction !== "borrow" ||
-    !useExistingSupply ||
-    borrowRequiresCollateralInput;
+    !borrowNeedsCollateral;
+  const showBorrowPercentField =
+    positionAction === "borrow" &&
+    !!selectedDebtAsset &&
+    draftMaxBorrowAmount != null &&
+    draftMaxBorrowAmount > 0n;
   const borrowSubmitLabel =
-    positionAction === "borrow"
-      ? borrowRequiresCollateralInput
-        ? "Deposit Collateral & Borrow"
-        : "Submit Borrow"
-      : "Submit Repay";
+    positionAction === "borrow" ? "Submit Borrow" : "Submit Repay";
 
   // -----------------------------------------------------------------------
   // Render
@@ -1634,7 +1943,7 @@ export default function VesuScreen() {
                       />
                     </View>
 
-                    {borrowRequiresCollateralInput && (
+                    {borrowNeedsCollateral && (
                       <View
                         style={[
                           styles.noticeCard,
@@ -1642,7 +1951,7 @@ export default function VesuScreen() {
                         ]}
                       >
                         <ThemedText style={{ fontSize: 14, fontWeight: "700" }}>
-                          Deposit collateral first
+                          Add collateral to start borrowing
                         </ThemedText>
                         <ThemedText
                           style={[
@@ -1650,8 +1959,9 @@ export default function VesuScreen() {
                             { color: textSecondary },
                           ]}
                         >
-                          Supply {selectedMarketCard.option.token.symbol} in the
-                          Supply tab first, then come back to borrow against it.
+                          Enter an amount to deposit below, or turn on existing
+                          supply if you already have matching collateral in
+                          Vesu.
                         </ThemedText>
                       </View>
                     )}
@@ -1773,51 +2083,77 @@ export default function VesuScreen() {
                             ? "Amount to Borrow"
                             : "Amount to Repay"
                         }
-                        hint={`Wallet ${debtWalletBalance?.toFormatted(true) ?? EMPTY_STATE_LABEL}`}
+                        hint={
+                          positionAction === "borrow"
+                            ? `Wallet ${debtWalletBalance?.toFormatted(true) ?? EMPTY_STATE_LABEL}${draftMaxBorrowLabel ? ` · Max ${draftMaxBorrowLabel}` : ""}`
+                            : `Wallet ${debtWalletBalance?.toFormatted(true) ?? EMPTY_STATE_LABEL}`
+                        }
                         value={debtAmount}
                         error={debtAmountError}
-                        onChangeText={setDebtAmount}
+                        onChangeText={handleDebtAmountChange}
                         maxValue={
                           positionAction === "repay"
                             ? debtWalletBalance?.toUnit()
-                            : maxBorrowAmount != null &&
-                                maxBorrowAmount > 0n &&
+                            : draftMaxBorrowAmount != null &&
+                                draftMaxBorrowAmount > 0n &&
                                 selectedDebtAsset
                               ? Amount.fromRaw(
-                                  maxBorrowAmount,
+                                  draftMaxBorrowAmount,
                                   selectedDebtAsset.token
                                 ).toUnit()
                               : undefined
                         }
                       />
 
-                      {showBorrowCollateralInput && (
-                        <AmountField
-                          label={
-                            positionAction === "borrow"
-                              ? "Additional Collateral (optional)"
-                              : "Collateral to Withdraw"
-                          }
-                          hint={
-                            positionAction === "borrow"
-                              ? `Wallet ${vaultBalance?.toFormatted(true) ?? EMPTY_STATE_LABEL}${depositedBalance ? ` · Deposited ${depositedBalance.toFormatted(true)}` : ""}`
-                              : `Position ${amountFromBase(position?.collateralAmount, selectedCollateralToken)}`
-                          }
-                          value={collateralAmount}
-                          error={collateralAmountError}
-                          onChangeText={setCollateralAmount}
-                          maxValue={
-                            positionAction === "borrow"
-                              ? vaultBalance?.toUnit()
-                              : selectedCollateralToken &&
-                                  position?.collateralAmount != null
-                                ? Amount.fromRaw(
-                                    position.collateralAmount,
-                                    selectedCollateralToken
-                                  ).toUnit()
-                                : undefined
-                          }
-                        />
+                      {positionAction === "borrow" &&
+                        showBorrowPercentField && (
+                          <PercentField
+                            label="Borrow % of Max"
+                            hint={
+                              draftMaxBorrowLabel
+                                ? `100 = ${draftMaxBorrowLabel}`
+                                : "0 to 100"
+                            }
+                            value={borrowPercent}
+                            error={borrowPercentError}
+                            onChangeText={handleBorrowPercentChange}
+                          />
+                        )}
+
+                      <AmountField
+                        label={
+                          positionAction === "borrow"
+                            ? "Amount to Deposit"
+                            : "Collateral to Withdraw"
+                        }
+                        hint={
+                          positionAction === "borrow"
+                            ? `Wallet ${vaultBalance?.toFormatted(true) ?? EMPTY_STATE_LABEL}${minimumRequiredDepositLabel ? ` · Need ${minimumRequiredDepositLabel}` : depositedBalance ? ` · Deposited ${depositedBalance.toFormatted(true)}` : ""}`
+                            : `Position ${amountFromBase(position?.collateralAmount, selectedCollateralToken)}`
+                        }
+                        value={collateralAmount}
+                        error={collateralAmountError}
+                        onChangeText={handleCollateralAmountChange}
+                        maxValue={
+                          positionAction === "borrow"
+                            ? vaultBalance?.toUnit()
+                            : selectedCollateralToken &&
+                                position?.collateralAmount != null
+                              ? Amount.fromRaw(
+                                  position.collateralAmount,
+                                  selectedCollateralToken
+                                ).toUnit()
+                              : undefined
+                        }
+                      />
+
+                      {positionAction === "borrow" && draftMaxBorrowLabel && (
+                        <ThemedText
+                          style={[styles.smallText, { color: textSecondary }]}
+                        >
+                          Current borrow limit with this deposit:{" "}
+                          {draftMaxBorrowLabel}
+                        </ThemedText>
                       )}
 
                       <SubmitButton
@@ -2028,6 +2364,11 @@ const styles = StyleSheet.create({
     fontSize: 18,
     paddingVertical: 10,
     fontWeight: "600",
+  },
+  percentSuffix: {
+    fontSize: 16,
+    fontWeight: "700",
+    paddingLeft: 8,
   },
   maxButton: { borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6 },
   maxButtonText: {

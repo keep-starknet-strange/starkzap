@@ -16,9 +16,12 @@ import {
   formatVesuUsdValue,
   getAvailableVesuCollateralAssets,
   getDefaultVesuCollateralAsset,
+  getVesuBorrowCapacityForDeposit,
   getVesuHealthStatus,
+  getVesuMinimumDepositForBorrow,
   getVesuPoolLabel,
   hasVesuExposure,
+  type VesuPoolData,
 } from "../examples/mobile/vesu";
 
 function createToken(
@@ -351,5 +354,83 @@ describe("mobile Vesu helpers", () => {
     expect(getVesuHealthStatus(healthy, null)).toBe("No open position");
     expect(getVesuHealthStatus(healthy, openPosition)).toBe("Healthy");
     expect(getVesuHealthStatus(atRisk, openPosition)).toBe("At risk");
+  });
+
+  it("adds borrow capacity for a draft collateral deposit", () => {
+    const strk = createToken("STRK", "0xstrk");
+    const usdc = createToken("USDC", "0xusdc", 6);
+    const pool: VesuPoolData = {
+      id: "0xpool",
+      assets: [
+        {
+          address: strk.address,
+          symbol: strk.symbol,
+          decimals: strk.decimals,
+          usdPrice: { value: "2000000000000000000", decimals: 18 },
+        },
+        {
+          address: usdc.address,
+          symbol: usdc.symbol,
+          decimals: usdc.decimals,
+          usdPrice: { value: "1000000000000000000", decimals: 18 },
+        },
+      ],
+      pairs: [
+        {
+          collateralAssetAddress: strk.address,
+          debtAssetAddress: usdc.address,
+          maxLTV: { value: "500000000000000000", decimals: 18 },
+        },
+      ],
+    };
+
+    const maxBorrow = getVesuBorrowCapacityForDeposit({
+      pool,
+      collateralToken: strk,
+      debtToken: usdc,
+      currentMaxBorrowAmount: Amount.parse("100", usdc).toBase(),
+      depositAmount: Amount.parse("10", strk),
+    });
+
+    expect(maxBorrow).toBe(109_900_000n);
+  });
+
+  it("derives the minimum deposit needed for a target borrow", () => {
+    const strk = createToken("STRK", "0xstrk");
+    const usdc = createToken("USDC", "0xusdc", 6);
+    const pool: VesuPoolData = {
+      id: "0xpool",
+      assets: [
+        {
+          address: strk.address,
+          symbol: strk.symbol,
+          decimals: strk.decimals,
+          usdPrice: { value: "2000000000000000000", decimals: 18 },
+        },
+        {
+          address: usdc.address,
+          symbol: usdc.symbol,
+          decimals: usdc.decimals,
+          usdPrice: { value: "1000000000000000000", decimals: 18 },
+        },
+      ],
+      pairs: [
+        {
+          collateralAssetAddress: strk.address,
+          debtAssetAddress: usdc.address,
+          maxLTV: { value: "500000000000000000", decimals: 18 },
+        },
+      ],
+    };
+
+    const requiredDeposit = getVesuMinimumDepositForBorrow({
+      pool,
+      collateralToken: strk,
+      debtToken: usdc,
+      currentMaxBorrowAmount: Amount.parse("100", usdc).toBase(),
+      borrowAmount: Amount.parse("125", usdc),
+    });
+
+    expect(requiredDeposit).toBe(25_252_525_252_525_252_526n);
   });
 });
