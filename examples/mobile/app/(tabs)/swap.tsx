@@ -385,14 +385,10 @@ export default function SwapScreen() {
     router.replace("/");
   }, [clearBalances, disconnect, logout, resetNetworkConfig, walletType]);
 
-  const handleSelectScreenMode = useCallback(
-    (nextMode: ScreenMode) => {
-      setScreenMode(nextMode);
-      setQuoteError(null);
-      dca.setDcaError(null);
-    },
-    [dca]
-  );
+  const handleSelectScreenMode = useCallback((nextMode: ScreenMode) => {
+    setScreenMode(nextMode);
+    setQuoteError(null);
+  }, []);
 
   const handleSelectIntegration = useCallback((integrationId: string) => {
     setSelectedIntegrationId(integrationId);
@@ -439,31 +435,11 @@ export default function SwapScreen() {
           break;
         }
         case "dca-from": {
-          dca.setDcaSellToken(token);
-          if (token.address === dca.dcaBuyToken.address) {
-            const alternative = pickerTokens.find(
-              (candidate) => candidate.address !== token.address
-            );
-            if (alternative) {
-              dca.setDcaBuyToken(alternative);
-            }
-          }
-          dca.setDcaPreview(null);
-          dca.setDcaError(null);
+          dca.handleSelectDcaSellToken(token);
           break;
         }
         case "dca-to": {
-          dca.setDcaBuyToken(token);
-          if (token.address === dca.dcaSellToken.address) {
-            const alternative = pickerTokens.find(
-              (candidate) => candidate.address !== token.address
-            );
-            if (alternative) {
-              dca.setDcaSellToken(alternative);
-            }
-          }
-          dca.setDcaPreview(null);
-          dca.setDcaError(null);
+          dca.handleSelectDcaBuyToken(token);
           break;
         }
       }

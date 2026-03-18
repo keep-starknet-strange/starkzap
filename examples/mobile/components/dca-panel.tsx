@@ -131,11 +131,9 @@ export function DcaPanel({
     dcaSellBalance,
     canPreviewDca,
     canCreateDca,
-    setDcaFrequency,
-    setDcaPreview,
-    setDcaError,
     handleSelectDcaProvider,
     handleSelectDcaPreviewProvider,
+    handleSelectDcaFrequency,
     handleFlipDcaTokens,
     handleDcaTotalAmountChange,
     handleDcaCycleAmountChange,
@@ -385,11 +383,7 @@ export function DcaPanel({
                     { borderColor },
                     selected && styles.integrationPillSelected,
                   ]}
-                  onPress={() => {
-                    setDcaFrequency(option.value);
-                    setDcaPreview(null);
-                    setDcaError(null);
-                  }}
+                  onPress={() => handleSelectDcaFrequency(option.value)}
                   activeOpacity={0.88}
                 >
                   <ThemedText

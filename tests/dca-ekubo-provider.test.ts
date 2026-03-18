@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { RpcProvider } from "starknet";
 import { Amount, ChainId, fromAddress, type Token } from "@/types";
+import { DCA_CONTINUOUS_FREQUENCY } from "@/dca/interface";
 import { EkuboDcaProvider, getEkuboDcaPreset } from "@/dca/ekubo";
 import {
   assertNonNegativeInteger,
@@ -265,7 +266,7 @@ describe("EkuboDcaProvider", () => {
       sellAmountBase: 5000000n,
       amountSoldBase: 1000000n,
       amountBoughtBase: 750000000000000000n,
-      frequency: "CONTINUOUS",
+      frequency: DCA_CONTINUOUS_FREQUENCY,
       status: "ACTIVE",
     });
     expect(page.content[0]!.id).toBe(

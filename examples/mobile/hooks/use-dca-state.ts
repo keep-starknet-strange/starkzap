@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Amount,
+  DCA_CONTINUOUS_FREQUENCY,
   type ChainId,
   type DcaOrder,
   type DcaProvider,
@@ -114,7 +115,7 @@ export function getDefaultDcaPair(
 }
 
 export function getDcaFrequencyLabel(frequency: string): string {
-  if (frequency === "CONTINUOUS") {
+  if (frequency === DCA_CONTINUOUS_FREQUENCY) {
     return "Continuous";
   }
   return (
@@ -194,13 +195,6 @@ export interface UseDcaStateReturn {
   isRefreshingDcaOrders: boolean;
   cancellingDcaOrderId: string | null;
 
-  // Setters (for token picker integration)
-  setDcaSellToken: React.Dispatch<React.SetStateAction<Token>>;
-  setDcaBuyToken: React.Dispatch<React.SetStateAction<Token>>;
-  setDcaPreview: React.Dispatch<React.SetStateAction<DcaPreviewState | null>>;
-  setDcaError: React.Dispatch<React.SetStateAction<string | null>>;
-  setDcaFrequency: React.Dispatch<React.SetStateAction<DcaFrequencyValue>>;
-
   // Computed
   canPreviewDca: boolean;
   canCreateDca: boolean;
@@ -222,6 +216,9 @@ export interface UseDcaStateReturn {
   // Handlers
   handleSelectDcaProvider: (providerId: string) => void;
   handleSelectDcaPreviewProvider: (integrationId: string) => void;
+  handleSelectDcaSellToken: (token: Token) => void;
+  handleSelectDcaBuyToken: (token: Token) => void;
+  handleSelectDcaFrequency: (value: DcaFrequencyValue) => void;
   handlePreviewDca: () => Promise<void>;
   handleCreateDca: () => Promise<void>;
   handleCancelDcaOrder: (order: DcaOrder) => Promise<void>;
@@ -271,6 +268,12 @@ export function useDcaState(deps: UseDcaStateDeps): UseDcaStateReturn {
   const [cancellingDcaOrderId, setCancellingDcaOrderId] = useState<
     string | null
   >(null);
+  const dcaOrdersRequestId = useRef(0);
+
+  const clearDcaTransientState = useCallback(() => {
+    setDcaPreview(null);
+    setDcaError(null);
+  }, []);
 
   // Sync DCA provider selection
   useEffect(() => {
@@ -338,11 +341,20 @@ export function useDcaState(deps: UseDcaStateDeps): UseDcaStateReturn {
     });
   }, [dcaDefaultPair.buyToken, dcaDefaultPair.sellToken, dcaTokens]);
 
-  // Reset preview on chain change
+  // Clear transient state when the active chain/provider/session changes.
   useEffect(() => {
-    setDcaPreview(null);
-    setDcaError(null);
-  }, [chainId]);
+    dcaOrdersRequestId.current += 1;
+    clearDcaTransientState();
+    setDcaOrders([]);
+    setDcaOrdersError(null);
+    setIsRefreshingDcaOrders(false);
+  }, [chainId, clearDcaTransientState, selectedDcaProviderId, wallet]);
+
+  useEffect(() => {
+    if (screenMode !== "dca") {
+      clearDcaTransientState();
+    }
+  }, [clearDcaTransientState, screenMode]);
 
   // Resolved providers
   const selectedDcaPreviewProvider = useMemo<SwapProvider | null>(() => {
@@ -484,6 +496,9 @@ export function useDcaState(deps: UseDcaStateDeps): UseDcaStateReturn {
         return;
       }
 
+      const requestId = ++dcaOrdersRequestId.current;
+      const isCurrentRequest = () => dcaOrdersRequestId.current === requestId;
+
       setIsRefreshingDcaOrders(true);
       if (!silent) {
         setDcaOrdersError(null);
@@ -500,6 +515,9 @@ export function useDcaState(deps: UseDcaStateDeps): UseDcaStateReturn {
           provider: selectedDcaProviderId,
           size: DCA_ORDER_PAGE_SIZE,
         });
+        if (!isCurrentRequest()) {
+          return;
+        }
         setDcaOrders(page.content);
         setDcaOrdersError(null);
         if (!silent) {
@@ -508,11 +526,16 @@ export function useDcaState(deps: UseDcaStateDeps): UseDcaStateReturn {
           );
         }
       } catch (error) {
+        if (!isCurrentRequest()) {
+          return;
+        }
         const message = error instanceof Error ? error.message : String(error);
         setDcaOrdersError(message);
         addLog(`DCA orders refresh failed: ${message}`);
       } finally {
-        setIsRefreshingDcaOrders(false);
+        if (isCurrentRequest()) {
+          setIsRefreshingDcaOrders(false);
+        }
       }
     },
     [addLog, selectedDcaProviderId, wallet]
@@ -526,41 +549,85 @@ export function useDcaState(deps: UseDcaStateDeps): UseDcaStateReturn {
     void refreshDcaOrders(true);
   }, [chainId, refreshDcaOrders, screenMode, selectedDcaProviderId, wallet]);
 
-  const handleSelectDcaProvider = useCallback((providerId: string) => {
-    setSelectedDcaProviderId(providerId);
-    setDcaOrders([]);
-    setDcaPreview(null);
-    setDcaError(null);
-    setDcaOrdersError(null);
-  }, []);
+  const handleSelectDcaProvider = useCallback(
+    (providerId: string) => {
+      setSelectedDcaProviderId(providerId);
+      clearDcaTransientState();
+    },
+    [clearDcaTransientState]
+  );
 
   const handleSelectDcaPreviewProvider = useCallback(
     (integrationId: string) => {
       setSelectedDcaPreviewProviderId(integrationId);
-      setDcaPreview(null);
-      setDcaError(null);
+      clearDcaTransientState();
     },
-    []
+    [clearDcaTransientState]
+  );
+
+  const handleSelectDcaSellToken = useCallback(
+    (token: Token) => {
+      setDcaSellToken(token);
+      setDcaBuyToken((current) => {
+        if (current.address !== token.address) {
+          return current;
+        }
+        return (
+          dcaTokens.find((candidate) => candidate.address !== token.address) ??
+          current
+        );
+      });
+      clearDcaTransientState();
+    },
+    [clearDcaTransientState, dcaTokens]
+  );
+
+  const handleSelectDcaBuyToken = useCallback(
+    (token: Token) => {
+      setDcaBuyToken(token);
+      setDcaSellToken((current) => {
+        if (current.address !== token.address) {
+          return current;
+        }
+        return (
+          dcaTokens.find((candidate) => candidate.address !== token.address) ??
+          current
+        );
+      });
+      clearDcaTransientState();
+    },
+    [clearDcaTransientState, dcaTokens]
+  );
+
+  const handleSelectDcaFrequency = useCallback(
+    (value: DcaFrequencyValue) => {
+      setDcaFrequency(value);
+      clearDcaTransientState();
+    },
+    [clearDcaTransientState]
   );
 
   const handleFlipDcaTokens = useCallback(() => {
     setDcaSellToken(dcaBuyToken);
     setDcaBuyToken(dcaSellToken);
-    setDcaPreview(null);
-    setDcaError(null);
-  }, [dcaBuyToken, dcaSellToken]);
+    clearDcaTransientState();
+  }, [clearDcaTransientState, dcaBuyToken, dcaSellToken]);
 
-  const handleDcaTotalAmountChange = useCallback((value: string) => {
-    setDcaTotalAmount(value);
-    setDcaPreview(null);
-    setDcaError(null);
-  }, []);
+  const handleDcaTotalAmountChange = useCallback(
+    (value: string) => {
+      setDcaTotalAmount(value);
+      clearDcaTransientState();
+    },
+    [clearDcaTransientState]
+  );
 
-  const handleDcaCycleAmountChange = useCallback((value: string) => {
-    setDcaCycleAmount(value);
-    setDcaPreview(null);
-    setDcaError(null);
-  }, []);
+  const handleDcaCycleAmountChange = useCallback(
+    (value: string) => {
+      setDcaCycleAmount(value);
+      clearDcaTransientState();
+    },
+    [clearDcaTransientState]
+  );
 
   const handlePreviewDca = useCallback(async () => {
     if (!wallet || !parsedDcaCycleAmount || !selectedDcaPreviewProviderId) {
@@ -780,11 +847,6 @@ export function useDcaState(deps: UseDcaStateDeps): UseDcaStateReturn {
     isDcaSubmitting,
     isRefreshingDcaOrders,
     cancellingDcaOrderId,
-    setDcaSellToken,
-    setDcaBuyToken,
-    setDcaPreview,
-    setDcaError,
-    setDcaFrequency,
     canPreviewDca,
     canCreateDca,
     dcaExceedsBalance,
@@ -801,6 +863,9 @@ export function useDcaState(deps: UseDcaStateDeps): UseDcaStateReturn {
     selectedDcaPreviewProvider,
     handleSelectDcaProvider,
     handleSelectDcaPreviewProvider,
+    handleSelectDcaSellToken,
+    handleSelectDcaBuyToken,
+    handleSelectDcaFrequency,
     handlePreviewDca,
     handleCreateDca,
     handleCancelDcaOrder,

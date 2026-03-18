@@ -10,6 +10,7 @@ import {
   ArgentXV050Preset,
   BraavosPreset,
   DevnetPreset,
+  DCA_CONTINUOUS_FREQUENCY,
   TongoConfidential,
   ExternalChain,
   Protocol,
@@ -778,7 +779,7 @@ function getDcaBackendLabel(providerId: string): string {
 }
 
 function formatDcaFrequency(order: DcaOrder): string {
-  return order.frequency === "CONTINUOUS" || order.providerId === "ekubo"
+  return order.frequency === DCA_CONTINUOUS_FREQUENCY
     ? "Continuous"
     : order.frequency;
 }
@@ -933,11 +934,7 @@ function updateDcaButtons(): void {
     !hasTotal ||
     !hasCycle;
   btnDcaCreate.disabled =
-    !isWalletConnected ||
-    !hasDcaProvider ||
-    !hasPreviewProvider ||
-    !hasTotal ||
-    !hasCycle;
+    !isWalletConnected || !hasDcaProvider || !hasTotal || !hasCycle;
   btnDcaRefresh.disabled = !isWalletConnected;
 }
 
@@ -1049,14 +1046,16 @@ function parseOptionalAmountInput(
   return amount;
 }
 
-function buildDcaInput() {
+function buildDcaInput(options: { requirePreviewProvider?: boolean } = {}) {
   const dcaProviderId = dcaProviderSelect.value;
   if (!dcaProviderId || !dcaProvidersById.has(dcaProviderId)) {
     throw new Error("Select a valid recurring DCA backend");
   }
 
   const previewProviderId = dcaPreviewProviderSelect.value;
-  if (!previewProviderId || !swapProvidersById.has(previewProviderId)) {
+  const hasPreviewProvider =
+    previewProviderId.length > 0 && swapProvidersById.has(previewProviderId);
+  if (options.requirePreviewProvider && !hasPreviewProvider) {
     throw new Error("Select a valid DCA preview source");
   }
 
@@ -1126,7 +1125,7 @@ function buildDcaInput() {
 
   return {
     dcaProviderId,
-    previewProviderId,
+    ...(hasPreviewProvider && { previewProviderId }),
     sellToken,
     buyToken,
     sellAmount,
@@ -2107,7 +2106,7 @@ async function fetchDcaPreview() {
       sellToken,
       buyToken,
       sellAmountPerCycle,
-    } = buildDcaInput();
+    } = buildDcaInput({ requirePreviewProvider: true });
 
     log(
       `Previewing ${previewProviderId.toUpperCase()} DCA cycle ${sellAmountPerCycle.toUnit()} ${sellToken.symbol} -> ${buyToken.symbol}`,
@@ -2166,9 +2165,12 @@ async function createDcaOrder() {
       pricingStrategy,
     } = buildDcaInput();
     const sponsor = dcaSponsoredInput.checked;
+    const previewSuffix = previewProviderId
+      ? `, preview ${previewProviderId.toUpperCase()}`
+      : "";
 
     log(
-      `Creating ${dcaProviderId.toUpperCase()} DCA order ${sellAmount.toUnit()} ${sellToken.symbol} total / ${sellAmountPerCycle.toUnit()} per cycle into ${buyToken.symbol} (${frequency}, preview ${previewProviderId.toUpperCase()})`,
+      `Creating ${dcaProviderId.toUpperCase()} DCA order ${sellAmount.toUnit()} ${sellToken.symbol} total / ${sellAmountPerCycle.toUnit()} per cycle into ${buyToken.symbol} (${frequency}${previewSuffix})`,
       "info"
     );
 

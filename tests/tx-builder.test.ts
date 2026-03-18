@@ -205,7 +205,7 @@ function createMockWallet(
     dca: vi.fn().mockReturnValue(mockDca),
     getChainId: vi.fn().mockReturnValue(ChainId.SEPOLIA),
     getDefaultSwapProvider: vi.fn().mockReturnValue(defaultSwapProvider),
-    getSwapProvider: vi.fn(),
+    getSwapProvider: vi.fn().mockReturnValue(defaultSwapProvider),
     prepareSwap,
     execute: vi.fn().mockResolvedValue({ hash: "0xtxhash" }),
     estimateFee: vi.fn().mockResolvedValue({ overall_fee: 1000n }),
@@ -455,6 +455,29 @@ describe("TxBuilder", () => {
       await new TxBuilder(wallet).swap(request).calls();
 
       expect(wallet.prepareSwap).toHaveBeenCalledWith(request);
+    });
+
+    it("should fail fast for invalid swap providers without mutating the builder", () => {
+      const request = {
+        provider: "missing",
+        tokenIn: mockUSDC,
+        tokenOut: mockSTRK,
+        amountIn: Amount.parse("1", mockUSDC),
+      } as const;
+      const wallet = createMockWallet({
+        getSwapProvider: vi.fn().mockImplementation(() => {
+          throw new Error(
+            'Unknown swap provider "missing". Registered providers: default'
+          );
+        }),
+      });
+      const builder = new TxBuilder(wallet);
+
+      expect(() => builder.swap(request)).toThrow(
+        'Unknown swap provider "missing". Registered providers: default'
+      );
+      expect(builder.length).toBe(0);
+      expect(wallet.prepareSwap).not.toHaveBeenCalled();
     });
 
     it("should propagate wallet.prepareSwap failures", async () => {

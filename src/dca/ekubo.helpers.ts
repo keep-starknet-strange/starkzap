@@ -1,5 +1,9 @@
 import { fromAddress, type Address, type ChainId } from "@/types";
-import type { DcaOrder, DcaOrderStatus } from "@/dca/interface";
+import {
+  DCA_CONTINUOUS_FREQUENCY,
+  type DcaOrder,
+  type DcaOrderStatus,
+} from "@/dca/interface";
 import { isRecord } from "@/utils/ekubo";
 
 export const DEFAULT_EKUBO_DCA_API_BASE = "https://prod-api.ekubo.org";
@@ -489,7 +493,7 @@ export function toEkuboDcaOrder(params: {
     buyTokenAddress: parsedOrderId.orderKey.buyToken,
     startDate,
     endDate,
-    frequency: "CONTINUOUS",
+    frequency: DCA_CONTINUOUS_FREQUENCY,
     iterations: 1,
     status,
     pricingStrategy: {},

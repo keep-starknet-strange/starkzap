@@ -13,9 +13,11 @@ import type { Tx } from "@/tx";
 export type DcaOrderStatus = "INDEXING" | "ACTIVE" | "CLOSED";
 export type DcaTradeStatus = "CANCELLED" | "PENDING" | "SUCCEEDED";
 export type DcaAction = "create" | "cancel";
+export const DCA_CONTINUOUS_FREQUENCY = "CONTINUOUS" as const;
 /**
  * ISO 8601 duration string (e.g. `"PT12H"`, `"P1D"`, `"P1W"`).
- * Parsed by providers via {@link parseIsoDurationSeconds}.
+ * Providers may also return {@link DCA_CONTINUOUS_FREQUENCY} for continuous
+ * TWAMM-style orders that do not execute on a discrete cycle.
  */
 export type DcaFrequency = string;
 
