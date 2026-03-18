@@ -63,6 +63,9 @@ interface StakingState {
   // Currently active position key (for modals)
   activePositionKey: string | null;
 
+  // Stale async guard epoch (incremented on clearStaking)
+  staleEpoch: number;
+
   // Global loading states for actions
   isLoadingPools: boolean;
   isStaking: boolean;
@@ -123,12 +126,14 @@ export const useStakingStore = create<StakingState>((set, get) => ({
   positions: {},
   validatorPools: null,
   activePositionKey: null,
+  staleEpoch: 0,
   isLoadingPools: false,
   isStaking: false,
   isClaimingRewards: false,
   isExiting: false,
 
   fetchValidatorPools: async (validator, sdk) => {
+    const epoch = get().staleEpoch;
     set({
       isLoadingPools: true,
       validatorPools: { validator, pools: [], isLoading: true },
@@ -136,6 +141,7 @@ export const useStakingStore = create<StakingState>((set, get) => ({
 
     try {
       const pools = await sdk.getStakerPools(validator.stakerAddress);
+      if (get().staleEpoch !== epoch) return [];
       set({
         validatorPools: { validator, pools, isLoading: false },
         isLoadingPools: false,
@@ -143,6 +149,7 @@ export const useStakingStore = create<StakingState>((set, get) => ({
       return pools;
     } catch (error) {
       console.error("Failed to fetch validator pools:", error);
+      if (get().staleEpoch !== epoch) return [];
       set({ validatorPools: null, isLoadingPools: false });
       Alert.alert(
         "Error",
@@ -207,6 +214,7 @@ export const useStakingStore = create<StakingState>((set, get) => ({
   },
 
   loadPosition: async (key, wallet) => {
+    const epoch = get().staleEpoch;
     const positionData = get().positions[key];
     if (!positionData) return;
 
@@ -224,6 +232,7 @@ export const useStakingStore = create<StakingState>((set, get) => ({
         wallet.isPoolMember(poolAddress),
       ]);
 
+      if (get().staleEpoch !== epoch) return;
       set((state) => ({
         positions: {
           ...state.positions,
@@ -237,6 +246,7 @@ export const useStakingStore = create<StakingState>((set, get) => ({
       }));
     } catch (error) {
       console.error("Failed to load position:", error);
+      if (get().staleEpoch !== epoch) return;
       set((state) => ({
         positions: {
           ...state.positions,
@@ -252,9 +262,13 @@ export const useStakingStore = create<StakingState>((set, get) => ({
   },
 
   loadAllPositions: async (wallet) => {
+    const epoch = get().staleEpoch;
     const { positions } = get();
     await Promise.all(
-      Object.keys(positions).map((key) => get().loadPosition(key, wallet))
+      Object.keys(positions).map(async (key) => {
+        if (get().staleEpoch !== epoch) return;
+        await get().loadPosition(key, wallet);
+      })
     );
   },
 
@@ -263,6 +277,7 @@ export const useStakingStore = create<StakingState>((set, get) => ({
   },
 
   stake: async (key, wallet, amountStr, addLog) => {
+    const epoch = get().staleEpoch;
     const positionData = get().positions[key];
     if (!positionData) return;
 
@@ -301,16 +316,19 @@ export const useStakingStore = create<StakingState>((set, get) => ({
       });
 
       addLog("Stake successful!");
+      if (get().staleEpoch !== epoch) return;
       await get().loadPosition(key, wallet);
     } catch (error) {
       addLog(`Stake failed: ${error}`);
+      if (get().staleEpoch !== epoch) return;
       Alert.alert("Stake Failed", String(error));
     } finally {
-      set({ isStaking: false });
+      if (get().staleEpoch === epoch) set({ isStaking: false });
     }
   },
 
   addStake: async (key, wallet, amountStr, addLog) => {
+    const epoch = get().staleEpoch;
     const positionData = get().positions[key];
     if (!positionData) return;
 
@@ -349,16 +367,19 @@ export const useStakingStore = create<StakingState>((set, get) => ({
       });
 
       addLog("Added stake successfully!");
+      if (get().staleEpoch !== epoch) return;
       await get().loadPosition(key, wallet);
     } catch (error) {
       addLog(`Add stake failed: ${error}`);
+      if (get().staleEpoch !== epoch) return;
       Alert.alert("Add Stake Failed", String(error));
     } finally {
-      set({ isStaking: false });
+      if (get().staleEpoch === epoch) set({ isStaking: false });
     }
   },
 
   claimRewards: async (key, wallet, addLog) => {
+    const epoch = get().staleEpoch;
     const positionData = get().positions[key];
     if (!positionData) return;
 
@@ -396,16 +417,19 @@ export const useStakingStore = create<StakingState>((set, get) => ({
       });
 
       addLog("Rewards claimed successfully!");
+      if (get().staleEpoch !== epoch) return;
       await get().loadPosition(key, wallet);
     } catch (error) {
       addLog(`Claim failed: ${error}`);
+      if (get().staleEpoch !== epoch) return;
       Alert.alert("Claim Failed", String(error));
     } finally {
-      set({ isClaimingRewards: false });
+      if (get().staleEpoch === epoch) set({ isClaimingRewards: false });
     }
   },
 
   exitIntent: async (key, wallet, amountStr, addLog) => {
+    const epoch = get().staleEpoch;
     const positionData = get().positions[key];
     if (!positionData) return;
 
@@ -444,16 +468,19 @@ export const useStakingStore = create<StakingState>((set, get) => ({
       });
 
       addLog("Exit intent registered successfully!");
+      if (get().staleEpoch !== epoch) return;
       await get().loadPosition(key, wallet);
     } catch (error) {
       addLog(`Exit intent failed: ${error}`);
+      if (get().staleEpoch !== epoch) return;
       Alert.alert("Exit Intent Failed", String(error));
     } finally {
-      set({ isExiting: false });
+      if (get().staleEpoch === epoch) set({ isExiting: false });
     }
   },
 
   exit: async (key, wallet, addLog) => {
+    const epoch = get().staleEpoch;
     const positionData = get().positions[key];
     if (!positionData) return;
 
@@ -491,12 +518,14 @@ export const useStakingStore = create<StakingState>((set, get) => ({
       });
 
       addLog("Exit completed successfully! Tokens returned to wallet.");
+      if (get().staleEpoch !== epoch) return;
       await get().loadPosition(key, wallet);
     } catch (error) {
       addLog(`Exit failed: ${error}`);
+      if (get().staleEpoch !== epoch) return;
       Alert.alert("Exit Failed", String(error));
     } finally {
-      set({ isExiting: false });
+      if (get().staleEpoch === epoch) set({ isExiting: false });
     }
   },
 
@@ -505,6 +534,7 @@ export const useStakingStore = create<StakingState>((set, get) => ({
       positions: {},
       validatorPools: null,
       activePositionKey: null,
+      staleEpoch: get().staleEpoch + 1,
     });
   },
 }));

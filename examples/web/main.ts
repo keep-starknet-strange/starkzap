@@ -1038,6 +1038,10 @@ async function confidentialFund() {
   try {
     const strkToken = getSelectedTongoToken();
     const amount = Amount.parse(rawAmount, strkToken);
+    if (amount.toBase() <= 0n) {
+      log("Amount must be greater than zero", "error");
+      return;
+    }
     const tx = await wallet
       .tx()
       .confidentialFund(confidential, {
@@ -1083,6 +1087,10 @@ async function confidentialTransfer() {
   try {
     const strkToken = getSelectedTongoToken();
     const amount = Amount.parse(rawAmount, strkToken);
+    if (amount.toBase() <= 0n) {
+      log("Amount must be greater than zero", "error");
+      return;
+    }
     const tx = await wallet
       .tx()
       .confidentialTransfer(confidential, {
@@ -1131,6 +1139,10 @@ async function confidentialWithdraw() {
   try {
     const strkToken = getSelectedTongoToken();
     const amount = Amount.parse(rawAmount, strkToken);
+    if (amount.toBase() <= 0n) {
+      log("Amount must be greater than zero", "error");
+      return;
+    }
     const tx = await wallet
       .tx()
       .confidentialWithdraw(confidential, {
@@ -1618,6 +1630,10 @@ async function lendingDeposit() {
   setButtonLoading(btnLendingDeposit, true);
   try {
     const amount = Amount.parse(raw, token);
+    if (amount.toBase() <= 0n) {
+      log("Amount must be greater than zero", "error");
+      return;
+    }
     log(`Depositing ${amount.toUnit()} ${token.symbol} into Vesu...`, "info");
     const tx = await wallet.lending().deposit(
       {
@@ -1656,6 +1672,10 @@ async function lendingWithdraw() {
   setButtonLoading(btnLendingWithdraw, true);
   try {
     const amount = Amount.parse(raw, token);
+    if (amount.toBase() <= 0n) {
+      log("Amount must be greater than zero", "error");
+      return;
+    }
     log(`Withdrawing ${amount.toUnit()} ${token.symbol} from Vesu...`, "info");
     const tx = await wallet.lending().withdraw(
       {
@@ -1727,10 +1747,18 @@ async function lendingBorrow() {
   setButtonLoading(btnLendingBorrow, true);
   try {
     const amount = Amount.parse(rawDebt, debtToken);
+    if (amount.toBase() <= 0n) {
+      log("Amount must be greater than zero", "error");
+      return;
+    }
     const rawCollateral = lendingCollateralAmountInput.value.trim();
     const collateralAmount = rawCollateral
       ? Amount.parse(rawCollateral, collateralToken)
       : undefined;
+    if (collateralAmount && collateralAmount.toBase() <= 0n) {
+      log("Collateral amount must be greater than zero", "error");
+      return;
+    }
     const useEarnPosition = lendingUseEarnInput.checked;
 
     await assertLendingBorrowCollateralReady({
@@ -1788,10 +1816,18 @@ async function lendingRepay() {
   setButtonLoading(btnLendingRepay, true);
   try {
     const amount = Amount.parse(rawDebt, debtToken);
+    if (amount.toBase() <= 0n) {
+      log("Amount must be greater than zero", "error");
+      return;
+    }
     const rawCollateral = lendingCollateralAmountInput.value.trim();
     const collateralAmount = rawCollateral
       ? Amount.parse(rawCollateral, collateralToken)
       : undefined;
+    if (collateralAmount && collateralAmount.toBase() <= 0n) {
+      log("Collateral amount must be greater than zero", "error");
+      return;
+    }
 
     log(`Repaying ${amount.toUnit()} ${debtToken.symbol}...`, "info");
     const tx = await wallet.lending().repay(

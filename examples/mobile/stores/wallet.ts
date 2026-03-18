@@ -117,6 +117,7 @@ interface WalletState {
   // Loading states
   isConnecting: boolean;
   isCheckingStatus: boolean;
+  networkSwitchRequestId: number;
 
   // Logs
   logs: string[];
@@ -298,6 +299,7 @@ export const useWalletStore = create<WalletState>((set, get) => ({
   isDeployed: null,
   isConnecting: false,
   isCheckingStatus: false,
+  networkSwitchRequestId: 0,
   logs: [],
 
   // Network configuration actions
@@ -372,7 +374,8 @@ export const useWalletStore = create<WalletState>((set, get) => ({
       return;
     }
 
-    set({ isConnecting: true });
+    const requestId = get().networkSwitchRequestId + 1;
+    set({ isConnecting: true, networkSwitchRequestId: requestId });
     state.addLog(`Switching network to ${nextNetwork.name}...`);
 
     try {
@@ -380,6 +383,8 @@ export const useWalletStore = create<WalletState>((set, get) => ({
         rpcUrl: nextNetwork.rpcUrl,
         chainId: nextNetwork.chainId,
       });
+
+      if (get().networkSwitchRequestId !== requestId) return;
 
       let nextWallet = state.wallet;
       if (state.walletType === "privatekey") {
@@ -412,6 +417,8 @@ export const useWalletStore = create<WalletState>((set, get) => ({
         });
       }
 
+      if (get().networkSwitchRequestId !== requestId) return;
+
       set({
         ...configuredSdkState,
         selectedNetworkIndex: index,
@@ -424,13 +431,16 @@ export const useWalletStore = create<WalletState>((set, get) => ({
       get().addLog(`Chain: ${configuredSdkState.chainId.toLiteral()}`);
 
       if (nextWallet) {
+        if (get().networkSwitchRequestId !== requestId) return;
         await get().checkDeploymentStatus();
       }
     } catch (error) {
       get().addLog(`Network switch failed: ${error}`);
       throw error;
     } finally {
-      set({ isConnecting: false });
+      if (get().networkSwitchRequestId === requestId) {
+        set({ isConnecting: false });
+      }
     }
   },
 
@@ -545,6 +555,7 @@ export const useWalletStore = create<WalletState>((set, get) => ({
         walletType: "privy",
         privyWalletId: walletId,
         privyPublicKey: publicKey,
+        privateKey: "",
       });
       addLog(`Connected: ${truncateAddress(connectedWallet.address)}`);
 
@@ -573,6 +584,7 @@ export const useWalletStore = create<WalletState>((set, get) => ({
       privyEmail: "",
       privyWalletId: null,
       privyPublicKey: null,
+      networkSwitchRequestId: 0,
     });
     addLog("Disconnected");
   },

@@ -141,18 +141,28 @@ export interface VesuPoolData {
 
 const VESU_POOL_API_BASE = "https://api.vesu.xyz/pools";
 
+const VESU_POOL_FETCH_TIMEOUT_MS = 8_000;
+
 export async function fetchVesuPoolData(
   poolAddress: string
 ): Promise<VesuPoolData | null> {
+  const controller = new AbortController();
+  const timer = setTimeout(
+    () => controller.abort(),
+    VESU_POOL_FETCH_TIMEOUT_MS
+  );
   try {
     const response = await fetch(
-      `${VESU_POOL_API_BASE}/${poolAddress}?onlyEnabledAssets=true`
+      `${VESU_POOL_API_BASE}/${poolAddress}?onlyEnabledAssets=true`,
+      { signal: controller.signal }
     );
     if (!response.ok) return null;
     const payload = (await response.json()) as { data?: VesuPoolData };
     return payload.data ?? null;
   } catch {
     return null;
+  } finally {
+    clearTimeout(timer);
   }
 }
 
@@ -174,8 +184,12 @@ export function getVesuDebtFloor(
  * Format the debt floor as a USD string (e.g. "$10").
  */
 export function formatVesuDebtFloor(debtFloor: bigint): string {
-  const usd = Number(debtFloor) / 1e18;
-  return `$${usd.toFixed(usd % 1 === 0 ? 0 : 2)}`;
+  const scale = 10n ** 18n;
+  const dollars = debtFloor / scale;
+  const remainder = debtFloor % scale;
+  const cents = (remainder * 100n) / scale;
+  if (cents === 0n) return `$${dollars.toString()}`;
+  return `$${dollars.toString()}.${cents.toString().padStart(2, "0")}`;
 }
 
 export function getVesuBorrowCapacityForDeposit(params: {
@@ -470,6 +484,7 @@ export function buildVesuMarketCards(params: {
     .map((option) => {
       const market = marketByKey.get(option.key);
       const token = resolveDisplayToken(option.token, tokenLookup);
+      const resolvedCanBorrow = market?.canBeBorrowed ?? option.canBorrow;
       const poolLabel =
         market?.poolName?.trim() || getVesuPoolLabel(option.poolAddress);
       const collateralTokens = (
@@ -483,13 +498,13 @@ export function buildVesuMarketCards(params: {
         option: {
           ...option,
           token,
-          canBorrow: market?.canBeBorrowed ?? option.canBorrow,
+          canBorrow: resolvedCanBorrow,
         },
         poolLabel,
         totalSuppliedLabel: formatVesuCompactUsd(market?.stats?.totalSupplied),
         totalBorrowedLabel: formatVesuCompactUsd(market?.stats?.totalBorrowed),
         supplyAprLabel: formatVesuRate(market?.stats?.supplyApy),
-        borrowAprLabel: option.canBorrow
+        borrowAprLabel: resolvedCanBorrow
           ? formatVesuRate(market?.stats?.borrowApr)
           : "N/A",
         collateralTokens,
@@ -523,7 +538,6 @@ function filterUniquePoolAssets(
     if (extraFilter && !extraFilter(option)) continue;
     if (
       counterpart?.poolAddress &&
-      option.poolAddress &&
       option.poolAddress !== counterpart.poolAddress
     )
       continue;
