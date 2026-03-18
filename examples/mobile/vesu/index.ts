@@ -624,10 +624,12 @@ function symbolPriority(symbol: string, order: readonly string[]): number {
   return index === -1 ? order.length : index;
 }
 
-const ASSET_PRIORITY_ORDER: string[] = [
-  ...DEFAULT_VESU_DEBT_SYMBOLS,
-  ...DEFAULT_VESU_VAULT_SYMBOLS,
-  ...DEFAULT_VESU_COLLATERAL_SYMBOLS,
+const ASSET_PRIORITY_ORDER = [
+  ...new Set([
+    ...DEFAULT_VESU_DEBT_SYMBOLS,
+    ...DEFAULT_VESU_VAULT_SYMBOLS,
+    ...DEFAULT_VESU_COLLATERAL_SYMBOLS,
+  ]),
 ];
 
 function getAssetPriority(symbol: string): number {

@@ -6,6 +6,7 @@ import type {
   LendingHealthQuoteRequest,
   LendingHealthRequest,
   LendingMarket,
+  LendingMarketStats,
   LendingPosition,
   LendingPositionRequest,
   LendingProvider,
@@ -1004,19 +1005,9 @@ export class VesuLendingProvider implements LendingProvider {
       return null;
     }
 
-    const stats = entry.stats;
-    const supplyApy = toAmount(stats?.supplyApy);
-    const borrowApr = toAmount(stats?.borrowApr);
-    const totalSupplied = toAmount(stats?.totalSupplied);
-    const totalBorrowed = toAmount(stats?.totalDebt);
-    const utilization = toAmount(stats?.currentUtilization);
-    const hasStats =
-      supplyApy || borrowApr || totalSupplied || totalBorrowed || utilization;
-
-    return {
+    const market: LendingMarket = {
       protocol: this.id,
       poolAddress: fromAddress(entry.pool.id),
-      ...(entry.pool.name ? { poolName: entry.pool.name } : {}),
       asset: {
         address: fromAddress(entry.address),
         symbol: entry.symbol,
@@ -1024,23 +1015,36 @@ export class VesuLendingProvider implements LendingProvider {
         name: entry.name,
       },
       vTokenAddress: fromAddress(entry.vToken.address),
-      ...(entry.vToken.symbol ? { vTokenSymbol: entry.vToken.symbol } : {}),
-      ...(stats?.canBeBorrowed != null
-        ? { canBeBorrowed: stats.canBeBorrowed }
-        : {}),
-      ...(hasStats
-        ? {
-            stats: {
-              ...(supplyApy ? { supplyApy } : {}),
-              ...(borrowApr ? { borrowApr } : {}),
-              ...(totalSupplied ? { totalSupplied } : {}),
-              ...(totalBorrowed ? { totalBorrowed } : {}),
-              ...(utilization ? { utilization } : {}),
-            },
-          }
-        : {}),
     };
+    if (entry.pool.name) market.poolName = entry.pool.name;
+    if (entry.vToken.symbol) market.vTokenSymbol = entry.vToken.symbol;
+    if (entry.stats?.canBeBorrowed != null)
+      market.canBeBorrowed = entry.stats.canBeBorrowed;
+
+    if (entry.stats) {
+      const stats = toMarketStats(entry.stats);
+      if (stats) market.stats = stats;
+    }
+
+    return market;
   }
+}
+
+function toMarketStats(
+  s: NonNullable<VesuMarketApiItem["stats"]>
+): LendingMarketStats | undefined {
+  const stats: LendingMarketStats = {};
+  const supplyApy = toAmount(s.supplyApy);
+  if (supplyApy) stats.supplyApy = supplyApy;
+  const borrowApr = toAmount(s.borrowApr);
+  if (borrowApr) stats.borrowApr = borrowApr;
+  const totalSupplied = toAmount(s.totalSupplied);
+  if (totalSupplied) stats.totalSupplied = totalSupplied;
+  const totalBorrowed = toAmount(s.totalDebt);
+  if (totalBorrowed) stats.totalBorrowed = totalBorrowed;
+  const utilization = toAmount(s.currentUtilization);
+  if (utilization) stats.utilization = utilization;
+  return Object.keys(stats).length > 0 ? stats : undefined;
 }
 
 function toAmount(
