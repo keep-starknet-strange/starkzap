@@ -6,6 +6,7 @@ import React, {
   useCallback,
   useContext,
   useMemo,
+  useRef,
   useState,
 } from "react";
 import { TransactionExecutionStatus } from "starknet";
@@ -266,50 +267,60 @@ export const StarknetConnectorProvider: React.FC<{
   const network = normalizeNetwork(process.env.EXPO_PUBLIC_STARKNET_NETWORK);
   const cartridgeRpc = resolveCartridgeRpc(network);
   const cartridgeRedirectUrl = resolveCartridgeRedirectUrl();
+  const connectInFlightRef = useRef<Promise<void> | null>(null);
   const [wallet, setWallet] = useState<WalletInterface | null>(null);
   const [account, setAccount] = useState<StarknetAccount | null>(null);
   const [connecting, setConnecting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const connectCartridge = useCallback(async () => {
+    if (connectInFlightRef.current) {
+      return connectInFlightRef.current;
+    }
+
     setError(null);
 
-    setConnecting(true);
-    try {
-      const native = await loadNativeModule();
-      const sdk = new native.StarkZap({
-        network: toSdkNetwork(network),
-        rpcUrl: cartridgeRpc,
-      });
-      await ensureCartridgeAdapterRegistered(cartridgeRedirectUrl);
-      const policies = getTicTacToePolicies();
-      const onboard = await sdk.onboard({
-        strategy: "cartridge",
-        deploy: "never",
-        cartridge: {
-          ...(policies ? { policies } : {}),
-          ...(process.env.EXPO_PUBLIC_CARTRIDGE_PRESET
-            ? { preset: process.env.EXPO_PUBLIC_CARTRIDGE_PRESET }
-            : {}),
-          ...(process.env.EXPO_PUBLIC_CARTRIDGE_URL
-            ? { url: process.env.EXPO_PUBLIC_CARTRIDGE_URL }
-            : { url: "https://x.cartridge.gg" }),
-          ...(cartridgeRedirectUrl
-            ? { redirectUrl: cartridgeRedirectUrl }
-            : {}),
-        },
-      });
+    connectInFlightRef.current = (async () => {
+      setConnecting(true);
+      try {
+        const native = await loadNativeModule();
+        const sdk = new native.StarkZap({
+          network: toSdkNetwork(network),
+          rpcUrl: cartridgeRpc,
+        });
+        await ensureCartridgeAdapterRegistered(cartridgeRedirectUrl);
+        const policies = getTicTacToePolicies();
+        const onboard = await sdk.onboard({
+          strategy: "cartridge",
+          deploy: "never",
+          cartridge: {
+            ...(policies ? { policies } : {}),
+            ...(process.env.EXPO_PUBLIC_CARTRIDGE_PRESET
+              ? { preset: process.env.EXPO_PUBLIC_CARTRIDGE_PRESET }
+              : {}),
+            ...(process.env.EXPO_PUBLIC_CARTRIDGE_URL
+              ? { url: process.env.EXPO_PUBLIC_CARTRIDGE_URL }
+              : { url: "https://x.cartridge.gg" }),
+            ...(cartridgeRedirectUrl
+              ? { redirectUrl: cartridgeRedirectUrl }
+              : {}),
+          },
+        });
 
-      const connectedWallet = onboard.wallet as WalletInterface;
-      setWallet(connectedWallet);
-      setAccount(connectedWallet.getAccount());
-    } catch (connectError) {
-      const message = toErrorMessage(connectError);
-      setError(message);
-      throw connectError;
-    } finally {
-      setConnecting(false);
-    }
+        const connectedWallet = onboard.wallet as WalletInterface;
+        setWallet(connectedWallet);
+        setAccount(connectedWallet.getAccount());
+      } catch (connectError) {
+        const message = toErrorMessage(connectError);
+        setError(message);
+        throw connectError;
+      } finally {
+        setConnecting(false);
+        connectInFlightRef.current = null;
+      }
+    })();
+
+    return connectInFlightRef.current;
   }, [cartridgeRedirectUrl, cartridgeRpc, network]);
 
   const disconnectAccount = useCallback(async () => {
