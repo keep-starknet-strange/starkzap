@@ -205,6 +205,61 @@ describe("VesuLendingProvider", () => {
     expect(callContract).not.toHaveBeenCalled();
   });
 
+  it("treats zero earn shares as no existing supply when borrowing", async () => {
+    const callContract = vi
+      .fn()
+      .mockResolvedValueOnce([fromAddress("0x1234")])
+      .mockResolvedValueOnce(toU256Words(0n));
+    const provider = new VesuLendingProvider();
+    const context = createContext(callContract);
+
+    const prepared = await provider.prepareBorrow(context, {
+      poolAddress: fromAddress("0x999"),
+      collateralToken,
+      debtToken,
+      amount: Amount.parse("11", debtToken),
+      useEarnPosition: true,
+    });
+
+    expect(callContract).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({
+        contractAddress: vesuPresets.SN_MAIN.poolFactory,
+        entrypoint: "v_token_for_asset",
+      })
+    );
+    expect(callContract).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({
+        contractAddress: fromAddress("0x1234"),
+        entrypoint: "balance_of",
+      })
+    );
+    expect(prepared.calls).toHaveLength(1);
+    expect(prepared.calls[0]!.entrypoint).toBe("modify_position");
+    expect(prepared.calls[0]!.contractAddress).toBe(fromAddress("0x999"));
+  });
+
+  it("propagates earn-position lookup failures in borrow preparation", async () => {
+    const callContract = vi
+      .fn()
+      .mockResolvedValueOnce([fromAddress("0x1234")])
+      .mockResolvedValueOnce(toU256Words(5n))
+      .mockRejectedValueOnce(new Error("convert failed"));
+    const provider = new VesuLendingProvider();
+    const context = createContext(callContract);
+
+    await expect(
+      provider.prepareBorrow(context, {
+        poolAddress: fromAddress("0x999"),
+        collateralToken,
+        debtToken,
+        amount: Amount.parse("11", debtToken),
+        useEarnPosition: true,
+      })
+    ).rejects.toThrow("convert failed");
+  });
+
   it("rejects delegated borrow user overrides", async () => {
     const callContract = vi.fn();
     const provider = new VesuLendingProvider();

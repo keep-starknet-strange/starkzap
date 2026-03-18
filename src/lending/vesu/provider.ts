@@ -759,34 +759,30 @@ export class VesuLendingProvider implements LendingProvider {
     collateralToken: Token,
     user: Address
   ): Promise<bigint> {
-    try {
-      const vTokenAddress = await this.resolveVTokenAddress(
-        context,
-        poolAddress,
-        collateralToken.address
-      );
+    const vTokenAddress = await this.resolveVTokenAddress(
+      context,
+      poolAddress,
+      collateralToken.address
+    );
 
-      // Get user's vToken share balance
-      const balanceResult = await context.provider.callContract({
-        contractAddress: vTokenAddress,
-        entrypoint: "balance_of",
-        calldata: CallData.compile([user]),
-      });
-      const shares = parseU256(balanceResult, 0, "vtoken_balance");
-      if (shares === 0n) {
-        return 0n;
-      }
-
-      // Convert shares to underlying assets
-      const assetsResult = await context.provider.callContract({
-        contractAddress: vTokenAddress,
-        entrypoint: "convert_to_assets",
-        calldata: CallData.compile([uint256.bnToUint256(shares)]),
-      });
-      return parseU256(assetsResult, 0, "vtoken_assets");
-    } catch {
+    // Zero shares is a valid "no earn position" result; other read failures
+    // must propagate so useEarnPosition calls do not silently degrade.
+    const balanceResult = await context.provider.callContract({
+      contractAddress: vTokenAddress,
+      entrypoint: "balance_of",
+      calldata: CallData.compile([user]),
+    });
+    const shares = parseU256(balanceResult, 0, "vtoken_balance");
+    if (shares === 0n) {
       return 0n;
     }
+
+    const assetsResult = await context.provider.callContract({
+      contractAddress: vTokenAddress,
+      entrypoint: "convert_to_assets",
+      calldata: CallData.compile([uint256.bnToUint256(shares)]),
+    });
+    return parseU256(assetsResult, 0, "vtoken_assets");
   }
 
   private async readAssetPrice(
