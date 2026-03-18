@@ -11,6 +11,7 @@ export const VESU_PROVIDER_ID = "vesu" as const;
 export const VESU_HEALTH_VALUE_SCALE = 10n ** 18n;
 const VESU_BASIS_POINTS_SCALE = 10_000n;
 const VESU_MAX_BORROW_SAFETY_BPS = 9_900n;
+const VESU_CLOSE_REPAY_BUFFER_DECIMALS = 5;
 
 const FALLBACK_ASSETS = [
   { symbol: "STRK", canBorrow: false },
@@ -263,6 +264,18 @@ export function getVesuMinimumDepositForBorrow(params: {
     effectiveMaxLtv
   );
   return ceilDiv(requiredCollateralValue * collateralScale, collateralPrice);
+}
+
+export function getVesuCloseRepayAmount(params: {
+  debtAmount?: bigint | null;
+  debtToken: Token;
+}): bigint | null {
+  const debtAmount = params.debtAmount ?? 0n;
+  if (debtAmount <= 0n) {
+    return null;
+  }
+
+  return debtAmount + getVesuCloseRepayBuffer(params.debtToken.decimals);
 }
 
 export interface VesuMarketCard {
@@ -755,6 +768,14 @@ function normalizeVesuDecimal(value: string, decimals: number): bigint {
 
 function ceilDiv(dividend: bigint, divisor: bigint): bigint {
   return (dividend + divisor - 1n) / divisor;
+}
+
+function getVesuCloseRepayBuffer(decimals: number): bigint {
+  if (decimals <= VESU_CLOSE_REPAY_BUFFER_DECIMALS) {
+    return 1n;
+  }
+
+  return 10n ** BigInt(decimals - VESU_CLOSE_REPAY_BUFFER_DECIMALS);
 }
 
 function symbolPriority(symbol: string, order: readonly string[]): number {
