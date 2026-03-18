@@ -18,6 +18,8 @@ import {
   type SolanaProvider,
   type DcaProvider,
   type DcaOrder,
+  type LendingMarket,
+  type LendingPosition,
   type WalletInterface,
   type AccountClassConfig,
   type SwapProvider,
@@ -32,6 +34,12 @@ import {
   formatFeeEstimate,
 } from "./bridge";
 import { getDcaProviders } from "./dca";
+import {
+  buildFallbackWebVesuMarkets,
+  buildWebVesuDebtOptions,
+  buildWebVesuMarketOptions,
+  type WebVesuMarketLike,
+} from "./vesu";
 
 // Configuration
 const NETWORK =
@@ -64,6 +72,7 @@ const DCA_FREQUENCY_OPTIONS = [
   { value: "P3D", label: "Every 3 days" },
   { value: "P1W", label: "Weekly" },
 ] as const;
+const VESU_PROVIDER_ID = "vesu";
 
 // Tongo confidential contract addresses per token
 // Full list: https://docs.tongo.cash/protocol/contracts.html
@@ -127,6 +136,7 @@ let wallet: WalletInterface | null = null;
 let walletType: "cartridge" | "privatekey" | "privy" | null = null;
 let confidential: TongoConfidential | null = null;
 let dcaOrdersRequestId = 0;
+let lendingMarkets: LendingMarket[] = [];
 
 // DOM Elements
 const walletSection = document.getElementById("wallet-section")!;
@@ -1417,6 +1427,7 @@ function showConnected() {
     bridgeController.setStarknetWallet(wallet);
   }
   updateDcaButtons();
+  void refreshLendingMarkets({ silent: true });
 }
 
 function showDisconnected() {
@@ -1426,6 +1437,10 @@ function showDisconnected() {
   privyForm.classList.add("hidden");
   wallet = null;
   walletType = null;
+  lendingMarkets = [];
+  populateLendingTokens();
+  lendingMarketsEl.classList.add("hidden");
+  lendingPositionEl.classList.add("hidden");
   clearSwapQuote();
   populateDcaProviders();
   clearDcaPreview();
@@ -2599,30 +2614,243 @@ btnTongoRefresh.addEventListener("click", async () => {
 // ---------------------------------------------------------------------------
 
 function populateLendingTokens(): void {
-  for (const select of [
+  const markets = getActiveLendingMarkets();
+  const marketOptions = buildWebVesuMarketOptions(markets);
+
+  setLendingSelectOptions(
     lendingTokenSelect,
+    marketOptions,
+    lendingTokenSelect.value
+  );
+  setLendingSelectOptions(
     lendingCollateralTokenSelect,
+    marketOptions,
+    lendingCollateralTokenSelect.value || lendingTokenSelect.value
+  );
+  if (!lendingCollateralTokenSelect.value && lendingTokenSelect.value) {
+    lendingCollateralTokenSelect.value = lendingTokenSelect.value;
+  }
+  populateLendingDebtTokens();
+}
+
+function getActiveLendingMarkets(): WebVesuMarketLike[] {
+  if (lendingMarkets.length > 0) {
+    return lendingMarkets;
+  }
+  return buildFallbackWebVesuMarkets(presetTokens);
+}
+
+function getSelectedLendingSupplyMarket(): WebVesuMarketLike | null {
+  return (
+    buildWebVesuMarketOptions(getActiveLendingMarkets()).find(
+      (option) => option.key === lendingTokenSelect.value
+    )?.market ?? null
+  );
+}
+
+function getSelectedLendingCollateralMarket(): WebVesuMarketLike | null {
+  return (
+    buildWebVesuMarketOptions(getActiveLendingMarkets()).find(
+      (option) => option.key === lendingCollateralTokenSelect.value
+    )?.market ?? null
+  );
+}
+
+function getSelectedLendingDebtMarket(): WebVesuMarketLike | null {
+  return (
+    buildWebVesuDebtOptions(
+      getActiveLendingMarkets(),
+      lendingCollateralTokenSelect.value || null
+    ).find((option) => option.key === lendingDebtTokenSelect.value)?.market ??
+    null
+  );
+}
+
+function setLendingSelectOptions(
+  select: HTMLSelectElement,
+  options: ReturnType<typeof buildWebVesuMarketOptions>,
+  preferredValue: string
+): void {
+  select.innerHTML = "";
+  for (const option of options) {
+    const element = document.createElement("option");
+    element.value = option.key;
+    element.textContent = option.label;
+    select.appendChild(element);
+  }
+  if (options.length === 0) {
+    return;
+  }
+  select.value = options.some((option) => option.key === preferredValue)
+    ? preferredValue
+    : options[0]!.key;
+}
+
+function populateLendingDebtTokens(): void {
+  const debtOptions = buildWebVesuDebtOptions(
+    getActiveLendingMarkets(),
+    lendingCollateralTokenSelect.value || null
+  );
+  setLendingSelectOptions(
     lendingDebtTokenSelect,
-  ]) {
-    select.innerHTML = "";
-    for (const token of presetTokens) {
-      const opt = document.createElement("option");
-      opt.value = token.address;
-      opt.textContent = tokenOptionLabel(token);
-      select.appendChild(opt);
-    }
+    debtOptions,
+    lendingDebtTokenSelect.value
+  );
+}
+
+function formatLendingCompactUsd(value?: Amount): string {
+  if (!value) {
+    return "$0";
+  }
+  const numeric = Number(value.toUnit());
+  if (!Number.isFinite(numeric) || numeric <= 0) {
+    return "$0";
+  }
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+    notation: "compact",
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 2,
+  }).format(numeric);
+}
+
+function formatLendingRate(value?: Amount): string {
+  if (!value) {
+    return "N/A";
+  }
+  return new Intl.NumberFormat("en-US", {
+    style: "percent",
+    maximumFractionDigits: 2,
+  }).format(Number(value.toUnit()));
+}
+
+function renderLendingMarkets(): void {
+  const marketOptions = buildWebVesuMarketOptions(getActiveLendingMarkets());
+  if (marketOptions.length === 0) {
+    lendingMarketsEl.innerHTML = `<div class="quote-row"><span class="quote-label">No markets found</span></div>`;
+    lendingMarketsEl.classList.remove("hidden");
+    return;
   }
 
-  // Default selections
-  const strk = presetTokens.find((t) => t.symbol === "STRK");
-  const usdc = presetTokens.find(
-    (t) => t.symbol === "USDC" || t.symbol === "USDC.e"
+  const selectedSupplyKey = lendingTokenSelect.value;
+  const selectedCollateralKey = lendingCollateralTokenSelect.value;
+  const rows = marketOptions.map((option) => {
+    const markers = [
+      option.key === selectedSupplyKey ? "Supply" : "",
+      option.key === selectedCollateralKey ? "Collateral" : "",
+    ].filter(Boolean);
+    const stats = option.market.stats;
+    const status =
+      option.market.canBeBorrowed === false ? "Supply only" : "Borrowable";
+    return `
+      <div class="quote-row"><span class="quote-label">${option.label}${markers.length ? ` · ${markers.join(" / ")}` : ""}</span><span class="quote-value">${status}</span></div>
+      <div class="quote-row"><span class="quote-label">Total supplied</span><span class="quote-value">${formatLendingCompactUsd(stats?.totalSupplied)}</span></div>
+      <div class="quote-row"><span class="quote-label">Total borrowed</span><span class="quote-value">${formatLendingCompactUsd(stats?.totalBorrowed)}</span></div>
+      <div class="quote-row"><span class="quote-label">Supply APY</span><span class="quote-value">${formatLendingRate(stats?.supplyApy)}</span></div>
+      <div class="quote-row"><span class="quote-label">Borrow APR</span><span class="quote-value">${option.market.canBeBorrowed === false ? "N/A" : formatLendingRate(stats?.borrowApr)}</span></div>
+    `;
+  });
+
+  lendingMarketsEl.innerHTML = rows.join("");
+  lendingMarketsEl.classList.remove("hidden");
+}
+
+function hasLendingExposure(position: LendingPosition): boolean {
+  return (
+    position.collateralShares > 0n ||
+    position.nominalDebt > 0n ||
+    (position.collateralAmount ?? 0n) > 0n ||
+    (position.debtAmount ?? 0n) > 0n
   );
-  const eth = presetTokens.find((t) => t.symbol === "ETH");
-  if (strk) lendingTokenSelect.value = strk.address;
-  if (strk) lendingCollateralTokenSelect.value = strk.address;
-  if (usdc) lendingDebtTokenSelect.value = usdc.address;
-  else if (eth) lendingDebtTokenSelect.value = eth.address;
+}
+
+async function assertLendingBorrowCollateralReady(params: {
+  collateralMarket: WebVesuMarketLike;
+  debtMarket: WebVesuMarketLike;
+  useEarnPosition: boolean;
+  collateralAmount?: Amount;
+}): Promise<void> {
+  if (params.collateralAmount) {
+    return;
+  }
+
+  const commonRequest = {
+    provider: VESU_PROVIDER_ID,
+    collateralToken: params.collateralMarket.asset,
+    debtToken: params.debtMarket.asset,
+    ...(params.collateralMarket.poolAddress
+      ? { poolAddress: params.collateralMarket.poolAddress }
+      : {}),
+  };
+
+  const [position, maxBorrowAmount] = await Promise.all([
+    wallet!.lending().getPosition(commonRequest),
+    params.useEarnPosition
+      ? wallet!
+          .lending()
+          .getMaxBorrowAmount({
+            ...commonRequest,
+            useEarnPosition: true,
+          })
+          .catch(() => null)
+      : Promise.resolve(null),
+  ]);
+  if (hasLendingExposure(position)) {
+    return;
+  }
+
+  if (
+    params.useEarnPosition &&
+    (maxBorrowAmount == null || maxBorrowAmount > 0n)
+  ) {
+    return;
+  }
+
+  throw new Error(
+    params.useEarnPosition
+      ? "No matching supplied collateral is available for this market. Deposit first or enter additional collateral."
+      : "No collateral is currently active for this market. Enable existing supply or enter additional collateral."
+  );
+}
+
+async function refreshLendingMarkets(options?: {
+  silent?: boolean;
+  reveal?: boolean;
+}): Promise<void> {
+  if (!wallet) {
+    lendingMarkets = [];
+    populateLendingTokens();
+    return;
+  }
+
+  if (!options?.silent) {
+    log("Fetching Vesu markets...", "info");
+  }
+
+  try {
+    lendingMarkets = await wallet
+      .lending()
+      .getMarkets({ provider: VESU_PROVIDER_ID });
+    if (!options?.silent) {
+      if (lendingMarkets.length > 0) {
+        log(`Loaded ${lendingMarkets.length} Vesu market(s)`, "success");
+      } else {
+        log(
+          "Vesu market discovery returned no metadata; using fallback assets",
+          "info"
+        );
+      }
+    }
+  } catch (err) {
+    lendingMarkets = [];
+    log(`Vesu market discovery failed: ${err}`, "error");
+  }
+
+  populateLendingTokens();
+  if (options?.reveal || !lendingMarketsEl.classList.contains("hidden")) {
+    renderLendingMarkets();
+  }
 }
 
 function getLendingFeeMode(): { feeMode: "sponsored" | "user_pays" } {
@@ -2631,11 +2859,12 @@ function getLendingFeeMode(): { feeMode: "sponsored" | "user_pays" } {
 
 async function lendingDeposit() {
   if (!wallet) return;
-  const token = getTokenByAddress(lendingTokenSelect.value);
-  if (!token) {
-    log("Select a token", "error");
+  const market = getSelectedLendingSupplyMarket();
+  if (!market) {
+    log("Select a supply market", "error");
     return;
   }
+  const token = market.asset;
   const raw = lendingAmountInput.value.trim();
   if (!raw) {
     log("Enter an amount", "error");
@@ -2646,11 +2875,18 @@ async function lendingDeposit() {
   try {
     const amount = Amount.parse(raw, token);
     log(`Depositing ${amount.toUnit()} ${token.symbol} into Vesu...`, "info");
-    const tx = await wallet
-      .lending()
-      .deposit({ token, amount }, getLendingFeeMode());
+    const tx = await wallet.lending().deposit(
+      {
+        provider: VESU_PROVIDER_ID,
+        token,
+        amount,
+        ...(market.poolAddress ? { poolAddress: market.poolAddress } : {}),
+      },
+      getLendingFeeMode()
+    );
     log(`Deposit tx: ${truncateAddress(tx.hash)}`, "success");
     await tx.wait();
+    await refreshLendingMarkets({ silent: true });
     log("Deposit confirmed!", "success");
   } catch (err) {
     log(`Deposit failed: ${err}`, "error");
@@ -2661,11 +2897,12 @@ async function lendingDeposit() {
 
 async function lendingWithdraw() {
   if (!wallet) return;
-  const token = getTokenByAddress(lendingTokenSelect.value);
-  if (!token) {
-    log("Select a token", "error");
+  const market = getSelectedLendingSupplyMarket();
+  if (!market) {
+    log("Select a supply market", "error");
     return;
   }
+  const token = market.asset;
   const raw = lendingAmountInput.value.trim();
   if (!raw) {
     log("Enter an amount", "error");
@@ -2676,11 +2913,18 @@ async function lendingWithdraw() {
   try {
     const amount = Amount.parse(raw, token);
     log(`Withdrawing ${amount.toUnit()} ${token.symbol} from Vesu...`, "info");
-    const tx = await wallet
-      .lending()
-      .withdraw({ token, amount }, getLendingFeeMode());
+    const tx = await wallet.lending().withdraw(
+      {
+        provider: VESU_PROVIDER_ID,
+        token,
+        amount,
+        ...(market.poolAddress ? { poolAddress: market.poolAddress } : {}),
+      },
+      getLendingFeeMode()
+    );
     log(`Withdraw tx: ${truncateAddress(tx.hash)}`, "success");
     await tx.wait();
+    await refreshLendingMarkets({ silent: true });
     log("Withdrawal confirmed!", "success");
   } catch (err) {
     log(`Withdraw failed: ${err}`, "error");
@@ -2691,20 +2935,27 @@ async function lendingWithdraw() {
 
 async function lendingWithdrawMax() {
   if (!wallet) return;
-  const token = getTokenByAddress(lendingTokenSelect.value);
-  if (!token) {
-    log("Select a token", "error");
+  const market = getSelectedLendingSupplyMarket();
+  if (!market) {
+    log("Select a supply market", "error");
     return;
   }
+  const token = market.asset;
 
   setButtonLoading(btnLendingWithdrawMax, true);
   try {
     log(`Withdrawing max ${token.symbol} from Vesu...`, "info");
-    const tx = await wallet
-      .lending()
-      .withdrawMax({ token }, getLendingFeeMode());
+    const tx = await wallet.lending().withdrawMax(
+      {
+        provider: VESU_PROVIDER_ID,
+        token,
+        ...(market.poolAddress ? { poolAddress: market.poolAddress } : {}),
+      },
+      getLendingFeeMode()
+    );
     log(`Withdraw max tx: ${truncateAddress(tx.hash)}`, "success");
     await tx.wait();
+    await refreshLendingMarkets({ silent: true });
     log("Withdraw max confirmed!", "success");
   } catch (err) {
     log(`Withdraw max failed: ${err}`, "error");
@@ -2715,12 +2966,14 @@ async function lendingWithdrawMax() {
 
 async function lendingBorrow() {
   if (!wallet) return;
-  const collateralToken = getTokenByAddress(lendingCollateralTokenSelect.value);
-  const debtToken = getTokenByAddress(lendingDebtTokenSelect.value);
-  if (!collateralToken || !debtToken) {
-    log("Select tokens", "error");
+  const collateralMarket = getSelectedLendingCollateralMarket();
+  const debtMarket = getSelectedLendingDebtMarket();
+  if (!collateralMarket || !debtMarket) {
+    log("Select a collateral market and debt asset", "error");
     return;
   }
+  const collateralToken = collateralMarket.asset;
+  const debtToken = debtMarket.asset;
   const rawDebt = lendingDebtAmountInput.value.trim();
   if (!rawDebt) {
     log("Enter a debt amount", "error");
@@ -2734,6 +2987,14 @@ async function lendingBorrow() {
     const collateralAmount = rawCollateral
       ? Amount.parse(rawCollateral, collateralToken)
       : undefined;
+    const useEarnPosition = lendingUseEarnInput.checked;
+
+    await assertLendingBorrowCollateralReady({
+      collateralMarket,
+      debtMarket,
+      useEarnPosition,
+      collateralAmount,
+    });
 
     log(
       `Borrowing ${amount.toUnit()} ${debtToken.symbol} with ${collateralToken.symbol} collateral...`,
@@ -2741,16 +3002,21 @@ async function lendingBorrow() {
     );
     const tx = await wallet.lending().borrow(
       {
+        provider: VESU_PROVIDER_ID,
         collateralToken,
         debtToken,
         amount,
+        ...(collateralMarket.poolAddress
+          ? { poolAddress: collateralMarket.poolAddress }
+          : {}),
         ...(collateralAmount ? { collateralAmount } : {}),
-        ...(lendingUseEarnInput.checked ? { useEarnPosition: true } : {}),
+        ...(useEarnPosition ? { useEarnPosition: true } : {}),
       },
       getLendingFeeMode()
     );
     log(`Borrow tx: ${truncateAddress(tx.hash)}`, "success");
     await tx.wait();
+    await refreshLendingMarkets({ silent: true });
     log("Borrow confirmed!", "success");
   } catch (err) {
     log(`Borrow failed: ${err}`, "error");
@@ -2761,12 +3027,14 @@ async function lendingBorrow() {
 
 async function lendingRepay() {
   if (!wallet) return;
-  const collateralToken = getTokenByAddress(lendingCollateralTokenSelect.value);
-  const debtToken = getTokenByAddress(lendingDebtTokenSelect.value);
-  if (!collateralToken || !debtToken) {
-    log("Select tokens", "error");
+  const collateralMarket = getSelectedLendingCollateralMarket();
+  const debtMarket = getSelectedLendingDebtMarket();
+  if (!collateralMarket || !debtMarket) {
+    log("Select a collateral market and debt asset", "error");
     return;
   }
+  const collateralToken = collateralMarket.asset;
+  const debtToken = debtMarket.asset;
   const rawDebt = lendingDebtAmountInput.value.trim();
   if (!rawDebt) {
     log("Enter a repay amount", "error");
@@ -2784,9 +3052,13 @@ async function lendingRepay() {
     log(`Repaying ${amount.toUnit()} ${debtToken.symbol}...`, "info");
     const tx = await wallet.lending().repay(
       {
+        provider: VESU_PROVIDER_ID,
         collateralToken,
         debtToken,
         amount,
+        ...(collateralMarket.poolAddress
+          ? { poolAddress: collateralMarket.poolAddress }
+          : {}),
         ...(collateralAmount
           ? { collateralAmount, withdrawCollateral: true }
           : {}),
@@ -2795,6 +3067,7 @@ async function lendingRepay() {
     );
     log(`Repay tx: ${truncateAddress(tx.hash)}`, "success");
     await tx.wait();
+    await refreshLendingMarkets({ silent: true });
     log("Repay confirmed!", "success");
   } catch (err) {
     log(`Repay failed: ${err}`, "error");
@@ -2805,12 +3078,14 @@ async function lendingRepay() {
 
 async function lendingViewPosition() {
   if (!wallet) return;
-  const collateralToken = getTokenByAddress(lendingCollateralTokenSelect.value);
-  const debtToken = getTokenByAddress(lendingDebtTokenSelect.value);
-  if (!collateralToken || !debtToken) {
-    log("Select collateral and debt tokens", "error");
+  const collateralMarket = getSelectedLendingCollateralMarket();
+  const debtMarket = getSelectedLendingDebtMarket();
+  if (!collateralMarket || !debtMarket) {
+    log("Select a collateral market and debt asset", "error");
     return;
   }
+  const collateralToken = collateralMarket.asset;
+  const debtToken = debtMarket.asset;
 
   setButtonLoading(btnLendingPosition, true);
   try {
@@ -2819,8 +3094,22 @@ async function lendingViewPosition() {
       "info"
     );
     const [position, health] = await Promise.all([
-      wallet.lending().getPosition({ collateralToken, debtToken }),
-      wallet.lending().getHealth({ collateralToken, debtToken }),
+      wallet.lending().getPosition({
+        provider: VESU_PROVIDER_ID,
+        collateralToken,
+        debtToken,
+        ...(collateralMarket.poolAddress
+          ? { poolAddress: collateralMarket.poolAddress }
+          : {}),
+      }),
+      wallet.lending().getHealth({
+        provider: VESU_PROVIDER_ID,
+        collateralToken,
+        debtToken,
+        ...(collateralMarket.poolAddress
+          ? { poolAddress: collateralMarket.poolAddress }
+          : {}),
+      }),
     ]);
 
     const collateralAmt =
@@ -2858,7 +3147,9 @@ async function lendingMyPositions() {
   setButtonLoading(btnLendingMyPositions, true);
   try {
     log("Fetching all Vesu positions...", "info");
-    const positions = await wallet.lending().getPositions();
+    const positions = await wallet
+      .lending()
+      .getPositions({ provider: VESU_PROVIDER_ID });
 
     if (positions.length === 0) {
       lendingPositionEl.innerHTML = `<div class="quote-row"><span class="quote-label">No positions found</span></div>`;
@@ -2895,30 +3186,9 @@ async function lendingMyPositions() {
 }
 
 async function lendingBrowseMarkets() {
-  if (!wallet) return;
-
   setButtonLoading(btnLendingMarkets, true);
   try {
-    log("Fetching Vesu markets...", "info");
-    const markets = await wallet.lending().getMarkets();
-
-    if (markets.length === 0) {
-      lendingMarketsEl.innerHTML = `<div class="quote-row"><span class="quote-label">No markets found</span></div>`;
-      lendingMarketsEl.classList.remove("hidden");
-      log("No markets found", "info");
-      return;
-    }
-
-    const rows = markets.map(
-      (m) =>
-        `<div class="quote-row"><span class="quote-label">${m.asset.symbol}</span><span class="quote-value">${truncateAddress(m.poolAddress)} · ${m.canBeBorrowed ? "Borrowable" : "Supply only"}</span></div>`
-    );
-    lendingMarketsEl.innerHTML = rows.join("");
-    lendingMarketsEl.classList.remove("hidden");
-    log(`Loaded ${markets.length} market(s)`, "success");
-  } catch (err) {
-    log(`Markets query failed: ${err}`, "error");
-    lendingMarketsEl.classList.add("hidden");
+    await refreshLendingMarkets({ reveal: true });
   } finally {
     setButtonLoading(btnLendingMarkets, false, "Browse Markets");
   }
@@ -2926,12 +3196,14 @@ async function lendingBrowseMarkets() {
 
 async function lendingMaxBorrow() {
   if (!wallet) return;
-  const collateralToken = getTokenByAddress(lendingCollateralTokenSelect.value);
-  const debtToken = getTokenByAddress(lendingDebtTokenSelect.value);
-  if (!collateralToken || !debtToken) {
-    log("Select collateral and debt tokens", "error");
+  const collateralMarket = getSelectedLendingCollateralMarket();
+  const debtMarket = getSelectedLendingDebtMarket();
+  if (!collateralMarket || !debtMarket) {
+    log("Select a collateral market and debt asset", "error");
     return;
   }
+  const collateralToken = collateralMarket.asset;
+  const debtToken = debtMarket.asset;
 
   setButtonLoading(btnLendingMaxBorrow, true);
   try {
@@ -2939,9 +3211,15 @@ async function lendingMaxBorrow() {
       `Calculating max borrow for ${collateralToken.symbol}/${debtToken.symbol}...`,
       "info"
     );
-    const maxAmount = await wallet
-      .lending()
-      .getMaxBorrowAmount({ collateralToken, debtToken });
+    const maxAmount = await wallet.lending().getMaxBorrowAmount({
+      provider: VESU_PROVIDER_ID,
+      collateralToken,
+      debtToken,
+      ...(collateralMarket.poolAddress
+        ? { poolAddress: collateralMarket.poolAddress }
+        : {}),
+      ...(lendingUseEarnInput.checked ? { useEarnPosition: true } : {}),
+    });
     const formatted = Amount.fromRaw(maxAmount, debtToken).toFormatted(true);
 
     lendingPositionEl.innerHTML = `<div class="quote-row"><span class="quote-label">Max Borrow</span><span class="quote-value">${formatted} ${debtToken.symbol}</span></div>`;
@@ -2957,12 +3235,14 @@ async function lendingMaxBorrow() {
 
 async function lendingHealthQuote() {
   if (!wallet) return;
-  const collateralToken = getTokenByAddress(lendingCollateralTokenSelect.value);
-  const debtToken = getTokenByAddress(lendingDebtTokenSelect.value);
-  if (!collateralToken || !debtToken) {
-    log("Select collateral and debt tokens", "error");
+  const collateralMarket = getSelectedLendingCollateralMarket();
+  const debtMarket = getSelectedLendingDebtMarket();
+  if (!collateralMarket || !debtMarket) {
+    log("Select a collateral market and debt asset", "error");
     return;
   }
+  const collateralToken = collateralMarket.asset;
+  const debtToken = debtMarket.asset;
   const rawDebt = lendingDebtAmountInput.value.trim();
   if (!rawDebt) {
     log("Enter a borrow amount for health quote", "error");
@@ -2982,13 +3262,25 @@ async function lendingHealthQuote() {
       action: {
         action: "borrow",
         request: {
+          provider: VESU_PROVIDER_ID,
           collateralToken,
           debtToken,
           amount,
+          ...(collateralMarket.poolAddress
+            ? { poolAddress: collateralMarket.poolAddress }
+            : {}),
           ...(collateralAmount ? { collateralAmount } : {}),
+          ...(lendingUseEarnInput.checked ? { useEarnPosition: true } : {}),
         },
       },
-      health: { collateralToken, debtToken },
+      health: {
+        provider: VESU_PROVIDER_ID,
+        collateralToken,
+        debtToken,
+        ...(collateralMarket.poolAddress
+          ? { poolAddress: collateralMarket.poolAddress }
+          : {}),
+      },
       ...getLendingFeeMode(),
     });
 
@@ -3022,6 +3314,22 @@ btnLendingMyPositions.addEventListener("click", lendingMyPositions);
 btnLendingMarkets.addEventListener("click", lendingBrowseMarkets);
 btnLendingMaxBorrow.addEventListener("click", lendingMaxBorrow);
 btnLendingHealthQuote.addEventListener("click", lendingHealthQuote);
+lendingTokenSelect.addEventListener("change", () => {
+  if (!lendingMarketsEl.classList.contains("hidden")) {
+    renderLendingMarkets();
+  }
+});
+lendingCollateralTokenSelect.addEventListener("change", () => {
+  populateLendingDebtTokens();
+  if (!lendingMarketsEl.classList.contains("hidden")) {
+    renderLendingMarkets();
+  }
+});
+lendingDebtTokenSelect.addEventListener("change", () => {
+  if (!lendingMarketsEl.classList.contains("hidden")) {
+    renderLendingMarkets();
+  }
+});
 
 // Initial log
 initializeSwapForm();
