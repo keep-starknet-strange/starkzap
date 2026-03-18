@@ -456,6 +456,111 @@ describe("VesuLendingProvider", () => {
     });
   });
 
+  it("includes existing supply in projected borrow health when requested", async () => {
+    const oneUsd = 10n ** 18n;
+    const callContract = vi
+      .fn()
+      .mockResolvedValueOnce([fromAddress("0x1234")])
+      .mockResolvedValueOnce([...toU256Words(oneUsd)])
+      .mockResolvedValueOnce([...toU256Words(1_000n * oneUsd)])
+      .mockResolvedValueOnce([...toU256Words(oneUsd), "1"])
+      .mockResolvedValueOnce([...toU256Words(oneUsd), "1"])
+      .mockResolvedValueOnce(["700000000000000000", "0", "0"]);
+    const provider = new VesuLendingProvider();
+    const context = createContext(callContract);
+
+    const projected = await provider.quoteProjectedHealth(
+      context,
+      {
+        action: {
+          action: "borrow",
+          request: {
+            collateralToken,
+            debtToken,
+            amount: Amount.parse("200", debtToken),
+            useEarnPosition: true,
+          },
+        },
+        health: {
+          collateralToken,
+          debtToken,
+        },
+      },
+      {
+        isCollateralized: true,
+        collateralValue: 0n,
+        debtValue: 0n,
+      }
+    );
+
+    expect(projected).toEqual({
+      isCollateralized: true,
+      collateralValue: 1_000n * oneUsd,
+      debtValue: 200n * oneUsd,
+    });
+  });
+
+  it("applies the documented 1 percent safety margin to max borrow quotes", async () => {
+    const oneUsd = 10n ** 18n;
+    const callContract = vi
+      .fn()
+      .mockResolvedValueOnce([
+        "1",
+        ...toU256Words(1000n * oneUsd),
+        ...toU256Words(0n),
+      ])
+      .mockResolvedValueOnce([...toU256Words(oneUsd), "1"])
+      .mockResolvedValueOnce([...toU256Words(oneUsd), "1"])
+      .mockResolvedValueOnce(["500000000000000000"]);
+    const provider = new VesuLendingProvider();
+    const context = createContext(callContract);
+
+    const maxBorrow = await provider.getMaxBorrowAmount(context, {
+      collateralToken,
+      debtToken,
+    });
+
+    expect(maxBorrow).toBe(495_000_000n);
+  });
+
+  it("ignores earn-position collateral for max borrow unless explicitly requested", async () => {
+    const oneUsd = 10n ** 18n;
+    const provider = new VesuLendingProvider();
+
+    const withoutEarnContext = createContext(
+      vi
+        .fn()
+        .mockResolvedValueOnce(["1", ...toU256Words(0n), ...toU256Words(0n)])
+        .mockResolvedValueOnce([...toU256Words(oneUsd), "1"])
+        .mockResolvedValueOnce([...toU256Words(oneUsd), "1"])
+        .mockResolvedValueOnce(["500000000000000000"])
+    );
+    const withoutEarn = await provider.getMaxBorrowAmount(withoutEarnContext, {
+      collateralToken,
+      debtToken,
+    });
+
+    const withEarnContext = createContext(
+      vi
+        .fn()
+        .mockResolvedValueOnce(["1", ...toU256Words(0n), ...toU256Words(0n)])
+        .mockResolvedValueOnce([fromAddress("0x1234")])
+        .mockResolvedValueOnce([...toU256Words(oneUsd), "1"])
+        .mockResolvedValueOnce([...toU256Words(oneUsd), "1"])
+        .mockResolvedValueOnce(["500000000000000000"])
+        .mockResolvedValueOnce([...toU256Words(oneUsd)])
+        .mockResolvedValueOnce([...toU256Words(1_000n * oneUsd)])
+    );
+    const withEarn = await provider.getMaxBorrowAmount(withEarnContext, {
+      collateralToken,
+      debtToken,
+      useEarnPosition: true,
+    });
+
+    expect(withoutEarn).toBe(0n);
+    expect(withEarn).toBe(495_000_000n);
+  });
+
   it("maps markets from API payload", async () => {
     const fetcher = vi.fn().mockResolvedValue({
       ok: true,

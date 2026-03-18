@@ -189,6 +189,8 @@ export interface LendingMaxBorrowRequest extends LendingRequestBase {
   collateralToken: Token;
   debtToken: Token;
   user?: Address;
+  /** Include redeemable earn-position collateral in the max borrow calculation. */
+  useEarnPosition?: boolean;
 }
 
 export interface LendingProvider {

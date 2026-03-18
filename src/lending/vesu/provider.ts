@@ -31,6 +31,8 @@ import { vesuPresets, type VesuChainConfig } from "@/lending/vesu/presets";
 
 type VesuChain = "SN_MAIN" | "SN_SEPOLIA";
 const VESU_SCALE = 10n ** 18n;
+const BASIS_POINTS_SCALE = 10_000n;
+const MAX_BORROW_SAFETY_BPS = 9_900n;
 
 interface VesuApiDecimalValue {
   value?: string;
@@ -519,6 +521,14 @@ export class VesuLendingProvider implements LendingProvider {
       debtDelta = -request.action.request.amount.toBase();
     } else {
       debtDelta = request.action.request.amount.toBase();
+      if (request.action.request.useEarnPosition) {
+        collateralDelta += await this.readEarnBalance(
+          context,
+          actionContext.poolAddress,
+          actionRequest.collateralToken,
+          actionContext.user
+        );
+      }
     }
 
     const [collateralPrice, debtPrice, maxLtv] = await Promise.all([
@@ -685,12 +695,14 @@ export class VesuLendingProvider implements LendingProvider {
           poolAddress,
           user,
         }),
-        this.readEarnBalance(
-          context,
-          poolAddress,
-          request.collateralToken,
-          user
-        ),
+        request.useEarnPosition
+          ? this.readEarnBalance(
+              context,
+              poolAddress,
+              request.collateralToken,
+              user
+            )
+          : Promise.resolve(0n),
         this.readAssetPrice(
           context,
           poolAddress,
@@ -732,9 +744,9 @@ export class VesuLendingProvider implements LendingProvider {
     const debtScale = tokenScale(request.debtToken.decimals);
     const maxBorrowAmount = (maxBorrowValue * debtScale) / debtPrice.value;
 
-    // Apply 1% safety margin to account for rounding differences between
-    // our off-chain computation and the on-chain collateralization check.
-    return (maxBorrowAmount * 99n) / 100n;
+    // Apply a 1% safety margin to avoid surfacing a "max" value that
+    // rounds above what the on-chain collateralization check will accept.
+    return (maxBorrowAmount * MAX_BORROW_SAFETY_BPS) / BASIS_POINTS_SCALE;
   }
 
   /**
