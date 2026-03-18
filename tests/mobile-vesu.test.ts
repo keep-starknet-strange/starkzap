@@ -17,6 +17,7 @@ import {
   getAvailableVesuCollateralAssets,
   getDefaultVesuCollateralAsset,
   getVesuBorrowCapacityForDeposit,
+  getVesuCloseRepayAmount,
   getVesuHealthStatus,
   getVesuMinimumDepositForBorrow,
   getVesuPoolLabel,
@@ -432,5 +433,16 @@ describe("mobile Vesu helpers", () => {
     });
 
     expect(requiredDeposit).toBe(25_252_525_252_525_252_526n);
+  });
+
+  it("adds a small buffer when closing a repay position", () => {
+    const usdc = createToken("USDC", "0xusdc", 6);
+
+    const closeRepayAmount = getVesuCloseRepayAmount({
+      debtAmount: Amount.parse("10.124186", usdc).toBase(),
+      debtToken: usdc,
+    });
+
+    expect(closeRepayAmount).toBe(10_124_196n);
   });
 });

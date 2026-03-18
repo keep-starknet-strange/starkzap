@@ -50,6 +50,7 @@ import {
   getAvailableVesuDebtAssets,
   getDefaultVesuDebtAsset,
   getVesuBorrowCapacityForDeposit,
+  getVesuCloseRepayAmount,
   getVesuHealthStatus,
   getVesuMinimumDepositForBorrow,
   getVesuPoolLabel,
@@ -865,6 +866,48 @@ export default function VesuScreen() {
     position?.debtAmount,
     selectedDebtAsset?.token ?? null
   );
+  const exactDebtAmountLabel =
+    position?.debtAmount != null && selectedDebtAsset
+      ? Amount.fromRaw(
+          position.debtAmount,
+          selectedDebtAsset.token
+        ).toFormatted()
+      : null;
+  const closeRepayAmount = useMemo(() => {
+    if (!selectedDebtAsset) {
+      return null;
+    }
+
+    return getVesuCloseRepayAmount({
+      debtAmount: position?.debtAmount,
+      debtToken: selectedDebtAsset.token,
+    });
+  }, [position?.debtAmount, selectedDebtAsset]);
+  const repayMaxInputValue = useMemo(() => {
+    if (positionAction !== "repay" || !selectedDebtAsset) {
+      return undefined;
+    }
+
+    const walletBalanceBase = debtWalletBalance?.toBase();
+    const targetRepayBase = closeRepayAmount ?? position?.debtAmount ?? null;
+    if (targetRepayBase == null) {
+      return debtWalletBalance ? debtWalletBalance.toUnit() : undefined;
+    }
+
+    const maxRepayBase =
+      walletBalanceBase == null || walletBalanceBase > targetRepayBase
+        ? targetRepayBase
+        : walletBalanceBase;
+    return maxRepayBase > 0n
+      ? Amount.fromRaw(maxRepayBase, selectedDebtAsset.token).toUnit()
+      : undefined;
+  }, [
+    closeRepayAmount,
+    debtWalletBalance,
+    position?.debtAmount,
+    positionAction,
+    selectedDebtAsset,
+  ]);
 
   const debtDropdownOptions = useMemo<DropdownOption[]>(
     () =>
@@ -1352,12 +1395,19 @@ export default function VesuScreen() {
     setIsSubmitting(true);
     try {
       const options = getExecuteOptions(useSponsored, canUseSponsored);
+      const effectiveDebtAmount =
+        positionAction === "repay" &&
+        closeRepayAmount != null &&
+        parsedDebt.toBase() >= (position?.debtAmount ?? 0n) &&
+        (debtWalletBalance?.toBase() ?? 0n) >= closeRepayAmount
+          ? Amount.fromRaw(closeRepayAmount, selectedDebtAsset.token)
+          : parsedDebt;
       const tx =
         positionAction === "borrow"
           ? await wallet.lending().borrow(
               {
                 ...commonRequest,
-                amount: parsedDebt,
+                amount: effectiveDebtAmount,
                 ...(parsedCollateral
                   ? { collateralAmount: parsedCollateral }
                   : {}),
@@ -1368,7 +1418,7 @@ export default function VesuScreen() {
           : await wallet.lending().repay(
               {
                 ...commonRequest,
-                amount: parsedDebt,
+                amount: effectiveDebtAmount,
                 ...(parsedCollateral
                   ? {
                       collateralAmount: parsedCollateral,
@@ -1388,16 +1438,16 @@ export default function VesuScreen() {
             : "Repaying Vesu Debt",
         pendingSubtitle:
           positionAction === "borrow"
-            ? `Borrowing ${parsedDebt.toUnit()} ${selectedDebtAsset.token.symbol}`
-            : `Repaying ${parsedDebt.toUnit()} ${selectedDebtAsset.token.symbol}`,
+            ? `Borrowing ${effectiveDebtAmount.toUnit()} ${selectedDebtAsset.token.symbol}`
+            : `Repaying ${effectiveDebtAmount.toUnit()} ${selectedDebtAsset.token.symbol}`,
         successTitle:
           positionAction === "borrow"
             ? "Vesu Borrow Complete"
             : "Vesu Repay Complete",
         successSubtitle:
           positionAction === "borrow"
-            ? `Borrowed ${parsedDebt.toUnit()} ${selectedDebtAsset.token.symbol}`
-            : `Repaid ${parsedDebt.toUnit()} ${selectedDebtAsset.token.symbol}`,
+            ? `Borrowed ${effectiveDebtAmount.toUnit()} ${selectedDebtAsset.token.symbol}`
+            : `Repaid ${effectiveDebtAmount.toUnit()} ${selectedDebtAsset.token.symbol}`,
       });
       setDebtAmount("");
       setCollateralAmount("");
@@ -1420,11 +1470,14 @@ export default function VesuScreen() {
     addLog,
     canUseSponsored,
     chainId,
+    closeRepayAmount,
     collateralAmount,
     debtAmount,
+    debtWalletBalance,
     fetchBalances,
     isVesuSupported,
     loadMarkets,
+    position?.debtAmount,
     positionAction,
     refreshPosition,
     selectedCollateralToken,
@@ -2086,14 +2139,14 @@ export default function VesuScreen() {
                         hint={
                           positionAction === "borrow"
                             ? `Wallet ${debtWalletBalance?.toFormatted(true) ?? EMPTY_STATE_LABEL}${draftMaxBorrowLabel ? ` · Max ${draftMaxBorrowLabel}` : ""}`
-                            : `Wallet ${debtWalletBalance?.toFormatted(true) ?? EMPTY_STATE_LABEL}`
+                            : `Debt ${exactDebtAmountLabel ?? EMPTY_STATE_LABEL} · Wallet ${debtWalletBalance?.toFormatted(true) ?? EMPTY_STATE_LABEL}`
                         }
                         value={debtAmount}
                         error={debtAmountError}
                         onChangeText={handleDebtAmountChange}
                         maxValue={
                           positionAction === "repay"
-                            ? debtWalletBalance?.toUnit()
+                            ? repayMaxInputValue
                             : draftMaxBorrowAmount != null &&
                                 draftMaxBorrowAmount > 0n &&
                                 selectedDebtAsset
@@ -2104,6 +2157,17 @@ export default function VesuScreen() {
                               : undefined
                         }
                       />
+
+                      {positionAction === "repay" &&
+                        closeRepayAmount != null &&
+                        (debtWalletBalance?.toBase() ?? 0n) >=
+                          closeRepayAmount && (
+                          <ThemedText
+                            style={[styles.smallText, { color: textSecondary }]}
+                          >
+                            MAX includes a small buffer to clear residual debt.
+                          </ThemedText>
+                        )}
 
                       {positionAction === "borrow" &&
                         showBorrowPercentField && (
