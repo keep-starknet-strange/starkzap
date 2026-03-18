@@ -36,6 +36,11 @@ import {
   getEkuboErrorMessageFromPayload,
   supportsEkuboChain,
 } from "@/utils/ekubo";
+import {
+  DEFAULT_EKUBO_API_BASE,
+  getEkuboQuoterChainId,
+  parseEkuboQuoteResponse,
+} from "@/swap/ekubo.helpers";
 
 const MAX_U32 = 2n ** 32n - 1n;
 const DEFAULT_EKUBO_REQUEST_TIMEOUT_MS = 10_000;
@@ -44,6 +49,7 @@ interface EkuboDcaConfig {
   positions: Address;
   positionsNft: Address;
   twammExtension: Address;
+  fallbackTwammPoolFee?: bigint;
 }
 
 export const ekuboDcaPresets = {
@@ -74,6 +80,8 @@ export const ekuboDcaPresets = {
 export interface EkuboDcaProviderOptions {
   /** Optional Ekubo API base URL override. */
   apiBase?: string;
+  /** Optional Ekubo swap quote API base URL override. */
+  quoteApiBase?: string;
   /** Optional fetch implementation override for custom runtimes/tests. */
   fetcher?: typeof fetch;
   /** Optional minimum TVL filter passed to Ekubo pair-pools discovery. */
@@ -99,12 +107,14 @@ export class EkuboDcaProvider implements DcaProvider {
   readonly id = "ekubo";
 
   private readonly apiBase: string;
+  private readonly quoteApiBase: string;
   private readonly fetcher: typeof fetch;
   private readonly minTvlUsd: number;
   private readonly presets: Record<"SN_MAIN" | "SN_SEPOLIA", EkuboDcaConfig>;
 
   constructor(options: EkuboDcaProviderOptions = {}) {
     this.apiBase = options.apiBase ?? DEFAULT_EKUBO_DCA_API_BASE;
+    this.quoteApiBase = options.quoteApiBase ?? DEFAULT_EKUBO_API_BASE;
     this.fetcher = options.fetcher ?? fetch;
     this.minTvlUsd = options.minTvlUsd ?? 0;
     this.presets = {
@@ -277,14 +287,62 @@ export class EkuboDcaProvider implements DcaProvider {
   ): Promise<bigint> {
     const minTvlUsdParam =
       this.minTvlUsd > 0 ? `?minTvlUsd=${this.minTvlUsd}` : "";
-    return pickTwammPoolFee(
-      parseEkuboPoolsResponse(
-        await this.fetchJson(
-          `/pair/${toEkuboApiChainId(chainId)}/${request.sellToken.address}/${request.buyToken.address}/pools${minTvlUsdParam}`,
-          "pair pools"
-        )
-      ),
-      preset.twammExtension
+    const poolsPath = `/pair/${toEkuboApiChainId(chainId)}/${request.sellToken.address}/${request.buyToken.address}/pools${minTvlUsdParam}`;
+
+    try {
+      return pickTwammPoolFee(
+        parseEkuboPoolsResponse(await this.fetchJson(poolsPath, "pair pools")),
+        preset.twammExtension
+      );
+    } catch (error) {
+      try {
+        return await this.resolvePoolFeeFromQuote(chainId, request, preset);
+      } catch (quoteError) {
+        if (preset.fallbackTwammPoolFee != null) {
+          return preset.fallbackTwammPoolFee;
+        }
+
+        const baseMessage =
+          error instanceof Error ? error.message : String(error);
+        const quoteMessage =
+          quoteError instanceof Error ? quoteError.message : String(quoteError);
+        throw new Error(
+          `${baseMessage}; quote fallback also failed: ${quoteMessage}`
+        );
+      }
+    }
+  }
+
+  private async resolvePoolFeeFromQuote(
+    chainId: ChainId,
+    request: DcaCreateRequest,
+    preset: EkuboDcaConfig
+  ): Promise<bigint> {
+    const amountInBase = request.sellAmountPerCycle.toBase();
+    const quotePath = `/${getEkuboQuoterChainId(chainId)}/${amountInBase.toString()}/${request.sellToken.address}/${request.buyToken.address}`;
+    const quote = parseEkuboQuoteResponse(
+      await this.fetchJson(quotePath, "quote fallback", this.quoteApiBase)
+    );
+
+    for (const split of quote.splits) {
+      for (const step of split.route) {
+        const extension = fromAddress(step.pool_key.extension);
+        const token0 = fromAddress(step.pool_key.token0);
+        const token1 = fromAddress(step.pool_key.token1);
+        const isExactPair =
+          (token0 === request.sellToken.address &&
+            token1 === request.buyToken.address) ||
+          (token0 === request.buyToken.address &&
+            token1 === request.sellToken.address);
+
+        if (extension === preset.twammExtension && isExactPair) {
+          return BigInt(step.pool_key.fee);
+        }
+      }
+    }
+
+    throw new Error(
+      "Ekubo quote fallback did not include an exact TWAMM-enabled pool for this pair"
     );
   }
 
@@ -363,7 +421,8 @@ export class EkuboDcaProvider implements DcaProvider {
 
   private async fetchJson(
     path: string,
-    requestLabel: string
+    requestLabel: string,
+    apiBase = this.apiBase
   ): Promise<unknown> {
     const controller =
       typeof AbortController !== "undefined" ? new AbortController() : null;
@@ -373,7 +432,7 @@ export class EkuboDcaProvider implements DcaProvider {
 
     try {
       const response = await this.fetcher(
-        `${this.apiBase}${path}`,
+        `${apiBase}${path}`,
         controller ? { signal: controller.signal } : undefined
       );
       const payload = await response.json().catch(() => null);

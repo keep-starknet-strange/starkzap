@@ -236,10 +236,11 @@ The connected wallet card also includes a **DCA** panel with:
 
 Important boundary in this demo:
 
-- `wallet.dca().create()`, `getOrders()`, and `cancel()` go through the selected native backend (`avnu` or `ekubo`).
+- `wallet.dca().create()`, `getOrders()`, and `cancel()` go through the selected native backend.
+- On Sepolia, the clearest Ekubo DCA demo pairs I could confirm from public quote routes are `ETH -> USDC.e` and `WBTC -> ETH`.
 - The preview selector only estimates a single recurring leg through the wallet's registered swap providers. It does not change the recurring order backend.
 - `AVNU` supports optional min/max buy-per-cycle guards in this demo.
-- `Ekubo` creates a native continuous TWAMM order, so the orders list will show `Continuous` instead of a discrete cadence.
+- `Ekubo` creates a native continuous TWAMM order on supported chains, so the orders list will show `Continuous` instead of a discrete cadence.
 
 Example usage:
 

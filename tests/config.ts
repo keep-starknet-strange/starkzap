@@ -1,6 +1,9 @@
 import { ChainId, fromAddress, type SDKConfig } from "@/types";
 import "dotenv/config";
 
+const DEFAULT_TESTNET_RPC_URL =
+  "https://api.cartridge.gg/x/starknet/sepolia/rpc/v0_9";
+
 const TESTNET_RPC_URL =
   process.env.STARKZAP_TESTNET_RPC_URL ??
   process.env.SEPOLIA_RPC_URL ??
@@ -32,7 +35,7 @@ function parseOptionalAddress(value: string | undefined) {
  * Test configuration for Starknet Sepolia testnet.
  */
 export const testnetConfig: SDKConfig = {
-  rpcUrl: TESTNET_RPC_URL ?? "https://starknet-sepolia.public.blastapi.io",
+  rpcUrl: TESTNET_RPC_URL ?? DEFAULT_TESTNET_RPC_URL,
   chainId: ChainId.SEPOLIA,
 };
 

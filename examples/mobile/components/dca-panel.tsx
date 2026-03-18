@@ -10,6 +10,7 @@ import {
 import Ionicons from "@expo/vector-icons/Ionicons";
 import {
   Amount,
+  type ChainId,
   type DcaProvider,
   type SwapProvider,
   type Token,
@@ -80,6 +81,7 @@ export interface DcaPanelProps {
   addLog: (message: string) => void;
   availableIntegrations: readonly SwapProvider[];
   availableDcaProviders: readonly DcaProvider[];
+  chainId: ChainId;
   useSponsored: boolean;
   setUseSponsored: (value: boolean) => void;
   canUseSponsored: boolean;
@@ -93,6 +95,7 @@ export function DcaPanel({
   addLog,
   availableIntegrations,
   availableDcaProviders,
+  chainId,
   useSponsored,
   setUseSponsored,
   canUseSponsored,
@@ -185,6 +188,11 @@ export function DcaPanel({
               ? "Ekubo creates a native continuous TWAMM order."
               : "Avnu creates a discrete recurring order with optional min/max guards."}
           </ThemedText>
+          {selectedDcaProvider?.id === "ekubo" && chainId.isSepolia() && (
+            <ThemedText style={[styles.callsHint, { color: textSecondary }]}>
+              On Sepolia, try ETH -&gt; USDC.e or WBTC -&gt; ETH for Ekubo DCA.
+            </ThemedText>
+          )}
         </View>
 
         <View style={styles.fieldSection}>

@@ -6,6 +6,7 @@ import { EkuboDcaProvider, getEkuboDcaPreset } from "@/dca/ekubo";
 import {
   assertNonNegativeInteger,
   parseEkuboOrdersResponse,
+  parseIsoDurationSeconds,
   parseOrderInfoResult,
   parseEkuboPoolsResponse,
   parsePositiveBigInt,
@@ -47,6 +48,10 @@ describe("EkuboDcaProvider", () => {
 
     expect(provider.supportsChain(ChainId.MAINNET)).toBe(true);
     expect(provider.supportsChain(ChainId.SEPOLIA)).toBe(true);
+  });
+
+  it("accepts hour-based ISO frequencies", () => {
+    expect(parseIsoDurationSeconds("PT1H")).toBe(3600);
   });
 
   it("returns empty indexing pages without querying Ekubo", async () => {
@@ -149,6 +154,146 @@ describe("EkuboDcaProvider", () => {
       entrypoint: "clear",
       calldata: [sellToken.address],
     });
+  });
+
+  it("falls back to an exact TWAMM route fee from swap quotes when pair discovery fails", async () => {
+    const preset = getEkuboDcaPreset(ChainId.SEPOLIA);
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        jsonResponse({ error: "Internal server error" }, 500)
+      )
+      .mockResolvedValueOnce(
+        jsonResponse({
+          total_calculated: "123",
+          price_impact: 0.5,
+          splits: [
+            {
+              amount_specified: "1000000",
+              amount_calculated: "123",
+              route: [
+                {
+                  pool_key: {
+                    token0: sellToken.address,
+                    token1: buyToken.address,
+                    fee: "17014118346046923173168730371588410572",
+                    tick_spacing: "1",
+                    extension: preset.twammExtension,
+                  },
+                  sqrt_ratio_limit: "0",
+                  skip_ahead: "0",
+                },
+              ],
+            },
+          ],
+        })
+      );
+    const provider = new EkuboDcaProvider({
+      apiBase: "https://mock-ekubo",
+      quoteApiBase: "https://mock-quoter",
+      fetcher: fetchMock as unknown as typeof fetch,
+    });
+    const context = {
+      chainId: ChainId.SEPOLIA,
+      rpcProvider: {
+        getBlock: vi.fn().mockResolvedValue({
+          timestamp: 1_000,
+        }),
+      } as unknown as RpcProvider,
+      walletAddress: fromAddress("0xabc"),
+    };
+
+    const prepared = await provider.prepareCreate(context, {
+      sellToken,
+      buyToken,
+      sellAmount: Amount.parse("5", sellToken),
+      sellAmountPerCycle: Amount.parse("1", sellToken),
+      frequency: "P1D",
+      traderAddress: context.walletAddress,
+    });
+
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      1,
+      `https://mock-ekubo/pair/${BigInt(ChainId.SEPOLIA.toFelt252()).toString()}/${sellToken.address}/${buyToken.address}/pools`,
+      expect.objectContaining({
+        signal: expect.any(AbortSignal),
+      })
+    );
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      2,
+      `https://mock-quoter/393402133025997798000961/1000000/${sellToken.address}/${buyToken.address}`,
+      expect.objectContaining({
+        signal: expect.any(AbortSignal),
+      })
+    );
+    expect(prepared.calls[1]).toMatchObject({
+      entrypoint: "mint_and_increase_sell_amount",
+      calldata: expect.arrayContaining([
+        sellToken.address,
+        buyToken.address,
+        "17014118346046923173168730371588410572",
+      ]),
+    });
+  });
+
+  it("rejects quote fallback routes that only touch indirect TWAMM pools", async () => {
+    const preset = getEkuboDcaPreset(ChainId.SEPOLIA);
+    const provider = new EkuboDcaProvider({
+      apiBase: "https://mock-ekubo",
+      quoteApiBase: "https://mock-quoter",
+      fetcher: vi
+        .fn()
+        .mockResolvedValueOnce(
+          jsonResponse({ error: "Internal server error" }, 500)
+        )
+        .mockResolvedValueOnce(
+          jsonResponse({
+            total_calculated: "123",
+            price_impact: 0.5,
+            splits: [
+              {
+                amount_specified: "1000000",
+                amount_calculated: "123",
+                route: [
+                  {
+                    pool_key: {
+                      token0: buyToken.address,
+                      token1: fromAddress("0x333"),
+                      fee: "777",
+                      tick_spacing: "1",
+                      extension: preset.twammExtension,
+                    },
+                    sqrt_ratio_limit: "0",
+                    skip_ahead: "0",
+                  },
+                ],
+              },
+            ],
+          })
+        ) as unknown as typeof fetch,
+    });
+    const context = {
+      chainId: ChainId.SEPOLIA,
+      rpcProvider: {
+        getBlock: vi.fn().mockResolvedValue({
+          timestamp: 1_000,
+        }),
+      } as unknown as RpcProvider,
+      walletAddress: fromAddress("0xabc"),
+    };
+
+    await expect(
+      provider.prepareCreate(context, {
+        sellToken,
+        buyToken,
+        sellAmount: Amount.parse("5", sellToken),
+        sellAmountPerCycle: Amount.parse("1", sellToken),
+        frequency: "P1D",
+        traderAddress: context.walletAddress,
+      })
+    ).rejects.toThrow(
+      "Ekubo pair pools request failed (500): Internal server error; quote fallback also failed: Ekubo quote fallback did not include an exact TWAMM-enabled pool for this pair"
+    );
   });
 
   it("validates amount relationships before querying Ekubo", async () => {
@@ -488,7 +633,13 @@ describe("EkuboDcaProvider", () => {
     );
     const provider = new EkuboDcaProvider({
       apiBase: "https://mock-ekubo",
+      quoteApiBase: "https://mock-quoter",
       fetcher: fetchMock as unknown as typeof fetch,
+      presets: {
+        SN_SEPOLIA: {
+          fallbackTwammPoolFee: undefined,
+        },
+      },
     });
     const context = {
       chainId: ChainId.SEPOLIA,
@@ -509,9 +660,11 @@ describe("EkuboDcaProvider", () => {
         frequency: "P1D",
         traderAddress: context.walletAddress,
       })
-    ).rejects.toThrow("Ekubo pair pools request timed out after 10000ms");
+    ).rejects.toThrow(
+      "Ekubo pair pools request timed out after 10000ms; quote fallback also failed: Ekubo quote fallback request timed out after 10000ms"
+    );
 
-    await vi.advanceTimersByTimeAsync(10_000);
+    await vi.advanceTimersByTimeAsync(20_000);
     await promise;
   });
 });

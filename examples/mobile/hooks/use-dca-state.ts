@@ -4,9 +4,11 @@ import {
   DCA_CONTINUOUS_FREQUENCY,
   type ChainId,
   type DcaOrder,
+  type PreparedDcaAction,
   type DcaProvider,
   type SwapProvider,
   type Token,
+  type Tx,
   type WalletInterface,
 } from "starkzap";
 import {
@@ -18,6 +20,7 @@ import { getSwapProviderLabel } from "@/swaps";
 const DCA_ORDER_PAGE_SIZE = 6;
 
 export const DCA_FREQUENCY_OPTIONS = [
+  { value: "PT1H", label: "1h" },
   { value: "PT12H", label: "12h" },
   { value: "P1D", label: "Daily" },
   { value: "P3D", label: "3d" },
@@ -31,6 +34,48 @@ export interface DcaPreviewState {
   priceImpactBps?: bigint | null;
   providerId: string;
   routeCallCount?: number;
+}
+
+function describeDcaError(error: unknown): string {
+  if (!(error instanceof Error)) {
+    return String(error);
+  }
+
+  const parts = [error.message];
+  if ("cause" in error && error.cause != null) {
+    parts.push(`cause=${String(error.cause)}`);
+  }
+
+  return parts.join(" | ");
+}
+
+function summarizeDcaStatuses(orders: readonly DcaOrder[]): string {
+  const counts = new Map<string, number>();
+
+  for (const order of orders) {
+    counts.set(order.status, (counts.get(order.status) ?? 0) + 1);
+  }
+
+  return [...counts.entries()]
+    .map(([status, count]) => `${status}:${count}`)
+    .join(", ");
+}
+
+function describeLatestDcaOrder(order: DcaOrder): string {
+  const nextPendingTrade = order.trades.find(
+    (trade) => trade.status === "PENDING"
+  );
+  const nextTrade = nextPendingTrade?.expectedTradeDate.toISOString();
+
+  return [
+    `${order.status} ${cropAddress(order.orderAddress)}`,
+    `start=${order.startDate.toISOString()}`,
+    `executed=${order.executedTradesCount}`,
+    `pending=${order.pendingTradesCount}`,
+    nextTrade ? `next=${nextTrade}` : null,
+  ]
+    .filter((part): part is string => part != null)
+    .join(" | ");
 }
 
 function getPreferredDcaPreviewProviderId(
@@ -521,24 +566,34 @@ export function useDcaState(deps: UseDcaStateDeps): UseDcaStateReturn {
         setDcaOrders(page.content);
         setDcaOrdersError(null);
         if (!silent) {
+          const statusSummary = summarizeDcaStatuses(page.content);
           addLog(
-            `Loaded ${page.content.length} ${selectedDcaProviderId.toUpperCase()} DCA orders`
+            `Loaded ${page.content.length} ${selectedDcaProviderId.toUpperCase()} DCA orders${statusSummary ? ` (${statusSummary})` : ""}`
           );
+
+          const latestOrder = page.content[0];
+          if (latestOrder) {
+            addLog(
+              `Latest ${selectedDcaProviderId.toUpperCase()} order: ${describeLatestDcaOrder(latestOrder)}`
+            );
+          }
         }
       } catch (error) {
         if (!isCurrentRequest()) {
           return;
         }
-        const message = error instanceof Error ? error.message : String(error);
+        const message = describeDcaError(error);
         setDcaOrdersError(message);
-        addLog(`DCA orders refresh failed: ${message}`);
+        addLog(
+          `DCA orders refresh failed for ${selectedDcaProviderId?.toUpperCase() ?? "unknown"} on ${chainId.toLiteral()}: ${message}`
+        );
       } finally {
         if (isCurrentRequest()) {
           setIsRefreshingDcaOrders(false);
         }
       }
     },
-    [addLog, selectedDcaProviderId, wallet]
+    [addLog, chainId, selectedDcaProviderId, wallet]
   );
 
   // Auto-refresh orders when on DCA tab
@@ -665,7 +720,7 @@ export function useDcaState(deps: UseDcaStateDeps): UseDcaStateReturn {
         ).toFormatted(true)}`
       );
     } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
+      const message = describeDcaError(error);
       setDcaError(message);
       addLog(`DCA preview failed: ${message}`);
     } finally {
@@ -696,21 +751,53 @@ export function useDcaState(deps: UseDcaStateDeps): UseDcaStateReturn {
 
     try {
       const wantsSponsored = useSponsored && canUseSponsored;
+      const createRequest = {
+        provider: selectedDcaProviderId,
+        buyToken: dcaBuyToken,
+        frequency: dcaFrequency,
+        sellAmount: parsedDcaTotalAmount,
+        sellAmountPerCycle: parsedDcaCycleAmount,
+        sellToken: dcaSellToken,
+      };
+
       addLog(
         `Creating ${selectedDcaProviderId.toUpperCase()} DCA order ${dcaTotalAmount} ${dcaSellToken.symbol} total / ${dcaCycleAmount} per cycle into ${dcaBuyToken.symbol} (${dcaFrequency})`
       );
 
-      const tx = await wallet.dca().create(
-        {
-          provider: selectedDcaProviderId,
-          buyToken: dcaBuyToken,
-          frequency: dcaFrequency,
-          sellAmount: parsedDcaTotalAmount,
-          sellAmountPerCycle: parsedDcaCycleAmount,
-          sellToken: dcaSellToken,
-        },
-        wantsSponsored ? { feeMode: "sponsored" } : undefined
+      addLog(
+        `Preparing ${selectedDcaProviderId.toUpperCase()} DCA calls on ${chainId.toLiteral()}...`
       );
+
+      let prepared: PreparedDcaAction;
+      try {
+        prepared = await wallet.dca().prepareCreate(createRequest);
+      } catch (error) {
+        const message = describeDcaError(error);
+        setDcaError(message);
+        addLog(
+          `DCA create preparation failed for ${selectedDcaProviderId.toUpperCase()} on ${chainId.toLiteral()}: ${message}`
+        );
+        return;
+      }
+
+      addLog(
+        `Prepared ${prepared.providerId.toUpperCase()} DCA create: ${prepared.calls.length} call${prepared.calls.length === 1 ? "" : "s"}${prepared.orderAddress ? `, order ${cropAddress(prepared.orderAddress)}` : ""}`
+      );
+
+      let tx: Tx;
+      try {
+        tx = await wallet.execute(
+          prepared.calls,
+          wantsSponsored ? { feeMode: "sponsored" } : undefined
+        );
+      } catch (error) {
+        const message = describeDcaError(error);
+        setDcaError(message);
+        addLog(
+          `DCA transaction submission failed for ${prepared.providerId.toUpperCase()} on ${chainId.toLiteral()} (${wantsSponsored ? "sponsored" : "user_pays"}): ${message}`
+        );
+        return;
+      }
 
       addLog(`DCA create tx submitted: ${tx.hash.slice(0, 10)}...`);
       addLog(
@@ -730,7 +817,16 @@ export function useDcaState(deps: UseDcaStateDeps): UseDcaStateReturn {
       );
 
       addLog("Waiting for DCA confirmation...");
-      await tx.wait();
+      try {
+        await tx.wait();
+      } catch (error) {
+        const message = describeDcaError(error);
+        setDcaError(message);
+        addLog(
+          `DCA confirmation failed for ${prepared.providerId.toUpperCase()} on ${chainId.toLiteral()}: ${message}`
+        );
+        return;
+      }
 
       updateTransactionToast({
         txHash: tx.hash,
@@ -741,9 +837,9 @@ export function useDcaState(deps: UseDcaStateDeps): UseDcaStateReturn {
 
       addLog("DCA order created");
       await fetchBalances(wallet, chainId);
-      await refreshDcaOrders(true);
+      await refreshDcaOrders();
     } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
+      const message = describeDcaError(error);
       setDcaError(message);
       addLog(`DCA creation failed: ${message}`);
     } finally {
@@ -811,9 +907,9 @@ export function useDcaState(deps: UseDcaStateDeps): UseDcaStateReturn {
 
         addLog(`DCA order cancelled: ${cropAddress(order.orderAddress)}`);
         await fetchBalances(wallet, chainId);
-        await refreshDcaOrders(true);
+        await refreshDcaOrders();
       } catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
+        const message = describeDcaError(error);
         setDcaError(message);
         addLog(`DCA cancel failed: ${message}`);
       } finally {

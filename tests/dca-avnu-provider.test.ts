@@ -237,6 +237,38 @@ describe("AvnuDcaProvider", () => {
     });
   });
 
+  it("passes hour-based frequencies through to AVNU create requests", async () => {
+    avnuMocks.createDcaToCalls.mockResolvedValue({
+      chainId: "SN_SEPOLIA",
+      calls: [
+        {
+          contractAddress: "0x555",
+          entrypoint: "open_dca",
+          calldata: [1, 2n, "0x3"],
+        },
+      ],
+    });
+
+    const provider = new AvnuDcaProvider({
+      apiBases: {
+        SN_SEPOLIA: ["https://mock-sepolia.avnu.fi"],
+      },
+    });
+
+    await provider.prepareCreate(context, {
+      sellToken,
+      buyToken,
+      sellAmount: Amount.parse("5", sellToken),
+      sellAmountPerCycle: Amount.parse("1", sellToken),
+      frequency: "PT1H",
+      traderAddress,
+    });
+
+    const request = avnuMocks.createDcaToCalls.mock.calls[0]?.[0];
+    expect(request?.frequency.toJSON()).toBe("PT1H");
+    expect(request?.frequency.toISOString()).toBe("PT1H");
+  });
+
   it("falls back to the second sepolia endpoint when the first create attempt fails", async () => {
     avnuMocks.createDcaToCalls
       .mockRejectedValueOnce(new Error("temporary failure"))

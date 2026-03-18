@@ -26,6 +26,7 @@ import {
 import { useThemeColor } from "@/hooks/use-theme-color";
 import {
   useDcaState,
+  formatTokenAmount,
   getCuratedDcaTokens,
   getDefaultDcaPair,
   getExplorerUrl,
@@ -46,7 +47,12 @@ import {
 } from "@/swaps";
 import { getDcaProviders } from "@/dca";
 import { DcaPanel } from "@/components/dca-panel";
-import { Amount, type SwapProvider, type Token } from "@starkzap/native";
+import {
+  Amount,
+  type SwapProvider,
+  type SwapQuote,
+  type Token,
+} from "@starkzap/native";
 
 const WBTC_LOGO_FALLBACK =
   "https://altcoinsbox.com/wp-content/uploads/2023/01/wbtc-wrapped-bitcoin-logo.png";
@@ -214,7 +220,9 @@ export default function SwapScreen() {
       strkToken
   );
   const [amount, setAmount] = useState("");
+  const [swapQuote, setSwapQuote] = useState<SwapQuote | null>(null);
   const [quoteError, setQuoteError] = useState<string | null>(null);
+  const [isQuoteLoading, setIsQuoteLoading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [useSponsored, setUseSponsored] = useState(
     preferSponsored && Boolean(paymasterNodeUrl)
@@ -332,6 +340,99 @@ export default function SwapScreen() {
       return null;
     }
   }, [amount, amountParseError, fromToken]);
+
+  useEffect(() => {
+    if (
+      screenMode !== "swap" ||
+      !wallet ||
+      !selectedIntegration ||
+      !amountIn ||
+      sameToken ||
+      exceedsBalance ||
+      amountParseError
+    ) {
+      setSwapQuote(null);
+      setIsQuoteLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+    const timeoutId = setTimeout(() => {
+      setIsQuoteLoading(true);
+      setSwapQuote(null);
+      setQuoteError(null);
+
+      wallet
+        .getQuote({
+          provider: selectedIntegration,
+          tokenIn: fromToken,
+          tokenOut: toToken,
+          amountIn,
+        })
+        .then((quote) => {
+          if (cancelled) {
+            return;
+          }
+          setSwapQuote(quote);
+        })
+        .catch((error) => {
+          if (cancelled) {
+            return;
+          }
+          const message =
+            error instanceof Error ? error.message : String(error);
+          setQuoteError(message);
+        })
+        .finally(() => {
+          if (!cancelled) {
+            setIsQuoteLoading(false);
+          }
+        });
+    }, 250);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timeoutId);
+    };
+  }, [
+    amountIn,
+    amountParseError,
+    exceedsBalance,
+    fromToken,
+    sameToken,
+    screenMode,
+    selectedIntegration,
+    toToken,
+    wallet,
+  ]);
+
+  const swapQuoteAmount = useMemo(() => {
+    if (!swapQuote) {
+      return null;
+    }
+    return formatTokenAmount(swapQuote.amountOutBase, toToken);
+  }, [swapQuote, toToken]);
+
+  const swapQuoteMeta = useMemo(() => {
+    if (!selectedIntegration) {
+      return null;
+    }
+
+    const sourceLabel = getSwapProviderLabel(selectedIntegration);
+    if (isQuoteLoading) {
+      return `Fetching ${sourceLabel} quote...`;
+    }
+    if (!swapQuote) {
+      return null;
+    }
+    if (swapQuote.priceImpactBps == null) {
+      return `Source: ${sourceLabel}`;
+    }
+
+    return `Source: ${sourceLabel} • Price impact: ${(
+      Number(swapQuote.priceImpactBps) / 100
+    ).toFixed(2)}%`;
+  }, [isQuoteLoading, selectedIntegration, swapQuote]);
 
   const canSubmit =
     !!wallet &&
@@ -791,12 +892,49 @@ export default function SwapScreen() {
               </View>
 
               <ThemedText style={[styles.callsHint, { color: textSecondary }]}>
-                Quotes and route calls are fetched from{" "}
+                Estimated receive updates automatically from{" "}
                 {selectedIntegration
                   ? getSwapProviderLabel(selectedIntegration)
                   : "the selected integration"}{" "}
-                automatically.
+                for the current amount.
               </ThemedText>
+
+              {(isQuoteLoading || swapQuote) && selectedIntegration && (
+                <View
+                  style={[
+                    styles.quotePreviewCard,
+                    { backgroundColor: borderColor },
+                  ]}
+                >
+                  <View style={styles.quotePreviewRow}>
+                    <ThemedText
+                      style={[
+                        styles.quotePreviewLabel,
+                        { color: textSecondary },
+                      ]}
+                    >
+                      Estimated Receive
+                    </ThemedText>
+                    {isQuoteLoading ? (
+                      <ActivityIndicator size="small" color={primaryColor} />
+                    ) : (
+                      <ThemedText style={styles.quotePreviewValue}>
+                        {swapQuoteAmount}
+                      </ThemedText>
+                    )}
+                  </View>
+                  {swapQuoteMeta && (
+                    <ThemedText
+                      style={[
+                        styles.quotePreviewMeta,
+                        { color: textSecondary },
+                      ]}
+                    >
+                      {swapQuoteMeta}
+                    </ThemedText>
+                  )}
+                </View>
+              )}
 
               <SponsoredToggle
                 useSponsored={useSponsored}
@@ -855,6 +993,7 @@ export default function SwapScreen() {
             addLog={addLog}
             availableIntegrations={availableIntegrations}
             availableDcaProviders={availableDcaProviders}
+            chainId={chainId}
             useSponsored={useSponsored}
             setUseSponsored={setUseSponsored}
             canUseSponsored={canUseSponsored}
@@ -1153,6 +1292,30 @@ const styles = StyleSheet.create({
   },
   networkPillText: {
     fontSize: 12,
+    fontWeight: "700",
+  },
+  quotePreviewCard: {
+    borderRadius: 12,
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  quotePreviewLabel: {
+    fontSize: 11,
+    fontWeight: "700",
+    letterSpacing: 0.3,
+    textTransform: "uppercase",
+  },
+  quotePreviewMeta: {
+    fontSize: 12,
+  },
+  quotePreviewRow: {
+    alignItems: "center",
+    flexDirection: "row",
+    justifyContent: "space-between",
+  },
+  quotePreviewValue: {
+    fontSize: 16,
     fontWeight: "700",
   },
   scrollView: { flex: 1 },

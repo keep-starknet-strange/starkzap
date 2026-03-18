@@ -210,6 +210,84 @@ describe("Wallet", () => {
       expect(wallet.dca().listProviders()).toContain("ekubo");
       expect(wallet.dca().getDefaultDcaProvider()).toBe(ekuboDcaProvider);
     });
+
+    it("should pass the connected wallet address into DCA create requests", async () => {
+      const signer = new StarkSigner(testPrivateKeys.key1);
+      const testDcaProvider: DcaProvider = {
+        id: "dca-probe",
+        supportsChain: () => true,
+        getOrders: vi.fn().mockResolvedValue({
+          content: [],
+          totalPages: 0,
+          totalElements: 0,
+          size: 10,
+          pageNumber: 0,
+        }),
+        prepareCreate: vi.fn().mockResolvedValue({
+          providerId: "dca-probe",
+          action: "create" as const,
+          calls: [
+            {
+              contractAddress: fromAddress("0x999"),
+              entrypoint: "open_dca",
+              calldata: [],
+            },
+          ],
+        }),
+        prepareCancel: vi.fn().mockResolvedValue({
+          providerId: "dca-probe",
+          action: "cancel" as const,
+          calls: [
+            {
+              contractAddress: fromAddress("0x999"),
+              entrypoint: "cancel_dca",
+              calldata: [],
+            },
+          ],
+        }),
+      };
+      const testBuyToken: Token = {
+        name: "Test STRK",
+        symbol: "STRK",
+        decimals: 18,
+        address: fromAddress("0x5678"),
+      };
+
+      const wallet = await sdk.connectWallet({
+        account: {
+          signer,
+          accountClass: OpenZeppelinPreset,
+        },
+        dcaProviders: [testDcaProvider],
+        defaultDcaProviderId: "dca-probe",
+      });
+
+      const walletAddress = wallet.address;
+      const prepared = await wallet.dca().prepareCreate({
+        provider: "dca-probe",
+        sellToken: testSwapToken,
+        buyToken: testBuyToken,
+        sellAmount: Amount.parse("10", testSwapToken),
+        sellAmountPerCycle: Amount.parse("5", testSwapToken),
+        frequency: "PT1H",
+      });
+
+      expect(testDcaProvider.prepareCreate).toHaveBeenCalledWith(
+        {
+          chainId: config.chainId!,
+          rpcProvider: wallet.getProvider(),
+          walletAddress,
+        },
+        expect.objectContaining({
+          traderAddress: walletAddress,
+          sellToken: testSwapToken,
+          buyToken: testBuyToken,
+          frequency: "PT1H",
+        })
+      );
+      expect(prepared.calls).toHaveLength(1);
+      expect(prepared.providerId).toBe("dca-probe");
+    });
   });
 
   describe("isDeployed", () => {

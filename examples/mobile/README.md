@@ -28,9 +28,8 @@ Set these values in `.env`:
 
 - `EXPO_PUBLIC_PRIVY_APP_ID`: Privy app id. If empty, Privy flow is disabled.
 - `EXPO_PUBLIC_PRIVY_SERVER_URL`: backend URL used by the app for Privy wallet/sign endpoints.
-- optional
-- `EXPO_PUBLIC_PRIVY_CLIENT_ID`: Privy client id for Expo provider.
-- `EXPO_PUBLIC_PAYMASTER_PROXY_URL`: paymaster proxy URL. If omitted, defaults to `${EXPO_PUBLIC_PRIVY_SERVER_URL}/api/paymaster`.
+- `EXPO_PUBLIC_PRIVY_CLIENT_ID`: optional Privy client id for the Expo provider.
+- `EXPO_PUBLIC_PAYMASTER_PROXY_URL`: optional paymaster proxy URL. If omitted, the example only auto-derives `${EXPO_PUBLIC_PRIVY_SERVER_URL}/api/paymaster` on Sepolia. Mainnet requires an explicit paymaster URL.
 
 ## Install and run
 
@@ -81,6 +80,7 @@ Notes:
 
 - AVNU source: uses `GET /swap/v3/quotes` + `POST /swap/v3/build` from `https://starknet.api.avnu.fi`, then executes via `wallet.swap(...)`.
 - Ekubo source: fetches quote from `https://prod-api-quoter.ekubo.org` and builds router calls (`transfer` + `swap/multihop` + `clear_minimum` + `clear`).
+- Typing a valid `Amount In` now auto-fetches an estimated receive preview for the selected swap source.
 - Swap backends are pluggable through a shared TypeScript contract (`SwapProvider`) from `starkzap`, with app-level extensions in `swaps/interface.ts`.
 - Active integrations are registered in `swaps/index.ts` and rendered through one common UI.
 - Token selection is sourced from preset token lists for the active network, with in-modal search.
@@ -101,8 +101,10 @@ Notes:
 
 - The mobile wallet session registers both swap providers and DCA providers during onboarding, so the backend selector and preview selector only show integrations the connected wallet can actually use.
 - The mobile example keeps DCA token choices curated and chain-specific instead of exposing the full swap token list.
+- The cadence picker includes a `1h` option for quicker demos, plus `12h`, `Daily`, `3d`, and `Weekly`.
 - `AVNU` creates discrete recurring orders.
-- `Ekubo` creates a native continuous TWAMM order, so listed orders show `Continuous` instead of a preset cadence.
+- `Ekubo` creates a native continuous TWAMM order on supported chains, so listed orders show `Continuous` instead of a preset cadence.
+- On Sepolia, the clearest Ekubo DCA demo pairs I could confirm from public quote routes are `ETH -> USDC.e` and `WBTC -> ETH`.
 - Pull-to-refresh updates balances, and in `DCA` mode it also refreshes the recent order list.
 
 ## Backend for Privy and paymaster (optional but recommended)
@@ -119,5 +121,5 @@ Run the backend separately in `examples/server` and point `EXPO_PUBLIC_PRIVY_SER
 
 - Privy button disabled: `EXPO_PUBLIC_PRIVY_APP_ID` is missing.
 - Privy login/signing errors: verify `EXPO_PUBLIC_PRIVY_SERVER_URL` and backend health.
-- Sponsored toggle disabled: `EXPO_PUBLIC_PAYMASTER_PROXY_URL` (or derived server URL) is not configured.
+- Sponsored toggle disabled: `EXPO_PUBLIC_PAYMASTER_PROXY_URL` is not configured, or you are on Mainnet without an explicit paymaster URL.
 - Metro module resolution issues after dependency changes: run `npm run start -- --clear` (or `npx expo start -c`).
