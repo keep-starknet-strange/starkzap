@@ -127,6 +127,31 @@ const isNonNull = <T>(value: T | null): value is T => value !== null;
 type NormalizeEthereumAddress = (value: string) => EthereumAddress;
 type NormalizeSolanaAddress = (value: string) => SolanaAddress;
 
+function getTokenChain(token: BridgeTokenApiRecord): ExternalChain | null {
+  if (typeof token.chain !== "string") {
+    return null;
+  }
+
+  switch (token.chain.trim().toLowerCase()) {
+    case ExternalChain.ETHEREUM:
+      return ExternalChain.ETHEREUM;
+    case ExternalChain.SOLANA:
+      return ExternalChain.SOLANA;
+    default:
+      return null;
+  }
+}
+
+function isOptionalPeerDependencyError(
+  error: unknown,
+  dependency: "ethers" | "@solana/web3.js"
+): error is Error {
+  return (
+    error instanceof Error &&
+    error.message.includes(`optional peer dependency "${dependency}"`)
+  );
+}
+
 function parseToken(
   token: BridgeTokenApiRecord,
   normalizeEthereumAddress?: NormalizeEthereumAddress,
@@ -289,6 +314,7 @@ export class BridgeTokenRepository {
     query: BridgeTokenQuery,
     key: string
   ): Promise<BridgeToken[]> {
+    const isExplicitChainRequest = query.chain !== undefined;
     const url = new URL(this.apiUrl);
     url.searchParams.set("env", query.env ?? DEFAULT_ENV);
     if (query.chain) {
@@ -307,24 +333,61 @@ export class BridgeTokenRepository {
     }
 
     const payload = assertArrayPayload(await response.json());
-    const hasEthereumRows = payload.some((token) => {
-      return (
-        typeof token.chain === "string" &&
-        token.chain.toLowerCase() === ExternalChain.ETHEREUM
-      );
+    const visiblePayload = payload.filter((token) => {
+      return !token.hidden && !token.deprecated;
     });
-    const hasSolanaRows = payload.some((token) => {
-      return (
-        typeof token.chain === "string" &&
-        token.chain.toLowerCase() === ExternalChain.SOLANA
-      );
+    const scopedPayload = query.chain
+      ? visiblePayload.filter((token) => getTokenChain(token) === query.chain)
+      : visiblePayload;
+
+    const hasEthereumRows = scopedPayload.some((token) => {
+      return getTokenChain(token) === ExternalChain.ETHEREUM;
     });
-    const ethers = hasEthereumRows
-      ? await loadEthers("Bridge token parsing")
-      : undefined;
-    const solanaWeb3 = hasSolanaRows
-      ? await loadSolanaWeb3("Bridge token parsing")
-      : undefined;
+    const hasSolanaRows = scopedPayload.some((token) => {
+      return getTokenChain(token) === ExternalChain.SOLANA;
+    });
+    const unavailableChains = new Set<ExternalChain>();
+    let ethers: Awaited<ReturnType<typeof loadEthers>> | undefined;
+    let solanaWeb3: Awaited<ReturnType<typeof loadSolanaWeb3>> | undefined;
+
+    if (hasEthereumRows) {
+      if (query.chain === ExternalChain.ETHEREUM) {
+        ethers = await loadEthers("Bridge token parsing");
+      } else {
+        try {
+          ethers = await loadEthers("Bridge token parsing");
+        } catch (error) {
+          if (!isOptionalPeerDependencyError(error, "ethers")) {
+            throw error;
+          }
+          unavailableChains.add(ExternalChain.ETHEREUM);
+          console.warn(
+            '[starkzap] Skipping ethereum bridge tokens because optional peer dependency "ethers" is not installed.',
+            error
+          );
+        }
+      }
+    }
+
+    if (hasSolanaRows) {
+      if (query.chain === ExternalChain.SOLANA) {
+        solanaWeb3 = await loadSolanaWeb3("Bridge token parsing");
+      } else {
+        try {
+          solanaWeb3 = await loadSolanaWeb3("Bridge token parsing");
+        } catch (error) {
+          if (!isOptionalPeerDependencyError(error, "@solana/web3.js")) {
+            throw error;
+          }
+          unavailableChains.add(ExternalChain.SOLANA);
+          console.warn(
+            '[starkzap] Skipping solana bridge tokens because optional peer dependency "@solana/web3.js" is not installed.',
+            error
+          );
+        }
+      }
+    }
+
     const normalizeEthereumAddress = ethers
       ? (value: string) => fromEthereumAddress(value, ethers)
       : undefined;
@@ -332,9 +395,14 @@ export class BridgeTokenRepository {
       ? (value: string) => fromSolanaAddress(value, solanaWeb3)
       : undefined;
 
-    const tokens = payload
+    const tokens = scopedPayload
       .filter((token) => {
-        return !token.hidden && !token.deprecated;
+        if (isExplicitChainRequest) {
+          return true;
+        }
+
+        const chain = getTokenChain(token);
+        return chain === null || !unavailableChains.has(chain);
       })
       .map((token) => {
         try {
@@ -344,6 +412,9 @@ export class BridgeTokenRepository {
             normalizeSolanaAddress
           );
         } catch (e) {
+          if (isExplicitChainRequest) {
+            throw e;
+          }
           console.warn(`Ignoring token ${token.symbol} due to`, e);
           return null;
         }
