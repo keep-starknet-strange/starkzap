@@ -3,6 +3,7 @@ import path from "path";
 
 const alias = {
   "@": path.resolve(__dirname, "./src"),
+  "@starkzap/native": path.resolve(__dirname, "./packages/native/src/index.ts"),
 };
 
 export default defineConfig({
