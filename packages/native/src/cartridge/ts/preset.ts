@@ -1,9 +1,14 @@
 import { shortString } from "starknet";
 import type { CartridgeSessionPolicies } from "@/cartridge/types";
 import { SessionProtocolError } from "@/cartridge/ts/errors";
-import { asRecord, type FetchLike } from "@/cartridge/ts/shared";
+import {
+  asRecord,
+  fetchWithTimeout,
+  type FetchLike,
+} from "@/cartridge/ts/shared";
 
 const DEFAULT_PRESET_BASE_URL = "https://static.cartridge.gg/presets";
+const DEFAULT_PRESET_REQUEST_TIMEOUT_MS = 15_000;
 
 type Validator<T> = (obj: unknown) => obj is T;
 
@@ -107,13 +112,43 @@ function describePayload(payload: unknown): string {
   return String(payload);
 }
 
+function describeTransportError(error: unknown): string {
+  if (error instanceof Error) {
+    const message = error.message.trim();
+    if (message) {
+      return message.endsWith(".") ? message : `${message}.`;
+    }
+  }
+
+  return "Unknown transport error.";
+}
+
 async function fetchJson<T>(
   fetchImpl: FetchLike,
   url: string,
   context: string,
   validate?: Validator<T>
 ): Promise<T> {
-  const response = await fetchImpl(url);
+  let response: Awaited<ReturnType<FetchLike>>;
+  try {
+    response = await fetchWithTimeout(
+      fetchImpl,
+      url,
+      {},
+      {
+        requestTimeoutMs: DEFAULT_PRESET_REQUEST_TIMEOUT_MS,
+        timeoutMessage: `Cartridge preset request timed out after ${DEFAULT_PRESET_REQUEST_TIMEOUT_MS}ms.`,
+        createTimeoutError: (message, cause) =>
+          new SessionProtocolError(message, cause),
+      }
+    );
+  } catch (error) {
+    throw new SessionProtocolError(
+      `${context} failed: ${describeTransportError(error)}`,
+      error
+    );
+  }
+
   if (!response.ok) {
     throw new SessionProtocolError(
       `${context} failed with ${response.status} ${response.statusText}.`

@@ -1,8 +1,8 @@
 import {
+  CairoFelt252,
   type PaymasterOptions,
   RpcProvider,
   constants,
-  shortString,
 } from "starknet";
 import type { NetworkPreset, NetworkName } from "@/network";
 import type { Address } from "@/types";
@@ -13,25 +13,7 @@ export type ChainIdLiteral = "SN_MAIN" | "SN_SEPOLIA";
 const VALID_CHAIN_IDS: readonly string[] = ["SN_MAIN", "SN_SEPOLIA"];
 
 function decodeFelt252ToAscii(felt252: string): string {
-  try {
-    return shortString.decodeShortString(felt252);
-  } catch {
-    const hex = felt252.startsWith("0x")
-      ? felt252.slice(2)
-      : BigInt(felt252).toString(16);
-    const normalizedHex = hex.length % 2 === 0 ? hex : `0${hex}`;
-
-    let decoded = "";
-    for (let i = 0; i < normalizedHex.length; i += 2) {
-      const byteHex = normalizedHex.slice(i, i + 2);
-      if (!/^[0-9a-fA-F]{2}$/.test(byteHex)) {
-        throw new Error(`Invalid felt252 byte: "${byteHex}"`);
-      }
-      const byte = Number.parseInt(byteHex, 16);
-      decoded += String.fromCharCode(byte);
-    }
-    return decoded;
-  }
+  return new CairoFelt252(felt252).decodeUtf8();
 }
 
 /**

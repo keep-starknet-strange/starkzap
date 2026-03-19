@@ -44,6 +44,30 @@ function createAccount(
 }
 
 describe("TsSessionAccount", () => {
+  it("rejects expired sessions before attempting execution", async () => {
+    const executeFromOutside = vi.fn();
+    const execute = vi.fn();
+    const account = new TsSessionAccount({
+      rpcUrl: "https://api.cartridge.gg/x/starknet/sepolia",
+      chainId: "0x534e5f5345504f4c4941",
+      session: {
+        ...SESSION,
+        expiresAt: "1",
+      },
+      sessionPrivateKey: "0x1234",
+      policyRoot: "0x5678",
+      sessionKeyGuid: SESSION.sessionKeyGuid,
+      executeFromOutside,
+      execute,
+    });
+
+    await expect(account.executeWithFallback(CALLS)).rejects.toThrow(
+      "Cartridge TS session is expired and cannot execute transactions."
+    );
+    expect(executeFromOutside).not.toHaveBeenCalled();
+    expect(execute).not.toHaveBeenCalled();
+  });
+
   it("falls back when outside execution throws an explicit error code", async () => {
     const codedError = Object.assign(new Error("authorization service down"), {
       code: "OUTSIDE_EXECUTION",
@@ -118,5 +142,20 @@ describe("TsSessionAccount", () => {
       "callback bridge not implemented"
     );
     expect(execute).not.toHaveBeenCalled();
+  });
+
+  it("falls back for SNIP-9 compatibility errors", async () => {
+    const executeFromOutside = vi
+      .fn()
+      .mockRejectedValue(new Error("Account is not compatible with SNIP-9"));
+    const execute = vi
+      .fn()
+      .mockResolvedValue({ transaction_hash: "0xfeedbeef" });
+    const account = createAccount({ executeFromOutside, execute });
+
+    await expect(account.executeWithFallback(CALLS)).resolves.toEqual({
+      transaction_hash: "0xfeedbeef",
+    });
+    expect(execute).toHaveBeenCalledTimes(1);
   });
 });

@@ -238,7 +238,10 @@ export class NativeCartridgeWallet extends BaseWallet {
 
   private constructor(options: NativeCartridgeWalletOptions) {
     const staking = options.staking;
-    super(fromAddress(options.session.account.address), staking);
+    super({
+      address: fromAddress(options.session.account.address),
+      stakingConfig: staking,
+    });
     this.session = options.session;
     this.provider = options.provider;
     this.chainId = options.chainId;
