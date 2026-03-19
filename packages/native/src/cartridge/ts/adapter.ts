@@ -25,6 +25,7 @@ import {
   SessionRejectedError,
   SessionTimeoutError,
 } from "@/cartridge/ts/errors";
+import { asRecord, type FetchLike } from "@/cartridge/ts/shared";
 import {
   extractTransactionHash,
   TsSessionAccount,
@@ -42,21 +43,6 @@ const DEFAULT_CARTRIDGE_URL = "https://x.cartridge.gg";
 const DEFAULT_CARTRIDGE_API_URL = "https://api.cartridge.gg";
 const DEFAULT_REDIRECT_QUERY_NAME = "startapp";
 const DEFAULT_EXECUTE_FROM_OUTSIDE_REQUEST_TIMEOUT_MS = 15_000;
-
-type FetchLike = (
-  input: string,
-  init?: {
-    method?: string;
-    headers?: Record<string, string>;
-    body?: string;
-    signal?: unknown;
-  }
-) => Promise<{
-  ok: boolean;
-  status: number;
-  statusText: string;
-  json(): Promise<unknown>;
-}>;
 
 export interface OpenSessionArgs {
   url: string;
@@ -178,13 +164,6 @@ async function fetchWithTimeout(
       clearTimeout(timeoutId);
     }
   }
-}
-
-function asRecord(value: unknown): Record<string, unknown> | null {
-  if (!value || typeof value !== "object" || Array.isArray(value)) {
-    return null;
-  }
-  return value as Record<string, unknown>;
 }
 
 function readJsonRpcErrorMessage(payload: unknown): string | null {

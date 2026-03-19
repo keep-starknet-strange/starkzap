@@ -95,6 +95,37 @@ describe("NativeCartridgeWallet", () => {
     );
   });
 
+  it("throws when class hash is unavailable for undeployed accounts", async () => {
+    const undeployedProvider = {
+      getClassHashAt: vi
+        .fn()
+        .mockRejectedValue(new Error("contract not found")),
+    } as unknown as RpcProvider;
+    const wallet = await NativeCartridgeWallet.create({
+      session,
+      provider: undeployedProvider,
+      chainId: ChainId.SEPOLIA,
+    });
+
+    expect(() => wallet.getClassHash()).toThrow(
+      "Account class hash is unavailable for undeployed Cartridge accounts."
+    );
+  });
+
+  it("rethrows unexpected class hash lookup failures during creation", async () => {
+    const brokenProvider = {
+      getClassHashAt: vi.fn().mockRejectedValue(new Error("rpc timeout")),
+    } as unknown as RpcProvider;
+
+    await expect(
+      NativeCartridgeWallet.create({
+        session,
+        provider: brokenProvider,
+        chainId: ChainId.SEPOLIA,
+      })
+    ).rejects.toThrow("rpc timeout");
+  });
+
   it("disconnects and exposes username/controller", async () => {
     const wallet = await NativeCartridgeWallet.create({
       session,
