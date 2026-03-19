@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   MAINNET_PAYMASTER_DISABLED_MESSAGE,
   resolveExamplePaymasterNodeUrl,
-} from "../examples/mobile/constants/paymaster";
+} from "../examples/shared/paymaster";
 
 describe("mobile example paymaster config", () => {
   it("derives the local proxy automatically on sepolia", () => {
