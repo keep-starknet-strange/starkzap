@@ -12,41 +12,61 @@ export type ConfidentialRecipient = { x: BigNumberish; y: BigNumberish };
 
 /** Configuration for creating a Confidential instance. */
 export interface ConfidentialConfig {
+  /** The Tongo private key (separate from the Starknet wallet key). */
   privateKey: BigNumberish | Uint8Array;
+  /** The Tongo contract address on Starknet. */
   contractAddress: Address;
+  /** An RPC provider for on-chain reads. */
   provider: RpcProvider;
 }
 
-/** Shared fields for all confidential operations. */
-interface ConfidentialDetailsBase {
+/** Details for funding a confidential account. */
+export interface ConfidentialFundDetails {
+  /** Amount to fund. */
+  amount: Amount;
   /** The Starknet sender address (wallet address executing the tx). */
   sender: Address;
   /** Optional fee paid to sender (for relayed txs). */
   feeTo?: bigint;
 }
 
-export interface ConfidentialFundDetails extends ConfidentialDetailsBase {
-  amount: Amount;
-}
-
-export interface ConfidentialTransferDetails extends ConfidentialDetailsBase {
+/** Details for a confidential transfer. */
+export interface ConfidentialTransferDetails {
+  /** Amount to transfer. */
   amount: Amount;
   /** Recipient's confidential account identity (provider-specific). */
   to: ConfidentialRecipient;
+  /** The Starknet sender address. */
+  sender: Address;
+  /** Optional fee paid to sender (for relayed txs). */
+  feeTo?: bigint;
 }
 
-export interface ConfidentialWithdrawDetails extends ConfidentialDetailsBase {
+/** Details for withdrawing from a confidential account. */
+export interface ConfidentialWithdrawDetails {
+  /** Amount to withdraw. */
   amount: Amount;
   /** The Starknet address to receive the withdrawn ERC20 tokens. */
   to: Address;
+  /** The Starknet sender address. */
+  sender: Address;
+  /** Optional fee paid to sender (for relayed txs). */
+  feeTo?: bigint;
 }
 
-export interface ConfidentialRagequitDetails extends ConfidentialDetailsBase {
+/** Details for an emergency ragequit (full withdrawal). */
+export interface ConfidentialRagequitDetails {
   /** The Starknet address to receive all funds. */
   to: Address;
+  /** The Starknet sender address. */
+  sender: Address;
+  /** Optional fee paid to sender (for relayed txs). */
+  feeTo?: bigint;
 }
 
+/** Details for a rollover (activate pending balance). */
 export interface ConfidentialRolloverDetails {
+  /** The Starknet sender address. */
   sender: Address;
 }
 

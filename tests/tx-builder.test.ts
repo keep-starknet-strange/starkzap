@@ -1145,6 +1145,28 @@ describe("TxBuilder", () => {
 
       expect(wallet.execute).toHaveBeenCalledTimes(1);
     });
+
+    it("should reject concurrent send attempts while the first send is in flight", async () => {
+      let resolveExecute: ((value: { hash: string }) => void) | undefined;
+      const executePromise = new Promise<{ hash: string }>((resolve) => {
+        resolveExecute = resolve;
+      });
+      const wallet = createMockWallet({
+        execute: vi.fn().mockReturnValue(executePromise),
+      });
+      const builder = new TxBuilder(wallet).add(rawCall);
+
+      const firstSend = builder.send();
+      await Promise.resolve();
+
+      await expect(builder.send()).rejects.toThrow(
+        "This transaction is currently being sent"
+      );
+      expect(wallet.execute).toHaveBeenCalledTimes(1);
+
+      resolveExecute?.({ hash: "0xtxhash" });
+      await expect(firstSend).resolves.toEqual({ hash: "0xtxhash" });
+    });
   });
 
   // ============================================================
