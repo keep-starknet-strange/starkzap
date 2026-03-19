@@ -39,16 +39,18 @@ export interface LendingPosition {
   collateralAmount?: bigint;
   /** Debt amount in debt asset base units. */
   debtAmount?: bigint;
-  /** Collateral USD value from protocol collateralization check [SCALE]. */
+  /** Collateral USD value on a 1e18 scale (for example, $1 = 1_000000000000000000n). */
   collateralValue: bigint;
-  /** Debt USD value from protocol collateralization check [SCALE]. */
+  /** Debt USD value on a 1e18 scale (for example, $1 = 1_000000000000000000n). */
   debtValue: bigint;
   isCollateralized: boolean;
 }
 
 export interface LendingHealth {
   isCollateralized: boolean;
+  /** Collateral USD value on a 1e18 scale (for example, $1 = 1_000000000000000000n). */
   collateralValue: bigint;
+  /** Debt USD value on a 1e18 scale (for example, $1 = 1_000000000000000000n). */
   debtValue: bigint;
 }
 
@@ -168,7 +170,9 @@ export type LendingUserPositionType = "earn" | "borrow";
 
 export interface LendingTokenBalance {
   token: Token;
+  /** Token amount in base units as an integer bigint (smallest indivisible token unit). */
   amount: bigint;
+  /** USD value on a 1e18 scale (for example, $1 = 1_000000000000000000n). */
   usdValue?: bigint;
 }
 

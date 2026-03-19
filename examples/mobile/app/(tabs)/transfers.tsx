@@ -156,10 +156,10 @@ export default function TransfersScreen() {
     clearBalances,
   } = useBalancesStore();
 
-  const allTokens = getTokensForNetwork(chainId);
-  const strkToken = getStrkToken(chainId);
-  const wbtcToken = getWbtcToken(chainId);
-  const usdcToken = getUsdcToken(chainId);
+  const allTokens = useMemo(() => getTokensForNetwork(chainId), [chainId]);
+  const strkToken = useMemo(() => getStrkToken(chainId), [chainId]);
+  const wbtcToken = useMemo(() => getWbtcToken(chainId), [chainId]);
+  const usdcToken = useMemo(() => getUsdcToken(chainId), [chainId]);
   const primaryTokens = useMemo(() => {
     const eth = allTokens.find((t) => t.symbol === "ETH");
     return [strkToken, wbtcToken, usdcToken, eth].filter(

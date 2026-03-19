@@ -505,6 +505,10 @@ export const useStakingStore = create<StakingState>((set, get) => ({
       positions: {},
       validatorPools: null,
       activePositionKey: null,
+      isLoadingPools: false,
+      isStaking: false,
+      isClaimingRewards: false,
+      isExiting: false,
     });
   },
 }));

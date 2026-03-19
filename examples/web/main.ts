@@ -761,6 +761,20 @@ function createQuoteRow(label: string, value: string): HTMLDivElement {
   return row;
 }
 
+function assertPositiveAmount(
+  amount: Amount,
+  token: Token,
+  context: string
+): void {
+  if (amount.toBase() > 0n) {
+    return;
+  }
+
+  throw new Error(
+    `${context} amount must be greater than zero for ${token.symbol}`
+  );
+}
+
 function createOrderMeta(label: string, value: string): HTMLDivElement {
   const meta = document.createElement("div");
   meta.className = "order-meta";
@@ -2874,6 +2888,7 @@ async function lendingDeposit() {
   setButtonLoading(btnLendingDeposit, true);
   try {
     const amount = Amount.parse(raw, token);
+    assertPositiveAmount(amount, token, "Deposit");
     log(`Depositing ${amount.toUnit()} ${token.symbol} into Vesu...`, "info");
     const tx = await wallet.lending().deposit(
       {
@@ -2912,6 +2927,7 @@ async function lendingWithdraw() {
   setButtonLoading(btnLendingWithdraw, true);
   try {
     const amount = Amount.parse(raw, token);
+    assertPositiveAmount(amount, token, "Withdraw");
     log(`Withdrawing ${amount.toUnit()} ${token.symbol} from Vesu...`, "info");
     const tx = await wallet.lending().withdraw(
       {
@@ -2983,10 +2999,14 @@ async function lendingBorrow() {
   setButtonLoading(btnLendingBorrow, true);
   try {
     const amount = Amount.parse(rawDebt, debtToken);
+    assertPositiveAmount(amount, debtToken, "Borrow");
     const rawCollateral = lendingCollateralAmountInput.value.trim();
     const collateralAmount = rawCollateral
       ? Amount.parse(rawCollateral, collateralToken)
       : undefined;
+    if (collateralAmount) {
+      assertPositiveAmount(collateralAmount, collateralToken, "Collateral");
+    }
     const useEarnPosition = lendingUseEarnInput.checked;
 
     await assertLendingBorrowCollateralReady({
@@ -3044,10 +3064,14 @@ async function lendingRepay() {
   setButtonLoading(btnLendingRepay, true);
   try {
     const amount = Amount.parse(rawDebt, debtToken);
+    assertPositiveAmount(amount, debtToken, "Repay");
     const rawCollateral = lendingCollateralAmountInput.value.trim();
     const collateralAmount = rawCollateral
       ? Amount.parse(rawCollateral, collateralToken)
       : undefined;
+    if (collateralAmount) {
+      assertPositiveAmount(collateralAmount, collateralToken, "Collateral");
+    }
 
     log(`Repaying ${amount.toUnit()} ${debtToken.symbol}...`, "info");
     const tx = await wallet.lending().repay(
@@ -3124,13 +3148,13 @@ async function lendingViewPosition() {
         ? Amount.fromRaw(position.debtAmount, debtToken).toFormatted(true)
         : "0";
 
-    lendingPositionEl.innerHTML = `
-      <div class="quote-row"><span class="quote-label">Status</span><span class="quote-value">${health.isCollateralized ? "Healthy" : "At risk"}</span></div>
-      <div class="quote-row"><span class="quote-label">Collateral</span><span class="quote-value">${collateralAmt}</span></div>
-      <div class="quote-row"><span class="quote-label">Debt</span><span class="quote-value">${debtAmt}</span></div>
-      <div class="quote-row"><span class="quote-label">Collateral Shares</span><span class="quote-value">${position.collateralShares.toString()}</span></div>
-      <div class="quote-row"><span class="quote-label">Nominal Debt</span><span class="quote-value">${position.nominalDebt.toString()}</span></div>
-    `;
+    lendingPositionEl.replaceChildren(
+      createQuoteRow("Status", health.isCollateralized ? "Healthy" : "At risk"),
+      createQuoteRow("Collateral", collateralAmt),
+      createQuoteRow("Debt", debtAmt),
+      createQuoteRow("Collateral Shares", position.collateralShares.toString()),
+      createQuoteRow("Nominal Debt", position.nominalDebt.toString())
+    );
     lendingPositionEl.classList.remove("hidden");
     log("Position loaded", "success");
   } catch (err) {
@@ -3252,10 +3276,14 @@ async function lendingHealthQuote() {
   setButtonLoading(btnLendingHealthQuote, true);
   try {
     const amount = Amount.parse(rawDebt, debtToken);
+    assertPositiveAmount(amount, debtToken, "Health quote");
     const rawCollateral = lendingCollateralAmountInput.value.trim();
     const collateralAmount = rawCollateral
       ? Amount.parse(rawCollateral, collateralToken)
       : undefined;
+    if (collateralAmount) {
+      assertPositiveAmount(collateralAmount, collateralToken, "Collateral");
+    }
 
     log("Quoting health impact...", "info");
     const quote = await wallet.lending().quoteHealth({

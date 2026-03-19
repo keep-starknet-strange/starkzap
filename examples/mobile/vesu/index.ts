@@ -29,6 +29,7 @@ const DEFAULT_VESU_COLLATERAL_SYMBOLS = [
 const PERCENT_SCALE = 10_000n;
 const DISPLAY_DECIMALS = 2;
 const UNKNOWN_POOL_LABEL = "Pool unavailable";
+const VESU_POOL_REQUEST_TIMEOUT_MS = 8_000;
 
 const POOL_VISUAL_PRESETS = [
   {
@@ -144,15 +145,24 @@ const VESU_POOL_API_BASE = "https://api.vesu.xyz/pools";
 export async function fetchVesuPoolData(
   poolAddress: string
 ): Promise<VesuPoolData | null> {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(
+    () => controller.abort(),
+    VESU_POOL_REQUEST_TIMEOUT_MS
+  );
+
   try {
     const response = await fetch(
-      `${VESU_POOL_API_BASE}/${poolAddress}?onlyEnabledAssets=true`
+      `${VESU_POOL_API_BASE}/${poolAddress}?onlyEnabledAssets=true`,
+      { signal: controller.signal }
     );
     if (!response.ok) return null;
     const payload = (await response.json()) as { data?: VesuPoolData };
     return payload.data ?? null;
   } catch {
     return null;
+  } finally {
+    clearTimeout(timeoutId);
   }
 }
 
@@ -174,8 +184,15 @@ export function getVesuDebtFloor(
  * Format the debt floor as a USD string (e.g. "$10").
  */
 export function formatVesuDebtFloor(debtFloor: bigint): string {
-  const usd = Number(debtFloor) / 1e18;
-  return `$${usd.toFixed(usd % 1 === 0 ? 0 : 2)}`;
+  const dollars = debtFloor / VESU_HEALTH_VALUE_SCALE;
+  const remainder = debtFloor % VESU_HEALTH_VALUE_SCALE;
+  const cents = (remainder * 100n) / VESU_HEALTH_VALUE_SCALE;
+
+  if (cents <= 0n) {
+    return `$${dollars.toString()}`;
+  }
+
+  return `$${dollars.toString()}.${cents.toString().padStart(2, "0")}`;
 }
 
 export function getVesuBorrowCapacityForDeposit(params: {

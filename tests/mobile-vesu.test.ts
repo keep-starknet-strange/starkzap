@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { Amount } from "@/types";
 import type {
   LendingHealth,
@@ -11,10 +11,12 @@ import {
   buildVesuAssetOptions,
   buildVesuMarketCards,
   formatVesuCompactUsd,
+  formatVesuDebtFloor,
   formatVesuLtv,
   getVesuPoolVisual,
   formatVesuRate,
   formatVesuUsdValue,
+  fetchVesuPoolData,
   getAvailableVesuCollateralAssets,
   getDefaultVesuCollateralAsset,
   getVesuBorrowCapacityForDeposit,
@@ -330,6 +332,45 @@ describe("mobile Vesu helpers", () => {
         debtValue: 0n,
       })
     ).toBe("0.00%");
+  });
+
+  it("formats Vesu debt floors with bigint precision", () => {
+    expect(formatVesuDebtFloor(10n * 10n ** 18n)).toBe("$10");
+    expect(formatVesuDebtFloor(10n * 10n ** 18n + 5n * 10n ** 16n)).toBe(
+      "$10.05"
+    );
+    expect(
+      formatVesuDebtFloor(
+        12_345_678_901_234_567_890n * 10n ** 18n + 45n * 10n ** 16n
+      )
+    ).toBe("$12345678901234567890.45");
+  });
+
+  it("aborts slow Vesu pool fetches and returns null", async () => {
+    vi.useFakeTimers();
+    let aborted = false;
+    const fetchMock = vi.fn((_input: string, init?: RequestInit) => {
+      return new Promise<never>((_, reject) => {
+        init?.signal?.addEventListener("abort", () => {
+          aborted = true;
+          reject(new Error("aborted"));
+        });
+      });
+    });
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    try {
+      const request = fetchVesuPoolData("0xpool");
+      await vi.advanceTimersByTimeAsync(8_000);
+
+      await expect(request).resolves.toBeNull();
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      expect(aborted).toBe(true);
+    } finally {
+      vi.unstubAllGlobals();
+      vi.useRealTimers();
+    }
   });
 
   it("reports health status from the current position", () => {

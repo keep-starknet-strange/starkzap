@@ -130,6 +130,7 @@ interface WalletState {
   // Loading states
   isConnecting: boolean;
   isCheckingStatus: boolean;
+  networkSwitchRequestId: number;
 
   // Logs
   logs: string[];
@@ -360,6 +361,7 @@ export const useWalletStore = create<WalletState>((set, get) => ({
   isDeployed: null,
   isConnecting: false,
   isCheckingStatus: false,
+  networkSwitchRequestId: 0,
   logs: [],
   connectedEthWallet: undefined,
   connectedSolWallet: undefined,
@@ -483,7 +485,10 @@ export const useWalletStore = create<WalletState>((set, get) => ({
       return;
     }
 
-    set({ isConnecting: true });
+    const requestId = state.networkSwitchRequestId + 1;
+    const isCurrentRequest = () => get().networkSwitchRequestId === requestId;
+
+    set({ isConnecting: true, networkSwitchRequestId: requestId });
     state.addLog(`Switching network to ${nextNetwork.name}...`);
 
     try {
@@ -491,6 +496,9 @@ export const useWalletStore = create<WalletState>((set, get) => ({
         rpcUrl: nextNetwork.rpcUrl,
         chainId: nextNetwork.chainId,
       });
+      if (!isCurrentRequest()) {
+        return;
+      }
 
       let nextWallet = state.wallet;
       if (state.walletType === "privatekey") {
@@ -506,6 +514,9 @@ export const useWalletStore = create<WalletState>((set, get) => ({
           selectedPreset: state.selectedPreset,
           preferSponsored: state.preferSponsored,
         });
+        if (!isCurrentRequest()) {
+          return;
+        }
       } else if (state.walletType === "privy") {
         if (!state.privyWalletId || !state.privyPublicKey || !accessToken) {
           throw new Error(
@@ -521,8 +532,14 @@ export const useWalletStore = create<WalletState>((set, get) => ({
           privySelectedPreset: state.privySelectedPreset,
           preferSponsored: state.preferSponsored,
         });
+        if (!isCurrentRequest()) {
+          return;
+        }
       }
 
+      if (!isCurrentRequest()) {
+        return;
+      }
       set({
         ...configuredSdkState,
         selectedNetworkIndex: index,
@@ -530,27 +547,41 @@ export const useWalletStore = create<WalletState>((set, get) => ({
         wallet: nextWallet,
         isDeployed: null,
       });
+      if (!isCurrentRequest()) {
+        return;
+      }
       get().addLog(`Switched to ${nextNetwork.name}`);
       get().addLog(`RPC: ${configuredSdkState.rpcUrl}`);
       get().addLog(`Chain: ${configuredSdkState.chainId.toLiteral()}`);
 
       if (nextWallet) {
+        if (!isCurrentRequest()) {
+          return;
+        }
         await get().checkDeploymentStatus();
       }
     } catch (error) {
+      if (!isCurrentRequest()) {
+        return;
+      }
       get().addLog(`Network switch failed: ${error}`);
       throw error;
     } finally {
+      if (!isCurrentRequest()) {
+        return;
+      }
       set({ isConnecting: false });
     }
   },
 
   resetNetworkConfig: () => {
-    const { addLog } = get();
+    const { addLog, networkSwitchRequestId } = get();
     set({
       sdk: null,
       paymasterNodeUrl: null,
       isConfigured: false,
+      isConnecting: false,
+      isCheckingStatus: false,
       wallet: null,
       walletType: null,
       isDeployed: null,
@@ -578,6 +609,7 @@ export const useWalletStore = create<WalletState>((set, get) => ({
       bridgeDepositFeeEstimate: null,
       bridgeDepositFeeLoading: false,
       bridgeFastTransfer: false,
+      networkSwitchRequestId: networkSwitchRequestId + 1,
     });
     addLog("Network configuration reset");
   },
@@ -1096,8 +1128,10 @@ export const useWalletStore = create<WalletState>((set, get) => ({
   },
 
   disconnect: () => {
-    const { addLog } = get();
+    const { addLog, networkSwitchRequestId } = get();
     set({
+      isConnecting: false,
+      isCheckingStatus: false,
       wallet: null,
       walletType: null,
       isDeployed: null,
@@ -1105,22 +1139,42 @@ export const useWalletStore = create<WalletState>((set, get) => ({
       privyEmail: "",
       privyWalletId: null,
       privyPublicKey: null,
+      networkSwitchRequestId: networkSwitchRequestId + 1,
     });
     addLog("Disconnected");
   },
 
   checkDeploymentStatus: async () => {
-    const { wallet, addLog } = get();
+    const { wallet, addLog, networkSwitchRequestId } = get();
     if (!wallet) return;
 
+    const requestId = networkSwitchRequestId;
     set({ isCheckingStatus: true });
     try {
       const deployed = await wallet.isDeployed();
+      if (
+        get().networkSwitchRequestId !== requestId ||
+        get().wallet !== wallet
+      ) {
+        return;
+      }
       set({ isDeployed: deployed });
       addLog(`Account is ${deployed ? "deployed ✓" : "not deployed"}`);
     } catch (err) {
+      if (
+        get().networkSwitchRequestId !== requestId ||
+        get().wallet !== wallet
+      ) {
+        return;
+      }
       addLog(`Failed to check status: ${err}`);
     } finally {
+      if (
+        get().networkSwitchRequestId !== requestId ||
+        get().wallet !== wallet
+      ) {
+        return;
+      }
       set({ isCheckingStatus: false });
     }
   },
