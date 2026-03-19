@@ -229,6 +229,35 @@ interface ConfiguredSdkState {
   chainId: ChainId;
 }
 
+function sameBridgeToken(
+  left: BridgeToken | null,
+  right: BridgeToken | null
+): boolean {
+  if (!left || !right) {
+    return left === right;
+  }
+
+  return left.id === right.id && left.chain === right.chain;
+}
+
+function getBridgeResetState() {
+  return {
+    bridgeSelectedToken: null,
+    bridgeDepositBalance: null,
+    bridgeDepositBalanceUnit: null,
+    bridgeDepositBalanceLoading: false,
+    bridgeAllowance: null,
+    bridgeAllowanceLoading: false,
+    bridgeTokens: [],
+    bridgeIsLoading: false,
+    bridgeError: null,
+    bridgeLastUpdated: null,
+    bridgeDepositFeeEstimate: null,
+    bridgeDepositFeeLoading: false,
+    bridgeFastTransfer: false,
+  } as const;
+}
+
 function getStakingConfig(chainId: ChainId): StakingConfig | undefined {
   if (chainId.isMainnet()) {
     return {
@@ -445,16 +474,7 @@ export const useWalletStore = create<WalletState>((set, get) => ({
     set({
       ...configuredSdkState,
       isConfigured: true,
-      bridgeSelectedToken: null,
-      bridgeDepositBalance: null,
-      bridgeDepositBalanceUnit: null,
-      bridgeAllowance: null,
-      bridgeTokens: [],
-      bridgeError: null,
-      bridgeLastUpdated: null,
-      bridgeDepositFeeEstimate: null,
-      bridgeDepositFeeLoading: false,
-      bridgeFastTransfer: false,
+      ...getBridgeResetState(),
       logs: [
         `SDK configured with ${selectedNetworkIndex !== null ? NETWORKS[selectedNetworkIndex].name : "Custom Network"}`,
       ],
@@ -546,7 +566,12 @@ export const useWalletStore = create<WalletState>((set, get) => ({
         isConfigured: true,
         wallet: nextWallet,
         isDeployed: null,
+        ...getBridgeResetState(),
       });
+      if (!isCurrentRequest()) {
+        return;
+      }
+      await get().fetchBridgeTokens();
       if (!isCurrentRequest()) {
         return;
       }
@@ -596,19 +621,7 @@ export const useWalletStore = create<WalletState>((set, get) => ({
       connectedSolWallet: undefined,
       bridgeDirection: "to-starknet",
       bridgeExternalChain: ExternalChain.ETHEREUM,
-      bridgeSelectedToken: null,
-      bridgeDepositBalance: null,
-      bridgeDepositBalanceUnit: null,
-      bridgeDepositBalanceLoading: false,
-      bridgeAllowance: null,
-      bridgeAllowanceLoading: false,
-      bridgeTokens: [],
-      bridgeIsLoading: false,
-      bridgeError: null,
-      bridgeLastUpdated: null,
-      bridgeDepositFeeEstimate: null,
-      bridgeDepositFeeLoading: false,
-      bridgeFastTransfer: false,
+      ...getBridgeResetState(),
       networkSwitchRequestId: networkSwitchRequestId + 1,
     });
     addLog("Network configuration reset");
@@ -652,16 +665,7 @@ export const useWalletStore = create<WalletState>((set, get) => ({
     if (bridgeExternalChain === chain) return;
     set({
       bridgeExternalChain: chain,
-      bridgeSelectedToken: null,
-      bridgeDepositBalance: null,
-      bridgeDepositBalanceUnit: null,
-      bridgeAllowance: null,
-      bridgeTokens: [],
-      bridgeError: null,
-      bridgeLastUpdated: null,
-      bridgeDepositFeeEstimate: null,
-      bridgeDepositFeeLoading: false,
-      bridgeFastTransfer: false,
+      ...getBridgeResetState(),
     });
   },
 
@@ -693,16 +697,29 @@ export const useWalletStore = create<WalletState>((set, get) => ({
   },
 
   fetchBridgeTokens: async () => {
-    const { sdk, bridgeExternalChain } = get();
+    const { sdk, bridgeExternalChain, chainId } = get();
 
     if (!sdk) {
       return;
     }
 
+    const chainLiteral = chainId.toLiteral();
+    const isCurrentRequest = () => {
+      const current = get();
+      return (
+        current.sdk === sdk &&
+        current.chainId.toLiteral() === chainLiteral &&
+        current.bridgeExternalChain === bridgeExternalChain
+      );
+    };
+
     set({ bridgeIsLoading: true, bridgeError: null });
 
     try {
       const bridgeTokens = await sdk.getBridgingTokens(bridgeExternalChain);
+      if (!isCurrentRequest()) {
+        return;
+      }
 
       set({
         bridgeTokens,
@@ -711,6 +728,9 @@ export const useWalletStore = create<WalletState>((set, get) => ({
         bridgeLastUpdated: new Date(),
       });
     } catch (error) {
+      if (!isCurrentRequest()) {
+        return;
+      }
       set({
         bridgeIsLoading: false,
         bridgeError: error instanceof Error ? error.message : String(error),
@@ -730,6 +750,7 @@ export const useWalletStore = create<WalletState>((set, get) => ({
       connectedEthWallet,
       connectedSolWallet,
       wallet,
+      chainId,
     } = get();
 
     const clearBalance = {
@@ -742,6 +763,20 @@ export const useWalletStore = create<WalletState>((set, get) => ({
       set(clearBalance);
       return;
     }
+
+    const chainLiteral = chainId.toLiteral();
+    const isCurrentRequest = () => {
+      const current = get();
+      return (
+        current.sdk === sdk &&
+        current.chainId.toLiteral() === chainLiteral &&
+        current.bridgeDirection === bridgeDirection &&
+        current.wallet === wallet &&
+        current.connectedEthWallet === connectedEthWallet &&
+        current.connectedSolWallet === connectedSolWallet &&
+        sameBridgeToken(current.bridgeSelectedToken, bridgeSelectedToken)
+      );
+    };
 
     set(clearBalance);
 
@@ -797,6 +832,9 @@ export const useWalletStore = create<WalletState>((set, get) => ({
         }
       }
 
+      if (!isCurrentRequest()) {
+        return;
+      }
       set({
         bridgeDepositBalance: balance ? balance.toFormatted(true) : null,
         bridgeDepositBalanceUnit: balance ? balance.toUnit() : null,
@@ -804,6 +842,9 @@ export const useWalletStore = create<WalletState>((set, get) => ({
       });
     } catch (error) {
       console.error("Failed to fetch deposit balance:", error);
+      if (!isCurrentRequest()) {
+        return;
+      }
       set(clearBalance);
     }
   },
@@ -817,12 +858,27 @@ export const useWalletStore = create<WalletState>((set, get) => ({
       connectedEthWallet,
       connectedSolWallet,
       addLog,
+      chainId,
     } = get();
 
     if (!sdk || !bridgeSelectedToken || bridgeDirection !== "to-starknet") {
       set({ bridgeAllowance: null, bridgeAllowanceLoading: false });
       return;
     }
+
+    const chainLiteral = chainId.toLiteral();
+    const isCurrentRequest = () => {
+      const current = get();
+      return (
+        current.sdk === sdk &&
+        current.chainId.toLiteral() === chainLiteral &&
+        current.bridgeDirection === bridgeDirection &&
+        current.wallet === wallet &&
+        current.connectedEthWallet === connectedEthWallet &&
+        current.connectedSolWallet === connectedSolWallet &&
+        sameBridgeToken(current.bridgeSelectedToken, bridgeSelectedToken)
+      );
+    };
 
     const externalWallet =
       bridgeSelectedToken.chain === ExternalChain.ETHEREUM
@@ -857,12 +913,18 @@ export const useWalletStore = create<WalletState>((set, get) => ({
         );
       }
 
+      if (!isCurrentRequest()) {
+        return;
+      }
       set({
         bridgeAllowance: allowance ? allowance.toFormatted(true) : null,
         bridgeAllowanceLoading: false,
       });
     } catch (error) {
       addLog(`Failed to calculate allowance ${error?.toString()}`);
+      if (!isCurrentRequest()) {
+        return;
+      }
       set({ bridgeAllowance: null, bridgeAllowanceLoading: false });
     }
   },
@@ -876,12 +938,27 @@ export const useWalletStore = create<WalletState>((set, get) => ({
       connectedSolWallet,
       bridgeFastTransfer,
       addLog,
+      chainId,
     } = get();
 
     if (!wallet || !bridgeSelectedToken || bridgeDirection !== "to-starknet") {
       set({ bridgeDepositFeeEstimate: null, bridgeDepositFeeLoading: false });
       return;
     }
+
+    const chainLiteral = chainId.toLiteral();
+    const isCurrentRequest = () => {
+      const current = get();
+      return (
+        current.chainId.toLiteral() === chainLiteral &&
+        current.bridgeDirection === bridgeDirection &&
+        current.bridgeFastTransfer === bridgeFastTransfer &&
+        current.wallet === wallet &&
+        current.connectedEthWallet === connectedEthWallet &&
+        current.connectedSolWallet === connectedSolWallet &&
+        sameBridgeToken(current.bridgeSelectedToken, bridgeSelectedToken)
+      );
+    };
 
     const isEthereum = bridgeSelectedToken.chain === ExternalChain.ETHEREUM;
     const isSolana = bridgeSelectedToken.chain === ExternalChain.SOLANA;
@@ -915,12 +992,18 @@ export const useWalletStore = create<WalletState>((set, get) => ({
         return;
       }
 
+      if (!isCurrentRequest()) {
+        return;
+      }
       set({
         bridgeDepositFeeEstimate: estimate,
         bridgeDepositFeeLoading: false,
       });
     } catch (error) {
       addLog(`Failed to estimate fees ${error?.toString()}`);
+      if (!isCurrentRequest()) {
+        return;
+      }
       set({ bridgeDepositFeeEstimate: null, bridgeDepositFeeLoading: false });
     }
   },

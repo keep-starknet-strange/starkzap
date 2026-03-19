@@ -91,6 +91,59 @@ describe("VesuLendingProvider", () => {
     });
   });
 
+  it("derives position usdValue from amount and normalized usdPrice", async () => {
+    const fetcher = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        data: [
+          {
+            protocolVersion: "v2",
+            pool: { id: "0x123", name: "Prime" },
+            type: "borrow",
+            collateral: {
+              address: collateralToken.address,
+              symbol: collateralToken.symbol,
+              decimals: 6,
+              value: "1500000",
+              usdPrice: {
+                value: "250000000",
+                decimals: 8,
+              },
+            },
+            debt: {
+              address: debtToken.address,
+              symbol: debtToken.symbol,
+              decimals: 18,
+              value: "2000000000000000000",
+              usdPrice: {
+                value: "4000000000000000000",
+                decimals: 18,
+              },
+            },
+          },
+        ],
+      }),
+    });
+    const provider = new VesuLendingProvider({
+      fetcher: fetcher as unknown as typeof fetch,
+    });
+    const context = createContext(vi.fn());
+
+    const positions = await provider.getPositions(context, {});
+
+    expect(positions).toHaveLength(1);
+    expect(positions[0]).toMatchObject({
+      collateral: {
+        amount: 1_500_000n,
+        usdValue: 3_750_000_000_000_000_000n,
+      },
+      debt: {
+        amount: 2_000_000_000_000_000_000n,
+        usdValue: 8_000_000_000_000_000_000n,
+      },
+    });
+  });
+
   it("throws on deposit when chain has no poolFactory configured", async () => {
     const callContract = vi.fn();
     const provider = new VesuLendingProvider({

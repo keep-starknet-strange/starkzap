@@ -640,6 +640,7 @@ export class VesuLendingProvider implements LendingProvider {
       decimals: collateral.decimals,
       name: collateral.name ?? collateral.symbol,
     };
+    const collateralUsdValue = toPositionUsdValue(collateral);
 
     const result: LendingUserPosition = {
       type: posType,
@@ -650,9 +651,7 @@ export class VesuLendingProvider implements LendingProvider {
       collateral: {
         token: collateralToken,
         amount: BigInt(collateral.value),
-        ...(collateral.usdPrice?.value != null
-          ? { usdValue: BigInt(collateral.usdPrice.value) }
-          : {}),
+        ...(collateralUsdValue != null ? { usdValue: collateralUsdValue } : {}),
       },
     };
 
@@ -676,6 +675,7 @@ export class VesuLendingProvider implements LendingProvider {
 
     const debt = entry.debt;
     if (debt?.address && debt.symbol && debt.decimals != null && debt.value) {
+      const debtUsdValue = toPositionUsdValue(debt);
       result.debt = {
         token: {
           address: fromAddress(debt.address),
@@ -684,9 +684,7 @@ export class VesuLendingProvider implements LendingProvider {
           name: debt.name ?? debt.symbol,
         },
         amount: BigInt(debt.value),
-        ...(debt.usdPrice?.value != null
-          ? { usdValue: BigInt(debt.usdPrice.value) }
-          : {}),
+        ...(debtUsdValue != null ? { usdValue: debtUsdValue } : {}),
       };
     }
 
@@ -1072,6 +1070,37 @@ function toAmount(
 ): Amount | undefined {
   if (!v?.value || v.decimals == null) return undefined;
   return Amount.fromRaw(v.value, v.decimals);
+}
+
+function normalizeVesuDecimal(value: string, decimals: number): bigint {
+  const raw = BigInt(value);
+  if (decimals === 18) {
+    return raw;
+  }
+  if (decimals > 18) {
+    return raw / 10n ** BigInt(decimals - 18);
+  }
+  return raw * 10n ** BigInt(18 - decimals);
+}
+
+function toPositionUsdValue(
+  token: VesuPositionApiTokenInfo | null | undefined
+): bigint | undefined {
+  if (
+    !token?.value ||
+    token.decimals == null ||
+    !token.usdPrice?.value ||
+    token.usdPrice.decimals == null
+  ) {
+    return undefined;
+  }
+
+  return amountToValueDelta(
+    BigInt(token.value),
+    normalizeVesuDecimal(token.usdPrice.value, token.usdPrice.decimals),
+    tokenScale(token.decimals),
+    "floor"
+  );
 }
 
 function assertAssetsDenomination(
