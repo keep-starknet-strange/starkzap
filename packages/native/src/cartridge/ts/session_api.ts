@@ -4,6 +4,7 @@ import {
   SessionRejectedError,
   SessionTimeoutError,
 } from "@/cartridge/ts/errors";
+import { asRecord, type FetchLike } from "@/cartridge/ts/shared";
 import type { CartridgePolicies } from "@/cartridge/types";
 import {
   hasPoliciesInput,
@@ -30,21 +31,6 @@ const SUBSCRIBE_CREATE_SESSION_QUERY = `query SubscribeCreateSession($sessionKey
     authorization
   }
 }`;
-
-type FetchLike = (
-  input: string,
-  init?: {
-    method?: string;
-    headers?: Record<string, string>;
-    body?: string;
-    signal?: unknown;
-  }
-) => Promise<{
-  ok: boolean;
-  status: number;
-  statusText: string;
-  json(): Promise<unknown>;
-}>;
 
 export interface SessionRegistration {
   username: string;
@@ -98,9 +84,6 @@ type GraphQLSubscribeSessionResult = {
   };
   errors?: Array<{ message?: string }>;
 };
-
-type UnknownRecord = Record<string, unknown>;
-
 function ensureFetch(fetchImpl?: FetchLike): FetchLike {
   if (fetchImpl) {
     return fetchImpl;
@@ -221,13 +204,6 @@ async function fetchWithTimeout(
       clearTimeout(timeoutId);
     }
   }
-}
-
-function asRecord(value: unknown): UnknownRecord | null {
-  if (!value || typeof value !== "object" || Array.isArray(value)) {
-    return null;
-  }
-  return value as UnknownRecord;
 }
 
 function toOptionalString(value: unknown): string | null {

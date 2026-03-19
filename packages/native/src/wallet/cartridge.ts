@@ -229,7 +229,7 @@ export class NativeCartridgeWallet extends BaseWallet {
   private readonly session: CartridgeNativeSessionHandle;
   private readonly provider: RpcProvider;
   private readonly chainId: ChainId;
-  private readonly classHash: string;
+  private readonly classHash: string | undefined;
   private readonly explorerConfig: ExplorerConfig | undefined;
   private readonly defaultFeeMode: SupportedNativeCartridgeFeeMode;
   private readonly defaultTimeBounds: PaymasterTimeBounds | undefined;
@@ -242,7 +242,7 @@ export class NativeCartridgeWallet extends BaseWallet {
     this.session = options.session;
     this.provider = options.provider;
     this.chainId = options.chainId;
-    this.classHash = options.classHash ?? "0x0";
+    this.classHash = options.classHash;
     this.explorerConfig = options.explorer;
     this.defaultFeeMode = options.feeMode ?? "sponsored";
     this.defaultTimeBounds = options.timeBounds;
@@ -257,18 +257,20 @@ export class NativeCartridgeWallet extends BaseWallet {
     options: NativeCartridgeWalletOptions
   ): Promise<NativeCartridgeWallet> {
     const feeMode = resolveSupportedCartridgeFeeMode(options.feeMode);
-    let classHash = "0x0";
+    let classHash: string | undefined;
     try {
       classHash = await options.provider.getClassHashAt(
         fromAddress(options.session.account.address)
       );
-    } catch {
-      // Keep fallback hash for undeployed or unsupported providers.
+    } catch (error) {
+      if (!isContractNotFound(error)) {
+        throw error;
+      }
     }
 
     return new NativeCartridgeWallet({
       ...options,
-      classHash,
+      ...(classHash !== undefined && { classHash }),
       ...(feeMode && { feeMode }),
     });
   }
@@ -403,6 +405,11 @@ export class NativeCartridgeWallet extends BaseWallet {
   }
 
   getClassHash(): string {
+    if (!this.classHash) {
+      throw new Error(
+        "Account class hash is unavailable for undeployed Cartridge accounts."
+      );
+    }
     return this.classHash;
   }
 
