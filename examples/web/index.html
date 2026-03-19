@@ -1236,8 +1236,17 @@
               />
             </div>
             <div class="form-group">
-              <label for="lending-debt-amount">Debt Amount</label>
+              <label for="lending-debt-amount"
+                >Debt Amount (optional for repay)</label
+              >
               <input id="lending-debt-amount" type="text" placeholder="0.001" />
+            </div>
+          </div>
+
+          <div class="swap-grid">
+            <div id="lending-borrow-percent-group" class="form-group hidden">
+              <label for="lending-borrow-percent">Borrow % of Max</label>
+              <input id="lending-borrow-percent" type="text" placeholder="25" />
             </div>
           </div>
 
@@ -1262,6 +1271,13 @@
               type="button"
             >
               Repay
+            </button>
+            <button
+              id="btn-lending-repay-max"
+              class="btn btn-secondary"
+              type="button"
+            >
+              Repay Max
             </button>
             <button
               id="btn-lending-position"
@@ -1296,6 +1312,7 @@
             </button>
           </div>
 
+          <div id="lending-draft" class="quote-box hidden"></div>
           <div id="lending-position" class="quote-box hidden"></div>
         </div>
       </div>

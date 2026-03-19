@@ -20,6 +20,7 @@ import {
   type DcaOrder,
   type LendingMarket,
   type LendingPosition,
+  type LendingUserPosition,
   type WalletInterface,
   type AccountClassConfig,
   type SwapProvider,
@@ -38,6 +39,18 @@ import {
   buildFallbackWebVesuMarkets,
   buildWebVesuDebtOptions,
   buildWebVesuMarketOptions,
+  fetchWebVesuPoolData,
+  formatWebVesuPercentInput,
+  getWebVesuBorrowCapacityForDeposit,
+  getWebVesuBorrowPosition,
+  getWebVesuCloseRepayAmount,
+  getWebVesuMinimumDepositForBorrow,
+  getWebVesuPositionBadgeLabel,
+  getWebVesuRepaySubmissionAmount,
+  getWebVesuUserPositionForMarket,
+  parseWebVesuPercentInput,
+  WEB_VESU_PERCENT_SCALE,
+  type WebVesuPoolData,
   type WebVesuMarketLike,
 } from "./vesu";
 
@@ -137,6 +150,14 @@ let walletType: "cartridge" | "privatekey" | "privy" | null = null;
 let confidential: TongoConfidential | null = null;
 let dcaOrdersRequestId = 0;
 let lendingMarkets: LendingMarket[] = [];
+let lendingUserPositions: LendingUserPosition[] = [];
+let lendingSelectedPoolData: WebVesuPoolData | null = null;
+let lendingSelectedPoolRequestId = 0;
+let lendingSelectedMaxBorrowAmount: bigint | null = null;
+let lendingSelectedMaxBorrowRequestId = 0;
+let lendingRefreshRequestId = 0;
+let lendingBorrowDriver: "debt" | "percent" | null = null;
+const lendingPoolDataCache = new Map<string, WebVesuPoolData | null>();
 
 // DOM Elements
 const walletSection = document.getElementById("wallet-section")!;
@@ -402,11 +423,20 @@ const lendingCollateralAmountInput = document.getElementById(
 const lendingDebtAmountInput = document.getElementById(
   "lending-debt-amount"
 ) as HTMLInputElement;
+const lendingBorrowPercentGroup = document.getElementById(
+  "lending-borrow-percent-group"
+)!;
+const lendingBorrowPercentInput = document.getElementById(
+  "lending-borrow-percent"
+) as HTMLInputElement;
 const btnLendingBorrow = document.getElementById(
   "btn-lending-borrow"
 ) as HTMLButtonElement;
 const btnLendingRepay = document.getElementById(
   "btn-lending-repay"
+) as HTMLButtonElement;
+const btnLendingRepayMax = document.getElementById(
+  "btn-lending-repay-max"
 ) as HTMLButtonElement;
 const btnLendingPosition = document.getElementById(
   "btn-lending-position"
@@ -414,6 +444,7 @@ const btnLendingPosition = document.getElementById(
 const btnLendingMyPositions = document.getElementById(
   "btn-lending-my-positions"
 ) as HTMLButtonElement;
+const lendingDraftEl = document.getElementById("lending-draft")!;
 const lendingPositionEl = document.getElementById("lending-position")!;
 const btnLendingMarkets = document.getElementById(
   "btn-lending-markets"
@@ -761,6 +792,38 @@ function createQuoteRow(label: string, value: string): HTMLDivElement {
   return row;
 }
 
+function createQuoteNotice(message: string): HTMLDivElement {
+  const row = document.createElement("div");
+  row.className = "quote-row";
+
+  const labelEl = document.createElement("span");
+  labelEl.className = "quote-label";
+  labelEl.textContent = message;
+
+  row.append(labelEl);
+  return row;
+}
+
+function renderQuoteBox(
+  container: HTMLElement,
+  rows: HTMLDivElement[],
+  emptyMessage?: string
+): void {
+  if (rows.length === 0) {
+    if (!emptyMessage) {
+      container.replaceChildren();
+      container.classList.add("hidden");
+      return;
+    }
+    container.replaceChildren(createQuoteNotice(emptyMessage));
+    container.classList.remove("hidden");
+    return;
+  }
+
+  container.replaceChildren(...rows);
+  container.classList.remove("hidden");
+}
+
 function assertPositiveAmount(
   amount: Amount,
   token: Token,
@@ -773,6 +836,22 @@ function assertPositiveAmount(
   throw new Error(
     `${context} amount must be greater than zero for ${token.symbol}`
   );
+}
+
+function parseOptionalAmount(raw: string, token: Token): Amount | null {
+  const trimmed = raw.trim();
+  if (!trimmed) {
+    return null;
+  }
+  return Amount.parse(trimmed, token);
+}
+
+function tryParseAmount(raw: string, token: Token): Amount | null {
+  try {
+    return parseOptionalAmount(raw, token);
+  } catch {
+    return null;
+  }
 }
 
 function createOrderMeta(label: string, value: string): HTMLDivElement {
@@ -1452,7 +1531,17 @@ function showDisconnected() {
   wallet = null;
   walletType = null;
   lendingMarkets = [];
+  lendingUserPositions = [];
+  lendingSelectedPoolData = null;
+  lendingSelectedMaxBorrowAmount = null;
+  lendingRefreshRequestId += 1;
+  lendingSelectedPoolRequestId += 1;
+  lendingSelectedMaxBorrowRequestId += 1;
+  lendingBorrowDriver = null;
   populateLendingTokens();
+  lendingBorrowPercentInput.value = "";
+  lendingBorrowPercentGroup.classList.add("hidden");
+  lendingDraftEl.classList.add("hidden");
   lendingMarketsEl.classList.add("hidden");
   lendingPositionEl.classList.add("hidden");
   clearSwapQuote();
@@ -2712,6 +2801,283 @@ function populateLendingDebtTokens(): void {
   );
 }
 
+function getSelectedLendingEarnPosition(): LendingUserPosition | null {
+  const market = getSelectedLendingSupplyMarket();
+  if (!market) {
+    return null;
+  }
+
+  return getWebVesuUserPositionForMarket({
+    userPositions: lendingUserPositions,
+    token: market.asset,
+    poolAddress: market.poolAddress,
+    type: "earn",
+  });
+}
+
+function getSelectedLendingBorrowPosition(): LendingUserPosition | null {
+  const collateralMarket = getSelectedLendingCollateralMarket();
+  const debtMarket = getSelectedLendingDebtMarket();
+  if (!collateralMarket || !debtMarket) {
+    return null;
+  }
+
+  return getWebVesuBorrowPosition({
+    userPositions: lendingUserPositions,
+    collateralToken: collateralMarket.asset,
+    debtToken: debtMarket.asset,
+    poolAddress: collateralMarket.poolAddress,
+  });
+}
+
+function getCurrentLendingDraftMaxBorrowAmount(): bigint | null {
+  const collateralMarket = getSelectedLendingCollateralMarket();
+  const debtMarket = getSelectedLendingDebtMarket();
+  if (!collateralMarket || !debtMarket) {
+    return lendingSelectedMaxBorrowAmount;
+  }
+
+  return getWebVesuBorrowCapacityForDeposit({
+    pool: lendingSelectedPoolData,
+    collateralToken: collateralMarket.asset,
+    debtToken: debtMarket.asset,
+    depositAmount: tryParseAmount(
+      lendingCollateralAmountInput.value,
+      collateralMarket.asset
+    ),
+    currentMaxBorrowAmount: lendingSelectedMaxBorrowAmount,
+  });
+}
+
+function getCurrentLendingMinimumDeposit(): bigint | null {
+  const collateralMarket = getSelectedLendingCollateralMarket();
+  const debtMarket = getSelectedLendingDebtMarket();
+  if (!collateralMarket || !debtMarket) {
+    return 0n;
+  }
+
+  return getWebVesuMinimumDepositForBorrow({
+    pool: lendingSelectedPoolData,
+    collateralToken: collateralMarket.asset,
+    debtToken: debtMarket.asset,
+    borrowAmount: tryParseAmount(
+      lendingDebtAmountInput.value,
+      debtMarket.asset
+    ),
+    currentMaxBorrowAmount: lendingSelectedMaxBorrowAmount,
+  });
+}
+
+function updateLendingBorrowPercentVisibility(): void {
+  const hasDebtMarket = getSelectedLendingDebtMarket() != null;
+  const shouldShow =
+    hasDebtMarket && (getCurrentLendingDraftMaxBorrowAmount() ?? 0n) > 0n;
+  lendingBorrowPercentGroup.classList.toggle("hidden", !shouldShow);
+  if (!hasDebtMarket) {
+    lendingBorrowPercentInput.value = "";
+  }
+}
+
+function syncLendingBorrowInputs(): void {
+  const debtMarket = getSelectedLendingDebtMarket();
+  const draftMaxBorrowAmount = getCurrentLendingDraftMaxBorrowAmount();
+  updateLendingBorrowPercentVisibility();
+  if (
+    !debtMarket ||
+    draftMaxBorrowAmount == null ||
+    draftMaxBorrowAmount <= 0n
+  ) {
+    if (lendingBorrowDriver !== "percent") {
+      lendingBorrowPercentInput.value = "";
+    }
+    return;
+  }
+
+  if (lendingBorrowDriver === "percent") {
+    const percent = parseWebVesuPercentInput(lendingBorrowPercentInput.value);
+    if (percent == null) {
+      return;
+    }
+
+    lendingDebtAmountInput.value = Amount.fromRaw(
+      (draftMaxBorrowAmount * percent) / WEB_VESU_PERCENT_SCALE,
+      debtMarket.asset
+    ).toUnit();
+    return;
+  }
+
+  const debtAmount = tryParseAmount(
+    lendingDebtAmountInput.value,
+    debtMarket.asset
+  );
+  if (!debtAmount) {
+    lendingBorrowPercentInput.value = "";
+    return;
+  }
+
+  const ratio =
+    debtAmount.toBase() >= draftMaxBorrowAmount
+      ? WEB_VESU_PERCENT_SCALE
+      : (debtAmount.toBase() * WEB_VESU_PERCENT_SCALE) / draftMaxBorrowAmount;
+  lendingBorrowPercentInput.value = formatWebVesuPercentInput(ratio);
+}
+
+function renderLendingDraft(): void {
+  const rows: HTMLDivElement[] = [];
+  const supplyMarket = getSelectedLendingSupplyMarket();
+  const collateralMarket = getSelectedLendingCollateralMarket();
+  const debtMarket = getSelectedLendingDebtMarket();
+  const earnPosition = getSelectedLendingEarnPosition();
+  const borrowPosition = getSelectedLendingBorrowPosition();
+
+  if (earnPosition && supplyMarket) {
+    rows.push(
+      createQuoteRow(
+        "My Deposit",
+        `${Amount.fromRaw(earnPosition.collateral.amount, earnPosition.collateral.token).toFormatted(true)} ${supplyMarket.asset.symbol}`
+      )
+    );
+  }
+
+  if (borrowPosition) {
+    rows.push(
+      createQuoteRow(
+        "My Collateral",
+        `${Amount.fromRaw(borrowPosition.collateral.amount, borrowPosition.collateral.token).toFormatted(true)} ${borrowPosition.collateral.token.symbol}`
+      )
+    );
+    if (borrowPosition.debt) {
+      rows.push(
+        createQuoteRow(
+          "My Debt",
+          `${Amount.fromRaw(borrowPosition.debt.amount, borrowPosition.debt.token).toFormatted(true)} ${borrowPosition.debt.token.symbol}`
+        )
+      );
+    }
+  }
+
+  if (collateralMarket && debtMarket) {
+    const draftMaxBorrowAmount = getCurrentLendingDraftMaxBorrowAmount();
+    if (draftMaxBorrowAmount != null && draftMaxBorrowAmount > 0n) {
+      rows.push(
+        createQuoteRow(
+          "Borrow Limit",
+          `${Amount.fromRaw(draftMaxBorrowAmount, debtMarket.asset).toFormatted(true)} ${debtMarket.asset.symbol}`
+        )
+      );
+    }
+
+    const minimumDeposit = getCurrentLendingMinimumDeposit();
+    if (minimumDeposit != null && minimumDeposit > 0n) {
+      rows.push(
+        createQuoteRow(
+          "Deposit Needed",
+          `${Amount.fromRaw(minimumDeposit, collateralMarket.asset).toFormatted(true)} ${collateralMarket.asset.symbol}`
+        )
+      );
+    }
+  }
+
+  if (
+    borrowPosition &&
+    lendingCollateralAmountInput.value.trim() &&
+    !lendingDebtAmountInput.value.trim()
+  ) {
+    rows.push(
+      createQuoteNotice(
+        "Leave debt blank and submit Repay to withdraw collateral only."
+      )
+    );
+  }
+
+  renderQuoteBox(lendingDraftEl, rows);
+}
+
+async function refreshSelectedLendingPoolData(): Promise<void> {
+  const poolAddress = getSelectedLendingCollateralMarket()?.poolAddress ?? null;
+  const requestId = ++lendingSelectedPoolRequestId;
+
+  if (!poolAddress) {
+    lendingSelectedPoolData = null;
+    syncLendingBorrowInputs();
+    renderLendingDraft();
+    return;
+  }
+
+  if (lendingPoolDataCache.has(poolAddress)) {
+    lendingSelectedPoolData = lendingPoolDataCache.get(poolAddress) ?? null;
+    syncLendingBorrowInputs();
+    renderLendingDraft();
+    return;
+  }
+
+  lendingSelectedPoolData = null;
+  syncLendingBorrowInputs();
+  renderLendingDraft();
+  const poolData = await fetchWebVesuPoolData(poolAddress);
+  if (requestId !== lendingSelectedPoolRequestId) {
+    return;
+  }
+
+  lendingSelectedPoolData = poolData;
+  lendingPoolDataCache.set(poolAddress, poolData);
+  syncLendingBorrowInputs();
+  renderLendingDraft();
+}
+
+async function refreshSelectedLendingBorrowState(options?: {
+  silent?: boolean;
+}): Promise<void> {
+  const collateralMarket = getSelectedLendingCollateralMarket();
+  const debtMarket = getSelectedLendingDebtMarket();
+  const requestId = ++lendingSelectedMaxBorrowRequestId;
+  if (!wallet || !collateralMarket || !debtMarket) {
+    lendingSelectedMaxBorrowAmount = null;
+    syncLendingBorrowInputs();
+    renderLendingDraft();
+    return;
+  }
+
+  lendingSelectedMaxBorrowAmount = null;
+  syncLendingBorrowInputs();
+  renderLendingDraft();
+  try {
+    const nextMaxBorrowAmount = await wallet.lending().getMaxBorrowAmount({
+      provider: VESU_PROVIDER_ID,
+      collateralToken: collateralMarket.asset,
+      debtToken: debtMarket.asset,
+      ...(collateralMarket.poolAddress
+        ? { poolAddress: collateralMarket.poolAddress }
+        : {}),
+      ...(lendingUseEarnInput.checked ? { useEarnPosition: true } : {}),
+    });
+    if (requestId !== lendingSelectedMaxBorrowRequestId) {
+      return;
+    }
+    lendingSelectedMaxBorrowAmount = nextMaxBorrowAmount;
+  } catch (err) {
+    if (requestId !== lendingSelectedMaxBorrowRequestId) {
+      return;
+    }
+    if (!options?.silent) {
+      log(`Max borrow refresh failed: ${err}`, "error");
+    }
+    lendingSelectedMaxBorrowAmount = null;
+  }
+
+  syncLendingBorrowInputs();
+  renderLendingDraft();
+}
+
+async function refreshSelectedLendingContext(options?: {
+  silent?: boolean;
+}): Promise<void> {
+  await Promise.all([
+    refreshSelectedLendingPoolData(),
+    refreshSelectedLendingBorrowState(options),
+  ]);
+}
+
 function formatLendingCompactUsd(value?: Amount): string {
   if (!value) {
     return "$0";
@@ -2742,32 +3108,60 @@ function formatLendingRate(value?: Amount): string {
 function renderLendingMarkets(): void {
   const marketOptions = buildWebVesuMarketOptions(getActiveLendingMarkets());
   if (marketOptions.length === 0) {
-    lendingMarketsEl.innerHTML = `<div class="quote-row"><span class="quote-label">No markets found</span></div>`;
-    lendingMarketsEl.classList.remove("hidden");
+    renderQuoteBox(lendingMarketsEl, [], "No markets found");
     return;
   }
 
   const selectedSupplyKey = lendingTokenSelect.value;
   const selectedCollateralKey = lendingCollateralTokenSelect.value;
-  const rows = marketOptions.map((option) => {
+  const selectedDebtKey = lendingDebtTokenSelect.value;
+  const rows = marketOptions.flatMap((option) => {
     const markers = [
       option.key === selectedSupplyKey ? "Supply" : "",
       option.key === selectedCollateralKey ? "Collateral" : "",
+      option.key === selectedDebtKey ? "Debt" : "",
     ].filter(Boolean);
     const stats = option.market.stats;
     const status =
       option.market.canBeBorrowed === false ? "Supply only" : "Borrowable";
-    return `
-      <div class="quote-row"><span class="quote-label">${option.label}${markers.length ? ` · ${markers.join(" / ")}` : ""}</span><span class="quote-value">${status}</span></div>
-      <div class="quote-row"><span class="quote-label">Total supplied</span><span class="quote-value">${formatLendingCompactUsd(stats?.totalSupplied)}</span></div>
-      <div class="quote-row"><span class="quote-label">Total borrowed</span><span class="quote-value">${formatLendingCompactUsd(stats?.totalBorrowed)}</span></div>
-      <div class="quote-row"><span class="quote-label">Supply APY</span><span class="quote-value">${formatLendingRate(stats?.supplyApy)}</span></div>
-      <div class="quote-row"><span class="quote-label">Borrow APR</span><span class="quote-value">${option.market.canBeBorrowed === false ? "N/A" : formatLendingRate(stats?.borrowApr)}</span></div>
-    `;
+    const activePosition = getWebVesuUserPositionForMarket({
+      userPositions: lendingUserPositions,
+      token: option.market.asset,
+      poolAddress: option.market.poolAddress,
+    });
+
+    return [
+      createQuoteRow(
+        `${option.label}${markers.length ? ` · ${markers.join(" / ")}` : ""}`,
+        status
+      ),
+      ...(activePosition
+        ? [
+            createQuoteRow(
+              "My Position",
+              getWebVesuPositionBadgeLabel(activePosition)
+            ),
+          ]
+        : []),
+      createQuoteRow(
+        "Total supplied",
+        formatLendingCompactUsd(stats?.totalSupplied)
+      ),
+      createQuoteRow(
+        "Total borrowed",
+        formatLendingCompactUsd(stats?.totalBorrowed)
+      ),
+      createQuoteRow("Supply APY", formatLendingRate(stats?.supplyApy)),
+      createQuoteRow(
+        "Borrow APR",
+        option.market.canBeBorrowed === false
+          ? "N/A"
+          : formatLendingRate(stats?.borrowApr)
+      ),
+    ];
   });
 
-  lendingMarketsEl.innerHTML = rows.join("");
-  lendingMarketsEl.classList.remove("hidden");
+  renderQuoteBox(lendingMarketsEl, rows);
 }
 
 function hasLendingExposure(position: LendingPosition): boolean {
@@ -2832,9 +3226,12 @@ async function refreshLendingMarkets(options?: {
   silent?: boolean;
   reveal?: boolean;
 }): Promise<void> {
+  const requestId = ++lendingRefreshRequestId;
   if (!wallet) {
     lendingMarkets = [];
+    lendingUserPositions = [];
     populateLendingTokens();
+    renderLendingDraft();
     return;
   }
 
@@ -2842,10 +3239,16 @@ async function refreshLendingMarkets(options?: {
     log("Fetching Vesu markets...", "info");
   }
 
-  try {
-    lendingMarkets = await wallet
-      .lending()
-      .getMarkets({ provider: VESU_PROVIDER_ID });
+  const [marketsResult, positionsResult] = await Promise.allSettled([
+    wallet.lending().getMarkets({ provider: VESU_PROVIDER_ID }),
+    wallet.lending().getPositions({ provider: VESU_PROVIDER_ID }),
+  ]);
+  if (requestId !== lendingRefreshRequestId) {
+    return;
+  }
+
+  if (marketsResult.status === "fulfilled") {
+    lendingMarkets = marketsResult.value;
     if (!options?.silent) {
       if (lendingMarkets.length > 0) {
         log(`Loaded ${lendingMarkets.length} Vesu market(s)`, "success");
@@ -2856,15 +3259,32 @@ async function refreshLendingMarkets(options?: {
         );
       }
     }
-  } catch (err) {
+  } else {
     lendingMarkets = [];
-    log(`Vesu market discovery failed: ${err}`, "error");
+    log(`Vesu market discovery failed: ${marketsResult.reason}`, "error");
+  }
+
+  if (positionsResult.status === "fulfilled") {
+    lendingUserPositions = positionsResult.value;
+    if (!options?.silent && lendingUserPositions.length > 0) {
+      log(`Loaded ${lendingUserPositions.length} Vesu position(s)`, "success");
+    }
+  } else {
+    lendingUserPositions = [];
+    if (!options?.silent) {
+      log(`Vesu positions fetch failed: ${positionsResult.reason}`, "error");
+    }
   }
 
   populateLendingTokens();
+  await refreshSelectedLendingContext({ silent: true });
+  if (requestId !== lendingRefreshRequestId) {
+    return;
+  }
   if (options?.reveal || !lendingMarketsEl.classList.contains("hidden")) {
     renderLendingMarkets();
   }
+  renderLendingDraft();
 }
 
 function getLendingFeeMode(): { feeMode: "sponsored" | "user_pays" } {
@@ -3000,10 +3420,11 @@ async function lendingBorrow() {
   try {
     const amount = Amount.parse(rawDebt, debtToken);
     assertPositiveAmount(amount, debtToken, "Borrow");
-    const rawCollateral = lendingCollateralAmountInput.value.trim();
-    const collateralAmount = rawCollateral
-      ? Amount.parse(rawCollateral, collateralToken)
-      : undefined;
+    const collateralAmount =
+      parseOptionalAmount(
+        lendingCollateralAmountInput.value,
+        collateralToken
+      ) ?? undefined;
     if (collateralAmount) {
       assertPositiveAmount(collateralAmount, collateralToken, "Collateral");
     }
@@ -3037,6 +3458,11 @@ async function lendingBorrow() {
     log(`Borrow tx: ${truncateAddress(tx.hash)}`, "success");
     await tx.wait();
     await refreshLendingMarkets({ silent: true });
+    lendingDebtAmountInput.value = "";
+    lendingCollateralAmountInput.value = "";
+    lendingBorrowPercentInput.value = "";
+    lendingBorrowDriver = null;
+    renderLendingDraft();
     log("Borrow confirmed!", "success");
   } catch (err) {
     log(`Borrow failed: ${err}`, "error");
@@ -3055,25 +3481,44 @@ async function lendingRepay() {
   }
   const collateralToken = collateralMarket.asset;
   const debtToken = debtMarket.asset;
-  const rawDebt = lendingDebtAmountInput.value.trim();
-  if (!rawDebt) {
-    log("Enter a repay amount", "error");
-    return;
-  }
 
   setButtonLoading(btnLendingRepay, true);
   try {
-    const amount = Amount.parse(rawDebt, debtToken);
-    assertPositiveAmount(amount, debtToken, "Repay");
-    const rawCollateral = lendingCollateralAmountInput.value.trim();
-    const collateralAmount = rawCollateral
-      ? Amount.parse(rawCollateral, collateralToken)
-      : undefined;
+    const parsedDebt = parseOptionalAmount(
+      lendingDebtAmountInput.value,
+      debtToken
+    );
+    const collateralAmount =
+      parseOptionalAmount(
+        lendingCollateralAmountInput.value,
+        collateralToken
+      ) ?? undefined;
+    if (parsedDebt) {
+      assertPositiveAmount(parsedDebt, debtToken, "Repay");
+    }
     if (collateralAmount) {
       assertPositiveAmount(collateralAmount, collateralToken, "Collateral");
     }
+    const borrowPosition = getSelectedLendingBorrowPosition();
+    const walletDebtBalance = await wallet.balanceOf(debtToken);
+    const amount = getWebVesuRepaySubmissionAmount({
+      debtToken,
+      debtAmount: parsedDebt,
+      collateralAmount,
+      currentDebtAmount: borrowPosition?.debt?.amount,
+      walletDebtBalance: walletDebtBalance.toBase(),
+    });
+    if (!amount) {
+      throw new Error("Enter a repay amount or collateral to withdraw first");
+    }
+    const isCollateralOnlyRepay = amount.toBase() === 0n;
 
-    log(`Repaying ${amount.toUnit()} ${debtToken.symbol}...`, "info");
+    log(
+      isCollateralOnlyRepay
+        ? `Withdrawing ${collateralAmount?.toUnit() ?? "0"} ${collateralToken.symbol} collateral...`
+        : `Repaying ${amount.toUnit()} ${debtToken.symbol}...`,
+      "info"
+    );
     const tx = await wallet.lending().repay(
       {
         provider: VESU_PROVIDER_ID,
@@ -3092,7 +3537,17 @@ async function lendingRepay() {
     log(`Repay tx: ${truncateAddress(tx.hash)}`, "success");
     await tx.wait();
     await refreshLendingMarkets({ silent: true });
-    log("Repay confirmed!", "success");
+    lendingDebtAmountInput.value = "";
+    lendingCollateralAmountInput.value = "";
+    lendingBorrowPercentInput.value = "";
+    lendingBorrowDriver = null;
+    renderLendingDraft();
+    log(
+      isCollateralOnlyRepay
+        ? "Collateral withdrawal confirmed!"
+        : "Repay confirmed!",
+      "success"
+    );
   } catch (err) {
     log(`Repay failed: ${err}`, "error");
   } finally {
@@ -3171,35 +3626,43 @@ async function lendingMyPositions() {
   setButtonLoading(btnLendingMyPositions, true);
   try {
     log("Fetching all Vesu positions...", "info");
-    const positions = await wallet
+    lendingUserPositions = await wallet
       .lending()
       .getPositions({ provider: VESU_PROVIDER_ID });
+    const positions = lendingUserPositions;
+    renderLendingMarkets();
+    renderLendingDraft();
 
     if (positions.length === 0) {
-      lendingPositionEl.innerHTML = `<div class="quote-row"><span class="quote-label">No positions found</span></div>`;
-      lendingPositionEl.classList.remove("hidden");
+      renderQuoteBox(lendingPositionEl, [], "No positions found");
       log("No Vesu positions found", "info");
       return;
     }
 
-    const rows = positions.map((p) => {
+    const rows = positions.flatMap((p) => {
       const col = p.collateral;
       const colFormatted = Amount.fromRaw(col.amount, col.token).toFormatted(
         true
       );
-      let row = `<div class="quote-row"><span class="quote-label">${p.type === "earn" ? "Deposit" : "Collateral"} (${p.pool.name ?? truncateAddress(p.pool.id)})</span><span class="quote-value">${colFormatted} ${col.token.symbol}</span></div>`;
+      const nextRows = [
+        createQuoteRow(
+          `${p.type === "earn" ? "Deposit" : "Collateral"} (${p.pool.name ?? truncateAddress(p.pool.id)})`,
+          `${colFormatted} ${col.token.symbol}`
+        ),
+      ];
       if (p.debt) {
         const debtFormatted = Amount.fromRaw(
           p.debt.amount,
           p.debt.token
         ).toFormatted(true);
-        row += `<div class="quote-row"><span class="quote-label">Debt</span><span class="quote-value">${debtFormatted} ${p.debt.token.symbol}</span></div>`;
+        nextRows.push(
+          createQuoteRow("Debt", `${debtFormatted} ${p.debt.token.symbol}`)
+        );
       }
-      return row;
+      return nextRows;
     });
 
-    lendingPositionEl.innerHTML = rows.join("");
-    lendingPositionEl.classList.remove("hidden");
+    renderQuoteBox(lendingPositionEl, rows);
     log(`Loaded ${positions.length} position(s)`, "success");
   } catch (err) {
     log(`Positions query failed: ${err}`, "error");
@@ -3235,19 +3698,16 @@ async function lendingMaxBorrow() {
       `Calculating max borrow for ${collateralToken.symbol}/${debtToken.symbol}...`,
       "info"
     );
-    const maxAmount = await wallet.lending().getMaxBorrowAmount({
-      provider: VESU_PROVIDER_ID,
-      collateralToken,
-      debtToken,
-      ...(collateralMarket.poolAddress
-        ? { poolAddress: collateralMarket.poolAddress }
-        : {}),
-      ...(lendingUseEarnInput.checked ? { useEarnPosition: true } : {}),
-    });
+    await refreshSelectedLendingContext({ silent: true });
+    const maxAmount = getCurrentLendingDraftMaxBorrowAmount();
+    if (maxAmount == null) {
+      throw new Error("Max borrow is unavailable for this market pair");
+    }
     const formatted = Amount.fromRaw(maxAmount, debtToken).toFormatted(true);
 
-    lendingPositionEl.innerHTML = `<div class="quote-row"><span class="quote-label">Max Borrow</span><span class="quote-value">${formatted} ${debtToken.symbol}</span></div>`;
-    lendingPositionEl.classList.remove("hidden");
+    renderQuoteBox(lendingPositionEl, [
+      createQuoteRow("Max Borrow", `${formatted} ${debtToken.symbol}`),
+    ]);
     log(`Max borrow: ${formatted} ${debtToken.symbol}`, "success");
   } catch (err) {
     log(`Max borrow query failed: ${err}`, "error");
@@ -3316,12 +3776,21 @@ async function lendingHealthQuote() {
       ? "✓ Would succeed"
       : `✗ Would fail: ${quote.simulation.ok === false ? quote.simulation.reason : ""}`;
 
-    lendingPositionEl.innerHTML = `
-      <div class="quote-row"><span class="quote-label">Current Health</span><span class="quote-value">${quote.current.isCollateralized ? "Healthy" : "At risk"}</span></div>
-      ${quote.projected ? `<div class="quote-row"><span class="quote-label">Projected Health</span><span class="quote-value">${quote.projected.isCollateralized ? "Healthy" : "At risk"}</span></div>` : ""}
-      <div class="quote-row"><span class="quote-label">Simulation</span><span class="quote-value">${simStatus}</span></div>
-    `;
-    lendingPositionEl.classList.remove("hidden");
+    renderQuoteBox(lendingPositionEl, [
+      createQuoteRow(
+        "Current Health",
+        quote.current.isCollateralized ? "Healthy" : "At risk"
+      ),
+      ...(quote.projected
+        ? [
+            createQuoteRow(
+              "Projected Health",
+              quote.projected.isCollateralized ? "Healthy" : "At risk"
+            ),
+          ]
+        : []),
+      createQuoteRow("Simulation", simStatus),
+    ]);
     log("Health quote loaded", "success");
   } catch (err) {
     log(`Health quote failed: ${err}`, "error");
@@ -3331,12 +3800,58 @@ async function lendingHealthQuote() {
   }
 }
 
+async function lendingRepayMax() {
+  if (!wallet) return;
+  const debtMarket = getSelectedLendingDebtMarket();
+  const borrowPosition = getSelectedLendingBorrowPosition();
+  if (!debtMarket) {
+    log("Select a debt asset first", "error");
+    return;
+  }
+  if (!borrowPosition?.debt) {
+    log("No open debt found for this market", "error");
+    return;
+  }
+
+  setButtonLoading(btnLendingRepayMax, true);
+  try {
+    const walletDebtBalance = await wallet.balanceOf(debtMarket.asset);
+    const targetRepayBase =
+      getWebVesuCloseRepayAmount({
+        debtAmount: borrowPosition.debt.amount,
+        debtToken: debtMarket.asset,
+      }) ?? borrowPosition.debt.amount;
+    const repayBase =
+      walletDebtBalance.toBase() > targetRepayBase
+        ? targetRepayBase
+        : walletDebtBalance.toBase();
+    if (repayBase <= 0n) {
+      throw new Error("Repay max is unavailable for this position");
+    }
+    const repayAmount = Amount.fromRaw(repayBase, debtMarket.asset);
+
+    lendingBorrowDriver = "debt";
+    lendingDebtAmountInput.value = repayAmount.toUnit();
+    syncLendingBorrowInputs();
+    renderLendingDraft();
+    log(
+      `Repay max set to ${repayAmount.toUnit()} ${debtMarket.asset.symbol}`,
+      "success"
+    );
+  } catch (err) {
+    log(`Repay max failed: ${err}`, "error");
+  } finally {
+    setButtonLoading(btnLendingRepayMax, false, "Repay Max");
+  }
+}
+
 // Lending event listeners
 btnLendingDeposit.addEventListener("click", lendingDeposit);
 btnLendingWithdraw.addEventListener("click", lendingWithdraw);
 btnLendingWithdrawMax.addEventListener("click", lendingWithdrawMax);
 btnLendingBorrow.addEventListener("click", lendingBorrow);
 btnLendingRepay.addEventListener("click", lendingRepay);
+btnLendingRepayMax.addEventListener("click", lendingRepayMax);
 btnLendingPosition.addEventListener("click", lendingViewPosition);
 btnLendingMyPositions.addEventListener("click", lendingMyPositions);
 btnLendingMarkets.addEventListener("click", lendingBrowseMarkets);
@@ -3346,17 +3861,40 @@ lendingTokenSelect.addEventListener("change", () => {
   if (!lendingMarketsEl.classList.contains("hidden")) {
     renderLendingMarkets();
   }
+  renderLendingDraft();
 });
 lendingCollateralTokenSelect.addEventListener("change", () => {
   populateLendingDebtTokens();
+  void refreshSelectedLendingContext({ silent: true });
   if (!lendingMarketsEl.classList.contains("hidden")) {
     renderLendingMarkets();
   }
+  renderLendingDraft();
 });
 lendingDebtTokenSelect.addEventListener("change", () => {
+  void refreshSelectedLendingContext({ silent: true });
   if (!lendingMarketsEl.classList.contains("hidden")) {
     renderLendingMarkets();
   }
+  renderLendingDraft();
+});
+lendingCollateralAmountInput.addEventListener("input", () => {
+  syncLendingBorrowInputs();
+  renderLendingDraft();
+});
+lendingDebtAmountInput.addEventListener("input", () => {
+  lendingBorrowDriver = "debt";
+  syncLendingBorrowInputs();
+  renderLendingDraft();
+});
+lendingBorrowPercentInput.addEventListener("input", () => {
+  lendingBorrowDriver = "percent";
+  syncLendingBorrowInputs();
+  renderLendingDraft();
+});
+lendingUseEarnInput.addEventListener("change", () => {
+  void refreshSelectedLendingContext({ silent: true });
+  renderLendingDraft();
 });
 
 // Initial log
