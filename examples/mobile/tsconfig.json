@@ -1,8 +1,18 @@
 {
-  "extends": "./tsconfig.base.json",
   "compilerOptions": {
+    "allowJs": true,
+    "customConditions": ["react-native"],
+    "esModuleInterop": true,
+    "jsx": "react-native",
+    "lib": ["DOM", "ESNext"],
+    "module": "esnext",
+    "moduleDetection": "force",
+    "noEmit": true,
+    "resolveJsonModule": true,
+    "skipLibCheck": true,
     "strict": true,
     "moduleResolution": "Bundler",
+    "target": "ESNext",
     "paths": {
       "@/*": ["./*"],
       "react": ["./node_modules/@types/react/index.d.ts"],
@@ -12,5 +22,6 @@
       ]
     }
   },
-  "include": ["**/*.ts", "**/*.tsx", ".expo/types/**/*.ts", "expo-env.d.ts"]
+  "include": ["**/*.ts", "**/*.tsx", ".expo/types/**/*.ts", "expo-env.d.ts"],
+  "exclude": ["node_modules", "babel.config.js", "metro.config.js"]
 }

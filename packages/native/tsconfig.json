@@ -24,10 +24,6 @@
     "resolveJsonModule": true,
     "skipLibCheck": true
   },
-  "tsc-alias": {
-    "resolveFullPaths": true,
-    "resolveFullExtension": ".js"
-  },
   "include": ["src/**/*"],
   "exclude": ["node_modules", "dist"]
 }

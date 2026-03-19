@@ -9,7 +9,7 @@ import type {
   ConnectCartridgeOptions,
   OnboardOptions,
   NativeOnboardCartridgeConfig,
-} from "./types/onboard";
+} from "./types/onboard.js";
 
 export class StarkZap extends CoreStarkZap {
   constructor(config: SDKConfig) {
