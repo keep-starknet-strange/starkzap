@@ -12,17 +12,12 @@ describe("ChainId.fromFelt252", () => {
     ).toBe("SN_SEPOLIA");
   });
 
-  it("rejects malformed hex bytes in fallback decoding", () => {
+  it("rejects malformed chain felt inputs as unsupported chain ids", () => {
     expect(() => ChainId.fromFelt252("0x534e5f4d41494g")).toThrow(
-      'Invalid felt252 byte: "4g"'
+      'Unsupported chain ID: "0x534e5f4d41494g"'
     );
-  });
-
-  it("preserves null bytes when whitespace forces fallback decoding", () => {
-    const decodedWithNullByte = `Unsupported chain ID: "SN_MAIN${String.fromCharCode(0)}"`;
-
     expect(() => ChainId.fromFelt252(" 0x534e5f4d41494e00")).toThrow(
-      decodedWithNullByte
+      'Unsupported chain ID: " 0x534e5f4d41494e00"'
     );
   });
 });

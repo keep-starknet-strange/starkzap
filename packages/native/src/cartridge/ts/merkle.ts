@@ -110,15 +110,15 @@ export function computePolicyMerkleProofs(
   const leaves = policies.map(hashPolicyLeaf);
   const proofs = leaves.map(() => [] as string[]);
   let currentLevel = leaves.slice();
-  let currentIndices: Array<number | null> = leaves.map((_, index) => index);
+  let currentIndices: number[][] = leaves.map((_, index) => [index]);
 
   while (currentLevel.length > 1) {
     const nextLevel: string[] = [];
-    const nextIndices: Array<number | null> = [];
+    const nextIndices: number[][] = [];
 
     if (currentLevel.length % 2 !== 0) {
       currentLevel.push(ZERO_FELT);
-      currentIndices.push(null);
+      currentIndices.push([]);
     }
 
     for (let i = 0; i < currentLevel.length; i += 2) {
@@ -129,18 +129,18 @@ export function computePolicyMerkleProofs(
         );
       }
       const right = currentLevel[i + 1] ?? ZERO_FELT;
-      const leftIndex = currentIndices[i] ?? null;
-      const rightIndex = currentIndices[i + 1] ?? null;
+      const leftIndices = currentIndices[i] ?? [];
+      const rightIndices = currentIndices[i + 1] ?? [];
 
-      if (leftIndex !== null) {
-        proofs[leftIndex]?.push(right);
+      for (const index of leftIndices) {
+        proofs[index]?.push(right);
       }
-      if (rightIndex !== null) {
-        proofs[rightIndex]?.push(left);
+      for (const index of rightIndices) {
+        proofs[index]?.push(left);
       }
 
       nextLevel.push(hashPair(left, right));
-      nextIndices.push(leftIndex);
+      nextIndices.push([...leftIndices, ...rightIndices]);
     }
 
     currentLevel = nextLevel;

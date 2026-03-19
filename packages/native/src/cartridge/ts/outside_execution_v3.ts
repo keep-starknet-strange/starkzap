@@ -36,7 +36,7 @@ const AUTHORIZATION_BY_REGISTERED = shortFelt("authorization-by-registered");
 // matches the deterministic sentinel used in controller.c for the same purpose.
 // Changing it would break parity with the Cartridge protocol — do not treat it
 // as a private key that needs rotation or secrecy.
-const GUARDIAN_KEY = shortFelt("CARTRIDGE_GUARDIAN");
+const GUARDIAN_KEY_PLACEHOLDER = shortFelt("CARTRIDGE_GUARDIAN");
 
 const STARKNET_DOMAIN_TYPE_HASH = selectorFelt(
   '"StarknetDomain"("name":"shortstring","version":"shortstring","chainId":"shortstring","revision":"shortstring")'
@@ -580,7 +580,10 @@ export function buildSignedOutsideExecutionV3({
   );
 
   const sessionSignature = signStarknet(sessionTokenHash, sessionPrivateKey);
-  const guardianSignature = signStarknet(sessionTokenHash, GUARDIAN_KEY);
+  const guardianSignature = signStarknet(
+    sessionTokenHash,
+    GUARDIAN_KEY_PLACEHOLDER
+  );
 
   const sessionAuthorization = [
     AUTHORIZATION_BY_REGISTERED,

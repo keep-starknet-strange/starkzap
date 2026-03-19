@@ -1,11 +1,19 @@
 import type {
+  ChainId,
   ExplorerConfig,
   OnboardOptions as CoreOnboardOptions,
   OnboardResult,
+  RpcProvider,
   SDKConfig,
   StakingConfig,
 } from "starkzap";
-import { StarkZap as CoreStarkZap, getChainId } from "starkzap";
+import {
+  StarkZap as CoreStarkZap,
+  getChainId,
+  getStakingPreset,
+  networks,
+  type NetworkPreset,
+} from "starkzap";
 import type {
   ConnectCartridgeOptions,
   OnboardOptions,
@@ -19,15 +27,71 @@ import {
 } from "@/wallet/cartridge";
 import type { CartridgeNativeConnectArgs } from "@/cartridge/types";
 
+interface ResolvedNativeSdkConfig {
+  chainId: ChainId;
+  explorer?: ExplorerConfig;
+  rpcUrl: string;
+  staking?: StakingConfig;
+}
+
+function resolveProviderRpcUrl(provider: RpcProvider): string {
+  const nodeUrl = provider.channel.nodeUrl;
+  if (typeof nodeUrl === "string" && nodeUrl.length > 0) {
+    return nodeUrl;
+  }
+
+  throw new Error(
+    "Unable to resolve RPC URL from the SDK provider for Cartridge."
+  );
+}
+
+function resolveNativeSdkConfig(
+  config: SDKConfig,
+  provider: RpcProvider
+): ResolvedNativeSdkConfig {
+  let networkPreset: NetworkPreset | undefined;
+  if (config.network) {
+    networkPreset =
+      typeof config.network === "string"
+        ? networks[config.network]
+        : config.network;
+  }
+
+  const chainId = config.chainId ?? networkPreset?.chainId;
+  if (!chainId) {
+    throw new Error(
+      "StarkZap requires either 'network' or 'chainId' to be specified"
+    );
+  }
+
+  const explorer =
+    config.explorer ??
+    (networkPreset?.explorerUrl
+      ? { baseUrl: networkPreset.explorerUrl }
+      : undefined);
+  const staking = config.staking ?? getStakingPreset(chainId);
+
+  return {
+    chainId,
+    rpcUrl: resolveProviderRpcUrl(provider),
+    ...(explorer && { explorer }),
+    ...(staking && { staking }),
+  };
+}
+
 export class StarkZap extends CoreStarkZap {
+  private readonly nativeConfig: ResolvedNativeSdkConfig;
+  private nativeChainValidationPromise: Promise<void> | null = null;
+
   constructor(config: SDKConfig) {
     super(config);
+    this.nativeConfig = resolveNativeSdkConfig(config, this.getProvider());
   }
 
   override async connectCartridge(
     options: ConnectCartridgeOptions = {}
   ): Promise<Awaited<ReturnType<CoreStarkZap["connectCartridge"]>>> {
-    await this.ensureProviderChainMatchesConfig();
+    await this.ensureNativeProviderChainMatchesConfig();
     const feeMode = validateSupportedCartridgeFeeMode(options.feeMode);
 
     const adapter = getCartridgeNativeAdapterOrThrow();
@@ -116,8 +180,28 @@ export class StarkZap extends CoreStarkZap {
     };
   }
 
+  private async ensureNativeProviderChainMatchesConfig(): Promise<void> {
+    if (!this.nativeChainValidationPromise) {
+      this.nativeChainValidationPromise = (async () => {
+        const providerChainId = await getChainId(this.getProvider());
+        if (
+          providerChainId.toLiteral() !== this.nativeConfig.chainId.toLiteral()
+        ) {
+          throw new Error(
+            `RPC chain mismatch: provider returned ${providerChainId.toLiteral()} but SDK is configured for ${this.nativeConfig.chainId.toLiteral()}.`
+          );
+        }
+      })().catch((error) => {
+        this.nativeChainValidationPromise = null;
+        throw error;
+      });
+    }
+
+    await this.nativeChainValidationPromise;
+  }
+
   private resolveProviderRpcUrl(): string {
-    const { rpcUrl } = this.getSdkConfig();
+    const { rpcUrl } = this.nativeConfig;
     if (rpcUrl.length > 0) {
       return rpcUrl;
     }
@@ -131,7 +215,7 @@ export class StarkZap extends CoreStarkZap {
     explorer?: ExplorerConfig;
     staking?: StakingConfig;
   } {
-    const config = this.getSdkConfig();
+    const config = this.nativeConfig;
     return {
       ...(config.explorer && { explorer: config.explorer }),
       ...(config.staking && { staking: config.staking }),

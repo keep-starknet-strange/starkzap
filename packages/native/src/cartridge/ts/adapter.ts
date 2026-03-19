@@ -25,7 +25,12 @@ import {
   SessionRejectedError,
   SessionTimeoutError,
 } from "@/cartridge/ts/errors";
-import { asRecord, type FetchLike } from "@/cartridge/ts/shared";
+import {
+  asRecord,
+  ensureFetch,
+  fetchWithTimeout,
+  type FetchLike,
+} from "@/cartridge/ts/shared";
 import {
   extractTransactionHash,
   TsSessionAccount,
@@ -82,90 +87,6 @@ export interface CreateCartridgeTsAdapterOptions {
   logger?: Pick<Console, "info" | "warn" | "error">;
 }
 
-function ensureFetch(fetchImpl?: FetchLike): FetchLike {
-  if (fetchImpl) {
-    return fetchImpl;
-  }
-  if (typeof fetch === "function") {
-    return fetch as unknown as FetchLike;
-  }
-  throw new SessionProtocolError(
-    "No fetch implementation available for Cartridge V3 outside execution."
-  );
-}
-
-async function fetchWithTimeout(
-  fetchFn: FetchLike,
-  input: string,
-  init: {
-    method?: string;
-    headers?: Record<string, string>;
-    body?: string;
-  },
-  requestTimeoutMs: number
-): Promise<Awaited<ReturnType<FetchLike>>> {
-  const timeoutMessage = `cartridge_addExecuteOutsideTransaction timed out after ${requestTimeoutMs}ms.`;
-  if (!Number.isFinite(requestTimeoutMs) || requestTimeoutMs <= 0) {
-    return fetchFn(input, init);
-  }
-
-  let timeoutId: ReturnType<typeof setTimeout> | null = null;
-  const createTimeoutPromise = (onTimeout?: () => void) =>
-    new Promise<never>((_, reject) => {
-      timeoutId = setTimeout(() => {
-        try {
-          onTimeout?.();
-        } finally {
-          reject(new SessionTimeoutError(timeoutMessage));
-        }
-      }, requestTimeoutMs);
-    });
-  const invokeFetch = (requestInit: Parameters<FetchLike>[1]) =>
-    Promise.resolve().then(() => fetchFn(input, requestInit));
-  const rethrowTimeoutLikeError = (error: unknown): never => {
-    const message = error instanceof Error ? error.message.toLowerCase() : "";
-    const name = error instanceof Error ? error.name : "";
-    if (name === "AbortError" || message.includes("abort")) {
-      throw new SessionTimeoutError(timeoutMessage, error);
-    }
-    throw error;
-  };
-
-  const maybeAbortController = (
-    globalThis as unknown as {
-      AbortController?: new () => { signal: unknown; abort(): void };
-    }
-  ).AbortController;
-  if (typeof maybeAbortController === "function") {
-    const controller = new maybeAbortController();
-    try {
-      return await Promise.race([
-        invokeFetch({
-          ...init,
-          signal: controller.signal,
-        }),
-        createTimeoutPromise(() => {
-          controller.abort();
-        }),
-      ]);
-    } catch (error) {
-      rethrowTimeoutLikeError(error);
-    } finally {
-      if (timeoutId !== null) {
-        clearTimeout(timeoutId);
-      }
-    }
-  }
-
-  try {
-    return await Promise.race([invokeFetch(init), createTimeoutPromise()]);
-  } finally {
-    if (timeoutId !== null) {
-      clearTimeout(timeoutId);
-    }
-  }
-}
-
 function readJsonRpcErrorMessage(payload: unknown): string | null {
   const record = asRecord(payload);
   const errorRecord = asRecord(record?.error);
@@ -199,7 +120,11 @@ async function resolveEffectivePolicies(
     args.preset &&
     (!hasManualPolicies || !args.shouldOverridePresetPolicies)
   ) {
-    const fetchFn = ensureFetch(options.fetchImpl);
+    const fetchFn = ensureFetch(
+      options.fetchImpl,
+      "No fetch implementation available for Cartridge V3 outside execution.",
+      (message) => new SessionProtocolError(message)
+    );
     const resolvedPolicies = await (
       options.resolvePresetPolicies ?? resolvePresetPolicies
     )({
@@ -418,7 +343,14 @@ export function createCartridgeTsAdapter(
               "[starkzap] cartridge-ts executing via cartridge_addExecuteOutsideTransaction (pure TS V3)"
             );
 
-            const fetchFn = ensureFetch(options.fetchImpl);
+            const fetchFn = ensureFetch(
+              options.fetchImpl,
+              "No fetch implementation available for Cartridge V3 outside execution.",
+              (message) => new SessionProtocolError(message)
+            );
+            const requestTimeoutMs =
+              options.executeFromOutsideRequestTimeoutMs ??
+              DEFAULT_EXECUTE_FROM_OUTSIDE_REQUEST_TIMEOUT_MS;
             const response = await fetchWithTimeout(
               fetchFn,
               rpcUrl,
@@ -438,8 +370,12 @@ export function createCartridgeTsAdapter(
                   },
                 }),
               },
-              options.executeFromOutsideRequestTimeoutMs ??
-                DEFAULT_EXECUTE_FROM_OUTSIDE_REQUEST_TIMEOUT_MS
+              {
+                requestTimeoutMs,
+                timeoutMessage: `cartridge_addExecuteOutsideTransaction timed out after ${requestTimeoutMs}ms.`,
+                createTimeoutError: (message, cause) =>
+                  new SessionTimeoutError(message, cause),
+              }
             );
 
             if (!response.ok) {
