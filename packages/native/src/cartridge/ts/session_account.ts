@@ -1,6 +1,7 @@
 import type { Call, PaymasterTimeBounds } from "starknet";
 import { SessionProtocolError } from "@/cartridge/ts/errors";
 import type { SessionRegistration } from "@/cartridge/ts/session_api";
+import { asRecord } from "@/cartridge/ts/shared";
 
 export interface TsSessionExecutionDetails {
   feeMode: { mode: "sponsored" };
@@ -56,13 +57,6 @@ const EXECUTE_FALLBACK_MESSAGE_PATTERNS = [
   /(?:^|:\s*)requested entrypoint does not exist(?:[.!)]|\s|$)/i,
   /(?:^|:\s*)entrypoint does not exist(?:[.!)]|\s|$)/i,
 ];
-
-function asRecord(value: unknown): Record<string, unknown> | null {
-  if (!value || typeof value !== "object" || Array.isArray(value)) {
-    return null;
-  }
-  return value as Record<string, unknown>;
-}
 
 function toMessage(error: unknown): string {
   if (error instanceof Error) {

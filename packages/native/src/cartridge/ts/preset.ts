@@ -1,24 +1,11 @@
 import { shortString } from "starknet";
 import type { CartridgeSessionPolicies } from "@/cartridge/types";
 import { SessionProtocolError } from "@/cartridge/ts/errors";
+import { asRecord, type FetchLike } from "@/cartridge/ts/shared";
 
 const DEFAULT_PRESET_BASE_URL = "https://static.cartridge.gg/presets";
 
 type Validator<T> = (obj: unknown) => obj is T;
-
-type FetchLike = (
-  input: string,
-  init?: {
-    method?: string;
-    headers?: Record<string, string>;
-    body?: string;
-  }
-) => Promise<{
-  ok: boolean;
-  status: number;
-  statusText: string;
-  json(): Promise<unknown>;
-}>;
 
 interface PresetIndex {
   baseUrl?: string;
@@ -56,14 +43,6 @@ function decodeChainId(chainId: string): string {
   } catch {
     return trimmed;
   }
-}
-
-function asRecord(value: unknown): Record<string, unknown> | null {
-  if (!value || typeof value !== "object" || Array.isArray(value)) {
-    return null;
-  }
-
-  return value as Record<string, unknown>;
 }
 
 function isPresetIndex(value: unknown): value is PresetIndex {

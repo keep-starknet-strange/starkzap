@@ -8,6 +8,7 @@ import type {
   CartridgeSessionPolicies,
 } from "@/cartridge/types";
 import { SessionProtocolError } from "@/cartridge/ts/errors";
+import { asRecord } from "@/cartridge/ts/shared";
 
 export interface CanonicalSessionPolicy {
   contractAddress: string;
@@ -85,13 +86,6 @@ function compareControllerCanonicalPolicy(
   }
 
   return compareLexically(a.entrypoint, b.entrypoint);
-}
-
-function asRecord(value: unknown): Record<string, unknown> | null {
-  if (!value || typeof value !== "object" || Array.isArray(value)) {
-    return null;
-  }
-  return value as Record<string, unknown>;
 }
 
 function hasMessages(policies: CartridgeSessionPolicies): boolean {

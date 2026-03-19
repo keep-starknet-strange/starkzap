@@ -22,7 +22,21 @@ const STARKNET_MESSAGE = shortFelt("StarkNet Message");
 const OUTSIDE_EXECUTION_CALLER_ANY = shortFelt("ANY_CALLER");
 const SESSION_TOKEN_MAGIC = shortFelt("session-token");
 const AUTHORIZATION_BY_REGISTERED = shortFelt("authorization-by-registered");
-const GUARDIAN_PRIVATE_KEY = shortFelt("CARTRIDGE_GUARDIAN");
+// The Cartridge session token format requires two signatures: one from the
+// ephemeral session key (produced below with `sessionPrivateKey`) and one
+// from the guardian key.
+//
+// In this client-side flow, the guardian is Cartridge's own paymaster
+// infrastructure. When `cartridge_addExecuteOutsideTransaction` receives the
+// request, Cartridge's server discards the client-provided guardian signature
+// and replaces it with one produced by their actual guardian key before
+// submitting the transaction to the network.
+//
+// This constant is therefore a well-known placeholder, not a secret. Its value
+// matches the deterministic sentinel used in controller.c for the same purpose.
+// Changing it would break parity with the Cartridge protocol — do not treat it
+// as a private key that needs rotation or secrecy.
+const GUARDIAN_KEY = shortFelt("CARTRIDGE_GUARDIAN");
 
 const STARKNET_DOMAIN_TYPE_HASH = selectorFelt(
   '"StarknetDomain"("name":"shortstring","version":"shortstring","chainId":"shortstring","revision":"shortstring")'
@@ -566,10 +580,7 @@ export function buildSignedOutsideExecutionV3({
   );
 
   const sessionSignature = signStarknet(sessionTokenHash, sessionPrivateKey);
-  const guardianSignature = signStarknet(
-    sessionTokenHash,
-    GUARDIAN_PRIVATE_KEY
-  );
+  const guardianSignature = signStarknet(sessionTokenHash, GUARDIAN_KEY);
 
   const sessionAuthorization = [
     AUTHORIZATION_BY_REGISTERED,
