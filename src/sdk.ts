@@ -97,14 +97,6 @@ export class StarkZap {
     this.provider = new RpcProvider({ nodeUrl: this.config.rpcUrl });
   }
 
-  protected getSdkConfig(): Readonly<{
-    rpcUrl: string;
-    explorer?: SDKConfig["explorer"];
-    staking?: SDKConfig["staking"];
-  }> {
-    return this.config;
-  }
-
   private resolveConfig(config: SDKConfig): ResolvedConfig {
     // Get network preset if specified
     let networkPreset: NetworkPreset | undefined;
@@ -168,7 +160,7 @@ export class StarkZap {
     return this.config.staking;
   }
 
-  protected async ensureProviderChainMatchesConfig(): Promise<void> {
+  private async ensureProviderChainMatchesConfig(): Promise<void> {
     if (!this.chainValidationPromise) {
       this.chainValidationPromise = (async () => {
         const providerChainId = await getChainId(this.provider);

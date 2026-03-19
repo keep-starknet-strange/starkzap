@@ -2,9 +2,13 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
+import { hash, num } from "starknet";
 import { deriveSessionSignerGuid } from "@/cartridge/ts/guid";
 import { canonicalizeSessionPolicies } from "@/cartridge/ts/policy";
-import { computePolicyMerkle } from "@/cartridge/ts/merkle";
+import {
+  computePolicyMerkle,
+  computePolicyMerkleProofs,
+} from "@/cartridge/ts/merkle";
 import { SessionProtocolError } from "@/cartridge/ts/errors";
 import {
   buildCartridgeSessionUrl,
@@ -49,6 +53,23 @@ function loadFixture(): FixtureFile {
     "fixtures/v1.session-parity.json"
   );
   return JSON.parse(fs.readFileSync(fixturePath, "utf8")) as FixtureFile;
+}
+
+function normalizeFelt(value: string): string {
+  return num.toHex(value).toLowerCase();
+}
+
+function hashPair(left: string, right: string): string {
+  const leftBigInt = BigInt(left);
+  const rightBigInt = BigInt(right);
+  if (leftBigInt <= rightBigInt) {
+    return normalizeFelt(hash.computePoseidonHash(left, right));
+  }
+  return normalizeFelt(hash.computePoseidonHash(right, left));
+}
+
+function computeRootFromProof(leaf: string, proof: readonly string[]): string {
+  return proof.reduce((current, sibling) => hashPair(current, sibling), leaf);
 }
 
 describe("cartridge ts parity fixtures", () => {
@@ -108,6 +129,41 @@ describe("cartridge ts parity fixtures", () => {
         entrypoint: "approve",
       },
     ]);
+  });
+
+  it("PAR-007 policy proofs reconstruct the root for every leaf in a 3-policy tree", () => {
+    const canonical = canonicalizeSessionPolicies([
+      { target: "0x1", method: "approve" },
+      { target: "0x2", method: "transfer" },
+      { target: "0x3", method: "mint" },
+    ]);
+
+    const { root } = computePolicyMerkle(canonical);
+    const proofs = computePolicyMerkleProofs(canonical);
+
+    expect(proofs).toHaveLength(3);
+    for (const proof of proofs) {
+      expect(proof.proof).toHaveLength(2);
+      expect(computeRootFromProof(proof.leaf, proof.proof)).toBe(root);
+    }
+  });
+
+  it("PAR-008 policy proofs reconstruct the root for every leaf in a 4-policy tree", () => {
+    const canonical = canonicalizeSessionPolicies([
+      { target: "0x1", method: "approve" },
+      { target: "0x2", method: "transfer" },
+      { target: "0x3", method: "mint" },
+      { target: "0x4", method: "burn" },
+    ]);
+
+    const { root } = computePolicyMerkle(canonical);
+    const proofs = computePolicyMerkleProofs(canonical);
+
+    expect(proofs).toHaveLength(4);
+    for (const proof of proofs) {
+      expect(proof.proof).toHaveLength(2);
+      expect(computeRootFromProof(proof.leaf, proof.proof)).toBe(root);
+    }
   });
 
   it("PAR-101 session URL includes required query payload", () => {

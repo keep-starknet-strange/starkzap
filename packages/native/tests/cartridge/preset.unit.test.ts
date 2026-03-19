@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import type { CartridgeSessionPolicies } from "@/cartridge/types";
 import { SessionProtocolError } from "@/cartridge/ts/errors";
 import { resolvePresetPolicies } from "@/cartridge/ts/preset";
@@ -13,6 +13,10 @@ function jsonResponse(payload: unknown) {
 }
 
 describe("cartridge preset resolution", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it("resolves policies when preset payloads match the expected shape", async () => {
     const policies: CartridgeSessionPolicies = {
       contracts: {
@@ -45,11 +49,17 @@ describe("cartridge preset resolution", () => {
 
     expect(fetchImpl).toHaveBeenNthCalledWith(
       1,
-      "https://static.cartridge.gg/presets/index.json"
+      "https://static.cartridge.gg/presets/index.json",
+      expect.objectContaining({
+        signal: expect.anything(),
+      })
     );
     expect(fetchImpl).toHaveBeenNthCalledWith(
       2,
-      "https://cdn.cartridge.gg/presets/tic-tac-toe/config.json"
+      "https://cdn.cartridge.gg/presets/tic-tac-toe/config.json",
+      expect.objectContaining({
+        signal: expect.anything(),
+      })
     );
   });
 
@@ -90,5 +100,52 @@ describe("cartridge preset resolution", () => {
     await expect(promise).rejects.toThrow(
       'Loading Cartridge preset "tic-tac-toe" returned an invalid JSON payload: {"chains":{"SN_SEPOLIA":{"policies":"invalid"}}}.'
     );
+  });
+
+  it("times out stalled preset requests and wraps the timeout with context", async () => {
+    vi.useFakeTimers();
+
+    const fetchImpl = vi
+      .fn()
+      .mockImplementation(() => new Promise<never>(() => undefined));
+
+    const promise = resolvePresetPolicies({
+      preset: "tic-tac-toe",
+      chainId: "SN_SEPOLIA",
+      fetchImpl,
+    }).catch((caught) => caught);
+
+    await vi.advanceTimersByTimeAsync(15_000);
+
+    const error = await promise;
+
+    expect(error).toBeInstanceOf(SessionProtocolError);
+    expect((error as Error).message).toBe(
+      "Loading Cartridge preset index failed: Cartridge preset request timed out after 15000ms."
+    );
+    expect(fetchImpl).toHaveBeenCalledWith(
+      "https://static.cartridge.gg/presets/index.json",
+      expect.objectContaining({
+        signal: expect.anything(),
+      })
+    );
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it("wraps low-level preset transport failures in a protocol error", async () => {
+    const transportError = new Error("network down");
+    const fetchImpl = vi.fn().mockRejectedValue(transportError);
+
+    const error = await resolvePresetPolicies({
+      preset: "tic-tac-toe",
+      chainId: "SN_SEPOLIA",
+      fetchImpl,
+    }).catch((caught) => caught);
+
+    expect(error).toBeInstanceOf(SessionProtocolError);
+    expect((error as Error).message).toBe(
+      "Loading Cartridge preset index failed: network down."
+    );
+    expect((error as Error & { cause?: unknown }).cause).toBe(transportError);
   });
 });

@@ -4,7 +4,12 @@ import {
   SessionRejectedError,
   SessionTimeoutError,
 } from "@/cartridge/ts/errors";
-import { asRecord, type FetchLike } from "@/cartridge/ts/shared";
+import {
+  asRecord,
+  ensureFetch,
+  fetchWithTimeout,
+  type FetchLike,
+} from "@/cartridge/ts/shared";
 import type { CartridgePolicies } from "@/cartridge/types";
 import {
   hasPoliciesInput,
@@ -84,17 +89,6 @@ type GraphQLSubscribeSessionResult = {
   };
   errors?: Array<{ message?: string }>;
 };
-function ensureFetch(fetchImpl?: FetchLike): FetchLike {
-  if (fetchImpl) {
-    return fetchImpl;
-  }
-  if (typeof fetch === "function") {
-    return fetch as unknown as FetchLike;
-  }
-  throw new SessionProtocolError(
-    "No fetch implementation available for Cartridge session subscription."
-  );
-}
 
 function padBase64(value: string): string {
   const remainder = value.length % 4;
@@ -145,65 +139,6 @@ function decodeBase64(value: string): string {
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-async function fetchWithTimeout(
-  fetchFn: FetchLike,
-  input: string,
-  init: {
-    method?: string;
-    headers?: Record<string, string>;
-    body?: string;
-  },
-  requestTimeoutMs: number
-): Promise<Awaited<ReturnType<FetchLike>>> {
-  const timeoutMessage = `Cartridge session subscription request timed out after ${requestTimeoutMs}ms.`;
-  if (!Number.isFinite(requestTimeoutMs) || requestTimeoutMs <= 0) {
-    return fetchFn(input, init);
-  }
-
-  const maybeAbortController = (
-    globalThis as unknown as {
-      AbortController?: new () => { signal: unknown; abort(): void };
-    }
-  ).AbortController;
-  if (typeof maybeAbortController === "function") {
-    const controller = new maybeAbortController();
-    const timeoutId = setTimeout(() => {
-      controller.abort();
-    }, requestTimeoutMs);
-    try {
-      return await fetchFn(input, {
-        ...init,
-        signal: controller.signal,
-      });
-    } catch (error) {
-      const message = error instanceof Error ? error.message.toLowerCase() : "";
-      const name = error instanceof Error ? error.name : "";
-      if (name === "AbortError" || message.includes("abort")) {
-        throw new SessionProtocolError(timeoutMessage, error);
-      }
-      throw error;
-    } finally {
-      clearTimeout(timeoutId);
-    }
-  }
-
-  let timeoutId: ReturnType<typeof setTimeout> | null = null;
-  try {
-    return await Promise.race([
-      fetchFn(input, init),
-      new Promise<never>((_, reject) => {
-        timeoutId = setTimeout(() => {
-          reject(new SessionProtocolError(timeoutMessage));
-        }, requestTimeoutMs);
-      }),
-    ]);
-  } finally {
-    if (timeoutId !== null) {
-      clearTimeout(timeoutId);
-    }
-  }
 }
 
 function toOptionalString(value: unknown): string | null {
@@ -453,7 +388,11 @@ export async function waitForSessionSubscription({
   requestTimeoutMs = 15_000,
   fetchImpl,
 }: WaitForSessionSubscriptionOptions): Promise<SessionRegistration> {
-  const fetchFn = ensureFetch(fetchImpl);
+  const fetchFn = ensureFetch(
+    fetchImpl,
+    "No fetch implementation available for Cartridge session subscription.",
+    (message) => new SessionProtocolError(message)
+  );
   const startedAt = Date.now();
   let attempt = 0;
   let lastError: unknown;
@@ -475,7 +414,12 @@ export async function waitForSessionSubscription({
             },
           }),
         },
-        requestTimeoutMs
+        {
+          requestTimeoutMs,
+          timeoutMessage: `Cartridge session subscription request timed out after ${requestTimeoutMs}ms.`,
+          createTimeoutError: (message, cause) =>
+            new SessionProtocolError(message, cause),
+        }
       );
 
       if (!response.ok) {
