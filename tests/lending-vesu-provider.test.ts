@@ -40,6 +40,57 @@ describe("VesuLendingProvider", () => {
     expect(provider.supportsChain(ChainId.SEPOLIA)).toBe(true);
   });
 
+  it("skips malformed position API items instead of failing the full response", async () => {
+    const fetcher = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        data: [
+          {
+            protocolVersion: "v2",
+            pool: { id: "0x123", name: "Prime" },
+            type: "earn",
+            collateral: {
+              address: collateralToken.address,
+              symbol: collateralToken.symbol,
+              decimals: collateralToken.decimals,
+              value: "1000",
+            },
+          },
+          {
+            protocolVersion: "v2",
+            pool: { id: "not-an-address", name: "Broken" },
+            type: "earn",
+            collateral: {
+              address: collateralToken.address,
+              symbol: collateralToken.symbol,
+              decimals: collateralToken.decimals,
+              value: "1000",
+            },
+          },
+        ],
+      }),
+    });
+    const provider = new VesuLendingProvider({
+      fetcher: fetcher as unknown as typeof fetch,
+    });
+    const context = createContext(vi.fn());
+
+    const positions = await provider.getPositions(context, {});
+
+    expect(positions).toHaveLength(1);
+    expect(positions[0]).toMatchObject({
+      type: "earn",
+      pool: { id: fromAddress("0x123"), name: "Prime" },
+      collateral: {
+        amount: 1000n,
+        token: expect.objectContaining({
+          address: collateralToken.address,
+          symbol: collateralToken.symbol,
+        }),
+      },
+    });
+  });
+
   it("throws on deposit when chain has no poolFactory configured", async () => {
     const callContract = vi.fn();
     const provider = new VesuLendingProvider({

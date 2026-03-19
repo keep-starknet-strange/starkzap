@@ -593,14 +593,26 @@ export class VesuLendingProvider implements LendingProvider {
       throw new Error(`Vesu positions request failed (${response.status})`);
     }
     const payload = (await response.json()) as VesuPositionsResponse;
-    return (payload.data ?? [])
-      .filter(
-        (entry) =>
-          entry.protocolVersion?.toLowerCase() === "v2" &&
-          entry.isDeprecated !== true
-      )
-      .map((entry) => this.toUserPosition(entry))
-      .filter((p): p is LendingUserPosition => p != null);
+    const positions: LendingUserPosition[] = [];
+    for (const entry of payload.data ?? []) {
+      if (
+        entry.protocolVersion?.toLowerCase() !== "v2" ||
+        entry.isDeprecated === true
+      ) {
+        continue;
+      }
+
+      try {
+        const position = this.toUserPosition(entry);
+        if (position) {
+          positions.push(position);
+        }
+      } catch {
+        continue;
+      }
+    }
+
+    return positions;
   }
 
   private toUserPosition(

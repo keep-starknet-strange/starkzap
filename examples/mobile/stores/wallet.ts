@@ -1107,6 +1107,7 @@ export const useWalletStore = create<WalletState>((set, get) => ({
       set({
         wallet: connectedWallet,
         walletType: "privy",
+        privateKey: "",
         privyWalletId: walletId,
         privyPublicKey: publicKey,
       });

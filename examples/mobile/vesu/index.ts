@@ -487,6 +487,7 @@ export function buildVesuMarketCards(params: {
     .map((option) => {
       const market = marketByKey.get(option.key);
       const token = resolveDisplayToken(option.token, tokenLookup);
+      const canBorrow = market?.canBeBorrowed ?? option.canBorrow;
       const poolLabel =
         market?.poolName?.trim() || getVesuPoolLabel(option.poolAddress);
       const collateralTokens = (
@@ -500,13 +501,13 @@ export function buildVesuMarketCards(params: {
         option: {
           ...option,
           token,
-          canBorrow: market?.canBeBorrowed ?? option.canBorrow,
+          canBorrow,
         },
         poolLabel,
         totalSuppliedLabel: formatVesuCompactUsd(market?.stats?.totalSupplied),
         totalBorrowedLabel: formatVesuCompactUsd(market?.stats?.totalBorrowed),
         supplyAprLabel: formatVesuRate(market?.stats?.supplyApy),
-        borrowAprLabel: option.canBorrow
+        borrowAprLabel: canBorrow
           ? formatVesuRate(market?.stats?.borrowApr)
           : "N/A",
         collateralTokens,
@@ -540,7 +541,6 @@ function filterUniquePoolAssets(
     if (extraFilter && !extraFilter(option)) continue;
     if (
       counterpart?.poolAddress &&
-      option.poolAddress &&
       option.poolAddress !== counterpart.poolAddress
     )
       continue;
