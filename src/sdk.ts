@@ -1,5 +1,12 @@
 import { type Call, type PaymasterTimeBounds, RpcProvider } from "starknet";
-import { ChainId, getChainId, type SDKConfig } from "@/types/config";
+import {
+  type BridgingConfig,
+  ChainId,
+  type ExplorerConfig,
+  getChainId,
+  type SDKConfig,
+  type StakingConfig,
+} from "@/types/config";
 import type { ConnectWalletOptions, FeeMode } from "@/types/wallet";
 import { type NetworkPreset, networks } from "@/network";
 import { Wallet } from "@/wallet";
@@ -160,7 +167,17 @@ export class StarkZap {
     return this.config.staking;
   }
 
-  private async ensureProviderChainMatchesConfig(): Promise<void> {
+  protected getResolvedConfig(): Readonly<{
+    bridging?: BridgingConfig;
+    chainId: ChainId;
+    explorer?: ExplorerConfig;
+    rpcUrl: string;
+    staking?: StakingConfig;
+  }> {
+    return this.config;
+  }
+
+  protected async ensureProviderChainMatchesConfig(): Promise<void> {
     if (!this.chainValidationPromise) {
       this.chainValidationPromise = (async () => {
         const providerChainId = await getChainId(this.provider);

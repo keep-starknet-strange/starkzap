@@ -28,9 +28,14 @@ export interface NativeOnboardCartridgeConfig extends Omit<
 
 export interface OnboardCartridgeOptions extends Omit<
   CoreCartridgeOnboardOptions,
-  "cartridge"
+  "cartridge" | "deploy"
 > {
   strategy: "cartridge";
+  /**
+   * Native Cartridge sessions do not support account deployment in this
+   * release. Omit this option or set it to "never".
+   */
+  deploy?: "never";
   cartridge?: NativeOnboardCartridgeConfig;
 }
 

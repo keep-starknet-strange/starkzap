@@ -212,6 +212,17 @@ describe("cartridge ts parity fixtures", () => {
     expect(parsed.searchParams.get("needs_session_creation")).toBe("true");
   });
 
+  it("PAR-101c session URL rejects non-http base URLs", () => {
+    expect(() =>
+      buildCartridgeSessionUrl({
+        baseUrl: "ftp://x.cartridge.gg",
+        publicKey: "0x1234",
+        policies: [{ target: "0xabc", method: "play_move" }],
+        rpcUrl: "https://api.cartridge.gg/x/starknet/sepolia",
+      })
+    ).toThrow("baseUrl must use http:// or https://");
+  });
+
   it("PAR-101a empty policies and no preset throws protocol error", () => {
     expect(() =>
       buildCartridgeSessionUrl({
@@ -231,7 +242,7 @@ describe("cartridge ts parity fixtures", () => {
     ).toThrow("Cartridge session URL requires either policies or a preset.");
   });
 
-  it("PAR-101c malformed contract methods payloads fail with a protocol error", () => {
+  it("PAR-101d malformed contract methods payloads fail with a protocol error", () => {
     const malformedPolicies = {
       contracts: {
         "0xabc": {

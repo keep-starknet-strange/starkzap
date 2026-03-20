@@ -58,6 +58,11 @@ export interface CartridgeNativeConnectArgs {
   forceNewSession?: boolean;
 }
 
+export interface CartridgeExecutionResult {
+  transaction_hash: string;
+  recovered_from_rpc_error?: true;
+}
+
 export interface CartridgeNativeAccountLike {
   address: string;
   execute: (
@@ -66,7 +71,7 @@ export interface CartridgeNativeAccountLike {
       feeMode: { mode: "sponsored" };
       timeBounds?: PaymasterTimeBounds;
     }
-  ) => Promise<{ transaction_hash: string }>;
+  ) => Promise<CartridgeExecutionResult>;
   signMessage?: (typedData: TypedData) => Promise<Signature>;
   simulateTransaction?: (
     invocations: Array<{ type: "INVOKE"; payload: Call[] }>

@@ -1,5 +1,6 @@
 import { ec, encode, stark, type Call } from "starknet";
 import type {
+  CartridgeExecutionResult,
   CartridgeNativeAdapter,
   CartridgeNativeConnectArgs,
 } from "@/cartridge/types";
@@ -27,6 +28,7 @@ import {
 } from "@/cartridge/ts/errors";
 import {
   asRecord,
+  assertSafeHttpUrl,
   ensureFetch,
   fetchWithTimeout,
   type FetchLike,
@@ -87,6 +89,15 @@ export interface CreateCartridgeTsAdapterOptions {
   logger?: Pick<Console, "info" | "warn" | "error">;
 }
 
+function normalizeConfiguredUrl(
+  value: string | undefined,
+  label: string
+): string | undefined {
+  return value
+    ? assertSafeHttpUrl(value, label).toString().replace(/\/+$/, "")
+    : undefined;
+}
+
 function readJsonRpcErrorMessage(payload: unknown): string | null {
   const record = asRecord(payload);
   const errorRecord = asRecord(record?.error);
@@ -120,6 +131,10 @@ async function resolveEffectivePolicies(
     args.preset &&
     (!hasManualPolicies || !args.shouldOverridePresetPolicies)
   ) {
+    const presetConfigBaseUrl = normalizeConfiguredUrl(
+      options.presetConfigBaseUrl,
+      "presetConfigBaseUrl"
+    );
     const fetchFn = ensureFetch(
       options.fetchImpl,
       "No fetch implementation available for Cartridge V3 outside execution.",
@@ -131,8 +146,8 @@ async function resolveEffectivePolicies(
       preset: args.preset,
       chainId: args.chainId,
       fetchImpl: fetchFn,
-      ...(options.presetConfigBaseUrl && {
-        presetBaseUrl: options.presetConfigBaseUrl,
+      ...(presetConfigBaseUrl && {
+        presetBaseUrl: presetConfigBaseUrl,
       }),
     });
 
@@ -239,15 +254,21 @@ async function resolveSessionRegistration(
   }
 
   if (options.subscribeSession) {
+    const cartridgeApiUrl =
+      normalizeConfiguredUrl(options.cartridgeApiUrl, "cartridgeApiUrl") ??
+      DEFAULT_CARTRIDGE_API_URL;
     return options.subscribeSession({
-      cartridgeApiUrl: options.cartridgeApiUrl ?? DEFAULT_CARTRIDGE_API_URL,
+      cartridgeApiUrl,
       sessionKeyGuid,
       ...(options.fetchImpl ? { fetchImpl: options.fetchImpl } : {}),
     });
   }
 
+  const cartridgeApiUrl =
+    normalizeConfiguredUrl(options.cartridgeApiUrl, "cartridgeApiUrl") ??
+    DEFAULT_CARTRIDGE_API_URL;
   return waitForSessionSubscription({
-    cartridgeApiUrl: options.cartridgeApiUrl ?? DEFAULT_CARTRIDGE_API_URL,
+    cartridgeApiUrl,
     sessionKeyGuid,
     ...(options.sessionRegistrationTimeoutMs
       ? { timeoutMs: options.sessionRegistrationTimeoutMs }
@@ -264,6 +285,10 @@ export function createCartridgeTsAdapter(
 ): CartridgeNativeAdapter {
   return {
     async connect(args: CartridgeNativeConnectArgs) {
+      const cartridgeBaseUrl = args.url
+        ? assertSafeHttpUrl(args.url, "url").toString().replace(/\/+$/, "")
+        : normalizeConfiguredUrl(options.cartridgeUrl, "cartridgeUrl") ??
+          DEFAULT_CARTRIDGE_URL;
       const sessionPrivateKey = stark.randomAddress();
       const formattedPrivateKey = encode.addHexPrefix(sessionPrivateKey);
       const sessionPublicKey = ec.starkCurve.getStarkKey(sessionPrivateKey);
@@ -276,7 +301,7 @@ export function createCartridgeTsAdapter(
       );
       const sessionKeyGuid = deriveSessionSignerGuid(formattedPrivateKey);
       const sessionUrl = buildCartridgeSessionUrl({
-        baseUrl: args.url || options.cartridgeUrl || DEFAULT_CARTRIDGE_URL,
+        baseUrl: cartridgeBaseUrl,
         publicKey: sessionPublicKey,
         ...(sessionUrlPolicies ? { policies: sessionUrlPolicies } : {}),
         rpcUrl: args.rpcUrl,
@@ -300,7 +325,7 @@ export function createCartridgeTsAdapter(
         `[starkzap] cartridge-ts session resolved address=${session.address}`
       );
 
-      const tsSessionAccount = new TsSessionAccount({
+      let activeSessionAccount: TsSessionAccount | null = new TsSessionAccount({
         rpcUrl: args.rpcUrl,
         chainId: args.chainId,
         session,
@@ -392,7 +417,10 @@ export function createCartridgeTsAdapter(
                 options.logger?.warn?.(
                   `[starkzap] cartridge-ts recovered tx hash from cartridge_addExecuteOutsideTransaction error payload txHash=${txHash} message=${errorMessage}`
                 );
-                return { transaction_hash: txHash };
+                return {
+                  transaction_hash: txHash,
+                  recovered_from_rpc_error: true,
+                } satisfies CartridgeExecutionResult;
               }
               throw new SessionProtocolError(
                 `cartridge_addExecuteOutsideTransaction failed: ${errorMessage}`
@@ -413,25 +441,24 @@ export function createCartridgeTsAdapter(
         ...(options.execute ? { execute: options.execute } : {}),
       });
 
+      const accountAddress = activeSessionAccount.address();
+      const sessionUsername = activeSessionAccount.username();
       let isConnected = true;
-      const sessionAccountWithCleanup = tsSessionAccount as TsSessionAccount & {
-        disconnect?: () => Promise<void> | void;
-        close?: () => Promise<void> | void;
-      };
 
       return {
         account: {
-          address: tsSessionAccount.address(),
+          address: accountAddress,
           execute: async (
             calls: Call[],
             details?: TsSessionExecutionDetails
           ) => {
-            if (!isConnected) {
+            const currentSessionAccount = activeSessionAccount;
+            if (!isConnected || !currentSessionAccount) {
               throw new SessionProtocolError(
                 "Cartridge TS session has been disconnected and cannot execute transactions."
               );
             }
-            const response = await tsSessionAccount.executeWithFallback(
+            const response = await currentSessionAccount.executeWithFallback(
               calls,
               details
             );
@@ -441,21 +468,34 @@ export function createCartridgeTsAdapter(
                 "TS Cartridge adapter execute call did not return a transaction hash."
               );
             }
-            return { transaction_hash: transactionHash };
+            const responseRecord = asRecord(response);
+            return {
+              transaction_hash: transactionHash,
+              ...(responseRecord?.recovered_from_rpc_error === true && {
+                recovered_from_rpc_error: true as const,
+              }),
+            };
           },
         },
-        username: async () => tsSessionAccount.username(),
+        username: async () => sessionUsername,
         disconnect: async () => {
-          if (!isConnected) {
+          const currentSessionAccount = activeSessionAccount;
+          if (!isConnected || !currentSessionAccount) {
             return;
           }
           isConnected = false;
+          activeSessionAccount = null;
           options.logger?.info?.(
             `[starkzap] cartridge-ts disconnect sessionKeyGuid=${sessionKeyGuid}`
           );
+          const sessionAccountWithCleanup =
+            currentSessionAccount as TsSessionAccount & {
+              disconnect?: () => Promise<void> | void;
+              close?: () => Promise<void> | void;
+            };
           const disconnectSession =
-            sessionAccountWithCleanup.disconnect?.bind(tsSessionAccount) ??
-            sessionAccountWithCleanup.close?.bind(tsSessionAccount);
+            sessionAccountWithCleanup.disconnect?.bind(currentSessionAccount) ??
+            sessionAccountWithCleanup.close?.bind(currentSessionAccount);
           await disconnectSession?.();
         },
         controller: {

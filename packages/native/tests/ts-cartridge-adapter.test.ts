@@ -47,6 +47,60 @@ describe("cartridge ts adapter", () => {
     );
   });
 
+  it("rejects invalid cartridgeUrl values before building the session URL", async () => {
+    const openSession = vi.fn();
+    const adapter = createCartridgeTsAdapter({
+      cartridgeUrl: "ftp://x.cartridge.gg",
+      openSession,
+    });
+
+    await expect(
+      adapter.connect({
+        rpcUrl: "https://api.cartridge.gg/x/starknet/sepolia",
+        chainId: "0x534e5f5345504f4c4941",
+        policies: [{ target: "0x1", method: "create_game" }],
+      })
+    ).rejects.toThrow("cartridgeUrl must use http:// or https://");
+    expect(openSession).not.toHaveBeenCalled();
+  });
+
+  it("rejects invalid cartridgeApiUrl values before invoking subscription callbacks", async () => {
+    const subscribeSession = vi.fn();
+    const adapter = createCartridgeTsAdapter({
+      cartridgeApiUrl: "ftp://api.cartridge.gg/graphql",
+      openSession: async () => ({
+        status: "success",
+      }),
+      subscribeSession,
+    });
+
+    await expect(
+      adapter.connect({
+        rpcUrl: "https://api.cartridge.gg/x/starknet/sepolia",
+        chainId: "0x534e5f5345504f4c4941",
+        policies: [{ target: "0x1", method: "create_game" }],
+      })
+    ).rejects.toThrow("cartridgeApiUrl must use http:// or https://");
+    expect(subscribeSession).not.toHaveBeenCalled();
+  });
+
+  it("rejects invalid presetConfigBaseUrl values before resolving presets", async () => {
+    const resolvePresetPolicies = vi.fn();
+    const adapter = createCartridgeTsAdapter({
+      presetConfigBaseUrl: "ftp://static.cartridge.gg/presets",
+      resolvePresetPolicies,
+    });
+
+    await expect(
+      adapter.connect({
+        rpcUrl: "https://api.cartridge.gg/x/starknet/sepolia",
+        chainId: "0x534e5f5345504f4c4941",
+        preset: "tic-tac-toe",
+      })
+    ).rejects.toThrow("presetConfigBaseUrl must use http:// or https://");
+    expect(resolvePresetPolicies).not.toHaveBeenCalled();
+  });
+
   it("uses pure TS V3 cartridge_addExecuteOutsideTransaction by default", async () => {
     const fetchImpl = vi.fn().mockResolvedValue({
       ok: true,
@@ -83,6 +137,7 @@ describe("cartridge ts adapter", () => {
     );
 
     expect(tx.transaction_hash).toBe("0xdeadbeef");
+    expect(tx.recovered_from_rpc_error).toBeUndefined();
     expect(fetchImpl).toHaveBeenCalledTimes(1);
 
     const [url, init] = fetchImpl.mock.calls[0] as [
@@ -363,6 +418,7 @@ describe("cartridge ts adapter", () => {
     );
 
     expect(tx.transaction_hash).toBe("0xdeadbeef");
+    expect(tx.recovered_from_rpc_error).toBe(true);
     expect(logger.warn).toHaveBeenCalledTimes(1);
   });
 
@@ -627,12 +683,69 @@ describe("cartridge ts adapter", () => {
     expect(executeFromOutside).toHaveBeenCalledTimes(1);
   });
 
-  it("runs lower-level cleanup when the session account exposes one", async () => {
+  it("clears the session private key when disconnecting", async () => {
+    const disconnectDescriptor = Object.getOwnPropertyDescriptor(
+      TsSessionAccount.prototype,
+      "disconnect"
+    );
+    const originalDisconnect = TsSessionAccount.prototype.disconnect;
+    const disconnect = vi.fn(function (this: TsSessionAccount) {
+      originalDisconnect.call(this);
+      expect(
+        (
+          this as unknown as {
+            sessionPrivateKey: string | null;
+          }
+        ).sessionPrivateKey
+      ).toBeNull();
+    });
+
+    Object.defineProperty(TsSessionAccount.prototype, "disconnect", {
+      configurable: true,
+      value: disconnect,
+    });
+
+    try {
+      const adapter = createCartridgeTsAdapter({
+        openSession: async () => ({
+          status: "success",
+          encodedSession: ENCODED_SESSION,
+        }),
+        execute: async () => ({ transaction_hash: "0xfeedbeef" }),
+      });
+
+      const handle = await adapter.connect({
+        rpcUrl: "https://api.cartridge.gg/x/starknet/sepolia",
+        chainId: "0x534e5f5345504f4c4941",
+        policies: [{ target: "0x1", method: "create_game" }],
+      });
+
+      await handle.disconnect?.();
+      await handle.disconnect?.();
+
+      expect(disconnect).toHaveBeenCalledTimes(1);
+    } finally {
+      if (disconnectDescriptor) {
+        Object.defineProperty(
+          TsSessionAccount.prototype,
+          "disconnect",
+          disconnectDescriptor
+        );
+      }
+    }
+  });
+
+  it("falls back to close when the session account does not expose disconnect", async () => {
     const close = vi.fn().mockResolvedValue(undefined);
+    const disconnectDescriptor = Object.getOwnPropertyDescriptor(
+      TsSessionAccount.prototype,
+      "disconnect"
+    );
     const closeDescriptor = Object.getOwnPropertyDescriptor(
       TsSessionAccount.prototype,
       "close"
     );
+    Reflect.deleteProperty(TsSessionAccount.prototype, "disconnect");
     Object.defineProperty(TsSessionAccount.prototype, "close", {
       configurable: true,
       value: close,
@@ -658,6 +771,13 @@ describe("cartridge ts adapter", () => {
 
       expect(close).toHaveBeenCalledTimes(1);
     } finally {
+      if (disconnectDescriptor) {
+        Object.defineProperty(
+          TsSessionAccount.prototype,
+          "disconnect",
+          disconnectDescriptor
+        );
+      }
       if (closeDescriptor) {
         Object.defineProperty(
           TsSessionAccount.prototype,
