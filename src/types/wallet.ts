@@ -70,6 +70,25 @@ export interface AccountConfig {
  */
 export type FeeMode = "sponsored" | "user_pays";
 
+// ─── Provider Options ────────────────────────────────────────────────────────
+
+/**
+ * Shared provider registration options.
+ *
+ * Used by `connectWallet()`, `onboard()`, and `WalletOptions` to register
+ * swap and DCA providers on the wallet at creation time.
+ */
+export interface ProviderOptions {
+  /** Optional additional swap providers to register on the wallet */
+  swapProviders?: SwapProvider[];
+  /** Optional default swap provider id (must be registered) */
+  defaultSwapProviderId?: string;
+  /** Optional additional DCA providers to register on the wallet */
+  dcaProviders?: DcaProvider[];
+  /** Optional default DCA provider id (must be registered) */
+  defaultDcaProviderId?: string;
+}
+
 // ─── Connect Options ─────────────────────────────────────────────────────────
 
 /**
@@ -94,7 +113,7 @@ export type FeeMode = "sponsored" | "user_pays";
  * });
  * ```
  */
-export interface ConnectWalletOptions {
+export interface ConnectWalletOptions extends ProviderOptions {
   /** Account configuration */
   account: AccountConfig;
   /** Optional known account address (skips SDK address derivation) */
@@ -103,14 +122,6 @@ export interface ConnectWalletOptions {
   feeMode?: FeeMode;
   /** Optional time bounds for paymaster transactions */
   timeBounds?: PaymasterTimeBounds;
-  /** Optional additional swap providers to register on the connected wallet */
-  swapProviders?: SwapProvider[];
-  /** Optional default swap provider id (must be registered) */
-  defaultSwapProviderId?: string;
-  /** Optional additional DCA providers to register on the connected wallet */
-  dcaProviders?: DcaProvider[];
-  /** Optional default DCA provider id (must be registered) */
-  defaultDcaProviderId?: string;
 }
 
 // ─── Ensure Ready ────────────────────────────────────────────────────────────
