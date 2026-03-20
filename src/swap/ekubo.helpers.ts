@@ -64,11 +64,12 @@ function parseNonNegativeBigInt(
 }
 
 function toI129(value: bigint): { mag: bigint; sign: boolean } {
-  const magnitude = value < 0n ? value * -1n : value;
-  if (magnitude > MAX_U128) {
+  const sign = value < 0n;
+  const mag = sign ? -value : value;
+  if (mag > MAX_U128) {
     throw new Error("Value exceeds i129 magnitude range");
   }
-  return { mag: magnitude, sign: value < 0n };
+  return { mag, sign };
 }
 
 function toPoolKeyCalldata(poolKey: EkuboPoolKey): {

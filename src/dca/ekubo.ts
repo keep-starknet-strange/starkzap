@@ -413,8 +413,7 @@ export class EkuboDcaProvider implements DcaProvider {
   private async getCurrentBlockTimestamp(
     context: DcaProviderContext
   ): Promise<number> {
-    const latestBlock = await context.rpcProvider.getBlock("latest");
-    const timestamp = latestBlock.timestamp;
+    const { timestamp } = await context.rpcProvider.getBlock("latest");
     assertNonNegativeInteger(timestamp, "latest block timestamp");
     return timestamp;
   }
