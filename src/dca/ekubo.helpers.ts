@@ -374,16 +374,15 @@ export function parseOrderInfosResult(
   result: string[],
   expected: number
 ): EkuboOnChainOrderInfo[] {
-  const values = result.map((item) => String(item));
   const expectedLength = expected * 3 + 1;
 
-  if (values.length !== expectedLength) {
+  if (result.length !== expectedLength) {
     throw new Error(
-      `Ekubo order infos response is malformed: expected ${expectedLength} values, got ${values.length}`
+      `Ekubo order infos response is malformed: expected ${expectedLength} values, got ${result.length}`
     );
   }
 
-  const declaredLength = Number(values[0]);
+  const declaredLength = Number(result[0]);
   if (declaredLength !== expected) {
     throw new Error(
       `Ekubo order infos length mismatch: header says ${declaredLength}, expected ${expected}`
@@ -393,7 +392,7 @@ export function parseOrderInfosResult(
   const infos: EkuboOnChainOrderInfo[] = [];
   for (let index = 0; index < expected; index += 1) {
     const baseIndex = 1 + index * 3;
-    infos.push(parseOrderInfoResult(values.slice(baseIndex, baseIndex + 3)));
+    infos.push(parseOrderInfoResult(result.slice(baseIndex, baseIndex + 3)));
   }
 
   return infos;
