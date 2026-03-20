@@ -287,8 +287,8 @@ export function createCartridgeTsAdapter(
     async connect(args: CartridgeNativeConnectArgs) {
       const cartridgeBaseUrl = args.url
         ? assertSafeHttpUrl(args.url, "url").toString().replace(/\/+$/, "")
-        : normalizeConfiguredUrl(options.cartridgeUrl, "cartridgeUrl") ??
-          DEFAULT_CARTRIDGE_URL;
+        : (normalizeConfiguredUrl(options.cartridgeUrl, "cartridgeUrl") ??
+          DEFAULT_CARTRIDGE_URL);
       const sessionPrivateKey = stark.randomAddress();
       const formattedPrivateKey = encode.addHexPrefix(sessionPrivateKey);
       const sessionPublicKey = ec.starkCurve.getStarkKey(sessionPrivateKey);
