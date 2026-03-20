@@ -25,9 +25,11 @@ config.resolver.extraNodeModules = {
   ),
 };
 
+const finalConfig = withStarkzap(config);
+
 // Resolve @/* path alias (tsconfig paths) for Metro bundler
-const prevResolveRequest = config.resolver.resolveRequest;
-config.resolver.resolveRequest = (context, moduleName, platform) => {
+const prevResolveRequest = finalConfig.resolver.resolveRequest;
+finalConfig.resolver.resolveRequest = (context, moduleName, platform) => {
   const resolver = prevResolveRequest ?? context.resolveRequest;
   if (moduleName.startsWith("@/")) {
     const aliasedPath = path.join(__dirname, moduleName.slice(2));
@@ -36,4 +38,4 @@ config.resolver.resolveRequest = (context, moduleName, platform) => {
   return resolver(context, moduleName, platform);
 };
 
-module.exports = withStarkzap(config);
+module.exports = finalConfig;
