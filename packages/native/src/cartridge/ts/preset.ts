@@ -3,12 +3,14 @@ import type { CartridgeSessionPolicies } from "@/cartridge/types";
 import { SessionProtocolError } from "@/cartridge/ts/errors";
 import {
   asRecord,
+  assertSafeHttpUrl,
   fetchWithTimeout,
   type FetchLike,
 } from "@/cartridge/ts/shared";
 
 const DEFAULT_PRESET_BASE_URL = "https://static.cartridge.gg/presets";
 const DEFAULT_PRESET_REQUEST_TIMEOUT_MS = 15_000;
+const TRUSTED_CARTRIDGE_PRESET_DOMAIN = "cartridge.gg";
 
 type Validator<T> = (obj: unknown) => obj is T;
 
@@ -123,6 +125,102 @@ function describeTransportError(error: unknown): string {
   return "Unknown transport error.";
 }
 
+function isTrustedCartridgePresetHostname(hostname: string): boolean {
+  return (
+    hostname === TRUSTED_CARTRIDGE_PRESET_DOMAIN ||
+    hostname.endsWith(`.${TRUSTED_CARTRIDGE_PRESET_DOMAIN}`)
+  );
+}
+
+function getNormalizedUrlPort(url: URL): string {
+  if (url.port) {
+    return url.port;
+  }
+
+  if (url.protocol === "https:") {
+    return "443";
+  }
+
+  if (url.protocol === "http:") {
+    return "80";
+  }
+
+  return "";
+}
+
+function isTrustedPresetBaseUrl(expectedUrl: URL, actualUrl: URL): boolean {
+  if (
+    actualUrl.protocol !== expectedUrl.protocol ||
+    getNormalizedUrlPort(actualUrl) !== getNormalizedUrlPort(expectedUrl) ||
+    actualUrl.username.length > 0 ||
+    actualUrl.password.length > 0
+  ) {
+    return false;
+  }
+
+  if (actualUrl.hostname === expectedUrl.hostname) {
+    return true;
+  }
+
+  // Allow Cartridge-managed preset hosting to move between trusted
+  // cartridge.gg subdomains without trusting arbitrary remote hosts.
+  return (
+    isTrustedCartridgePresetHostname(expectedUrl.hostname) &&
+    isTrustedCartridgePresetHostname(actualUrl.hostname)
+  );
+}
+
+function resolvePresetConfigBaseUrl(
+  presetBaseUrl: string,
+  indexBaseUrl?: string
+): string {
+  const trimmedBaseUrl = indexBaseUrl?.trim();
+  if (!trimmedBaseUrl) {
+    return presetBaseUrl.replace(/\/+$/, "");
+  }
+
+  let expectedUrl: URL;
+  try {
+    expectedUrl = new URL(presetBaseUrl);
+  } catch (error) {
+    throw new SessionProtocolError(
+      `Configured Cartridge preset base URL is invalid: ${presetBaseUrl}.`,
+      error
+    );
+  }
+
+  let actualUrl: URL;
+  try {
+    actualUrl = new URL(trimmedBaseUrl, expectedUrl);
+  } catch (error) {
+    throw new SessionProtocolError(
+      `Loading Cartridge preset index returned an invalid baseUrl "${trimmedBaseUrl}".`,
+      error
+    );
+  }
+
+  if (!isTrustedPresetBaseUrl(expectedUrl, actualUrl)) {
+    throw new SessionProtocolError(
+      `Loading Cartridge preset index returned an untrusted baseUrl "${actualUrl.toString()}".`
+    );
+  }
+
+  return actualUrl.toString().replace(/\/+$/, "");
+}
+
+function normalizeConfiguredPresetBaseUrl(presetBaseUrl: string): string {
+  try {
+    return assertSafeHttpUrl(presetBaseUrl, "presetBaseUrl")
+      .toString()
+      .replace(/\/+$/, "");
+  } catch (error) {
+    throw new SessionProtocolError(
+      `Configured Cartridge preset base URL is invalid: ${presetBaseUrl}.`,
+      error
+    );
+  }
+}
+
 async function fetchJson<T>(
   fetchImpl: FetchLike,
   url: string,
@@ -178,20 +276,22 @@ export async function resolvePresetPolicies({
   fetchImpl,
   presetBaseUrl = DEFAULT_PRESET_BASE_URL,
 }: ResolvePresetPoliciesArgs): Promise<CartridgeSessionPolicies> {
+  const normalizedPresetBaseUrl =
+    normalizeConfiguredPresetBaseUrl(presetBaseUrl);
   const index = await fetchJson<PresetIndex>(
     fetchImpl,
-    `${presetBaseUrl}/index.json`,
+    `${normalizedPresetBaseUrl}/index.json`,
     "Loading Cartridge preset index",
     isPresetIndex
   );
-  const baseUrl =
-    typeof index.baseUrl === "string" && index.baseUrl.trim().length > 0
-      ? index.baseUrl
-      : presetBaseUrl;
+  const baseUrl = resolvePresetConfigBaseUrl(
+    normalizedPresetBaseUrl,
+    index.baseUrl
+  );
 
   const config = await fetchJson<PresetConfig>(
     fetchImpl,
-    `${baseUrl.replace(/\/+$/, "")}/${preset}/config.json`,
+    `${baseUrl}/${preset}/config.json`,
     `Loading Cartridge preset "${preset}"`,
     isPresetConfig
   );

@@ -158,4 +158,22 @@ describe("TsSessionAccount", () => {
     });
     expect(execute).toHaveBeenCalledTimes(1);
   });
+
+  it("clears the session private key on disconnect", async () => {
+    const executeFromOutside = vi.fn();
+    const account = createAccount({ executeFromOutside });
+    const internalAccount = account as unknown as {
+      sessionPrivateKey: string | null;
+    };
+
+    expect(internalAccount.sessionPrivateKey).toBe("0x1234");
+
+    account.disconnect();
+
+    expect(internalAccount.sessionPrivateKey).toBeNull();
+    await expect(account.executeWithFallback(CALLS)).rejects.toThrow(
+      "Cartridge TS session has been disconnected and cannot execute transactions."
+    );
+    expect(executeFromOutside).not.toHaveBeenCalled();
+  });
 });

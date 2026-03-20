@@ -12,6 +12,7 @@ export {
   registerCartridgeNativeAdapter,
 } from "@/cartridge/registry";
 export type {
+  CartridgeExecutionResult,
   CartridgeContractPolicy,
   CartridgePolicies,
   CartridgePolicy,

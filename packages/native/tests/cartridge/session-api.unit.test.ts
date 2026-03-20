@@ -134,4 +134,19 @@ describe("waitForSessionSubscription", () => {
       isRevoked: false,
     });
   });
+
+  it("rejects invalid cartridgeApiUrl values before issuing subscription fetches", async () => {
+    const fetchImpl = vi.fn();
+
+    const error = await waitForSessionSubscription({
+      cartridgeApiUrl: "ftp://api.cartridge.gg/graphql",
+      sessionKeyGuid: "0x123",
+      fetchImpl,
+    }).catch((caught) => caught);
+
+    expect((error as Error).message).toBe(
+      "cartridgeApiUrl must use http:// or https://"
+    );
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
 });

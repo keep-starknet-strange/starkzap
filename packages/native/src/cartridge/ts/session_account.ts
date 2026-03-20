@@ -102,7 +102,7 @@ export class TsSessionAccount {
   private readonly rpcUrl: string;
   private readonly chainId: string;
   private readonly session: SessionRegistration;
-  private readonly sessionPrivateKey: string;
+  private sessionPrivateKey: string | null;
   private readonly policyRoot: string;
   private readonly sessionKeyGuid: string;
   private readonly executeFromOutsideImpl: TsExecuteFromOutside | undefined;
@@ -131,6 +131,10 @@ export class TsSessionAccount {
     return this.session.sessionKeyGuid;
   }
 
+  disconnect(): void {
+    this.sessionPrivateKey = null;
+  }
+
   isExpired(nowMs: number = Date.now()): boolean {
     const expiresAtSeconds = Number(this.session.expiresAt);
     if (!Number.isFinite(expiresAtSeconds)) {
@@ -149,13 +153,20 @@ export class TsSessionAccount {
       );
     }
 
+    const sessionPrivateKey = this.sessionPrivateKey;
+    if (!sessionPrivateKey) {
+      throw new SessionProtocolError(
+        "Cartridge TS session has been disconnected and cannot execute transactions."
+      );
+    }
+
     const context: TsSessionExecutionContext = {
       calls,
       ...(details ? { details } : {}),
       rpcUrl: this.rpcUrl,
       chainId: this.chainId,
       session: this.session,
-      sessionPrivateKey: this.sessionPrivateKey,
+      sessionPrivateKey,
       policyRoot: this.policyRoot,
       sessionKeyGuid: this.sessionKeyGuid,
     };
