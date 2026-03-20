@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { hash, num } from "starknet";
 import { deriveSessionSignerGuid } from "@/cartridge/ts/guid";
 import { canonicalizeSessionPolicies } from "@/cartridge/ts/policy";
@@ -331,6 +331,30 @@ describe("cartridge ts parity fixtures", () => {
     });
   });
 
+  it("PAR-102e malformed redirect base64 fails with a protocol error", () => {
+    const decodeError = new SyntaxError("Invalid base64 payload.");
+    vi.stubGlobal("atob", () => {
+      throw decodeError;
+    });
+
+    try {
+      let thrown: unknown;
+      try {
+        parseSessionFromEncodedRedirect("%%%");
+      } catch (error) {
+        thrown = error;
+      }
+
+      expect(thrown).toBeInstanceOf(SessionProtocolError);
+      expect((thrown as Error).message).toBe(
+        "Cartridge session redirect payload is not valid base64."
+      );
+      expect((thrown as Error & { cause?: unknown }).cause).toBe(decodeError);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
   it("PAR-102c redirect parsing accepts missing session key guid when default is provided", () => {
     const payload = {
       username: "player1",
@@ -356,6 +380,48 @@ describe("cartridge ts parity fixtures", () => {
       metadataHash: "0x0",
       sessionKeyGuid: "0x999",
     });
+  });
+
+  it("PAR-102f alias-only legacy redirect payloads are rejected", () => {
+    const payload = {
+      accountId: "player1",
+      accountAddress: "0xabc",
+      owner_guid: "0x123",
+      expires_at: "4702444800",
+      session_key_guid: "0x999",
+    };
+    const encoded = Buffer.from(JSON.stringify(payload), "utf8").toString(
+      "base64url"
+    );
+
+    expect(() => parseSessionFromEncodedRedirect(encoded)).toThrow(
+      SessionProtocolError
+    );
+    expect(() => parseSessionFromEncodedRedirect(encoded)).toThrow(
+      "Malformed Cartridge session payload; missing required fields: username, address, ownerGuid, expiresAt, sessionKeyGuid."
+    );
+  });
+
+  it("PAR-102g alias-only controller redirect payloads are rejected", () => {
+    const payload = {
+      controller: {
+        address: "0xabc",
+        accountId: "player1",
+      },
+      authorization: ["0xdead", "0x123"],
+      expiresAt: "4702444800",
+      sessionKeyGuid: "0x999",
+    };
+    const encoded = Buffer.from(JSON.stringify(payload), "utf8").toString(
+      "base64url"
+    );
+
+    expect(() => parseSessionFromEncodedRedirect(encoded)).toThrow(
+      SessionProtocolError
+    );
+    expect(() => parseSessionFromEncodedRedirect(encoded)).toThrow(
+      "Malformed Cartridge session payload; missing required fields: username."
+    );
   });
 
   it("extracts encoded session from callback URLs", () => {

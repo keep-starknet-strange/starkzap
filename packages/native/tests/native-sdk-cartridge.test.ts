@@ -77,6 +77,34 @@ describe("@starkzap/native cartridge sdk", () => {
     expect(callArg?.rpcUrl).toContain("sepolia");
   });
 
+  it.each([
+    ["empty array", []],
+    ["empty contracts object", { contracts: {} }],
+  ])(
+    "treats %s policies as absent when using a preset",
+    async (_label, policies) => {
+      const sdk = makeSdk();
+      vi.spyOn(sdk.getProvider(), "getClassHashAt").mockResolvedValue("0x1");
+
+      const { adapter, connect } = makeAdapter();
+      registerCartridgeNativeAdapter(adapter);
+
+      await sdk.connectCartridge({
+        policies,
+        preset: "session-preset",
+      });
+
+      expect(connect).toHaveBeenCalledWith(
+        expect.objectContaining({
+          chainId: ChainId.SEPOLIA.toFelt252(),
+          preset: "session-preset",
+        })
+      );
+
+      expect(connect.mock.calls[0]?.[0]).not.toHaveProperty("policies");
+    }
+  );
+
   it("rejects unsupported default fee modes before connecting", async () => {
     const sdk = makeSdk();
     const { adapter, connect } = makeAdapter();

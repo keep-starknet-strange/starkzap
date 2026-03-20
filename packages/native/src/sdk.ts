@@ -96,8 +96,10 @@ export class StarkZap extends CoreStarkZap {
 
     const adapter = getCartridgeNativeAdapterOrThrow();
 
-    const policies = options.policies;
-    if (!hasPoliciesInput(policies) && !options.preset) {
+    const policies = hasPoliciesInput(options.policies)
+      ? options.policies
+      : undefined;
+    if (!policies && !options.preset) {
       throw new Error(
         "Cartridge session connection requires either non-empty policies or a preset that resolves policies for the active chain."
       );

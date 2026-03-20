@@ -95,6 +95,27 @@ describe("NativeCartridgeWallet", () => {
     );
   });
 
+  it("fails fast on execute when the account is undeployed", async () => {
+    const undeployedProvider = {
+      getClassHashAt: vi
+        .fn()
+        .mockRejectedValue(new Error("contract not found")),
+    } as unknown as RpcProvider;
+    const wallet = await NativeCartridgeWallet.create({
+      session,
+      provider: undeployedProvider,
+      chainId: ChainId.SEPOLIA,
+    });
+
+    await expect(
+      wallet.execute([{ contractAddress: "0x1" } as Call], {
+        feeMode: "sponsored",
+      })
+    ).rejects.toThrow("Account not deployed and deploy mode is 'never'");
+
+    expect(session.account.execute).not.toHaveBeenCalled();
+  });
+
   it("throws when class hash is unavailable for undeployed accounts", async () => {
     const undeployedProvider = {
       getClassHashAt: vi
