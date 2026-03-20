@@ -100,7 +100,14 @@ export abstract class EthereumBridge implements BridgeInterface<EthereumAddress>
 
   protected abstract getAllowanceSpender(): Promise<EthereumAddress | null>;
 
-  protected abstract getEthereumGasPrice(): Promise<bigint>;
+  protected async getEthereumGasPrice(): Promise<bigint> {
+    const gasData = await this.config.provider.getFeeData();
+    const gasPrice = gasData.gasPrice ?? 0n;
+    const maxFeePerGas = gasData.maxFeePerGas;
+    return maxFeePerGas && gasData.maxPriorityFeePerGas
+      ? maxFeePerGas
+      : gasPrice;
+  }
 
   protected async approveSpendingOf(amount: Amount): Promise<void> {
     const spender = await this.getAllowanceSpender();

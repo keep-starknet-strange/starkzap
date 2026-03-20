@@ -41,33 +41,16 @@ export class CCTPFees {
     fastTransfer?: boolean
   ): Promise<number> {
     try {
-      const feeData = await this.getFees(direction, chainId);
-
-      if (!Array.isArray(feeData)) {
-        return this.getFallbackFee(direction, fastTransfer);
-      }
-
+      const feeData = await this.fetchFees(direction, chainId);
       const targetThreshold = getFinalityThreshold(fastTransfer);
-
-      const fee = feeData.find((f) => f.finalityThreshold === targetThreshold);
-
-      if (fee) {
-        return fee.minimumFee;
-      }
-
-      return this.getFallbackFee(direction, fastTransfer);
+      const fee = feeData.find(
+        (f) => f.finalityThreshold === targetThreshold
+      );
+      return fee?.minimumFee ?? this.getFallbackFee(direction, fastTransfer);
     } catch (error) {
       console.error("Failed to get transfer fee, using fallback:", error);
       return this.getFallbackFee(direction, fastTransfer);
     }
-  }
-
-  private async getFees(
-    direction: BridgeDirection,
-    chainId: ChainId
-  ): Promise<CCTPFeeData[]> {
-    // Possibly cache these fees.
-    return this.fetchFees(direction, chainId);
   }
 
   private async fetchFees(
@@ -82,13 +65,7 @@ export class CCTPFees {
       direction === BridgeDirection.DEPOSIT_TO_STARKNET
         ? STARKNET_DOMAIN_ID
         : ETHEREUM_DOMAIN_ID;
-
-    let domainUrl;
-    if (chainId.isMainnet()) {
-      domainUrl = LIVE_DOMAIN;
-    } else {
-      domainUrl = SANDBOX_DOMAIN;
-    }
+    const domainUrl = chainId.isMainnet() ? LIVE_DOMAIN : SANDBOX_DOMAIN;
     const url = `${domainUrl}/v2/burn/USDC/fees/${source}/${destination}`;
 
     const response = await fetch(url);

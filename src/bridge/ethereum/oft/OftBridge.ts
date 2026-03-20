@@ -1,8 +1,9 @@
 import { EthereumBridge } from "@/bridge/ethereum/EthereumBridge";
 import type { BridgeDepositOptions } from "@/bridge/types/BridgeInterface";
-import type {
-  EthereumWalletConfig,
-  OftDepositFeeEstimation,
+import {
+  DUMMY_SN_ADDRESS,
+  type EthereumWalletConfig,
+  type OftDepositFeeEstimation,
 } from "@/bridge/ethereum/types";
 import type { Address, ExternalTransactionResponse } from "@/types";
 import {
@@ -10,7 +11,6 @@ import {
   type EthereumAddress,
   EthereumBridgeToken,
   ExternalChain,
-  fromAddress,
 } from "@/types";
 import type { WalletInterface } from "@/wallet";
 import type { ContractTransaction } from "ethers";
@@ -21,10 +21,6 @@ import {
   DEFAULT_OFT_MIN_AMOUNT,
   OFT_MIN_AMOUNT_BY_TOKEN_ID,
 } from "@/bridge/ethereum/oft/constants";
-
-const DUMMY_SN_ADDRESS = fromAddress(
-  "0x023123100123103023123acb1231231231231031231ca123f23123123123100a"
-);
 const DUMMY_ETH_ADDRESS = "0x0000000000000000000000000000000000000001";
 const DUMMY_DEPOSIT_TX_CACHE_TTL_MS = 60_000;
 
@@ -73,7 +69,7 @@ export class OftBridge extends EthereumBridge {
     const quotes = await this.layerZeroApi.getDepositQuotes({
       srcWalletAddress: signerAddress,
       dstWalletAddress: recipient,
-      amount: amount,
+      amount,
     });
 
     const depositTx = this.layerZeroApi.getDepositTransaction(quotes);
@@ -163,16 +159,6 @@ export class OftBridge extends EthereumBridge {
     }
 
     return this.cachedSpender;
-  }
-
-  protected async getEthereumGasPrice(): Promise<bigint> {
-    const gasData = await this.config.provider.getFeeData();
-    const gasPrice = gasData.gasPrice ?? 0n;
-    const maxFeePerGas = gasData.maxFeePerGas;
-
-    return maxFeePerGas && gasData.maxPriorityFeePerGas
-      ? maxFeePerGas
-      : gasPrice;
   }
 
   private getOftMinAmount(): Amount {
