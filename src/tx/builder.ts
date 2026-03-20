@@ -104,9 +104,7 @@ export class TxBuilder {
     const errors = this.pendingErrors.splice(0);
     if (errors.length === 1 && errors[0] instanceof Error) throw errors[0];
     const messages = errors.map((e) =>
-      e instanceof Error
-        ? e.message
-        : String(e ?? "Unknown async builder error")
+      e instanceof Error ? e.message : String(e ?? "Unknown async builder error")
     );
     throw new Error(messages.join("; "));
   }
@@ -233,19 +231,27 @@ export class TxBuilder {
       takerAddress: this.wallet.address,
       providerResolver: this.wallet,
     });
+<<<<<<< HEAD
     return this.queuePreparedCalls(
       "Swap",
       "swap",
       this.wallet.prepareSwap(request)
     );
+=======
+    return this.queuePreparedCalls("Swap", "swap", this.wallet.prepareSwap(request));
+>>>>>>> ae2a695 (refactor(tx): update tx module)
   }
 
   /**
    * Add a lending deposit operation.
    */
   lendDeposit(request: LendingDepositRequest): this {
+<<<<<<< HEAD
     return this.queuePreparedCalls(
       "Lending",
+=======
+    return this.queuePreparedCalls("Lending",
+>>>>>>> ae2a695 (refactor(tx): update tx module)
       "deposit",
       this.wallet.lending().prepareDeposit(request)
     );
@@ -255,8 +261,12 @@ export class TxBuilder {
    * Add a lending withdraw operation.
    */
   lendWithdraw(request: LendingWithdrawRequest): this {
+<<<<<<< HEAD
     return this.queuePreparedCalls(
       "Lending",
+=======
+    return this.queuePreparedCalls("Lending",
+>>>>>>> ae2a695 (refactor(tx): update tx module)
       "withdraw",
       this.wallet.lending().prepareWithdraw(request)
     );
@@ -266,8 +276,12 @@ export class TxBuilder {
    * Add a max-withdraw lending operation.
    */
   lendWithdrawMax(request: LendingWithdrawMaxRequest): this {
+<<<<<<< HEAD
     return this.queuePreparedCalls(
       "Lending",
+=======
+    return this.queuePreparedCalls("Lending",
+>>>>>>> ae2a695 (refactor(tx): update tx module)
       "withdrawMax",
       this.wallet.lending().prepareWithdrawMax(request)
     );
@@ -277,8 +291,12 @@ export class TxBuilder {
    * Add a lending borrow operation.
    */
   lendBorrow(request: LendingBorrowRequest): this {
+<<<<<<< HEAD
     return this.queuePreparedCalls(
       "Lending",
+=======
+    return this.queuePreparedCalls("Lending",
+>>>>>>> ae2a695 (refactor(tx): update tx module)
       "borrow",
       this.wallet.lending().prepareBorrow(request)
     );
@@ -288,8 +306,12 @@ export class TxBuilder {
    * Add a lending repay operation.
    */
   lendRepay(request: LendingRepayRequest): this {
+<<<<<<< HEAD
     return this.queuePreparedCalls(
       "Lending",
+=======
+    return this.queuePreparedCalls("Lending",
+>>>>>>> ae2a695 (refactor(tx): update tx module)
       "repay",
       this.wallet.lending().prepareRepay(request)
     );
@@ -299,8 +321,12 @@ export class TxBuilder {
    * Add a DCA order creation operation.
    */
   dcaCreate(request: DcaCreateInput): this {
+<<<<<<< HEAD
     return this.queuePreparedCalls(
       "DCA",
+=======
+    return this.queuePreparedCalls("DCA",
+>>>>>>> ae2a695 (refactor(tx): update tx module)
       "create",
       this.wallet.dca().prepareCreate(request)
     );
@@ -310,8 +336,12 @@ export class TxBuilder {
    * Add a DCA cancellation operation.
    */
   dcaCancel(request: DcaCancelInput): this {
+<<<<<<< HEAD
     return this.queuePreparedCalls(
       "DCA",
+=======
+    return this.queuePreparedCalls("DCA",
+>>>>>>> ae2a695 (refactor(tx): update tx module)
       "cancel",
       this.wallet.dca().prepareCancel(request)
     );
@@ -677,9 +707,7 @@ export class TxBuilder {
 
     const promise = this.calls().then(async (calls) => {
       if (calls.length === 0) {
-        throw new Error(
-          "No calls to execute. Add at least one operation before calling send()."
-        );
+        throw new Error("No calls to execute. Add at least one operation before calling send().");
       }
       const tx = await this.wallet.execute(calls, options);
       this.sent = true;
