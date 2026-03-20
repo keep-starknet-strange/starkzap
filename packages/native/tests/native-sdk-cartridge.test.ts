@@ -118,7 +118,9 @@ describe("@starkzap/native cartridge sdk", () => {
     registerCartridgeNativeAdapter(secondAdapter);
 
     const secondSdk = makeSdk();
-    vi.spyOn(secondSdk.getProvider(), "getClassHashAt").mockResolvedValue("0x1");
+    vi.spyOn(secondSdk.getProvider(), "getClassHashAt").mockResolvedValue(
+      "0x1"
+    );
 
     await firstSdk.connectCartridge({
       policies: [{ target: "0xaaa", method: "transfer" }],
@@ -264,9 +266,9 @@ describe("@starkzap/native cartridge sdk", () => {
       },
     } as never;
 
-    await expect(
-      sdk.onboard(unsupportedDeployRequest)
-    ).rejects.toThrow("does not support deployment in this release");
+    await expect(sdk.onboard(unsupportedDeployRequest)).rejects.toThrow(
+      "does not support deployment in this release"
+    );
   });
 
   it("reapplies swap and dca providers during native cartridge onboarding", async () => {

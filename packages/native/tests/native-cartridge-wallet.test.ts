@@ -133,12 +133,9 @@ describe("NativeCartridgeWallet", () => {
       timeBounds: defaultTimeBounds,
     });
 
-    await wallet.getAccount().execute(
-      calls,
-      {
-        timeBounds: runtimeTimeBounds,
-      } as UniversalDetails & { timeBounds: PaymasterTimeBounds }
-    );
+    await wallet.getAccount().execute(calls, {
+      timeBounds: runtimeTimeBounds,
+    } as UniversalDetails & { timeBounds: PaymasterTimeBounds });
 
     expect(session.account.execute).toHaveBeenCalledWith(calls, {
       feeMode: { mode: "sponsored" },
