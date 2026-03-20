@@ -281,12 +281,20 @@ await wallet.dca().create({
 
 ### Network
 
-The app connects to Starknet Sepolia by default. Set `VITE_NETWORK` to switch:
+The app connects to Starknet Sepolia by default. You can switch between Sepolia and mainnet from the header selector in the UI; changing the selector reloads the playground into the matching SDK configuration.
+
+`VITE_NETWORK` still controls the default network used on first load:
 
 ```bash
 VITE_NETWORK=mainnet    # "mainnet" or "sepolia" (default)
-VITE_RPC_URL=<url>      # Optional custom RPC URL (overrides the default Cartridge RPC)
+VITE_RPC_URL=<url>      # Optional single-network RPC override for the default network
+VITE_MAINNET_RPC_URL=<url>  # Optional mainnet RPC override for UI switching
+VITE_SEPOLIA_RPC_URL=<url>  # Optional sepolia RPC override for UI switching
 ```
+
+If you use the in-app selector and want custom RPC endpoints for both networks, prefer `VITE_MAINNET_RPC_URL` and `VITE_SEPOLIA_RPC_URL`. `VITE_RPC_URL` remains supported for the default env-selected network.
+
+On mainnet, the Vesu market browser can load pool metadata without a connected Starknet wallet. Wallet connection is still required for positions, health checks, and transaction submission.
 
 For mainnet, also set `AVNU_PAYMASTER_URL` in the server's `.env` to `https://mainnet.paymaster.avnu.fi`.
 

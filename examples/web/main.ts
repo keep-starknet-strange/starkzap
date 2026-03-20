@@ -14,6 +14,7 @@ import {
   TongoConfidential,
   ExternalChain,
   Protocol,
+  VesuLendingProvider,
   type Eip1193Provider,
   type SolanaProvider,
   type DcaProvider,
@@ -55,20 +56,97 @@ import {
 } from "./vesu";
 
 // Configuration
-const NETWORK =
-  (import.meta.env.VITE_NETWORK as string | undefined)?.toLowerCase() ===
-  "mainnet"
-    ? "mainnet"
-    : "sepolia";
-const RPC_URL =
-  (import.meta.env.VITE_RPC_URL as string | undefined) ??
-  `https://api.cartridge.gg/x/starknet/${NETWORK}/rpc/v0_9`;
+type AppNetwork = "mainnet" | "sepolia";
+
+const MAINNET_NETWORK: AppNetwork = "mainnet";
+const SEPOLIA_NETWORK: AppNetwork = "sepolia";
+const NETWORK_QUERY_PARAM = "network";
+const NETWORK_STORAGE_KEY = "starkzap:web:network";
+const DEFAULT_RPC_URLS: Record<AppNetwork, string> = {
+  [MAINNET_NETWORK]: "https://api.cartridge.gg/x/starknet/mainnet/rpc/v0_9",
+  [SEPOLIA_NETWORK]: "https://api.cartridge.gg/x/starknet/sepolia/rpc/v0_9",
+};
+
+function normalizeNetwork(value: string | null | undefined): AppNetwork | null {
+  const normalized = value?.toLowerCase();
+  if (normalized === MAINNET_NETWORK || normalized === SEPOLIA_NETWORK) {
+    return normalized;
+  }
+  return null;
+}
+
+const ENV_NETWORK =
+  normalizeNetwork(import.meta.env.VITE_NETWORK as string | undefined) ??
+  SEPOLIA_NETWORK;
+
+function readStoredNetwork(): AppNetwork | null {
+  try {
+    return normalizeNetwork(window.localStorage.getItem(NETWORK_STORAGE_KEY));
+  } catch {
+    return null;
+  }
+}
+
+function persistSelectedNetwork(network: AppNetwork): void {
+  try {
+    if (network === ENV_NETWORK) {
+      window.localStorage.removeItem(NETWORK_STORAGE_KEY);
+      return;
+    }
+    window.localStorage.setItem(NETWORK_STORAGE_KEY, network);
+  } catch {
+    // Ignore storage failures and fall back to query/env config.
+  }
+}
+
+function readQueryNetwork(): AppNetwork | null {
+  const params = new URLSearchParams(window.location.search);
+  return normalizeNetwork(params.get(NETWORK_QUERY_PARAM));
+}
+
+function resolveConfiguredNetwork(): AppNetwork {
+  const queryNetwork = readQueryNetwork();
+  if (queryNetwork) {
+    persistSelectedNetwork(queryNetwork);
+    return queryNetwork;
+  }
+
+  return readStoredNetwork() ?? ENV_NETWORK;
+}
+
+const NETWORK = resolveConfiguredNetwork();
+const SHARED_RPC_URL = import.meta.env.VITE_RPC_URL as string | undefined;
+const MAINNET_RPC_URL = import.meta.env.VITE_MAINNET_RPC_URL as
+  | string
+  | undefined;
+const SEPOLIA_RPC_URL = import.meta.env.VITE_SEPOLIA_RPC_URL as
+  | string
+  | undefined;
+
+function resolveRpcUrl(network: AppNetwork): string {
+  if (network === MAINNET_NETWORK) {
+    return (
+      MAINNET_RPC_URL ??
+      (ENV_NETWORK === MAINNET_NETWORK ? SHARED_RPC_URL : undefined) ??
+      DEFAULT_RPC_URLS[MAINNET_NETWORK]
+    );
+  }
+
+  return (
+    SEPOLIA_RPC_URL ??
+    (ENV_NETWORK === SEPOLIA_NETWORK ? SHARED_RPC_URL : undefined) ??
+    DEFAULT_RPC_URLS[SEPOLIA_NETWORK]
+  );
+}
+
+const RPC_URL = resolveRpcUrl(NETWORK);
 const PRIVY_SERVER_URL = "http://localhost:3001";
 const DUMMY_POLICY = {
   target: "0x04718f5a0fc34cc1af16a1cdee98ffb20c31f5cd61d6ab07201858f4287c938d", // STRK
   method: "transfer",
 };
-const SDK_CHAIN_ID = NETWORK === "mainnet" ? ChainId.MAINNET : ChainId.SEPOLIA;
+const SDK_CHAIN_ID =
+  NETWORK === MAINNET_NETWORK ? ChainId.MAINNET : ChainId.SEPOLIA;
 const ALCHEMY_API_KEY = import.meta.env.VITE_ALCHEMY_API_KEY as
   | string
   | undefined;
@@ -116,6 +194,7 @@ const dcaProviders: DcaProvider[] = getDcaProviders();
 const dcaProvidersById = new Map<string, DcaProvider>(
   dcaProviders.map((provider) => [provider.id, provider])
 );
+const publicVesuProvider = new VesuLendingProvider();
 const presetTokens = Object.values(getPresets(SDK_CHAIN_ID)).sort((a, b) =>
   a.symbol.localeCompare(b.symbol)
 );
@@ -157,14 +236,20 @@ let lendingSelectedMaxBorrowAmount: bigint | null = null;
 let lendingSelectedMaxBorrowRequestId = 0;
 let lendingRefreshRequestId = 0;
 let lendingBorrowDriver: "debt" | "percent" | null = null;
+let lendingSupplyAction: "deposit" | "withdraw" = "deposit";
+let lendingPositionAction: "borrow" | "repay" = "borrow";
 const lendingPoolDataCache = new Map<string, WebVesuPoolData | null>();
 
 // DOM Elements
 const walletSection = document.getElementById("wallet-section")!;
 const pkForm = document.getElementById("pk-form")!;
 const logContainer = document.getElementById("log")!;
+const networkSelect = document.getElementById(
+  "network-select"
+) as HTMLSelectElement;
 const networkBadge = document.getElementById("network-badge")!;
 networkBadge.textContent = NETWORK;
+networkSelect.value = NETWORK;
 
 const btnCartridge = document.getElementById(
   "btn-cartridge"
@@ -402,11 +487,17 @@ const lendingAmountInput = document.getElementById(
 const lendingSponsoredInput = document.getElementById(
   "lending-sponsored"
 ) as HTMLInputElement;
-const btnLendingDeposit = document.getElementById(
-  "btn-lending-deposit"
+const btnLendingSupplyModeDeposit = document.getElementById(
+  "btn-lending-supply-mode-deposit"
 ) as HTMLButtonElement;
-const btnLendingWithdraw = document.getElementById(
-  "btn-lending-withdraw"
+const btnLendingSupplyModeWithdraw = document.getElementById(
+  "btn-lending-supply-mode-withdraw"
+) as HTMLButtonElement;
+const lendingAmountLabelEl = document.getElementById(
+  "lending-amount-label"
+) as HTMLLabelElement;
+const btnLendingSupplySubmit = document.getElementById(
+  "btn-lending-supply-submit"
 ) as HTMLButtonElement;
 const btnLendingWithdrawMax = document.getElementById(
   "btn-lending-withdraw-max"
@@ -420,20 +511,30 @@ const lendingDebtTokenSelect = document.getElementById(
 const lendingCollateralAmountInput = document.getElementById(
   "lending-collateral-amount"
 ) as HTMLInputElement;
+const lendingCollateralAmountLabelEl = document.getElementById(
+  "lending-collateral-amount-label"
+) as HTMLLabelElement;
 const lendingDebtAmountInput = document.getElementById(
   "lending-debt-amount"
 ) as HTMLInputElement;
+const lendingDebtAmountLabelEl = document.getElementById(
+  "lending-debt-amount-label"
+) as HTMLLabelElement;
 const lendingBorrowPercentGroup = document.getElementById(
   "lending-borrow-percent-group"
 )!;
 const lendingBorrowPercentInput = document.getElementById(
   "lending-borrow-percent"
 ) as HTMLInputElement;
-const btnLendingBorrow = document.getElementById(
-  "btn-lending-borrow"
+const btnLendingPositionModeBorrow = document.getElementById(
+  "btn-lending-position-mode-borrow"
 ) as HTMLButtonElement;
-const btnLendingRepay = document.getElementById(
-  "btn-lending-repay"
+const btnLendingPositionModeRepay = document.getElementById(
+  "btn-lending-position-mode-repay"
+) as HTMLButtonElement;
+const lendingUseEarnRow = document.getElementById("lending-use-earn-row")!;
+const btnLendingPositionSubmit = document.getElementById(
+  "btn-lending-position-submit"
 ) as HTMLButtonElement;
 const btnLendingRepayMax = document.getElementById(
   "btn-lending-repay-max"
@@ -471,6 +572,123 @@ const presets: Record<string, AccountClassConfig> = {
 
 function tokenOptionLabel(token: Token): string {
   return `${token.symbol} (${token.name})`;
+}
+
+function reloadForNetwork(network: AppNetwork): void {
+  persistSelectedNetwork(network);
+
+  const url = new URL(window.location.href);
+  if (network === ENV_NETWORK) {
+    url.searchParams.delete(NETWORK_QUERY_PARAM);
+  } else {
+    url.searchParams.set(NETWORK_QUERY_PARAM, network);
+  }
+
+  window.location.replace(url.toString());
+}
+
+function handleNetworkChange(): void {
+  const nextNetwork = normalizeNetwork(networkSelect.value);
+  if (!nextNetwork || nextNetwork === NETWORK) {
+    networkSelect.value = NETWORK;
+    return;
+  }
+
+  if (
+    wallet &&
+    !window.confirm(
+      `Switching to ${nextNetwork} will reload the playground and disconnect the current wallet. Continue?`
+    )
+  ) {
+    networkSelect.value = NETWORK;
+    return;
+  }
+
+  reloadForNetwork(nextNetwork);
+}
+
+function renderLendingModes(): void {
+  btnLendingSupplyModeDeposit.classList.toggle(
+    "is-active",
+    lendingSupplyAction === "deposit"
+  );
+  btnLendingSupplyModeWithdraw.classList.toggle(
+    "is-active",
+    lendingSupplyAction === "withdraw"
+  );
+  lendingAmountLabelEl.textContent =
+    lendingSupplyAction === "deposit"
+      ? "Amount to Deposit"
+      : "Amount to Withdraw";
+  btnLendingSupplySubmit.textContent =
+    lendingSupplyAction === "deposit" ? "Deposit" : "Withdraw";
+  btnLendingWithdrawMax.classList.toggle(
+    "hidden",
+    lendingSupplyAction !== "withdraw"
+  );
+
+  btnLendingPositionModeBorrow.classList.toggle(
+    "is-active",
+    lendingPositionAction === "borrow"
+  );
+  btnLendingPositionModeRepay.classList.toggle(
+    "is-active",
+    lendingPositionAction === "repay"
+  );
+  lendingCollateralAmountLabelEl.textContent =
+    lendingPositionAction === "borrow"
+      ? "Collateral Amount"
+      : "Collateral to Withdraw";
+  lendingDebtAmountLabelEl.textContent =
+    lendingPositionAction === "borrow"
+      ? "Amount to Borrow"
+      : "Amount to Repay (optional)";
+  btnLendingPositionSubmit.textContent =
+    lendingPositionAction === "borrow" ? "Borrow" : "Repay";
+  btnLendingMaxBorrow.classList.toggle(
+    "hidden",
+    lendingPositionAction !== "borrow"
+  );
+  btnLendingRepayMax.classList.toggle(
+    "hidden",
+    lendingPositionAction !== "repay"
+  );
+  lendingUseEarnRow.classList.toggle(
+    "hidden",
+    lendingPositionAction !== "borrow"
+  );
+  if (lendingPositionAction !== "borrow") {
+    lendingBorrowDriver = "debt";
+    lendingBorrowPercentInput.value = "";
+  }
+  updateLendingBorrowPercentVisibility();
+}
+
+function setLendingSupplyAction(action: "deposit" | "withdraw"): void {
+  lendingSupplyAction = action;
+  renderLendingModes();
+}
+
+function setLendingPositionAction(action: "borrow" | "repay"): void {
+  lendingPositionAction = action;
+  renderLendingModes();
+  renderLendingDraft();
+}
+
+async function lendingSubmitSupply(): Promise<void> {
+  if (lendingSupplyAction === "withdraw") {
+    await lendingWithdraw(btnLendingSupplySubmit);
+    return;
+  }
+  await lendingDeposit(btnLendingSupplySubmit);
+}
+
+async function lendingSubmitPosition(): Promise<void> {
+  if (lendingPositionAction === "repay") {
+    await lendingRepay(btnLendingPositionSubmit);
+    return;
+  }
+  await lendingBorrow(btnLendingPositionSubmit);
 }
 
 function formatProtocolTag(protocol: Protocol): string {
@@ -1530,7 +1748,6 @@ function showDisconnected() {
   privyForm.classList.add("hidden");
   wallet = null;
   walletType = null;
-  lendingMarkets = [];
   lendingUserPositions = [];
   lendingSelectedPoolData = null;
   lendingSelectedMaxBorrowAmount = null;
@@ -1542,7 +1759,6 @@ function showDisconnected() {
   lendingBorrowPercentInput.value = "";
   lendingBorrowPercentGroup.classList.add("hidden");
   lendingDraftEl.classList.add("hidden");
-  lendingMarketsEl.classList.add("hidden");
   lendingPositionEl.classList.add("hidden");
   clearSwapQuote();
   populateDcaProviders();
@@ -1555,6 +1771,7 @@ function showDisconnected() {
     bridgeController.setStarknetWallet(null);
   }
   updateDcaButtons();
+  void refreshLendingMarkets({ silent: true });
 }
 
 function setStatus(status: "deployed" | "not-deployed" | "checking") {
@@ -2871,17 +3088,23 @@ function getCurrentLendingMinimumDeposit(): bigint | null {
 function updateLendingBorrowPercentVisibility(): void {
   const hasDebtMarket = getSelectedLendingDebtMarket() != null;
   const shouldShow =
-    hasDebtMarket && (getCurrentLendingDraftMaxBorrowAmount() ?? 0n) > 0n;
+    lendingPositionAction === "borrow" &&
+    hasDebtMarket &&
+    (getCurrentLendingDraftMaxBorrowAmount() ?? 0n) > 0n;
   lendingBorrowPercentGroup.classList.toggle("hidden", !shouldShow);
-  if (!hasDebtMarket) {
+  if (!shouldShow) {
     lendingBorrowPercentInput.value = "";
   }
 }
 
 function syncLendingBorrowInputs(): void {
+  updateLendingBorrowPercentVisibility();
+  if (lendingPositionAction !== "borrow") {
+    return;
+  }
+
   const debtMarket = getSelectedLendingDebtMarket();
   const draftMaxBorrowAmount = getCurrentLendingDraftMaxBorrowAmount();
-  updateLendingBorrowPercentVisibility();
   if (
     !debtMarket ||
     draftMaxBorrowAmount == null ||
@@ -3227,21 +3450,22 @@ async function refreshLendingMarkets(options?: {
   reveal?: boolean;
 }): Promise<void> {
   const requestId = ++lendingRefreshRequestId;
-  if (!wallet) {
-    lendingMarkets = [];
-    lendingUserPositions = [];
-    populateLendingTokens();
-    renderLendingDraft();
-    return;
-  }
-
   if (!options?.silent) {
-    log("Fetching Vesu markets...", "info");
+    log(
+      wallet
+        ? "Fetching Vesu markets..."
+        : "Fetching public Vesu markets (wallet not connected)...",
+      "info"
+    );
   }
 
   const [marketsResult, positionsResult] = await Promise.allSettled([
-    wallet.lending().getMarkets({ provider: VESU_PROVIDER_ID }),
-    wallet.lending().getPositions({ provider: VESU_PROVIDER_ID }),
+    wallet
+      ? wallet.lending().getMarkets({ provider: VESU_PROVIDER_ID })
+      : publicVesuProvider.getMarkets(SDK_CHAIN_ID),
+    wallet
+      ? wallet.lending().getPositions({ provider: VESU_PROVIDER_ID })
+      : Promise.resolve([]),
   ]);
   if (requestId !== lendingRefreshRequestId) {
     return;
@@ -3291,7 +3515,9 @@ function getLendingFeeMode(): { feeMode: "sponsored" | "user_pays" } {
   return { feeMode: lendingSponsoredInput.checked ? "sponsored" : "user_pays" };
 }
 
-async function lendingDeposit() {
+async function lendingDeposit(
+  submitButton: HTMLButtonElement = btnLendingSupplySubmit
+) {
   if (!wallet) return;
   const market = getSelectedLendingSupplyMarket();
   if (!market) {
@@ -3305,7 +3531,7 @@ async function lendingDeposit() {
     return;
   }
 
-  setButtonLoading(btnLendingDeposit, true);
+  setButtonLoading(submitButton, true);
   try {
     const amount = Amount.parse(raw, token);
     assertPositiveAmount(amount, token, "Deposit");
@@ -3326,11 +3552,13 @@ async function lendingDeposit() {
   } catch (err) {
     log(`Deposit failed: ${err}`, "error");
   } finally {
-    setButtonLoading(btnLendingDeposit, false, "Deposit");
+    setButtonLoading(submitButton, false, "Deposit");
   }
 }
 
-async function lendingWithdraw() {
+async function lendingWithdraw(
+  submitButton: HTMLButtonElement = btnLendingSupplySubmit
+) {
   if (!wallet) return;
   const market = getSelectedLendingSupplyMarket();
   if (!market) {
@@ -3344,7 +3572,7 @@ async function lendingWithdraw() {
     return;
   }
 
-  setButtonLoading(btnLendingWithdraw, true);
+  setButtonLoading(submitButton, true);
   try {
     const amount = Amount.parse(raw, token);
     assertPositiveAmount(amount, token, "Withdraw");
@@ -3365,7 +3593,7 @@ async function lendingWithdraw() {
   } catch (err) {
     log(`Withdraw failed: ${err}`, "error");
   } finally {
-    setButtonLoading(btnLendingWithdraw, false, "Withdraw");
+    setButtonLoading(submitButton, false, "Withdraw");
   }
 }
 
@@ -3400,7 +3628,9 @@ async function lendingWithdrawMax() {
   }
 }
 
-async function lendingBorrow() {
+async function lendingBorrow(
+  submitButton: HTMLButtonElement = btnLendingPositionSubmit
+) {
   if (!wallet) return;
   const collateralMarket = getSelectedLendingCollateralMarket();
   const debtMarket = getSelectedLendingDebtMarket();
@@ -3416,7 +3646,7 @@ async function lendingBorrow() {
     return;
   }
 
-  setButtonLoading(btnLendingBorrow, true);
+  setButtonLoading(submitButton, true);
   try {
     const amount = Amount.parse(rawDebt, debtToken);
     assertPositiveAmount(amount, debtToken, "Borrow");
@@ -3467,11 +3697,13 @@ async function lendingBorrow() {
   } catch (err) {
     log(`Borrow failed: ${err}`, "error");
   } finally {
-    setButtonLoading(btnLendingBorrow, false, "Borrow");
+    setButtonLoading(submitButton, false, "Borrow");
   }
 }
 
-async function lendingRepay() {
+async function lendingRepay(
+  submitButton: HTMLButtonElement = btnLendingPositionSubmit
+) {
   if (!wallet) return;
   const collateralMarket = getSelectedLendingCollateralMarket();
   const debtMarket = getSelectedLendingDebtMarket();
@@ -3482,7 +3714,7 @@ async function lendingRepay() {
   const collateralToken = collateralMarket.asset;
   const debtToken = debtMarket.asset;
 
-  setButtonLoading(btnLendingRepay, true);
+  setButtonLoading(submitButton, true);
   try {
     const parsedDebt = parseOptionalAmount(
       lendingDebtAmountInput.value,
@@ -3551,7 +3783,7 @@ async function lendingRepay() {
   } catch (err) {
     log(`Repay failed: ${err}`, "error");
   } finally {
-    setButtonLoading(btnLendingRepay, false, "Repay");
+    setButtonLoading(submitButton, false, "Repay");
   }
 }
 
@@ -3683,6 +3915,7 @@ async function lendingBrowseMarkets() {
 
 async function lendingMaxBorrow() {
   if (!wallet) return;
+  setLendingPositionAction("borrow");
   const collateralMarket = getSelectedLendingCollateralMarket();
   const debtMarket = getSelectedLendingDebtMarket();
   if (!collateralMarket || !debtMarket) {
@@ -3802,6 +4035,7 @@ async function lendingHealthQuote() {
 
 async function lendingRepayMax() {
   if (!wallet) return;
+  setLendingPositionAction("repay");
   const debtMarket = getSelectedLendingDebtMarket();
   const borrowPosition = getSelectedLendingBorrowPosition();
   if (!debtMarket) {
@@ -3846,17 +4080,32 @@ async function lendingRepayMax() {
 }
 
 // Lending event listeners
-btnLendingDeposit.addEventListener("click", lendingDeposit);
-btnLendingWithdraw.addEventListener("click", lendingWithdraw);
+btnLendingSupplyModeDeposit.addEventListener("click", () => {
+  setLendingSupplyAction("deposit");
+});
+btnLendingSupplyModeWithdraw.addEventListener("click", () => {
+  setLendingSupplyAction("withdraw");
+});
+btnLendingSupplySubmit.addEventListener("click", () => {
+  void lendingSubmitSupply();
+});
 btnLendingWithdrawMax.addEventListener("click", lendingWithdrawMax);
-btnLendingBorrow.addEventListener("click", lendingBorrow);
-btnLendingRepay.addEventListener("click", lendingRepay);
+btnLendingPositionModeBorrow.addEventListener("click", () => {
+  setLendingPositionAction("borrow");
+});
+btnLendingPositionModeRepay.addEventListener("click", () => {
+  setLendingPositionAction("repay");
+});
+btnLendingPositionSubmit.addEventListener("click", () => {
+  void lendingSubmitPosition();
+});
 btnLendingRepayMax.addEventListener("click", lendingRepayMax);
 btnLendingPosition.addEventListener("click", lendingViewPosition);
 btnLendingMyPositions.addEventListener("click", lendingMyPositions);
 btnLendingMarkets.addEventListener("click", lendingBrowseMarkets);
 btnLendingMaxBorrow.addEventListener("click", lendingMaxBorrow);
 btnLendingHealthQuote.addEventListener("click", lendingHealthQuote);
+networkSelect.addEventListener("change", handleNetworkChange);
 lendingTokenSelect.addEventListener("change", () => {
   if (!lendingMarketsEl.classList.contains("hidden")) {
     renderLendingMarkets();
@@ -3901,7 +4150,8 @@ lendingUseEarnInput.addEventListener("change", () => {
 initializeSwapForm();
 populateTongoTokenSelect();
 initializeDcaForm();
-populateLendingTokens();
+renderLendingModes();
+void refreshLendingMarkets({ silent: true });
 log(`SDK initialized on ${NETWORK} with RPC: ${RPC_URL}`, "info");
 if (REOWN_PROJECT_ID) {
   log("Bridge enabled (Reown AppKit)", "info");
