@@ -683,13 +683,9 @@ export class Staking {
       providerOrAccount: provider,
     }).typedv2(STAKING_ABI);
 
-    const tokenAddresses = await stakingContract
-      .get_active_tokens()
-      .then((addresses) => {
-        return addresses.map((address) => {
-          return fromAddress(address);
-        });
-      });
+    const tokenAddresses = (await stakingContract.get_active_tokens()).map(
+      fromAddress
+    );
 
     return await getTokensFromAddresses(tokenAddresses, provider);
   }
@@ -727,28 +723,21 @@ export class Staking {
 
     const { pools } = await stakingContract.staker_pool_info(stakerAddress);
 
-    const tokenAddresses = pools.map((pool) => {
-      return fromAddress(pool.token_address);
-    });
-
+    const tokenAddresses = pools.map((pool) => fromAddress(pool.token_address));
     const tokens = await getTokensFromAddresses(tokenAddresses, provider);
     const tokensMap = groupBy(tokens, (token) => token.address);
-    return pools.flatMap((pool) => {
-      const poolAddress = fromAddress(pool.pool_contract);
-      const tokens = tokensMap.get(fromAddress(pool.token_address));
-      const token = tokens?.[0];
-      if (!token) {
-        return [];
-      }
 
-      return [
-        {
-          poolContract: poolAddress,
-          token: token,
+    return pools.reduce<Pool[]>((result, pool) => {
+      const token = tokensMap.get(fromAddress(pool.token_address))?.[0];
+      if (token) {
+        result.push({
+          poolContract: fromAddress(pool.pool_contract),
+          token,
           amount: Amount.fromRaw(pool.amount, token),
-        },
-      ];
-    });
+        });
+      }
+      return result;
+    }, []);
   }
 }
 
