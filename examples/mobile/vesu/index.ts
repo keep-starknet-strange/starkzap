@@ -6,6 +6,7 @@ import {
   type LendingUserPosition,
   type Token,
 } from "@starkzap/native";
+import { sameAddress } from "./utils";
 
 export const VESU_PROVIDER_ID = "vesu" as const;
 
@@ -340,8 +341,12 @@ export function getVesuUserPositionForMarket(params: {
       params.userPositions.find(
         (position) =>
           position.type === type &&
-          position.collateral.token.address === params.token.address &&
-          (!params.poolAddress || position.pool.id === params.poolAddress)
+          sameAddress(
+            position.collateral.token.address,
+            params.token.address
+          ) &&
+          (!params.poolAddress ||
+            sameAddress(position.pool.id, params.poolAddress))
       ) ?? null;
     if (match) {
       return match;
@@ -406,8 +411,8 @@ export function buildVesuAssetOptions(params: {
     );
     if (
       !token ||
-      Array.from(options.values()).some(
-        (existing) => existing.token.address === token.address
+      Array.from(options.values()).some((existing) =>
+        sameAddress(existing.token.address, token.address)
       )
     ) {
       continue;
@@ -544,7 +549,10 @@ function filterUniquePoolAssets(
       option.poolAddress !== counterpart.poolAddress
     )
       continue;
-    if (counterpart && option.token.address === counterpart.token.address)
+    if (
+      counterpart &&
+      sameAddress(option.token.address, counterpart.token.address)
+    )
       continue;
     if (!seen.has(option.token.address)) seen.set(option.token.address, option);
   }
@@ -812,9 +820,8 @@ function getPoolAssetUsdPrice(
   pool: VesuPoolData | null | undefined,
   token: Token
 ): bigint | null {
-  const asset = pool?.assets.find(
-    (candidate) =>
-      candidate.address.toLowerCase() === token.address.toLowerCase()
+  const asset = pool?.assets.find((candidate) =>
+    sameAddress(candidate.address, token.address)
   );
   if (!asset?.usdPrice?.value) {
     return null;
@@ -829,10 +836,8 @@ function getPoolPairMaxLtv(
 ): bigint | null {
   const pair = pool?.pairs.find(
     (candidate) =>
-      candidate.collateralAssetAddress.toLowerCase() ===
-        collateralAssetAddress.toLowerCase() &&
-      candidate.debtAssetAddress.toLowerCase() ===
-        debtAssetAddress.toLowerCase()
+      sameAddress(candidate.collateralAssetAddress, collateralAssetAddress) &&
+      sameAddress(candidate.debtAssetAddress, debtAssetAddress)
   );
   if (!pair?.maxLTV?.value) {
     return null;

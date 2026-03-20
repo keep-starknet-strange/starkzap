@@ -72,6 +72,14 @@ export function getPercentError(value: string): string | null {
     : null;
 }
 
+export function sameAddress(
+  left?: string | null,
+  right?: string | null
+): boolean {
+  if (!left || !right) return false;
+  return left.toLowerCase() === right.toLowerCase();
+}
+
 export function formatPercentInput(value: bigint): string {
   const clamped =
     value < 0n ? 0n : value > PERCENT_SCALE ? PERCENT_SCALE : value;

@@ -845,7 +845,10 @@ export const useWalletStore = create<WalletState>((set, get) => ({
       if (!isCurrentRequest()) {
         return;
       }
-      set(clearBalance);
+      set({
+        ...clearBalance,
+        bridgeError: error instanceof Error ? error.message : String(error),
+      });
     }
   },
 

@@ -699,7 +699,9 @@ export class TxBuilder {
       throw new Error("This transaction is currently being sent.");
     }
 
-    this.sendPromise = (async () => {
+    // Set the marker synchronously before any async work to prevent
+    // concurrent send() calls from passing the guard in the same microtask.
+    const promise = (async () => {
       const calls = await this.calls();
       if (calls.length === 0) {
         throw new Error(
@@ -711,9 +713,10 @@ export class TxBuilder {
       this.sent = true;
       return tx;
     })();
+    this.sendPromise = promise;
 
     try {
-      return await this.sendPromise;
+      return await promise;
     } finally {
       this.sendPromise = null;
     }

@@ -108,7 +108,7 @@ export class VesuLendingProvider implements LendingProvider {
 
   private readonly fetcher: typeof fetch;
   private readonly chainConfigs: Partial<Record<VesuChain, VesuChainConfig>>;
-  private readonly vTokenCache = new Map<string, Address>();
+  private readonly vTokenCache = new Map<string, Promise<Address>>();
 
   constructor(options: VesuLendingProviderOptions = {}) {
     if (options.fetcher) {
@@ -892,7 +892,7 @@ export class VesuLendingProvider implements LendingProvider {
     };
   }
 
-  private async resolveVTokenAddress(
+  private resolveVTokenAddress(
     context: LendingProviderContext,
     poolAddress: Address,
     assetAddress: Address
@@ -909,18 +909,22 @@ export class VesuLendingProvider implements LendingProvider {
         `Vesu chain "${context.chainId.toLiteral()}" has no poolFactory configured. Required for deposit/withdraw vToken resolution.`
       );
     }
-    const result = await context.provider.callContract({
-      contractAddress: poolFactory,
-      entrypoint: "v_token_for_asset",
-      calldata: CallData.compile([poolAddress, assetAddress]),
-    });
-    const candidate = result[0];
-    if (candidate == null || BigInt(String(candidate)) === 0n) {
-      throw new Error("Unable to resolve Vesu vToken for asset");
-    }
-    const resolved = fromAddress(candidate);
-    this.vTokenCache.set(key, resolved);
-    return resolved;
+    const promise = (async () => {
+      const result = await context.provider.callContract({
+        contractAddress: poolFactory,
+        entrypoint: "v_token_for_asset",
+        calldata: CallData.compile([poolAddress, assetAddress]),
+      });
+      const candidate = result[0];
+      if (candidate == null || BigInt(String(candidate)) === 0n) {
+        throw new Error("Unable to resolve Vesu vToken for asset");
+      }
+      return fromAddress(candidate);
+    })();
+    this.vTokenCache.set(key, promise);
+    // Evict from cache on failure so subsequent calls can retry.
+    promise.catch(() => this.vTokenCache.delete(key));
+    return promise;
   }
 
   private async resolveVaultContext<
@@ -1182,16 +1186,33 @@ function parseBool(raw: unknown, label: string): boolean {
   if (raw == null) {
     throw new Error(`Missing felt value for "${label}"`);
   }
-  return BigInt(String(raw)) !== 0n;
+  try {
+    return BigInt(String(raw)) !== 0n;
+  } catch {
+    throw new Error(
+      `Invalid felt value for "${label}": expected numeric, got ${String(raw)}`
+    );
+  }
 }
 
 function parseU256(result: unknown[], offset: number, label: string): bigint {
+  if (offset < 0 || offset + 1 >= result.length) {
+    throw new Error(
+      `Invalid offset ${offset} for u256 "${label}" (result length: ${result.length})`
+    );
+  }
   const lowWord = result[offset];
   const highWord = result[offset + 1];
   if (lowWord == null || highWord == null) {
     throw new Error(`Missing u256 words for "${label}" at offset ${offset}`);
   }
-  const low = BigInt(String(lowWord));
-  const high = BigInt(String(highWord));
-  return low + (high << 128n);
+  try {
+    const low = BigInt(String(lowWord));
+    const high = BigInt(String(highWord));
+    return low + (high << 128n);
+  } catch {
+    throw new Error(
+      `Invalid u256 words for "${label}" at offset ${offset}: [${String(lowWord)}, ${String(highWord)}]`
+    );
+  }
 }

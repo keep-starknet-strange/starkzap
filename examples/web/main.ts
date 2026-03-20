@@ -140,7 +140,9 @@ function resolveRpcUrl(network: AppNetwork): string {
 }
 
 const RPC_URL = resolveRpcUrl(NETWORK);
-const PRIVY_SERVER_URL = "http://localhost:3001";
+const PRIVY_SERVER_URL =
+  (import.meta.env.VITE_PRIVY_SERVER_URL as string | undefined) ??
+  "http://localhost:3001";
 const DUMMY_POLICY = {
   target: "0x04718f5a0fc34cc1af16a1cdee98ffb20c31f5cd61d6ab07201858f4287c938d", // STRK
   method: "transfer",
