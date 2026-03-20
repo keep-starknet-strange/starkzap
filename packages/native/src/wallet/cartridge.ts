@@ -330,6 +330,7 @@ export class NativeCartridgeWallet extends BaseWallet {
   }
 
   async execute(calls: Call[], options: ExecuteOptions = {}): Promise<Tx> {
+    await this.ensureReady();
     const feeMode = options.feeMode ?? this.defaultFeeMode;
     if (feeMode !== "sponsored") {
       throw new Error(unsupportedUserPaysMessage());
