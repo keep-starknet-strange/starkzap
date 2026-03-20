@@ -6,7 +6,12 @@
     "noUncheckedIndexedAccess": true,
     "exactOptionalPropertyTypes": true,
     "paths": {
-      "@/*": ["./*"]
+      "@/*": ["./*"],
+      "expo-router": ["./types/expo-router"],
+      "expo-router/html": ["./types/expo-router-html"],
+      "expo-splash-screen": ["./types/expo-splash-screen"],
+      "expo-status-bar": ["./types/expo-status-bar"],
+      "@react-navigation/native": ["./types/react-navigation-native"]
     }
   },
   "include": ["**/*.ts", "**/*.tsx", ".expo/types/**/*.ts", "expo-env.d.ts"]

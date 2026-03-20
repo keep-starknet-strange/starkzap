@@ -32,7 +32,7 @@ function calculateWinner(board: CellValue[]): {
   winner: "X" | "O" | null;
   line: number[] | null;
 } {
-  const lines = [
+  const lines: ReadonlyArray<readonly [number, number, number]> = [
     [0, 1, 2],
     [3, 4, 5],
     [6, 7, 8],
@@ -43,8 +43,9 @@ function calculateWinner(board: CellValue[]): {
     [2, 4, 6],
   ];
   for (const [a, b, c] of lines) {
-    if (board[a] && board[a] === board[b] && board[a] === board[c]) {
-      return { winner: board[a], line: [a, b, c] };
+    const candidate = board[a];
+    if (candidate && candidate === board[b] && candidate === board[c]) {
+      return { winner: candidate, line: [a, b, c] };
     }
   }
   return { winner: null, line: null };
@@ -548,7 +549,7 @@ export default function PlayScreen() {
           disabled={
             !gameStarted || !!winner || !isMyTurn || !!activePendingMove
           }
-          winningLine={winningLine ?? undefined}
+          winningLine={winningLine}
           pendingCellIndex={
             activePendingMove?.isPending ? activePendingMove.cell : null
           }
