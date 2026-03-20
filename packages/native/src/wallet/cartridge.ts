@@ -365,7 +365,15 @@ export class NativeCartridgeWallet extends BaseWallet {
     }
     const simulate = this.session.account.simulateTransaction;
     if (!simulate) {
-      return { ok: true };
+      try {
+        await this.ensureReady();
+        return { ok: true };
+      } catch (error) {
+        return {
+          ok: false,
+          reason: error instanceof Error ? error.message : "Unknown error",
+        };
+      }
     }
     try {
       const simulation = await simulate([
