@@ -1,6 +1,7 @@
 /* global require, module, __dirname */
 /* eslint-disable @typescript-eslint/no-require-imports */
 const { getDefaultConfig } = require("expo/metro-config");
+const { withStarkzap } = require("@starkzap/native/metro");
 const path = require("path");
 
 const workspaceRoot = path.resolve(__dirname, "../..");
@@ -35,4 +36,4 @@ config.resolver.resolveRequest = (context, moduleName, platform) => {
   return resolver(context, moduleName, platform);
 };
 
-module.exports = config;
+module.exports = withStarkzap(config);
