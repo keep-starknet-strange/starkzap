@@ -1,6 +1,4 @@
-export function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null;
-}
+import { isRecord } from "@/utils/ekubo";
 
 export function describeValue(value: unknown): string {
   if (typeof value === "string") {
