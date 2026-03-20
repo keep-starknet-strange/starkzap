@@ -3,8 +3,16 @@ import * as WebBrowser from "expo-web-browser";
 import React from "react";
 import { Platform } from "react-native";
 
+type LinkPressEvent = {
+  defaultPrevented: boolean;
+  preventDefault: () => void;
+};
+
 export function ExternalLink(
-  props: Omit<React.ComponentProps<typeof Link>, "href"> & { href: string }
+  props: Omit<React.ComponentProps<typeof Link>, "href" | "onPress"> & {
+    href: string;
+    onPress?: (event: LinkPressEvent) => boolean | void;
+  }
 ) {
   const { href, onPress, ...rest } = props;
 
@@ -12,9 +20,8 @@ export function ExternalLink(
     <Link
       target="_blank"
       {...rest}
-      // @ts-expect-error: External URLs are not typed.
       href={href}
-      onPress={(e) => {
+      onPress={(e: LinkPressEvent) => {
         const onPressResult = onPress?.(e) as boolean | void | undefined;
 
         if (onPressResult === false || e.defaultPrevented) {
