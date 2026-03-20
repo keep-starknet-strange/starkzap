@@ -63,6 +63,26 @@ describe("cartridge preset resolution", () => {
     );
   });
 
+  it("rejects preset index redirects to untrusted hosts", async () => {
+    const fetchImpl = vi
+      .fn()
+      .mockResolvedValueOnce(
+        jsonResponse({ baseUrl: "https://attacker.example/presets" })
+      );
+    const promise = resolvePresetPolicies({
+      preset: "tic-tac-toe",
+      chainId: "SN_SEPOLIA",
+      fetchImpl,
+      presetBaseUrl: "https://static.cartridge.gg/presets",
+    });
+
+    await expect(promise).rejects.toThrow(SessionProtocolError);
+    await expect(promise).rejects.toThrow(
+      'Loading Cartridge preset index returned an untrusted baseUrl "https://attacker.example/presets".'
+    );
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+  });
+
   it("throws a protocol error when the preset index payload is invalid", async () => {
     const fetchImpl = vi.fn().mockResolvedValue(jsonResponse({ baseUrl: 123 }));
     const promise = resolvePresetPolicies({
@@ -147,5 +167,22 @@ describe("cartridge preset resolution", () => {
       "Loading Cartridge preset index failed: network down."
     );
     expect((error as Error & { cause?: unknown }).cause).toBe(transportError);
+  });
+
+  it("rejects invalid preset base URLs before loading the preset index", async () => {
+    const fetchImpl = vi.fn();
+
+    const error = await resolvePresetPolicies({
+      preset: "tic-tac-toe",
+      chainId: "SN_SEPOLIA",
+      fetchImpl,
+      presetBaseUrl: "ftp://static.cartridge.gg/presets",
+    }).catch((caught) => caught);
+
+    expect(error).toBeInstanceOf(SessionProtocolError);
+    expect((error as Error).message).toBe(
+      "Configured Cartridge preset base URL is invalid: ftp://static.cartridge.gg/presets."
+    );
+    expect(fetchImpl).not.toHaveBeenCalled();
   });
 });

@@ -1,97 +1,40 @@
 import type {
-  ChainId,
-  ExplorerConfig,
   OnboardOptions as CoreOnboardOptions,
   OnboardResult,
-  RpcProvider,
   SDKConfig,
-  StakingConfig,
 } from "starkzap";
-import {
-  StarkZap as CoreStarkZap,
-  getChainId,
-  getStakingPreset,
-  networks,
-  type NetworkPreset,
-} from "starkzap";
+import { StarkZap as CoreStarkZap } from "starkzap";
 import type {
   ConnectCartridgeOptions,
   OnboardOptions,
   NativeOnboardCartridgeConfig,
 } from "@/types/onboard";
-import { getCartridgeNativeAdapterOrThrow } from "@/cartridge/registry";
+import {
+  getCartridgeNativeAdapter,
+  getCartridgeNativeAdapterOrThrow,
+} from "@/cartridge/registry";
 import { hasPoliciesInput } from "@/cartridge/ts/policy";
 import {
   NativeCartridgeWallet,
   validateSupportedCartridgeFeeMode,
 } from "@/wallet/cartridge";
-import type { CartridgeNativeConnectArgs } from "@/cartridge/types";
-
-interface ResolvedNativeSdkConfig {
-  chainId: ChainId;
-  explorer?: ExplorerConfig;
-  rpcUrl: string;
-  staking?: StakingConfig;
-}
-
-function resolveProviderRpcUrl(provider: RpcProvider): string {
-  const nodeUrl = provider.channel.nodeUrl;
-  if (typeof nodeUrl === "string" && nodeUrl.length > 0) {
-    return nodeUrl;
-  }
-
-  throw new Error(
-    "Unable to resolve RPC URL from the SDK provider for Cartridge."
-  );
-}
-
-function resolveNativeSdkConfig(
-  config: SDKConfig,
-  provider: RpcProvider
-): ResolvedNativeSdkConfig {
-  let networkPreset: NetworkPreset | undefined;
-  if (config.network) {
-    networkPreset =
-      typeof config.network === "string"
-        ? networks[config.network]
-        : config.network;
-  }
-
-  const chainId = config.chainId ?? networkPreset?.chainId;
-  if (!chainId) {
-    throw new Error(
-      "StarkZap requires either 'network' or 'chainId' to be specified"
-    );
-  }
-
-  const explorer =
-    config.explorer ??
-    (networkPreset?.explorerUrl
-      ? { baseUrl: networkPreset.explorerUrl }
-      : undefined);
-  const staking = config.staking ?? getStakingPreset(chainId);
-
-  return {
-    chainId,
-    rpcUrl: resolveProviderRpcUrl(provider),
-    ...(explorer && { explorer }),
-    ...(staking && { staking }),
-  };
-}
+import type {
+  CartridgeNativeAdapter,
+  CartridgeNativeConnectArgs,
+} from "@/cartridge/types";
 
 export class StarkZap extends CoreStarkZap {
-  private readonly nativeConfig: ResolvedNativeSdkConfig;
-  private nativeChainValidationPromise: Promise<void> | null = null;
+  private cartridgeAdapter: CartridgeNativeAdapter | null;
 
   constructor(config: SDKConfig) {
     super(config);
-    this.nativeConfig = resolveNativeSdkConfig(config, this.getProvider());
+    this.cartridgeAdapter = getCartridgeNativeAdapter();
   }
 
   override async connectCartridge(
     options: ConnectCartridgeOptions = {}
   ): Promise<Awaited<ReturnType<CoreStarkZap["connectCartridge"]>>> {
-    const adapter = getCartridgeNativeAdapterOrThrow();
+    const adapter = this.getCartridgeAdapterOrThrow();
     const feeMode = validateSupportedCartridgeFeeMode(options.feeMode);
 
     const policies = hasPoliciesInput(options.policies)
@@ -103,12 +46,12 @@ export class StarkZap extends CoreStarkZap {
       );
     }
 
-    await this.ensureNativeProviderChainMatchesConfig();
+    await this.ensureProviderChainMatchesConfig();
 
     const provider = this.getProvider();
-    const chainId = await getChainId(provider);
-    const rpcUrl = this.resolveProviderRpcUrl();
-    const internals = this.getResolvedInternals();
+    const { bridging, chainId, explorer, rpcUrl, staking } =
+      this.getResolvedConfig();
+    const walletExplorer = options.explorer ?? explorer;
 
     const args: CartridgeNativeConnectArgs = {
       rpcUrl,
@@ -133,27 +76,34 @@ export class StarkZap extends CoreStarkZap {
       chainId,
       ...(feeMode && { feeMode }),
       ...(options.timeBounds && { timeBounds: options.timeBounds }),
-      ...((options.explorer ?? internals.explorer) && {
-        explorer: options.explorer ?? internals.explorer,
+      ...(walletExplorer && {
+        explorer: walletExplorer,
       }),
-      ...(internals.staking && { staking: internals.staking }),
+      ...(bridging && { bridging }),
+      ...(staking && { staking }),
     });
 
     return wallet as Awaited<ReturnType<CoreStarkZap["connectCartridge"]>>;
   }
 
-  async onboard(options: OnboardOptions): Promise<OnboardResult>;
-  override async onboard(options: CoreOnboardOptions): Promise<OnboardResult>;
-  override async onboard(
-    options: CoreOnboardOptions | OnboardOptions
-  ): Promise<OnboardResult> {
+  async onboard(
+    options: Exclude<OnboardOptions, { strategy: "cartridge" }>
+  ): Promise<OnboardResult>;
+  async onboard(
+    options: Extract<OnboardOptions, { strategy: "cartridge" }>
+  ): Promise<OnboardResult>;
+  override async onboard(options: CoreOnboardOptions): Promise<OnboardResult> {
     if (options.strategy !== "cartridge") {
-      return super.onboard(options as CoreOnboardOptions);
+      return super.onboard(options);
     }
 
     const deploy = options.deploy ?? "never";
     const feeMode = validateSupportedCartridgeFeeMode(options.feeMode);
     const timeBounds = options.timeBounds;
+    const swapProviders = options.swapProviders;
+    const defaultSwapProviderId = options.defaultSwapProviderId;
+    const dcaProviders = options.dcaProviders;
+    const defaultDcaProviderId = options.defaultDcaProviderId;
     const shouldEnsureReady = deploy !== "never";
 
     const nativeCartridge =
@@ -166,6 +116,23 @@ export class StarkZap extends CoreStarkZap {
       ...(feeMode && { feeMode }),
       ...(timeBounds && { timeBounds }),
     });
+
+    if (swapProviders?.length) {
+      for (const swapProvider of swapProviders) {
+        wallet.registerSwapProvider(swapProvider);
+      }
+    }
+    if (defaultSwapProviderId) {
+      wallet.setDefaultSwapProvider(defaultSwapProviderId);
+    }
+    if (dcaProviders?.length) {
+      for (const dcaProvider of dcaProviders) {
+        wallet.dca().registerProvider(dcaProvider);
+      }
+    }
+    if (defaultDcaProviderId) {
+      wallet.dca().setDefaultProvider(defaultDcaProviderId);
+    }
 
     if (shouldEnsureReady) {
       await wallet.ensureReady({
@@ -182,45 +149,11 @@ export class StarkZap extends CoreStarkZap {
     };
   }
 
-  private async ensureNativeProviderChainMatchesConfig(): Promise<void> {
-    if (!this.nativeChainValidationPromise) {
-      this.nativeChainValidationPromise = (async () => {
-        const providerChainId = await getChainId(this.getProvider());
-        if (
-          providerChainId.toLiteral() !== this.nativeConfig.chainId.toLiteral()
-        ) {
-          throw new Error(
-            `RPC chain mismatch: provider returned ${providerChainId.toLiteral()} but SDK is configured for ${this.nativeConfig.chainId.toLiteral()}.`
-          );
-        }
-      })().catch((error) => {
-        this.nativeChainValidationPromise = null;
-        throw error;
-      });
+  private getCartridgeAdapterOrThrow(): CartridgeNativeAdapter {
+    if (!this.cartridgeAdapter) {
+      this.cartridgeAdapter = getCartridgeNativeAdapterOrThrow();
     }
 
-    await this.nativeChainValidationPromise;
-  }
-
-  private resolveProviderRpcUrl(): string {
-    const { rpcUrl } = this.nativeConfig;
-    if (rpcUrl.length > 0) {
-      return rpcUrl;
-    }
-
-    throw new Error(
-      "Unable to resolve RPC URL from the SDK provider for Cartridge."
-    );
-  }
-
-  private getResolvedInternals(): {
-    explorer?: ExplorerConfig;
-    staking?: StakingConfig;
-  } {
-    const config = this.nativeConfig;
-    return {
-      ...(config.explorer && { explorer: config.explorer }),
-      ...(config.staking && { staking: config.staking }),
-    };
+    return this.cartridgeAdapter;
   }
 }

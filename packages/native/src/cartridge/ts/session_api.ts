@@ -6,6 +6,7 @@ import {
 } from "@/cartridge/ts/errors";
 import {
   asRecord,
+  assertSafeHttpUrl,
   ensureFetch,
   fetchWithTimeout,
   type FetchLike,
@@ -277,7 +278,9 @@ export function buildCartridgeSessionUrl({
   redirectUrl,
   redirectQueryName = DEFAULT_REDIRECT_QUERY_NAME,
 }: BuildSessionUrlOptions): string {
-  const normalizedBaseUrl = baseUrl.replace(/\/+$/, "");
+  const normalizedBaseUrl = assertSafeHttpUrl(baseUrl, "baseUrl")
+    .toString()
+    .replace(/\/+$/, "");
   const params = new URLSearchParams({
     public_key: publicKey,
     rpc_url: rpcUrl,
@@ -373,6 +376,12 @@ export async function waitForSessionSubscription({
   requestTimeoutMs = 15_000,
   fetchImpl,
 }: WaitForSessionSubscriptionOptions): Promise<SessionRegistration> {
+  const normalizedCartridgeApiUrl = assertSafeHttpUrl(
+    cartridgeApiUrl,
+    "cartridgeApiUrl"
+  )
+    .toString()
+    .replace(/\/+$/, "");
   const fetchFn = ensureFetch(
     fetchImpl,
     "No fetch implementation available for Cartridge session subscription.",
@@ -395,7 +404,7 @@ export async function waitForSessionSubscription({
     try {
       const response = await fetchWithTimeout(
         fetchFn,
-        cartridgeApiUrl,
+        normalizedCartridgeApiUrl,
         {
           method: "POST",
           headers: {

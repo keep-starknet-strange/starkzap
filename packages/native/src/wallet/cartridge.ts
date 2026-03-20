@@ -1,5 +1,6 @@
 import { BaseWallet, Tx, fromAddress } from "starkzap";
 import type {
+  BridgingConfig,
   ChainId,
   DeployOptions,
   EnsureReadyOptions,
@@ -28,7 +29,10 @@ import {
   type TypedData,
   type UniversalDetails,
 } from "starknet";
-import type { CartridgeNativeSessionHandle } from "@/cartridge/types";
+import type {
+  CartridgeExecutionResult,
+  CartridgeNativeSessionHandle,
+} from "@/cartridge/types";
 
 const NEGATIVE_DEPLOYMENT_CACHE_TTL_MS = 3_000;
 
@@ -67,6 +71,9 @@ function unsupportedUserPaysMessage(): string {
 }
 
 export type SupportedNativeCartridgeFeeMode = Extract<FeeMode, "sponsored">;
+type UniversalDetailsWithTimeBounds = UniversalDetails & {
+  timeBounds?: PaymasterTimeBounds;
+};
 
 export function validateSupportedCartridgeFeeMode(
   feeMode?: FeeMode
@@ -86,7 +93,7 @@ function resolveSupportedCartridgeFeeMode(
 
 function assertTransactionHashResponse(
   response: unknown
-): asserts response is { transaction_hash: string } {
+): asserts response is CartridgeExecutionResult {
   const record = response as { transaction_hash?: unknown } | null;
   if (
     !record ||
@@ -164,12 +171,15 @@ class NativeCartridgeAccount extends Account {
 
   override async execute(
     transactions: Call | Call[],
-    _details?: UniversalDetails
+    details?: UniversalDetails
   ): Promise<InvokeFunctionResponse> {
     const calls = Array.isArray(transactions) ? transactions : [transactions];
+    const timeBounds =
+      (details as UniversalDetailsWithTimeBounds | undefined)?.timeBounds ??
+      this.defaultTimeBounds;
     const response = await this.session.account.execute(
       calls,
-      sponsoredDetails(this.defaultTimeBounds)
+      sponsoredDetails(timeBounds)
     );
     assertTransactionHashResponse(response);
     return response;
@@ -214,6 +224,7 @@ class NativeCartridgeAccount extends Account {
 }
 
 export interface NativeCartridgeWalletOptions {
+  bridging?: BridgingConfig;
   session: CartridgeNativeSessionHandle;
   provider: RpcProvider;
   chainId: ChainId;
@@ -240,6 +251,7 @@ export class NativeCartridgeWallet extends BaseWallet {
     const staking = options.staking;
     super({
       address: fromAddress(options.session.account.address),
+      ...(options.bridging && { bridgingConfig: options.bridging }),
       stakingConfig: staking,
     });
     this.session = options.session;
@@ -330,7 +342,6 @@ export class NativeCartridgeWallet extends BaseWallet {
   }
 
   async execute(calls: Call[], options: ExecuteOptions = {}): Promise<Tx> {
-    await this.ensureReady();
     const feeMode = options.feeMode ?? this.defaultFeeMode;
     if (feeMode !== "sponsored") {
       throw new Error(unsupportedUserPaysMessage());
@@ -365,15 +376,7 @@ export class NativeCartridgeWallet extends BaseWallet {
     }
     const simulate = this.session.account.simulateTransaction;
     if (!simulate) {
-      try {
-        await this.ensureReady();
-        return { ok: true };
-      } catch (error) {
-        return {
-          ok: false,
-          reason: error instanceof Error ? error.message : "Unknown error",
-        };
-      }
+      return { ok: true };
     }
     try {
       const simulation = await simulate([

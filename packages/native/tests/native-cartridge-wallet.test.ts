@@ -1,6 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { ChainId } from "starkzap";
-import { Account, type Call, type RpcProvider } from "starknet";
+import { ChainId, type BridgingConfig } from "starkzap";
+import {
+  Account,
+  type Call,
+  type PaymasterTimeBounds,
+  type RpcProvider,
+  type UniversalDetails,
+} from "starknet";
 import { NativeCartridgeWallet } from "@/wallet/cartridge";
 import type { CartridgeNativeSessionHandle } from "@/cartridge/types";
 
@@ -95,7 +101,7 @@ describe("NativeCartridgeWallet", () => {
     );
   });
 
-  it("fails fast on execute when the account is undeployed", async () => {
+  it("supports sponsored execute when the account is undeployed", async () => {
     const undeployedProvider = {
       getClassHashAt: vi
         .fn()
@@ -111,12 +117,36 @@ describe("NativeCartridgeWallet", () => {
       wallet.execute([{ contractAddress: "0x1" } as Call], {
         feeMode: "sponsored",
       })
-    ).rejects.toThrow("Account not deployed and deploy mode is 'never'");
+    ).resolves.toMatchObject({ hash: "0xfeed" });
 
-    expect(session.account.execute).not.toHaveBeenCalled();
+    expect(session.account.execute).toHaveBeenCalledTimes(1);
   });
 
-  it("fails preflight when simulation is unavailable and the account is undeployed", async () => {
+  it("prefers runtime time bounds on the account execute path", async () => {
+    const calls = [{ contractAddress: "0x1" } as Call];
+    const defaultTimeBounds: PaymasterTimeBounds = { executeBefore: 100 };
+    const runtimeTimeBounds: PaymasterTimeBounds = { executeBefore: 200 };
+    const wallet = await NativeCartridgeWallet.create({
+      session,
+      provider,
+      chainId: ChainId.SEPOLIA,
+      timeBounds: defaultTimeBounds,
+    });
+
+    await wallet.getAccount().execute(
+      calls,
+      {
+        timeBounds: runtimeTimeBounds,
+      } as UniversalDetails & { timeBounds: PaymasterTimeBounds }
+    );
+
+    expect(session.account.execute).toHaveBeenCalledWith(calls, {
+      feeMode: { mode: "sponsored" },
+      timeBounds: runtimeTimeBounds,
+    });
+  });
+
+  it("returns a sendable preflight result when simulation is unavailable and the account is undeployed", async () => {
     const undeployedProvider = {
       getClassHashAt: vi
         .fn()
@@ -134,8 +164,7 @@ describe("NativeCartridgeWallet", () => {
         feeMode: "sponsored",
       })
     ).resolves.toEqual({
-      ok: false,
-      reason: "Account not deployed and deploy mode is 'never'",
+      ok: true,
     });
   });
 
@@ -180,5 +209,25 @@ describe("NativeCartridgeWallet", () => {
     expect(wallet.getController()).toEqual({ id: "controller.c" });
     await wallet.disconnect();
     expect(session.disconnect).toHaveBeenCalledTimes(1);
+  });
+
+  it("retains bridging config on the native wallet path", async () => {
+    const bridging: BridgingConfig = {
+      layerZeroApiKey: "lz-key",
+      ethereumRpcUrl: "https://eth.example",
+      solanaRpcUrl: "https://sol.example",
+    };
+
+    const wallet = await NativeCartridgeWallet.create({
+      session,
+      provider,
+      chainId: ChainId.SEPOLIA,
+      bridging,
+    });
+
+    expect(
+      (wallet as unknown as { bridging: { bridgingConfig?: BridgingConfig } })
+        .bridging.bridgingConfig
+    ).toEqual(bridging);
   });
 });
