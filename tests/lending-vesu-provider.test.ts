@@ -31,6 +31,7 @@ function createContext(
 describe("VesuLendingProvider", () => {
   afterEach(() => {
     vi.restoreAllMocks();
+    vi.unstubAllGlobals();
   });
 
   it("supports mainnet and sepolia by default", () => {
@@ -38,6 +39,23 @@ describe("VesuLendingProvider", () => {
 
     expect(provider.supportsChain(ChainId.MAINNET)).toBe(true);
     expect(provider.supportsChain(ChainId.SEPOLIA)).toBe(true);
+  });
+
+  it("binds the default global fetch implementation", async () => {
+    const fetchMock = vi.fn(function (this: unknown, url: string) {
+      expect(this).toBe(globalThis);
+      expect(url).toBe("https://api.vesu.xyz/markets");
+      return Promise.resolve({
+        ok: true,
+        json: async () => ({ data: [] }),
+      });
+    });
+    vi.stubGlobal("fetch", fetchMock as unknown as typeof fetch);
+
+    const provider = new VesuLendingProvider();
+
+    await expect(provider.getMarkets(ChainId.MAINNET)).resolves.toEqual([]);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
   it("skips malformed position API items instead of failing the full response", async () => {
@@ -89,6 +107,64 @@ describe("VesuLendingProvider", () => {
         }),
       },
     });
+  });
+
+  it("filters out fully closed positions with zero collateral and zero debt", async () => {
+    const fetcher = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        data: [
+          {
+            protocolVersion: "v2",
+            pool: { id: "0x123", name: "Prime" },
+            type: "earn",
+            collateral: {
+              address: collateralToken.address,
+              symbol: collateralToken.symbol,
+              decimals: collateralToken.decimals,
+              value: "0",
+            },
+          },
+          {
+            protocolVersion: "v2",
+            pool: { id: "0x456", name: "Active" },
+            type: "earn",
+            collateral: {
+              address: collateralToken.address,
+              symbol: collateralToken.symbol,
+              decimals: collateralToken.decimals,
+              value: "1000",
+            },
+          },
+          {
+            protocolVersion: "v2",
+            pool: { id: "0x789", name: "Closed Borrow" },
+            type: "borrow",
+            collateral: {
+              address: collateralToken.address,
+              symbol: collateralToken.symbol,
+              decimals: collateralToken.decimals,
+              value: "0",
+            },
+            debt: {
+              address: debtToken.address,
+              symbol: debtToken.symbol,
+              decimals: debtToken.decimals,
+              value: "0",
+            },
+          },
+        ],
+      }),
+    });
+    const provider = new VesuLendingProvider({
+      fetcher: fetcher as unknown as typeof fetch,
+    });
+    const context = createContext(vi.fn());
+
+    const positions = await provider.getPositions(context, {});
+
+    expect(positions).toHaveLength(1);
+    expect(positions[0]!.pool.name).toBe("Active");
   });
 
   it("derives position usdValue from amount and normalized usdPrice", async () => {

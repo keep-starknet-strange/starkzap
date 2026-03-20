@@ -33,7 +33,9 @@ export interface LendingMarket {
 }
 
 export interface LendingPosition {
+  /** Collateral share balance as a protocol-native integer quantity. */
   collateralShares: bigint;
+  /** Debt principal in the provider's native integer accounting units. */
   nominalDebt: bigint;
   /** Collateral amount in collateral asset base units. */
   collateralAmount?: bigint;

@@ -111,7 +111,15 @@ export class VesuLendingProvider implements LendingProvider {
   private readonly vTokenCache = new Map<string, Address>();
 
   constructor(options: VesuLendingProviderOptions = {}) {
-    this.fetcher = options.fetcher ?? fetch;
+    if (options.fetcher) {
+      this.fetcher = options.fetcher;
+    } else if (typeof globalThis.fetch === "function") {
+      this.fetcher = globalThis.fetch.bind(globalThis) as typeof fetch;
+    } else {
+      throw new Error(
+        "No fetch implementation available. Provide fetcher in VesuLendingProvider."
+      );
+    }
 
     const chainConfigs: Partial<Record<VesuChain, VesuChainConfig>> = {};
     for (const chain of ["SN_MAIN", "SN_SEPOLIA"] as const) {
@@ -642,6 +650,8 @@ export class VesuLendingProvider implements LendingProvider {
     };
     const collateralUsdValue = toPositionUsdValue(collateral);
 
+    const collateralAmountRaw = BigInt(collateral.value);
+
     const result: LendingUserPosition = {
       type: posType,
       pool: {
@@ -650,7 +660,7 @@ export class VesuLendingProvider implements LendingProvider {
       },
       collateral: {
         token: collateralToken,
-        amount: BigInt(collateral.value),
+        amount: collateralAmountRaw,
         ...(collateralUsdValue != null ? { usdValue: collateralUsdValue } : {}),
       },
     };
@@ -674,7 +684,9 @@ export class VesuLendingProvider implements LendingProvider {
     }
 
     const debt = entry.debt;
+    let debtAmountRaw = 0n;
     if (debt?.address && debt.symbol && debt.decimals != null && debt.value) {
+      debtAmountRaw = BigInt(debt.value);
       const debtUsdValue = toPositionUsdValue(debt);
       result.debt = {
         token: {
@@ -683,9 +695,14 @@ export class VesuLendingProvider implements LendingProvider {
           decimals: debt.decimals,
           name: debt.name ?? debt.symbol,
         },
-        amount: BigInt(debt.value),
+        amount: debtAmountRaw,
         ...(debtUsdValue != null ? { usdValue: debtUsdValue } : {}),
       };
+    }
+
+    // Skip fully closed positions (zero collateral and zero debt)
+    if (collateralAmountRaw === 0n && debtAmountRaw === 0n) {
+      return null;
     }
 
     return result;
