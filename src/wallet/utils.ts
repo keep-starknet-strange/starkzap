@@ -7,6 +7,7 @@ import {
 } from "starknet";
 import type { PAYMASTER_API } from "@starknet-io/starknet-types-010";
 import { Tx } from "@/tx";
+import { isRecord } from "@/utils/ekubo";
 import type { Address } from "@/types";
 import type {
   DeployOptions,
@@ -80,7 +81,7 @@ export async function ensureWalletReady(
       return;
     }
 
-    if (!deployed && deploy === "never") {
+    if (deploy === "never") {
       throw new Error("Account not deployed and deploy mode is 'never'");
     }
 
@@ -129,22 +130,9 @@ export async function preflightTransaction(
       { type: "INVOKE", payload: calls },
     ]);
 
-    const result = simulation[0] as Record<string, unknown> | undefined;
-    if (result && "transaction_trace" in result && result.transaction_trace) {
-      const trace = result.transaction_trace as Record<string, unknown>;
-      if (
-        "execute_invocation" in trace &&
-        trace.execute_invocation &&
-        typeof trace.execute_invocation === "object"
-      ) {
-        const invocation = trace.execute_invocation as Record<string, unknown>;
-        if ("revert_reason" in invocation) {
-          return {
-            ok: false,
-            reason: (invocation.revert_reason as string) ?? "Simulation failed",
-          };
-        }
-      }
+    const revertReason = extractRevertReason(simulation[0]);
+    if (revertReason !== null) {
+      return { ok: false, reason: revertReason };
     }
 
     return { ok: true };
@@ -166,4 +154,22 @@ export function sponsoredDetails(
     ...(timeBounds && { timeBounds }),
     ...(deploymentData && { deploymentData }),
   };
+}
+
+/**
+ * Safely extract a revert reason from a simulation result.
+ * Returns the reason string, or `null` if the simulation succeeded.
+ */
+function extractRevertReason(result: unknown): string | null {
+  if (!isRecord(result)) return null;
+  const trace = result.transaction_trace;
+  if (!isRecord(trace)) return null;
+  const invocation = trace.execute_invocation;
+  if (!isRecord(invocation)) return null;
+  if ("revert_reason" in invocation) {
+    return typeof invocation.revert_reason === "string"
+      ? invocation.revert_reason
+      : "Simulation failed";
+  }
+  return null;
 }

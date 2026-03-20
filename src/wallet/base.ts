@@ -43,6 +43,7 @@ import {
   type LendingProvider,
   VesuLendingProvider,
 } from "@/lending";
+import { ProviderRegistry } from "@/providers/registry";
 import { BridgeOperator } from "@/bridge";
 import type { BridgeDepositOptions } from "@/bridge/types/BridgeInterface";
 import type { ConnectedExternalWallet } from "@/connect";
@@ -114,9 +115,11 @@ export abstract class BaseWallet implements WalletInterface {
     this.address = options.address;
     this.stakingConfig = options.stakingConfig;
     this.bridging = new BridgeOperator(this, options.bridgingConfig);
-    this.swapProviders = new Map();
-    const provider = options.defaultSwapProvider ?? new AvnuSwapProvider();
-    this.registerSwapProvider(provider, true);
+    this.swapRegistry = new ProviderRegistry("swap");
+    this.swapRegistry.register(
+      options.defaultSwapProvider ?? new AvnuSwapProvider(),
+      true
+    );
     this.lendingClient = new LendingClient(
       {
         address: this.address,
@@ -140,59 +143,27 @@ export abstract class BaseWallet implements WalletInterface {
     );
   }
 
-  /** Registered swap providers by id. */
-  private readonly swapProviders: Map<string, SwapProvider>;
-  private defaultSwapProviderId: string | null = null;
+  private readonly swapRegistry: ProviderRegistry<SwapProvider>;
   private readonly lendingClient: LendingClient;
   private readonly dcaClient: DcaClient;
 
-  // ============================================================
-  // Abstract methods - children MUST implement
-  // ============================================================
-
-  /** @inheritdoc */
   abstract isDeployed(): Promise<boolean>;
-
-  /** @inheritdoc */
   abstract ensureReady(options?: EnsureReadyOptions): Promise<void>;
-
-  /** @inheritdoc */
   abstract deploy(options?: DeployOptions): Promise<Tx>;
-
-  /** @inheritdoc */
   abstract execute(calls: Call[], options?: ExecuteOptions): Promise<Tx>;
+  abstract signMessage(typedData: TypedData): Promise<Signature>;
+  abstract preflight(options: PreflightOptions): Promise<PreflightResult>;
+  abstract getAccount(): Account;
+  abstract getProvider(): RpcProvider;
+  abstract getChainId(): ChainId;
+  abstract getFeeMode(): FeeMode;
+  abstract getClassHash(): string;
+  abstract estimateFee(calls: Call[]): Promise<EstimateFeeResponseOverhead>;
+  abstract disconnect(): Promise<void>;
 
-  /** @inheritdoc */
   callContract(call: Call): ReturnType<RpcProvider["callContract"]> {
     return this.getProvider().callContract(call);
   }
-
-  /** @inheritdoc */
-  abstract signMessage(typedData: TypedData): Promise<Signature>;
-
-  /** @inheritdoc */
-  abstract preflight(options: PreflightOptions): Promise<PreflightResult>;
-
-  /** @inheritdoc */
-  abstract getAccount(): Account;
-
-  /** @inheritdoc */
-  abstract getProvider(): RpcProvider;
-
-  /** @inheritdoc */
-  abstract getChainId(): ChainId;
-
-  /** @inheritdoc */
-  abstract getFeeMode(): FeeMode;
-
-  /** @inheritdoc */
-  abstract getClassHash(): string;
-
-  /** @inheritdoc */
-  abstract estimateFee(calls: Call[]): Promise<EstimateFeeResponseOverhead>;
-
-  /** @inheritdoc */
-  abstract disconnect(): Promise<void>;
 
   // ============================================================
   // Transaction builder
@@ -273,40 +244,23 @@ export abstract class BaseWallet implements WalletInterface {
   }
 
   registerSwapProvider(provider: SwapProvider, makeDefault = false): void {
-    this.swapProviders.set(provider.id, provider);
-    if (makeDefault || this.defaultSwapProviderId == null) {
-      this.defaultSwapProviderId = provider.id;
-    }
+    this.swapRegistry.register(provider, makeDefault);
   }
 
   setDefaultSwapProvider(providerId: string): void {
-    if (!this.swapProviders.has(providerId)) {
-      throw new Error(
-        `Unknown swap provider "${providerId}". Registered providers: ${this.listSwapProviders().join(", ")}`
-      );
-    }
-    this.defaultSwapProviderId = providerId;
+    this.swapRegistry.setDefault(providerId);
   }
 
   getSwapProvider(providerId: string): SwapProvider {
-    const provider = this.swapProviders.get(providerId);
-    if (!provider) {
-      throw new Error(
-        `Unknown swap provider "${providerId}". Registered providers: ${this.listSwapProviders().join(", ")}`
-      );
-    }
-    return provider;
+    return this.swapRegistry.get(providerId);
   }
 
   listSwapProviders(): string[] {
-    return Array.from(this.swapProviders.keys());
+    return this.swapRegistry.list();
   }
 
   getDefaultSwapProvider(): SwapProvider {
-    if (!this.defaultSwapProviderId) {
-      throw new Error("No default swap provider configured");
-    }
-    return this.getSwapProvider(this.defaultSwapProviderId);
+    return this.swapRegistry.getDefault();
   }
 
   protected clearCaches(): void {
@@ -316,19 +270,16 @@ export abstract class BaseWallet implements WalletInterface {
   }
 
   private assertSwapCalls(calls: Call[], source?: string): void {
-    if (calls.length) {
-      return;
-    }
-    if (source) {
-      throw new Error(`Swap ${source} returned no calls`);
-    }
-    throw new Error("Swap returned no calls");
+    if (calls.length) return;
+    throw new Error(
+      source ? `Swap ${source} returned no calls` : "Swap returned no calls"
+    );
   }
 
-  private evictOldest<K, V>(cache: Map<K, V>): void {
-    const oldest = cache.keys().next().value;
-    if (oldest !== undefined) {
-      cache.delete(oldest);
+  private evictFirst<K, V>(cache: Map<K, V>): void {
+    const firstKey = cache.keys().next().value;
+    if (firstKey !== undefined) {
+      cache.delete(firstKey);
     }
   }
 
@@ -349,7 +300,7 @@ export abstract class BaseWallet implements WalletInterface {
     let erc20 = this.erc20s.get(token.address);
     if (!erc20) {
       if (this.erc20s.size >= MAX_ERC20_CACHE_SIZE) {
-        this.evictOldest(this.erc20s);
+        this.evictFirst(this.erc20s);
       }
       erc20 = new Erc20(token, this.getProvider());
       this.erc20s.set(token.address, erc20);
@@ -678,18 +629,19 @@ export abstract class BaseWallet implements WalletInterface {
     return await staking.getCommission();
   }
 
-  /**
-   * Asserts that staking configuration is available.
-   *
-   * @returns The staking configuration
-   * @throws Error if staking configuration was not provided to the SDK
-   */
   private assertStakingConfig(): StakingConfig {
     if (!this.stakingConfig) {
       throw new Error("`stakingConfig` is not defined in the sdk config.");
     }
-
     return this.stakingConfig;
+  }
+
+  private cacheStaking(poolAddress: Address, staking: Staking): Staking {
+    if (this.stakingMap.size >= MAX_STAKING_CACHE_SIZE) {
+      this.evictFirst(this.stakingMap);
+    }
+    this.stakingMap.set(poolAddress, staking);
+    return staking;
   }
 
   /**
@@ -714,28 +666,14 @@ export abstract class BaseWallet implements WalletInterface {
    */
   async staking(poolAddress: Address): Promise<Staking> {
     const config = this.assertStakingConfig();
-
     const cached = this.stakingMap.get(poolAddress);
-    if (cached) {
-      return cached;
-    }
-
+    if (cached) return cached;
     const inFlight = this.stakingInFlight.get(poolAddress);
-    if (inFlight) {
-      return inFlight;
-    }
+    if (inFlight) return inFlight;
 
     const loading = Staking.fromPool(poolAddress, this.getProvider(), config)
-      .then((staking) => {
-        if (this.stakingMap.size >= MAX_STAKING_CACHE_SIZE) {
-          this.evictOldest(this.stakingMap);
-        }
-        this.stakingMap.set(poolAddress, staking);
-        return staking;
-      })
-      .finally(() => {
-        this.stakingInFlight.delete(poolAddress);
-      });
+      .then((s) => this.cacheStaking(poolAddress, s))
+      .finally(() => this.stakingInFlight.delete(poolAddress));
 
     this.stakingInFlight.set(poolAddress, loading);
     return loading;
@@ -763,27 +701,10 @@ export abstract class BaseWallet implements WalletInterface {
    *
    * @see {@link Staking.fromStaker}
    */
-  async stakingInStaker(
-    stakerAddress: Address,
-    token: Token
-  ): Promise<Staking> {
+  async stakingInStaker(stakerAddress: Address, token: Token): Promise<Staking> {
     const config = this.assertStakingConfig();
-
-    const staking = await Staking.fromStaker(
-      stakerAddress,
-      token,
-      this.getProvider(),
-      config
-    );
-
-    const poolAddress = staking.poolAddress;
-    if (this.stakingMap.size >= MAX_STAKING_CACHE_SIZE) {
-      this.evictOldest(this.stakingMap);
-    }
-    this.stakingMap.set(poolAddress, staking);
-    this.stakingInFlight.delete(poolAddress);
-
-    return staking;
+    const staking = await Staking.fromStaker(stakerAddress, token, this.getProvider(), config);
+    return this.cacheStaking(staking.poolAddress, staking);
   }
 
   // ============================================================
