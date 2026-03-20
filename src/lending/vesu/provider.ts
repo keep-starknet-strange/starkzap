@@ -1,4 +1,5 @@
 import type {
+  LendingActionInput,
   LendingAmountDenomination,
   LendingBorrowRequest,
   LendingDepositRequest,
@@ -282,54 +283,27 @@ export class VesuLendingProvider implements LendingProvider {
     );
     const debtAmount = request.amount.toBase();
     const debtDenomination = request.debtDenomination ?? "assets";
-    const calls: Call[] = [];
 
     assertAssetsDenomination("borrow", "debt", debtDenomination);
 
-    // Determine collateral: explicit amount, or withdraw from earn position
     let collateralAmount = request.collateralAmount?.toBase() ?? 0n;
     const collateralDenomination = request.collateralDenomination ?? "assets";
     assertAssetsDenomination("borrow", "collateral", collateralDenomination);
 
-    if (request.useEarnPosition) {
-      const earnBalance = await this.readEarnBalance(
-        context,
-        poolAddress,
-        request.collateralToken,
-        user
-      );
-      if (earnBalance > 0n) {
-        const vTokenAddress = await this.resolveVTokenAddress(
+    const earnCalls = request.useEarnPosition
+      ? await this.buildEarnRedemptionCalls(
           context,
           poolAddress,
-          request.collateralToken.address
-        );
+          request.collateralToken,
+          user
+        )
+      : null;
 
-        // Get vToken shares to redeem all
-        const balanceResult = await context.provider.callContract({
-          contractAddress: vTokenAddress,
-          entrypoint: "balance_of",
-          calldata: CallData.compile([user]),
-        });
-        const shares = parseU256(balanceResult, 0, "vtoken_balance");
-
-        if (shares > 0n) {
-          // Redeem all vToken shares → underlying tokens go to user wallet
-          calls.push({
-            contractAddress: vTokenAddress,
-            entrypoint: "redeem",
-            calldata: CallData.compile([
-              uint256.bnToUint256(shares),
-              user,
-              user,
-            ]),
-          });
-
-          // Use the full earn balance as collateral
-          collateralAmount = collateralAmount + earnBalance;
-        }
-      }
+    if (earnCalls) {
+      collateralAmount = collateralAmount + earnCalls.earnBalance;
     }
+
+    const calls: Call[] = [...(earnCalls?.calls ?? [])];
 
     if (collateralAmount > 0n && collateralDenomination === "assets") {
       calls.push(
@@ -519,26 +493,73 @@ export class VesuLendingProvider implements LendingProvider {
       return null;
     }
 
-    const collateralAmount = actionRequest.collateralAmount?.toBase() ?? 0n;
-    let collateralDelta = collateralAmount;
-    let debtDelta: bigint;
-    if (request.action.action === "repay") {
-      collateralDelta = request.action.request.withdrawCollateral
+    const { collateralDelta, debtDelta } = await this.computeHealthQuoteDeltas(
+      context,
+      request.action,
+      actionContext
+    );
+
+    return this.projectHealth(
+      context,
+      actionContext,
+      actionRequest,
+      current,
+      collateralDelta,
+      debtDelta
+    );
+  }
+
+  /**
+   * Compute the collateral and debt deltas for a projected health quote.
+   * Only supports "borrow" and "repay" actions.
+   */
+  private async computeHealthQuoteDeltas(
+    context: LendingProviderContext,
+    action: LendingActionInput,
+    actionContext: { poolAddress: Address; user: Address }
+  ): Promise<{ collateralDelta: bigint; debtDelta: bigint }> {
+    if (action.action === "repay") {
+      const collateralAmount = action.request.collateralAmount?.toBase() ?? 0n;
+      const collateralDelta = action.request.withdrawCollateral
         ? -collateralAmount
         : collateralAmount;
-      debtDelta = -request.action.request.amount.toBase();
-    } else {
-      debtDelta = request.action.request.amount.toBase();
-      if (request.action.request.useEarnPosition) {
+      return {
+        collateralDelta,
+        debtDelta: -action.request.amount.toBase(),
+      };
+    }
+
+    if (action.action === "borrow") {
+      let collateralDelta = action.request.collateralAmount?.toBase() ?? 0n;
+      if (action.request.useEarnPosition) {
         collateralDelta += await this.readEarnBalance(
           context,
           actionContext.poolAddress,
-          actionRequest.collateralToken,
+          action.request.collateralToken,
           actionContext.user
         );
       }
+      return {
+        collateralDelta,
+        debtDelta: action.request.amount.toBase(),
+      };
     }
 
+    return { collateralDelta: 0n, debtDelta: 0n };
+  }
+
+  /**
+   * Given deltas and current health, resolve on-chain prices and compute
+   * projected health values.
+   */
+  private async projectHealth(
+    context: LendingProviderContext,
+    actionContext: { poolAddress: Address; user: Address },
+    actionRequest: { collateralToken: Token; debtToken: Token },
+    current: LendingHealth,
+    collateralDelta: bigint,
+    debtDelta: bigint
+  ): Promise<LendingHealth | null> {
     const [collateralPrice, debtPrice, maxLtv] = await Promise.all([
       this.readAssetPrice(
         context,
@@ -610,20 +631,31 @@ export class VesuLendingProvider implements LendingProvider {
         continue;
       }
 
-      try {
-        const position = this.toUserPosition(entry);
-        if (position) {
-          positions.push(position);
-        }
-      } catch {
-        continue;
+      const position = this.toUserPosition(entry);
+      if (position) {
+        positions.push(position);
       }
     }
 
     return positions;
   }
 
+  /**
+   * Parse a single API position entry into a domain object.
+   * Returns `null` for entries with missing/invalid fields rather than throwing,
+   * so a single malformed entry does not break the entire positions response.
+   */
   private toUserPosition(
+    entry: VesuPositionApiItem
+  ): LendingUserPosition | null {
+    try {
+      return this.parseUserPosition(entry);
+    } catch {
+      return null;
+    }
+  }
+
+  private parseUserPosition(
     entry: VesuPositionApiItem
   ): LendingUserPosition | null {
     const collateral = entry.collateral;
@@ -774,6 +806,53 @@ export class VesuLendingProvider implements LendingProvider {
     // Apply a 1% safety margin to avoid surfacing a "max" value that
     // rounds above what the on-chain collateralization check will accept.
     return (maxBorrowAmount * MAX_BORROW_SAFETY_BPS) / BASIS_POINTS_SCALE;
+  }
+
+  /**
+   * Build calls to redeem a user's entire earn position (vToken → underlying)
+   * so the proceeds can be used as collateral in a borrow.
+   */
+  private async buildEarnRedemptionCalls(
+    context: LendingProviderContext,
+    poolAddress: Address,
+    collateralToken: Token,
+    user: Address
+  ): Promise<{ calls: Call[]; earnBalance: bigint } | null> {
+    const earnBalance = await this.readEarnBalance(
+      context,
+      poolAddress,
+      collateralToken,
+      user
+    );
+    if (earnBalance === 0n) {
+      return null;
+    }
+
+    const vTokenAddress = await this.resolveVTokenAddress(
+      context,
+      poolAddress,
+      collateralToken.address
+    );
+    const balanceResult = await context.provider.callContract({
+      contractAddress: vTokenAddress,
+      entrypoint: "balance_of",
+      calldata: CallData.compile([user]),
+    });
+    const shares = parseU256(balanceResult, 0, "vtoken_balance");
+    if (shares === 0n) {
+      return null;
+    }
+
+    return {
+      calls: [
+        {
+          contractAddress: vTokenAddress,
+          entrypoint: "redeem",
+          calldata: CallData.compile([uint256.bnToUint256(shares), user, user]),
+        },
+      ],
+      earnBalance,
+    };
   }
 
   /**

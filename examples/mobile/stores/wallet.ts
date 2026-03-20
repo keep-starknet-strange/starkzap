@@ -240,6 +240,47 @@ function sameBridgeToken(
   return left.id === right.id && left.chain === right.chain;
 }
 
+interface BridgeRequestSnapshot {
+  sdk?: StarkZap | null;
+  chainId: ChainId;
+  bridgeDirection: "to-starknet" | "from-starknet";
+  wallet: WalletInterface | null;
+  connectedEthWallet: ConnectedEthereumWallet | undefined;
+  connectedSolWallet: ConnectedSolanaWallet | undefined;
+  bridgeSelectedToken: BridgeToken | null;
+  bridgeExternalChain?: ExternalChain;
+  bridgeFastTransfer?: boolean;
+}
+
+/**
+ * Create a staleness guard for bridge async operations.
+ * Returns a function that checks whether the store still matches
+ * the snapshot captured at request time.
+ */
+function createBridgeRequestGuard(
+  snapshot: BridgeRequestSnapshot,
+  get: () => BridgeRequestSnapshot
+): () => boolean {
+  const chainLiteral = snapshot.chainId.toLiteral();
+  return () => {
+    const current = get();
+    return (
+      (snapshot.sdk === undefined || current.sdk === snapshot.sdk) &&
+      current.chainId.toLiteral() === chainLiteral &&
+      current.bridgeDirection === snapshot.bridgeDirection &&
+      current.wallet === snapshot.wallet &&
+      current.connectedEthWallet === snapshot.connectedEthWallet &&
+      current.connectedSolWallet === snapshot.connectedSolWallet &&
+      sameBridgeToken(
+        current.bridgeSelectedToken,
+        snapshot.bridgeSelectedToken
+      ) &&
+      (snapshot.bridgeFastTransfer == null ||
+        current.bridgeFastTransfer === snapshot.bridgeFastTransfer)
+    );
+  };
+}
+
 function getBridgeResetState() {
   return {
     bridgeSelectedToken: null,
@@ -357,6 +398,49 @@ async function onboardPrivyWallet(params: {
   });
 
   return onboard.wallet;
+}
+
+/**
+ * Re-onboard the current wallet session against a new SDK instance
+ * during a network switch. Returns the existing wallet when the
+ * wallet type does not require re-onboarding.
+ */
+async function rebindWallet(
+  state: WalletState,
+  sdk: StarkZap,
+  accessToken?: string
+): Promise<WalletInterface | null> {
+  if (state.walletType === "privatekey") {
+    if (!state.privateKey.trim()) {
+      throw new Error(
+        "Private key session is unavailable. Reconnect the wallet first."
+      );
+    }
+    return onboardPrivateKeyWallet({
+      sdk,
+      privateKey: state.privateKey,
+      selectedPreset: state.selectedPreset,
+      preferSponsored: state.preferSponsored,
+    });
+  }
+
+  if (state.walletType === "privy") {
+    if (!state.privyWalletId || !state.privyPublicKey || !accessToken) {
+      throw new Error(
+        "Privy session is unavailable. Log in again before switching networks."
+      );
+    }
+    return onboardPrivyWallet({
+      sdk,
+      walletId: state.privyWalletId,
+      publicKey: state.privyPublicKey,
+      accessToken,
+      privySelectedPreset: state.privySelectedPreset,
+      preferSponsored: state.preferSponsored,
+    });
+  }
+
+  return state.wallet;
 }
 
 export const useWalletStore = create<WalletState>((set, get) => ({
@@ -516,50 +600,15 @@ export const useWalletStore = create<WalletState>((set, get) => ({
         rpcUrl: nextNetwork.rpcUrl,
         chainId: nextNetwork.chainId,
       });
-      if (!isCurrentRequest()) {
-        return;
-      }
+      if (!isCurrentRequest()) return;
 
-      let nextWallet = state.wallet;
-      if (state.walletType === "privatekey") {
-        if (!state.privateKey.trim()) {
-          throw new Error(
-            "Private key session is unavailable. Reconnect the wallet first."
-          );
-        }
+      const nextWallet = await rebindWallet(
+        state,
+        configuredSdkState.sdk,
+        accessToken
+      );
+      if (!isCurrentRequest()) return;
 
-        nextWallet = await onboardPrivateKeyWallet({
-          sdk: configuredSdkState.sdk,
-          privateKey: state.privateKey,
-          selectedPreset: state.selectedPreset,
-          preferSponsored: state.preferSponsored,
-        });
-        if (!isCurrentRequest()) {
-          return;
-        }
-      } else if (state.walletType === "privy") {
-        if (!state.privyWalletId || !state.privyPublicKey || !accessToken) {
-          throw new Error(
-            "Privy session is unavailable. Log in again before switching networks."
-          );
-        }
-
-        nextWallet = await onboardPrivyWallet({
-          sdk: configuredSdkState.sdk,
-          walletId: state.privyWalletId,
-          publicKey: state.privyPublicKey,
-          accessToken,
-          privySelectedPreset: state.privySelectedPreset,
-          preferSponsored: state.preferSponsored,
-        });
-        if (!isCurrentRequest()) {
-          return;
-        }
-      }
-
-      if (!isCurrentRequest()) {
-        return;
-      }
       set({
         ...configuredSdkState,
         selectedNetworkIndex: index,
@@ -568,34 +617,26 @@ export const useWalletStore = create<WalletState>((set, get) => ({
         isDeployed: null,
         ...getBridgeResetState(),
       });
-      if (!isCurrentRequest()) {
-        return;
-      }
+      if (!isCurrentRequest()) return;
+
       await get().fetchBridgeTokens();
-      if (!isCurrentRequest()) {
-        return;
-      }
+      if (!isCurrentRequest()) return;
+
       get().addLog(`Switched to ${nextNetwork.name}`);
       get().addLog(`RPC: ${configuredSdkState.rpcUrl}`);
       get().addLog(`Chain: ${configuredSdkState.chainId.toLiteral()}`);
 
       if (nextWallet) {
-        if (!isCurrentRequest()) {
-          return;
-        }
         await get().checkDeploymentStatus();
       }
     } catch (error) {
-      if (!isCurrentRequest()) {
-        return;
-      }
+      if (!isCurrentRequest()) return;
       get().addLog(`Network switch failed: ${error}`);
       throw error;
     } finally {
-      if (!isCurrentRequest()) {
-        return;
+      if (isCurrentRequest()) {
+        set({ isConnecting: false });
       }
-      set({ isConnecting: false });
     }
   },
 
@@ -764,19 +805,18 @@ export const useWalletStore = create<WalletState>((set, get) => ({
       return;
     }
 
-    const chainLiteral = chainId.toLiteral();
-    const isCurrentRequest = () => {
-      const current = get();
-      return (
-        current.sdk === sdk &&
-        current.chainId.toLiteral() === chainLiteral &&
-        current.bridgeDirection === bridgeDirection &&
-        current.wallet === wallet &&
-        current.connectedEthWallet === connectedEthWallet &&
-        current.connectedSolWallet === connectedSolWallet &&
-        sameBridgeToken(current.bridgeSelectedToken, bridgeSelectedToken)
-      );
-    };
+    const isCurrentRequest = createBridgeRequestGuard(
+      {
+        sdk,
+        chainId,
+        bridgeDirection,
+        wallet,
+        connectedEthWallet,
+        connectedSolWallet,
+        bridgeSelectedToken,
+      },
+      get
+    );
 
     set(clearBalance);
 
@@ -869,19 +909,18 @@ export const useWalletStore = create<WalletState>((set, get) => ({
       return;
     }
 
-    const chainLiteral = chainId.toLiteral();
-    const isCurrentRequest = () => {
-      const current = get();
-      return (
-        current.sdk === sdk &&
-        current.chainId.toLiteral() === chainLiteral &&
-        current.bridgeDirection === bridgeDirection &&
-        current.wallet === wallet &&
-        current.connectedEthWallet === connectedEthWallet &&
-        current.connectedSolWallet === connectedSolWallet &&
-        sameBridgeToken(current.bridgeSelectedToken, bridgeSelectedToken)
-      );
-    };
+    const isCurrentRequest = createBridgeRequestGuard(
+      {
+        sdk,
+        chainId,
+        bridgeDirection,
+        wallet,
+        connectedEthWallet,
+        connectedSolWallet,
+        bridgeSelectedToken,
+      },
+      get
+    );
 
     const externalWallet =
       bridgeSelectedToken.chain === ExternalChain.ETHEREUM
@@ -949,19 +988,18 @@ export const useWalletStore = create<WalletState>((set, get) => ({
       return;
     }
 
-    const chainLiteral = chainId.toLiteral();
-    const isCurrentRequest = () => {
-      const current = get();
-      return (
-        current.chainId.toLiteral() === chainLiteral &&
-        current.bridgeDirection === bridgeDirection &&
-        current.bridgeFastTransfer === bridgeFastTransfer &&
-        current.wallet === wallet &&
-        current.connectedEthWallet === connectedEthWallet &&
-        current.connectedSolWallet === connectedSolWallet &&
-        sameBridgeToken(current.bridgeSelectedToken, bridgeSelectedToken)
-      );
-    };
+    const isCurrentRequest = createBridgeRequestGuard(
+      {
+        chainId,
+        bridgeDirection,
+        wallet,
+        connectedEthWallet,
+        connectedSolWallet,
+        bridgeSelectedToken,
+        bridgeFastTransfer,
+      },
+      get
+    );
 
     const isEthereum = bridgeSelectedToken.chain === ExternalChain.ETHEREUM;
     const isSolana = bridgeSelectedToken.chain === ExternalChain.SOLANA;

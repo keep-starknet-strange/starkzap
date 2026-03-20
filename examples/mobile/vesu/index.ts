@@ -6,7 +6,7 @@ import {
   type LendingUserPosition,
   type Token,
 } from "@starkzap/native";
-import { sameAddress } from "./utils";
+import { PERCENT_SCALE, sameAddress } from "./utils";
 
 export const VESU_PROVIDER_ID = "vesu" as const;
 
@@ -27,7 +27,6 @@ const DEFAULT_VESU_COLLATERAL_SYMBOLS = [
   "WBTC",
   "USDC",
 ] as const;
-const PERCENT_SCALE = 10_000n;
 const DISPLAY_DECIMALS = 2;
 const UNKNOWN_POOL_LABEL = "Pool unavailable";
 const VESU_POOL_REQUEST_TIMEOUT_MS = 8_000;
