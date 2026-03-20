@@ -91,10 +91,8 @@ export class StarkZap extends CoreStarkZap {
   override async connectCartridge(
     options: ConnectCartridgeOptions = {}
   ): Promise<Awaited<ReturnType<CoreStarkZap["connectCartridge"]>>> {
-    await this.ensureNativeProviderChainMatchesConfig();
-    const feeMode = validateSupportedCartridgeFeeMode(options.feeMode);
-
     const adapter = getCartridgeNativeAdapterOrThrow();
+    const feeMode = validateSupportedCartridgeFeeMode(options.feeMode);
 
     const policies = hasPoliciesInput(options.policies)
       ? options.policies
@@ -104,6 +102,8 @@ export class StarkZap extends CoreStarkZap {
         "Cartridge session connection requires either non-empty policies or a preset that resolves policies for the active chain."
       );
     }
+
+    await this.ensureNativeProviderChainMatchesConfig();
 
     const provider = this.getProvider();
     const chainId = await getChainId(provider);

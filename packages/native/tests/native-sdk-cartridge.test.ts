@@ -41,9 +41,14 @@ describe("@starkzap/native cartridge sdk", () => {
 
   it("throws a deterministic error when adapter is missing", async () => {
     const sdk = makeSdk();
+    const getChainId = vi
+      .spyOn(sdk.getProvider(), "getChainId")
+      .mockRejectedValue(new Error("rpc offline"));
+
     await expect(sdk.connectCartridge()).rejects.toThrow(
       "Cartridge adapter is not registered."
     );
+    expect(getChainId).not.toHaveBeenCalled();
   });
 
   it("forwards options to the adapter including forceNewSession", async () => {
@@ -107,6 +112,9 @@ describe("@starkzap/native cartridge sdk", () => {
 
   it("rejects unsupported default fee modes before connecting", async () => {
     const sdk = makeSdk();
+    const getChainId = vi
+      .spyOn(sdk.getProvider(), "getChainId")
+      .mockRejectedValue(new Error("rpc offline"));
     const { adapter, connect } = makeAdapter();
     registerCartridgeNativeAdapter(adapter);
 
@@ -117,6 +125,23 @@ describe("@starkzap/native cartridge sdk", () => {
       })
     ).rejects.toThrow("supports sponsored session execution only");
 
+    expect(getChainId).not.toHaveBeenCalled();
+    expect(connect).not.toHaveBeenCalled();
+  });
+
+  it("rejects missing policies or preset before provider validation", async () => {
+    const sdk = makeSdk();
+    const getChainId = vi
+      .spyOn(sdk.getProvider(), "getChainId")
+      .mockRejectedValue(new Error("rpc offline"));
+    const { adapter, connect } = makeAdapter();
+    registerCartridgeNativeAdapter(adapter);
+
+    await expect(sdk.connectCartridge()).rejects.toThrow(
+      "Cartridge session connection requires either non-empty policies or a preset that resolves policies for the active chain."
+    );
+
+    expect(getChainId).not.toHaveBeenCalled();
     expect(connect).not.toHaveBeenCalled();
   });
 
