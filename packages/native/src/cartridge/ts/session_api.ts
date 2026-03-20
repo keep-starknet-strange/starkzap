@@ -152,16 +152,6 @@ function toOptionalString(value: unknown): string | null {
   return null;
 }
 
-function firstNonEmptyString(...values: unknown[]): string {
-  for (const value of values) {
-    const normalized = toOptionalString(value);
-    if (normalized) {
-      return normalized;
-    }
-  }
-  return "";
-}
-
 function readAuthorization(values: unknown): string[] | undefined {
   if (!Array.isArray(values)) {
     return undefined;
@@ -188,6 +178,24 @@ function readBoolean(value: unknown): boolean | undefined {
   return undefined;
 }
 
+function readSupportedUsername(record: Record<string, unknown>): string {
+  const controller = asRecord(record.controller);
+  return (
+    toOptionalString(record.username) ??
+    toOptionalString(controller?.accountID) ??
+    ""
+  );
+}
+
+function readSupportedAddress(record: Record<string, unknown>): string {
+  const controller = asRecord(record.controller);
+  return (
+    toOptionalString(record.address) ??
+    toOptionalString(controller?.address) ??
+    ""
+  );
+}
+
 function normalizeSessionRegistration(session: unknown): SessionRegistration {
   const record = asRecord(session);
   if (!record) {
@@ -196,57 +204,23 @@ function normalizeSessionRegistration(session: unknown): SessionRegistration {
     );
   }
 
-  const controller = asRecord(record.controller);
   const authorization = readAuthorization(record.authorization);
-
-  const username = firstNonEmptyString(
-    record.username,
-    record.accountID,
-    record.accountId,
-    record.account_id,
-    controller?.accountID,
-    controller?.accountId,
-    controller?.account_id
-  );
-  const rawAddress = firstNonEmptyString(
-    record.address,
-    record.accountAddress,
-    record.account_address,
-    controller?.address
-  );
-  const ownerGuid = firstNonEmptyString(
-    record.ownerGuid,
-    record.owner_guid,
-    authorization?.[1]
-  );
-  const expiresAt = firstNonEmptyString(
-    record.expiresAt,
-    record.expires_at,
-    record.expiry,
-    record.expires
-  );
-  const guardianKeyGuid = firstNonEmptyString(
-    record.guardianKeyGuid,
-    record.guardian_key_guid,
-    "0x0"
-  );
-  const metadataHash = firstNonEmptyString(
-    record.metadataHash,
-    record.metadata_hash,
-    "0x0"
-  );
-  const sessionKeyGuid = firstNonEmptyString(
-    record.sessionKeyGuid,
-    record.session_key_guid,
-    record.id
-  );
-  const chainId = firstNonEmptyString(
-    record.chainId,
-    record.chainID,
-    record.chain_id
-  );
-  const appId = firstNonEmptyString(record.appId, record.appID, record.app_id);
-  const isRevoked = readBoolean(record.isRevoked ?? record.is_revoked);
+  const username = readSupportedUsername(record);
+  const rawAddress = readSupportedAddress(record);
+  const ownerGuid =
+    toOptionalString(record.ownerGuid) ?? authorization?.[1] ?? "";
+  const expiresAt = toOptionalString(record.expiresAt) ?? "";
+  const guardianKeyGuid = toOptionalString(record.guardianKeyGuid) ?? "0x0";
+  const metadataHash = toOptionalString(record.metadataHash) ?? "0x0";
+  const sessionKeyGuid =
+    toOptionalString(record.sessionKeyGuid) ??
+    toOptionalString(record.id) ??
+    "";
+  const chainId =
+    toOptionalString(record.chainId) ?? toOptionalString(record.chainID) ?? "";
+  const appId =
+    toOptionalString(record.appId) ?? toOptionalString(record.appID) ?? "";
+  const isRevoked = readBoolean(record.isRevoked);
 
   const missingFields: string[] = [];
   if (!username) missingFields.push("username");
@@ -341,7 +315,18 @@ export function parseSessionFromEncodedRedirect(
     defaultSessionKeyGuid?: string;
   } = {}
 ): SessionRegistration {
-  const raw = decodeBase64(encodedSession);
+  let raw: string;
+  try {
+    raw = decodeBase64(encodedSession);
+  } catch (error) {
+    if (error instanceof SessionProtocolError) {
+      throw error;
+    }
+    throw new SessionProtocolError(
+      "Cartridge session redirect payload is not valid base64.",
+      error
+    );
+  }
   let parsed: unknown;
   try {
     parsed = JSON.parse(raw);
@@ -359,7 +344,7 @@ export function parseSessionFromEncodedRedirect(
     );
   }
 
-  if (!record.sessionKeyGuid && !record.session_key_guid && !record.id) {
+  if (!record.sessionKeyGuid && !record.id) {
     if (options.defaultSessionKeyGuid) {
       record.sessionKeyGuid = options.defaultSessionKeyGuid;
     }
@@ -398,6 +383,15 @@ export async function waitForSessionSubscription({
   let lastError: unknown;
 
   while (Date.now() - startedAt < timeoutMs) {
+    const remainingMs = timeoutMs - (Date.now() - startedAt);
+    if (remainingMs <= 0) {
+      break;
+    }
+    const requestBudgetMs =
+      requestTimeoutMs > 0
+        ? Math.min(requestTimeoutMs, remainingMs)
+        : remainingMs;
+
     try {
       const response = await fetchWithTimeout(
         fetchFn,
@@ -415,8 +409,8 @@ export async function waitForSessionSubscription({
           }),
         },
         {
-          requestTimeoutMs,
-          timeoutMessage: `Cartridge session subscription request timed out after ${requestTimeoutMs}ms.`,
+          requestTimeoutMs: requestBudgetMs,
+          timeoutMessage: `Cartridge session subscription request timed out after ${requestBudgetMs}ms.`,
           createTimeoutError: (message, cause) =>
             new SessionProtocolError(message, cause),
         }
@@ -480,7 +474,15 @@ export async function waitForSessionSubscription({
       lastError = error;
     }
 
-    await sleep(nextDelayMs(attempt));
+    const remainingDelayBudgetMs = timeoutMs - (Date.now() - startedAt);
+    if (remainingDelayBudgetMs <= 0) {
+      break;
+    }
+
+    const delayMs = Math.min(nextDelayMs(attempt), remainingDelayBudgetMs);
+    if (delayMs > 0) {
+      await sleep(delayMs);
+    }
     attempt += 1;
   }
 

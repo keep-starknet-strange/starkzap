@@ -1,10 +1,23 @@
+function attachCause(error: Error, cause?: unknown): void {
+  if (cause === undefined) {
+    return;
+  }
+
+  Object.defineProperty(error, "cause", {
+    value: cause,
+    configurable: true,
+    enumerable: false,
+    writable: true,
+  });
+}
+
 export class SessionProtocolError extends Error {
+  declare cause?: unknown;
+
   constructor(message: string, cause?: unknown) {
     super(message);
     this.name = "SessionProtocolError";
-    if (cause !== undefined) {
-      (this as Error & { cause?: unknown }).cause = cause;
-    }
+    attachCause(this, cause);
   }
 }
 
