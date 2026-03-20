@@ -92,9 +92,11 @@ export class StarkZap extends CoreStarkZap {
   async onboard(
     options: Extract<OnboardOptions, { strategy: "cartridge" }>
   ): Promise<OnboardResult>;
-  override async onboard(options: CoreOnboardOptions): Promise<OnboardResult> {
+  override async onboard(
+    options: CoreOnboardOptions | OnboardOptions
+  ): Promise<OnboardResult> {
     if (options.strategy !== "cartridge") {
-      return super.onboard(options);
+      return super.onboard(options as CoreOnboardOptions);
     }
 
     const deploy = options.deploy ?? "never";

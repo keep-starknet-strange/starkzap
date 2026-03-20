@@ -220,8 +220,13 @@ async function ensureCartridgeAdapterRegistered(
     didRegisterCartridgeAdapter = true;
   })();
 
-  await adapterRegistrationPromise;
-  // Keep promise reference on failure to prevent re-attempts
+  try {
+    await adapterRegistrationPromise;
+  } finally {
+    // Clear so a failed registration can be retried; success is still gated by
+    // didRegisterCartridgeAdapter for subsequent calls.
+    adapterRegistrationPromise = null;
+  }
 }
 
 function getTicTacToePolicies() {
