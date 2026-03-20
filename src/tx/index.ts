@@ -201,7 +201,7 @@ function buildExplorerUrl(
 ): string {
   const encodedHash = encodeURIComponent(hash);
 
-  if (config?.baseUrl) {
+  if (config && "baseUrl" in config && config.baseUrl) {
     const baseUrl = assertSafeHttpUrl(config.baseUrl, "explorer.baseUrl");
     const normalizedBaseUrl = new URL(baseUrl.toString());
     if (!normalizedBaseUrl.pathname.endsWith("/")) {
@@ -211,7 +211,8 @@ function buildExplorerUrl(
   }
 
   const isMainnet = chainId.isMainnet();
-  const explorerProvider = config?.provider ?? "voyager";
+  const explorerProvider =
+    config && "provider" in config ? config.provider : "voyager";
 
   if (explorerProvider === "starkscan") {
     const subdomain = isMainnet ? "" : "sepolia.";
