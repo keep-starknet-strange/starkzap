@@ -34,6 +34,7 @@ import type {
   CartridgeNativeSessionHandle,
 } from "@/cartridge/types";
 
+// Cache "not deployed" results for 3s to avoid hammering the RPC when deployment is pending.
 const NEGATIVE_DEPLOYMENT_CACHE_TTL_MS = 3_000;
 
 function sponsoredDetails(timeBounds?: PaymasterTimeBounds): {
@@ -64,6 +65,12 @@ function isContractNotFound(error: unknown): boolean {
 
 function unsupportedDeployMessage(): string {
   return 'Cartridge wallet does not support deployment in this release. Use deploy: "never" and sponsored session execution.';
+}
+
+function unsupportedSessionFeature(feature: string): Error {
+  return new Error(
+    `Cartridge session does not expose ${feature} in this release.`
+  );
 }
 
 function unsupportedUserPaysMessage(): string {
@@ -110,9 +117,7 @@ class NativeCartridgeSigner extends StarknetSignerInterface {
   }
 
   async getPubKey(): Promise<string> {
-    throw new Error(
-      "Cartridge session does not expose a Stark public key in this release."
-    );
+    throw unsupportedSessionFeature("a Stark public key");
   }
 
   async signMessage(
@@ -120,9 +125,7 @@ class NativeCartridgeSigner extends StarknetSignerInterface {
     _accountAddress: string
   ): Promise<Signature> {
     if (!this.session.account.signMessage) {
-      throw new Error(
-        "Cartridge session does not expose signMessage in this release."
-      );
+      throw unsupportedSessionFeature("signMessage");
     }
     return this.session.account.signMessage(typedData);
   }
@@ -131,8 +134,8 @@ class NativeCartridgeSigner extends StarknetSignerInterface {
     _transactions: Call[],
     _details: InvocationsSignerDetails
   ): Promise<Signature> {
-    throw new Error(
-      "Cartridge session does not expose raw invoke signing in this release. Use wallet.execute() or account.execute()."
+    throw unsupportedSessionFeature(
+      "raw invoke signing. Use wallet.execute() or account.execute()"
     );
   }
 
@@ -145,9 +148,7 @@ class NativeCartridgeSigner extends StarknetSignerInterface {
   async signDeclareTransaction(
     _details: DeclareSignerDetails
   ): Promise<Signature> {
-    throw new Error(
-      "Cartridge session does not support declare signing in this release."
-    );
+    throw unsupportedSessionFeature("declare signing");
   }
 }
 
@@ -190,9 +191,7 @@ class NativeCartridgeAccount extends Account {
     _details?: UniversalDetails
   ): Promise<EstimateFeeResponseOverhead> {
     if (!this.session.account.estimateInvokeFee) {
-      throw new Error(
-        "Cartridge session does not expose estimateInvokeFee in this release."
-      );
+      throw unsupportedSessionFeature("estimateInvokeFee");
     }
     return this.session.account.estimateInvokeFee(
       Array.isArray(calls) ? calls : [calls]
@@ -204,9 +203,7 @@ class NativeCartridgeAccount extends Account {
     _details?: SimulateTransactionDetails
   ): Promise<SimulateTransactionOverheadResponse> {
     if (!this.session.account.simulateTransaction) {
-      throw new Error(
-        "Cartridge session does not expose simulateTransaction in this release."
-      );
+      throw unsupportedSessionFeature("simulateTransaction");
     }
     return this.session.account.simulateTransaction(
       invocations
@@ -215,9 +212,7 @@ class NativeCartridgeAccount extends Account {
 
   override async signMessage(typedData: TypedData): Promise<Signature> {
     if (!this.session.account.signMessage) {
-      throw new Error(
-        "Cartridge session does not expose signMessage in this release."
-      );
+      throw unsupportedSessionFeature("signMessage");
     }
     return this.session.account.signMessage(typedData);
   }
@@ -362,9 +357,7 @@ export class NativeCartridgeWallet extends BaseWallet {
 
   async signMessage(typedData: TypedData): Promise<Signature> {
     if (!this.session.account.signMessage) {
-      throw new Error(
-        "Cartridge session does not expose signMessage in this release."
-      );
+      throw unsupportedSessionFeature("signMessage");
     }
     return this.session.account.signMessage(typedData);
   }
@@ -430,9 +423,7 @@ export class NativeCartridgeWallet extends BaseWallet {
 
   async estimateFee(calls: Call[]): Promise<EstimateFeeResponseOverhead> {
     if (!this.session.account.estimateInvokeFee) {
-      throw new Error(
-        "Cartridge session does not expose estimateInvokeFee in this release."
-      );
+      throw unsupportedSessionFeature("estimateInvokeFee");
     }
     return this.session.account.estimateInvokeFee(calls);
   }

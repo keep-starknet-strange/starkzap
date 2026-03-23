@@ -38,6 +38,9 @@ export interface TsSessionAccountOptions {
   execute?: TsExecute;
 }
 
+// When executeFromOutside (SNIP-9) fails with one of these error codes or
+// message patterns, the adapter falls back to direct execute. This handles
+// accounts that do not support outside execution or have stale nonces.
 const EXECUTE_FALLBACK_ERROR_CODES = new Set([
   "OUTSIDE_EXECUTION",
   "OUTSIDE_EXECUTION_AUTHORIZATION_FAILED",
