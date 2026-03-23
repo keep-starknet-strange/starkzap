@@ -48,6 +48,9 @@ export * from "@/connect";
 // Types
 export * from "@/types";
 
+// Utils
+export { assertSafeHttpUrl } from "@/utils/url";
+
 // Re-export useful starknet.js types and classes for apps that need read-only contract calls
 export {
   Contract,

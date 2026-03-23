@@ -86,10 +86,10 @@ export class StarkZap extends CoreStarkZap {
     return wallet as Awaited<ReturnType<CoreStarkZap["connectCartridge"]>>;
   }
 
-  async onboard(
+  override async onboard(
     options: Exclude<OnboardOptions, { strategy: "cartridge" }>
   ): Promise<OnboardResult>;
-  async onboard(
+  override async onboard(
     options: Extract<OnboardOptions, { strategy: "cartridge" }>
   ): Promise<OnboardResult>;
   override async onboard(

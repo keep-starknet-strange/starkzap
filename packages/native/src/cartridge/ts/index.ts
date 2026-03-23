@@ -3,6 +3,7 @@ import {
   createCartridgeTsAdapter,
   type CreateCartridgeTsAdapterOptions,
 } from "@/cartridge/ts/adapter";
+import type { CartridgeNativeAdapter } from "@/cartridge/types";
 
 export { createCartridgeTsAdapter, type CreateCartridgeTsAdapterOptions };
 export { deriveSessionSignerGuid } from "@/cartridge/ts/guid";
@@ -39,7 +40,7 @@ export {
 
 export function registerCartridgeTsAdapter(
   options: CreateCartridgeTsAdapterOptions = {}
-) {
+): CartridgeNativeAdapter {
   const adapter = createCartridgeTsAdapter(options);
   registerCartridgeNativeAdapter(adapter);
   return adapter;

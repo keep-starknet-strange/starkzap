@@ -1,15 +1,18 @@
 import {
   CallData,
-  addAddressPadding,
   ec,
   encode,
   hash,
-  num,
   shortString,
   stark,
   type Call,
 } from "starknet";
 import { SessionProtocolError } from "@/cartridge/ts/errors";
+import {
+  normalizeFelt,
+  normalizeContractAddress,
+  selectorFromEntrypoint,
+} from "@/cartridge/ts/shared";
 import type { PolicyMerkleProof } from "@/cartridge/ts/merkle";
 import type { SessionRegistration } from "@/cartridge/ts/session_api";
 import type { TsSessionExecutionDetails } from "@/cartridge/ts/session_account";
@@ -127,10 +130,6 @@ function selectorFelt(value: string): string {
   return normalizeFelt(hash.getSelectorFromName(value));
 }
 
-function normalizeFelt(value: string | number | bigint): string {
-  return num.toHex(value).toLowerCase();
-}
-
 function toUintBigInt(
   value: string | number | bigint,
   fieldName: string
@@ -153,7 +152,7 @@ function toUintBigInt(
     if (!trimmed || trimmed.startsWith("-")) {
       throw new Error("value cannot be empty or negative");
     }
-    return trimmed.startsWith("0x") ? BigInt(trimmed) : BigInt(trimmed);
+    return BigInt(trimmed);
   } catch (error) {
     throw new SessionProtocolError(
       `Invalid unsigned integer for ${fieldName}`,
@@ -168,32 +167,6 @@ function feltFromValue(
 ): string {
   const parsed = toUintBigInt(value, fieldName);
   return normalizeFelt(parsed);
-}
-
-function normalizeContractAddress(address: string): string {
-  const trimmed = address.trim();
-  if (!trimmed) {
-    throw new SessionProtocolError("Call contract address cannot be empty.");
-  }
-  try {
-    return addAddressPadding(trimmed.toLowerCase());
-  } catch (error) {
-    throw new SessionProtocolError(
-      `Invalid contract address for outside execution call: ${address}`,
-      error
-    );
-  }
-}
-
-function selectorFromEntrypoint(entrypoint: string): string {
-  const trimmed = entrypoint.trim();
-  if (!trimmed) {
-    throw new SessionProtocolError("Call entrypoint cannot be empty.");
-  }
-  if (/^0x[0-9a-f]+$/i.test(trimmed)) {
-    return normalizeFelt(trimmed);
-  }
-  return normalizeFelt(hash.getSelectorFromName(trimmed));
 }
 
 function normalizeChainId(chainId: string): string {

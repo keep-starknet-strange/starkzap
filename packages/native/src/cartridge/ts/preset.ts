@@ -6,6 +6,7 @@ import {
   assertSafeHttpUrl,
   fetchWithTimeout,
   type FetchLike,
+  stripTrailingSlash,
 } from "@/cartridge/ts/shared";
 
 const DEFAULT_PRESET_BASE_URL = "https://static.cartridge.gg/presets";
@@ -176,7 +177,7 @@ function resolvePresetConfigBaseUrl(
 ): string {
   const trimmedBaseUrl = indexBaseUrl?.trim();
   if (!trimmedBaseUrl) {
-    return presetBaseUrl.replace(/\/+$/, "");
+    return stripTrailingSlash(presetBaseUrl);
   }
 
   let expectedUrl: URL;
@@ -205,14 +206,14 @@ function resolvePresetConfigBaseUrl(
     );
   }
 
-  return actualUrl.toString().replace(/\/+$/, "");
+  return stripTrailingSlash(actualUrl.toString());
 }
 
 function normalizeConfiguredPresetBaseUrl(presetBaseUrl: string): string {
   try {
-    return assertSafeHttpUrl(presetBaseUrl, "presetBaseUrl")
-      .toString()
-      .replace(/\/+$/, "");
+    return stripTrailingSlash(
+      assertSafeHttpUrl(presetBaseUrl, "presetBaseUrl").toString()
+    );
   } catch (error) {
     throw new SessionProtocolError(
       `Configured Cartridge preset base URL is invalid: ${presetBaseUrl}.`,

@@ -7,9 +7,11 @@ import {
 import {
   asRecord,
   assertSafeHttpUrl,
+  DEFAULT_REDIRECT_QUERY_NAME,
   ensureFetch,
   fetchWithTimeout,
   type FetchLike,
+  stripTrailingSlash,
 } from "@/cartridge/ts/shared";
 import type { CartridgePolicies } from "@/cartridge/types";
 import {
@@ -17,7 +19,6 @@ import {
   policiesToSessionUrlShape,
 } from "@/cartridge/ts/policy";
 
-const DEFAULT_REDIRECT_QUERY_NAME = "startapp";
 const SUBSCRIBE_CREATE_SESSION_QUERY = `query SubscribeCreateSession($sessionKeyGuid: Felt!) {
   subscribeCreateSession(sessionKeyGuid: $sessionKeyGuid) {
     id
@@ -278,9 +279,9 @@ export function buildCartridgeSessionUrl({
   redirectUrl,
   redirectQueryName = DEFAULT_REDIRECT_QUERY_NAME,
 }: BuildSessionUrlOptions): string {
-  const normalizedBaseUrl = assertSafeHttpUrl(baseUrl, "baseUrl")
-    .toString()
-    .replace(/\/+$/, "");
+  const normalizedBaseUrl = stripTrailingSlash(
+    assertSafeHttpUrl(baseUrl, "baseUrl").toString()
+  );
   const params = new URLSearchParams({
     public_key: publicKey,
     rpc_url: rpcUrl,
@@ -376,12 +377,9 @@ export async function waitForSessionSubscription({
   requestTimeoutMs = 15_000,
   fetchImpl,
 }: WaitForSessionSubscriptionOptions): Promise<SessionRegistration> {
-  const normalizedCartridgeApiUrl = assertSafeHttpUrl(
-    cartridgeApiUrl,
-    "cartridgeApiUrl"
-  )
-    .toString()
-    .replace(/\/+$/, "");
+  const normalizedCartridgeApiUrl = stripTrailingSlash(
+    assertSafeHttpUrl(cartridgeApiUrl, "cartridgeApiUrl").toString()
+  );
   const fetchFn = ensureFetch(
     fetchImpl,
     "No fetch implementation available for Cartridge session subscription.",

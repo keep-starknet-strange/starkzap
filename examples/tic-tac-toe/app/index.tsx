@@ -83,7 +83,6 @@ export default function PlayScreen() {
     clearGame,
     contractAddress,
   } = useTicTacToe();
-  const invitations: { id: GameId; from: string }[] = [];
   const [joinGameId, setJoinGameId] = useState("");
 
   const colorScheme = useColorScheme() ?? "light";
@@ -240,7 +239,7 @@ export default function PlayScreen() {
     void sync();
     const intervalId = setInterval(() => {
       void sync();
-    }, 1000);
+    }, 5000);
 
     return () => {
       cancelled = true;
@@ -505,35 +504,6 @@ export default function PlayScreen() {
           </Pressable>
         </View>
 
-        {invitations.length > 0 && !gameStarted && (
-          <View style={styles.invitePanel}>
-            <Text style={styles.inviteTitle}>Invitations</Text>
-            {invitations.map((inv) => (
-              <View key={inv.id} style={styles.inviteRow}>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.inviteText}>Game #{inv.id} from</Text>
-                  <Text selectable numberOfLines={1} style={styles.inviteFrom}>
-                    {inv.from}
-                  </Text>
-                </View>
-                <Pressable
-                  accessibilityRole="button"
-                  onPress={() => {
-                    loadGame(inv.id);
-                    setGameStarted(true);
-                  }}
-                  style={({ pressed }) => [
-                    styles.acceptButton,
-                    { opacity: pressed ? 0.8 : 1 },
-                  ]}
-                >
-                  <Text style={styles.acceptText}>Accept</Text>
-                </Pressable>
-              </View>
-            ))}
-          </View>
-        )}
-
         <View style={styles.statusRow}>
           <View style={styles.statusContent}>
             <Text style={styles.status}>{statusText}</Text>
@@ -575,44 +545,6 @@ export default function PlayScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-  },
-  invitePanel: {
-    marginTop: 8,
-    padding: 12,
-    borderRadius: 10,
-    borderWidth: StyleSheet.hairlineWidth * 2,
-    borderColor: "rgba(127,127,127,0.4)",
-  },
-  inviteTitle: {
-    fontSize: 16,
-    fontWeight: "700",
-    marginBottom: 8,
-  },
-  inviteRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    marginBottom: 8,
-  },
-  inviteText: {
-    fontSize: 14,
-    opacity: 0.85,
-  },
-  inviteFrom: {
-    fontSize: 12,
-    opacity: 0.8,
-  },
-  acceptButton: {
-    height: 36,
-    paddingHorizontal: 14,
-    borderRadius: 8,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "#34c759",
-  },
-  acceptText: {
-    color: "#fff",
-    fontWeight: "700",
   },
   content: {
     flex: 1,

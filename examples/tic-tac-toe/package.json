@@ -15,17 +15,13 @@
     "@expo/vector-icons": "^15.0.2",
     "@react-native-async-storage/async-storage": "2.2.0",
     "@react-navigation/native": "^7.1.8",
-    "@tanstack/react-query": "^5.90.1",
     "buffer": "^6.0.3",
-    "ethers": "^6.15.0",
     "expo": "~54.0.9",
     "expo-constants": "~18.0.9",
     "expo-crypto": "^15.0.7",
     "expo-font": "~14.0.8",
     "expo-linking": "~8.0.8",
-    "expo-local-authentication": "^17.0.7",
     "expo-router": "~6.0.7",
-    "expo-secure-store": "~15.0.7",
     "expo-splash-screen": "~31.0.10",
     "expo-status-bar": "~3.0.8",
     "expo-web-browser": "~15.0.7",
@@ -41,9 +37,7 @@
     "react-native-svg": "^15.13.0",
     "react-native-web": "~0.21.0",
     "react-native-worklets": "0.5.1",
-    "starknet": "^9.2.1",
-    "zod": "^4.1.11",
-    "zustand": "^5.0.8"
+    "starknet": "^9.2.1"
   },
   "devDependencies": {
     "@types/react": "~19.1.13",

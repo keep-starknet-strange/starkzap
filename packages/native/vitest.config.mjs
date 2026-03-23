@@ -6,7 +6,10 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 export default defineConfig({
   resolve: {
-    alias: [{ find: "@", replacement: path.resolve(__dirname, "./src") }],
+    alias: [
+      { find: "@", replacement: path.resolve(__dirname, "./src") },
+      { find: "starkzap", replacement: path.resolve(__dirname, "../../dist/src/index.js") },
+    ],
   },
   test: {
     globals: true,

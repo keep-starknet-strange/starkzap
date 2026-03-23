@@ -62,13 +62,11 @@ function isContractNotFound(error: unknown): boolean {
   return false;
 }
 
-function unsupportedDeployMessage(): string {
-  return 'Cartridge wallet does not support deployment in this release. Use deploy: "never" and sponsored session execution.';
-}
+const UNSUPPORTED_DEPLOY_MESSAGE =
+  'Cartridge wallet does not support deployment in this release. Use deploy: "never" and sponsored session execution.';
 
-function unsupportedUserPaysMessage(): string {
-  return 'Cartridge wallet currently supports sponsored session execution only. Use feeMode: "sponsored".';
-}
+const UNSUPPORTED_USER_PAYS_MESSAGE =
+  'Cartridge wallet currently supports sponsored session execution only. Use feeMode: "sponsored".';
 
 export type SupportedNativeCartridgeFeeMode = Extract<FeeMode, "sponsored">;
 type UniversalDetailsWithTimeBounds = UniversalDetails & {
@@ -82,7 +80,7 @@ export function validateSupportedCartridgeFeeMode(
     return feeMode;
   }
 
-  throw new Error(unsupportedUserPaysMessage());
+  throw new Error(UNSUPPORTED_USER_PAYS_MESSAGE);
 }
 
 function resolveSupportedCartridgeFeeMode(
@@ -139,7 +137,7 @@ class NativeCartridgeSigner extends StarknetSignerInterface {
   async signDeployAccountTransaction(
     _details: DeployAccountSignerDetails
   ): Promise<Signature> {
-    throw new Error(unsupportedDeployMessage());
+    throw new Error(UNSUPPORTED_DEPLOY_MESSAGE);
   }
 
   async signDeclareTransaction(
@@ -252,7 +250,7 @@ export class NativeCartridgeWallet extends BaseWallet {
     super({
       address: fromAddress(options.session.account.address),
       ...(options.bridging && { bridgingConfig: options.bridging }),
-      stakingConfig: staking,
+      ...(staking && { stakingConfig: staking }),
     });
     this.session = options.session;
     this.provider = options.provider;
@@ -330,7 +328,7 @@ export class NativeCartridgeWallet extends BaseWallet {
       if (deploy === "never") {
         throw new Error("Account not deployed and deploy mode is 'never'");
       }
-      throw new Error(unsupportedDeployMessage());
+      throw new Error(UNSUPPORTED_DEPLOY_MESSAGE);
     } catch (error) {
       onProgress?.({ step: "FAILED" });
       throw error;
@@ -338,13 +336,13 @@ export class NativeCartridgeWallet extends BaseWallet {
   }
 
   async deploy(_options: DeployOptions = {}): Promise<Tx> {
-    throw new Error(unsupportedDeployMessage());
+    throw new Error(UNSUPPORTED_DEPLOY_MESSAGE);
   }
 
   async execute(calls: Call[], options: ExecuteOptions = {}): Promise<Tx> {
     const feeMode = options.feeMode ?? this.defaultFeeMode;
     if (feeMode !== "sponsored") {
-      throw new Error(unsupportedUserPaysMessage());
+      throw new Error(UNSUPPORTED_USER_PAYS_MESSAGE);
     }
     const timeBounds = options.timeBounds ?? this.defaultTimeBounds;
     const response = await this.session.account.execute(
@@ -372,7 +370,7 @@ export class NativeCartridgeWallet extends BaseWallet {
   async preflight(options: PreflightOptions): Promise<PreflightResult> {
     const feeMode = options.feeMode ?? this.defaultFeeMode;
     if (feeMode !== "sponsored") {
-      return { ok: false, reason: unsupportedUserPaysMessage() };
+      return { ok: false, reason: UNSUPPORTED_USER_PAYS_MESSAGE };
     }
     const simulate = this.session.account.simulateTransaction;
     if (!simulate) {

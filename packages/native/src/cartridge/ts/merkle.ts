@@ -1,6 +1,7 @@
-import { hash, num } from "starknet";
+import { hash } from "starknet";
 import type { CanonicalSessionPolicy } from "@/cartridge/ts/policy";
 import { SessionProtocolError } from "@/cartridge/ts/errors";
+import { normalizeFelt, selectorFromEntrypoint } from "@/cartridge/ts/shared";
 
 export interface PolicyMerkleResult {
   leaves: string[];
@@ -14,10 +15,6 @@ export interface PolicyMerkleProof {
   proof: string[];
 }
 
-function normalizeFelt(value: string): string {
-  return num.toHex(value).toLowerCase();
-}
-
 const POLICY_CALL_TYPE_HASH = normalizeFelt(
   hash.getSelectorFromName(
     '"Allowed Method"("Contract Address":"ContractAddress","selector":"selector")'
@@ -25,13 +22,6 @@ const POLICY_CALL_TYPE_HASH = normalizeFelt(
 );
 
 const ZERO_FELT = "0x0";
-
-function selectorFromEntrypoint(entrypoint: string): string {
-  if (/^0x[0-9a-f]+$/i.test(entrypoint)) {
-    return normalizeFelt(entrypoint);
-  }
-  return normalizeFelt(hash.getSelectorFromName(entrypoint));
-}
 
 function hashPair(left: string, right: string): string {
   const leftBigInt = BigInt(left);

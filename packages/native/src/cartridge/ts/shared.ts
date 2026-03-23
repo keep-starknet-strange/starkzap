@@ -2,6 +2,12 @@
  * Shared internal helpers for Cartridge TS modules.
  * Prefer importing these instead of redeclaring local copies.
  */
+import { addAddressPadding, hash, num } from "starknet";
+import { assertSafeHttpUrl } from "starkzap";
+import { SessionProtocolError } from "@/cartridge/ts/errors";
+
+export { assertSafeHttpUrl };
+
 export interface FetchLikeResponse {
   ok: boolean;
   status: number;
@@ -34,6 +40,8 @@ export interface FetchWithTimeoutOptions {
   createTimeoutError(message: string, cause?: unknown): Error;
 }
 
+export const DEFAULT_REDIRECT_QUERY_NAME = "startapp";
+
 /**
  * Narrows unknown JSON-like payloads to plain object records used by Cartridge TS parsing.
  */
@@ -44,24 +52,47 @@ export function asRecord(value: unknown): UnknownRecord | null {
   return value as UnknownRecord;
 }
 
-/**
- * Validate and normalize an HTTP(S) URL.
- */
-export function assertSafeHttpUrl(value: string, label: string): URL {
-  let parsed: URL;
+export function stripTrailingSlash(value: string): string {
+  return value.replace(/\/+$/, "");
+}
+
+export function normalizeFelt(value: string | number | bigint): string {
+  return num.toHex(value).toLowerCase();
+}
+
+export function selectorFromEntrypoint(entrypoint: string): string {
+  const trimmed = entrypoint.trim();
+  if (!trimmed) {
+    throw new SessionProtocolError("Call entrypoint cannot be empty.");
+  }
+  if (/^0x[0-9a-f]+$/i.test(trimmed)) {
+    return normalizeFelt(trimmed);
+  }
+  return normalizeFelt(hash.getSelectorFromName(trimmed));
+}
+
+export function normalizeContractAddress(
+  address: string,
+  context?: string
+): string {
+  const trimmed = address.trim();
+  if (!trimmed) {
+    throw new SessionProtocolError(
+      context
+        ? `${context} is missing a contract address.`
+        : "Call contract address cannot be empty."
+    );
+  }
   try {
-    parsed = new URL(value);
-  } catch {
-    throw new Error(`${label} must be a valid URL`);
+    return addAddressPadding(trimmed.toLowerCase());
+  } catch (error) {
+    throw new SessionProtocolError(
+      context
+        ? `${context} has an invalid address: ${address}`
+        : `Invalid contract address: ${address}`,
+      error
+    );
   }
-
-  const protocol = parsed.protocol.toLowerCase();
-
-  if (protocol !== "https:" && protocol !== "http:") {
-    throw new Error(`${label} must use http:// or https://`);
-  }
-
-  return parsed;
 }
 
 export function ensureFetch(

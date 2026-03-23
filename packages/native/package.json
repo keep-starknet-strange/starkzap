@@ -22,9 +22,6 @@
     "dist",
     "metro.cjs"
   ],
-  "sideEffects": [
-    "./dist/polyfills/install.js"
-  ],
   "publishConfig": {
     "access": "public"
   },

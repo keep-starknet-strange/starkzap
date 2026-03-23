@@ -1,4 +1,3 @@
-import { addAddressPadding } from "starknet";
 import type {
   CartridgeContractPolicy,
   CartridgePolicies,
@@ -8,7 +7,7 @@ import type {
   CartridgeSessionPolicies,
 } from "@/cartridge/types";
 import { SessionProtocolError } from "@/cartridge/ts/errors";
-import { asRecord } from "@/cartridge/ts/shared";
+import { asRecord, normalizeContractAddress } from "@/cartridge/ts/shared";
 
 export interface CanonicalSessionPolicy {
   contractAddress: string;
@@ -90,22 +89,6 @@ function compareControllerCanonicalPolicy(
 
 function hasMessages(policies: CartridgeSessionPolicies): boolean {
   return Array.isArray(policies.messages) && policies.messages.length > 0;
-}
-
-function normalizeContractAddress(rawAddress: string, context: string): string {
-  const trimmed = rawAddress.trim();
-  if (!trimmed) {
-    throw new SessionProtocolError(`${context} is missing a contract address.`);
-  }
-
-  try {
-    return addAddressPadding(trimmed.toLowerCase());
-  } catch (error) {
-    throw new SessionProtocolError(
-      `${context} has an invalid address: ${rawAddress}`,
-      error
-    );
-  }
 }
 
 function normalizeOptionalString(value: unknown): string | undefined {
