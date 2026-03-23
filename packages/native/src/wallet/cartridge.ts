@@ -29,10 +29,7 @@ import {
   type TypedData,
   type UniversalDetails,
 } from "starknet";
-import type {
-  CartridgeExecutionResult,
-  CartridgeNativeSessionHandle,
-} from "@/cartridge/types";
+import type { CartridgeNativeSessionHandle } from "@/cartridge/types";
 
 // Cache "not deployed" results for 3s to avoid hammering the RPC when deployment is pending.
 const NEGATIVE_DEPLOYMENT_CACHE_TTL_MS = 3_000;
@@ -92,16 +89,44 @@ export function validateSupportedCartridgeFeeMode(
   throw new Error(unsupportedUserPaysMessage());
 }
 
+/**
+ * Thrown when the Cartridge session reports a hash that was recovered from an RPC error.
+ * The submission may still be ambiguous; {@link transactionHash} is preserved so UIs can link to an explorer or prompt the user before retrying.
+ */
+export class CartridgeRecoveredRpcExecutionError extends Error {
+  readonly recoveredFromRpcError = true as const;
+  readonly transactionHash: string;
+
+  constructor(transactionHash: string) {
+    super(
+      "Cartridge execution recovered a transaction hash from an RPC error."
+    );
+    this.name = "CartridgeRecoveredRpcExecutionError";
+    this.transactionHash = transactionHash;
+  }
+}
+
+/** Session execution result after validation: a concrete hash and not the ambiguous recovered-RPC case. */
+type VerifiedCartridgeExecutionResult = {
+  transaction_hash: string;
+};
+
 function assertTransactionHashResponse(
   response: unknown
-): asserts response is CartridgeExecutionResult {
-  const record = response as { transaction_hash?: unknown } | null;
+): asserts response is VerifiedCartridgeExecutionResult {
+  const record = response as {
+    transaction_hash?: unknown;
+    recovered_from_rpc_error?: unknown;
+  } | null;
   if (
     !record ||
     typeof record !== "object" ||
     typeof record.transaction_hash !== "string"
   ) {
     throw new Error("Cartridge execution did not return a transaction hash.");
+  }
+  if (record.recovered_from_rpc_error === true) {
+    throw new CartridgeRecoveredRpcExecutionError(record.transaction_hash);
   }
 }
 

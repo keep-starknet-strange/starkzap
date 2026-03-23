@@ -23,3 +23,4 @@ export type {
   CartridgeSessionPolicies,
   CartridgeNativeSessionHandle,
 } from "@/cartridge/types";
+export { CartridgeRecoveredRpcExecutionError } from "@/wallet/cartridge";
