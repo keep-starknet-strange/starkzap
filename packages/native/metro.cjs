@@ -119,7 +119,21 @@ function withStarkzap(config) {
   config.resolver = config.resolver || {};
   const prev = config.resolver.resolveRequest;
 
+  // The native package uses @/* path aliases (tsconfig paths) that map to
+  // packages/native/src/*. When Metro reads the source directly (via the
+  // "source" field), it needs to resolve these aliases at bundle time.
+  const nativeSrcDir = path.resolve(__dirname, "src");
+
   config.resolver.resolveRequest = (context, moduleName, platform) => {
+    // Resolve @/* imports originating from the native package's own source.
+    if (
+      moduleName.startsWith("@/") &&
+      context.originModulePath.startsWith(nativeSrcDir)
+    ) {
+      const resolved = path.join(nativeSrcDir, moduleName.slice(2));
+      const resolver = prev ?? context.resolveRequest;
+      return resolver(context, resolved, platform);
+    }
     const bare = moduleName.startsWith("node:")
       ? moduleName.slice(5)
       : moduleName;
