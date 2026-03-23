@@ -444,6 +444,7 @@ export function createCartridgeTsAdapter(
           options.executeFromOutside ??
           createDefaultExecuteFromOutside(options, policyProofIndex),
         ...(options.execute ? { execute: options.execute } : {}),
+        ...(options.logger ? { logger: options.logger } : {}),
       });
 
       const accountAddress = activeSessionAccount.address();

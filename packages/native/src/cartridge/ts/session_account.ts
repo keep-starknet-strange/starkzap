@@ -36,6 +36,7 @@ export interface TsSessionAccountOptions {
   sessionKeyGuid: string;
   executeFromOutside?: TsExecuteFromOutside;
   execute?: TsExecute;
+  logger?: Pick<Console, "info" | "warn" | "error">;
 }
 
 // When executeFromOutside (SNIP-9) fails with one of these error codes or
@@ -110,6 +111,9 @@ export class TsSessionAccount {
   private readonly sessionKeyGuid: string;
   private readonly executeFromOutsideImpl: TsExecuteFromOutside | undefined;
   private readonly executeImpl: TsExecute | undefined;
+  private readonly logger:
+    | Pick<Console, "info" | "warn" | "error">
+    | undefined;
 
   constructor(options: TsSessionAccountOptions) {
     this.rpcUrl = options.rpcUrl;
@@ -120,6 +124,7 @@ export class TsSessionAccount {
     this.sessionKeyGuid = options.sessionKeyGuid;
     this.executeFromOutsideImpl = options.executeFromOutside;
     this.executeImpl = options.execute;
+    this.logger = options.logger;
   }
 
   address(): string {
@@ -184,6 +189,9 @@ export class TsSessionAccount {
         if (!shouldFallbackToExecute(error)) {
           throw error;
         }
+        this.logger?.warn?.(
+          `[starkzap] cartridge-ts executeFromOutside failed, falling back to direct execute: ${toMessage(error)}`
+        );
         outsideExecutionError = error;
         didFallbackFromOutside = true;
       }
@@ -204,7 +212,7 @@ export class TsSessionAccount {
 }
 
 export function extractTransactionHash(response: unknown): string | null {
-  if (typeof response === "string" && response) {
+  if (typeof response === "string" && response.startsWith("0x")) {
     return response;
   }
 
