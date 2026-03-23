@@ -175,12 +175,10 @@ async function resolveEffectivePolicies(
 
 function extractJsonRpcErrorTransactionHash(payload: unknown): string | null {
   const record = asRecord(payload);
-  const errorRecord = asRecord(record?.error);
-  const errorData = errorRecord?.data;
+  const errorData = asRecord(record?.error)?.data;
   return (
     extractTransactionHash(errorData) ??
-    extractTransactionHash(asRecord(errorData)?.result) ??
-    null
+    extractTransactionHash(asRecord(errorData)?.result)
   );
 }
 

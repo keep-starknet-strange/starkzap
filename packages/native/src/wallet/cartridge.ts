@@ -92,12 +92,6 @@ export function validateSupportedCartridgeFeeMode(
   throw new Error(unsupportedUserPaysMessage());
 }
 
-function resolveSupportedCartridgeFeeMode(
-  feeMode?: FeeMode
-): SupportedNativeCartridgeFeeMode {
-  return validateSupportedCartridgeFeeMode(feeMode) ?? "sponsored";
-}
-
 function assertTransactionHashResponse(
   response: unknown
 ): asserts response is CartridgeExecutionResult {
@@ -266,7 +260,8 @@ export class NativeCartridgeWallet extends BaseWallet {
   static async create(
     options: NativeCartridgeWalletOptions
   ): Promise<NativeCartridgeWallet> {
-    const feeMode = resolveSupportedCartridgeFeeMode(options.feeMode);
+    const feeMode =
+      validateSupportedCartridgeFeeMode(options.feeMode) ?? "sponsored";
     let classHash: string | undefined;
     try {
       classHash = await options.provider.getClassHashAt(

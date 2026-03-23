@@ -106,7 +106,7 @@ function normalizeBase64Input(value: string): string {
     return trimmed;
   }
 
-  let decoded = trimmed;
+  let decoded: string;
   try {
     decoded = decodeURIComponent(trimmed);
   } catch {
@@ -286,7 +286,7 @@ export function buildCartridgeSessionUrl({
     rpc_url: rpcUrl,
   });
 
-  if (hasPoliciesInput(policies) && policies) {
+  if (policies && hasPoliciesInput(policies)) {
     params.set("policies", JSON.stringify(policiesToSessionUrlShape(policies)));
   }
 

@@ -209,11 +209,14 @@ export const TicTacToeProvider: React.FC<{ children: React.ReactNode }> = ({
           entrypoint: "get_game",
           calldata: [normalizedGameId],
         })) as CallContractResultLike;
-        const values: unknown[] = Array.isArray(raw)
-          ? raw
-          : Array.isArray(raw?.result)
-            ? raw.result
-            : [];
+        let values: unknown[];
+        if (Array.isArray(raw)) {
+          values = raw;
+        } else if (Array.isArray(raw?.result)) {
+          values = raw.result;
+        } else {
+          values = [];
+        }
         if (values.length < 6) return null;
 
         const toScalarString = (v: unknown): string => {

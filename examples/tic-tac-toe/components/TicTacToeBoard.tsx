@@ -44,12 +44,15 @@ export default function TicTacToeBoard(props: TicTacToeBoardProps) {
           const isWinning = winningLine?.includes(index);
           const isPending = pendingCellIndex === index;
           const value = board[index];
-          const symbolColor =
-            value === "X"
-              ? (Colors[colorScheme].xSymbol as string)
-              : value === "O"
-                ? (Colors[colorScheme].oSymbol as string)
-                : (Colors[colorScheme].text as string);
+          const colors = Colors[colorScheme];
+          let symbolColor: string;
+          if (value === "X") {
+            symbolColor = colors.xSymbol as string;
+          } else if (value === "O") {
+            symbolColor = colors.oSymbol as string;
+          } else {
+            symbolColor = colors.text as string;
+          }
 
           return (
             <Pressable

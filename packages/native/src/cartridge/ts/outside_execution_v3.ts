@@ -172,10 +172,6 @@ function feltFromValue(
   return normalizeFelt(parsed);
 }
 
-function normalizeCallContractAddress(address: string): string {
-  return normalizeContractAddress(address, "Outside execution call");
-}
-
 function normalizeCallEntrypoint(entrypoint: string): string {
   const trimmed = entrypoint.trim();
   if (!trimmed) {
@@ -210,8 +206,9 @@ function normalizeExecutionCallTarget(
 ): NormalizedExecutionCallTarget {
   const entrypoint = rawEntrypointFromCall(call).trim();
   return {
-    contractAddress: normalizeCallContractAddress(
-      rawContractAddressFromCall(call)
+    contractAddress: normalizeContractAddress(
+      rawContractAddressFromCall(call),
+      "Outside execution call"
     ),
     entrypoint,
     selector: normalizeCallEntrypoint(entrypoint),

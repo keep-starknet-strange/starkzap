@@ -80,7 +80,6 @@ function toSdkNetwork(network: StarknetNetwork): "mainnet" | "sepolia" {
     case "SN_MAIN":
       return "mainnet";
     case "SN_SEPOLIA":
-    default:
       return "sepolia";
   }
 }
@@ -98,10 +97,6 @@ function resolveCartridgeRpc(network: StarknetNetwork): string {
     return configured;
   }
   return CARTRIDGE_RPC_BY_NETWORK[network];
-}
-
-function isRevertedReceipt(receipt: GetTransactionReceiptResponse): boolean {
-  return receipt.isReverted();
 }
 
 function isRevertedWaitError(error: unknown): error is Error & {
@@ -170,7 +165,6 @@ function registerTsCartridgeAdapter(
     openSession: async ({
       url,
       redirectUrl,
-      redirectQueryName: _redirectQueryName,
     }: CartridgeTsOpenSessionArgs): Promise<CartridgeTsOpenSessionResult> => {
       const callbackUrl = redirectUrl ?? defaultRedirectUrl;
       if (callbackUrl) {
@@ -180,17 +174,12 @@ function registerTsCartridgeAdapter(
         );
 
         if (authResult.type === "success") {
-          return {
-            status: "success",
-            ...("url" in authResult && authResult.url
-              ? { callbackUrl: authResult.url }
-              : {}),
-          };
+          const callbackUrl =
+            "url" in authResult && authResult.url ? authResult.url : undefined;
+          return { status: "success", callbackUrl };
         }
-        if (authResult.type === "cancel") {
-          return { status: "cancel" };
-        }
-        return { status: "dismiss" };
+
+        return { status: authResult.type === "cancel" ? "cancel" : "dismiss" };
       }
 
       // Fallback for runtimes where redirect callbacks are unavailable.
@@ -302,12 +291,11 @@ export const StarknetConnectorProvider: React.FC<{
           network: toSdkNetwork(network),
           rpcUrl: cartridgeRpc,
         });
-        const policies = getTicTacToePolicies();
         const onboard = await sdk.onboard({
           strategy: "cartridge",
           deploy: "never",
           cartridge: {
-            ...(policies ? { policies } : {}),
+            policies: getTicTacToePolicies(),
             ...(process.env.EXPO_PUBLIC_CARTRIDGE_PRESET
               ? { preset: process.env.EXPO_PUBLIC_CARTRIDGE_PRESET }
               : {}),
@@ -369,7 +357,7 @@ export const StarknetConnectorProvider: React.FC<{
       try {
         const receipt = await provider.waitForTransaction(txHash);
 
-        if (isRevertedReceipt(receipt)) {
+        if (receipt.isReverted()) {
           return { success: false, reverted: true, receipt };
         }
 
@@ -380,11 +368,7 @@ export const StarknetConnectorProvider: React.FC<{
         }
 
         const receipt = await getReceiptIfAvailable(provider, txHash);
-        return {
-          success: false,
-          reverted: true,
-          ...(receipt ? { receipt } : {}),
-        };
+        return { success: false, reverted: true, receipt };
       }
     },
     [provider]

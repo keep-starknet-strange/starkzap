@@ -178,7 +178,6 @@ export class TsSessionAccount {
     };
 
     let outsideExecutionError: unknown;
-    let didFallbackFromOutside = false;
 
     if (this.executeFromOutsideImpl) {
       try {
@@ -191,7 +190,6 @@ export class TsSessionAccount {
           `[starkzap] cartridge-ts executeFromOutside failed, falling back to direct execute: ${toMessage(error)}`
         );
         outsideExecutionError = error;
-        didFallbackFromOutside = true;
       }
     }
 
@@ -199,7 +197,7 @@ export class TsSessionAccount {
       return this.executeImpl(context);
     }
 
-    if (didFallbackFromOutside) {
+    if (outsideExecutionError) {
       throw outsideExecutionError;
     }
 

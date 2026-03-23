@@ -149,18 +149,17 @@ export default function PlayScreen() {
 
   const submitMove = useCallback(
     async (gameId: GameId, cell: number, symbol: "X" | "O") => {
+      const isCurrentMove = (current: PendingMove | null): boolean =>
+        current?.gameId === gameId &&
+        current.cell === cell &&
+        current.symbol === symbol;
+
+      const clearIfCurrent = () =>
+        setPendingMove((current) => (isCurrentMove(current) ? null : current));
+
       const txHash = await playMove(gameId, cell);
       if (!txHash) {
-        setPendingMove((current) => {
-          if (
-            current?.gameId === gameId &&
-            current.cell === cell &&
-            current.symbol === symbol
-          ) {
-            return null;
-          }
-          return current;
-        });
+        clearIfCurrent();
         return;
       }
 
@@ -170,45 +169,20 @@ export default function PlayScreen() {
           if (__DEV__ && txResult.reverted) {
             console.warn("play_move transaction reverted", txResult.receipt);
           }
-          setPendingMove((current) => {
-            if (
-              current?.gameId === gameId &&
-              current.cell === cell &&
-              current.symbol === symbol
-            ) {
-              return null;
-            }
-            return current;
-          });
+          clearIfCurrent();
           await syncGame(gameId);
           return;
         }
 
-        setPendingMove((current) => {
-          if (
-            current?.gameId === gameId &&
-            current.cell === cell &&
-            current.symbol === symbol
-          ) {
-            return { ...current, isPending: false };
-          }
-          return current;
-        });
+        setPendingMove((current) =>
+          isCurrentMove(current) ? { ...current, isPending: false } : current
+        );
         await syncGame(gameId);
       } catch (waitError) {
         if (__DEV__) {
           console.warn("Failed waiting for play_move confirmation", waitError);
         }
-        setPendingMove((current) => {
-          if (
-            current?.gameId === gameId &&
-            current.cell === cell &&
-            current.symbol === symbol
-          ) {
-            return null;
-          }
-          return current;
-        });
+        clearIfCurrent();
         try {
           await syncGame(gameId);
         } catch {
@@ -322,23 +296,19 @@ export default function PlayScreen() {
     setPendingMove(null);
   }
 
-  const statusText = creatingGame
-    ? "Waiting for game to be created…"
-    : activePendingMove?.isPending
-      ? "Waiting for move confirmation…"
-      : activePendingMove
-        ? "Move confirmed. Syncing board…"
-        : winner
-          ? `Winner: ${winner}`
-          : isDraw
-            ? "Draw"
-            : gameStarted
-              ? myRole
-                ? isMyTurn
-                  ? `Your turn (${myRole})`
-                  : `Opponent's turn (${currentPlayer})`
-                : "Waiting for players"
-              : "Enter an address to start";
+  function getStatusText(): string {
+    if (creatingGame) return "Waiting for game to be created…";
+    if (activePendingMove?.isPending) return "Waiting for move confirmation…";
+    if (activePendingMove) return "Move confirmed. Syncing board…";
+    if (winner) return `Winner: ${winner}`;
+    if (isDraw) return "Draw";
+    if (!gameStarted) return "Enter an address to start";
+    if (!myRole) return "Waiting for players";
+    return isMyTurn
+      ? `Your turn (${myRole})`
+      : `Opponent's turn (${currentPlayer})`;
+  }
+  const statusText = getStatusText();
   if (!account?.address) {
     return <AccountGate />;
   }
@@ -410,10 +380,7 @@ export default function PlayScreen() {
             value={opponentAddress}
             onChangeText={setOpponentAddress}
             placeholder="0x..."
-            placeholderTextColor={Platform.select({
-              ios: "#999",
-              android: "#999",
-            })}
+            placeholderTextColor="#999"
             autoCapitalize="none"
             autoCorrect={false}
             style={[
@@ -464,10 +431,7 @@ export default function PlayScreen() {
             value={joinGameId}
             onChangeText={setJoinGameId}
             placeholder="e.g., 3"
-            placeholderTextColor={Platform.select({
-              ios: "#999",
-              android: "#999",
-            })}
+            placeholderTextColor="#999"
             keyboardType="number-pad"
             returnKeyType="done"
             style={[

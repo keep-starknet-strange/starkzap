@@ -156,12 +156,8 @@ export async function fetchWithTimeout(
     return fetchFn(input, init);
   }
 
-  let timeoutId: ReturnType<typeof setTimeout> | null = null;
-  const clearRequestTimeout = () => {
-    if (timeoutId !== null) {
-      clearTimeout(timeoutId);
-    }
-  };
+  let timeoutId: ReturnType<typeof setTimeout> | undefined;
+  const clearRequestTimeout = () => clearTimeout(timeoutId);
   const createTimeoutPromise = (onTimeout?: () => void) =>
     new Promise<never>((_, reject) => {
       timeoutId = setTimeout(() => {

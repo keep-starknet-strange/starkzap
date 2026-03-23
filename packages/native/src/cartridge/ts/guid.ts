@@ -13,9 +13,8 @@ export function deriveSessionSignerGuid(privateKey: string): string {
     );
   }
 
-  let normalizedHex = normalizedPrivateKey;
   try {
-    normalizedHex = encode.addHexPrefix(normalizedPrivateKey);
+    const normalizedHex = encode.addHexPrefix(normalizedPrivateKey);
     const publicKey = ec.starkCurve.getStarkKey(normalizedHex);
     return num
       .toHex(hash.computePoseidonHash(STARKNET_SIGNER_DOMAIN, publicKey))
