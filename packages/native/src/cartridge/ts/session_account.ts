@@ -111,9 +111,7 @@ export class TsSessionAccount {
   private readonly sessionKeyGuid: string;
   private readonly executeFromOutsideImpl: TsExecuteFromOutside | undefined;
   private readonly executeImpl: TsExecute | undefined;
-  private readonly logger:
-    | Pick<Console, "info" | "warn" | "error">
-    | undefined;
+  private readonly logger: Pick<Console, "info" | "warn" | "error"> | undefined;
 
   constructor(options: TsSessionAccountOptions) {
     this.rpcUrl = options.rpcUrl;

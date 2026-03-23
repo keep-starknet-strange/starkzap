@@ -226,10 +226,7 @@ describe("waitForSessionSubscription", () => {
       status: 200,
       statusText: "OK",
       json: async () => ({
-        errors: [
-          { message: "Rate limited" },
-          { message: "Try again later" },
-        ],
+        errors: [{ message: "Rate limited" }, { message: "Try again later" }],
       }),
     });
 

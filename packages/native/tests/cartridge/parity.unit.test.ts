@@ -174,10 +174,7 @@ describe("cartridge ts parity fixtures", () => {
     const objectPolicies: CartridgeSessionPolicies = {
       contracts: {
         "0x1": {
-          methods: [
-            { entrypoint: "approve" },
-            { entrypoint: "transfer" },
-          ],
+          methods: [{ entrypoint: "approve" }, { entrypoint: "transfer" }],
         },
         "0x2": {
           methods: [{ entrypoint: "mint" }],
@@ -231,9 +228,7 @@ describe("cartridge ts parity fixtures", () => {
     const approveWithSpender: CartridgeSessionPolicies = {
       contracts: {
         "0x1": {
-          methods: [
-            { entrypoint: "approve", spender: "0x2", amount: "100" },
-          ],
+          methods: [{ entrypoint: "approve", spender: "0x2", amount: "100" }],
         },
       },
     };
@@ -255,10 +250,7 @@ describe("cartridge ts parity fixtures", () => {
     const objectPolicies: CartridgeSessionPolicies = {
       contracts: {
         "0x1": {
-          methods: [
-            { entrypoint: "approve" },
-            { entrypoint: "transfer" },
-          ],
+          methods: [{ entrypoint: "approve" }, { entrypoint: "transfer" }],
         },
       },
     };

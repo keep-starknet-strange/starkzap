@@ -173,10 +173,7 @@ function feltFromValue(
 }
 
 function normalizeCallContractAddress(address: string): string {
-  return normalizeContractAddress(
-    address,
-    "Outside execution call"
-  );
+  return normalizeContractAddress(address, "Outside execution call");
 }
 
 function normalizeCallEntrypoint(entrypoint: string): string {
@@ -213,7 +210,9 @@ function normalizeExecutionCallTarget(
 ): NormalizedExecutionCallTarget {
   const entrypoint = rawEntrypointFromCall(call).trim();
   return {
-    contractAddress: normalizeCallContractAddress(rawContractAddressFromCall(call)),
+    contractAddress: normalizeCallContractAddress(
+      rawContractAddressFromCall(call)
+    ),
     entrypoint,
     selector: normalizeCallEntrypoint(entrypoint),
   };
@@ -550,7 +549,10 @@ export function buildSignedOutsideExecutionV3({
     })),
   };
 
-  const sessionAddress = normalizeContractAddress(session.address, "Session address");
+  const sessionAddress = normalizeContractAddress(
+    session.address,
+    "Session address"
+  );
   const feltChainId = normalizeChainId(chainId);
 
   const txHash = hashOutsideExecutionMessage(

@@ -92,7 +92,6 @@ function hasMessages(policies: CartridgeSessionPolicies): boolean {
   return Array.isArray(policies.messages) && policies.messages.length > 0;
 }
 
-
 function normalizeOptionalString(value: unknown): string | undefined {
   if (typeof value !== "string") {
     return undefined;
@@ -308,14 +307,8 @@ function normalizeContractPolicyForUrl(
   contractAddress: string
 ): CartridgeContractPolicy {
   const methods = contract.methods;
-  if (
-    methods !== undefined &&
-    methods !== null &&
-    !Array.isArray(methods)
-  ) {
-    throw new SessionProtocolError(
-      "Policy contract.methods must be an array."
-    );
+  if (methods !== undefined && methods !== null && !Array.isArray(methods)) {
+    throw new SessionProtocolError("Policy contract.methods must be an array.");
   }
 
   const normalizedContract: CartridgeContractPolicy = {
