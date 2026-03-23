@@ -7,7 +7,10 @@ import {
   type RpcProvider,
   type UniversalDetails,
 } from "starknet";
-import { NativeCartridgeWallet } from "@/wallet/cartridge";
+import {
+  CartridgeRecoveredRpcExecutionError,
+  NativeCartridgeWallet,
+} from "@/wallet/cartridge";
 import type { CartridgeNativeSessionHandle } from "@/cartridge/types";
 
 function makeProvider(): RpcProvider {
@@ -44,13 +47,80 @@ describe("NativeCartridgeWallet", () => {
       provider,
       chainId: ChainId.SEPOLIA,
     });
+
     const tx = await wallet.execute([{ contractAddress: "0x1" } as Call], {
       feeMode: "sponsored",
     });
+
     expect(tx.hash).toBe("0xfeed");
     expect(wallet.getFeeMode()).toBe("sponsored");
     expect(session.account.execute).toHaveBeenCalledTimes(1);
     expect(wallet.getAccount()).toBeInstanceOf(Account);
+  });
+
+  it("rejects wallet.execute when session returns recovered_from_rpc_error", async () => {
+    vi.mocked(session.account.execute).mockResolvedValue({
+      transaction_hash: "0x123",
+      recovered_from_rpc_error: true,
+    });
+
+    const wallet = await NativeCartridgeWallet.create({
+      session,
+      provider,
+      chainId: ChainId.SEPOLIA,
+    });
+
+    const err = await wallet
+      .execute([{ contractAddress: "0x1" } as Call], {
+        feeMode: "sponsored",
+      })
+      .then(
+        () => {
+          throw new Error("expected execute to reject");
+        },
+        (e: unknown) => e
+      );
+
+    expect(err).toBeInstanceOf(CartridgeRecoveredRpcExecutionError);
+    expect(err).toMatchObject({
+      message: expect.stringMatching(/recovered/i),
+      transactionHash: "0x123",
+      recoveredFromRpcError: true,
+    });
+    expect(session.account.execute).toHaveBeenCalledTimes(1);
+  });
+
+  it("rejects account.execute when session returns recovered_from_rpc_error", async () => {
+    vi.mocked(session.account.execute).mockResolvedValue({
+      transaction_hash: "0x123",
+      recovered_from_rpc_error: true,
+    });
+
+    const wallet = await NativeCartridgeWallet.create({
+      session,
+      provider,
+      chainId: ChainId.SEPOLIA,
+    });
+
+    const calls = [{ contractAddress: "0x1" } as Call];
+
+    const err = await wallet
+      .getAccount()
+      .execute(calls)
+      .then(
+        () => {
+          throw new Error("expected execute to reject");
+        },
+        (e: unknown) => e
+      );
+
+    expect(err).toBeInstanceOf(CartridgeRecoveredRpcExecutionError);
+    expect(err).toMatchObject({
+      message: expect.stringMatching(/recovered/i),
+      transactionHash: "0x123",
+      recoveredFromRpcError: true,
+    });
+    expect(session.account.execute).toHaveBeenCalledTimes(1);
   });
 
   it("rejects unsupported default fee mode during creation", async () => {
