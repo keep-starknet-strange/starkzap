@@ -9,6 +9,7 @@ import {
   assertSafeHttpUrl,
   ensureFetch,
   fetchWithTimeout,
+  normalizeHttpUrl,
   type FetchLike,
 } from "@/cartridge/ts/shared";
 import type { CartridgePolicies } from "@/cartridge/types";
@@ -17,6 +18,7 @@ import {
   policiesToSessionUrlShape,
 } from "@/cartridge/ts/policy";
 
+// Telegram Mini App convention: "startapp" carries the deep-link payload in Telegram WebApp redirects.
 const DEFAULT_REDIRECT_QUERY_NAME = "startapp";
 const SUBSCRIBE_CREATE_SESSION_QUERY = `query SubscribeCreateSession($sessionKeyGuid: Felt!) {
   subscribeCreateSession(sessionKeyGuid: $sessionKeyGuid) {
@@ -261,6 +263,7 @@ function normalizeSessionRegistration(session: unknown): SessionRegistration {
   };
 }
 
+// Exponential-ish backoff for session subscription polling, capped at 5s.
 function nextDelayMs(attempt: number): number {
   if (attempt <= 0) return 500;
   if (attempt === 1) return 1000;
@@ -278,9 +281,7 @@ export function buildCartridgeSessionUrl({
   redirectUrl,
   redirectQueryName = DEFAULT_REDIRECT_QUERY_NAME,
 }: BuildSessionUrlOptions): string {
-  const normalizedBaseUrl = assertSafeHttpUrl(baseUrl, "baseUrl")
-    .toString()
-    .replace(/\/+$/, "");
+  const normalizedBaseUrl = normalizeHttpUrl(baseUrl, "baseUrl");
   const params = new URLSearchParams({
     public_key: publicKey,
     rpc_url: rpcUrl,
@@ -360,13 +361,17 @@ export function extractEncodedSessionFromUrl(
   url: string,
   queryName: string = DEFAULT_REDIRECT_QUERY_NAME
 ): string | null {
+  let parsed: URL;
   try {
-    const parsed = new URL(url);
-    const value = parsed.searchParams.get(queryName);
-    return value && value.length > 0 ? value : null;
-  } catch {
-    return null;
+    parsed = new URL(url);
+  } catch (error) {
+    throw new SessionProtocolError(
+      `Cartridge callback URL is not a valid URL: ${url}`,
+      error
+    );
   }
+  const value = parsed.searchParams.get(queryName);
+  return value && value.length > 0 ? value : null;
 }
 
 export async function waitForSessionSubscription({
@@ -376,12 +381,10 @@ export async function waitForSessionSubscription({
   requestTimeoutMs = 15_000,
   fetchImpl,
 }: WaitForSessionSubscriptionOptions): Promise<SessionRegistration> {
-  const normalizedCartridgeApiUrl = assertSafeHttpUrl(
+  const normalizedCartridgeApiUrl = normalizeHttpUrl(
     cartridgeApiUrl,
     "cartridgeApiUrl"
-  )
-    .toString()
-    .replace(/\/+$/, "");
+  );
   const fetchFn = ensureFetch(
     fetchImpl,
     "No fetch implementation available for Cartridge session subscription.",
@@ -442,7 +445,7 @@ export async function waitForSessionSubscription({
 
         const ownerGuid = node.authorization?.[1];
         if (!ownerGuid) {
-          throw new SessionProtocolError(
+          throw new SessionRejectedError(
             "Cartridge session subscription is missing owner GUID authorization."
           );
         }
@@ -472,7 +475,8 @@ export async function waitForSessionSubscription({
         const message = payload.errors
           .map((error) => error.message ?? "Unknown GraphQL error")
           .join("; ");
-        throw new SessionProtocolError(
+        // GraphQL validation error — permanent, do not retry.
+        throw new SessionRejectedError(
           `Cartridge session subscription returned GraphQL errors: ${message}`
         );
       }
