@@ -26,9 +26,9 @@ import {
   Amount,
   RpcProvider,
   fromAddress,
-} from "@starkzap/native";
-import type { ConfidentialState } from "@starkzap/native";
-import type { ChainId } from "@starkzap/native";
+} from "starkzap-native";
+import type { ConfidentialState } from "starkzap-native";
+import type { ChainId } from "starkzap-native";
 
 // Tongo contract addresses per token
 // Full list: https://docs.tongo.cash/protocol/contracts.html

@@ -1,5 +1,5 @@
 const { getDefaultConfig } = require("expo/metro-config");
-const { withStarkzap } = require("@starkzap/native/metro");
+const { withStarkzap } = require("starkzap-native/metro");
 const path = require("path");
 
 const workspaceRoot = path.resolve(__dirname, "../..");

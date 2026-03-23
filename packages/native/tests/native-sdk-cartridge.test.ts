@@ -59,7 +59,7 @@ function makeDcaProvider(id: string): DcaProvider {
   };
 }
 
-describe("@starkzap/native cartridge sdk", () => {
+describe("starkzap-native cartridge sdk", () => {
   beforeEach(() => {
     clearCartridgeNativeAdapter();
   });

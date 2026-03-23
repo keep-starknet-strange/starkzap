@@ -1,6 +1,6 @@
 # Starkzap Mobile Example (Expo)
 
-React Native + Expo app showing how to integrate `@starkzap/native` in a mobile client.
+React Native + Expo app showing how to integrate `starkzap-native` in a mobile client.
 
 ## What this app demonstrates
 
@@ -53,11 +53,11 @@ Platform shortcuts:
 - `npm run android`
 - `npm run web`
 
-Note: this example depends on the local native package via `"@starkzap/native": "file:../../packages/native"`. The `postinstall` script builds core + native packages from repo root.
+Note: this example depends on the local native package via `"starkzap-native": "file:../../packages/native"`. The `postinstall` script builds core + native packages from repo root.
 
 ## SDK integration points in this app
 
-- `entrypoint.js`: installs required polyfills via `@starkzap/native/install` before Expo startup.
+- `entrypoint.js`: installs required polyfills via `starkzap-native/install` before Expo startup.
 - `metro.config.js`: uses minimal monorepo resolution and package-exports compatibility overrides.
 - `stores/wallet.ts`: creates `StarkZap`, configures paymaster, and handles signer/Privy onboarding.
 - `app/index.tsx`: connection screen and network setup flow.

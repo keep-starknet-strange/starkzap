@@ -52,7 +52,7 @@ import {
   type SwapProvider,
   type SwapQuote,
   type Token,
-} from "@starkzap/native";
+} from "starkzap-native";
 
 const WBTC_LOGO_FALLBACK =
   "https://altcoinsbox.com/wp-content/uploads/2023/01/wbtc-wrapped-bitcoin-logo.png";

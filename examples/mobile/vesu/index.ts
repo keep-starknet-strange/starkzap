@@ -5,7 +5,7 @@ import {
   type LendingPosition,
   type LendingUserPosition,
   type Token,
-} from "@starkzap/native";
+} from "starkzap-native";
 import { PERCENT_SCALE, sameAddress } from "./utils";
 
 export const VESU_PROVIDER_ID = "vesu" as const;

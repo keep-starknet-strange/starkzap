@@ -28,7 +28,7 @@
     "@reown/appkit-react-native": "^2.0.2",
     "@reown/appkit-solana-react-native": "^2.0.2",
     "@solana/web3.js": "^1.98.4",
-    "@starkzap/native": "file:../../packages/native",
+    "starkzap-native": "file:../../packages/native",
     "@walletconnect/react-native-compat": "^2.23.7",
     "buffer": "^6.0.3",
     "ethers": "^6.16.0",

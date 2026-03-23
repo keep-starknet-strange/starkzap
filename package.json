@@ -77,9 +77,9 @@
   },
   "scripts": {
     "build": "tsc; tsc-alias",
-    "build:all": "npm run build --workspace @starkzap/native",
+    "build:all": "npm run build --workspace starkzap-native",
     "typecheck": "tsc --noEmit",
-    "typecheck:all": "npm run typecheck --workspace @starkzap/native",
+    "typecheck:all": "npm run typecheck --workspace starkzap-native",
     "lint": "eslint .",
     "fix": "eslint . --fix",
     "prettier": "prettier --write .",

@@ -1,5 +1,5 @@
 {
-  "name": "@starkzap/native",
+  "name": "starkzap-native",
   "version": "2.0.0",
   "description": "React Native companion package for Starkzap",
   "license": "MIT",
@@ -35,6 +35,7 @@
     "test:cartridge:parity": "npm run build --prefix ../.. && vitest run --config vitest.config.mjs tests/cartridge/parity.unit.test.ts"
   },
   "dependencies": {
+    "expo": "^55.0.8",
     "starkzap": "file:../.."
   },
   "peerDependencies": {

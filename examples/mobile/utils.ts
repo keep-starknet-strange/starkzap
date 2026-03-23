@@ -1,4 +1,4 @@
-import type { ChainId } from "@starkzap/native";
+import type { ChainId } from "starkzap-native";
 
 export function cropAddress(address: string): string {
   if (address.length <= 13) return address;

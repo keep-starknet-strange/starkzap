@@ -25,7 +25,7 @@ import {
   StarkSigner,
   StarkZap,
   type WalletInterface,
-} from "@starkzap/native";
+} from "starkzap-native";
 import {
   showCopiedToast,
   showTransactionToast,

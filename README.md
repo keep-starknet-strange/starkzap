@@ -30,7 +30,7 @@ or
 yarn add starkzap
 ```
 
-Building for React Native/Expo? Use [React Native Integration](/build/starkzap/react-native) and install `@starkzap/native` instead of using `starkzap` directly in your mobile app.
+Building for React Native/Expo? Use [React Native Integration](/build/starkzap/react-native) and install `starkzap-native` instead of using `starkzap` directly in your mobile app.
 
 ### Dependencies
 
@@ -44,13 +44,13 @@ This will be installed automatically when you install `starkzap`.
 
 All peer dependencies are **optional** to keep the package lean. Install only what you need:
 
-| Feature                                                          | Included in                        | Peer Dependencies                                                                                         |
-| ---------------------------------------------------------------- | ---------------------------------- | --------------------------------------------------------------------------------------------------------- |
-| **Ethereum bridging** (deposit / withdraw to Ethereum)           | `starkzap`,<br/>`@starkzap/native` | `ethers@^6`                                                                                               |
-| **Solana bridging** (deposit / withdraw to Solana via Hyperlane) | `starkzap`,<br/>`@starkzap/native` | `@solana/web3.js@^1`, `@hyperlane-xyz/sdk@^14`, `@hyperlane-xyz/registry@^19`, `@hyperlane-xyz/utils@^14` |
-| **Cartridge Controller wallet**                                  | `starkzap`,<br/>`@starkzap/native` | `@cartridge/controller@^0.13`                                                                             |
-| **Confidential transfers** (Tongo)                               | `starkzap`,<br/>`@starkzap/native` | `@fatsolutions/tongo-sdk@^1`                                                                              |
-| **React Native / Expo**                                          | `@starkzap/native`                 | `react-native-get-random-values@^1`, `fast-text-encoding@^1`, `@ethersproject/shims@^5`, `buffer@^6`      |
+| Feature                                                          | Included in                       | Peer Dependencies                                                                                         |
+| ---------------------------------------------------------------- | --------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| **Ethereum bridging** (deposit / withdraw to Ethereum)           | `starkzap`,<br/>`starkzap-native` | `ethers@^6`                                                                                               |
+| **Solana bridging** (deposit / withdraw to Solana via Hyperlane) | `starkzap`,<br/>`starkzap-native` | `@solana/web3.js@^1`, `@hyperlane-xyz/sdk@^14`, `@hyperlane-xyz/registry@^19`, `@hyperlane-xyz/utils@^14` |
+| **Cartridge Controller wallet**                                  | `starkzap`,<br/>`starkzap-native` | `@cartridge/controller@^0.13`                                                                             |
+| **Confidential transfers** (Tongo)                               | `starkzap`,<br/>`starkzap-native` | `@fatsolutions/tongo-sdk@^1`                                                                              |
+| **React Native / Expo**                                          | `starkzap-native`                 | `react-native-get-random-values@^1`, `fast-text-encoding@^1`, `@ethersproject/shims@^5`, `buffer@^6`      |
 
 ```bash
 # Ethereum bridging
@@ -65,8 +65,8 @@ npm install @cartridge/controller
 # Confidential transfers
 npm install @fatsolutions/tongo-sdk
 
-# React Native / Expo (use @starkzap/native instead of starkzap)
-npm install @starkzap/native react-native-get-random-values fast-text-encoding @ethersproject/shims buffer
+# React Native / Expo (use starkzap-native instead of starkzap)
+npm install starkzap-native react-native-get-random-values fast-text-encoding @ethersproject/shims buffer
 ```
 
 ---

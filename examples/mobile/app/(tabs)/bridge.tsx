@@ -19,7 +19,7 @@ import {
   Protocol,
   type SolanaDepositFeeEstimation,
   type SolanaProvider,
-} from "@starkzap/native";
+} from "starkzap-native";
 
 import { ThemedText } from "@/components/themed-text";
 import { useThemeColor } from "@/hooks/use-theme-color";

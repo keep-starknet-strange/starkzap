@@ -45,11 +45,11 @@ cd examples/tic-tac-toe
 npm install
 ```
 
-This app depends on `@starkzap/native` from `../../packages/native`. The `postinstall` script builds the SDK packages from repo root.
+This app depends on `starkzap-native` from `../../packages/native`. The `postinstall` script builds the SDK packages from repo root.
 
 ## Cartridge Session Adapter
 
-This app uses the TypeScript Cartridge session adapter from `@starkzap/native`.
+This app uses the TypeScript Cartridge session adapter from `starkzap-native`.
 No local Rust, UniFFI binding generation, or XCFramework build step is required for the session flow.
 
 ## Run
@@ -69,7 +69,7 @@ Platform shortcuts:
 
 ## Notes For Cartridge Onboarding
 
-- `@starkzap/native` is loaded lazily when connecting Cartridge (not at app bootstrap), which avoids early runtime crashes from transitive modules.
+- `starkzap-native` is loaded lazily when connecting Cartridge (not at app bootstrap), which avoids early runtime crashes from transitive modules.
 - Cartridge auth/session is handled by the TS session adapter in `app/context/StarknetConnector.tsx`, registered via `registerCartridgeTsAdapter(...)`.
 - The example uses callback-first auth (`openAuthSessionAsync`) and falls back to browser + polling only if a callback URI is unavailable.
 - Redirect URL is taken from `EXPO_PUBLIC_CARTRIDGE_REDIRECT_URL` when set, otherwise generated via Expo Linking (`Linking.createURL("cartridge/callback")`).

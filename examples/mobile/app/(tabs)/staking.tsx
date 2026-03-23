@@ -36,7 +36,7 @@ import {
   type StakingPosition as StakingPositionType,
 } from "@/stores/staking";
 import { showCopiedToast } from "@/components/Toast";
-import type { Amount, Pool, Token, Validator } from "@starkzap/native";
+import type { Amount, Pool, Token, Validator } from "starkzap-native";
 
 function TinyTokenLogo({ token }: { token: Token }) {
   const [imageError, setImageError] = useState(false);

@@ -11,7 +11,7 @@ import {
   type ChainId,
   type WalletInterface,
   type StarkZap,
-} from "@starkzap/native";
+} from "starkzap-native";
 import {
   showTransactionToast,
   updateTransactionToast,

@@ -1,4 +1,4 @@
-import { Amount, type ExecuteOptions, type Token } from "@starkzap/native";
+import { Amount, type ExecuteOptions, type Token } from "starkzap-native";
 
 const EMPTY_STATE_LABEL = "—";
 const FEE_MODE_SPONSORED = "sponsored" as const;

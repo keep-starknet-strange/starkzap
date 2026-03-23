@@ -13,7 +13,7 @@ import {
   type LendingHealth,
   type LendingUserPosition,
   type Token,
-} from "@starkzap/native";
+} from "starkzap-native";
 import { ThemedText } from "@/components/themed-text";
 import { useThemeColor } from "@/hooks/use-theme-color";
 import {

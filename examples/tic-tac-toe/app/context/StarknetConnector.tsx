@@ -1,4 +1,4 @@
-import type { WalletInterface } from "@starkzap/native";
+import type { WalletInterface } from "starkzap-native";
 import * as Linking from "expo-linking";
 import * as WebBrowser from "expo-web-browser";
 import React, {
@@ -33,7 +33,7 @@ type CartridgeTsOpenSessionResult = {
   status?: "success" | "cancel" | "dismiss";
 };
 
-type StarkZapNativeModule = typeof import("@starkzap/native") & {
+type StarkZapNativeModule = typeof import("starkzap-native") & {
   registerCartridgeTsAdapter: (options?: {
     logger?: Pick<Console, "info" | "warn" | "error">;
     sessionRegistrationTimeoutMs?: number;
@@ -154,7 +154,7 @@ function registerTsCartridgeAdapter(
 ): void {
   if (typeof native.registerCartridgeTsAdapter !== "function") {
     throw new Error(
-      "Installed @starkzap/native build does not expose registerCartridgeTsAdapter(). Rebuild @starkzap/native before running the app."
+      "Installed starkzap-native build does not expose registerCartridgeTsAdapter(). Rebuild starkzap-native before running the app."
     );
   }
 
@@ -193,7 +193,7 @@ let nativeModulePromise: Promise<StarkZapNativeModule> | null = null;
 function loadNativeModule(): Promise<StarkZapNativeModule> {
   if (!nativeModulePromise) {
     nativeModulePromise =
-      import("@starkzap/native") as unknown as Promise<StarkZapNativeModule>;
+      import("starkzap-native") as unknown as Promise<StarkZapNativeModule>;
   }
   return nativeModulePromise;
 }

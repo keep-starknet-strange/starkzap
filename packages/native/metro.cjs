@@ -49,7 +49,7 @@ function resolvePolyfills(projectRoot) {
     const list = missing.map((m) => `  - ${m}`).join("\n");
     const install = `npm install ${missing.join(" ")}`;
     console.warn(
-      `\n[@starkzap/native] Missing required polyfills:\n${list}\n\n` +
+      `\n[starkzap-native] Missing required polyfills:\n${list}\n\n` +
         `Install them to avoid runtime crashes:\n  ${install}\n`
     );
   }
@@ -68,7 +68,7 @@ function resolvePolyfills(projectRoot) {
  * ```js
  * // metro.config.js
  * const { getDefaultConfig } = require("expo/metro-config");
- * const { withStarkzap } = require("@starkzap/native/metro");
+ * const { withStarkzap } = require("starkzap-native/metro");
  *
  * const config = getDefaultConfig(__dirname);
  * module.exports = withStarkzap(config);

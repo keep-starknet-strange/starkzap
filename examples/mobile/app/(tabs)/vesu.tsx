@@ -22,7 +22,7 @@ import {
   type LendingPosition,
   type LendingUserPosition,
   type Tx,
-} from "@starkzap/native";
+} from "starkzap-native";
 import { ActionPills } from "@/components/ActionPills";
 import { DropdownField, type DropdownOption } from "@/components/DropdownField";
 import { LogsFAB } from "@/components/LogsFAB";
