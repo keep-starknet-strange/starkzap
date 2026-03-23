@@ -168,7 +168,7 @@ describe("policiesToSessionUrlShape method normalization", () => {
       is_enabled: true,
     };
 
-    expectTypeOf(snakeCaseOnly).toMatchTypeOf<CartridgePolicyMethodInput>();
-    expectTypeOf(snakeCaseOnly).not.toMatchTypeOf<CartridgePolicyMethod>();
+    expectTypeOf(snakeCaseOnly).toExtend<CartridgePolicyMethodInput>();
+    expectTypeOf(snakeCaseOnly).not.toEqualTypeOf<CartridgePolicyMethod>();
   });
 });

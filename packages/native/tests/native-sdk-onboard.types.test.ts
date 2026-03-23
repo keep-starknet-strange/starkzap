@@ -24,15 +24,15 @@ describe("native StarkZap.onboard typing", () => {
 
   it("accepts a variable typed as the full native OnboardOptions union", () => {
     const options = null as unknown as OnboardOptions;
-    expectTypeOf(options).toMatchTypeOf<OnboardParam>();
-    expectTypeOf(sdk.onboard(options)).toMatchTypeOf<Promise<OnboardResult>>();
+    expectTypeOf(options).toExtend<OnboardParam>();
+    expectTypeOf(sdk.onboard(options)).toExtend<Promise<OnboardResult>>();
   });
 
   it("accepts a mixed union of cartridge and signer native variants", () => {
     const options = null as unknown as
       | NativeCartridgeOnboard
       | NativeSignerOnboard;
-    expectTypeOf(sdk.onboard(options)).toMatchTypeOf<Promise<OnboardResult>>();
+    expectTypeOf(sdk.onboard(options)).toExtend<Promise<OnboardResult>>();
   });
 
   it("accepts native cartridge variant args", () => {
@@ -42,6 +42,6 @@ describe("native StarkZap.onboard typing", () => {
         policies: [{ target: "0x1", method: "transfer" }],
       },
     };
-    expectTypeOf(sdk.onboard(options)).toMatchTypeOf<Promise<OnboardResult>>();
+    expectTypeOf(sdk.onboard(options)).toExtend<Promise<OnboardResult>>();
   });
 });
