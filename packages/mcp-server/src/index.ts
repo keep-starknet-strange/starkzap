@@ -22,7 +22,7 @@ import {
   ListToolsRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js";
 import { z } from "zod";
-import { Amount, fromAddress, StarkSDK, StarkSigner } from "starkzap";
+import { Amount, fromAddress, StarkZap, StarkSigner } from "starkzap";
 import type { Address, Token, Wallet } from "starkzap";
 import {
   assertStakingPoolShape,
@@ -257,7 +257,7 @@ const poolClassHashInFlight = new Map<Address, Promise<string>>();
 // ---------------------------------------------------------------------------
 // SDK + wallet singleton (lazy init)
 // ---------------------------------------------------------------------------
-let sdkSingleton: StarkSDK | undefined;
+let sdkSingleton: StarkZap | undefined;
 let walletSingleton: Wallet | undefined;
 let walletInitPromise: Promise<Wallet> | undefined;
 let walletInitFailureCount = 0;
@@ -276,7 +276,7 @@ const sdkConfig = Object.freeze({
   }),
 });
 
-function getSdk(): StarkSDK {
+function getSdk(): StarkZap {
   if (sdkInitBackoffUntilMs > nowMs()) {
     const retryInMs = sdkInitBackoffUntilMs - nowMs();
     throw new Error(
@@ -285,7 +285,7 @@ function getSdk(): StarkSDK {
   }
   if (!sdkSingleton) {
     try {
-      sdkSingleton = new StarkSDK(sdkConfig);
+      sdkSingleton = new StarkZap(sdkConfig);
       sdkInitFailureCount = 0;
       sdkInitBackoffUntilMs = 0;
     } catch (error) {
@@ -1842,7 +1842,7 @@ interface TestingHooks {
   cleanupWalletAndSdkResources(): Promise<void>;
   trackedTransactions(): { active: string[]; timedOut: string[] };
   setNowProvider(provider: () => number): void;
-  setSdkSingleton(value: StarkSDK | undefined): void;
+  setSdkSingleton(value: StarkZap | undefined): void;
   setWalletSingleton(value: Wallet | undefined): void;
   getSdkConfig(): Record<string, unknown>;
   resetState(): void;
@@ -1873,7 +1873,7 @@ const testingHooks: TestingHooks = {
   setNowProvider(provider: () => number) {
     nowProvider = provider;
   },
-  setSdkSingleton(value: StarkSDK | undefined) {
+  setSdkSingleton(value: StarkZap | undefined) {
     sdkSingleton = value;
   },
   setWalletSingleton(value: Wallet | undefined) {
