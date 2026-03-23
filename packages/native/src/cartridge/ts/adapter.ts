@@ -28,7 +28,6 @@ import {
 } from "@/cartridge/ts/errors";
 import {
   asRecord,
-  assertSafeHttpUrl,
   ensureFetch,
   fetchWithTimeout,
   normalizeHttpUrl,

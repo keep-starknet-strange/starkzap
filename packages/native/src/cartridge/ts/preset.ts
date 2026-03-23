@@ -3,7 +3,6 @@ import type { CartridgeSessionPolicies } from "@/cartridge/types";
 import { SessionProtocolError } from "@/cartridge/ts/errors";
 import {
   asRecord,
-  assertSafeHttpUrl,
   fetchWithTimeout,
   normalizeHttpUrl,
   type FetchLike,
