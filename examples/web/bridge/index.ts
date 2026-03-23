@@ -1,7 +1,9 @@
 import {
   Amount,
+  type BridgeInitiateWithdrawFeeEstimation,
   type BridgeToken,
   type CCTPDepositFeeEstimation,
+  type CCTPInitiateWithdrawFeeEstimation,
   type ChainId,
   ConnectedEthereumWallet,
   ConnectedSolanaWallet,
@@ -44,7 +46,11 @@ export interface BridgeState {
   externalBalanceLoading: boolean;
   allowance: string | null;
   allowanceLoading: boolean;
-  feeEstimate: EthereumDepositFeeEstimation | SolanaDepositFeeEstimation | null;
+  feeEstimate:
+    | EthereumDepositFeeEstimation
+    | SolanaDepositFeeEstimation
+    | BridgeInitiateWithdrawFeeEstimation
+    | null;
   feeLoading: boolean;
   fastTransfer: boolean;
   tokensLoading: boolean;
@@ -139,7 +145,9 @@ export class BridgeController {
       );
       this.state.connectedEthWallet = wallet;
       this.log(
-        `Ethereum wallet connected: ${address.slice(0, 6)}...${address.slice(-4)}`,
+        `Ethereum wallet connected: ${address.slice(0, 6)}...${address.slice(
+          -4
+        )}`,
         "success"
       );
       this.render();
@@ -176,7 +184,9 @@ export class BridgeController {
       );
       this.state.connectedSolWallet = wallet;
       this.log(
-        `Solana wallet connected: ${address.slice(0, 4)}...${address.slice(-4)}`,
+        `Solana wallet connected: ${address.slice(0, 4)}...${address.slice(
+          -4
+        )}`,
         "success"
       );
       this.render();
@@ -208,8 +218,8 @@ export class BridgeController {
     this.fetchExternalBalance();
     if (dir === "to-starknet") {
       this.fetchAllowance();
-      this.fetchFeeEstimate();
     }
+    this.fetchFeeEstimate();
   }
 
   toggleDirection(): void {
@@ -235,8 +245,8 @@ export class BridgeController {
       this.fetchExternalBalance();
       if (this.state.direction === "to-starknet") {
         this.fetchAllowance();
-        this.fetchFeeEstimate();
       }
+      this.fetchFeeEstimate();
     }
   }
 
@@ -364,6 +374,7 @@ export class BridgeController {
       this.state.direction === "to-starknet"
         ? this.fetchAllowance()
         : Promise.resolve(),
+      this.fetchFeeEstimate(),
     ]);
 
     this.state.refreshing = false;
@@ -410,12 +421,7 @@ export class BridgeController {
       ? this.externalWalletFor(selectedToken)
       : undefined;
 
-    if (
-      !wallet ||
-      !selectedToken ||
-      direction !== "to-starknet" ||
-      !extWallet
-    ) {
+    if (!wallet || !selectedToken || !extWallet) {
       this.state.feeEstimate = null;
       this.render();
       return;
@@ -425,11 +431,19 @@ export class BridgeController {
     this.render();
 
     try {
-      this.state.feeEstimate = await wallet.getDepositFeeEstimate(
-        selectedToken,
-        extWallet,
-        { fastTransfer }
-      );
+      if (direction === "to-starknet") {
+        this.state.feeEstimate = await wallet.getDepositFeeEstimate(
+          selectedToken,
+          extWallet,
+          { fastTransfer }
+        );
+      } else {
+        this.state.feeEstimate = await wallet.getInitiateWithdrawFeeEstimate(
+          selectedToken,
+          extWallet,
+          { fastTransfer }
+        );
+      }
     } catch (err) {
       this.log(`Failed to estimate fees: ${err}`, "error");
       this.state.feeEstimate = null;
@@ -476,6 +490,43 @@ export class BridgeController {
     }
   }
 
+  async initiateWithdraw(amountStr: string): Promise<void> {
+    const { selectedToken, fastTransfer } = this.state;
+    const wallet = this.starknetWallet;
+    const extWallet = selectedToken
+      ? this.externalWalletFor(selectedToken)
+      : undefined;
+
+    if (!wallet || !selectedToken || !extWallet) {
+      this.log("Missing wallet or token for withdraw", "error");
+      return;
+    }
+
+    this.log(
+      `Initiating withdraw of ${amountStr} ${selectedToken.symbol} from Starknet...`,
+      "info"
+    );
+
+    try {
+      const withdrawAmount = Amount.parse(
+        amountStr,
+        selectedToken.decimals,
+        selectedToken.symbol
+      );
+
+      const tx = await wallet.initiateWithdraw(
+        extWallet.address,
+        withdrawAmount,
+        selectedToken,
+        extWallet,
+        { fastTransfer }
+      );
+      this.log(`Withdraw initiated: ${tx.hash}`, "success");
+    } catch (err) {
+      this.log(`Initiate withdraw failed: ${err}`, "error");
+    }
+  }
+
   isCCTP(): boolean {
     return this.state.selectedToken?.protocol === Protocol.CCTP;
   }
@@ -485,41 +536,72 @@ export class BridgeController {
   }
 }
 
-function isEthereumFee(
-  estimate: EthereumDepositFeeEstimation | SolanaDepositFeeEstimation
+type AnyFeeEstimate =
+  | EthereumDepositFeeEstimation
+  | SolanaDepositFeeEstimation
+  | BridgeInitiateWithdrawFeeEstimation;
+
+function isEthereumDepositFee(
+  estimate: AnyFeeEstimate
 ): estimate is EthereumDepositFeeEstimation {
-  return "l1Fee" in estimate;
+  return "l1Fee" in estimate && "approvalFee" in estimate;
 }
 
-export function formatFeeEstimate(
-  estimate: EthereumDepositFeeEstimation | SolanaDepositFeeEstimation
-): string {
+function isSolanaFee(
+  estimate: AnyFeeEstimate
+): estimate is SolanaDepositFeeEstimation {
+  return "localFee" in estimate;
+}
+
+export function formatFeeEstimate(estimate: AnyFeeEstimate): string {
   const lines: string[] = [];
 
-  if (isEthereumFee(estimate)) {
+  if (isEthereumDepositFee(estimate)) {
     lines.push(
-      `L1 Gas: ${estimate.l1Fee.toFormatted(false)}${estimate.l1FeeError ? " (est.)" : ""}`
+      `L1 Gas: ${estimate.l1Fee.toFormatted(false)}${
+        estimate.l1FeeError ? " (est.)" : ""
+      }`
     );
     lines.push(
-      `L2 Msg: ${estimate.l2Fee.toFormatted(false)}${estimate.l2FeeError ? " (est.)" : ""}`
+      `L2 Msg: ${estimate.l2Fee.toFormatted(false)}${
+        estimate.l2FeeError ? " (est.)" : ""
+      }`
     );
     lines.push(
-      `Approval: ${estimate.approvalFee.toFormatted(false)}${estimate.approvalFeeError ? " (est.)" : ""}`
+      `Approval: ${estimate.approvalFee.toFormatted(false)}${
+        estimate.approvalFeeError ? " (est.)" : ""
+      }`
     );
-
     const cctp = estimate as CCTPDepositFeeEstimation;
     if (cctp.fastTransferBpFee !== undefined) {
       lines.push(
         `Fast Transfer Fee: ${(cctp.fastTransferBpFee / 100).toFixed(2)}%`
       );
     }
+  } else if (isSolanaFee(estimate)) {
+    lines.push(
+      `Local Fee: ${estimate.localFee.toFormatted(false)}${
+        estimate.localFeeError ? " (est.)" : ""
+      }`
+    );
+    lines.push(
+      `Interchain Fee: ${estimate.interchainFee.toFormatted(false)}${
+        estimate.interchainFeeError ? " (est.)" : ""
+      }`
+    );
   } else {
+    // Ethereum initiate withdraw fee (Starknet → Ethereum)
     lines.push(
-      `Local Fee: ${estimate.localFee.toFormatted(false)}${estimate.localFeeError ? " (est.)" : ""}`
+      `L2 Fee: ${estimate.l2Fee.toFormatted(false)}${
+        estimate.l2FeeError ? " (est.)" : ""
+      }`
     );
-    lines.push(
-      `Interchain Fee: ${estimate.interchainFee.toFormatted(false)}${estimate.interchainFeeError ? " (est.)" : ""}`
-    );
+    const cctp = estimate as CCTPInitiateWithdrawFeeEstimation;
+    if (cctp.fastTransferBpFee !== undefined) {
+      lines.push(
+        `Fast Transfer Fee: ${(cctp.fastTransferBpFee / 100).toFixed(2)}%`
+      );
+    }
   }
 
   return lines.join("\n");

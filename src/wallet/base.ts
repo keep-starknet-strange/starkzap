@@ -2,13 +2,16 @@ import type { WalletInterface } from "@/wallet/interface";
 import {
   type Address,
   Amount,
+  type BridgeCompleteWithdrawFeeEstimation,
   type BridgeDepositFeeEstimation,
+  type BridgeInitiateWithdrawFeeEstimation,
   BridgeToken,
   type BridgingConfig,
   type ChainId,
   type DeployOptions,
   type EnsureReadyOptions,
   type ExecuteOptions,
+  type ExternalAddress,
   type ExternalTransactionResponse,
   type FeeMode,
   type PoolMember,
@@ -26,6 +29,7 @@ import type {
   RpcProvider,
   Signature,
   TypedData,
+  UniversalDetails,
 } from "starknet";
 import { Erc20 } from "@/erc20";
 import { Staking } from "@/staking";
@@ -45,7 +49,11 @@ import {
 } from "@/lending";
 import { ProviderRegistry } from "@/providers/registry";
 import { BridgeOperator } from "@/bridge";
-import type { BridgeDepositOptions } from "@/bridge/types/BridgeInterface";
+import type {
+  BridgeDepositOptions,
+  CompleteBridgeWithdrawOptions,
+  InitiateBridgeWithdrawOptions,
+} from "@/bridge/types/BridgeInterface";
 import type { ConnectedExternalWallet } from "@/connect";
 
 const MAX_ERC20_CACHE_SIZE = 128;
@@ -158,7 +166,10 @@ export abstract class BaseWallet implements WalletInterface {
   abstract getChainId(): ChainId;
   abstract getFeeMode(): FeeMode;
   abstract getClassHash(): string;
-  abstract estimateFee(calls: Call[]): Promise<EstimateFeeResponseOverhead>;
+  abstract estimateFee(
+    calls: Call[],
+    details?: UniversalDetails
+  ): Promise<EstimateFeeResponseOverhead>;
   abstract disconnect(): Promise<void>;
 
   callContract(call: Call): ReturnType<RpcProvider["callContract"]> {
@@ -847,5 +858,95 @@ export abstract class BaseWallet implements WalletInterface {
     options?: BridgeDepositOptions
   ): Promise<BridgeDepositFeeEstimation> {
     return this.bridging.getDepositFeeEstimate(token, externalWallet, options);
+  }
+
+  /**
+   * Initiate a withdrawal from Starknet to the external chain.
+   *
+   * Executes a transaction on Starknet that burns or locks L2 tokens and
+   * emits a cross-chain message. For most protocols a separate
+   * `completeWithdraw` call on the external chain is required after finality.
+   */
+  initiateWithdraw(
+    recipient: ExternalAddress,
+    amount: Amount,
+    token: BridgeToken,
+    externalWallet: ConnectedExternalWallet,
+    options?: InitiateBridgeWithdrawOptions
+  ): Promise<Tx> {
+    return this.bridging.initiateWithdraw(
+      recipient,
+      amount,
+      token,
+      externalWallet,
+      options
+    );
+  }
+
+  /**
+   * Get the L2 token balance available to withdraw (Starknet balance).
+   */
+  getWithdrawBalance(
+    token: BridgeToken,
+    externalWallet: ConnectedExternalWallet
+  ): Promise<Amount> {
+    return this.bridging.getWithdrawBalance(token, externalWallet);
+  }
+
+  /**
+   * Estimate the Starknet fee for the `initiateWithdraw` transaction.
+   */
+  getInitiateWithdrawFeeEstimate(
+    token: BridgeToken,
+    externalWallet: ConnectedExternalWallet,
+    options?: InitiateBridgeWithdrawOptions
+  ): Promise<BridgeInitiateWithdrawFeeEstimation> {
+    return this.bridging.getInitiateWithdrawFeeEstimate(
+      token,
+      externalWallet,
+      options
+    );
+  }
+
+  /**
+   * Complete a withdrawal on the external chain.
+   *
+   * Only required by protocols where the cross-chain message must be manually
+   * finalised after L2 finality (e.g. Canonical bridge, CCTP after Circle
+   * attestation). Throws for protocols that deliver automatically.
+   */
+  completeWithdraw(
+    recipient: ExternalAddress,
+    amount: Amount,
+    token: BridgeToken,
+    externalWallet: ConnectedExternalWallet,
+    options?: CompleteBridgeWithdrawOptions
+  ): Promise<ExternalTransactionResponse> {
+    return this.bridging.completeWithdraw(
+      recipient,
+      amount,
+      token,
+      externalWallet,
+      options
+    );
+  }
+
+  /**
+   * Estimate the external-chain fee for the `completeWithdraw` transaction.
+   */
+  getCompleteWithdrawFeeEstimate(
+    amount: Amount,
+    recipient: ExternalAddress,
+    token: BridgeToken,
+    externalWallet: ConnectedExternalWallet,
+    options?: CompleteBridgeWithdrawOptions
+  ): Promise<BridgeCompleteWithdrawFeeEstimation> {
+    return this.bridging.getCompleteWithdrawFeeEstimate(
+      amount,
+      recipient,
+      token,
+      externalWallet,
+      options
+    );
   }
 }

@@ -41,3 +41,18 @@ export type OftDepositFeeEstimation = EthereumDepositFeeEstimation & {
   /** LayerZero interchain fee (in ETH, included in msg.value of the deposit tx). */
   interchainFee: Amount;
 };
+
+export type EthereumInitiateWithdrawFeeEstimation = {
+  l2Fee: Amount;
+  l2FeeError?: FeeErrorCause | undefined;
+};
+
+export type EthereumCompleteWithdrawFeeEstimation = {
+  l1Fee: Amount;
+  l1FeeError?: FeeErrorCause | undefined;
+};
+
+export type CCTPInitiateWithdrawFeeEstimation =
+  EthereumInitiateWithdrawFeeEstimation & {
+    fastTransferBpFee: number;
+  };

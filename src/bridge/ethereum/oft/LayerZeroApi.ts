@@ -3,6 +3,7 @@ import { getAddress, Interface } from "ethers";
 import { type EthereumAddress, ExternalChain } from "@/types";
 import type { Address, Amount } from "@/types";
 import { fromEthereumAddress } from "@/connect/ethersRuntime";
+import type { Call } from "starknet";
 
 const LAYERZERO_API_BASE = "https://transfer.layerzero-api.com/v1";
 
@@ -89,12 +90,47 @@ export class LayerZeroApi {
     });
   }
 
+  /**
+   * Get LayerZero quotes for a withdrawal from Starknet to the external chain.
+   *
+   * The resulting quotes contain a Starknet-chain user step that can be
+   * converted to a `Call` via `getWithdrawCalls`.
+   */
+  async getWithdrawQuotes(
+    params: QuoteRequestParams
+  ): Promise<LayerZeroQuote[]> {
+    return this.getQuotes({
+      srcChainKey: "starknet",
+      srcTokenAddress: this.config.starknetTokenAddress.toString(),
+      dstChainKey: this.config.externalChainKey,
+      dstTokenAddress: this.config.externalTokenAddress,
+      ...params,
+    });
+  }
+
   getApprovalTransaction(quotes: LayerZeroQuote[]): ContractTransaction | null {
     return this.extractUserStep(quotes, "approve");
   }
 
   getDepositTransaction(quotes: LayerZeroQuote[]): ContractTransaction | null {
     return this.extractUserStep(quotes, "bridge");
+  }
+
+  /**
+   * Extract Starknet calls from withdraw quotes.
+   *
+   * The LayerZero API returns a Starknet-chain user step for withdrawals
+   * whose encoded transaction contains the OFT `send` call data. This method
+   * extracts those steps and casts them to starknet.js `Call` objects.
+   */
+  getWithdrawCalls(quotes: LayerZeroQuote[]): Call[] {
+    const quote = quotes[0];
+    if (!quote) return [];
+    const bridgeStep = quote.userSteps.find(
+      (step) => step.description === "bridge" && step.chainKey === "starknet"
+    );
+    if (!bridgeStep) return [];
+    return [bridgeStep.transaction.encoded as unknown as Call];
   }
 
   /**

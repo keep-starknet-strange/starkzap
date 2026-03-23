@@ -5,6 +5,7 @@ import {
   type PaymasterTimeBounds,
   type TypedData,
   type Signature,
+  type UniversalDetails,
 } from "starknet";
 import { Tx } from "@/tx";
 import {
@@ -372,8 +373,8 @@ export class CartridgeWallet extends BaseWallet {
     return this.classHash;
   }
 
-  async estimateFee(calls: Call[]) {
-    return this.walletAccount.estimateInvokeFee(calls);
+  async estimateFee(calls: Call[], details?: UniversalDetails) {
+    return this.walletAccount.estimateInvokeFee(calls, details);
   }
 
   /**

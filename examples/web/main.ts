@@ -62,9 +62,16 @@ const MAINNET_NETWORK: AppNetwork = "mainnet";
 const SEPOLIA_NETWORK: AppNetwork = "sepolia";
 const NETWORK_QUERY_PARAM = "network";
 const NETWORK_STORAGE_KEY = "starkzap:web:network";
+const ALCHEMY_API_KEY = import.meta.env.VITE_ALCHEMY_API_KEY as
+  | string
+  | undefined;
 const DEFAULT_RPC_URLS: Record<AppNetwork, string> = {
-  [MAINNET_NETWORK]: "https://api.cartridge.gg/x/starknet/mainnet/rpc/v0_9",
-  [SEPOLIA_NETWORK]: "https://api.cartridge.gg/x/starknet/sepolia/rpc/v0_9",
+  [MAINNET_NETWORK]: ALCHEMY_API_KEY
+    ? `https://starknet-mainnet.g.alchemy.com/starknet/version/rpc/v0_10/${ALCHEMY_API_KEY}`
+    : "https://api.cartridge.gg/x/starknet/mainnet/rpc/v0_9",
+  [SEPOLIA_NETWORK]: ALCHEMY_API_KEY
+    ? `https://starknet-sepolia.g.alchemy.com/starknet/version/rpc/v0_10/${ALCHEMY_API_KEY}`
+    : "https://api.cartridge.gg/x/starknet/sepolia/rpc/v0_9",
 };
 
 function normalizeNetwork(value: string | null | undefined): AppNetwork | null {
@@ -149,9 +156,6 @@ const DUMMY_POLICY = {
 };
 const SDK_CHAIN_ID =
   NETWORK === MAINNET_NETWORK ? ChainId.MAINNET : ChainId.SEPOLIA;
-const ALCHEMY_API_KEY = import.meta.env.VITE_ALCHEMY_API_KEY as
-  | string
-  | undefined;
 const OFT_PUBLIC_KEY = import.meta.env.VITE_OFT_PUBLIC_KEY as
   | string
   | undefined;
@@ -846,8 +850,12 @@ function renderSwapQuote(params: {
 
   swapQuoteEl.innerHTML = `
     <div class="quote-row"><span class="quote-label">Source</span><span class="quote-value">${params.providerId.toUpperCase()}</span></div>
-    <div class="quote-row"><span class="quote-label">Amount In</span><span class="quote-value">${params.amountIn.toFormatted(true)}</span></div>
-    <div class="quote-row"><span class="quote-label">Amount Out</span><span class="quote-value">${amountOut.toFormatted(true)}</span></div>
+    <div class="quote-row"><span class="quote-label">Amount In</span><span class="quote-value">${params.amountIn.toFormatted(
+      true
+    )}</span></div>
+    <div class="quote-row"><span class="quote-label">Amount Out</span><span class="quote-value">${amountOut.toFormatted(
+      true
+    )}</span></div>
     <div class="quote-row"><span class="quote-label">Price Impact</span><span class="quote-value">${priceImpactText}</span></div>
     <div class="quote-row"><span class="quote-label">Route Calls</span><span class="quote-value">${routeCalls}</span></div>
   `;
@@ -1188,7 +1196,9 @@ async function cancelDcaOrder(
     }
 
     log(
-      `Cancelling ${getDcaBackendLabel(order.providerId)} DCA order ${truncateAddress(order.orderAddress)}...`,
+      `Cancelling ${getDcaBackendLabel(
+        order.providerId
+      )} DCA order ${truncateAddress(order.orderAddress)}...`,
       "info"
     );
     const sponsor = dcaSponsoredInput.checked;
@@ -1237,16 +1247,24 @@ function renderDcaOrders(orders: DcaOrder[]): void {
     const orderHeaderInfo = document.createElement("div");
     const orderTitle = document.createElement("div");
     orderTitle.className = "order-title";
-    orderTitle.textContent = `${describeTokenAddress(order.sellTokenAddress)} -> ${describeTokenAddress(order.buyTokenAddress)}`;
+    orderTitle.textContent = `${describeTokenAddress(
+      order.sellTokenAddress
+    )} -> ${describeTokenAddress(order.buyTokenAddress)}`;
 
     const orderSubtitle = document.createElement("div");
     orderSubtitle.className = "order-subtitle";
-    orderSubtitle.textContent = `${getDcaBackendLabel(order.providerId)} · ${truncateAddress(order.orderAddress)} · ${order.timestamp.toLocaleString()}`;
+    orderSubtitle.textContent = `${getDcaBackendLabel(
+      order.providerId
+    )} · ${truncateAddress(
+      order.orderAddress
+    )} · ${order.timestamp.toLocaleString()}`;
 
     orderHeaderInfo.append(orderTitle, orderSubtitle);
 
     const statusBadge = document.createElement("span");
-    statusBadge.className = `status-badge ${getDcaStatusBadgeClass(order.status)}`;
+    statusBadge.className = `status-badge ${getDcaStatusBadgeClass(
+      order.status
+    )}`;
     statusBadge.textContent = order.status;
 
     orderHeader.append(orderHeaderInfo, statusBadge);
@@ -1559,7 +1577,9 @@ async function refreshDcaOrders(silent = false): Promise<void> {
     renderDcaOrders(page.content);
     if (!silent) {
       log(
-        `Loaded ${page.content.length} ${currentProvider.toUpperCase()} DCA orders`,
+        `Loaded ${
+          page.content.length
+        } ${currentProvider.toUpperCase()} DCA orders`,
         "success"
       );
     }
@@ -1693,7 +1713,7 @@ function renderBridge(): void {
   }
 
   // Fee estimate
-  if (s.direction === "to-starknet" && s.selectedToken) {
+  if (s.selectedToken) {
     bridgeFeesSection.classList.remove("hidden");
     if (s.feeLoading) {
       bridgeFeesEl.textContent = "Estimating...";
@@ -1706,19 +1726,24 @@ function renderBridge(): void {
     bridgeFeesSection.classList.add("hidden");
   }
 
-  // Deposit button
+  // Deposit / Withdraw button
   const hasAmount = bridgeAmountInput.value.trim().length > 0;
   const hasExternalWallet =
     (s.selectedToken?.chain === ExternalChain.SOLANA &&
       s.connectedSolWallet != null) ||
     (s.selectedToken?.chain !== ExternalChain.SOLANA &&
       s.connectedEthWallet != null);
-  const canDeposit =
-    s.direction === "to-starknet" &&
-    hasExternalWallet &&
-    s.selectedToken != null &&
-    hasAmount;
-  btnBridgeDeposit.disabled = !canDeposit;
+  if (s.direction === "to-starknet") {
+    btnBridgeDeposit.textContent = "Bridge Deposit";
+    btnBridgeDeposit.disabled = !(
+      hasExternalWallet &&
+      s.selectedToken != null &&
+      hasAmount
+    );
+  } else {
+    btnBridgeDeposit.textContent = "Initiate Withdraw";
+    btnBridgeDeposit.disabled = !(s.selectedToken != null && hasAmount);
+  }
 }
 
 // UI State
@@ -1777,7 +1802,9 @@ function showDisconnected() {
 }
 
 function setStatus(status: "deployed" | "not-deployed" | "checking") {
-  walletStatusEl.className = `status-badge status-${status === "not-deployed" ? "not-deployed" : status}`;
+  walletStatusEl.className = `status-badge status-${
+    status === "not-deployed" ? "not-deployed" : status
+  }`;
   walletStatusEl.textContent =
     status === "deployed"
       ? "Deployed"
@@ -2109,7 +2136,9 @@ async function fetchSwapQuote() {
       buildSwapInput();
 
     log(
-      `Fetching ${providerId.toUpperCase()} quote for ${amountIn.toUnit()} ${tokenIn.symbol} -> ${tokenOut.symbol}`,
+      `Fetching ${providerId.toUpperCase()} quote for ${amountIn.toUnit()} ${
+        tokenIn.symbol
+      } -> ${tokenOut.symbol}`,
       "info"
     );
 
@@ -2130,7 +2159,11 @@ async function fetchSwapQuote() {
       priceImpactBps: quote.priceImpactBps,
     });
     log(
-      `Quote received: ${Amount.fromRaw(quote.amountOutBase, tokenOut.decimals, tokenOut.symbol).toFormatted(true)}`,
+      `Quote received: ${Amount.fromRaw(
+        quote.amountOutBase,
+        tokenOut.decimals,
+        tokenOut.symbol
+      ).toFormatted(true)}`,
       "success"
     );
   } catch (err) {
@@ -2159,7 +2192,9 @@ async function submitSwap() {
     const sponsor = swapSponsoredInput.checked;
 
     log(
-      `Submitting ${providerId.toUpperCase()} swap ${amountIn.toUnit()} ${tokenIn.symbol} -> ${tokenOut.symbol}`,
+      `Submitting ${providerId.toUpperCase()} swap ${amountIn.toUnit()} ${
+        tokenIn.symbol
+      } -> ${tokenOut.symbol}`,
       "info"
     );
 
@@ -2504,7 +2539,9 @@ async function fetchDcaPreview() {
     } = buildDcaInput({ requirePreviewProvider: true });
 
     log(
-      `Previewing ${previewProviderId.toUpperCase()} DCA cycle ${sellAmountPerCycle.toUnit()} ${sellToken.symbol} -> ${buyToken.symbol}`,
+      `Previewing ${previewProviderId.toUpperCase()} DCA cycle ${sellAmountPerCycle.toUnit()} ${
+        sellToken.symbol
+      } -> ${buyToken.symbol}`,
       "info"
     );
 
@@ -2525,7 +2562,11 @@ async function fetchDcaPreview() {
       priceImpactBps: quote.priceImpactBps,
     });
     log(
-      `DCA cycle preview received: ${Amount.fromRaw(quote.amountOutBase, buyToken.decimals, buyToken.symbol).toFormatted(true)}`,
+      `DCA cycle preview received: ${Amount.fromRaw(
+        quote.amountOutBase,
+        buyToken.decimals,
+        buyToken.symbol
+      ).toFormatted(true)}`,
       "success"
     );
   } catch (err) {
@@ -2565,7 +2606,11 @@ async function createDcaOrder() {
       : "";
 
     log(
-      `Creating ${dcaProviderId.toUpperCase()} DCA order ${sellAmount.toUnit()} ${sellToken.symbol} total / ${sellAmountPerCycle.toUnit()} per cycle into ${buyToken.symbol} (${frequency}${previewSuffix})`,
+      `Creating ${dcaProviderId.toUpperCase()} DCA order ${sellAmount.toUnit()} ${
+        sellToken.symbol
+      } total / ${sellAmountPerCycle.toUnit()} per cycle into ${
+        buyToken.symbol
+      } (${frequency}${previewSuffix})`,
       "info"
     );
 
@@ -2814,8 +2859,11 @@ bridgeAmountInput.addEventListener("input", () => {
 
 btnBridgeDeposit.addEventListener("click", () => {
   const amount = bridgeAmountInput.value.trim();
-  if (amount && bridgeController) {
+  if (!amount || !bridgeController) return;
+  if (bridgeController.getState().direction === "to-starknet") {
     bridgeController.deposit(amount);
+  } else {
+    bridgeController.initiateWithdraw(amount);
   }
 });
 
@@ -3159,7 +3207,10 @@ function renderLendingDraft(): void {
     rows.push(
       createQuoteRow(
         "My Deposit",
-        `${Amount.fromRaw(earnPosition.collateral.amount, earnPosition.collateral.token).toFormatted(true)} ${supplyMarket.asset.symbol}`
+        `${Amount.fromRaw(
+          earnPosition.collateral.amount,
+          earnPosition.collateral.token
+        ).toFormatted(true)} ${supplyMarket.asset.symbol}`
       )
     );
   }
@@ -3168,14 +3219,20 @@ function renderLendingDraft(): void {
     rows.push(
       createQuoteRow(
         "My Collateral",
-        `${Amount.fromRaw(borrowPosition.collateral.amount, borrowPosition.collateral.token).toFormatted(true)} ${borrowPosition.collateral.token.symbol}`
+        `${Amount.fromRaw(
+          borrowPosition.collateral.amount,
+          borrowPosition.collateral.token
+        ).toFormatted(true)} ${borrowPosition.collateral.token.symbol}`
       )
     );
     if (borrowPosition.debt) {
       rows.push(
         createQuoteRow(
           "My Debt",
-          `${Amount.fromRaw(borrowPosition.debt.amount, borrowPosition.debt.token).toFormatted(true)} ${borrowPosition.debt.token.symbol}`
+          `${Amount.fromRaw(
+            borrowPosition.debt.amount,
+            borrowPosition.debt.token
+          ).toFormatted(true)} ${borrowPosition.debt.token.symbol}`
         )
       );
     }
@@ -3187,7 +3244,9 @@ function renderLendingDraft(): void {
       rows.push(
         createQuoteRow(
           "Borrow Limit",
-          `${Amount.fromRaw(draftMaxBorrowAmount, debtMarket.asset).toFormatted(true)} ${debtMarket.asset.symbol}`
+          `${Amount.fromRaw(draftMaxBorrowAmount, debtMarket.asset).toFormatted(
+            true
+          )} ${debtMarket.asset.symbol}`
         )
       );
     }
@@ -3197,7 +3256,9 @@ function renderLendingDraft(): void {
       rows.push(
         createQuoteRow(
           "Deposit Needed",
-          `${Amount.fromRaw(minimumDeposit, collateralMarket.asset).toFormatted(true)} ${collateralMarket.asset.symbol}`
+          `${Amount.fromRaw(minimumDeposit, collateralMarket.asset).toFormatted(
+            true
+          )} ${collateralMarket.asset.symbol}`
         )
       );
     }
@@ -3670,7 +3731,9 @@ async function lendingBorrow(
     });
 
     log(
-      `Borrowing ${amount.toUnit()} ${debtToken.symbol} with ${collateralToken.symbol} collateral...`,
+      `Borrowing ${amount.toUnit()} ${debtToken.symbol} with ${
+        collateralToken.symbol
+      } collateral...`,
       "info"
     );
     const tx = await wallet.lending().borrow(
@@ -3749,7 +3812,9 @@ async function lendingRepay(
 
     log(
       isCollateralOnlyRepay
-        ? `Withdrawing ${collateralAmount?.toUnit() ?? "0"} ${collateralToken.symbol} collateral...`
+        ? `Withdrawing ${collateralAmount?.toUnit() ?? "0"} ${
+            collateralToken.symbol
+          } collateral...`
         : `Repaying ${amount.toUnit()} ${debtToken.symbol}...`,
       "info"
     );
@@ -3880,7 +3945,9 @@ async function lendingMyPositions() {
       );
       const nextRows = [
         createQuoteRow(
-          `${p.type === "earn" ? "Deposit" : "Collateral"} (${p.pool.name ?? truncateAddress(p.pool.id)})`,
+          `${p.type === "earn" ? "Deposit" : "Collateral"} (${
+            p.pool.name ?? truncateAddress(p.pool.id)
+          })`,
           `${colFormatted} ${col.token.symbol}`
         ),
       ];
@@ -4009,7 +4076,9 @@ async function lendingHealthQuote() {
 
     const simStatus = quote.simulation.ok
       ? "✓ Would succeed"
-      : `✗ Would fail: ${quote.simulation.ok === false ? quote.simulation.reason : ""}`;
+      : `✗ Would fail: ${
+          quote.simulation.ok === false ? quote.simulation.reason : ""
+        }`;
 
     renderQuoteBox(lendingPositionEl, [
       createQuoteRow(

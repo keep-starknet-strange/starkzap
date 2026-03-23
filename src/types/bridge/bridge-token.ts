@@ -9,6 +9,7 @@ import type {
   EthereumAddress,
   ExternalAddress,
   SolanaAddress,
+  Token,
 } from "@/types";
 
 export interface BridgeTokenParams<A extends ExternalAddress> {
@@ -52,6 +53,15 @@ export abstract class BridgeToken<A extends ExternalAddress = ExternalAddress> {
     this.bridgeAddress = params.l1Bridge;
     this.starknetAddress = params.starknetAddress;
     this.starknetBridge = params.starknetBridge;
+  }
+
+  intoStarknetToken(): Token {
+    return {
+      name: this.name,
+      address: this.starknetAddress,
+      decimals: this.decimals,
+      symbol: this.symbol,
+    };
   }
 }
 

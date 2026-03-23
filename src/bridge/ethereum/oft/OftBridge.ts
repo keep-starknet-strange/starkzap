@@ -1,11 +1,21 @@
 import { EthereumBridge } from "@/bridge/ethereum/EthereumBridge";
-import type { BridgeDepositOptions } from "@/bridge/types/BridgeInterface";
+import type {
+  BridgeDepositOptions,
+  CompleteBridgeWithdrawOptions,
+  InitiateBridgeWithdrawOptions,
+} from "@/bridge/types/BridgeInterface";
 import {
   DUMMY_SN_ADDRESS,
   type EthereumWalletConfig,
   type OftDepositFeeEstimation,
+  EthereumInitiateWithdrawFeeEstimation,
+  EthereumCompleteWithdrawFeeEstimation,
 } from "@/bridge/ethereum/types";
-import type { Address, ExternalTransactionResponse } from "@/types";
+import type {
+  Address,
+  ExternalAddress,
+  ExternalTransactionResponse,
+} from "@/types";
 import {
   Amount,
   type EthereumAddress,
@@ -21,6 +31,9 @@ import {
   DEFAULT_OFT_MIN_AMOUNT,
   OFT_MIN_AMOUNT_BY_TOKEN_ID,
 } from "@/bridge/ethereum/oft/constants";
+import { Protocol } from "@/types/bridge/protocol";
+import type { Tx } from "@/tx";
+
 const DUMMY_ETH_ADDRESS = "0x0000000000000000000000000000000000000001";
 const DUMMY_DEPOSIT_TX_CACHE_TTL_MS = 60_000;
 
@@ -40,7 +53,7 @@ export class OftBridge extends EthereumBridge {
     starknetWallet: WalletInterface,
     apiKey: string
   ) {
-    super(bridgeToken, config, starknetWallet, []);
+    super(bridgeToken, config, starknetWallet);
 
     const chainId = starknetWallet.getChainId();
     if (!chainId.isMainnet()) {
@@ -134,6 +147,86 @@ export class OftBridge extends EthereumBridge {
       approvalFee,
       approvalFeeError,
     };
+  }
+
+  override async initiateWithdraw(
+    recipient: ExternalAddress,
+    amount: Amount,
+    options?: InitiateBridgeWithdrawOptions
+  ): Promise<Tx> {
+    const signerAddress = this.starknetWallet.address.toString();
+    const quotes = await this.layerZeroApi.getWithdrawQuotes({
+      srcWalletAddress: signerAddress,
+      dstWalletAddress: recipient.toString(),
+      amount,
+    });
+
+    const calls = this.layerZeroApi.getWithdrawCalls(quotes);
+    if (calls.length === 0) {
+      throw new Error(
+        "Failed to get OFT withdraw transaction from LayerZero API."
+      );
+    }
+
+    return this.starknetWallet.execute(calls, options);
+  }
+
+  override async getInitiateWithdrawFeeEstimate(
+    _options?: InitiateBridgeWithdrawOptions
+  ): Promise<EthereumInitiateWithdrawFeeEstimation> {
+    try {
+      const signerAddress = this.starknetWallet.address.toString();
+      const quotes = await this.layerZeroApi.getWithdrawQuotes({
+        srcWalletAddress: signerAddress,
+        dstWalletAddress: DUMMY_ETH_ADDRESS,
+        amount: this.getOftMinAmount(),
+      });
+      const calls = this.layerZeroApi.getWithdrawCalls(quotes);
+      if (calls.length > 0) {
+        const estimate = await this.starknetWallet.estimateFee(calls);
+        const isFri = estimate.unit === "FRI";
+        return {
+          l2Fee: Amount.fromRaw(
+            estimate.overall_fee,
+            18,
+            isFri ? "STRK" : "ETH"
+          ),
+        };
+      }
+    } catch {
+      // fall through to error result
+    }
+
+    return {
+      l2Fee: Amount.fromRaw(0n, 18, "STRK"),
+      l2FeeError: FeeErrorCause.GENERIC_L2_FEE_ERROR,
+    };
+  }
+
+  async completeWithdraw(
+    recipient: ExternalAddress,
+    amount: Amount,
+    options?: CompleteBridgeWithdrawOptions
+  ): Promise<ExternalTransactionResponse> {
+    if (this.bridgeToken.protocol !== Protocol.OFT_MIGRATED) {
+      throw new Error(
+        "OFT tokens are delivered automatically via LayerZero and do not require a completion step."
+      );
+    }
+    return super.completeWithdraw(recipient, amount, options);
+  }
+
+  async getCompleteWithdrawFeeEstimate(
+    amount: Amount,
+    recipient: ExternalAddress,
+    options?: CompleteBridgeWithdrawOptions
+  ): Promise<EthereumCompleteWithdrawFeeEstimation> {
+    if (this.bridgeToken.protocol !== Protocol.OFT_MIGRATED) {
+      throw new Error(
+        "OFT tokens are delivered automatically via LayerZero and do not have a completion fee."
+      );
+    }
+    return super.getCompleteWithdrawFeeEstimate(amount, recipient, options);
   }
 
   protected async getAllowanceSpender(): Promise<EthereumAddress | null> {

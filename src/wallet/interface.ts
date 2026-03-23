@@ -5,6 +5,7 @@ import type {
   RpcProvider,
   TypedData,
   Signature,
+  UniversalDetails,
 } from "starknet";
 import type { Tx } from "@/tx";
 import type { TxBuilder } from "@/tx/builder";
@@ -110,7 +111,10 @@ export interface WalletInterface extends BridgeOperatorInterface {
   /**
    * Estimate the fee for executing calls.
    */
-  estimateFee(calls: Call[]): Promise<EstimateFeeResponseOverhead>;
+  estimateFee(
+    calls: Call[],
+    details?: UniversalDetails
+  ): Promise<EstimateFeeResponseOverhead>;
 
   /**
    * Sign a typed data message (EIP-712 style).
@@ -153,6 +157,11 @@ export interface WalletInterface extends BridgeOperatorInterface {
    * Get the account class hash.
    */
   getClassHash(): string;
+
+  /**
+   * Disconnect the wallet and clean up resources.
+   */
+  disconnect(): Promise<void>;
 
   /**
    * Get the display username when supported (e.g. Cartridge).

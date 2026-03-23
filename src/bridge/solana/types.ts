@@ -29,3 +29,5 @@ export type HyperlaneFeeEstimate = {
 };
 
 export type SolanaDepositFeeEstimation = HyperlaneFeeEstimate;
+
+export type SolanaWithdrawFeeEstimation = HyperlaneFeeEstimate;

@@ -10,6 +10,7 @@ import type {
   Token as HyperlaneToken,
   TokenStandard as HyperlaneTokenStandard,
 } from "@hyperlane-xyz/sdk";
+import { RpcProvider } from "starknet";
 
 type ChainMetadataWithMailbox = ChainMetadata & { mailbox?: string };
 
@@ -105,6 +106,33 @@ export function setupMultiProtocolProvider(
     hyperlaneChainName(chainId, "solana"),
     solanaProvider
   );
+
+  // Hyperlane bundles its own starknet.js 7.x which defaults to
+  // `block_id: "pending"` for contract calls. Modern Starknet RPC specs (v0_9+)
+  // removed "pending" in favour of "pre_confirmed", causing RPC errors.
+  // Override with a provider from our starknet.js 9.x (which defaults to
+  // "latest") built from the wallet's already-configured RPC URL, bypassing
+  // Hyperlane's bundled version entirely.
+  {
+    type StarknetTypedProvider = Extract<
+      Parameters<MultiProtocolProvider["setProvider"]>[1],
+      { type: HyperlaneProviderType.Starknet }
+    >;
+
+    const starknetProvider: StarknetTypedProvider = {
+      type: ProviderType.Starknet as StarknetTypedProvider["type"],
+      // Double-cast required: Hyperlane's provider type is typed against its
+      // own starknet.js 7.x; at runtime the API is compatible.
+      provider: new RpcProvider({
+        nodeUrl: starknetWallet.getProvider().channel.nodeUrl,
+      }) as unknown as StarknetTypedProvider["provider"],
+    };
+
+    multiProvider.setProvider(
+      hyperlaneChainName(chainId, "starknet"),
+      starknetProvider
+    );
+  }
 
   return multiProvider;
 }

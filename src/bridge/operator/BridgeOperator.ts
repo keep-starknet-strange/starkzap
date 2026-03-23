@@ -3,6 +3,8 @@ import { BridgeToken, EthereumBridgeToken } from "@/types/bridge/bridge-token";
 import type {
   BridgeDepositOptions,
   BridgeInterface,
+  CompleteBridgeWithdrawOptions,
+  InitiateBridgeWithdrawOptions,
 } from "@/bridge/types/BridgeInterface";
 import { Protocol } from "@/types/bridge/protocol";
 import {
@@ -16,16 +18,20 @@ import type { BridgeOperatorInterface } from "@/bridge/operator/BridgeOperatorIn
 import {
   type Address,
   type Amount,
+  type BridgeCompleteWithdrawFeeEstimation,
   type BridgeDepositFeeEstimation,
+  type BridgeInitiateWithdrawFeeEstimation,
   type BridgingConfig,
   type EthereumAddress,
   ExternalChain,
+  type ExternalAddress,
   type ExternalTransactionResponse,
   type SolanaAddress,
   SolanaBridgeToken,
 } from "@/types";
 import { loadEthers } from "@/connect/ethersRuntime";
 import { loadSolanaWeb3 } from "@/connect/solanaWeb3Runtime";
+import type { Tx } from "@/tx";
 
 export class BridgeOperator implements BridgeOperatorInterface {
   private cache = new BridgeCache();
@@ -85,6 +91,101 @@ export class BridgeOperator implements BridgeOperatorInterface {
       this.starknetWallet
     );
     return bridge.getAllowance();
+  }
+
+  public async initiateWithdraw(
+    recipient: ExternalAddress,
+    amount: Amount,
+    token: BridgeToken,
+    externalWallet: ConnectedExternalWallet,
+    options?: InitiateBridgeWithdrawOptions
+  ): Promise<Tx> {
+    const bridge = await this.bridge(
+      token,
+      externalWallet,
+      this.starknetWallet
+    );
+    if (!bridge.initiateWithdraw) {
+      throw new Error(
+        `Protocol "${token.protocol}" does not support withdrawal.`
+      );
+    }
+    return bridge.initiateWithdraw(recipient, amount, options);
+  }
+
+  public async getWithdrawBalance(
+    token: BridgeToken,
+    externalWallet: ConnectedExternalWallet
+  ): Promise<Amount> {
+    const bridge = await this.bridge(
+      token,
+      externalWallet,
+      this.starknetWallet
+    );
+    if (!bridge.getAvailableWithdrawBalance) {
+      throw new Error(
+        `Protocol "${token.protocol}" does not support withdrawal balance queries.`
+      );
+    }
+    return bridge.getAvailableWithdrawBalance(this.starknetWallet.address);
+  }
+
+  public async getInitiateWithdrawFeeEstimate(
+    token: BridgeToken,
+    externalWallet: ConnectedExternalWallet,
+    options?: InitiateBridgeWithdrawOptions
+  ): Promise<BridgeInitiateWithdrawFeeEstimation> {
+    const bridge = await this.bridge(
+      token,
+      externalWallet,
+      this.starknetWallet
+    );
+    if (!bridge.getInitiateWithdrawFeeEstimate) {
+      throw new Error(
+        `Protocol "${token.protocol}" does not support withdrawal fee estimation.`
+      );
+    }
+    return bridge.getInitiateWithdrawFeeEstimate(options);
+  }
+
+  public async completeWithdraw(
+    recipient: ExternalAddress,
+    amount: Amount,
+    token: BridgeToken,
+    externalWallet: ConnectedExternalWallet,
+    options?: CompleteBridgeWithdrawOptions
+  ): Promise<ExternalTransactionResponse> {
+    const bridge = await this.bridge(
+      token,
+      externalWallet,
+      this.starknetWallet
+    );
+    if (!bridge.completeWithdraw) {
+      throw new Error(
+        `Protocol "${token.protocol}" does not require a completion step.`
+      );
+    }
+    return bridge.completeWithdraw(recipient, amount, options);
+  }
+
+  public async getCompleteWithdrawFeeEstimate(
+    amount: Amount,
+    recipient: ExternalAddress,
+    token: BridgeToken,
+    externalWallet: ConnectedExternalWallet,
+    options?: CompleteBridgeWithdrawOptions
+  ): Promise<BridgeCompleteWithdrawFeeEstimation> {
+    const bridge = await this.bridge(
+      token,
+      externalWallet,
+      this.starknetWallet
+    );
+    if (!bridge.getCompleteWithdrawFeeEstimate) {
+      throw new Error(
+        `Protocol "${token.protocol}" does not require a completion step.`
+      );
+    }
+    return bridge.getCompleteWithdrawFeeEstimate(amount, recipient, options);
   }
 
   private bridge(

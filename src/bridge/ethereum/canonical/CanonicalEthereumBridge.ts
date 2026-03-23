@@ -6,12 +6,13 @@ import type {
 } from "@/bridge";
 import { DUMMY_SN_ADDRESS } from "@/bridge/ethereum/types";
 import {
+  type Address,
+  Amount,
   type EthereumAddress,
   type ExternalTransactionResponse,
 } from "@/types";
 import { ethereumAddress } from "@/bridge/ethereum/EtherToken";
-import { type ContractTransaction, toBigInt } from "ethers";
-import { type Address, Amount } from "@/types";
+import { type ContractTransaction } from "ethers";
 import { RPC, uint256 } from "starknet";
 import { FeeErrorCause } from "@/types/errors";
 
@@ -45,7 +46,7 @@ export class CanonicalEthereumBridge extends EthereumBridge {
   async getDepositFeeEstimate(
     _options?: BridgeDepositOptions
   ): Promise<EthereumDepositFeeEstimation> {
-    const minimalAmount = await this.token.amount(1n);
+    const minimalAmount = await this.ethereumToken.amount(1n);
 
     const [allowance, l1ToL2MessageFee, approvalFeeEstimation] =
       await Promise.all([
@@ -162,24 +163,13 @@ export class CanonicalEthereumBridge extends EthereumBridge {
     }
   }
 
-  private async estimateEthereumSafeGasLimitForTx(
-    tx: ContractTransaction
-  ): Promise<bigint> {
-    const estimated = await this.config.provider.estimateGas(tx);
-    return (
-      (estimated *
-        toBigInt(Math.ceil(EthereumBridge.GAS_LIMIT_SAFE_MULTIPLIER * 100))) /
-      100n
-    );
-  }
-
   protected async getEthDepositValue(
     recipient: Address,
     amount: Amount
   ): Promise<Amount> {
     const { fee } = await this.estimateL1ToL2MessageFee(recipient, amount);
 
-    const bridgedEthAmount = this.token.isNativeEth()
+    const bridgedEthAmount = this.ethereumToken.isNativeEth()
       ? amount
       : this.ethAmount(0n);
     return fee.add(bridgedEthAmount);

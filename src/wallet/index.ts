@@ -7,6 +7,7 @@ import {
   type PaymasterTimeBounds,
   type TypedData,
   type Signature,
+  type UniversalDetails,
 } from "starknet";
 import { Tx } from "@/tx";
 import { AccountProvider } from "@/wallet/accounts/provider";
@@ -589,8 +590,8 @@ export class Wallet extends BaseWallet {
    * console.log(`Estimated fee: ${fee.overall_fee}`);
    * ```
    */
-  async estimateFee(calls: Call[]) {
-    return this.account.estimateInvokeFee(calls);
+  async estimateFee(calls: Call[], details?: UniversalDetails) {
+    return this.account.estimateInvokeFee(calls, details);
   }
 
   async disconnect(): Promise<void> {
