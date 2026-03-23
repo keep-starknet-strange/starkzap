@@ -22,7 +22,7 @@
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.26.0",
-    "starkzap": "^2.0.0",
+    "starkzap": "file:../..",
     "zod": "^3.25.0"
   },
   "devDependencies": {
