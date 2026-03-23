@@ -1,4 +1,3 @@
-import { addAddressPadding } from "starknet";
 import type {
   CartridgeContractPolicy,
   CartridgePolicies,
@@ -8,7 +7,7 @@ import type {
   CartridgeSessionPolicies,
 } from "@/cartridge/types";
 import { SessionProtocolError } from "@/cartridge/ts/errors";
-import { asRecord } from "@/cartridge/ts/shared";
+import { asRecord, normalizeContractAddress } from "@/cartridge/ts/shared";
 
 export interface CanonicalSessionPolicy {
   contractAddress: string;
@@ -71,7 +70,8 @@ function compareControllerCanonicalPolicy(
   a: CanonicalSessionPolicy,
   b: CanonicalSessionPolicy
 ): number {
-  // Mirror controller.c: address cmp, then ASCII-case-insensitive entrypoint cmp, then exact cmp.
+  // Mirror Cartridge controller (cartridge-gg/controller) policy ordering:
+  // address lexicographic, then ASCII-case-insensitive entrypoint, then exact entrypoint tiebreak.
   const addressSort = compareLexically(a.contractAddress, b.contractAddress);
   if (addressSort !== 0) {
     return addressSort;
@@ -92,21 +92,6 @@ function hasMessages(policies: CartridgeSessionPolicies): boolean {
   return Array.isArray(policies.messages) && policies.messages.length > 0;
 }
 
-function normalizeContractAddress(rawAddress: string, context: string): string {
-  const trimmed = rawAddress.trim();
-  if (!trimmed) {
-    throw new SessionProtocolError(`${context} is missing a contract address.`);
-  }
-
-  try {
-    return addAddressPadding(trimmed.toLowerCase());
-  } catch (error) {
-    throw new SessionProtocolError(
-      `${context} has an invalid address: ${rawAddress}`,
-      error
-    );
-  }
-}
 
 function normalizeOptionalString(value: unknown): string | undefined {
   if (typeof value !== "string") {
@@ -318,6 +303,37 @@ export function canonicalizeSessionPolicies(
   return normalized.sort(compareControllerCanonicalPolicy);
 }
 
+function normalizeContractPolicyForUrl(
+  contract: CartridgeContractPolicy,
+  contractAddress: string
+): CartridgeContractPolicy {
+  const methods = contract.methods;
+  if (
+    methods !== undefined &&
+    methods !== null &&
+    !Array.isArray(methods)
+  ) {
+    throw new SessionProtocolError(
+      "Policy contract.methods must be an array."
+    );
+  }
+
+  const normalizedContract: CartridgeContractPolicy = {
+    methods: (methods ?? []).map((method, index) =>
+      normalizeMethodForUrl(method, `Policy ${contractAddress}#${index}`)
+    ),
+  };
+  const name = normalizeOptionalString(contract.name);
+  if (name) {
+    normalizedContract.name = name;
+  }
+  const description = normalizeOptionalString(contract.description);
+  if (description) {
+    normalizedContract.description = description;
+  }
+  return normalizedContract;
+}
+
 export function policiesToSessionUrlShape(
   policies: CartridgePolicies
 ): CartridgePolicies {
@@ -362,36 +378,7 @@ export function policiesToSessionUrlShape(
 
       return [
         contractAddress,
-        (() => {
-          const methods = contract.methods;
-          if (
-            methods !== undefined &&
-            methods !== null &&
-            !Array.isArray(methods)
-          ) {
-            throw new SessionProtocolError(
-              "Policy contract.methods must be an array."
-            );
-          }
-
-          const normalizedContract: CartridgeContractPolicy = {
-            methods: (methods ?? []).map((method, index) =>
-              normalizeMethodForUrl(
-                method,
-                `Policy ${contractAddress}#${index}`
-              )
-            ),
-          };
-          const name = normalizeOptionalString(contract.name);
-          if (name) {
-            normalizedContract.name = name;
-          }
-          const description = normalizeOptionalString(contract.description);
-          if (description) {
-            normalizedContract.description = description;
-          }
-          return normalizedContract;
-        })(),
+        normalizeContractPolicyForUrl(contract, contractAddress),
       ];
     })
   );

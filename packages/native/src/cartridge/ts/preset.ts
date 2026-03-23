@@ -5,6 +5,7 @@ import {
   asRecord,
   assertSafeHttpUrl,
   fetchWithTimeout,
+  normalizeHttpUrl,
   type FetchLike,
 } from "@/cartridge/ts/shared";
 
@@ -210,9 +211,7 @@ function resolvePresetConfigBaseUrl(
 
 function normalizeConfiguredPresetBaseUrl(presetBaseUrl: string): string {
   try {
-    return assertSafeHttpUrl(presetBaseUrl, "presetBaseUrl")
-      .toString()
-      .replace(/\/+$/, "");
+    return normalizeHttpUrl(presetBaseUrl, "presetBaseUrl");
   } catch (error) {
     throw new SessionProtocolError(
       `Configured Cartridge preset base URL is invalid: ${presetBaseUrl}.`,

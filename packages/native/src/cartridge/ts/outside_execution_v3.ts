@@ -1,10 +1,8 @@
 import {
   CallData,
-  addAddressPadding,
   ec,
   encode,
   hash,
-  num,
   shortString,
   stark,
   type Call,
@@ -13,6 +11,11 @@ import { SessionProtocolError } from "@/cartridge/ts/errors";
 import type { PolicyMerkleProof } from "@/cartridge/ts/merkle";
 import type { SessionRegistration } from "@/cartridge/ts/session_api";
 import type { TsSessionExecutionDetails } from "@/cartridge/ts/session_account";
+import {
+  normalizeContractAddress,
+  normalizeFelt,
+  selectorFromEntrypoint,
+} from "@/cartridge/ts/shared";
 
 const ZERO_FELT = "0x0";
 const ONE_FELT = "0x1";
@@ -38,6 +41,9 @@ const AUTHORIZATION_BY_REGISTERED = shortFelt("authorization-by-registered");
 // as a private key that needs rotation or secrecy.
 const GUARDIAN_KEY_PLACEHOLDER = shortFelt("CARTRIDGE_GUARDIAN");
 
+// SNIP-12 type hashes for the Cartridge session protocol.
+// Each is the Starknet selector of the SNIP-12 struct encoding string.
+// Changing these breaks protocol compatibility.
 const STARKNET_DOMAIN_TYPE_HASH = selectorFelt(
   '"StarknetDomain"("name":"shortstring","version":"shortstring","chainId":"shortstring","revision":"shortstring")'
 );
@@ -127,10 +133,6 @@ function selectorFelt(value: string): string {
   return normalizeFelt(hash.getSelectorFromName(value));
 }
 
-function normalizeFelt(value: string | number | bigint): string {
-  return num.toHex(value).toLowerCase();
-}
-
 function toUintBigInt(
   value: string | number | bigint,
   fieldName: string
@@ -153,7 +155,7 @@ function toUintBigInt(
     if (!trimmed || trimmed.startsWith("-")) {
       throw new Error("value cannot be empty or negative");
     }
-    return trimmed.startsWith("0x") ? BigInt(trimmed) : BigInt(trimmed);
+    return BigInt(trimmed);
   } catch (error) {
     throw new SessionProtocolError(
       `Invalid unsigned integer for ${fieldName}`,
@@ -170,30 +172,19 @@ function feltFromValue(
   return normalizeFelt(parsed);
 }
 
-function normalizeContractAddress(address: string): string {
-  const trimmed = address.trim();
-  if (!trimmed) {
-    throw new SessionProtocolError("Call contract address cannot be empty.");
-  }
-  try {
-    return addAddressPadding(trimmed.toLowerCase());
-  } catch (error) {
-    throw new SessionProtocolError(
-      `Invalid contract address for outside execution call: ${address}`,
-      error
-    );
-  }
+function normalizeCallContractAddress(address: string): string {
+  return normalizeContractAddress(
+    address,
+    "Outside execution call"
+  );
 }
 
-function selectorFromEntrypoint(entrypoint: string): string {
+function normalizeCallEntrypoint(entrypoint: string): string {
   const trimmed = entrypoint.trim();
   if (!trimmed) {
     throw new SessionProtocolError("Call entrypoint cannot be empty.");
   }
-  if (/^0x[0-9a-f]+$/i.test(trimmed)) {
-    return normalizeFelt(trimmed);
-  }
-  return normalizeFelt(hash.getSelectorFromName(trimmed));
+  return selectorFromEntrypoint(trimmed);
 }
 
 function normalizeChainId(chainId: string): string {
@@ -222,9 +213,9 @@ function normalizeExecutionCallTarget(
 ): NormalizedExecutionCallTarget {
   const entrypoint = rawEntrypointFromCall(call).trim();
   return {
-    contractAddress: normalizeContractAddress(rawContractAddressFromCall(call)),
+    contractAddress: normalizeCallContractAddress(rawContractAddressFromCall(call)),
     entrypoint,
-    selector: selectorFromEntrypoint(entrypoint),
+    selector: normalizeCallEntrypoint(entrypoint),
   };
 }
 
@@ -270,7 +261,7 @@ export function createPolicyProofIndex(
 }
 
 function policyKey(contractAddress: string, selector: string): string {
-  return `${normalizeContractAddress(contractAddress)}:${normalizeFelt(selector)}`;
+  return `${normalizeContractAddress(contractAddress, "Policy proof key")}:${normalizeFelt(selector)}`;
 }
 
 export function listCallsMissingPolicyProofs(
@@ -463,7 +454,7 @@ function serializeSessionStruct(session: SessionStruct): string[] {
 function serializeStarknetSignerSignature(
   signature: StarknetSignerSignature
 ): string[] {
-  // SignerSignature::Starknet((StarknetSigner, StarknetSignature))
+  // SignerSignature variant 0 = Starknet, followed by (pubkey, r, s).
   return [ZERO_FELT, signature.pubkey, signature.r, signature.s];
 }
 
@@ -476,7 +467,8 @@ function serializeSessionToken(args: {
 }): string[] {
   return [
     ...serializeSessionStruct(args.session),
-    ONE_FELT,
+    ONE_FELT, // Variant discriminator for "registered session" token format.
+
     ...serializeArray(args.sessionAuthorization),
     ...serializeStarknetSignerSignature(args.sessionSignature),
     ...serializeStarknetSignerSignature(args.guardianSignature),
@@ -541,6 +533,7 @@ export function buildSignedOutsideExecutionV3({
 
   const outsideExecution: RpcOutsideExecutionV3 = {
     caller: OUTSIDE_EXECUTION_CALLER_ANY,
+    // SNIP-9 v2 nonce: (random_value, 1). High part = 1 signals non-sequential (random) nonce mode.
     nonce: [normalizeFelt(stark.randomAddress()), ONE_FELT],
     execute_after: feltFromValue(
       executeAfter,
@@ -557,7 +550,7 @@ export function buildSignedOutsideExecutionV3({
     })),
   };
 
-  const sessionAddress = normalizeContractAddress(session.address);
+  const sessionAddress = normalizeContractAddress(session.address, "Session address");
   const feltChainId = normalizeChainId(chainId);
 
   const txHash = hashOutsideExecutionMessage(

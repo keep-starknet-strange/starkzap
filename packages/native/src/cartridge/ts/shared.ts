@@ -2,6 +2,7 @@
  * Shared internal helpers for Cartridge TS modules.
  * Prefer importing these instead of redeclaring local copies.
  */
+import { addAddressPadding, hash, num } from "starknet";
 export interface FetchLikeResponse {
   ok: boolean;
   status: number;
@@ -42,6 +43,49 @@ export function asRecord(value: unknown): UnknownRecord | null {
     return null;
   }
   return value as UnknownRecord;
+}
+
+/**
+ * Normalize a felt value to a lowercase hex string.
+ */
+export function normalizeFelt(value: string | number | bigint): string {
+  return num.toHex(value).toLowerCase();
+}
+
+/**
+ * Derive a Starknet selector from an entrypoint name or hex selector.
+ */
+export function selectorFromEntrypoint(entrypoint: string): string {
+  if (/^0x[0-9a-f]+$/i.test(entrypoint)) {
+    return normalizeFelt(entrypoint);
+  }
+  return normalizeFelt(hash.getSelectorFromName(entrypoint));
+}
+
+/**
+ * Normalize and pad a Starknet contract address.
+ */
+export function normalizeContractAddress(
+  address: string,
+  context: string
+): string {
+  const trimmed = address.trim();
+  if (!trimmed) {
+    throw new Error(`${context} is missing a contract address.`);
+  }
+
+  try {
+    return addAddressPadding(trimmed.toLowerCase());
+  } catch (error) {
+    throw new Error(`${context} has an invalid address: ${address}`);
+  }
+}
+
+/**
+ * Validate and normalize an HTTP(S) URL, stripping trailing slashes.
+ */
+export function normalizeHttpUrl(value: string, label: string): string {
+  return assertSafeHttpUrl(value, label).toString().replace(/\/+$/, "");
 }
 
 /**
