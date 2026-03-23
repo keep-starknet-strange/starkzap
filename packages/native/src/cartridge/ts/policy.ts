@@ -3,8 +3,12 @@ import type {
   CartridgePolicies,
   CartridgePolicy,
   CartridgePolicyMethod,
+  CartridgePolicyMethodInput,
   CartridgePolicyPredicate,
   CartridgeSessionPolicies,
+  NormalizedCartridgeContractPolicy,
+  NormalizedCartridgePolicies,
+  NormalizedCartridgeSessionPolicies,
 } from "@/cartridge/types";
 import { SessionProtocolError } from "@/cartridge/ts/errors";
 import { asRecord, normalizeContractAddress } from "@/cartridge/ts/shared";
@@ -126,7 +130,7 @@ function normalizePredicate(
 }
 
 function normalizeMethodForUrl(
-  method: CartridgePolicyMethod,
+  method: CartridgePolicyMethodInput,
   context: string
 ): CartridgePolicyMethod {
   const entrypoint = normalizeOptionalString(method.entrypoint);
@@ -305,13 +309,13 @@ export function canonicalizeSessionPolicies(
 function normalizeContractPolicyForUrl(
   contract: CartridgeContractPolicy,
   contractAddress: string
-): CartridgeContractPolicy {
+): NormalizedCartridgeContractPolicy {
   const methods = contract.methods;
   if (methods !== undefined && methods !== null && !Array.isArray(methods)) {
     throw new SessionProtocolError("Policy contract.methods must be an array.");
   }
 
-  const normalizedContract: CartridgeContractPolicy = {
+  const normalizedContract: NormalizedCartridgeContractPolicy = {
     methods: (methods ?? []).map((method, index) =>
       normalizeMethodForUrl(method, `Policy ${contractAddress}#${index}`)
     ),
@@ -328,8 +332,17 @@ function normalizeContractPolicyForUrl(
 }
 
 export function policiesToSessionUrlShape(
+  policies: CartridgePolicy[]
+): CartridgePolicy[];
+export function policiesToSessionUrlShape(
+  policies: CartridgeSessionPolicies
+): NormalizedCartridgeSessionPolicies;
+export function policiesToSessionUrlShape(
   policies: CartridgePolicies
-): CartridgePolicies {
+): NormalizedCartridgePolicies;
+export function policiesToSessionUrlShape(
+  policies: CartridgePolicies
+): NormalizedCartridgePolicies {
   if (Array.isArray(policies)) {
     return policies.map((policy, index) => {
       const target = normalizeContractAddress(
