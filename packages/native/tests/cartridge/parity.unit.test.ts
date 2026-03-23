@@ -15,7 +15,11 @@ import {
   extractEncodedSessionFromUrl,
   parseSessionFromEncodedRedirect,
 } from "@/cartridge/ts/session_api";
-import type { CartridgePolicies, CartridgePolicy } from "@/cartridge/types";
+import type {
+  CartridgePolicies,
+  CartridgePolicy,
+  CartridgeSessionPolicies,
+} from "@/cartridge/types";
 
 type FixtureFile = {
   guidVectors: Array<{
@@ -164,6 +168,107 @@ describe("cartridge ts parity fixtures", () => {
       expect(proof.proof).toHaveLength(2);
       expect(computeRootFromProof(proof.leaf, proof.proof)).toBe(root);
     }
+  });
+
+  it("PAR-009 canonicalizes CartridgeSessionPolicies object-form input", () => {
+    const objectPolicies: CartridgeSessionPolicies = {
+      contracts: {
+        "0x1": {
+          methods: [
+            { entrypoint: "approve" },
+            { entrypoint: "transfer" },
+          ],
+        },
+        "0x2": {
+          methods: [{ entrypoint: "mint" }],
+        },
+      },
+    };
+
+    const canonical = canonicalizeSessionPolicies(objectPolicies);
+
+    expect(canonical.length).toBe(3);
+    expect(canonical.every((p) => p.contractAddress && p.entrypoint)).toBe(
+      true
+    );
+    // Should be sorted by address then entrypoint
+    const addresses = canonical.map((p) => p.contractAddress);
+    expect(addresses).toEqual([...addresses].sort());
+  });
+
+  it("PAR-010 rejects typed-data message policies in object-form input", () => {
+    const messagePolicies: CartridgeSessionPolicies = {
+      contracts: {
+        "0x1": {
+          methods: [{ entrypoint: "transfer" }],
+        },
+      },
+      messages: [{ key: "value" }],
+    };
+
+    expect(() => canonicalizeSessionPolicies(messagePolicies)).toThrow(
+      SessionProtocolError
+    );
+    expect(() => canonicalizeSessionPolicies(messagePolicies)).toThrow(
+      "message policies are not yet supported"
+    );
+  });
+
+  it("PAR-011 rejects empty contracts map in object-form input", () => {
+    const emptyPolicies: CartridgeSessionPolicies = {
+      contracts: {},
+    };
+
+    expect(() => canonicalizeSessionPolicies(emptyPolicies)).toThrow(
+      SessionProtocolError
+    );
+    expect(() => canonicalizeSessionPolicies(emptyPolicies)).toThrow(
+      "cannot be empty"
+    );
+  });
+
+  it("PAR-012 rejects approve policies with spender/amount in object-form input", () => {
+    const approveWithSpender: CartridgeSessionPolicies = {
+      contracts: {
+        "0x1": {
+          methods: [
+            { entrypoint: "approve", spender: "0x2", amount: "100" },
+          ],
+        },
+      },
+    };
+
+    expect(() => canonicalizeSessionPolicies(approveWithSpender)).toThrow(
+      SessionProtocolError
+    );
+    expect(() => canonicalizeSessionPolicies(approveWithSpender)).toThrow(
+      "spender/amount are not yet supported"
+    );
+  });
+
+  it("PAR-013 object-form policies produce the same merkle root as equivalent array-form", () => {
+    const arrayPolicies: CartridgePolicy[] = [
+      { target: "0x1", method: "approve" },
+      { target: "0x1", method: "transfer" },
+    ];
+
+    const objectPolicies: CartridgeSessionPolicies = {
+      contracts: {
+        "0x1": {
+          methods: [
+            { entrypoint: "approve" },
+            { entrypoint: "transfer" },
+          ],
+        },
+      },
+    };
+
+    const arrayCanonical = canonicalizeSessionPolicies(arrayPolicies);
+    const objectCanonical = canonicalizeSessionPolicies(objectPolicies);
+
+    expect(computePolicyMerkle(arrayCanonical).root).toBe(
+      computePolicyMerkle(objectCanonical).root
+    );
   });
 
   it("PAR-101 session URL includes required query payload", () => {

@@ -12,7 +12,7 @@ export type ChainIdLiteral = "SN_MAIN" | "SN_SEPOLIA";
 
 const VALID_CHAIN_IDS: readonly string[] = ["SN_MAIN", "SN_SEPOLIA"];
 
-function decodeFelt252ToAscii(felt252: string): string {
+function decodeFelt252ToShortString(felt252: string): string {
   return new CairoFelt252(felt252).decodeUtf8();
 }
 
@@ -87,7 +87,7 @@ export class ChainId {
    * @throws Error if the decoded value is not a supported chain
    */
   static fromFelt252(felt252: string): ChainId {
-    const decoded = decodeFelt252ToAscii(felt252);
+    const decoded = decodeFelt252ToShortString(felt252);
     if (!VALID_CHAIN_IDS.includes(decoded)) {
       throw new Error(
         `Unsupported chain ID: "${decoded}". Expected one of: ${VALID_CHAIN_IDS.join(", ")}`
