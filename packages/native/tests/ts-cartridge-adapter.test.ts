@@ -735,61 +735,6 @@ describe("cartridge ts adapter", () => {
     }
   });
 
-  it("falls back to close when the session account does not expose disconnect", async () => {
-    const close = vi.fn().mockResolvedValue(undefined);
-    const disconnectDescriptor = Object.getOwnPropertyDescriptor(
-      TsSessionAccount.prototype,
-      "disconnect"
-    );
-    const closeDescriptor = Object.getOwnPropertyDescriptor(
-      TsSessionAccount.prototype,
-      "close"
-    );
-    Reflect.deleteProperty(TsSessionAccount.prototype, "disconnect");
-    Object.defineProperty(TsSessionAccount.prototype, "close", {
-      configurable: true,
-      value: close,
-    });
-
-    try {
-      const adapter = createCartridgeTsAdapter({
-        openSession: async () => ({
-          status: "success",
-          encodedSession: ENCODED_SESSION,
-        }),
-        execute: async () => ({ transaction_hash: "0xfeedbeef" }),
-      });
-
-      const handle = await adapter.connect({
-        rpcUrl: "https://api.cartridge.gg/x/starknet/sepolia",
-        chainId: "0x534e5f5345504f4c4941",
-        policies: [{ target: "0x1", method: "create_game" }],
-      });
-
-      await handle.disconnect?.();
-      await handle.disconnect?.();
-
-      expect(close).toHaveBeenCalledTimes(1);
-    } finally {
-      if (disconnectDescriptor) {
-        Object.defineProperty(
-          TsSessionAccount.prototype,
-          "disconnect",
-          disconnectDescriptor
-        );
-      }
-      if (closeDescriptor) {
-        Object.defineProperty(
-          TsSessionAccount.prototype,
-          "close",
-          closeDescriptor
-        );
-      } else {
-        Reflect.deleteProperty(TsSessionAccount.prototype, "close");
-      }
-    }
-  });
-
   it("falls back to execute when outside execution returns SNIP-9 compatibility error", async () => {
     const executeFromOutside = vi
       .fn()

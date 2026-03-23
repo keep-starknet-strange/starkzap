@@ -31,6 +31,7 @@ import {
   assertSafeHttpUrl,
   ensureFetch,
   fetchWithTimeout,
+  normalizeHttpUrl,
   type FetchLike,
 } from "@/cartridge/ts/shared";
 import {
@@ -93,9 +94,7 @@ function normalizeConfiguredUrl(
   value: string | undefined,
   label: string
 ): string | undefined {
-  return value
-    ? assertSafeHttpUrl(value, label).toString().replace(/\/+$/, "")
-    : undefined;
+  return value ? normalizeHttpUrl(value, label) : undefined;
 }
 
 function readJsonRpcErrorMessage(payload: unknown): string | null {
@@ -253,20 +252,17 @@ async function resolveSessionRegistration(
     }
   }
 
+  const cartridgeApiUrl =
+    normalizeConfiguredUrl(options.cartridgeApiUrl, "cartridgeApiUrl") ??
+    DEFAULT_CARTRIDGE_API_URL;
+
   if (options.subscribeSession) {
-    const cartridgeApiUrl =
-      normalizeConfiguredUrl(options.cartridgeApiUrl, "cartridgeApiUrl") ??
-      DEFAULT_CARTRIDGE_API_URL;
     return options.subscribeSession({
       cartridgeApiUrl,
       sessionKeyGuid,
       ...(options.fetchImpl ? { fetchImpl: options.fetchImpl } : {}),
     });
   }
-
-  const cartridgeApiUrl =
-    normalizeConfiguredUrl(options.cartridgeApiUrl, "cartridgeApiUrl") ??
-    DEFAULT_CARTRIDGE_API_URL;
   return waitForSessionSubscription({
     cartridgeApiUrl,
     sessionKeyGuid,
@@ -280,13 +276,125 @@ async function resolveSessionRegistration(
   });
 }
 
+function createDefaultExecuteFromOutside(
+  options: CreateCartridgeTsAdapterOptions,
+  policyProofIndex: ReadonlyMap<string, string[]>
+): TsExecuteFromOutside {
+  return async ({
+    calls,
+    chainId,
+    details,
+    rpcUrl,
+    session,
+    sessionPrivateKey,
+    policyRoot,
+    sessionKeyGuid,
+  }) => {
+    const missingPolicyProofs = listCallsMissingPolicyProofs(
+      calls,
+      policyProofIndex
+    );
+    if (missingPolicyProofs.length > 0) {
+      throw new SessionProtocolError(
+        `Cannot execute from outside because session policy proofs are missing for: ${missingPolicyProofs.join(", ")}.`
+      );
+    }
+
+    const { outsideExecution, signature } = buildSignedOutsideExecutionV3({
+      calls,
+      ...(details ? { details } : {}),
+      chainId,
+      session,
+      sessionPrivateKey,
+      policyRoot,
+      sessionKeyGuid,
+      policyProofIndex,
+    });
+
+    options.logger?.info?.(
+      "[starkzap] cartridge-ts executing via cartridge_addExecuteOutsideTransaction (pure TS V3)"
+    );
+
+    const fetchFn = ensureFetch(
+      options.fetchImpl,
+      "No fetch implementation available for Cartridge V3 outside execution.",
+      (message) => new SessionProtocolError(message)
+    );
+    // Timeout for the cartridge_addExecuteOutsideTransaction JSON-RPC call.
+    const requestTimeoutMs =
+      options.executeFromOutsideRequestTimeoutMs ??
+      DEFAULT_EXECUTE_FROM_OUTSIDE_REQUEST_TIMEOUT_MS;
+    const response = await fetchWithTimeout(
+      fetchFn,
+      rpcUrl,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          id: 1,
+          jsonrpc: "2.0",
+          method: "cartridge_addExecuteOutsideTransaction",
+          params: {
+            address: session.address,
+            outside_execution: outsideExecution,
+            signature,
+          },
+        }),
+      },
+      {
+        requestTimeoutMs,
+        timeoutMessage: `cartridge_addExecuteOutsideTransaction timed out after ${requestTimeoutMs}ms.`,
+        createTimeoutError: (message, cause) =>
+          new SessionTimeoutError(message, cause),
+      }
+    );
+
+    if (!response.ok) {
+      throw new SessionProtocolError(
+        `cartridge_addExecuteOutsideTransaction failed with HTTP ${response.status} ${response.statusText}.`
+      );
+    }
+
+    const payload = await response.json();
+    const errorMessage = readJsonRpcErrorMessage(payload);
+    if (errorMessage) {
+      const txHash = extractJsonRpcErrorTransactionHash(payload);
+      if (txHash) {
+        options.logger?.warn?.(
+          `[starkzap] cartridge-ts recovered tx hash from cartridge_addExecuteOutsideTransaction error payload txHash=${txHash} message=${errorMessage}`
+        );
+        return {
+          transaction_hash: txHash,
+          recovered_from_rpc_error: true,
+        } satisfies CartridgeExecutionResult;
+      }
+      throw new SessionProtocolError(
+        `cartridge_addExecuteOutsideTransaction failed: ${errorMessage}`
+      );
+    }
+
+    const payloadRecord = asRecord(payload);
+    const result = payloadRecord?.result;
+    const txHash = extractTransactionHash(result);
+    if (!txHash) {
+      throw new SessionProtocolError(
+        "cartridge_addExecuteOutsideTransaction returned an invalid response (missing transaction hash)."
+      );
+    }
+
+    return { transaction_hash: txHash };
+  };
+}
+
 export function createCartridgeTsAdapter(
   options: CreateCartridgeTsAdapterOptions = {}
 ): CartridgeNativeAdapter {
   return {
     async connect(args: CartridgeNativeConnectArgs) {
       const cartridgeBaseUrl = args.url
-        ? assertSafeHttpUrl(args.url, "url").toString().replace(/\/+$/, "")
+        ? normalizeHttpUrl(args.url, "url")
         : (normalizeConfiguredUrl(options.cartridgeUrl, "cartridgeUrl") ??
           DEFAULT_CARTRIDGE_URL);
       const sessionPrivateKey = stark.randomAddress();
@@ -334,110 +442,7 @@ export function createCartridgeTsAdapter(
         sessionKeyGuid,
         executeFromOutside:
           options.executeFromOutside ??
-          (async ({
-            calls,
-            chainId,
-            details,
-            rpcUrl,
-            session,
-            sessionPrivateKey,
-          }) => {
-            const missingPolicyProofs = listCallsMissingPolicyProofs(
-              calls,
-              policyProofIndex
-            );
-            if (missingPolicyProofs.length > 0) {
-              throw new SessionProtocolError(
-                `Cannot execute from outside because session policy proofs are missing for: ${missingPolicyProofs.join(", ")}.`
-              );
-            }
-
-            const { outsideExecution, signature } =
-              buildSignedOutsideExecutionV3({
-                calls,
-                ...(details ? { details } : {}),
-                chainId,
-                session,
-                sessionPrivateKey,
-                policyRoot,
-                sessionKeyGuid,
-                policyProofIndex,
-              });
-
-            options.logger?.info?.(
-              "[starkzap] cartridge-ts executing via cartridge_addExecuteOutsideTransaction (pure TS V3)"
-            );
-
-            const fetchFn = ensureFetch(
-              options.fetchImpl,
-              "No fetch implementation available for Cartridge V3 outside execution.",
-              (message) => new SessionProtocolError(message)
-            );
-            const requestTimeoutMs =
-              options.executeFromOutsideRequestTimeoutMs ??
-              DEFAULT_EXECUTE_FROM_OUTSIDE_REQUEST_TIMEOUT_MS;
-            const response = await fetchWithTimeout(
-              fetchFn,
-              rpcUrl,
-              {
-                method: "POST",
-                headers: {
-                  "Content-Type": "application/json",
-                },
-                body: JSON.stringify({
-                  id: 1,
-                  jsonrpc: "2.0",
-                  method: "cartridge_addExecuteOutsideTransaction",
-                  params: {
-                    address: session.address,
-                    outside_execution: outsideExecution,
-                    signature,
-                  },
-                }),
-              },
-              {
-                requestTimeoutMs,
-                timeoutMessage: `cartridge_addExecuteOutsideTransaction timed out after ${requestTimeoutMs}ms.`,
-                createTimeoutError: (message, cause) =>
-                  new SessionTimeoutError(message, cause),
-              }
-            );
-
-            if (!response.ok) {
-              throw new SessionProtocolError(
-                `cartridge_addExecuteOutsideTransaction failed with HTTP ${response.status} ${response.statusText}.`
-              );
-            }
-
-            const payload = await response.json();
-            const errorMessage = readJsonRpcErrorMessage(payload);
-            if (errorMessage) {
-              const txHash = extractJsonRpcErrorTransactionHash(payload);
-              if (txHash) {
-                options.logger?.warn?.(
-                  `[starkzap] cartridge-ts recovered tx hash from cartridge_addExecuteOutsideTransaction error payload txHash=${txHash} message=${errorMessage}`
-                );
-                return {
-                  transaction_hash: txHash,
-                  recovered_from_rpc_error: true,
-                } satisfies CartridgeExecutionResult;
-              }
-              throw new SessionProtocolError(
-                `cartridge_addExecuteOutsideTransaction failed: ${errorMessage}`
-              );
-            }
-
-            const payloadRecord = asRecord(payload);
-            const result = payloadRecord?.result;
-            const txHash = extractTransactionHash(result);
-            if (!txHash) {
-              throw new SessionProtocolError(
-                "cartridge_addExecuteOutsideTransaction returned an invalid response (missing transaction hash)."
-              );
-            }
-
-            return { transaction_hash: txHash };
-          }),
+          createDefaultExecuteFromOutside(options, policyProofIndex),
         ...(options.execute ? { execute: options.execute } : {}),
       });
 
@@ -488,15 +493,7 @@ export function createCartridgeTsAdapter(
           options.logger?.info?.(
             `[starkzap] cartridge-ts disconnect sessionKeyGuid=${sessionKeyGuid}`
           );
-          const sessionAccountWithCleanup =
-            currentSessionAccount as TsSessionAccount & {
-              disconnect?: () => Promise<void> | void;
-              close?: () => Promise<void> | void;
-            };
-          const disconnectSession =
-            sessionAccountWithCleanup.disconnect?.bind(currentSessionAccount) ??
-            sessionAccountWithCleanup.close?.bind(currentSessionAccount);
-          await disconnectSession?.();
+          currentSessionAccount.disconnect();
         },
         controller: {
           type: "cartridge-ts-session",
