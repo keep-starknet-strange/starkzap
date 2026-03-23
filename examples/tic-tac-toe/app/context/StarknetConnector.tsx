@@ -126,7 +126,11 @@ async function getReceiptIfAvailable(
 ): Promise<GetTransactionReceiptResponse | undefined> {
   try {
     return await provider.getTransactionReceipt(txHash);
-  } catch {
+  } catch (error) {
+    console.warn(
+      `[StarknetConnector] Failed to retrieve receipt for ${txHash}:`,
+      toErrorMessage(error)
+    );
     return undefined;
   }
 }
@@ -140,7 +144,11 @@ function resolveCartridgeRedirectUrl(): string | undefined {
   try {
     const generated = Linking.createURL("cartridge/callback");
     return generated.trim().length > 0 ? generated : undefined;
-  } catch {
+  } catch (error) {
+    console.warn(
+      "[StarknetConnector] Linking.createURL failed; redirect-based auth unavailable:",
+      toErrorMessage(error)
+    );
     return undefined;
   }
 }
@@ -289,11 +297,11 @@ export const StarknetConnectorProvider: React.FC<{
       setConnecting(true);
       try {
         const native = await loadNativeModule();
+        await ensureCartridgeAdapterRegistered(cartridgeRedirectUrl);
         const sdk = new native.StarkZap({
           network: toSdkNetwork(network),
           rpcUrl: cartridgeRpc,
         });
-        await ensureCartridgeAdapterRegistered(cartridgeRedirectUrl);
         const policies = getTicTacToePolicies();
         const onboard = await sdk.onboard({
           strategy: "cartridge",
@@ -337,6 +345,11 @@ export const StarknetConnectorProvider: React.FC<{
 
     try {
       await wallet.disconnect();
+    } catch (error) {
+      console.warn(
+        "[StarknetConnector] disconnect failed:",
+        toErrorMessage(error)
+      );
     } finally {
       setWallet(null);
       setAccount(null);
@@ -348,7 +361,9 @@ export const StarknetConnectorProvider: React.FC<{
   const waitForTransaction = useCallback(
     async (txHash: string): Promise<WaitForTransactionResult> => {
       if (!provider) {
-        return { success: false, reverted: false };
+        throw new Error(
+          "waitForTransaction called without a connected wallet."
+        );
       }
 
       try {
