@@ -77,7 +77,18 @@ export function normalizeContractAddress(
   try {
     return addAddressPadding(trimmed.toLowerCase());
   } catch (error) {
-    throw new Error(`${context} has an invalid address: ${address}`);
+    const wrappedError = new Error(
+      `${context} has an invalid address: ${address}`
+    );
+    if (error !== undefined) {
+      Object.defineProperty(wrappedError, "cause", {
+        value: error,
+        configurable: true,
+        enumerable: false,
+        writable: true,
+      });
+    }
+    throw wrappedError;
   }
 }
 
