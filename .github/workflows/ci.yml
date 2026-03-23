@@ -86,6 +86,17 @@ jobs:
       - name: Build SDK + Native Package
         run: npm run -s build:all
 
+      - name: Install Mobile Example
+        run: npm ci --prefix examples/mobile
+
+      - name: Build Mobile Example (iOS Bundle)
+        working-directory: examples/mobile
+        run: npx expo export --platform ios --output-dir /tmp/mobile-ios-build
+
+      - name: Build Mobile Example (Android Bundle)
+        working-directory: examples/mobile
+        run: npx expo export --platform android --output-dir /tmp/mobile-android-build
+
       - name: Install Web Example
         run: npm ci --prefix examples/web
 
@@ -97,14 +108,3 @@ jobs:
 
       - name: Build Flappy-Bird Example
         run: npm run -s build --prefix examples/flappy-bird
-
-      - name: Install Mobile Example
-        run: npm ci --prefix examples/mobile
-
-      - name: Build Mobile Example (iOS Bundle)
-        working-directory: examples/mobile
-        run: npx expo export --platform ios --output-dir /tmp/mobile-ios-build
-
-      - name: Build Mobile Example (Android Bundle)
-        working-directory: examples/mobile
-        run: npx expo export --platform android --output-dir /tmp/mobile-android-build
