@@ -11,6 +11,10 @@ export interface CartridgePolicyPredicate {
   entrypoint: string;
 }
 
+/**
+ * Normalized canonical session policy method shape (camelCase only).
+ * Use {@link CartridgePolicyMethodInput} at boundaries where doc/config may use snake_case or `predicate` aliases.
+ */
 export interface CartridgePolicyMethod {
   name?: string;
   description?: string;
@@ -20,23 +24,61 @@ export interface CartridgePolicyMethod {
   isPaymastered?: boolean | CartridgePolicyPredicate;
   spender?: string;
   amount?: string | number | bigint;
-  // Accept doc/config variants and normalize internally.
+}
+
+/**
+ * Boundary/input shape for policy methods: extends the canonical fields with optional
+ * snake_case and `predicate` compatibility aliases. Normalization merges these into
+ * {@link CartridgePolicyMethod}; when both camelCase and snake_case are set, camelCase wins.
+ */
+export interface CartridgePolicyMethodInput extends CartridgePolicyMethod {
   is_enabled?: boolean;
   is_required?: boolean;
-  is_paymastered?: boolean;
+  is_paymastered?: boolean | CartridgePolicyPredicate;
   predicate?: CartridgePolicyPredicate;
 }
 
+/**
+ * Session policy contract entry as received from connect args, presets, or JSON (boundary/input).
+ */
 export interface CartridgeContractPolicy {
+  name?: string;
+  description?: string;
+  methods: CartridgePolicyMethodInput[];
+}
+
+/**
+ * Session policy contract after normalization (canonical {@link CartridgePolicyMethod} entries only).
+ */
+export interface NormalizedCartridgeContractPolicy {
   name?: string;
   description?: string;
   methods: CartridgePolicyMethod[];
 }
 
+/**
+ * Object-form session policies (`contracts` / optional `messages`). Boundary/input shape.
+ */
 export interface CartridgeSessionPolicies {
   contracts?: Record<string, CartridgeContractPolicy>;
   messages?: Array<Record<string, unknown>>;
 }
+
+/**
+ * Object-form session policies after URL-shape normalization: contracts keyed by normalized
+ * addresses with canonical method entries (no input-only aliases).
+ */
+export interface NormalizedCartridgeSessionPolicies {
+  contracts: Record<string, NormalizedCartridgeContractPolicy>;
+}
+
+/**
+ * Policies in the shape used for session URL encoding: array form is normalized {@link CartridgePolicy}
+ * entries; object form uses {@link NormalizedCartridgeSessionPolicies}.
+ */
+export type NormalizedCartridgePolicies =
+  | CartridgePolicy[]
+  | NormalizedCartridgeSessionPolicies;
 
 export interface CartridgePolicy {
   target: string;

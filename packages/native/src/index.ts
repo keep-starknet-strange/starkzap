@@ -17,10 +17,14 @@ export type {
   CartridgePolicies,
   CartridgePolicy,
   CartridgePolicyMethod,
+  CartridgePolicyMethodInput,
   CartridgePolicyPredicate,
   CartridgeNativeAdapter,
   CartridgeNativeConnectArgs,
   CartridgeSessionPolicies,
   CartridgeNativeSessionHandle,
+  NormalizedCartridgeContractPolicy,
+  NormalizedCartridgePolicies,
+  NormalizedCartridgeSessionPolicies,
 } from "@/cartridge/types";
 export { CartridgeRecoveredRpcExecutionError } from "@/wallet/cartridge";

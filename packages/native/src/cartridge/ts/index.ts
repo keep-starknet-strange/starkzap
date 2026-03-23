@@ -15,6 +15,11 @@ export {
   policiesToSessionUrlShape,
   type CanonicalSessionPolicy,
 } from "@/cartridge/ts/policy";
+export type {
+  NormalizedCartridgeContractPolicy,
+  NormalizedCartridgePolicies,
+  NormalizedCartridgeSessionPolicies,
+} from "@/cartridge/types";
 export {
   buildCartridgeSessionUrl,
   extractEncodedSessionFromUrl,
