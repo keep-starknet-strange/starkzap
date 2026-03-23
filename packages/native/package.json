@@ -1,6 +1,6 @@
 {
   "name": "@starkzap/native",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "description": "React Native companion package for Starkzap",
   "license": "MIT",
   "author": "0xLucqs",
