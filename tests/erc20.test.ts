@@ -4,6 +4,13 @@ import { Amount } from "@/types";
 import type { Wallet } from "@/wallet";
 import { Erc20 } from "@/erc20";
 
+vi.mock("@/erc20/token", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/erc20/token")>();
+  return { ...actual, getTokensFromAddresses: vi.fn() };
+});
+
+import { getTokensFromAddresses } from "@/erc20/token";
+
 // Mock tokens for testing
 const mockUSDC: Token = {
   name: "USD Coin",
@@ -188,8 +195,8 @@ describe("Erc20", () => {
       ]);
 
       expect(calls).toHaveLength(1);
-      expect(calls[0].entrypoint).toBe("transfer");
-      expect(calls[0].contractAddress).toBe(mockUSDC.address);
+      expect(calls[0]?.entrypoint).toBe("transfer");
+      expect(calls[0]?.contractAddress).toBe(mockUSDC.address);
     });
 
     it("should return multiple Calls for multiple transfers", () => {
@@ -204,8 +211,8 @@ describe("Erc20", () => {
       ]);
 
       expect(calls).toHaveLength(2);
-      expect(calls[0].entrypoint).toBe("transfer");
-      expect(calls[1].entrypoint).toBe("transfer");
+      expect(calls[0]?.entrypoint).toBe("transfer");
+      expect(calls[1]?.entrypoint).toBe("transfer");
     });
 
     it("should throw on decimals mismatch", () => {
@@ -232,6 +239,56 @@ describe("Erc20", () => {
           { to: "0xrecipient2" as Address, amount: invalidAmount },
         ])
       ).toThrow("Amount decimals mismatch");
+    });
+  });
+
+  describe("fromAddress", () => {
+    it("should return an Erc20 instance when token is resolved", async () => {
+      vi.mocked(getTokensFromAddresses).mockResolvedValue([mockUSDC]);
+
+      const wallet = createMockWallet();
+      const erc20 = await Erc20.fromAddress(
+        mockUSDC.address,
+        wallet.getProvider()
+      );
+
+      expect(erc20).toBeInstanceOf(Erc20);
+      expect(getTokensFromAddresses).toHaveBeenCalledWith(
+        [mockUSDC.address],
+        wallet.getProvider()
+      );
+    });
+
+    it("should throw when no token is resolved for the address", async () => {
+      vi.mocked(getTokensFromAddresses).mockResolvedValue([]);
+
+      const wallet = createMockWallet();
+
+      await expect(
+        Erc20.fromAddress(mockUSDC.address, wallet.getProvider())
+      ).rejects.toThrow(
+        `Could not resolve token with address ${mockUSDC.address}`
+      );
+    });
+
+    it("should produce an instance that uses the resolved token metadata", async () => {
+      vi.mocked(getTokensFromAddresses).mockResolvedValue([mockETH]);
+
+      const wallet = createMockWallet();
+      const mockBalance = 1500000000000000000n;
+      (
+        wallet.getProvider().callContract as ReturnType<typeof vi.fn>
+      ).mockResolvedValue(["0x" + mockBalance.toString(16), "0x0"]);
+
+      const erc20 = await Erc20.fromAddress(
+        mockETH.address,
+        wallet.getProvider()
+      );
+      const balance = await erc20.balanceOf(wallet.address);
+
+      expect(balance.toUnit()).toBe("1.5");
+      expect(balance.getSymbol()).toBe("ETH");
+      expect(balance.getDecimals()).toBe(18);
     });
   });
 

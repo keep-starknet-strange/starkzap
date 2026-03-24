@@ -34,3 +34,4 @@ export function groupBy<T, K>(
 }
 
 export * from "@/utils/url";
+export * from "@/bridge/utils/resolve-fetch";

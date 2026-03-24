@@ -20,6 +20,7 @@ import {
 } from "starknet";
 import type { Tx } from "@/tx";
 import { ABI as ERC20_ABI } from "@/abi/erc20";
+import { getTokensFromAddresses } from "@/erc20/token";
 
 /**
  * ERC20 token interaction helper.
@@ -44,7 +45,7 @@ import { ABI as ERC20_ABI } from "@/abi/erc20";
  * ```
  */
 export class Erc20 {
-  private readonly token: Token;
+  readonly token: Token;
   private readonly contract: TypedContractV2<typeof ERC20_ABI>;
 
   constructor(token: Token, provider: RpcProvider) {
@@ -148,5 +149,44 @@ export class Erc20 {
     } else {
       return Amount.fromRaw(uint256.uint256ToBN(result), this.token);
     }
+  }
+
+  /**
+   * Create an `Erc20` instance from a contract address alone, resolving token
+   * metadata (name, symbol, decimals) automatically.
+   *
+   * Resolution order:
+   * 1. Known preset tokens for the connected chain are checked first.
+   * 2. If not found in presets, metadata is fetched on-chain via the ERC20
+   *    `name`, `symbol`, and `decimals` entrypoints.
+   *
+   * @param address - The Starknet ERC20 contract address
+   * @param provider - An `RpcProvider` connected to the target network
+   * @returns A ready-to-use `Erc20` instance with resolved token metadata
+   * @throws Error if the token metadata cannot be resolved for the given address
+   *
+   * @example
+   * ```ts
+   * const erc20 = await Erc20.fromAddress(
+   *   "0x053c91253bc9682c04929ca02ed00b3e423f6710d2ee7e0d5ebb06f3ecf368a8" as Address,
+   *   provider
+   * );
+   *
+   * const balance = await erc20.balanceOf(wallet);
+   * console.log(balance.toFormatted()); // "100 USDC"
+   * ```
+   */
+  public static async fromAddress(
+    address: Address,
+    provider: RpcProvider
+  ): Promise<Erc20> {
+    const tokens = await getTokensFromAddresses([address], provider);
+
+    const token = tokens[0];
+    if (!token) {
+      throw new Error(`Could not resolve token with address ${address}`);
+    }
+
+    return new Erc20(token, provider);
   }
 }

@@ -1,4 +1,4 @@
-import { assertSafeHttpUrl } from "@/utils";
+import { assertSafeHttpUrl, resolveFetch } from "@/utils";
 import { type EthereumBridgeProtocol, Protocol } from "@/types/bridge/protocol";
 import { ExternalChain } from "@/types/bridge/external-chain";
 import {
@@ -260,15 +260,7 @@ export class BridgeTokenRepository {
       throw new Error("cacheTtlMs must be a positive finite number");
     }
 
-    if (options.fetchFn) {
-      this.fetchFn = options.fetchFn;
-    } else if (typeof globalThis.fetch === "function") {
-      this.fetchFn = globalThis.fetch.bind(globalThis) as typeof fetch;
-    } else {
-      throw new Error(
-        "No fetch implementation available. Provide fetchFn in BridgeTokenRepositoryOptions."
-      );
-    }
+    this.fetchFn = resolveFetch(options.fetchFn);
 
     this.now = options.now ?? Date.now;
   }

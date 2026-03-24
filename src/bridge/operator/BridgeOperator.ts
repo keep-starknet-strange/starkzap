@@ -32,14 +32,21 @@ import {
 import { loadEthers } from "@/connect/ethersRuntime";
 import { loadSolanaWeb3 } from "@/connect/solanaWeb3Runtime";
 import type { Tx } from "@/tx";
+import { AutoWithdrawFeesHandler } from "@/bridge/utils/auto-withdraw-fees-handler";
 
 export class BridgeOperator implements BridgeOperatorInterface {
   private cache = new BridgeCache();
+  private autoWithdrawFeesHandler: AutoWithdrawFeesHandler;
 
   constructor(
     private readonly starknetWallet: WalletInterface,
     private readonly bridgingConfig?: BridgingConfig
-  ) {}
+  ) {
+    this.autoWithdrawFeesHandler = new AutoWithdrawFeesHandler({
+      chainId: starknetWallet.getChainId(),
+      provider: starknetWallet.getProvider(),
+    });
+  }
 
   public async deposit(
     recipient: Address,
