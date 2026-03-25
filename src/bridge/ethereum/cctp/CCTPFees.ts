@@ -43,9 +43,7 @@ export class CCTPFees {
     try {
       const feeData = await this.fetchFees(direction, chainId);
       const targetThreshold = getFinalityThreshold(fastTransfer);
-      const fee = feeData.find(
-        (f) => f.finalityThreshold === targetThreshold
-      );
+      const fee = feeData.find((f) => f.finalityThreshold === targetThreshold);
       return fee?.minimumFee ?? this.getFallbackFee(direction, fastTransfer);
     } catch (error) {
       console.error("Failed to get transfer fee, using fallback:", error);

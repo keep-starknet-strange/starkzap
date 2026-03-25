@@ -50,10 +50,7 @@ export class CanonicalEthereumBridge extends EthereumBridge {
     const [allowance, l1ToL2MessageFee, approvalFeeEstimation] =
       await Promise.all([
         this.getAllowance(),
-        this.estimateL1ToL2MessageFee(
-          DUMMY_SN_ADDRESS,
-          minimalAmount
-        ),
+        this.estimateL1ToL2MessageFee(DUMMY_SN_ADDRESS, minimalAmount),
         this.estimateApprovalFee(),
       ]);
 

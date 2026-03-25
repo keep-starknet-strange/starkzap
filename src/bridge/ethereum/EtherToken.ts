@@ -104,9 +104,7 @@ export class ERC20EthereumToken implements EthereumTokenInterface {
   }
 
   public getContract(signer?: Signer): Contract {
-    return signer
-      ? (this.contract.connect(signer) as Contract)
-      : this.contract;
+    return signer ? (this.contract.connect(signer) as Contract) : this.contract;
   }
 
   public async approve(
