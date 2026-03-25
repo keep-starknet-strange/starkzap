@@ -39,7 +39,7 @@ import { useThemeColor } from "@/hooks/use-theme-color";
 
 const PRIVY_APP_ID = process.env.EXPO_PUBLIC_PRIVY_APP_ID || "";
 
-type ConnectionMethod = "privatekey" | "privy";
+type ConnectionMethod = "privatekey" | "privy" | "cartridge";
 
 const SLIDE_MS = 280;
 const SLIDE_GAP = 32;
@@ -183,7 +183,27 @@ function Step1Content({
         </>
       )}
 
-      <View style={[stepStyles.orRow, privyAvailable && { marginTop: 12 }]}>
+      <TouchableOpacity
+        style={[
+          stepStyles.oauthBtn,
+          { borderColor, marginTop: privyAvailable ? 12 : 0 },
+        ]}
+        onPress={() => {
+          setConnectionMethod("cartridge");
+          onNext();
+        }}
+        activeOpacity={0.88}
+      >
+        <Ionicons
+          name="game-controller-outline"
+          size={18}
+          color={primaryColor}
+          style={stepStyles.oauthBtnIcon}
+        />
+        <ThemedText style={stepStyles.oauthBtnText}>Cartridge</ThemedText>
+      </TouchableOpacity>
+
+      <View style={[stepStyles.orRow, { marginTop: 12 }]}>
         <ThemedText style={[stepStyles.oauthLabel, { color: textSecondary }]}>
           Or{" "}
         </ThemedText>
@@ -497,6 +517,78 @@ function Step2Privy({
 
       <TouchableOpacity onPress={onBack} style={stepStyles.backRowBottom}>
         <ThemedText type="link">← Back</ThemedText>
+      </TouchableOpacity>
+    </View>
+  );
+}
+
+// Step 2 Cartridge: one-tap connect via Cartridge Controller
+function Step2Cartridge({
+  onBack,
+  onConnect,
+  isConnecting,
+}: {
+  onBack: () => void;
+  onConnect: () => Promise<void>;
+  isConnecting: boolean;
+}) {
+  const borderColor = useThemeColor({}, "border");
+  const primaryColor = useThemeColor({}, "primary");
+  const textSecondary = useThemeColor({}, "textSecondary");
+
+  return (
+    <View style={stepStyles.step}>
+      <View style={stepStyles.stepTopRow}>
+        <TouchableOpacity onPress={onBack} hitSlop={8}>
+          <Ionicons name="arrow-back" size={20} color={primaryColor} />
+        </TouchableOpacity>
+        <ThemedText style={[stepStyles.oauthLabel, { color: textSecondary }]}>
+          Cartridge Controller
+        </ThemedText>
+        <View style={{ width: 20 }} />
+      </View>
+
+      <ThemedText
+        style={{
+          fontSize: 12,
+          color: textSecondary,
+          textAlign: "center",
+          marginBottom: 16,
+          lineHeight: 18,
+        }}
+      >
+        Connect with Cartridge for gasless session-based transactions via
+        passkeys or social login.
+      </ThemedText>
+
+      <TouchableOpacity
+        style={[
+          stepStyles.oauthBtn,
+          {
+            borderColor: primaryColor,
+            backgroundColor: primaryColor,
+            opacity: isConnecting ? 0.6 : 1,
+          },
+        ]}
+        onPress={onConnect}
+        disabled={isConnecting}
+        activeOpacity={0.88}
+      >
+        {isConnecting ? (
+          <ActivityIndicator size="small" color="#fff" />
+        ) : (
+          <>
+            <Ionicons
+              name="game-controller-outline"
+              size={18}
+              color="#fff"
+              style={stepStyles.oauthBtnIcon}
+            />
+            <ThemedText style={[stepStyles.oauthBtnText, { color: "#fff" }]}>
+              Connect with Cartridge
+            </ThemedText>
+          </>
+        )}
       </TouchableOpacity>
     </View>
   );
@@ -1542,6 +1634,7 @@ function LandingWithPrivy() {
     setSelectedPreset,
     setPreferSponsored,
     connect,
+    connectWithCartridge,
     connectWithPrivy,
     disconnect,
     selectNetwork,
@@ -1768,6 +1861,12 @@ function LandingWithPrivy() {
                             showEmailForm={showEmailForm}
                             setShowEmailForm={setShowEmailForm}
                           />
+                        ) : connectionMethod === "cartridge" ? (
+                          <Step2Cartridge
+                            onBack={handleBack}
+                            onConnect={connectWithCartridge}
+                            isConnecting={isConnecting}
+                          />
                         ) : (
                           <Step2PrivateKeyChoice
                             onBack={handleBack}
@@ -1908,15 +2007,19 @@ function LandingNoPrivy() {
     setSelectedPreset,
     setPreferSponsored,
     connect,
+    connectWithCartridge,
     selectNetwork,
   } = useWalletStore();
 
   const [loginStep, setLoginStep] = useState(0);
+  const [connectionMethod, setConnectionMethod] =
+    useState<ConnectionMethod>("privatekey");
   const { width } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const horizontalPadding = Math.max(48, insets.left, insets.right);
   const contentWidth = width - 2 * horizontalPadding;
   const slideSlotWidth = contentWidth + SLIDE_GAP;
+  const slideCount = connectionMethod === "privatekey" ? 3 : 2;
   const slideStyle = useSlideTransition(loginStep, slideSlotWidth);
 
   const handleNext = useCallback(() => {
@@ -1967,8 +2070,8 @@ function LandingNoPrivy() {
                   <Step1Content
                     selectedNetworkIndex={selectedNetworkIndex}
                     selectNetwork={selectNetwork}
-                    connectionMethod="privatekey"
-                    setConnectionMethod={() => {}}
+                    connectionMethod={connectionMethod}
+                    setConnectionMethod={setConnectionMethod}
                     onNext={handleNext}
                     privyAvailable={false}
                   />
@@ -1979,7 +2082,7 @@ function LandingNoPrivy() {
                 <Animated.View
                   style={[
                     styles.slideRow,
-                    { width: 3 * slideSlotWidth },
+                    { width: slideCount * slideSlotWidth },
                     slideStyle,
                   ]}
                 >
@@ -2000,8 +2103,8 @@ function LandingNoPrivy() {
                         <Step1Content
                           selectedNetworkIndex={selectedNetworkIndex}
                           selectNetwork={selectNetwork}
-                          connectionMethod="privatekey"
-                          setConnectionMethod={() => {}}
+                          connectionMethod={connectionMethod}
+                          setConnectionMethod={setConnectionMethod}
                           onNext={handleNext}
                           privyAvailable={false}
                         />
@@ -2022,42 +2125,52 @@ function LandingNoPrivy() {
                           { backgroundColor: cardBg },
                         ]}
                       >
-                        <Step2PrivateKeyChoice
-                          onBack={handleBack}
-                          onImport={() => setLoginStep(2)}
-                          onKeyGenerated={(key, preset) => {
-                            setPrivateKey(key);
-                            setSelectedPreset(preset);
-                            setLoginStep(2);
-                          }}
-                        />
+                        {connectionMethod === "cartridge" ? (
+                          <Step2Cartridge
+                            onBack={handleBack}
+                            onConnect={connectWithCartridge}
+                            isConnecting={isConnecting}
+                          />
+                        ) : (
+                          <Step2PrivateKeyChoice
+                            onBack={handleBack}
+                            onImport={() => setLoginStep(2)}
+                            onKeyGenerated={(key, preset) => {
+                              setPrivateKey(key);
+                              setSelectedPreset(preset);
+                              setLoginStep(2);
+                            }}
+                          />
+                        )}
                       </View>
                     </View>
                   </View>
-                  <View style={[styles.slidePage, { width: contentWidth }]}>
-                    <View style={styles.cardWrapper}>
-                      <View
-                        style={[
-                          styles.card,
-                          styles.cardInSlide,
-                          { backgroundColor: cardBg },
-                        ]}
-                      >
-                        <Step2PrivateKey
-                          selectedPreset={selectedPreset}
-                          setSelectedPreset={setSelectedPreset}
-                          preferSponsored={preferSponsored}
-                          setPreferSponsored={setPreferSponsored}
-                          paymasterNodeUrl={paymasterNodeUrl}
-                          privateKey={privateKey}
-                          setPrivateKey={setPrivateKey}
-                          connect={connect}
-                          isConnecting={isConnecting}
-                          onBack={handleBackToChoice}
-                        />
+                  {slideCount === 3 && (
+                    <View style={[styles.slidePage, { width: contentWidth }]}>
+                      <View style={styles.cardWrapper}>
+                        <View
+                          style={[
+                            styles.card,
+                            styles.cardInSlide,
+                            { backgroundColor: cardBg },
+                          ]}
+                        >
+                          <Step2PrivateKey
+                            selectedPreset={selectedPreset}
+                            setSelectedPreset={setSelectedPreset}
+                            preferSponsored={preferSponsored}
+                            setPreferSponsored={setPreferSponsored}
+                            paymasterNodeUrl={paymasterNodeUrl}
+                            privateKey={privateKey}
+                            setPrivateKey={setPrivateKey}
+                            connect={connect}
+                            isConnecting={isConnecting}
+                            onBack={handleBackToChoice}
+                          />
+                        </View>
                       </View>
                     </View>
-                  </View>
+                  )}
                 </Animated.View>
               </View>
             )}

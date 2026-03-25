@@ -1,6 +1,8 @@
 import { create } from "zustand";
 import { Alert } from "react-native";
 import * as Clipboard from "expo-clipboard";
+import * as Linking from "expo-linking";
+import * as WebBrowser from "expo-web-browser";
 import {
   type AccountClassConfig,
   Amount,
@@ -38,6 +40,132 @@ import {
 import { swapProviders } from "@/swaps";
 import { getDcaProviders } from "@/dca";
 import { getNetworkSelectionPatch } from "@/network-selection";
+
+// Complete any pending auth session from a previous Cartridge redirect.
+WebBrowser.maybeCompleteAuthSession();
+
+// --- Cartridge adapter registration (lazy, one-time) ---
+
+type CartridgeTsOpenSessionArgs = {
+  url: string;
+  redirectUrl?: string;
+  redirectQueryName: string;
+};
+
+type CartridgeTsOpenSessionResult = {
+  encodedSession?: string;
+  callbackUrl?: string;
+  status?: "success" | "cancel" | "dismiss";
+};
+
+type StarkZapNativeModule = typeof import("starkzap-native") & {
+  registerCartridgeTsAdapter: (options?: {
+    logger?: Pick<Console, "info" | "warn" | "error">;
+    sessionRegistrationTimeoutMs?: number;
+    sessionRequestTimeoutMs?: number;
+    openSession?: (
+      args: CartridgeTsOpenSessionArgs
+    ) => Promise<CartridgeTsOpenSessionResult>;
+  }) => unknown;
+};
+
+let nativeModulePromise: Promise<StarkZapNativeModule> | null = null;
+function loadNativeModule(): Promise<StarkZapNativeModule> {
+  if (!nativeModulePromise) {
+    nativeModulePromise =
+      import("starkzap-native") as unknown as Promise<StarkZapNativeModule>;
+  }
+  return nativeModulePromise;
+}
+
+function resolveCartridgeRedirectUrl(): string | undefined {
+  const configured = process.env.EXPO_PUBLIC_CARTRIDGE_REDIRECT_URL?.trim();
+  if (configured) {
+    return configured;
+  }
+
+  try {
+    const generated = Linking.createURL("cartridge/callback");
+    return generated.trim().length > 0 ? generated : undefined;
+  } catch (error) {
+    console.warn(
+      "[Cartridge] Linking.createURL failed; redirect-based auth unavailable:",
+      error instanceof Error ? error.message : String(error)
+    );
+    return undefined;
+  }
+}
+
+let didRegisterCartridgeAdapter = false;
+let adapterRegistrationPromise: Promise<void> | null = null;
+
+async function ensureCartridgeAdapterRegistered(): Promise<void> {
+  if (didRegisterCartridgeAdapter) {
+    return;
+  }
+  if (adapterRegistrationPromise) {
+    return adapterRegistrationPromise;
+  }
+
+  const defaultRedirectUrl = resolveCartridgeRedirectUrl();
+
+  adapterRegistrationPromise = (async () => {
+    const native = await loadNativeModule();
+
+    if (typeof native.registerCartridgeTsAdapter !== "function") {
+      throw new Error(
+        "Installed starkzap-native build does not expose registerCartridgeTsAdapter(). Rebuild starkzap-native before running the app."
+      );
+    }
+
+    native.registerCartridgeTsAdapter({
+      logger: console,
+      sessionRegistrationTimeoutMs: 180_000,
+      sessionRequestTimeoutMs: 10_000,
+      openSession: async ({
+        url,
+        redirectUrl,
+      }: CartridgeTsOpenSessionArgs): Promise<CartridgeTsOpenSessionResult> => {
+        const callbackUrl = redirectUrl ?? defaultRedirectUrl;
+        if (callbackUrl) {
+          const authResult = await WebBrowser.openAuthSessionAsync(
+            url,
+            callbackUrl
+          );
+
+          if (authResult.type === "success") {
+            const resultUrl =
+              "url" in authResult && authResult.url
+                ? authResult.url
+                : undefined;
+            return { status: "success", callbackUrl: resultUrl };
+          }
+
+          return {
+            status: authResult.type === "cancel" ? "cancel" : "dismiss",
+          };
+        }
+
+        // Fallback for runtimes where redirect callbacks are unavailable.
+        await WebBrowser.openBrowserAsync(url);
+        return {};
+      },
+    });
+    didRegisterCartridgeAdapter = true;
+  })();
+
+  try {
+    await adapterRegistrationPromise;
+  } finally {
+    adapterRegistrationPromise = null;
+  }
+}
+
+// Default Cartridge session policies — allow STRK transfers for the example app.
+const CARTRIDGE_STRK_POLICY = {
+  target: "0x04718f5a0fc34cc1af16a1cdee98ffb20c31f5cd61d6ab07201858f4287c938d",
+  method: "transfer",
+};
 
 // Privy server URL - change this to your server URL
 export const PRIVY_SERVER_URL = process.env.EXPO_PUBLIC_PRIVY_SERVER_URL ?? "";
@@ -113,8 +241,8 @@ interface WalletState {
   privateKey: string;
   selectedPreset: string;
 
-  // Privy state
-  walletType: "privatekey" | "privy" | null;
+  // Wallet type
+  walletType: "privatekey" | "privy" | "cartridge" | null;
   privyEmail: string;
   privySelectedPreset: string;
   privyWalletId: string | null;
@@ -185,6 +313,7 @@ interface WalletState {
   addLog: (message: string) => void;
   clearLogs: () => void;
   connect: () => Promise<void>;
+  connectWithCartridge: () => Promise<void>;
   connectWithPrivy: (
     walletId: string,
     publicKey: string,
@@ -400,6 +529,34 @@ async function onboardPrivyWallet(params: {
   return onboard.wallet;
 }
 
+async function onboardCartridgeWallet(params: {
+  sdk: StarkZap;
+}): Promise<WalletInterface> {
+  await ensureCartridgeAdapterRegistered();
+  const dcaProviders = getDcaProviders();
+  const redirectUrl = resolveCartridgeRedirectUrl();
+  const onboard = await params.sdk.onboard({
+    strategy: "cartridge" as const,
+    deploy: "never",
+    cartridge: {
+      policies: [CARTRIDGE_STRK_POLICY],
+      ...(process.env.EXPO_PUBLIC_CARTRIDGE_PRESET
+        ? { preset: process.env.EXPO_PUBLIC_CARTRIDGE_PRESET }
+        : {}),
+      ...(process.env.EXPO_PUBLIC_CARTRIDGE_URL
+        ? { url: process.env.EXPO_PUBLIC_CARTRIDGE_URL }
+        : { url: "https://x.cartridge.gg" }),
+      ...(redirectUrl ? { redirectUrl } : {}),
+    },
+    swapProviders,
+    defaultSwapProviderId: swapProviders[0]?.id,
+    dcaProviders,
+    defaultDcaProviderId: dcaProviders[0]?.id,
+  });
+
+  return onboard.wallet;
+}
+
 /**
  * Re-onboard the current wallet session against a new SDK instance
  * during a network switch. Returns the existing wallet when the
@@ -438,6 +595,10 @@ async function rebindWallet(
       privySelectedPreset: state.privySelectedPreset,
       preferSponsored: state.preferSponsored,
     });
+  }
+
+  if (state.walletType === "cartridge") {
+    return onboardCartridgeWallet({ sdk });
   }
 
   return state.wallet;
@@ -1193,6 +1354,46 @@ export const useWalletStore = create<WalletState>((set, get) => ({
       await get().checkDeploymentStatus();
     } catch (err) {
       addLog(`Connection failed: ${err}`);
+      Alert.alert("Connection Failed", String(err));
+    } finally {
+      set({ isConnecting: false });
+    }
+  },
+
+  connectWithCartridge: async () => {
+    const { sdk, addLog } = get();
+
+    if (!sdk) {
+      Alert.alert(
+        "Error",
+        "SDK not configured. Please configure network first."
+      );
+      return;
+    }
+
+    set({ isConnecting: true });
+    addLog("Connecting with Cartridge Controller...");
+
+    try {
+      const connectedWallet = await onboardCartridgeWallet({ sdk });
+
+      set({
+        wallet: connectedWallet,
+        walletType: "cartridge",
+        privateKey: "",
+        privyWalletId: null,
+        privyPublicKey: null,
+      });
+
+      const username = await connectedWallet.username?.();
+      const displayName = username
+        ? `${username} (${truncateAddress(connectedWallet.address)})`
+        : truncateAddress(connectedWallet.address);
+      addLog(`Connected: ${displayName}`);
+
+      await get().checkDeploymentStatus();
+    } catch (err) {
+      addLog(`Cartridge connection failed: ${err}`);
       Alert.alert("Connection Failed", String(err));
     } finally {
       set({ isConnecting: false });

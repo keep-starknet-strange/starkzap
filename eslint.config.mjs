@@ -21,7 +21,6 @@ export default defineConfig(
       "**/coverage/**",
       "docs/api/**",
       "docs/export/**",
-      "examples/flappy-bird/**",
       "examples/mobile/**",
       "external/**",
     ],

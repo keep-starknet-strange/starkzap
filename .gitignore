@@ -24,9 +24,6 @@ Thumbs.db
 *.log
 npm-debug.log*
 
-# Example app lockfiles we don't want in the repo
-examples/tic-tac-toe/package-lock.json
-
 # Test coverage
 coverage/
 .coverage/

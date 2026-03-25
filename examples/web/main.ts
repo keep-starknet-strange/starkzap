@@ -143,10 +143,37 @@ const RPC_URL = resolveRpcUrl(NETWORK);
 const PRIVY_SERVER_URL =
   (import.meta.env.VITE_PRIVY_SERVER_URL as string | undefined) ??
   "http://localhost:3001";
-const DUMMY_POLICY = {
-  target: "0x04718f5a0fc34cc1af16a1cdee98ffb20c31f5cd61d6ab07201858f4287c938d", // STRK
-  method: "transfer",
-};
+// Cartridge session policies — allow the app's core ERC20 operations gaslessly.
+const CARTRIDGE_POLICIES = [
+  {
+    target:
+      "0x04718f5a0fc34cc1af16a1cdee98ffb20c31f5cd61d6ab07201858f4287c938d", // STRK
+    method: "transfer",
+  },
+  {
+    target:
+      "0x04718f5a0fc34cc1af16a1cdee98ffb20c31f5cd61d6ab07201858f4287c938d", // STRK
+    method: "approve",
+  },
+  {
+    target:
+      "0x049d36570d4e46f48e99674bd3fcc84644ddd6b96f7c741b1562b82f9e004dc7", // ETH
+    method: "transfer",
+  },
+  {
+    target:
+      "0x049d36570d4e46f48e99674bd3fcc84644ddd6b96f7c741b1562b82f9e004dc7", // ETH
+    method: "approve",
+  },
+];
+
+// Track whether the Cartridge account requires user_pays (SNIP-9 incompatible).
+let cartridgeUseUserPays = false;
+
+function isSnip9IncompatibleError(err: unknown): boolean {
+  const msg = err instanceof Error ? err.message : String(err);
+  return /SNIP-9|not compatible with SNIP/i.test(msg);
+}
 const SDK_CHAIN_ID =
   NETWORK === MAINNET_NETWORK ? ChainId.MAINNET : ChainId.SEPOLIA;
 const ALCHEMY_API_KEY = import.meta.env.VITE_ALCHEMY_API_KEY as
@@ -1832,7 +1859,7 @@ async function connectCartridge() {
     const onboard = await sdk.onboard({
       strategy: OnboardStrategy.Cartridge,
       deploy: "never",
-      cartridge: { policies: [DUMMY_POLICY] },
+      cartridge: { policies: CARTRIDGE_POLICIES },
       swapProviders,
       defaultSwapProviderId: swapProviders[0]?.id,
       dcaProviders,
@@ -1840,12 +1867,18 @@ async function connectCartridge() {
     });
     wallet = onboard.wallet;
     walletType = "cartridge";
+    cartridgeUseUserPays = false;
     registerWalletSwapProviders(wallet);
 
-    walletAddressEl.textContent = truncateAddress(wallet.address);
+    // Display username if available, otherwise just the address.
+    const username = await wallet.username?.();
+    const displayName = username
+      ? `${username} (${truncateAddress(wallet.address)})`
+      : truncateAddress(wallet.address);
+    walletAddressEl.textContent = displayName;
     walletAddressEl.title = wallet.address;
 
-    log(`Connected: ${truncateAddress(wallet.address)}`, "success");
+    log(`Connected: ${displayName}`, "success");
     showConnected();
     await checkDeploymentStatus();
     await refreshDcaOrders(true);
@@ -1854,6 +1887,42 @@ async function connectCartridge() {
     log("Check if popups are blocked (look for icon in URL bar)", "info");
   } finally {
     setButtonLoading(btnCartridge, false, "Cartridge");
+  }
+}
+
+/**
+ * Execute calls with SNIP-9 fallback for Cartridge wallets.
+ * If the account is not SNIP-9 compatible, sponsored execution will fail;
+ * we detect this and retry with user_pays for the rest of the session.
+ */
+async function executeWithSnip9Fallback(
+  calls: Parameters<typeof wallet.execute>[0],
+  options?: Parameters<typeof wallet.execute>[1]
+): ReturnType<typeof wallet.execute> {
+  if (!wallet) throw new Error("Wallet not connected");
+
+  const feeMode =
+    walletType === "cartridge" && cartridgeUseUserPays
+      ? "user_pays"
+      : options?.feeMode;
+  const effectiveOptions = feeMode ? { ...options, feeMode } : options;
+
+  try {
+    return await wallet.execute(calls, effectiveOptions);
+  } catch (err) {
+    if (
+      walletType === "cartridge" &&
+      !cartridgeUseUserPays &&
+      isSnip9IncompatibleError(err)
+    ) {
+      cartridgeUseUserPays = true;
+      log(
+        "Account is not SNIP-9 compatible; retrying with user_pays...",
+        "info"
+      );
+      return wallet.execute(calls, { ...options, feeMode: "user_pays" });
+    }
+    throw err;
   }
 }
 
@@ -2025,7 +2094,7 @@ async function testTransfer() {
       "0x04718f5a0fc34cc1af16a1cdee98ffb20c31f5cd61d6ab07201858f4287c938d";
 
     // Transfer 0 STRK to self (safe test)
-    const tx = await wallet.execute([
+    const tx = await executeWithSnip9Fallback([
       {
         contractAddress: STRK_CONTRACT,
         entrypoint: "transfer",
@@ -2066,8 +2135,8 @@ async function testSponsoredTransfer() {
     const STRK_CONTRACT =
       "0x04718f5a0fc34cc1af16a1cdee98ffb20c31f5cd61d6ab07201858f4287c938d";
 
-    // Execute with sponsored fee mode
-    const tx = await wallet.execute(
+    // Execute with sponsored fee mode (SNIP-9 fallback handles incompatible accounts)
+    const tx = await executeWithSnip9Fallback(
       [
         {
           contractAddress: STRK_CONTRACT,
@@ -2435,7 +2504,7 @@ async function confidentialRollover() {
 
   try {
     const calls = await confidential.rollover({ sender: wallet.address });
-    const tx = await wallet.execute(calls);
+    const tx = await executeWithSnip9Fallback(calls);
 
     log(`Rollover tx submitted: ${truncateAddress(tx.hash)}`, "success");
     log("Waiting for confirmation...", "info");
@@ -2469,7 +2538,7 @@ async function confidentialRagequit() {
       to: toAddress,
       sender: wallet.address,
     });
-    const tx = await wallet.execute(calls);
+    const tx = await executeWithSnip9Fallback(calls);
 
     log(`Ragequit tx submitted: ${truncateAddress(tx.hash)}`, "success");
     log("Waiting for confirmation...", "info");
@@ -2631,6 +2700,7 @@ function disconnect() {
   if (wallet && walletType === "cartridge" && "disconnect" in wallet) {
     (wallet as { disconnect: () => Promise<void> }).disconnect();
   }
+  cartridgeUseUserPays = false;
   log("Disconnected", "info");
   showDisconnected();
   privateKeyInput.value = "";
