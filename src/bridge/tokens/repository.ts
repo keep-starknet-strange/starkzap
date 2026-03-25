@@ -131,14 +131,10 @@ function getTokenChain(token: BridgeTokenApiRecord): ExternalChain | null {
   if (typeof token.chain !== "string") {
     return null;
   }
-
-  switch (token.chain.trim().toLowerCase()) {
-    case ExternalChain.ETHEREUM:
-      return ExternalChain.ETHEREUM;
-    case ExternalChain.SOLANA:
-      return ExternalChain.SOLANA;
-    default:
-      return null;
+  try {
+    return parseChain(token.chain);
+  } catch {
+    return null;
   }
 }
 
@@ -234,10 +230,6 @@ function buildCacheKey(query: BridgeTokenQuery): string {
   return `${query.env ?? DEFAULT_ENV}:${query.chain ?? "all"}`;
 }
 
-function cloneTokens(tokens: BridgeToken[]): BridgeToken[] {
-  return [...tokens];
-}
-
 function assertArrayPayload(payload: unknown): BridgeTokenApiRecord[] {
   if (Array.isArray(payload)) {
     return payload as BridgeTokenApiRecord[];
@@ -292,19 +284,19 @@ export class BridgeTokenRepository {
     const now = this.now();
 
     if (cached && cached.expiresAt > now) {
-      return cloneTokens(cached.tokens);
+      return [...cached.tokens];
     }
 
     const inFlight = this.inflight.get(key);
     if (inFlight) {
-      return cloneTokens(await inFlight);
+      return [...(await inFlight)];
     }
 
     const request = this.fetchAndCache(query, key);
     this.inflight.set(key, request);
 
     try {
-      return cloneTokens(await request);
+      return [...(await request)];
     } finally {
       this.inflight.delete(key);
     }

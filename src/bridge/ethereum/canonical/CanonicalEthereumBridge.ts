@@ -4,10 +4,10 @@ import type {
   EthereumDepositFeeEstimation,
   EthereumTransactionDetails,
 } from "@/bridge";
+import { DUMMY_SN_ADDRESS } from "@/bridge/ethereum/types";
 import {
   type EthereumAddress,
   type ExternalTransactionResponse,
-  fromAddress,
 } from "@/types";
 import { ethereumAddress } from "@/bridge/ethereum/EtherToken";
 import { type ContractTransaction, toBigInt } from "ethers";
@@ -16,9 +16,6 @@ import { RPC, uint256 } from "starknet";
 import { FeeErrorCause } from "@/types/errors";
 
 export class CanonicalEthereumBridge extends EthereumBridge {
-  private static readonly DUMMY_SN_ADDRESS = fromAddress(
-    "0x023123100123103023123acb1231231231231031231ca123f23123123123100a"
-  );
   private static readonly DEFAULT_ESTIMATED_DEPOSIT_GAS_REQUIREMENT = 154744n;
 
   async deposit(
@@ -54,7 +51,7 @@ export class CanonicalEthereumBridge extends EthereumBridge {
       await Promise.all([
         this.getAllowance(),
         this.estimateL1ToL2MessageFee(
-          CanonicalEthereumBridge.DUMMY_SN_ADDRESS,
+          DUMMY_SN_ADDRESS,
           minimalAmount
         ),
         this.estimateApprovalFee(),
@@ -74,7 +71,7 @@ export class CanonicalEthereumBridge extends EthereumBridge {
       l1Fee = this.ethAmount(feeDecimal);
     } else {
       const details = await this.prepareDepositTransactionDetails(
-        CanonicalEthereumBridge.DUMMY_SN_ADDRESS,
+        DUMMY_SN_ADDRESS,
         minimalAmount
       );
       const tx = await this.populateTransaction(details);
@@ -91,16 +88,6 @@ export class CanonicalEthereumBridge extends EthereumBridge {
       approvalFee,
       approvalFeeError,
     };
-  }
-
-  protected async getEthereumGasPrice(): Promise<bigint> {
-    const gasData = await this.config.provider.getFeeData();
-    const gasPrice = gasData.gasPrice ?? 0n;
-    const maxFeePerGas = gasData.maxFeePerGas;
-
-    return maxFeePerGas && gasData.maxPriorityFeePerGas
-      ? maxFeePerGas
-      : gasPrice;
   }
 
   protected async prepareDepositTransactionDetails(

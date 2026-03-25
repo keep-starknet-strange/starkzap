@@ -90,20 +90,11 @@ export class LayerZeroApi {
   }
 
   getApprovalTransaction(quotes: LayerZeroQuote[]): ContractTransaction | null {
-    const quote = quotes[0];
-    if (!quote) return null;
-    try {
-      const approveStep = quote.userSteps.find(
-        (step) => step.description === "approve"
-      );
-      return approveStep?.transaction.encoded ?? null;
-    } catch {
-      return null;
-    }
+    return this.extractUserStep(quotes, "approve");
   }
 
   getDepositTransaction(quotes: LayerZeroQuote[]): ContractTransaction | null {
-    return this.getBridgeTransaction(quotes);
+    return this.extractUserStep(quotes, "bridge");
   }
 
   /**
@@ -164,16 +155,15 @@ export class LayerZeroApi {
     return data.quotes;
   }
 
-  private getBridgeTransaction(
-    quotes: LayerZeroQuote[]
+  private extractUserStep(
+    quotes: LayerZeroQuote[],
+    description: string
   ): ContractTransaction | null {
     const quote = quotes[0];
     if (!quote) return null;
     try {
-      const bridgeStep = quote.userSteps.find(
-        (step) => step.description === "bridge"
-      );
-      return bridgeStep?.transaction.encoded ?? null;
+      const step = quote.userSteps.find((s) => s.description === description);
+      return step?.transaction.encoded ?? null;
     } catch {
       return null;
     }

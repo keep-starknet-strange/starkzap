@@ -1,5 +1,13 @@
 import type { FeeErrorCause } from "@/types/errors";
-import type { Amount } from "@/types";
+import { type Amount, fromAddress } from "@/types";
+
+/**
+ * Dummy Starknet address used for fee estimation when no real recipient is known.
+ * Shared across Canonical and OFT bridge implementations.
+ */
+export const DUMMY_SN_ADDRESS = fromAddress(
+  "0x023123100123103023123acb1231231231231031231ca123f23123123123100a"
+);
 import type { PreparedTransactionRequest, Provider, Signer } from "ethers";
 
 export type EthereumWalletConfig = {

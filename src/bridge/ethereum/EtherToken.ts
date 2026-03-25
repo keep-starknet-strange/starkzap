@@ -14,13 +14,9 @@ export async function ethereumAddress(
   contract: Contract
 ): Promise<EthereumAddress> {
   const target = contract.target;
-
-  if (typeof target === "string") {
-    return fromEthereumAddress(target, { getAddress });
-  } else {
-    const address = await target.getAddress();
-    return fromEthereumAddress(address, { getAddress });
-  }
+  const address =
+    typeof target === "string" ? target : await target.getAddress();
+  return fromEthereumAddress(address, { getAddress });
 }
 
 export type EthereumTokenInterface = {
@@ -107,12 +103,10 @@ export class ERC20EthereumToken implements EthereumTokenInterface {
     return this.amount(allowance);
   }
 
-  public getContract(signer?: Signer | undefined): Contract {
-    if (signer) {
-      return this.contract.connect(signer) as Contract;
-    } else {
-      return this.contract;
-    }
+  public getContract(signer?: Signer): Contract {
+    return signer
+      ? (this.contract.connect(signer) as Contract)
+      : this.contract;
   }
 
   public async approve(
@@ -166,9 +160,7 @@ export class EtherToken implements EthereumTokenInterface {
   }
 
   public async amount(amount: bigint): Promise<Amount> {
-    const decimals = await this.decimals();
-    const symbol = await this.symbol();
-    return Amount.fromRaw(amount, decimals, symbol);
+    return Amount.fromRaw(amount, 18, "ETH");
   }
 
   async allowance(): Promise<Amount | null> {

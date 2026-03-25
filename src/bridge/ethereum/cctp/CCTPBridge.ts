@@ -122,16 +122,15 @@ export class CCTPBridge extends EthereumBridge {
   }
 
   protected getAllowanceSpender(): Promise<EthereumAddress> {
-    if (this.starknetWallet.getChainId().isMainnet()) {
-      return Promise.resolve(CCTPBridge.MAINNET_TOKEN_MESSENGER);
-    } else {
-      return Promise.resolve(CCTPBridge.SEPOLIA_TOKEN_MESSENGER);
-    }
+    return Promise.resolve(
+      this.starknetWallet.getChainId().isMainnet()
+        ? CCTPBridge.MAINNET_TOKEN_MESSENGER
+        : CCTPBridge.SEPOLIA_TOKEN_MESSENGER
+    );
   }
 
-  protected async getEthereumGasPrice(): Promise<bigint> {
+  protected override async getEthereumGasPrice(): Promise<bigint> {
     const feeData = await this.config.provider.getFeeData();
-
     return feeData.maxFeePerGas ?? feeData.gasPrice ?? 0n;
   }
 
