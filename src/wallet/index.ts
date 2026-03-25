@@ -28,8 +28,6 @@ import type {
   ChainId,
   StakingConfig,
 } from "@/types";
-import type { SwapProvider } from "@/swap";
-import type { DcaProvider } from "@/dca";
 import {
   checkDeployed,
   ensureWalletReady,

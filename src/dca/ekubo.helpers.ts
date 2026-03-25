@@ -5,12 +5,12 @@ import {
   type DcaOrderStatus,
 } from "@/dca/interface";
 import { isRecord } from "@/utils/ekubo";
+import { MAX_U128 } from "@/utils/constants";
 
 export const DEFAULT_EKUBO_DCA_API_BASE = "https://prod-api.ekubo.org";
 export const MINIMUM_START_DELAY_SECONDS = 64;
 
 const EKUBO_TIME_SPACING_SECONDS = 16;
-const MAX_U128 = 2n ** 128n - 1n;
 const ORDER_ID_PREFIX = "ekubo-v1";
 
 export interface EkuboOrderKey {

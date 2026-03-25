@@ -21,6 +21,7 @@ import type {
   PreparedLendingAction,
 } from "@/lending/interface";
 import { VesuLendingProvider } from "@/lending/vesu";
+import { assertPreparedCalls } from "@/providers/assert";
 import type { ExecuteOptions } from "@/types";
 import type { Tx } from "@/tx";
 import {
@@ -361,7 +362,7 @@ export class LendingClient {
       this.providerContext(),
       hydrate(request, this.context.address)
     );
-    this.assertPreparedCalls(prepared, provider.id);
+    assertPreparedCalls(prepared.calls, "Lending", provider.id);
     return prepared;
   }
 
@@ -378,15 +379,5 @@ export class LendingClient {
       provider: this.context.getProvider(),
       walletAddress: this.context.address,
     };
-  }
-
-  private assertPreparedCalls(
-    prepared: PreparedLendingAction,
-    providerId: string
-  ): void {
-    if (prepared.calls.length > 0) {
-      return;
-    }
-    throw new Error(`Lending provider "${providerId}" returned no calls`);
   }
 }

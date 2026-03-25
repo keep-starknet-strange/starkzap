@@ -13,6 +13,7 @@ import type {
   DcaProviderContext,
   PreparedDcaAction,
 } from "@/dca/interface";
+import { assertPreparedCalls } from "@/providers/assert";
 import { AvnuDcaProvider } from "@/dca/avnu";
 import {
   assertDcaContext,
@@ -82,7 +83,7 @@ export class DcaClient implements DcaClientInterface {
       hydrateDcaCreateInput(request, this.context.address)
     );
 
-    this.assertPreparedCalls(prepared, provider.id);
+    assertPreparedCalls(prepared.calls, "DCA", provider.id);
     return prepared;
   }
 
@@ -98,7 +99,7 @@ export class DcaClient implements DcaClientInterface {
       hydrateDcaCancelInput(request)
     );
 
-    this.assertPreparedCalls(prepared, provider.id);
+    assertPreparedCalls(prepared.calls, "DCA", provider.id);
     return prepared;
   }
 
@@ -147,15 +148,5 @@ export class DcaClient implements DcaClientInterface {
       rpcProvider: this.context.getProvider(),
       walletAddress: this.context.address,
     };
-  }
-
-  private assertPreparedCalls(
-    prepared: PreparedDcaAction,
-    providerId: string
-  ): void {
-    if (prepared.calls.length > 0) {
-      return;
-    }
-    throw new Error(`DCA provider "${providerId}" returned no calls`);
   }
 }

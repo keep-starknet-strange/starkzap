@@ -6,6 +6,7 @@ import {
   getEkuboErrorMessageFromPayload,
   isRecord,
 } from "@/utils/ekubo";
+import { MAX_U128 } from "@/utils/constants";
 
 export const DEFAULT_EKUBO_API_BASE = "https://prod-api-quoter.ekubo.org";
 
@@ -13,7 +14,6 @@ const EKUBO_QUOTER_CHAIN_IDS = {
   SN_MAIN: "23448594291968334",
   SN_SEPOLIA: "393402133025997798000961",
 } as const;
-const MAX_U128 = 2n ** 128n - 1n;
 const DEFAULT_SLIPPAGE_BPS = 100n;
 const BPS_DENOMINATOR = 10_000n;
 

@@ -637,7 +637,10 @@ export abstract class BaseWallet implements WalletInterface {
   }
 
   private cacheStaking(poolAddress: Address, staking: Staking): Staking {
-    if (this.stakingMap.size >= MAX_STAKING_CACHE_SIZE) {
+    if (
+      this.stakingMap.size >= MAX_STAKING_CACHE_SIZE &&
+      !this.stakingMap.has(poolAddress)
+    ) {
       this.evictFirst(this.stakingMap);
     }
     this.stakingMap.set(poolAddress, staking);
@@ -701,9 +704,17 @@ export abstract class BaseWallet implements WalletInterface {
    *
    * @see {@link Staking.fromStaker}
    */
-  async stakingInStaker(stakerAddress: Address, token: Token): Promise<Staking> {
+  async stakingInStaker(
+    stakerAddress: Address,
+    token: Token
+  ): Promise<Staking> {
     const config = this.assertStakingConfig();
-    const staking = await Staking.fromStaker(stakerAddress, token, this.getProvider(), config);
+    const staking = await Staking.fromStaker(
+      stakerAddress,
+      token,
+      this.getProvider(),
+      config
+    );
     return this.cacheStaking(staking.poolAddress, staking);
   }
 
