@@ -514,7 +514,7 @@ describe("TxBuilder", () => {
       });
 
       await expect(new TxBuilder(wallet).swap(request).calls()).rejects.toThrow(
-        "Swap returned no calls"
+        'Swap action "swap" returned no calls'
       );
     });
   });
