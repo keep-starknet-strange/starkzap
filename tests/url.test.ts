@@ -43,9 +43,9 @@ describe("assertSafeHttpUrl", () => {
   });
 
   it("throws on javascript protocol", () => {
-    expect(() =>
-      assertSafeHttpUrl("javascript:alert(1)", "explorer")
-    ).toThrow("explorer must use http:// or https://");
+    expect(() => assertSafeHttpUrl("javascript:alert(1)", "explorer")).toThrow(
+      "explorer must use http:// or https://"
+    );
   });
 
   it("throws on data URI", () => {

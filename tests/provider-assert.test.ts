@@ -4,9 +4,7 @@ import { assertPreparedCalls } from "@/providers/assert";
 describe("assertPreparedCalls", () => {
   it("does not throw when calls array is non-empty", () => {
     const calls = [{ contractAddress: "0x1", entrypoint: "transfer" }];
-    expect(() =>
-      assertPreparedCalls(calls, "DCA", "avnu")
-    ).not.toThrow();
+    expect(() => assertPreparedCalls(calls, "DCA", "avnu")).not.toThrow();
   });
 
   it("throws when calls array is empty", () => {
