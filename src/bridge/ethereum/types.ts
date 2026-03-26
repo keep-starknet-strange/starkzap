@@ -45,6 +45,8 @@ export type OftDepositFeeEstimation = EthereumDepositFeeEstimation & {
 export type EthereumInitiateWithdrawFeeEstimation = {
   l2Fee: Amount;
   l2FeeError?: FeeErrorCause | undefined;
+  autoWithdrawFee?: Amount | undefined;
+  autoWithdrawFeeError?: FeeErrorCause | undefined;
 };
 
 export type EthereumCompleteWithdrawFeeEstimation = {

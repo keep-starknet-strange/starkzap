@@ -171,7 +171,7 @@ export class OftBridge extends EthereumBridge {
     return this.starknetWallet.execute(calls, options);
   }
 
-  override async getInitiateWithdrawFeeEstimate(
+  async getInitiateWithdrawFeeEstimate(
     _options?: InitiateBridgeWithdrawOptions
   ): Promise<EthereumInitiateWithdrawFeeEstimation> {
     try {

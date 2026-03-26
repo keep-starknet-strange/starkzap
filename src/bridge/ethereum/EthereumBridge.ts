@@ -20,7 +20,6 @@ import {
 import {
   type ApprovalFeeEstimation,
   type EthereumCompleteWithdrawFeeEstimation,
-  type EthereumInitiateWithdrawFeeEstimation,
   type EthereumTransactionDetails,
   type EthereumWalletConfig,
 } from "@/bridge/ethereum/types";
@@ -128,29 +127,6 @@ export abstract class EthereumBridge implements BridgeInterface<EthereumAddress>
   ): Promise<Tx> {
     const call = this.buildInitiateWithdrawCall(recipient.toString(), amount);
     return this.starknetWallet.execute([call], options);
-  }
-
-  async getInitiateWithdrawFeeEstimate(
-    _options?: InitiateBridgeWithdrawOptions
-  ): Promise<EthereumInitiateWithdrawFeeEstimation> {
-    const minAmount = await this.ethereumToken.amount(1n);
-    const call = this.buildInitiateWithdrawCall(
-      "0x0000000000000000000000000000000000000001",
-      minAmount
-    );
-
-    try {
-      const estimate = await this.starknetWallet.estimateFee([call]);
-      const isFri = estimate.unit === "FRI";
-      return {
-        l2Fee: Amount.fromRaw(estimate.overall_fee, 18, isFri ? "STRK" : "ETH"),
-      };
-    } catch {
-      return {
-        l2Fee: Amount.fromRaw(0n, 18, "STRK"),
-        l2FeeError: FeeErrorCause.GENERIC_L2_FEE_ERROR,
-      };
-    }
   }
 
   async getAvailableWithdrawBalance(account: Address): Promise<Amount> {
@@ -334,7 +310,7 @@ export abstract class EthereumBridge implements BridgeInterface<EthereumAddress>
       entrypoint: "initiate_token_withdraw",
       calldata: CallData.compile({
         l1Token: this.bridgeToken.address.toString(),
-        l1_recipient: recipient,
+        l1Recipient: recipient,
         amount: uint256.bnToUint256(amount.toBase()),
       }),
     };

@@ -36,16 +36,21 @@ import { AutoWithdrawFeesHandler } from "@/bridge/utils/auto-withdraw-fees-handl
 
 export class BridgeOperator implements BridgeOperatorInterface {
   private cache = new BridgeCache();
-  private autoWithdrawFeesHandler: AutoWithdrawFeesHandler;
+  private _autoWithdrawFeesHandler: AutoWithdrawFeesHandler | undefined;
 
   constructor(
     private readonly starknetWallet: WalletInterface,
     private readonly bridgingConfig?: BridgingConfig
-  ) {
-    this.autoWithdrawFeesHandler = new AutoWithdrawFeesHandler({
-      chainId: starknetWallet.getChainId(),
-      provider: starknetWallet.getProvider(),
-    });
+  ) {}
+
+  private get autoWithdrawFeesHandler(): AutoWithdrawFeesHandler {
+    if (!this._autoWithdrawFeesHandler) {
+      this._autoWithdrawFeesHandler = new AutoWithdrawFeesHandler({
+        chainId: this.starknetWallet.getChainId(),
+        provider: this.starknetWallet.getProvider(),
+      });
+    }
+    return this._autoWithdrawFeesHandler;
   }
 
   public async deposit(
@@ -249,14 +254,24 @@ export class BridgeOperator implements BridgeOperatorInterface {
     if (token.id === "lords") {
       const { LordsBridge } =
         await import("@/bridge/ethereum/lords/LordsBridge");
-      return new LordsBridge(token, walletConfig, starknetWallet);
+      return new LordsBridge(
+        token,
+        walletConfig,
+        starknetWallet,
+        this.autoWithdrawFeesHandler
+      );
     }
 
     switch (token.protocol) {
       case Protocol.CANONICAL: {
         const { CanonicalEthereumBridge } =
           await import("@/bridge/ethereum/canonical/CanonicalEthereumBridge");
-        return new CanonicalEthereumBridge(token, walletConfig, starknetWallet);
+        return new CanonicalEthereumBridge(
+          token,
+          walletConfig,
+          starknetWallet,
+          this.autoWithdrawFeesHandler
+        );
       }
       case Protocol.CCTP: {
         const { CCTPBridge } =

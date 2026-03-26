@@ -8,14 +8,22 @@ import type { WalletInterface } from "@/wallet";
 import { type Call, CallData, RPC, uint256 } from "starknet";
 import { FeeErrorCause } from "@/types/errors";
 import LORDS_BRIDGE_ABI from "@/abi/ethereum/lordsBridge.json";
+import { AutoWithdrawFeesHandler } from "@/bridge/utils/auto-withdraw-fees-handler";
 
 export class LordsBridge extends CanonicalEthereumBridge {
   constructor(
     bridgeToken: EthereumBridgeToken,
     config: EthereumWalletConfig,
-    starknetWallet: WalletInterface
+    starknetWallet: WalletInterface,
+    autoWithdrawFeesHandler: AutoWithdrawFeesHandler
   ) {
-    super(bridgeToken, config, starknetWallet, LORDS_BRIDGE_ABI);
+    super(
+      bridgeToken,
+      config,
+      starknetWallet,
+      autoWithdrawFeesHandler,
+      LORDS_BRIDGE_ABI
+    );
   }
 
   /**
@@ -92,7 +100,7 @@ export class LordsBridge extends CanonicalEthereumBridge {
 
   /**
    * The LORDS L2 bridge uses a single-token `initiate_withdrawal` entrypoint
-   * with calldata `[l1_recipient, amount_low, amount_high]` — no token address
+   * with calldata `[l1Recipient, amount_low, amount_high]` — no token address
    * prefix, unlike the canonical `initiate_token_withdraw`.
    */
   protected override buildInitiateWithdrawCall(
@@ -103,7 +111,7 @@ export class LordsBridge extends CanonicalEthereumBridge {
       contractAddress: this.bridgeToken.starknetBridge.toString(),
       entrypoint: "initiate_withdrawal",
       calldata: CallData.compile({
-        l1_recipient: recipient,
+        l1Recipient: recipient,
         amount: uint256.bnToUint256(amount.toBase()),
       }),
     };

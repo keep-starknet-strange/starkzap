@@ -8,6 +8,8 @@ import {
 } from "@/types";
 import type {
   BridgeDepositOptions,
+  CCTPCompleteBridgeWithdrawOptions,
+  CCTPInitiateWithdrawBridgeOptions,
   CompleteBridgeWithdrawOptions,
   InitiateBridgeWithdrawOptions,
 } from "@/bridge/types/BridgeInterface";
@@ -152,29 +154,32 @@ export class CCTPBridge extends EthereumBridge {
     amount: Amount,
     options?: InitiateBridgeWithdrawOptions
   ): Promise<Tx> {
+    const { fastTransfer } = this.resolveCCTPInitiateOptions(options);
     const calls = await this.buildInitiateWithdrawCalls(
       recipient,
       amount,
-      options?.fastTransfer
+      fastTransfer
     );
     return this.starknetWallet.execute(calls, options);
   }
 
-  override async getInitiateWithdrawFeeEstimate(
+  async getInitiateWithdrawFeeEstimate(
     options?: InitiateBridgeWithdrawOptions
   ): Promise<CCTPInitiateWithdrawFeeEstimation> {
+    const { fastTransfer } = this.resolveCCTPInitiateOptions(options);
+
     const [calls, fastTransferBpFee] = await Promise.all([
       this.buildInitiateWithdrawCalls(
         fromEthereumAddress("0x0000000000000000000000000000000000000001", {
           getAddress,
         }),
         await this.ethereumToken.amount(1n),
-        options?.fastTransfer
+        fastTransfer
       ),
       this.cctpFees.getMinimumFeeBps(
         BridgeDirection.WITHDRAW_FROM_STARKNET,
         this.starknetWallet.getChainId(),
-        options?.fastTransfer
+        fastTransfer
       ),
     ]);
 
@@ -199,21 +204,28 @@ export class CCTPBridge extends EthereumBridge {
     _amount: Amount,
     options?: CompleteBridgeWithdrawOptions
   ): Promise<ExternalTransactionResponse> {
-    if (!options?.attestation || !options?.message) {
+    if (!options) {
       throw new Error(
-        "CCTP withdrawal completion requires a Circle attestation. " +
-          "Fetch the message and attestation from Circle's iris API after " +
-          "the Starknet withdrawal transaction achieves finality."
+        "CCTPCompleteBridgeWithdrawOptions must be provided for protocol CCTP."
       );
     }
 
-    let { attestation, message } = options;
+    if (options.protocol != "cctp") {
+      throw new Error("Incompatible options provided.");
+    }
 
-    if (
-      options.nonce &&
-      (await this.requiresReattestation(options.expirationBlock))
-    ) {
-      const result = await this.waitForReattestation(options.nonce);
+    const {
+      attestation: originalAttestation,
+      message: originalMessage,
+      nonce,
+      expirationBlock,
+    } = options;
+
+    let attestation = originalAttestation;
+    let message = originalMessage;
+
+    if (nonce && (await this.requiresReattestation(expirationBlock))) {
+      const result = await this.waitForReattestation(nonce);
       if (result.status === "complete") {
         attestation = result.attestation!;
         message = result.message!;
@@ -295,7 +307,7 @@ export class CCTPBridge extends EthereumBridge {
   async waitForAttestation(
     starknetTxHash: string,
     options?: { pollIntervalMs?: number; maxAttempts?: number }
-  ): Promise<CompleteBridgeWithdrawOptions> {
+  ): Promise<CCTPCompleteBridgeWithdrawOptions> {
     const baseUrl = getCircleApiBaseUrl(this.starknetWallet.getChainId());
     const interval = options?.pollIntervalMs ?? ATTESTATION_POLL_INTERVAL_MS;
     const maxAttempts = options?.maxAttempts ?? ATTESTATION_MAX_POLL_ATTEMPTS;
@@ -334,6 +346,7 @@ export class CCTPBridge extends EthereumBridge {
 
       if (msg.status === "complete" && msg.attestation && msg.message) {
         return {
+          protocol: "cctp",
           attestation: msg.attestation,
           message: msg.message,
           ...(msg.nonce !== undefined && { nonce: msg.nonce }),
@@ -541,5 +554,19 @@ export class CCTPBridge extends EthereumBridge {
     // Round up by adding (divisor - 1) before dividing
     const result = (numerator + divisor - 1n) / divisor;
     return this.usdcAmount(result);
+  }
+
+  private resolveCCTPInitiateOptions(
+    options?: InitiateBridgeWithdrawOptions
+  ): CCTPInitiateWithdrawBridgeOptions {
+    if (options && "protocol" in options) {
+      if (options.protocol !== "cctp") {
+        throw new Error(
+          "Only ExecuteOptions & CCTPInitiateWithdrawBridgeOptions are valid in a CCTP Bridge"
+        );
+      }
+      return options;
+    }
+    return { protocol: "cctp" };
   }
 }

@@ -9,7 +9,9 @@ import {
   ConnectedSolanaWallet,
   type Eip1193Provider,
   Erc20,
+  EthereumBridgeToken,
   type EthereumDepositFeeEstimation,
+  type EthereumInitiateWithdrawFeeEstimation,
   ExternalChain,
   Protocol,
   type SolanaDepositFeeEstimation,
@@ -53,6 +55,7 @@ export interface BridgeState {
     | null;
   feeLoading: boolean;
   fastTransfer: boolean;
+  autoWithdraw: boolean;
   tokensLoading: boolean;
   refreshing: boolean;
   error: string | null;
@@ -75,6 +78,7 @@ function initialState(): BridgeState {
     feeEstimate: null,
     feeLoading: false,
     fastTransfer: false,
+    autoWithdraw: false,
     tokensLoading: false,
     refreshing: false,
     error: null,
@@ -213,6 +217,7 @@ export class BridgeController {
     this.state.allowance = null;
     this.state.feeEstimate = null;
     this.state.fastTransfer = false;
+    this.state.autoWithdraw = false;
     this.render();
     this.fetchStarknetBalance();
     this.fetchExternalBalance();
@@ -239,6 +244,7 @@ export class BridgeController {
     this.state.allowance = null;
     this.state.feeEstimate = null;
     this.state.fastTransfer = false;
+    this.state.autoWithdraw = false;
     this.render();
     if (token) {
       this.fetchStarknetBalance();
@@ -254,6 +260,20 @@ export class BridgeController {
     this.state.fastTransfer = value;
     this.render();
     this.fetchFeeEstimate();
+  }
+
+  setAutoWithdraw(value: boolean): void {
+    this.state.autoWithdraw = value;
+    this.render();
+    this.fetchFeeEstimate();
+  }
+
+  tokenSupportsAutoWithdraw(): boolean {
+    const { selectedToken } = this.state;
+    return (
+      selectedToken instanceof EthereumBridgeToken &&
+      selectedToken.supportsAutoWithdraw
+    );
   }
 
   async fetchTokens(): Promise<void> {
@@ -415,7 +435,7 @@ export class BridgeController {
   }
 
   async fetchFeeEstimate(): Promise<void> {
-    const { selectedToken, direction, fastTransfer } = this.state;
+    const { selectedToken, direction, fastTransfer, autoWithdraw } = this.state;
     const wallet = this.starknetWallet;
     const extWallet = selectedToken
       ? this.externalWalletFor(selectedToken)
@@ -436,6 +456,12 @@ export class BridgeController {
           selectedToken,
           extWallet,
           { fastTransfer }
+        );
+      } else if (autoWithdraw && this.tokenSupportsAutoWithdraw()) {
+        this.state.feeEstimate = await wallet.getInitiateWithdrawFeeEstimate(
+          selectedToken,
+          extWallet,
+          { protocol: "canonical", autoWithdraw: true }
         );
       } else {
         this.state.feeEstimate = await wallet.getInitiateWithdrawFeeEstimate(
@@ -491,7 +517,7 @@ export class BridgeController {
   }
 
   async initiateWithdraw(amountStr: string): Promise<void> {
-    const { selectedToken, fastTransfer } = this.state;
+    const { selectedToken, fastTransfer, autoWithdraw } = this.state;
     const wallet = this.starknetWallet;
     const extWallet = selectedToken
       ? this.externalWalletFor(selectedToken)
@@ -502,8 +528,10 @@ export class BridgeController {
       return;
     }
 
+    const isAutoWithdraw = autoWithdraw && this.tokenSupportsAutoWithdraw();
+
     this.log(
-      `Initiating withdraw of ${amountStr} ${selectedToken.symbol} from Starknet...`,
+      `${isAutoWithdraw ? "Auto-withdrawing" : "Initiating withdraw of"} ${amountStr} ${selectedToken.symbol} from Starknet...`,
       "info"
     );
 
@@ -519,9 +547,16 @@ export class BridgeController {
         withdrawAmount,
         selectedToken,
         extWallet,
-        { fastTransfer }
+        isAutoWithdraw
+          ? { protocol: "canonical", autoWithdraw: true }
+          : { fastTransfer }
       );
-      this.log(`Withdraw initiated: ${tx.hash}`, "success");
+      this.log(
+        isAutoWithdraw
+          ? `Auto-withdraw initiated: ${tx.hash}`
+          : `Withdraw initiated: ${tx.hash}`,
+        "success"
+      );
     } catch (err) {
       this.log(`Initiate withdraw failed: ${err}`, "error");
     }
@@ -596,6 +631,14 @@ export function formatFeeEstimate(estimate: AnyFeeEstimate): string {
         estimate.l2FeeError ? " (est.)" : ""
       }`
     );
+    const eth = estimate as EthereumInitiateWithdrawFeeEstimation;
+    if (eth.autoWithdrawFeeError) {
+      lines.push(`Auto-Withdraw Fee: failed to estimate`);
+    } else if (eth.autoWithdrawFee !== undefined) {
+      lines.push(
+        `Auto-Withdraw Fee: ${eth.autoWithdrawFee.toFormatted(false)}`
+      );
+    }
     const cctp = estimate as CCTPInitiateWithdrawFeeEstimation;
     if (cctp.fastTransferBpFee !== undefined) {
       lines.push(

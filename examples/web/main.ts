@@ -456,6 +456,12 @@ const bridgeFastTransferRow = document.getElementById(
 const bridgeFastTransferInput = document.getElementById(
   "bridge-fast-transfer"
 ) as HTMLInputElement;
+const bridgeAutoWithdrawRow = document.getElementById(
+  "bridge-auto-withdraw-row"
+)!;
+const bridgeAutoWithdrawInput = document.getElementById(
+  "bridge-auto-withdraw"
+) as HTMLInputElement;
 const bridgeFeesSection = document.getElementById("bridge-fees-section")!;
 const bridgeFeesEl = document.getElementById("bridge-fees")!;
 const bridgeAmountInput = document.getElementById(
@@ -1712,6 +1718,17 @@ function renderBridge(): void {
     bridgeFastTransferRow.classList.add("hidden");
   }
 
+  // Auto-withdraw toggle (canonical Ethereum tokens that support it, from-starknet only)
+  if (
+    s.direction === "from-starknet" &&
+    bridgeController.tokenSupportsAutoWithdraw()
+  ) {
+    bridgeAutoWithdrawRow.classList.remove("hidden");
+    bridgeAutoWithdrawInput.checked = s.autoWithdraw;
+  } else {
+    bridgeAutoWithdrawRow.classList.add("hidden");
+  }
+
   // Fee estimate
   if (s.selectedToken) {
     bridgeFeesSection.classList.remove("hidden");
@@ -1741,7 +1758,11 @@ function renderBridge(): void {
       hasAmount
     );
   } else {
-    btnBridgeDeposit.textContent = "Initiate Withdraw";
+    const isAutoWithdraw =
+      s.autoWithdraw && bridgeController.tokenSupportsAutoWithdraw();
+    btnBridgeDeposit.textContent = isAutoWithdraw
+      ? "Auto Withdraw"
+      : "Initiate Withdraw";
     btnBridgeDeposit.disabled = !(s.selectedToken != null && hasAmount);
   }
 }
@@ -2851,6 +2872,10 @@ bridgeTokenSelect.addEventListener("change", () => {
 
 bridgeFastTransferInput.addEventListener("change", () => {
   bridgeController?.setFastTransfer(bridgeFastTransferInput.checked);
+});
+
+bridgeAutoWithdrawInput.addEventListener("change", () => {
+  bridgeController?.setAutoWithdraw(bridgeAutoWithdrawInput.checked);
 });
 
 bridgeAmountInput.addEventListener("input", () => {

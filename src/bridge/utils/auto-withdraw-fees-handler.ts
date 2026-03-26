@@ -5,12 +5,11 @@ import {
   type ChainId,
   type ChainIdLiteral,
   fromAddress,
-  type Token,
 } from "@/types";
 import { Erc20 } from "@/erc20";
 import { resolveFetch } from "@/utils";
 import type { WalletInterface } from "@/wallet";
-import { type BigNumberish, type RpcProvider } from "starknet";
+import { type RpcProvider } from "starknet";
 
 export interface AutoWithdrawFeesHandlerOptions {
   chainId: ChainId;
@@ -22,12 +21,16 @@ export interface AutoWithdrawFeesHandlerOptions {
 export interface AutoWithdrawFeeInput {
   bridgeToken: BridgeToken;
   amount: Amount;
-  walletOrAddress: WalletInterface | Address | BigNumberish;
+  walletOrAddress: WalletInterface | Address;
 }
 
 export interface AutoWithdrawFeeOutput {
   relayerAddress: Address;
-  gasCosts: Map<Token, Amount>;
+  preselectedGasToken: {
+    tokenAddress: Address;
+    cost: Amount;
+  };
+  costsPerToken: Map<Address, Amount>;
 }
 
 interface AutoWithdrawData {
@@ -61,7 +64,7 @@ export class AutoWithdrawFeesHandler {
       input.bridgeToken.starknetBridge
     );
 
-    const affordableGasCosts = new Map<Token, Amount>();
+    const affordableGasCosts = new Map<Address, Amount>();
 
     for (const [feeTokenAddress, rawGasCost] of gasCosts) {
       const erc20 = await Erc20.fromAddress(feeTokenAddress, this.provider);
@@ -79,13 +82,26 @@ export class AutoWithdrawFeesHandler {
         : balance;
 
       if (effectiveBalance.gte(gasCostAmount)) {
-        affordableGasCosts.set(erc20.token, gasCostAmount);
+        affordableGasCosts.set(erc20.token.address, gasCostAmount);
       }
     }
 
+    const [firstEntry] = affordableGasCosts;
+    if (!firstEntry) {
+      throw new Error(
+        "The user has no sufficient balance to cover for auto-withdraw."
+      );
+    }
+
+    const [tokenAddress, cost] = firstEntry;
+
     return {
       relayerAddress,
-      gasCosts: affordableGasCosts,
+      preselectedGasToken: {
+        tokenAddress,
+        cost,
+      },
+      costsPerToken: affordableGasCosts,
     };
   }
 

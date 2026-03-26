@@ -1,4 +1,4 @@
-import type { ExecuteOptions } from "@/types";
+import type { ExecuteOptions, Token } from "@/types";
 import {
   type Address,
   Amount,
@@ -32,47 +32,63 @@ export interface BridgeDepositOptions {
 }
 
 /**
- * Bridge-internal protocol hints for the initiate-withdrawal step.
- * Not exported — callers use `InitiateBridgeWithdrawOptions`.
+ * Initiate-withdrawal options specific to the canonical Ethereum bridge.
+ *
+ * When `autoWithdraw` is `true`, the L2 transaction includes an auto-withdraw
+ * payload so a relayer can finalise the withdrawal on L1 without manual user
+ * action. An optional `preferredFeeToken` hints which fee token the relayer
+ * should use; if omitted or unavailable the handler picks the first affordable
+ * token.
  */
-type InitiateWithdrawOptions = {
-  /**
-   * Enable fast transfer mode for CCTP (native USDC) withdrawals.
-   *
-   * Affects the Circle fee tier used for the Circle attestation step.
-   * Ignored by non-CCTP bridge implementations.
-   */
+export interface EthereumInitiateBridgeWithdrawOptions {
+  protocol: "canonical";
+  /** Enable automatic L1 completion via a relayer. */
+  autoWithdraw?: boolean;
+  /** Preferred fee token for the auto-withdraw gas payment. */
+  preferredFeeToken?: Token;
+}
+
+/**
+ * Initiate-withdrawal options specific to the CCTP (Circle) bridge.
+ *
+ * When `fastTransfer` is `true`, a lower finality threshold is used and a
+ * small basis-point fee is deducted from the transferred amount in exchange
+ * for faster cross-chain settlement.
+ */
+export interface CCTPInitiateWithdrawBridgeOptions {
+  protocol: "cctp";
+  /** Use Circle's fast-transfer tier for this withdrawal. */
   fastTransfer?: boolean;
-};
+}
 
 /**
  * Options for `initiateWithdraw` operations.
  *
- * Combines bridge-internal protocol hints with wallet execute options,
- * which are forwarded to `starknetWallet.execute()`.
+ * The discriminant field `protocol` selects the protocol-specific options.
+ * Wallet execute options (`feeMode`, `timeBounds`) are forwarded to
+ * `starknetWallet.execute()` regardless of protocol.
  */
-export type InitiateBridgeWithdrawOptions = InitiateWithdrawOptions &
-  ExecuteOptions;
+export type InitiateBridgeWithdrawOptions = ExecuteOptions &
+  (EthereumInitiateBridgeWithdrawOptions | CCTPInitiateWithdrawBridgeOptions);
 
 /**
- * Options for `completeWithdraw` operations.
+ * CCTP-specific data required to complete a withdrawal on the external chain.
  *
- * Contains arguments required by protocols that need a second on-chain step
- * to finalise a withdrawal on the external chain.
+ * All fields are obtained from Circle's iris API after the Starknet
+ * withdrawal transaction achieves the required finality threshold.
  */
-export type CompleteBridgeWithdrawOptions = {
+export interface CCTPCompleteBridgeWithdrawOptions {
+  protocol: "cctp";
+
   /**
-   * Circle attestation bytes required to complete a CCTP withdrawal.
-   *
-   * Obtain from Circle's iris API after the Starknet withdrawal transaction
-   * achieves the required finality threshold.
+   * Circle attestation bytes required to call `receiveMessage` on L1.
    */
-  attestation?: string;
+  attestation: string;
 
   /**
    * The CCTP burn message bytes corresponding to the attestation.
    */
-  message?: string;
+  message: string;
 
   /**
    * The CCTP message nonce. Required for re-attestation when the original
@@ -86,7 +102,16 @@ export type CompleteBridgeWithdrawOptions = {
    * before calling `receiveMessage`.
    */
   expirationBlock?: number;
-};
+}
+
+/**
+ * Options for `completeWithdraw` operations.
+ *
+ * Combines wallet execute options with the CCTP-specific fields needed to
+ * finalise the withdrawal on the external chain.
+ */
+export type CompleteBridgeWithdrawOptions = ExecuteOptions &
+  CCTPCompleteBridgeWithdrawOptions;
 
 export interface BridgeInterface<A extends ExternalAddress = ExternalAddress> {
   readonly starknetWallet: WalletInterface;

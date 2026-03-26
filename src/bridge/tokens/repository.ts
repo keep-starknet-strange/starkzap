@@ -48,6 +48,7 @@ interface BridgeTokenApiRecord {
   l2_bridge_address?: string;
   l2_fee_token_address?: string;
   bitcoin_runes_id?: string;
+  AW_support?: boolean;
 }
 
 const DEFAULT_ENV: BridgeTokenApiEnv = "mainnet";
@@ -64,6 +65,17 @@ function requiredString(
     throw new Error(`Missing required field "${field}"`);
   }
   return value.trim();
+}
+
+function requiredBoolean(
+  token: BridgeTokenApiRecord,
+  field: keyof BridgeTokenApiRecord
+): boolean {
+  const value = token[field];
+  if (typeof value !== "boolean") {
+    throw new Error(`Missing required field "${field}"`);
+  }
+  return value;
 }
 
 function optionalString(
@@ -189,6 +201,7 @@ function parseToken(
       ),
       starknetAddress: fromAddress(requiredString(token, "l2_token_address")),
       starknetBridge: fromAddress(requiredString(token, "l2_bridge_address")),
+      supportsAutoWithdraw: requiredBoolean(token, "AW_support"),
       ...(coingeckoId ? { coingeckoId } : {}),
     });
   }

@@ -313,7 +313,7 @@ describe("AutoWithdrawFeesHandler", () => {
         walletOrAddress: WALLET_ADDRESS,
       });
 
-      expect(result.gasCosts.size).toBe(2);
+      expect(result.costsPerToken.size).toBe(2);
     });
 
     it("excludes fee tokens whose balance is below the gas cost", async () => {
@@ -339,8 +339,8 @@ describe("AutoWithdrawFeesHandler", () => {
         walletOrAddress: WALLET_ADDRESS,
       });
 
-      expect(result.gasCosts.size).toBe(1);
-      const [token] = result.gasCosts.keys();
+      expect(result.costsPerToken.size).toBe(1);
+      const [token] = result.costsPerToken.keys();
       expect(token!.symbol).toBe("STRK");
     });
 
@@ -370,7 +370,7 @@ describe("AutoWithdrawFeesHandler", () => {
         walletOrAddress: WALLET_ADDRESS,
       });
 
-      expect(result.gasCosts.size).toBe(0);
+      expect(result.costsPerToken.size).toBe(0);
     });
 
     it("includes the bridge token as a fee token when remaining balance covers the gas cost", async () => {
@@ -398,8 +398,8 @@ describe("AutoWithdrawFeesHandler", () => {
         walletOrAddress: WALLET_ADDRESS,
       });
 
-      expect(result.gasCosts.size).toBe(1);
-      const [token, cost] = [...result.gasCosts][0]!;
+      expect(result.costsPerToken.size).toBe(1);
+      const [token, cost] = [...result.costsPerToken][0]!;
       expect(token.symbol).toBe("STRK");
       expect(cost.toBase()).toBe(gasCostRaw);
     });
@@ -429,7 +429,7 @@ describe("AutoWithdrawFeesHandler", () => {
         walletOrAddress: WALLET_ADDRESS,
       });
 
-      expect(result.gasCosts.size).toBe(0);
+      expect(result.costsPerToken.size).toBe(0);
     });
 
     it("returns an empty gasCosts map when no fee token can cover the gas cost", async () => {
@@ -452,7 +452,7 @@ describe("AutoWithdrawFeesHandler", () => {
         walletOrAddress: WALLET_ADDRESS,
       });
 
-      expect(result.gasCosts.size).toBe(0);
+      expect(result.costsPerToken.size).toBe(0);
     });
 
     it("calls Erc20.fromAddress with each fee token address and the configured provider", async () => {

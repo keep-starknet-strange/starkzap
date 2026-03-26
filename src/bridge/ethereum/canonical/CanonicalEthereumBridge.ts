@@ -2,22 +2,45 @@ import { EthereumBridge } from "@/bridge/ethereum/EthereumBridge";
 import type {
   BridgeDepositOptions,
   EthereumDepositFeeEstimation,
+  EthereumInitiateWithdrawFeeEstimation,
   EthereumTransactionDetails,
+  EthereumWalletConfig,
+  InitiateBridgeWithdrawOptions,
 } from "@/bridge";
 import { DUMMY_SN_ADDRESS } from "@/bridge/ethereum/types";
 import {
   type Address,
   Amount,
   type EthereumAddress,
+  EthereumBridgeToken,
+  type ExternalAddress,
   type ExternalTransactionResponse,
+  type Token,
 } from "@/types";
 import { ethereumAddress } from "@/bridge/ethereum/EtherToken";
-import { type ContractTransaction } from "ethers";
-import { RPC, uint256 } from "starknet";
+import { type ContractTransaction, type InterfaceAbi } from "ethers";
+import { type Call, CallData, RPC, uint256 } from "starknet";
 import { FeeErrorCause } from "@/types/errors";
+import type { WalletInterface } from "@/wallet";
+import {
+  type AutoWithdrawFeeOutput,
+  AutoWithdrawFeesHandler,
+} from "@/bridge/utils/auto-withdraw-fees-handler";
+import CANONICAL_BRIDGE_ABI from "@/abi/ethereum/canonicalBridge.json";
+import type { Tx } from "@/tx";
 
 export class CanonicalEthereumBridge extends EthereumBridge {
   private static readonly DEFAULT_ESTIMATED_DEPOSIT_GAS_REQUIREMENT = 154744n;
+
+  constructor(
+    bridgeToken: EthereumBridgeToken,
+    config: EthereumWalletConfig,
+    starknetWallet: WalletInterface,
+    private readonly autoWithdrawFeesHandler: AutoWithdrawFeesHandler,
+    bridgeAbi: InterfaceAbi = CANONICAL_BRIDGE_ABI
+  ) {
+    super(bridgeToken, config, starknetWallet, bridgeAbi);
+  }
 
   async deposit(
     recipient: Address,
@@ -86,6 +109,115 @@ export class CanonicalEthereumBridge extends EthereumBridge {
       approvalFee,
       approvalFeeError,
     };
+  }
+
+  async initiateWithdraw(
+    recipient: ExternalAddress,
+    amount: Amount,
+    options?: InitiateBridgeWithdrawOptions
+  ): Promise<Tx> {
+    if (options?.protocol === "canonical" && options.autoWithdraw) {
+      if (!this.bridgeToken.supportsAutoWithdraw) {
+        throw new Error(
+          `"autoWithdraw" was provided but token ${this.bridgeToken.name} does not support auto-withdrawals.`
+        );
+      }
+
+      const feeData = await this.autoWithdrawFeesHandler.getFeeData({
+        bridgeToken: this.bridgeToken,
+        amount,
+        walletOrAddress: this.starknetWallet,
+      });
+
+      const autoWithdraw = await this.getAutoWithdrawTransferCall(
+        feeData,
+        options.preferredFeeToken
+      );
+      const initiateWithdraw = this.buildInitiateWithdrawCall(
+        recipient.toString(),
+        amount
+      );
+
+      return this.starknetWallet.execute(
+        [autoWithdraw, initiateWithdraw],
+        options
+      );
+    }
+
+    return super.initiateWithdraw(recipient, amount, options);
+  }
+
+  async getInitiateWithdrawFeeEstimate(
+    options?: InitiateBridgeWithdrawOptions
+  ): Promise<EthereumInitiateWithdrawFeeEstimation> {
+    const calls: Call[] = [];
+    const minAmount = await this.ethereumToken.amount(1n);
+
+    let autoWithdrawFee: Amount | undefined = undefined;
+    let autoWithdrawFeeError: FeeErrorCause | undefined;
+    if (options?.protocol === "canonical" && options.autoWithdraw) {
+      if (!this.bridgeToken.supportsAutoWithdraw) {
+        throw new Error(
+          `"autoWithdraw" was provided but token ${this.bridgeToken.name} does not support auto-withdrawals.`
+        );
+      }
+
+      try {
+        const feeData = await this.autoWithdrawFeesHandler.getFeeData({
+          bridgeToken: this.bridgeToken,
+          amount: minAmount,
+          walletOrAddress: this.starknetWallet,
+        });
+
+        autoWithdrawFee = feeData.preselectedGasToken.cost;
+        autoWithdrawFeeError = undefined;
+
+        calls.push(
+          await this.getAutoWithdrawTransferCall(
+            feeData,
+            options.preferredFeeToken
+          )
+        );
+      } catch (error) {
+        console.log("Failed to estimate auto-withdraw fees", error);
+        autoWithdrawFee = undefined;
+        autoWithdrawFeeError = FeeErrorCause.AW_FEE_ERROR;
+      }
+    }
+
+    calls.push(
+      this.buildInitiateWithdrawCall(
+        "0x0000000000000000000000000000000000000001",
+        minAmount
+      )
+    );
+
+    try {
+      const estimate = await this.starknetWallet.estimateFee(calls);
+      const isFri = estimate.unit === "FRI";
+      return {
+        l2Fee: Amount.fromRaw(estimate.overall_fee, 18, isFri ? "STRK" : "ETH"),
+        autoWithdrawFee,
+        autoWithdrawFeeError,
+      };
+    } catch {
+      return {
+        l2Fee: Amount.fromRaw(0n, 18, "STRK"),
+        l2FeeError: FeeErrorCause.GENERIC_L2_FEE_ERROR,
+        autoWithdrawFee,
+        autoWithdrawFeeError,
+      };
+    }
+  }
+
+  protected async getEthereumGasPrice(): Promise<bigint> {
+    const gasData = await this.config.provider.getFeeData();
+    const gasPrice = gasData.gasPrice ?? 0n;
+    const maxFeePerGas = gasData.maxFeePerGas;
+
+    return maxFeePerGas && gasData.maxPriorityFeePerGas
+      ? maxFeePerGas
+      : gasPrice;
   }
 
   protected async prepareDepositTransactionDetails(
@@ -173,5 +305,29 @@ export class CanonicalEthereumBridge extends EthereumBridge {
       ? amount
       : this.ethAmount(0n);
     return fee.add(bridgedEthAmount);
+  }
+
+  protected async getAutoWithdrawTransferCall(
+    feeData: AutoWithdrawFeeOutput,
+    preferredFeeToken?: Token
+  ): Promise<Call> {
+    const feeTokenAddress =
+      preferredFeeToken && feeData.costsPerToken.has(preferredFeeToken.address)
+        ? preferredFeeToken.address
+        : feeData.preselectedGasToken.tokenAddress;
+
+    const gasCost =
+      (preferredFeeToken &&
+        feeData.costsPerToken.get(preferredFeeToken.address)) ||
+      feeData.preselectedGasToken.cost;
+
+    return {
+      contractAddress: feeTokenAddress,
+      entrypoint: "transfer",
+      calldata: CallData.compile({
+        user: feeData.relayerAddress,
+        amount: uint256.bnToUint256(gasCost.toBase()),
+      }),
+    };
   }
 }
