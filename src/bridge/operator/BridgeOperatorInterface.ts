@@ -15,6 +15,14 @@ import type {
   InitiateBridgeWithdrawOptions,
 } from "@/bridge/types/BridgeInterface";
 import type { Tx } from "@/tx";
+import type {
+  WithdrawMonitorResult,
+  DepositMonitorResult,
+  DepositState,
+  DepositStateInput,
+  WithdrawalState,
+  WithdrawalStateInput,
+} from "@/bridge/monitor/types";
 
 export interface BridgeOperatorInterface {
   /**
@@ -162,4 +170,66 @@ export interface BridgeOperatorInterface {
     externalWallet: ConnectedExternalWallet,
     options?: CompleteBridgeWithdrawOptions
   ): Promise<BridgeCompleteWithdrawFeeEstimation>;
+
+  /**
+   * Query the current status of a bridge deposit (one-time status snapshot).
+   *
+   * Requires `bridging.ethereumRpcUrl` to be configured for L1 tx checks.
+   *
+   * @param token - Bridge token that was deposited.
+   * @param externalTxHash - Source-chain transaction hash of the deposit.
+   * @param starknetTxHash - Optional. When provided, the L1 check is skipped
+   *   and the Starknet transaction is queried directly.
+   */
+  monitorDeposit(
+    token: BridgeToken,
+    externalTxHash: string,
+    starknetTxHash?: string
+  ): Promise<DepositMonitorResult>;
+
+  /**
+   * Query the current status of a bridge withdrawal (one-time status snapshot).
+   *
+   * @param token - Bridge token being withdrawn.
+   * @param snTxHash - Starknet initiate-withdraw transaction hash.
+   * @param externalTxHash - Optional. When provided, the Starknet check is
+   *   skipped and the external-chain completion transaction is queried directly.
+   */
+  monitorWithdrawal(
+    token: BridgeToken,
+    snTxHash: string,
+    externalTxHash?: string
+  ): Promise<WithdrawMonitorResult>;
+
+  /**
+   * Derive the high-level user-facing state of a deposit.
+   *
+   * Accepts either a previously fetched `DepositMonitorResult` or raw
+   * transaction hashes. When hashes are provided, `monitorDeposit` is called
+   * internally first.
+   *
+   * @param token - Bridge token being deposited.
+   * @param param - A `DepositMonitorResult` or `{ externalTxHash, starknetTxHash? }`
+   * @returns The simplified `DepositState` for the deposit
+   */
+  getDepositState(
+    token: BridgeToken,
+    param: DepositStateInput
+  ): Promise<DepositState>;
+
+  /**
+   * Derive the high-level user-facing state of a withdrawal.
+   *
+   * Accepts either a previously fetched `WithdrawMonitorResult` or raw
+   * transaction hashes. When hashes are provided, `monitorWithdraw` is called
+   * internally first.
+   *
+   * @param token - Bridge token being withdrawn.
+   * @param param - A `WithdrawMonitorResult` or `{ snTxHash, externalTxHash? }`
+   * @returns The simplified `WithdrawalState` for the withdrawal
+   */
+  getWithdrawalState(
+    token: BridgeToken,
+    param: WithdrawalStateInput
+  ): Promise<WithdrawalState>;
 }

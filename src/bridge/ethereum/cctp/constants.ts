@@ -11,6 +11,10 @@ export const STARKNET_DOMAIN_ID = 25;
 export const ETH_FAST_TRANSFER_FEE_BP = 1; // 0.01% - fallback value
 export const STARKNET_FAST_TRANSFER_FEE_BP = 14; // 0.14% - fallback value
 
+export const REATTESTATION_SAFETY_BLOCK_THRESHOLD = 50; // 50 blocks is approximately 10 minutes
+export const REATTESTATION_POLL_INTERVAL_MS = 1_500;
+export const REATTESTATION_POLL_ATTEMPTS = 5;
+
 const FAST_TRANSFER_FINALITY_THRESHOLD = 1000;
 const STANDARD_TRANSFER_FINALITY_THRESHOLD = 2000;
 
@@ -61,11 +65,6 @@ export const EMPTY_DESTINATION_CALLER =
 
 // Fallback L1 gas estimate for completeWithdraw when simulation fails
 export const FALLBACK_COMPLETE_WITHDRAW_GAS = 169_035n;
-
-// Re-attestation: how close to expiry (in blocks) we trigger re-attestation
-export const REATTESTATION_SAFETY_BLOCK_THRESHOLD = 50;
-export const REATTESTATION_POLL_INTERVAL_MS = 1_500;
-export const REATTESTATION_POLL_ATTEMPTS = 5;
 
 // Initial attestation polling: Circle typically attests standard transfers
 // in 20–30 min and fast transfers in 1–2 min.

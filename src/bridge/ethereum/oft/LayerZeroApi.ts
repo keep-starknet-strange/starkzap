@@ -21,7 +21,11 @@ export interface LayerZeroUserStep {
   chainKey: string;
   chainType: string;
   signerAddress: string;
-  transaction: { encoded: ContractTransaction };
+  transaction: { encoded: ContractTransaction | StarknetEncodedTransaction };
+}
+
+export interface StarknetEncodedTransaction {
+  calls: Call[];
 }
 
 export interface LayerZeroQuote {
@@ -130,7 +134,9 @@ export class LayerZeroApi {
       (step) => step.description === "bridge" && step.chainKey === "starknet"
     );
     if (!bridgeStep) return [];
-    return [bridgeStep.transaction.encoded as unknown as Call];
+    const starknetEncodedTransaction = bridgeStep.transaction
+      .encoded as StarknetEncodedTransaction;
+    return starknetEncodedTransaction.calls;
   }
 
   /**

@@ -18,6 +18,7 @@ import type { Tx } from "@/tx";
 import type {
   MultiProtocolProvider,
   SolanaWeb3Transaction,
+  StarknetJsTransaction,
   Token as HyperlaneToken,
   TokenAmount,
   WarpCore,
@@ -35,10 +36,6 @@ import type { Call } from "starknet";
 
 // https://github.com/hyperlane-xyz/hyperlane-warp-ui-template/blob/21ac2754c69f69d056a39bcc664531d6118fee0c/src/consts/chains.ts#L68
 const SOLANA_RENT_ESTIMATE = BigInt(Math.round(0.00411336 * 1e9));
-
-type StarknetHyperlaneTransaction = {
-  transaction: Record<string, unknown>;
-};
 
 export class SolanaHyperlaneBridge implements BridgeInterface<SolanaAddress> {
   private constructor(
@@ -63,7 +60,8 @@ export class SolanaHyperlaneBridge implements BridgeInterface<SolanaAddress> {
     const chainId = starknetWallet.getChainId();
     const multiProvider = setupMultiProtocolProvider(
       config,
-      starknetWallet,
+      chainId,
+      starknetWallet.getProvider().channel.nodeUrl,
       hyperlane
     );
 
@@ -190,7 +188,7 @@ export class SolanaHyperlaneBridge implements BridgeInterface<SolanaAddress> {
       ) as TokenAmount,
       sender: this.starknetWallet.address.toString(),
       recipient: recipient.toString(),
-    })) as unknown as StarknetHyperlaneTransaction[];
+    })) as StarknetJsTransaction[];
 
     if (transactions.length === 0) {
       throw new Error("Hyperlane returned no withdrawal transactions.");

@@ -728,6 +728,112 @@
         width: auto;
         accent-color: var(--accent-primary);
       }
+
+      /* Bridge transaction history */
+      .bridge-tx-item {
+        border: 1px solid var(--border-color);
+        border-radius: 8px;
+        padding: 0.6rem 0.75rem;
+        margin-bottom: 0.5rem;
+        background: rgba(10, 10, 15, 0.3);
+        font-size: 0.8rem;
+      }
+
+      .bridge-tx-item.completed {
+        opacity: 0.55;
+      }
+
+      .bridge-tx-meta {
+        display: flex;
+        gap: 0.5rem;
+        align-items: baseline;
+        flex-wrap: wrap;
+        margin-bottom: 0.35rem;
+      }
+
+      .bridge-tx-tag {
+        font-size: 0.65rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        padding: 0.1rem 0.35rem;
+        border-radius: 4px;
+        background: var(--bg-secondary);
+        color: var(--text-muted);
+      }
+
+      .bridge-tx-tag.deposit {
+        color: #4ade80;
+      }
+
+      .bridge-tx-tag.withdraw {
+        color: #60a5fa;
+      }
+
+      .bridge-tx-amount {
+        font-family: var(--font-mono);
+        color: var(--text-primary);
+      }
+
+      .bridge-tx-hash {
+        font-family: var(--font-mono);
+        color: var(--text-muted);
+        font-size: 0.72rem;
+      }
+
+      .bridge-tx-status {
+        font-size: 0.7rem;
+        font-family: var(--font-mono);
+        color: var(--text-secondary);
+        margin-bottom: 0.35rem;
+      }
+
+      .bridge-tx-actions {
+        display: flex;
+        gap: 0.4rem;
+        flex-wrap: wrap;
+        margin-top: 0.35rem;
+      }
+
+      .bridge-tx-actions button {
+        font-size: 0.72rem;
+        padding: 0.2rem 0.55rem;
+        border-radius: 5px;
+        border: 1px solid var(--border-color);
+        background: var(--bg-secondary);
+        color: var(--text-primary);
+        cursor: pointer;
+        font-family: var(--font-sans);
+      }
+
+      .bridge-tx-actions button:hover {
+        border-color: var(--accent-primary);
+      }
+
+      .bridge-tx-actions button.btn-complete {
+        border-color: var(--accent-primary);
+        color: var(--accent-primary);
+      }
+
+      .bridge-tx-actions button.btn-remove {
+        color: var(--text-muted);
+      }
+
+      .btn-copy-hash {
+        background: none;
+        border: none;
+        padding: 0 0.2rem;
+        margin-left: 0.2rem;
+        color: var(--text-muted);
+        cursor: pointer;
+        font-size: 0.75rem;
+        vertical-align: middle;
+        line-height: 1;
+      }
+
+      .btn-copy-hash:hover {
+        color: var(--text-primary);
+      }
     </style>
   </head>
 
@@ -1570,6 +1676,37 @@
               Bridge Deposit
             </button>
           </div>
+        </div>
+
+        <!-- Transaction History -->
+        <div id="bridge-tx-history" class="hidden" style="margin-top: 1.25rem">
+          <div
+            style="
+              display: flex;
+              justify-content: space-between;
+              align-items: center;
+              margin-bottom: 0.5rem;
+            "
+          >
+            <span
+              style="
+                font-size: 0.75rem;
+                font-weight: 600;
+                text-transform: uppercase;
+                letter-spacing: 0.05em;
+                color: var(--text-muted);
+              "
+              >Transaction History</span
+            >
+            <button
+              id="btn-bridge-tx-clear-completed"
+              class="bridge-direction-btn"
+              style="padding: 0.2rem 0.5rem; font-size: 0.7rem"
+            >
+              Clear Completed
+            </button>
+          </div>
+          <div id="bridge-tx-list"></div>
         </div>
       </div>
 

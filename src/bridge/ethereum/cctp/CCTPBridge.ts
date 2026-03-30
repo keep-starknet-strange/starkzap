@@ -8,7 +8,6 @@ import {
 } from "@/types";
 import type {
   BridgeDepositOptions,
-  CCTPCompleteBridgeWithdrawOptions,
   CCTPInitiateWithdrawBridgeOptions,
   CompleteBridgeWithdrawOptions,
   InitiateBridgeWithdrawOptions,
@@ -23,8 +22,6 @@ import { getAddress, Interface, type TransactionRequest } from "ethers";
 import { FeeErrorCause } from "@/types/errors";
 import { BridgeDirection, CCTPFees } from "@/bridge/ethereum/cctp/CCTPFees";
 import {
-  ATTESTATION_MAX_POLL_ATTEMPTS,
-  ATTESTATION_POLL_INTERVAL_MS,
   EMPTY_DESTINATION_CALLER,
   ETHEREUM_DOMAIN_ID,
   FALLBACK_COMPLETE_WITHDRAW_GAS,
@@ -214,24 +211,26 @@ export class CCTPBridge extends EthereumBridge {
       throw new Error("Incompatible options provided.");
     }
 
-    const {
-      attestation: originalAttestation,
-      message: originalMessage,
-      nonce,
-      expirationBlock,
-    } = options;
-
-    let attestation = originalAttestation;
-    let message = originalMessage;
+    const { attestation, message, expirationBlock, nonce } = options;
 
     if (nonce && (await this.requiresReattestation(expirationBlock))) {
       const result = await this.waitForReattestation(nonce);
-      if (result.status === "complete") {
-        attestation = result.attestation!;
-        message = result.message!;
-      } else {
-        throw new Error("CCTP re-attestation failed. Try again later.");
+      if (
+        result.status === "complete" &&
+        result.attestation &&
+        result.message
+      ) {
+        return this.execute({
+          to: getMessageTransmitter(
+            this.starknetWallet.getChainId()
+          ).toString(),
+          data: CCTPBridge.MESSAGE_TRANSMITTER_INTERFACE.encodeFunctionData(
+            "receiveMessage",
+            [result.message, result.attestation]
+          ),
+        }).then((r) => ({ hash: r.hash }));
       }
+      throw new Error("CCTP re-attestation failed. Try again later.");
     }
 
     const calldata =
@@ -286,80 +285,6 @@ export class CCTPBridge extends EthereumBridge {
         l1FeeError: FeeErrorCause.GENERIC_L1_FEE_ERROR,
       };
     }
-  }
-
-  /**
-   * Polls Circle's iris API until the attestation for the given Starknet
-   * transaction hash is ready, then returns the data needed to call
-   * `completeWithdraw` — no backend service required.
-   *
-   * Call this after `initiateWithdraw` resolves:
-   * ```ts
-   * const tx = await bridge.initiateWithdraw(recipient, amount);
-   * const attestationData = await bridge.waitForAttestation(tx.hash);
-   * const receipt = await bridge.completeWithdraw(recipient, amount, attestationData);
-   * ```
-   *
-   * @param starknetTxHash - The hash of the Starknet `deposit_for_burn` transaction.
-   * @param options.pollIntervalMs - How often to poll Circle (default 15 s).
-   * @param options.maxAttempts - Maximum number of poll attempts (default 200, ~50 min).
-   */
-  async waitForAttestation(
-    starknetTxHash: string,
-    options?: { pollIntervalMs?: number; maxAttempts?: number }
-  ): Promise<CCTPCompleteBridgeWithdrawOptions> {
-    const baseUrl = getCircleApiBaseUrl(this.starknetWallet.getChainId());
-    const interval = options?.pollIntervalMs ?? ATTESTATION_POLL_INTERVAL_MS;
-    const maxAttempts = options?.maxAttempts ?? ATTESTATION_MAX_POLL_ATTEMPTS;
-
-    for (let i = 0; i < maxAttempts; i++) {
-      await new Promise((resolve) => setTimeout(resolve, interval));
-
-      let data: {
-        messages: {
-          status: "complete" | "pending" | "failed";
-          attestation?: string;
-          message?: string;
-          nonce?: string;
-          expirationBlock?: number;
-        }[];
-      };
-
-      try {
-        const response = await fetch(
-          `${baseUrl}/v2/messages/${STARKNET_DOMAIN_ID}?transactionHash=${starknetTxHash}`
-        );
-        if (!response.ok) continue;
-        data = await response.json();
-      } catch {
-        continue;
-      }
-
-      const msg = data.messages[0];
-      if (!msg) continue;
-
-      if (msg.status === "failed") {
-        throw new Error(
-          `CCTP attestation failed for transaction: ${starknetTxHash}`
-        );
-      }
-
-      if (msg.status === "complete" && msg.attestation && msg.message) {
-        return {
-          protocol: "cctp",
-          attestation: msg.attestation,
-          message: msg.message,
-          ...(msg.nonce !== undefined && { nonce: msg.nonce }),
-          ...(msg.expirationBlock !== undefined && {
-            expirationBlock: msg.expirationBlock,
-          }),
-        };
-      }
-    }
-
-    throw new Error(
-      `CCTP attestation timed out after ${maxAttempts} attempts for transaction: ${starknetTxHash}`
-    );
   }
 
   protected getAllowanceSpender(): Promise<EthereumAddress> {
@@ -452,66 +377,6 @@ export class CCTPBridge extends EthereumBridge {
     return calls;
   }
 
-  private async requiresReattestation(
-    expirationBlock?: number
-  ): Promise<boolean> {
-    if (!expirationBlock) return false;
-    const currentBlock = await this.config.provider.getBlockNumber();
-    return (
-      currentBlock >= expirationBlock - REATTESTATION_SAFETY_BLOCK_THRESHOLD
-    );
-  }
-
-  private async waitForReattestation(nonce: string): Promise<{
-    status: "complete" | "failed";
-    attestation?: string;
-    message?: string;
-  }> {
-    const baseUrl = getCircleApiBaseUrl(this.starknetWallet.getChainId());
-
-    try {
-      await fetch(`${baseUrl}/v2/reattest/${nonce}`, { method: "POST" });
-    } catch {
-      // might already be re-attested; ignore and proceed to poll
-    }
-
-    for (let i = 0; i < REATTESTATION_POLL_ATTEMPTS; i++) {
-      await new Promise((resolve) =>
-        setTimeout(resolve, REATTESTATION_POLL_INTERVAL_MS)
-      );
-
-      try {
-        const response = await fetch(
-          `${baseUrl}/v2/messages/${STARKNET_DOMAIN_ID}?nonce=${nonce}`
-        );
-        if (!response.ok) continue;
-
-        const data = (await response.json()) as {
-          messages: {
-            status: "complete" | "pending" | "failed";
-            attestation?: string;
-            message?: string;
-          }[];
-        };
-
-        const msg = data.messages[0];
-        if (msg?.status === "complete") {
-          return {
-            status: "complete" as const,
-            ...(msg.attestation !== undefined && {
-              attestation: msg.attestation,
-            }),
-            ...(msg.message !== undefined && { message: msg.message }),
-          };
-        }
-      } catch {
-        // transient network error — retry
-      }
-    }
-
-    return { status: "failed" };
-  }
-
   private async createDepositForBurnTransaction(
     recipient: Address,
     amount: Amount,
@@ -568,5 +433,67 @@ export class CCTPBridge extends EthereumBridge {
       return options;
     }
     return { protocol: "cctp" };
+  }
+
+  private async waitForReattestation(nonce: string): Promise<{
+    status: "complete" | "failed";
+    attestation?: string;
+    message?: string;
+  }> {
+    const baseUrl = getCircleApiBaseUrl(this.starknetWallet.getChainId());
+
+    try {
+      await fetch(`${baseUrl}/v2/reattest/${nonce}`, { method: "POST" });
+    } catch {
+      // might already be re-attested; ignore and proceed to poll
+    }
+
+    for (let i = 0; i < REATTESTATION_POLL_ATTEMPTS; i++) {
+      await new Promise((resolve) =>
+        setTimeout(resolve, REATTESTATION_POLL_INTERVAL_MS)
+      );
+
+      try {
+        const response = await fetch(
+          `${baseUrl}/v2/messages/${STARKNET_DOMAIN_ID}?nonce=${nonce}`
+        );
+        if (!response.ok) continue;
+
+        const data = (await response.json()) as {
+          messages: {
+            status: string;
+            attestation: string;
+            message: string | null;
+          }[];
+        };
+
+        const msg = data.messages[0];
+        if (msg?.status === "complete" && msg.attestation !== "PENDING") {
+          return {
+            status: "complete",
+            attestation: msg.attestation,
+            ...(msg.message !== null && { message: msg.message }),
+          };
+        }
+      } catch {
+        // transient network error — retry
+      }
+    }
+
+    return { status: "failed" };
+  }
+
+  private async requiresReattestation(
+    expirationBlock?: number
+  ): Promise<boolean> {
+    if (!expirationBlock) {
+      return false;
+    }
+
+    const blockNumber = await this.config.provider.getBlockNumber();
+
+    return (
+      blockNumber >= expirationBlock - REATTESTATION_SAFETY_BLOCK_THRESHOLD
+    );
   }
 }

@@ -9,9 +9,8 @@ import type {
 import { Protocol } from "@/types/bridge/protocol";
 import {
   ConnectedEthereumWallet,
-  ConnectedSolanaWallet,
   type ConnectedExternalWallet,
-  SolanaNetwork,
+  ConnectedSolanaWallet,
 } from "@/connect";
 import type { WalletInterface } from "@/wallet";
 import type { BridgeOperatorInterface } from "@/bridge/operator/BridgeOperatorInterface";
@@ -23,20 +22,36 @@ import {
   type BridgeInitiateWithdrawFeeEstimation,
   type BridgingConfig,
   type EthereumAddress,
-  ExternalChain,
   type ExternalAddress,
+  ExternalChain,
   type ExternalTransactionResponse,
   type SolanaAddress,
   SolanaBridgeToken,
 } from "@/types";
 import { loadEthers } from "@/connect/ethersRuntime";
 import { loadSolanaWeb3 } from "@/connect/solanaWeb3Runtime";
+import { loadHyperlane } from "@/bridge/solana/hyperlaneRuntime";
 import type { Tx } from "@/tx";
 import { AutoWithdrawFeesHandler } from "@/bridge/utils/auto-withdraw-fees-handler";
+import type { Provider } from "ethers";
+import { resolveFetch } from "@/utils";
+import type { BridgeMonitorInterface } from "@/bridge/monitor/BridgeMonitorInterface";
+import type {
+  DepositMonitorResult,
+  DepositState,
+  DepositStateInput,
+  WithdrawalState,
+  WithdrawalStateInput,
+  WithdrawMonitorResult,
+} from "@/bridge/monitor/types";
 
 export class BridgeOperator implements BridgeOperatorInterface {
   private cache = new BridgeCache();
   private _autoWithdrawFeesHandler: AutoWithdrawFeesHandler | undefined;
+  private _ethereumMonitorProvider: Provider | undefined;
+  private _solanaMonitorDeps:
+    | ReturnType<BridgeOperator["buildSolanaMonitorDeps"]>
+    | undefined;
 
   constructor(
     private readonly starknetWallet: WalletInterface,
@@ -200,6 +215,102 @@ export class BridgeOperator implements BridgeOperatorInterface {
     return bridge.getCompleteWithdrawFeeEstimate(amount, recipient, options);
   }
 
+  public async monitorDeposit(
+    token: BridgeToken,
+    externalTxHash: string,
+    starknetTxHash?: string
+  ): Promise<DepositMonitorResult> {
+    const monitor = await this.resolveMonitor(token);
+    return monitor.monitorDeposit(externalTxHash, starknetTxHash);
+  }
+
+  public async monitorWithdrawal(
+    token: BridgeToken,
+    snTxHash: string,
+    externalTxHash?: string
+  ): Promise<WithdrawMonitorResult> {
+    const monitor = await this.resolveMonitor(token);
+    return monitor.monitorWithdrawal(snTxHash, externalTxHash);
+  }
+
+  public async getDepositState(
+    token: BridgeToken,
+    param: DepositStateInput
+  ): Promise<DepositState> {
+    const monitor = await this.resolveMonitor(token);
+    return monitor.getDepositState(param);
+  }
+
+  public async getWithdrawalState(
+    token: BridgeToken,
+    param: WithdrawalStateInput
+  ): Promise<WithdrawalState> {
+    const monitor = await this.resolveMonitor(token);
+    return monitor.getWithdrawalState(param);
+  }
+
+  private async resolveMonitor(
+    token: BridgeToken
+  ): Promise<BridgeMonitorInterface> {
+    if (
+      token.chain === ExternalChain.SOLANA &&
+      token.protocol == Protocol.HYPERLANE
+    ) {
+      return this.getSolanaHyperlaneMonitor();
+    }
+
+    const ethereumProvider = await this.getEthereumMonitorProvider();
+    const ethToken = token as EthereumBridgeToken;
+
+    switch (ethToken.protocol) {
+      case Protocol.CANONICAL: {
+        const { CanonicalMonitor } =
+          await import("@/bridge/monitor/canonical/CanonicalMonitor");
+        return new CanonicalMonitor({
+          chainId: this.starknetWallet.getChainId(),
+          starknetProvider: this.starknetWallet.getProvider(),
+          ethereumProvider,
+        });
+      }
+
+      case Protocol.CCTP: {
+        const { CctpMonitor } =
+          await import("@/bridge/monitor/cctp/CctpMonitor");
+        return new CctpMonitor({
+          chainId: this.starknetWallet.getChainId(),
+          starknetProvider: this.starknetWallet.getProvider(),
+          ethereumProvider,
+          fetchFn: resolveFetch(undefined),
+        });
+      }
+
+      case Protocol.OFT: {
+        const { OftMonitor } = await import("@/bridge/monitor/oft/OftMonitor");
+        return new OftMonitor({
+          starknetProvider: this.starknetWallet.getProvider(),
+          ethereumProvider,
+          protocol: ethToken.protocol,
+        });
+      }
+
+      case Protocol.OFT_MIGRATED: {
+        const { OftMigratedMonitor } =
+          await import("@/bridge/monitor/oft/OftMigratedMonitor");
+        return new OftMigratedMonitor({
+          chainId: this.starknetWallet.getChainId(),
+          starknetProvider: this.starknetWallet.getProvider(),
+          ethereumProvider,
+          fetchFn: resolveFetch(undefined),
+        });
+      }
+
+      default:
+        throw new Error(
+          `Unsupported protocol "${token.protocol}" for bridge monitoring.`
+        );
+    }
+  }
+
   private bridge(
     token: BridgeToken,
     wallet: ConnectedExternalWallet,
@@ -297,27 +408,57 @@ export class BridgeOperator implements BridgeOperatorInterface {
     }
   }
 
+  private buildSolanaMonitorDeps() {
+    return Promise.all([
+      this.buildSolanaConnection(),
+      loadHyperlane("Solana bridge monitoring"),
+    ]).then(([connection, hyperlane]) => ({ connection, hyperlane }));
+  }
+
+  private async getSolanaHyperlaneMonitor(): Promise<BridgeMonitorInterface> {
+    this._solanaMonitorDeps ??= this.buildSolanaMonitorDeps();
+    const { connection, hyperlane } = await this._solanaMonitorDeps;
+
+    const { SolanaHyperlaneMonitor } =
+      await import("@/bridge/monitor/hyperlane/SolanaHyperlaneMonitor");
+
+    return new SolanaHyperlaneMonitor({
+      chainId: this.starknetWallet.getChainId(),
+      starknetProvider: this.starknetWallet.getProvider(),
+      solanaConnection: connection,
+      hyperlane,
+    });
+  }
+
+  private async getEthereumMonitorProvider(): Promise<Provider> {
+    if (this._ethereumMonitorProvider) {
+      return this._ethereumMonitorProvider;
+    }
+
+    const rpcUrl = this.bridgingConfig?.ethereumRpcUrl;
+    if (!rpcUrl) {
+      throw new Error(
+        "Bridge monitoring requires an Ethereum RPC URL. " +
+          'Set "bridging.ethereumRpcUrl" in the SDK configuration.'
+      );
+    }
+
+    const { JsonRpcProvider } = await loadEthers("Bridge monitoring");
+    this._ethereumMonitorProvider = new JsonRpcProvider(rpcUrl);
+    return this._ethereumMonitorProvider;
+  }
+
   private async createSolanaBridge(
     token: SolanaBridgeToken,
     externalWallet: ConnectedSolanaWallet,
     starknetWallet: WalletInterface
   ): Promise<BridgeInterface<SolanaAddress>> {
-    // SolanaHyperlaneBridge and @solana/web3.js are loaded lazily in
-    // to avoid pulling Node.js-only transitive dependencies
-    // (@hyperlane-xyz/sdk → ethereumjs-util → assert, etc.)
-    // into clients that require polyfill.
-    const [{ SolanaHyperlaneBridge }, solanaWeb3] = await Promise.all([
+    // SolanaHyperlaneBridge and @solana/web3.js are loaded lazily to avoid
+    // pulling Node.js-only transitive dependencies into polyfill-requiring clients.
+    const [{ SolanaHyperlaneBridge }, connection] = await Promise.all([
       import("@/bridge/solana/SolanaHyperlaneBridge"),
-      loadSolanaWeb3("Solana bridge operations"),
+      this.buildSolanaConnection(),
     ]);
-
-    const cluster =
-      externalWallet.network === SolanaNetwork.MAINNET
-        ? "mainnet-beta"
-        : "testnet";
-    const endpoint =
-      this.bridgingConfig?.solanaRpcUrl ?? solanaWeb3.clusterApiUrl(cluster);
-    const connection = new solanaWeb3.Connection(endpoint);
 
     const walletConfig = {
       address: externalWallet.address,
@@ -337,5 +478,15 @@ export class BridgeOperator implements BridgeOperatorInterface {
           `Unsupported protocol "${token.protocol}" for ${token.chain} chain.`
         );
     }
+  }
+
+  private async buildSolanaConnection() {
+    const solanaWeb3 = await loadSolanaWeb3("Solana operations");
+    const cluster = this.starknetWallet.getChainId().isMainnet()
+      ? "mainnet-beta"
+      : "testnet";
+    const endpoint =
+      this.bridgingConfig?.solanaRpcUrl ?? solanaWeb3.clusterApiUrl(cluster);
+    return new solanaWeb3.Connection(endpoint);
   }
 }

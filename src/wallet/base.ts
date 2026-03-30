@@ -20,6 +20,14 @@ import {
   type StakingConfig,
   type Token,
 } from "@/types";
+import {
+  type WithdrawMonitorResult,
+  type DepositMonitorResult,
+  type WithdrawalState,
+  type WithdrawalStateInput,
+  type DepositStateInput,
+  DepositState,
+} from "@/bridge/monitor/types";
 import type { Tx } from "@/tx";
 import { TxBuilder } from "@/tx/builder";
 import type {
@@ -948,5 +956,35 @@ export abstract class BaseWallet implements WalletInterface {
       externalWallet,
       options
     );
+  }
+
+  monitorDeposit(
+    token: BridgeToken,
+    externalTxHash: string,
+    starknetTxHash?: string
+  ): Promise<DepositMonitorResult> {
+    return this.bridging.monitorDeposit(token, externalTxHash, starknetTxHash);
+  }
+
+  monitorWithdrawal(
+    token: BridgeToken,
+    snTxHash: string,
+    externalTxHash?: string
+  ): Promise<WithdrawMonitorResult> {
+    return this.bridging.monitorWithdrawal(token, snTxHash, externalTxHash);
+  }
+
+  getDepositState(
+    token: BridgeToken,
+    param: DepositStateInput
+  ): Promise<DepositState> {
+    return this.bridging.getDepositState(token, param);
+  }
+
+  getWithdrawalState(
+    token: BridgeToken,
+    param: WithdrawalStateInput
+  ): Promise<WithdrawalState> {
+    return this.bridging.getWithdrawalState(token, param);
   }
 }

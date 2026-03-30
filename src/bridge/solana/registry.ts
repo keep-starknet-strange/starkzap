@@ -1,6 +1,5 @@
 import type { ChainId, ChainIdLiteral, SolanaBridgeToken } from "@/types";
 import type { SolanaWalletConfig } from "@/bridge";
-import type { WalletInterface } from "@/wallet";
 import type { HyperlaneRuntime } from "@/bridge/solana/hyperlaneRuntime";
 import type {
   ChainMap,
@@ -74,11 +73,11 @@ export function hyperlaneChainName(
 }
 
 export function setupMultiProtocolProvider(
-  config: SolanaWalletConfig,
-  starknetWallet: WalletInterface,
+  config: Pick<SolanaWalletConfig, "connection">,
+  chainId: ChainId,
+  starknetNodeUrl: string,
   hyperlane: HyperlaneRuntime
 ): MultiProtocolProvider {
-  const chainId = starknetWallet.getChainId();
   const chains = chainId.isMainnet()
     ? buildMainnetChainMap(hyperlane)
     : buildTestnetChainMap(hyperlane);
@@ -124,7 +123,7 @@ export function setupMultiProtocolProvider(
       // Double-cast required: Hyperlane's provider type is typed against its
       // own starknet.js 7.x; at runtime the API is compatible.
       provider: new RpcProvider({
-        nodeUrl: starknetWallet.getProvider().channel.nodeUrl,
+        nodeUrl: starknetNodeUrl,
       }) as unknown as StarknetTypedProvider["provider"],
     };
 

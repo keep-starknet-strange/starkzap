@@ -7,3 +7,4 @@ export type {
   InitiateBridgeWithdrawOptions,
   CompleteBridgeWithdrawOptions,
 } from "@/bridge/types/BridgeInterface";
+export * from "@/bridge/monitor";

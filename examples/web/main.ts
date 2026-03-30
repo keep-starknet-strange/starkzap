@@ -35,6 +35,8 @@ import {
   initializeAppKit,
   formatFeeEstimate,
 } from "./bridge";
+import { BridgeTransferStatus, DepositState, WithdrawalState } from "starkzap";
+import type { StoredBridgeTx } from "./bridge/tx-storage";
 import { getDcaProviders } from "./dca";
 import {
   buildFallbackWebVesuMarkets,
@@ -469,6 +471,11 @@ const bridgeAmountInput = document.getElementById(
 ) as HTMLInputElement;
 const btnBridgeDeposit = document.getElementById(
   "btn-bridge-deposit"
+) as HTMLButtonElement;
+const bridgeTxHistory = document.getElementById("bridge-tx-history")!;
+const bridgeTxList = document.getElementById("bridge-tx-list")!;
+const btnBridgeTxClearCompleted = document.getElementById(
+  "btn-bridge-tx-clear-completed"
 ) as HTMLButtonElement;
 
 // Reown AppKit + Bridge Controller
@@ -1625,6 +1632,143 @@ function log(
   logContainer.scrollTop = logContainer.scrollHeight;
 }
 
+// Bridge transaction history rendering
+function statusLabel(status: string | undefined): string {
+  if (!status) return "pending";
+  const map: Record<string, string> = {
+    [BridgeTransferStatus.SUBMITTED_ON_L1]: "Submitted (L1)",
+    [BridgeTransferStatus.CONFIRMED_ON_L1]: "Confirmed (L1)",
+    [BridgeTransferStatus.COMPLETED_ON_L1]: "Completed (L1) ✓",
+    [BridgeTransferStatus.NOT_SUBMITTED_ON_L1]: "Not on L1",
+    [BridgeTransferStatus.SUBMITTED_ON_STARKNET]: "Submitted (Starknet)",
+    [BridgeTransferStatus.CONFIRMED_ON_STARKNET]: "Confirmed (Starknet)",
+    [BridgeTransferStatus.COMPLETED_ON_STARKNET]: "Completed (Starknet) ✓",
+    [BridgeTransferStatus.NOT_SUBMITTED_ON_STARKNET]: "Not on Starknet",
+    [BridgeTransferStatus.ERROR]: "Error",
+  };
+  return map[status] ?? status;
+}
+
+function needsCompletionStep(tx: StoredBridgeTx): boolean {
+  if (tx.type !== "initiateWithdraw" || tx.autoWithdraw) {
+    return false;
+  }
+  if (tx.externalTxHash) {
+    // completion already submitted
+    return false;
+  }
+  return tx.withdrawalState === WithdrawalState.READY_TO_CLAIM;
+}
+
+function renderBridgeTxHistory(records: Readonly<StoredBridgeTx[]>): void {
+  if (records.length === 0) {
+    bridgeTxHistory.classList.add("hidden");
+    return;
+  }
+
+  bridgeTxHistory.classList.remove("hidden");
+  bridgeTxList.innerHTML = "";
+
+  for (const tx of records) {
+    const item = document.createElement("div");
+    const isCompleted =
+      tx.withdrawalState === WithdrawalState.COMPLETED ||
+      tx.depositState === DepositState.COMPLETED;
+    item.className = `bridge-tx-item${isCompleted ? " completed" : ""}`;
+    item.dataset.txId = tx.id;
+
+    const isDeposit = tx.type === "deposit";
+    const tagClass = isDeposit ? "deposit" : "withdraw";
+    const typeLabel = isDeposit ? "Deposit" : "Withdraw";
+
+    // For deposits: primary = external (L1), secondary = Starknet.
+    // For withdrawals: primary = Starknet, secondary = external (L1 completion).
+    const primaryHash = isDeposit ? tx.externalTxHash : tx.snTxHash;
+    const secondaryHash = isDeposit ? tx.snTxHash : tx.externalTxHash;
+    const primaryLabel = isDeposit ? "L1" : "SN";
+    const secondaryLabel = isDeposit ? "SN" : "L1";
+
+    const checkedAt = tx.statusCheckedAt
+      ? `Checked ${Math.round((Date.now() - tx.statusCheckedAt) / 60000)} min ago`
+      : "Not checked yet";
+
+    function hashChip(hash: string, label: string, cls: string): string {
+      const short = `${hash.slice(0, 8)}...${hash.slice(-6)}`;
+      return `<span class="bridge-tx-hash ${cls}" title="${hash}">${label}: ${short}<button class="btn-copy-hash" data-hash="${hash}" title="Copy full hash">⎘</button></span>`;
+    }
+
+    item.innerHTML = `
+      <div class="bridge-tx-meta">
+        <span class="bridge-tx-tag ${tagClass}">${typeLabel}</span>
+        <span class="bridge-tx-amount">${formatRawAmount(tx.amountRaw, tx.tokenDecimals, tx.tokenSymbol)}</span>
+        ${primaryHash ? hashChip(primaryHash, primaryLabel, "primary") : ""}
+        ${secondaryHash ? hashChip(secondaryHash, secondaryLabel, "secondary") : ""}
+      </div>
+      <div class="bridge-tx-status">${statusLabel(tx.lastStatus)} · ${checkedAt}</div>
+      <div class="bridge-tx-actions">
+        <button class="btn-check-status">Check Status</button>
+        ${needsCompletionStep(tx) ? `<button class="btn-complete">Complete Withdrawal</button>` : ""}
+        <button class="btn-remove">✕</button>
+      </div>
+    `;
+
+    for (const btn of item.querySelectorAll<HTMLButtonElement>(
+      ".btn-copy-hash"
+    )) {
+      btn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        const target = e.currentTarget as HTMLButtonElement;
+        const hash = target.dataset.hash!;
+        void navigator.clipboard.writeText(hash).then(() => {
+          target.textContent = "✓";
+          setTimeout(() => {
+            target.textContent = "⎘";
+          }, 1500);
+        });
+      });
+    }
+
+    item
+      .querySelector(".btn-check-status")!
+      .addEventListener("click", () => bridgeController?.checkTxStatus(tx.id));
+
+    if (needsCompletionStep(tx)) {
+      item
+        .querySelector(".btn-complete")!
+        .addEventListener("click", () =>
+          bridgeController?.completeBridgeTx(tx.id)
+        );
+    }
+
+    item
+      .querySelector(".btn-remove")!
+      .addEventListener("click", () => bridgeController?.removeTxRecord(tx.id));
+
+    bridgeTxList.appendChild(item);
+  }
+}
+
+function formatRawAmount(
+  rawStr: string,
+  decimals: number,
+  symbol: string
+): string {
+  try {
+    const raw = BigInt(rawStr);
+    const divisor = BigInt(10 ** decimals);
+    const whole = raw / divisor;
+    const frac = raw % divisor;
+    const fracStr = frac
+      .toString()
+      .padStart(decimals, "0")
+      .replace(/0+$/, "")
+      .slice(0, 6);
+    return fracStr ? `${whole}.${fracStr} ${symbol}` : `${whole} ${symbol}`;
+  } catch {
+    return `? ${symbol}`;
+  }
+}
+
 // Bridge rendering
 function renderBridge(): void {
   if (!bridgeController) return;
@@ -1765,6 +1909,9 @@ function renderBridge(): void {
       : "Initiate Withdraw";
     btnBridgeDeposit.disabled = !(s.selectedToken != null && hasAmount);
   }
+
+  // Transaction history
+  renderBridgeTxHistory(bridgeController.getTxHistory());
 }
 
 // UI State
@@ -2890,6 +3037,10 @@ btnBridgeDeposit.addEventListener("click", () => {
   } else {
     bridgeController.initiateWithdraw(amount);
   }
+});
+
+btnBridgeTxClearCompleted.addEventListener("click", () => {
+  bridgeController?.clearCompletedTxRecords();
 });
 
 // Subscribe to AppKit account and network changes.
