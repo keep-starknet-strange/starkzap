@@ -134,9 +134,9 @@ export class LayerZeroApi {
       (step) => step.description === "bridge" && step.chainKey === "starknet"
     );
     if (!bridgeStep) return [];
-    const starknetEncodedTransaction = bridgeStep.transaction
-      .encoded as StarknetEncodedTransaction;
-    return starknetEncodedTransaction.calls;
+    const encoded = bridgeStep.transaction.encoded;
+    if (!("calls" in encoded) || !Array.isArray(encoded.calls)) return [];
+    return (encoded as StarknetEncodedTransaction).calls;
   }
 
   /**

@@ -25,7 +25,7 @@ export async function checkStarknetTxStatus(
   }
 
   if (receipt.isError()) {
-    return BridgeTransferStatus.NOT_SUBMITTED_ON_STARKNET;
+    return BridgeTransferStatus.ERROR;
   }
 
   if (receipt.isReverted()) {

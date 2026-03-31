@@ -75,7 +75,7 @@ export function hyperlaneChainName(
 export function setupMultiProtocolProvider(
   config: Pick<SolanaWalletConfig, "connection">,
   chainId: ChainId,
-  starknetNodeUrl: string,
+  starknetProvider: RpcProvider,
   hyperlane: HyperlaneRuntime
 ): MultiProtocolProvider {
   const chains = chainId.isMainnet()
@@ -118,18 +118,17 @@ export function setupMultiProtocolProvider(
       { type: HyperlaneProviderType.Starknet }
     >;
 
-    const starknetProvider: StarknetTypedProvider = {
+    const starknetTypedProvider: StarknetTypedProvider = {
       type: ProviderType.Starknet as StarknetTypedProvider["type"],
       // Double-cast required: Hyperlane's provider type is typed against its
       // own starknet.js 7.x; at runtime the API is compatible.
-      provider: new RpcProvider({
-        nodeUrl: starknetNodeUrl,
-      }) as unknown as StarknetTypedProvider["provider"],
+      provider:
+        starknetProvider as unknown as StarknetTypedProvider["provider"],
     };
 
     multiProvider.setProvider(
       hyperlaneChainName(chainId, "starknet"),
-      starknetProvider
+      starknetTypedProvider
     );
   }
 

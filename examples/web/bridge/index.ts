@@ -24,6 +24,7 @@ import {
   DepositState,
   WithdrawalState,
   type WithdrawMonitorResult,
+  type CctpWithdrawMonitorResult,
 } from "starkzap";
 import {
   loadTxHistory,
@@ -95,6 +96,14 @@ function initialState(): BridgeState {
     refreshing: false,
     error: null,
   };
+}
+
+function isCctpWithdrawMonitorResult(
+  obj: DepositMonitorResult | WithdrawMonitorResult
+): obj is CctpWithdrawMonitorResult {
+  return (
+    "protocol" in obj && (obj as WithdrawMonitorResult).protocol === "cctp"
+  );
 }
 
 export function initializeAppKit(projectId: string): AppKit {
@@ -487,10 +496,16 @@ export class BridgeController {
           { protocol: "canonical", autoWithdraw: true }
         );
       } else {
+        const withdrawOptions =
+          selectedToken.protocol === Protocol.CCTP
+            ? ({ protocol: "cctp", fastTransfer } as const)
+            : selectedToken.protocol === Protocol.CANONICAL
+              ? ({ protocol: "canonical" } as const)
+              : undefined;
         this.state.feeEstimate = await wallet.getInitiateWithdrawFeeEstimate(
           selectedToken,
           extWallet,
-          { protocol: "cctp", fastTransfer }
+          withdrawOptions
         );
       }
     } catch (err) {
@@ -662,18 +677,11 @@ export class BridgeController {
       }
 
       // Capture Circle attestation for CCTP withdrawals
-      const asWithdraw = result as WithdrawMonitorResult;
-      if (
-        asWithdraw.protocol === "cctp" &&
-        "attestation" in asWithdraw &&
-        asWithdraw.attestation
-      ) {
-        updates.cctpAttestation = asWithdraw.attestation;
-        updates.cctpMessage = (asWithdraw as { message?: string }).message;
-        updates.cctpNonce = (asWithdraw as { nonce?: string }).nonce;
-        updates.cctpExpirationBlock = (
-          asWithdraw as { expirationBlock?: number }
-        ).expirationBlock;
+      if (isCctpWithdrawMonitorResult(result)) {
+        updates.cctpAttestation = result.attestation;
+        updates.cctpMessage = result.message;
+        updates.cctpNonce = result.nonce;
+        updates.cctpExpirationBlock = result.expirationBlock;
       }
 
       // Derive the high-level withdrawal state for initiateWithdraw records.

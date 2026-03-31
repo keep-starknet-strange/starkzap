@@ -238,12 +238,7 @@ describe("AutoWithdrawFeesHandler", () => {
     });
 
     it("throws a fallback message on non-ok response without a message field", async () => {
-      const fetchFn = makeFetchFn(
-        { error: "Internal Server Error" },
-        false,
-        500
-      );
-      (fetchFn as ReturnType<typeof vi.fn>).mockResolvedValue({
+      const fetchFn = vi.fn().mockResolvedValue({
         ok: false,
         status: 500,
         statusText: "Internal Server Error",

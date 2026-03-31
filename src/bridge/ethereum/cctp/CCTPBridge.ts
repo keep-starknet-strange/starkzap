@@ -207,7 +207,7 @@ export class CCTPBridge extends EthereumBridge {
       );
     }
 
-    if (options.protocol != "cctp") {
+    if (options.protocol !== "cctp") {
       throw new Error("Incompatible options provided.");
     }
 
@@ -262,14 +262,12 @@ export class CCTPBridge extends EthereumBridge {
             [options.message, options.attestation]
           );
         try {
-          const [gasUnits] = await Promise.all([
-            this.config.provider.estimateGas({
-              to: getMessageTransmitter(
-                this.starknetWallet.getChainId()
-              ).toString(),
-              data: calldata,
-            }),
-          ]);
+          const gasUnits = await this.config.provider.estimateGas({
+            to: getMessageTransmitter(
+              this.starknetWallet.getChainId()
+            ).toString(),
+            data: calldata,
+          });
           return { l1Fee: this.ethAmount(gasUnits * gasPrice) };
         } catch {
           // fall through to fallback

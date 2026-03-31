@@ -254,7 +254,7 @@ export class BridgeOperator implements BridgeOperatorInterface {
   ): Promise<BridgeMonitorInterface> {
     if (
       token.chain === ExternalChain.SOLANA &&
-      token.protocol == Protocol.HYPERLANE
+      token.protocol === Protocol.HYPERLANE
     ) {
       return this.getSolanaHyperlaneMonitor();
     }

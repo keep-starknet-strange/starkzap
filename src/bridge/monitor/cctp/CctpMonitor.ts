@@ -57,6 +57,8 @@ interface AttestationData {
 
 const SAMPLE_BLOCKS = 10;
 const SAFETY_BUFFER_BLOCKS = 20;
+// Standard CCTP attestation can take up to ~20-30 min; use 40 min to be safe.
+const CCTP_MAX_RELAY_SECONDS = 2400;
 
 export class CctpMonitor implements BridgeMonitorInterface {
   private readonly chainId: ChainId;
@@ -289,8 +291,7 @@ export class CctpMonitor implements BridgeMonitorInterface {
   ): Promise<string | null> {
     try {
       const messageTransmitter = await this.getMessageTransmitter();
-      const fromBlock =
-        await this.inferStarknetBlockNumberByL1Timestamp(l1Timestamp);
+      const { fromBlock, toBlock } = await this.inferBlockRange(l1Timestamp);
       const { low: nonceLow, high: nonceHigh } = uint256.bnToUint256(
         BigInt(nonce)
       );
@@ -304,7 +305,7 @@ export class CctpMonitor implements BridgeMonitorInterface {
           [num.toHex(nonceHigh)], // keys[3]: nonce.high
         ],
         from_block: { block_number: fromBlock },
-        to_block: "latest", // TODO: Possible improvement. Maybe find a toBlock.
+        to_block: { block_number: toBlock },
         chunk_size: 100,
       });
 
@@ -349,23 +350,26 @@ export class CctpMonitor implements BridgeMonitorInterface {
     }
   }
 
-  private async inferStarknetBlockNumberByL1Timestamp(
+  private async inferBlockRange(
     l1Timestamp: number
-  ): Promise<number> {
+  ): Promise<{ fromBlock: number; toBlock: number }> {
     const latest = await this.starknetProvider.getBlock();
     const sample = await this.starknetProvider.getBlock(
       latest.block_number - SAMPLE_BLOCKS
     );
     const avgBlockTime = (latest.timestamp - sample.timestamp) / SAMPLE_BLOCKS;
 
-    const now = Math.floor(Date.now() / 1000);
-    const secondsSinceL1Confirm = now - l1Timestamp;
-    return Math.max(
-      0,
-      latest.block_number -
-        Math.ceil(secondsSinceL1Confirm / avgBlockTime) -
-        SAFETY_BUFFER_BLOCKS
-    );
+    const secondsSinceL1Confirm = latest.timestamp - l1Timestamp;
+    const estimatedBlock =
+      latest.block_number - Math.ceil(secondsSinceL1Confirm / avgBlockTime);
+
+    return {
+      fromBlock: Math.max(0, estimatedBlock - SAFETY_BUFFER_BLOCKS),
+      toBlock: Math.min(
+        latest.block_number,
+        estimatedBlock + Math.ceil(CCTP_MAX_RELAY_SECONDS / avgBlockTime)
+      ),
+    };
   }
 
   private getMessageTransmitter(): Promise<Address> {
@@ -375,8 +379,14 @@ export class CctpMonitor implements BridgeMonitorInterface {
         entrypoint: "local_message_transmitter",
       })
       .then((result) => {
-        const address = num.toHex(result[0]!);
+        if (!result[0])
+          throw new Error("local_message_transmitter returned empty result");
+        const address = num.toHex(result[0]);
         return fromAddress(address);
+      })
+      .catch((e) => {
+        this.messageTransmitterPromise = undefined;
+        throw e;
       });
     return this.messageTransmitterPromise;
   }

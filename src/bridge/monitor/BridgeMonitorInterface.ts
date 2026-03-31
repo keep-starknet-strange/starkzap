@@ -48,7 +48,7 @@ export interface BridgeMonitorInterface {
    * Derive the high-level user-facing state of a withdrawal.
    *
    * Accepts either a previously fetched `WithdrawMonitorResult` or raw
-   * transaction hashes. When hashes are provided, `monitorWithdraw` is called
+   * transaction hashes. When hashes are provided, `monitorWithdrawal` is called
    * internally first.
    *
    * @param param - A `WithdrawMonitorResult` or `{ snTxHash, externalTxHash? }`

@@ -159,11 +159,6 @@ export interface WalletInterface extends BridgeOperatorInterface {
   getClassHash(): string;
 
   /**
-   * Disconnect the wallet and clean up resources.
-   */
-  disconnect(): Promise<void>;
-
-  /**
    * Get the display username when supported (e.g. Cartridge).
    * Returns undefined for wallets that don't provide this.
    */

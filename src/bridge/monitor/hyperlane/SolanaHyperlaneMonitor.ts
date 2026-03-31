@@ -70,7 +70,7 @@ export class SolanaHyperlaneMonitor implements BridgeMonitorInterface {
     this.multiProtocolProvider = setupMultiProtocolProvider(
       { connection: solanaConnection },
       chainId,
-      starknetProvider.channel.nodeUrl,
+      starknetProvider,
       hyperlane
     );
   }
@@ -241,6 +241,7 @@ export class SolanaHyperlaneMonitor implements BridgeMonitorInterface {
       );
       if (!event) return false;
 
+      if (event.data.length < 2) return false;
       const data = { low: event.data[0]!, high: event.data[1]! };
       const messageId = num.toHex(uint256.uint256ToBN(data));
 

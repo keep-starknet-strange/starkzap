@@ -87,7 +87,6 @@ export class OftMonitor implements BridgeMonitorInterface {
 
     const overall = lzMessage.status.name;
     const dst = lzMessage.destination;
-    console.log(overall, dst?.status);
     if (overall === "FAILED" || dst?.status === "FAILED") {
       return { status: BridgeTransferStatus.ERROR, externalTxHash };
     }
@@ -227,7 +226,6 @@ export class OftMonitor implements BridgeMonitorInterface {
       });
       if (!response.ok) return null;
       const data = (await response.json()) as LzMessagesResponse;
-      console.log(data);
       return data.data[0] ?? null;
     } catch {
       return null;

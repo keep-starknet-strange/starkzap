@@ -61,7 +61,7 @@ export class SolanaHyperlaneBridge implements BridgeInterface<SolanaAddress> {
     const multiProvider = setupMultiProtocolProvider(
       config,
       chainId,
-      starknetWallet.getProvider().channel.nodeUrl,
+      starknetWallet.getProvider(),
       hyperlane
     );
 

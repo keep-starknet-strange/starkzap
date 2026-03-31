@@ -183,8 +183,7 @@ export class CanonicalEthereumBridge extends EthereumBridge {
             options.preferredFeeToken
           )
         );
-      } catch (error) {
-        console.log("Failed to estimate auto-withdraw fees", error);
+      } catch {
         autoWithdrawFee = undefined;
         autoWithdrawFeeError = FeeErrorCause.AW_FEE_ERROR;
       }
