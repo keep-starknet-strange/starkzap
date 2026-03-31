@@ -3,9 +3,8 @@ import type {
   Call,
   EstimateFeeResponseOverhead,
   RpcProvider,
-  TypedData,
   Signature,
-  UniversalDetails,
+  TypedData,
 } from "starknet";
 import type { Tx } from "@/tx";
 import type { TxBuilder } from "@/tx/builder";
@@ -13,7 +12,7 @@ import type { Erc20 } from "@/erc20";
 import type { Staking } from "@/staking";
 import type { LendingClient } from "@/lending";
 import type { DcaClientInterface } from "@/dca";
-import type { PreparedSwap, SwapInput, SwapQuote, SwapProvider } from "@/swap";
+import type { PreparedSwap, SwapInput, SwapProvider, SwapQuote } from "@/swap";
 import type {
   Address,
   Amount,
@@ -111,10 +110,7 @@ export interface WalletInterface extends BridgeOperatorInterface {
   /**
    * Estimate the fee for executing calls.
    */
-  estimateFee(
-    calls: Call[],
-    details?: UniversalDetails
-  ): Promise<EstimateFeeResponseOverhead>;
+  estimateFee(calls: Call[]): Promise<EstimateFeeResponseOverhead>;
 
   /**
    * Sign a typed data message (EIP-712 style).

@@ -21,12 +21,12 @@ import {
   type Token,
 } from "@/types";
 import {
-  type WithdrawMonitorResult,
   type DepositMonitorResult,
+  DepositState,
+  type DepositStateInput,
   type WithdrawalState,
   type WithdrawalStateInput,
-  type DepositStateInput,
-  DepositState,
+  type WithdrawMonitorResult,
 } from "@/bridge/monitor/types";
 import type { Tx } from "@/tx";
 import { TxBuilder } from "@/tx/builder";
@@ -37,11 +37,10 @@ import type {
   RpcProvider,
   Signature,
   TypedData,
-  UniversalDetails,
 } from "starknet";
 import { Erc20 } from "@/erc20";
 import { Staking } from "@/staking";
-import type { PreparedSwap, SwapInput, SwapQuote, SwapProvider } from "@/swap";
+import type { PreparedSwap, SwapInput, SwapProvider, SwapQuote } from "@/swap";
 import { AvnuSwapProvider } from "@/swap";
 import { resolveSwapInput } from "@/swap/utils";
 import {
@@ -174,10 +173,7 @@ export abstract class BaseWallet implements WalletInterface {
   abstract getChainId(): ChainId;
   abstract getFeeMode(): FeeMode;
   abstract getClassHash(): string;
-  abstract estimateFee(
-    calls: Call[],
-    details?: UniversalDetails
-  ): Promise<EstimateFeeResponseOverhead>;
+  abstract estimateFee(calls: Call[]): Promise<EstimateFeeResponseOverhead>;
   abstract disconnect(): Promise<void>;
 
   callContract(call: Call): ReturnType<RpcProvider["callContract"]> {

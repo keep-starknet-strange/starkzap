@@ -1,25 +1,24 @@
 import {
-  RpcProvider,
   type Account,
   type Call,
   type PaymasterTimeBounds,
-  type TypedData,
+  RpcProvider,
   type Signature,
-  type UniversalDetails,
+  type TypedData,
 } from "starknet";
 import { Tx } from "@/tx";
 import {
   type BridgingConfig,
   ChainId,
-  getChainId,
   type DeployOptions,
   type EnsureReadyOptions,
   type ExecuteOptions,
+  type ExplorerConfig,
   type FeeMode,
+  fromAddress,
+  getChainId,
   type PreflightOptions,
   type PreflightResult,
-  type ExplorerConfig,
-  fromAddress,
   type StakingConfig,
 } from "@/types";
 import {
@@ -373,8 +372,8 @@ export class CartridgeWallet extends BaseWallet {
     return this.classHash;
   }
 
-  async estimateFee(calls: Call[], details?: UniversalDetails) {
-    return this.walletAccount.estimateInvokeFee(calls, details);
+  async estimateFee(calls: Call[]) {
+    return this.walletAccount.estimateInvokeFee(calls);
   }
 
   /**
