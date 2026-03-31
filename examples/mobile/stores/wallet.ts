@@ -351,24 +351,31 @@ function createConfiguredSdkState(params: {
   };
 }
 
+function buildCommonOnboardOptions(params?: { preferSponsored?: boolean }) {
+  const dcaProviders = getDcaProviders();
+
+  return {
+    deploy: "never" as const,
+    ...(params?.preferSponsored ? { feeMode: "sponsored" as const } : {}),
+    swapProviders,
+    defaultSwapProviderId: swapProviders[0]?.id,
+    dcaProviders,
+    defaultDcaProviderId: dcaProviders[0]?.id,
+  };
+}
+
 async function onboardPrivateKeyWallet(params: {
   sdk: StarkZap;
   privateKey: string;
   selectedPreset: string;
   preferSponsored: boolean;
 }): Promise<WalletInterface> {
-  const dcaProviders = getDcaProviders();
   const signer = new StarkSigner(params.privateKey.trim());
   const onboard = await params.sdk.onboard({
     strategy: OnboardStrategy.Signer,
-    deploy: "never",
-    ...(params.preferSponsored && { feeMode: "sponsored" as const }),
+    ...buildCommonOnboardOptions({ preferSponsored: params.preferSponsored }),
     account: { signer },
     accountPreset: PRESETS[params.selectedPreset],
-    swapProviders,
-    defaultSwapProviderId: swapProviders[0]?.id,
-    dcaProviders,
-    defaultDcaProviderId: dcaProviders[0]?.id,
   });
 
   return onboard.wallet;
@@ -382,16 +389,10 @@ async function onboardPrivyWallet(params: {
   privySelectedPreset: string;
   preferSponsored: boolean;
 }): Promise<WalletInterface> {
-  const dcaProviders = getDcaProviders();
   const onboard = await params.sdk.onboard({
     strategy: OnboardStrategy.Privy,
-    deploy: "never",
-    ...(params.preferSponsored && { feeMode: "sponsored" as const }),
+    ...buildCommonOnboardOptions({ preferSponsored: params.preferSponsored }),
     accountPreset: PRESETS[params.privySelectedPreset],
-    swapProviders,
-    defaultSwapProviderId: swapProviders[0]?.id,
-    dcaProviders,
-    defaultDcaProviderId: dcaProviders[0]?.id,
     privy: {
       resolve: async () => ({
         walletId: params.walletId,
@@ -411,11 +412,9 @@ async function onboardCartridgeWallet(params: {
   sdk: StarkZap;
   cartridge: { preset: string; url?: string; redirectUrl?: string };
 }): Promise<WalletInterface> {
-  const dcaProviders = getDcaProviders();
   const onboard = await params.sdk.onboard({
     strategy: OnboardStrategy.Cartridge,
-    deploy: "never",
-    feeMode: "sponsored",
+    ...buildCommonOnboardOptions({ preferSponsored: true }),
     cartridge: {
       preset: params.cartridge.preset,
       url: params.cartridge.url ?? DEFAULT_CARTRIDGE_URL,
@@ -423,10 +422,6 @@ async function onboardCartridgeWallet(params: {
         ? { redirectUrl: params.cartridge.redirectUrl }
         : {}),
     },
-    swapProviders,
-    defaultSwapProviderId: swapProviders[0]?.id,
-    dcaProviders,
-    defaultDcaProviderId: dcaProviders[0]?.id,
   });
 
   return onboard.wallet;
@@ -1310,11 +1305,17 @@ export const useWalletStore = create<WalletState>((set, get) => ({
       return;
     }
 
-    set({ isConnecting: true });
+    const state = get();
+    const requestId = state.networkSwitchRequestId + 1;
+    const isCurrentRequest = () => get().networkSwitchRequestId === requestId;
+
+    set({ isConnecting: true, networkSwitchRequestId: requestId });
     addLog("Connecting with Cartridge...");
 
     try {
       await ensureCartridgeAdapterRegistered(config.redirectUrl);
+      if (!isCurrentRequest()) return;
+
       const connectedWallet = await onboardCartridgeWallet({
         sdk,
         cartridge: {
@@ -1323,6 +1324,7 @@ export const useWalletStore = create<WalletState>((set, get) => ({
           ...(config.redirectUrl ? { redirectUrl: config.redirectUrl } : {}),
         },
       });
+      if (!isCurrentRequest()) return;
 
       set({
         wallet: connectedWallet,
@@ -1331,14 +1333,19 @@ export const useWalletStore = create<WalletState>((set, get) => ({
         privyWalletId: null,
         privyPublicKey: null,
       });
+      if (!isCurrentRequest()) return;
+
       addLog(`Connected: ${truncateAddress(connectedWallet.address)}`);
 
       await get().checkDeploymentStatus();
     } catch (err) {
+      if (!isCurrentRequest()) return;
       addLog(`Cartridge connection failed: ${err}`);
       Alert.alert("Connection Failed", String(err));
     } finally {
-      set({ isConnecting: false });
+      if (isCurrentRequest()) {
+        set({ isConnecting: false });
+      }
     }
   },
 

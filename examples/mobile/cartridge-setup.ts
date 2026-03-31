@@ -110,7 +110,10 @@ function registerTsCartridgeAdapter(
         if (authResult.type === "success") {
           const resolvedUrl =
             "url" in authResult && authResult.url ? authResult.url : undefined;
-          return { status: "success", callbackUrl: resolvedUrl };
+          return {
+            status: "success",
+            ...(resolvedUrl ? { callbackUrl: resolvedUrl } : {}),
+          };
         }
 
         return { status: authResult.type === "cancel" ? "cancel" : "dismiss" };
