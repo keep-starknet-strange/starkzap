@@ -219,6 +219,8 @@ export interface UseDcaStateDeps {
   dcaDefaultPair: { buyToken: Token; sellToken: Token };
   useSponsored: boolean;
   canUseSponsored: boolean;
+  /** Cartridge sessions always use sponsored execution; toggles are hidden in UI. */
+  walletType: "privatekey" | "privy" | "cartridge" | null;
   screenMode: "swap" | "dca";
 }
 
@@ -286,6 +288,7 @@ export function useDcaState(deps: UseDcaStateDeps): UseDcaStateReturn {
     dcaDefaultPair,
     useSponsored,
     canUseSponsored,
+    walletType,
     screenMode,
   } = deps;
 
@@ -750,7 +753,8 @@ export function useDcaState(deps: UseDcaStateDeps): UseDcaStateReturn {
     setIsDcaSubmitting(true);
 
     try {
-      const wantsSponsored = useSponsored && canUseSponsored;
+      const wantsSponsored =
+        walletType === "cartridge" || (useSponsored && canUseSponsored);
       const createRequest = {
         provider: selectedDcaProviderId,
         buyToken: dcaBuyToken,
@@ -861,6 +865,7 @@ export function useDcaState(deps: UseDcaStateDeps): UseDcaStateReturn {
     selectedDcaProviderId,
     useSponsored,
     wallet,
+    walletType,
   ]);
 
   const handleCancelDcaOrder = useCallback(
@@ -873,7 +878,8 @@ export function useDcaState(deps: UseDcaStateDeps): UseDcaStateReturn {
       setDcaError(null);
 
       try {
-        const wantsSponsored = useSponsored && canUseSponsored;
+        const wantsSponsored =
+          walletType === "cartridge" || (useSponsored && canUseSponsored);
         addLog(
           `Cancelling ${getDcaProviderLabel(order.providerId)} DCA order ${cropAddress(order.orderAddress)}`
         );
@@ -924,6 +930,7 @@ export function useDcaState(deps: UseDcaStateDeps): UseDcaStateReturn {
       refreshDcaOrders,
       useSponsored,
       wallet,
+      walletType,
     ]
   );
 

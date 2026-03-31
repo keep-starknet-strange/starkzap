@@ -146,17 +146,20 @@ export default function BalancesScreen() {
   }, [wallet, chainId, fetchBalances]);
 
   const handleDisconnect = useCallback(async () => {
+    await disconnect();
     clearBalances();
     if (walletType === "privy") {
       await logout();
     }
-    disconnect();
     resetNetworkConfig();
     router.replace("/");
   }, [clearBalances, disconnect, resetNetworkConfig, walletType, logout]);
 
   const handleSelectNetwork = useCallback(
     async (index: number) => {
+      if (walletType === "cartridge") {
+        return;
+      }
       const nextNetwork = NETWORKS[index];
       setIsNetworkPickerOpen(false);
 
@@ -260,9 +263,13 @@ export default function BalancesScreen() {
           </View>
           <View style={styles.headerRight}>
             <TouchableOpacity
-              style={[styles.networkPill, { backgroundColor: borderColor }]}
+              style={[
+                styles.networkPill,
+                { backgroundColor: borderColor },
+                walletType === "cartridge" && styles.networkPillDisabled,
+              ]}
               onPress={() => setIsNetworkPickerOpen(true)}
-              disabled={isConnecting}
+              disabled={isConnecting || walletType === "cartridge"}
               activeOpacity={0.88}
             >
               <ThemedText
@@ -578,7 +585,7 @@ export default function BalancesScreen() {
           </ThemedText>
         </View>
 
-        {isDeployed === false && (
+        {isDeployed === false && walletType !== "cartridge" && (
           <View
             style={[
               styles.deployCard,
@@ -730,6 +737,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 6,
+  },
+  networkPillDisabled: {
+    opacity: 0.55,
   },
   networkPillText: {
     fontSize: 11,

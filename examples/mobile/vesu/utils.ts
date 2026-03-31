@@ -43,8 +43,12 @@ export function amountFromBase(
 
 export function getExecuteOptions(
   useSponsored: boolean,
-  canUseSponsored: boolean
+  canUseSponsored: boolean,
+  opts?: { sessionRequiresSponsored?: boolean }
 ): ExecuteOptions {
+  if (opts?.sessionRequiresSponsored) {
+    return { feeMode: FEE_MODE_SPONSORED };
+  }
   return {
     feeMode:
       useSponsored && canUseSponsored ? FEE_MODE_SPONSORED : FEE_MODE_USER_PAYS,

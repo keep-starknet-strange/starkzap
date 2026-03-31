@@ -232,6 +232,7 @@ export default function SwapScreen() {
   const [tokenSearch, setTokenSearch] = useState("");
 
   const canUseSponsored = Boolean(paymasterNodeUrl);
+  const isCartridgeSession = walletType === "cartridge";
 
   // DCA state hook
   const dca = useDcaState({
@@ -246,8 +247,15 @@ export default function SwapScreen() {
     dcaDefaultPair,
     useSponsored,
     canUseSponsored,
+    walletType,
     screenMode,
   });
+
+  useEffect(() => {
+    if (walletType === "cartridge") {
+      setUseSponsored(true);
+    }
+  }, [walletType]);
 
   useEffect(() => {
     if (!availableIntegrations.length) {
@@ -477,11 +485,11 @@ export default function SwapScreen() {
   }, [chainId, dca, fetchBalances, screenMode, wallet]);
 
   const handleDisconnect = useCallback(async () => {
+    await disconnect();
     clearBalances();
     if (walletType === "privy") {
       await logout();
     }
-    disconnect();
     resetNetworkConfig();
     router.replace("/");
   }, [clearBalances, disconnect, logout, resetNetworkConfig, walletType]);
@@ -576,7 +584,8 @@ export default function SwapScreen() {
     setIsSubmitting(true);
 
     try {
-      const wantsSponsored = useSponsored && canUseSponsored;
+      const wantsSponsored =
+        walletType === "cartridge" || (useSponsored && canUseSponsored);
       addLog(
         `Submitting ${getSwapProviderLabel(selectedIntegration)} swap ${amount} ${fromToken.symbol} -> ${toToken.symbol}`
       );
@@ -639,6 +648,7 @@ export default function SwapScreen() {
     toToken,
     useSponsored,
     wallet,
+    walletType,
   ]);
 
   if (!wallet) {
@@ -936,12 +946,14 @@ export default function SwapScreen() {
                 </View>
               )}
 
-              <SponsoredToggle
-                useSponsored={useSponsored}
-                setUseSponsored={setUseSponsored}
-                canUseSponsored={canUseSponsored}
-                disabled={isSubmitting}
-              />
+              {!isCartridgeSession && (
+                <SponsoredToggle
+                  useSponsored={useSponsored}
+                  setUseSponsored={setUseSponsored}
+                  canUseSponsored={canUseSponsored}
+                  disabled={isSubmitting}
+                />
+              )}
 
               {sameToken && (
                 <ThemedText style={styles.errorText}>
@@ -997,6 +1009,7 @@ export default function SwapScreen() {
             useSponsored={useSponsored}
             setUseSponsored={setUseSponsored}
             canUseSponsored={canUseSponsored}
+            hideSponsoredToggle={isCartridgeSession}
             onOpenTokenPicker={handleOpenTokenPicker}
             tokenMetadataByAddress={tokenMetadataByAddress}
           />
