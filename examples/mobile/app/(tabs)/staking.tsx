@@ -214,11 +214,11 @@ export default function StakingScreen() {
   }, [wallet, chainId, fetchBalances, loadAllPositions]);
 
   const handleDisconnect = useCallback(async () => {
+    await disconnect();
     clearBalances();
     if (walletType === "privy") {
       await logout();
     }
-    disconnect();
     resetNetworkConfig();
     router.replace("/");
   }, [clearBalances, disconnect, resetNetworkConfig, walletType, logout]);

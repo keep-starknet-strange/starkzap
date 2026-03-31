@@ -163,6 +163,14 @@ export default function VesuScreen() {
   const allTokens = useMemo(() => getTokensForNetwork(chainId), [chainId]);
   const isVesuSupported = SUPPORTED_VESU_CHAINS.has(chainId.toLiteral());
   const canUseSponsored = Boolean(paymasterNodeUrl);
+  const sessionRequiresSponsored = walletType === "cartridge";
+  const executeOpts = useMemo(
+    () =>
+      getExecuteOptions(useSponsored, canUseSponsored, {
+        sessionRequiresSponsored,
+      }),
+    [useSponsored, canUseSponsored, sessionRequiresSponsored]
+  );
   const marketColumns = width >= 1200 ? 3 : width >= 760 ? 2 : 1;
   const columnWidth: ViewStyle["width"] =
     marketColumns === 1 ? "100%" : marketColumns === 2 ? "48.5%" : "32%";
@@ -217,16 +225,20 @@ export default function VesuScreen() {
   }, [resetDraftState]);
 
   const handleDisconnect = useCallback(async () => {
+    await disconnect();
     clearBalances();
     if (walletType === "privy") await logout();
-    disconnect();
     resetNetworkConfig();
     router.replace("/");
   }, [clearBalances, disconnect, resetNetworkConfig, walletType, logout]);
 
   useEffect(() => {
+    if (walletType === "cartridge") {
+      setUseSponsored(true);
+      return;
+    }
     setUseSponsored(preferSponsored && Boolean(paymasterNodeUrl));
-  }, [paymasterNodeUrl, preferSponsored]);
+  }, [paymasterNodeUrl, preferSponsored, walletType]);
 
   // Memo: asset options and market cards
   const assetOptions = useMemo(
@@ -817,7 +829,7 @@ export default function VesuScreen() {
 
   const handleVaultSubmit = useCallback(async () => {
     if (!wallet || !selectedVaultAsset) return;
-    const options = getExecuteOptions(useSponsored, canUseSponsored);
+    const options = executeOpts;
     const requestBase = {
       provider: VESU_PROVIDER_ID,
       ...(selectedVaultAsset.poolAddress
@@ -871,13 +883,13 @@ export default function VesuScreen() {
   }, [
     canUseSponsored,
     chainId,
+    executeOpts,
     fetchBalances,
     loadMarkets,
     loadUserPositions,
     refreshPosition,
     selectedVaultAsset,
     trackTransaction,
-    useSponsored,
     vaultAction,
     vaultAmount,
     wallet,
@@ -896,7 +908,7 @@ export default function VesuScreen() {
             : {}),
           token: selectedVaultAsset.token,
         },
-        getExecuteOptions(useSponsored, canUseSponsored)
+        executeOpts
       );
       addLog(`Vesu withdraw max submitted: ${tx.hash.slice(0, 10)}...`);
       await trackTransaction({
@@ -923,13 +935,13 @@ export default function VesuScreen() {
     addLog,
     canUseSponsored,
     chainId,
+    executeOpts,
     fetchBalances,
     loadMarkets,
     loadUserPositions,
     refreshPosition,
     selectedVaultAsset,
     trackTransaction,
-    useSponsored,
     wallet,
   ]);
 
@@ -977,7 +989,7 @@ export default function VesuScreen() {
 
     setIsSubmitting(true);
     try {
-      const options = getExecuteOptions(useSponsored, canUseSponsored);
+      const options = executeOpts;
       const isCollateralOnlyRepay =
         positionAction === "repay" && requestedDebtAmount.toBase() === 0n;
       const tx =
@@ -1060,6 +1072,7 @@ export default function VesuScreen() {
     collateralAmount,
     debtAmount,
     debtWalletBalance,
+    executeOpts,
     fetchBalances,
     isVesuSupported,
     loadMarkets,
@@ -1072,7 +1085,6 @@ export default function VesuScreen() {
     selectedVaultAsset,
     trackTransaction,
     useExistingSupply,
-    useSponsored,
     wallet,
   ]);
 
@@ -1239,45 +1251,53 @@ export default function VesuScreen() {
                 pool.
               </ThemedText>
 
-              {/* Sponsored toggle */}
+              {/* Sponsored toggle (hidden for Cartridge — session is sponsored-only) */}
               <View style={styles.sponsoredRow}>
                 <ThemedText style={[styles.label, { color: textSecondary }]}>
                   Sponsored Mode
                 </ThemedText>
-                <View
-                  style={[
-                    styles.sponsoredSwitch,
-                    !canUseSponsored && { opacity: 0.5 },
-                  ]}
-                >
-                  {(["Off", "On"] as const).map((label) => {
-                    const isOn = label === "On";
-                    const isActive = useSponsored === isOn;
-                    return (
-                      <TouchableOpacity
-                        key={label}
-                        style={[
-                          styles.sponsoredSegment,
-                          isActive && styles.sponsoredSegmentSelected,
-                        ]}
-                        onPress={() => setUseSponsored(isOn)}
-                        disabled={!canUseSponsored}
-                        activeOpacity={0.88}
-                      >
-                        <ThemedText
+                {sessionRequiresSponsored ? (
+                  <ThemedText
+                    style={[styles.smallText, { color: textSecondary }]}
+                  >
+                    On (Cartridge session)
+                  </ThemedText>
+                ) : (
+                  <View
+                    style={[
+                      styles.sponsoredSwitch,
+                      !canUseSponsored && { opacity: 0.5 },
+                    ]}
+                  >
+                    {(["Off", "On"] as const).map((label) => {
+                      const isOn = label === "On";
+                      const isActive = useSponsored === isOn;
+                      return (
+                        <TouchableOpacity
+                          key={label}
                           style={[
-                            styles.sponsoredText,
-                            isActive && { color: "#fff" },
+                            styles.sponsoredSegment,
+                            isActive && styles.sponsoredSegmentSelected,
                           ]}
+                          onPress={() => setUseSponsored(isOn)}
+                          disabled={!canUseSponsored}
+                          activeOpacity={0.88}
                         >
-                          {label}
-                        </ThemedText>
-                      </TouchableOpacity>
-                    );
-                  })}
-                </View>
+                          <ThemedText
+                            style={[
+                              styles.sponsoredText,
+                              isActive && { color: "#fff" },
+                            ]}
+                          >
+                            {label}
+                          </ThemedText>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                )}
               </View>
-              {!canUseSponsored && (
+              {!canUseSponsored && !sessionRequiresSponsored && (
                 <ThemedText
                   style={[styles.smallText, { color: textSecondary }]}
                 >

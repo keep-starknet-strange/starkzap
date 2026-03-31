@@ -173,6 +173,12 @@ export default function TransfersScreen() {
     preferSponsored && Boolean(paymasterNodeUrl)
   );
 
+  useEffect(() => {
+    if (walletType === "cartridge") {
+      setUseSponsored(true);
+    }
+  }, [walletType]);
+
   const borderColor = useThemeColor({}, "border");
   const primaryColor = useThemeColor({}, "primary");
   const textSecondary = useThemeColor({}, "textSecondary");
@@ -194,11 +200,11 @@ export default function TransfersScreen() {
   }, [wallet, chainId, fetchBalances]);
 
   const handleDisconnect = useCallback(async () => {
+    await disconnect();
     clearBalances();
     if (walletType === "privy") {
       await logout();
     }
-    disconnect();
     resetNetworkConfig();
     router.replace("/");
   }, [clearBalances, disconnect, resetNetworkConfig, walletType, logout]);
@@ -334,7 +340,8 @@ export default function TransfersScreen() {
         addLog(
           `Transferring ${token.symbol} to ${transfersData.length} recipient(s)...`
         );
-        const wantsSponsored = useSponsored && canUseSponsored;
+        const wantsSponsored =
+          walletType === "cartridge" || (useSponsored && canUseSponsored);
         const tx = await wallet.transfer(
           token,
           transfersData,
@@ -392,6 +399,7 @@ export default function TransfersScreen() {
     fetchBalances,
     useSponsored,
     canUseSponsored,
+    walletType,
   ]);
 
   if (!wallet) {
@@ -663,54 +671,68 @@ export default function TransfersScreen() {
                     >
                       Sponsored
                     </ThemedText>
-                    <View
-                      style={[
-                        styles.sponsoredSwitchWrapperCompact,
-                        (!canUseSponsored || isSubmitting) &&
-                          styles.sponsoredSwitchDisabled,
-                      ]}
-                      pointerEvents={
-                        !canUseSponsored || isSubmitting ? "none" : "auto"
-                      }
-                    >
-                      <TouchableOpacity
+                    {walletType === "cartridge" ? (
+                      <ThemedText
                         style={[
-                          styles.sponsoredSwitchSegmentCompact,
-                          !useSponsored &&
-                            styles.sponsoredSwitchSegmentSelected,
+                          styles.sponsoredSwitchTextCompact,
+                          { color: textSecondary, marginLeft: 8 },
                         ]}
-                        onPress={() => setUseSponsored(false)}
-                        disabled={!canUseSponsored || isSubmitting}
-                        activeOpacity={0.88}
                       >
-                        <ThemedText
-                          style={[
-                            styles.sponsoredSwitchTextCompact,
-                            !useSponsored && styles.sponsoredSwitchTextSelected,
-                          ]}
-                        >
-                          Off
-                        </ThemedText>
-                      </TouchableOpacity>
-                      <TouchableOpacity
+                        On (Cartridge session)
+                      </ThemedText>
+                    ) : (
+                      <View
                         style={[
-                          styles.sponsoredSwitchSegmentCompact,
-                          useSponsored && styles.sponsoredSwitchSegmentSelected,
+                          styles.sponsoredSwitchWrapperCompact,
+                          (!canUseSponsored || isSubmitting) &&
+                            styles.sponsoredSwitchDisabled,
                         ]}
-                        onPress={() => setUseSponsored(true)}
-                        disabled={!canUseSponsored || isSubmitting}
-                        activeOpacity={0.88}
+                        pointerEvents={
+                          !canUseSponsored || isSubmitting ? "none" : "auto"
+                        }
                       >
-                        <ThemedText
+                        <TouchableOpacity
                           style={[
-                            styles.sponsoredSwitchTextCompact,
-                            useSponsored && styles.sponsoredSwitchTextSelected,
+                            styles.sponsoredSwitchSegmentCompact,
+                            !useSponsored &&
+                              styles.sponsoredSwitchSegmentSelected,
                           ]}
+                          onPress={() => setUseSponsored(false)}
+                          disabled={!canUseSponsored || isSubmitting}
+                          activeOpacity={0.88}
                         >
-                          On
-                        </ThemedText>
-                      </TouchableOpacity>
-                    </View>
+                          <ThemedText
+                            style={[
+                              styles.sponsoredSwitchTextCompact,
+                              !useSponsored &&
+                                styles.sponsoredSwitchTextSelected,
+                            ]}
+                          >
+                            Off
+                          </ThemedText>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          style={[
+                            styles.sponsoredSwitchSegmentCompact,
+                            useSponsored &&
+                              styles.sponsoredSwitchSegmentSelected,
+                          ]}
+                          onPress={() => setUseSponsored(true)}
+                          disabled={!canUseSponsored || isSubmitting}
+                          activeOpacity={0.88}
+                        >
+                          <ThemedText
+                            style={[
+                              styles.sponsoredSwitchTextCompact,
+                              useSponsored &&
+                                styles.sponsoredSwitchTextSelected,
+                            ]}
+                          >
+                            On
+                          </ThemedText>
+                        </TouchableOpacity>
+                      </View>
+                    )}
                   </View>
                 )}
                 {transfer.token && getBalance(transfer.token) != null && (
@@ -724,16 +746,18 @@ export default function TransfersScreen() {
                   </ThemedText>
                 )}
               </View>
-              {index === 0 && !canUseSponsored && (
-                <ThemedText
-                  style={[
-                    styles.sponsoredHintCompact,
-                    { color: textSecondary },
-                  ]}
-                >
-                  Paymaster not configured
-                </ThemedText>
-              )}
+              {index === 0 &&
+                !canUseSponsored &&
+                walletType !== "cartridge" && (
+                  <ThemedText
+                    style={[
+                      styles.sponsoredHintCompact,
+                      { color: textSecondary },
+                    ]}
+                  >
+                    Paymaster not configured
+                  </ThemedText>
+                )}
             </View>
 
             <View style={styles.fieldContainer}>

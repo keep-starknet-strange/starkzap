@@ -133,11 +133,11 @@ export default function ConfidentialScreen() {
   const [isRagequitting, setIsRagequitting] = useState(false);
 
   const handleDisconnect = useCallback(async () => {
+    await disconnect();
     clearBalances();
     if (walletType === "privy") {
       await logout();
     }
-    disconnect();
     resetNetworkConfig();
     router.replace("/");
   }, [clearBalances, disconnect, resetNetworkConfig, walletType, logout]);

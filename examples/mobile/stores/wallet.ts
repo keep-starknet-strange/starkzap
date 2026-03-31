@@ -38,6 +38,10 @@ import {
 import { swapProviders } from "@/swaps";
 import { getDcaProviders } from "@/dca";
 import { getNetworkSelectionPatch } from "@/network-selection";
+import {
+  ensureCartridgeAdapterRegistered,
+  resolveCartridgeConfig,
+} from "@/cartridge-setup";
 
 // Privy server URL - change this to your server URL
 export const PRIVY_SERVER_URL = process.env.EXPO_PUBLIC_PRIVY_SERVER_URL ?? "";
@@ -114,7 +118,7 @@ interface WalletState {
   selectedPreset: string;
 
   // Privy state
-  walletType: "privatekey" | "privy" | null;
+  walletType: "privatekey" | "privy" | "cartridge" | null;
   privyEmail: string;
   privySelectedPreset: string;
   privyWalletId: string | null;
@@ -191,7 +195,8 @@ interface WalletState {
     email: string,
     accessToken: string
   ) => Promise<void>;
-  disconnect: () => void;
+  connectWithCartridge: () => Promise<void>;
+  disconnect: () => Promise<void>;
   checkDeploymentStatus: () => Promise<void>;
   deploy: () => Promise<void>;
 }
@@ -346,24 +351,31 @@ function createConfiguredSdkState(params: {
   };
 }
 
+function buildCommonOnboardOptions(params?: { preferSponsored?: boolean }) {
+  const dcaProviders = getDcaProviders();
+
+  return {
+    deploy: "never" as const,
+    ...(params?.preferSponsored ? { feeMode: "sponsored" as const } : {}),
+    swapProviders,
+    defaultSwapProviderId: swapProviders[0]?.id,
+    dcaProviders,
+    defaultDcaProviderId: dcaProviders[0]?.id,
+  };
+}
+
 async function onboardPrivateKeyWallet(params: {
   sdk: StarkZap;
   privateKey: string;
   selectedPreset: string;
   preferSponsored: boolean;
 }): Promise<WalletInterface> {
-  const dcaProviders = getDcaProviders();
   const signer = new StarkSigner(params.privateKey.trim());
   const onboard = await params.sdk.onboard({
     strategy: OnboardStrategy.Signer,
-    deploy: "never",
-    ...(params.preferSponsored && { feeMode: "sponsored" as const }),
+    ...buildCommonOnboardOptions({ preferSponsored: params.preferSponsored }),
     account: { signer },
     accountPreset: PRESETS[params.selectedPreset],
-    swapProviders,
-    defaultSwapProviderId: swapProviders[0]?.id,
-    dcaProviders,
-    defaultDcaProviderId: dcaProviders[0]?.id,
   });
 
   return onboard.wallet;
@@ -377,16 +389,10 @@ async function onboardPrivyWallet(params: {
   privySelectedPreset: string;
   preferSponsored: boolean;
 }): Promise<WalletInterface> {
-  const dcaProviders = getDcaProviders();
   const onboard = await params.sdk.onboard({
     strategy: OnboardStrategy.Privy,
-    deploy: "never",
-    ...(params.preferSponsored && { feeMode: "sponsored" as const }),
+    ...buildCommonOnboardOptions({ preferSponsored: params.preferSponsored }),
     accountPreset: PRESETS[params.privySelectedPreset],
-    swapProviders,
-    defaultSwapProviderId: swapProviders[0]?.id,
-    dcaProviders,
-    defaultDcaProviderId: dcaProviders[0]?.id,
     privy: {
       resolve: async () => ({
         walletId: params.walletId,
@@ -394,6 +400,27 @@ async function onboardPrivyWallet(params: {
         serverUrl: `${PRIVY_SERVER_URL}/api/wallet/sign`,
         headers: { Authorization: `Bearer ${params.accessToken}` },
       }),
+    },
+  });
+
+  return onboard.wallet;
+}
+
+const DEFAULT_CARTRIDGE_URL = "https://x.cartridge.gg";
+
+async function onboardCartridgeWallet(params: {
+  sdk: StarkZap;
+  cartridge: { preset: string; url?: string; redirectUrl?: string };
+}): Promise<WalletInterface> {
+  const onboard = await params.sdk.onboard({
+    strategy: OnboardStrategy.Cartridge,
+    ...buildCommonOnboardOptions({ preferSponsored: true }),
+    cartridge: {
+      preset: params.cartridge.preset,
+      url: params.cartridge.url ?? DEFAULT_CARTRIDGE_URL,
+      ...(params.cartridge.redirectUrl
+        ? { redirectUrl: params.cartridge.redirectUrl }
+        : {}),
     },
   });
 
@@ -438,6 +465,12 @@ async function rebindWallet(
       privySelectedPreset: state.privySelectedPreset,
       preferSponsored: state.preferSponsored,
     });
+  }
+
+  if (state.walletType === "cartridge") {
+    throw new Error(
+      "Cartridge sessions are tied to one network. Disconnect, choose the network on the home screen, then connect with Cartridge again."
+    );
   }
 
   return state.wallet;
@@ -1252,8 +1285,81 @@ export const useWalletStore = create<WalletState>((set, get) => ({
     }
   },
 
-  disconnect: () => {
-    const { addLog, networkSwitchRequestId } = get();
+  connectWithCartridge: async () => {
+    const { sdk, addLog } = get();
+
+    if (!sdk) {
+      Alert.alert(
+        "Error",
+        "SDK not configured. Please configure network first."
+      );
+      return;
+    }
+
+    const config = resolveCartridgeConfig();
+    if (!config) {
+      Alert.alert(
+        "Cartridge not configured",
+        "Set EXPO_PUBLIC_CARTRIDGE_PRESET in your .env file to enable Cartridge login."
+      );
+      return;
+    }
+
+    const state = get();
+    const requestId = state.networkSwitchRequestId + 1;
+    const isCurrentRequest = () => get().networkSwitchRequestId === requestId;
+
+    set({ isConnecting: true, networkSwitchRequestId: requestId });
+    addLog("Connecting with Cartridge...");
+
+    try {
+      await ensureCartridgeAdapterRegistered(config.redirectUrl);
+      if (!isCurrentRequest()) return;
+
+      const connectedWallet = await onboardCartridgeWallet({
+        sdk,
+        cartridge: {
+          preset: config.preset,
+          ...(config.url ? { url: config.url } : {}),
+          ...(config.redirectUrl ? { redirectUrl: config.redirectUrl } : {}),
+        },
+      });
+      if (!isCurrentRequest()) return;
+
+      set({
+        wallet: connectedWallet,
+        walletType: "cartridge",
+        privateKey: "",
+        privyWalletId: null,
+        privyPublicKey: null,
+      });
+      if (!isCurrentRequest()) return;
+
+      addLog(`Connected: ${truncateAddress(connectedWallet.address)}`);
+
+      await get().checkDeploymentStatus();
+    } catch (err) {
+      if (!isCurrentRequest()) return;
+      addLog(`Cartridge connection failed: ${err}`);
+      Alert.alert("Connection Failed", String(err));
+    } finally {
+      if (isCurrentRequest()) {
+        set({ isConnecting: false });
+      }
+    }
+  },
+
+  disconnect: async () => {
+    const { wallet, walletType, addLog, networkSwitchRequestId } = get();
+
+    if (walletType === "cartridge" && wallet) {
+      try {
+        await wallet.disconnect();
+      } catch (err) {
+        console.warn("Cartridge wallet disconnect failed:", err);
+      }
+    }
+
     set({
       isConnecting: false,
       isCheckingStatus: false,

@@ -7,7 +7,8 @@ React Native + Expo app showing how to integrate `starkzap-native` in a mobile c
 - Configure Starknet network at runtime (Sepolia, Mainnet, or custom RPC).
 - Connect with a local private key via `sdk.onboard({ strategy: OnboardStrategy.Signer })`.
 - Connect with Privy via `sdk.onboard({ strategy: OnboardStrategy.Privy })`.
-- Check account deployment status and deploy when needed.
+- Connect with Cartridge via `sdk.onboard({ strategy: OnboardStrategy.Cartridge, deploy: "never", feeMode: "sponsored", cartridge: { ... } })` when `EXPO_PUBLIC_CARTRIDGE_PRESET` is set (Expo `registerCartridgeTsAdapter` + `expo-web-browser` redirect flow; see `cartridge-setup.ts`).
+- Check account deployment status and deploy when needed (deploy UI is hidden for Cartridge sessions; use private key or Privy to try deployment in this example).
 - Read balances, send transfers, execute Ekubo swaps, use Vesu lending/vault flows, and use staking flows.
 - Use sponsored transactions when a paymaster proxy is configured.
 
@@ -30,6 +31,14 @@ Set these values in `.env`:
 - `EXPO_PUBLIC_PRIVY_SERVER_URL`: backend URL used by the app for Privy wallet/sign endpoints.
 - `EXPO_PUBLIC_PRIVY_CLIENT_ID`: optional Privy client id for the Expo provider.
 - `EXPO_PUBLIC_PAYMASTER_PROXY_URL`: optional paymaster proxy URL. If omitted, the example only auto-derives `${EXPO_PUBLIC_PRIVY_SERVER_URL}/api/paymaster` on Sepolia. Mainnet requires an explicit paymaster URL.
+
+**Cartridge (optional)**
+
+- `EXPO_PUBLIC_CARTRIDGE_PRESET`: **required** to show Cartridge login. Must be a valid Cartridge preset name for your chain (policies resolve from Cartridge).
+- `EXPO_PUBLIC_CARTRIDGE_URL`: optional Cartridge web URL; defaults to `https://x.cartridge.gg` when omitted.
+- `EXPO_PUBLIC_CARTRIDGE_REDIRECT_URL`: optional OAuth redirect URL. If unset, the app uses `Linking.createURL("cartridge/callback")` (scheme from `app.json`, e.g. `mobile://...`). Any custom URL must be allowed in your Cartridge project settings.
+
+While connected with Cartridge, **in-app network switching is disabled**; disconnect, pick the network on the home screen, then connect again.
 
 ## Install and run
 
@@ -57,9 +66,10 @@ Note: this example depends on the local native package via `"starkzap-native": "
 
 ## SDK integration points in this app
 
-- `entrypoint.js`: installs required polyfills via `starkzap-native/install` before Expo startup.
-- `metro.config.js`: uses minimal monorepo resolution and package-exports compatibility overrides.
-- `stores/wallet.ts`: creates `StarkZap`, configures paymaster, and handles signer/Privy onboarding.
+- **Entry**: Expo's default `expo-router/entry` (see `package.json` `"main"`). There is no separate `entrypoint.js` in this example; the app boots through Expo Router.
+- `metro.config.js`: `withStarkzap` from `starkzap-native/metro` plus minimal monorepo resolution and package-exports compatibility overrides.
+- `cartridge-setup.ts`: one-time `registerCartridgeTsAdapter` with `expo-web-browser` auth session (imported from the wallet store so `WebBrowser.maybeCompleteAuthSession()` runs at startup).
+- `stores/wallet.ts`: creates `StarkZap`, configures paymaster, and handles signer/Privy/Cartridge onboarding.
 - `app/index.tsx`: connection screen and network setup flow.
 - `app/(tabs)/vesu.tsx`: Vesu Lite-inspired market cards with live supply/borrow stats when available, plus vault deposit/withdraw, withdraw max, and borrow/repay health previews.
 - `app/(tabs)/*`: balances, transfers, swap, and staking screens.
@@ -122,5 +132,7 @@ Run the backend separately in `examples/server` and point `EXPO_PUBLIC_PRIVY_SER
 
 - Privy button disabled: `EXPO_PUBLIC_PRIVY_APP_ID` is missing.
 - Privy login/signing errors: verify `EXPO_PUBLIC_PRIVY_SERVER_URL` and backend health.
+- Cartridge login missing: set `EXPO_PUBLIC_CARTRIDGE_PRESET` and restart Metro. Preset/load errors surface in alerts and the logs panel.
+- Cartridge redirect fails: ensure the redirect URL matches your app scheme (`mobile` in `app.json`) or set `EXPO_PUBLIC_CARTRIDGE_REDIRECT_URL` to an allowlisted URL.
 - Sponsored toggle disabled: `EXPO_PUBLIC_PAYMASTER_PROXY_URL` is not configured, or you are on Mainnet without an explicit paymaster URL.
 - Metro module resolution issues after dependency changes: run `npm run start -- --clear` (or `npx expo start -c`).

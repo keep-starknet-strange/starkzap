@@ -85,6 +85,8 @@ export interface DcaPanelProps {
   useSponsored: boolean;
   setUseSponsored: (value: boolean) => void;
   canUseSponsored: boolean;
+  /** When true, sponsored mode is fixed (Cartridge); hide the Off/On control. */
+  hideSponsoredToggle?: boolean;
   onOpenTokenPicker: (mode: "dca-from" | "dca-to") => void;
   tokenMetadataByAddress: Map<string, Token>;
 }
@@ -99,6 +101,7 @@ export function DcaPanel({
   useSponsored,
   setUseSponsored,
   canUseSponsored,
+  hideSponsoredToggle = false,
   onOpenTokenPicker,
   tokenMetadataByAddress,
 }: DcaPanelProps) {
@@ -410,12 +413,14 @@ export function DcaPanel({
           </View>
         </View>
 
-        <SponsoredToggle
-          useSponsored={useSponsored}
-          setUseSponsored={setUseSponsored}
-          canUseSponsored={canUseSponsored}
-          disabled={isDcaSubmitting || cancellingDcaOrderId != null}
-        />
+        {!hideSponsoredToggle && (
+          <SponsoredToggle
+            useSponsored={useSponsored}
+            setUseSponsored={setUseSponsored}
+            canUseSponsored={canUseSponsored}
+            disabled={isDcaSubmitting || cancellingDcaOrderId != null}
+          />
+        )}
 
         {dcaSameToken && (
           <ThemedText style={styles.errorText}>
