@@ -56,9 +56,11 @@ interface AttestationData {
 }
 
 const SAMPLE_BLOCKS = 10;
-const SAFETY_BUFFER_BLOCKS = 20;
-// Standard CCTP attestation can take up to ~20-30 min; use 40 min to be safe.
-const CCTP_MAX_RELAY_SECONDS = 2400;
+// Extra backward margin to absorb avgBlockTime estimation error for old txs.
+const SAFETY_BUFFER_BLOCKS = 100;
+// Standard CCTP attestation can take up to ~20-30 min but relayer lag has been
+// observed pushing delivery past 1 hour; use 2 hours to be safe.
+const CCTP_MAX_RELAY_SECONDS = 7200;
 
 export class CctpMonitor implements BridgeMonitorInterface {
   private readonly chainId: ChainId;
