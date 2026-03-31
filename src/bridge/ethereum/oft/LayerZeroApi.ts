@@ -135,7 +135,13 @@ export class LayerZeroApi {
     );
     if (!bridgeStep) return [];
     const encoded = bridgeStep.transaction.encoded;
-    if (!("calls" in encoded) || !Array.isArray(encoded.calls)) return [];
+    if (
+      encoded == null ||
+      typeof encoded !== "object" ||
+      !("calls" in encoded) ||
+      !Array.isArray(encoded.calls)
+    )
+      return [];
     return (encoded as StarknetEncodedTransaction).calls;
   }
 
