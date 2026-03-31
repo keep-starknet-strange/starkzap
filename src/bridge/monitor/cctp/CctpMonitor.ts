@@ -1,6 +1,6 @@
-import type { RpcProvider } from "starknet";
+import { num, hash, type RpcProvider, uint256 } from "starknet";
 import type { Provider } from "ethers";
-import type { ChainId } from "@/types";
+import { type Address, type ChainId, fromAddress } from "@/types";
 import { resolveFetch } from "@/utils";
 import type { BridgeMonitorInterface } from "@/bridge/monitor/BridgeMonitorInterface";
 import {
@@ -18,7 +18,9 @@ import {
   getEthereumTxStatus,
 } from "@/bridge/monitor/utils";
 import {
+  ETHEREUM_DOMAIN_ID,
   getCircleApiBaseUrl,
+  getTokenMessenger,
   STARKNET_DOMAIN_ID,
 } from "@/bridge/ethereum/cctp/constants";
 
@@ -53,11 +55,19 @@ interface AttestationData {
   expirationBlock?: number;
 }
 
+const SAMPLE_BLOCKS = 10;
+const SAFETY_BUFFER_BLOCKS = 20;
+
 export class CctpMonitor implements BridgeMonitorInterface {
   private readonly chainId: ChainId;
   private readonly starknetProvider: RpcProvider;
   private readonly ethereumProvider: Provider;
   private readonly fetchFn: typeof fetch;
+  private messageTransmitterPromise: Promise<Address> | undefined;
+
+  private messageReceivedKey = num.toHex(
+    hash.starknetKeccak("MessageReceived")
+  );
 
   constructor(options: CctpMonitorOptions) {
     this.chainId = options.chainId;
@@ -78,14 +88,43 @@ export class CctpMonitor implements BridgeMonitorInterface {
       return { status, externalTxHash, starknetTxHash };
     }
 
-    // For CCTP deposits, we can only check the L1 burn tx status.
-    // The L2 mint tx hash cannot be deterministically derived without Circle's API.
-    // TODO
-    const { status } = await getEthereumTxStatus(
+    const { status: l1Status, receipt } = await getEthereumTxStatus(
       externalTxHash,
       this.ethereumProvider
     );
-    return { status, externalTxHash };
+
+    if (l1Status !== BridgeTransferStatus.CONFIRMED_ON_L1 || !receipt) {
+      return { status: l1Status, externalTxHash };
+    }
+
+    // L1 confirmed — query Circle for the attestation nonce.
+    const attestation = await this.tryFetchDepositAttestation(externalTxHash);
+
+    if (
+      !attestation ||
+      attestation.status !== "complete" ||
+      !attestation.nonce
+    ) {
+      return { status: BridgeTransferStatus.CONFIRMED_ON_L1, externalTxHash };
+    }
+
+    // Attestation complete — try to find the Starknet mint tx by nonce.
+    const l1Block = await receipt.getBlock();
+    const snTxHash = await this.findDepositTxOnSn(
+      l1Block.timestamp,
+      attestation.nonce
+    );
+
+    if (!snTxHash) {
+      // Circle has attested but the relayer hasn't submitted on Starknet yet.
+      return { status: BridgeTransferStatus.CONFIRMED_ON_L1, externalTxHash };
+    }
+
+    const snStatus = await checkStarknetTxStatus(
+      snTxHash,
+      this.starknetProvider
+    );
+    return { status: snStatus, externalTxHash, starknetTxHash: snTxHash };
   }
 
   async monitorWithdrawal(
@@ -242,5 +281,103 @@ export class CctpMonitor implements BridgeMonitorInterface {
     } catch {
       return null;
     }
+  }
+
+  private async findDepositTxOnSn(
+    l1Timestamp: number,
+    nonce: string
+  ): Promise<string | null> {
+    try {
+      const messageTransmitter = await this.getMessageTransmitter();
+      const fromBlock =
+        await this.inferStarknetBlockNumberByL1Timestamp(l1Timestamp);
+      const { low: nonceLow, high: nonceHigh } = uint256.bnToUint256(
+        BigInt(nonce)
+      );
+
+      const response = await this.starknetProvider.getEvents({
+        address: messageTransmitter,
+        keys: [
+          [this.messageReceivedKey], // keys[0]: event selector
+          [], // keys[1]: caller — ignore
+          [String(nonceLow)], // keys[2]: nonce.low
+          [String(nonceHigh)], // keys[3]: nonce.high
+        ],
+        from_block: { block_number: fromBlock },
+        to_block: "latest", // TODO: Possible improvement. Maybe find a toBlock.
+        chunk_size: 100,
+      });
+
+      // data layout: [source_domain, sender.low, sender.high, ...message_body]
+      const match = response.events.find((e) => {
+        return e.data[0] === "0x0"; // source_domain = Ethereum
+      });
+
+      return match?.transaction_hash ?? null;
+    } catch {
+      return null;
+    }
+  }
+
+  private async tryFetchDepositAttestation(
+    ethTxHash: string
+  ): Promise<AttestationData | null> {
+    const baseUrl = getCircleApiBaseUrl(this.chainId);
+    const url = `${baseUrl}/v2/messages/${ETHEREUM_DOMAIN_ID}?transactionHash=${ethTxHash}`;
+
+    try {
+      const response = await this.fetchFn(url, {
+        method: "GET",
+        headers: { Accept: "application/json" },
+      });
+      if (!response.ok) return null;
+      const data = (await response.json()) as CCTPMessagesResponse;
+
+      const message = data.messages[0] ?? null;
+      if (!message) return null;
+
+      const isComplete =
+        message.status === "complete" && message.attestation !== "PENDING";
+      return {
+        status: isComplete ? "complete" : "pending",
+        ...(message.decodedMessage?.nonce !== undefined && {
+          nonce: message.decodedMessage.nonce,
+        }),
+      };
+    } catch {
+      return null;
+    }
+  }
+
+  private async inferStarknetBlockNumberByL1Timestamp(
+    l1Timestamp: number
+  ): Promise<number> {
+    const latest = await this.starknetProvider.getBlock();
+    const sample = await this.starknetProvider.getBlock(
+      latest.block_number - SAMPLE_BLOCKS
+    );
+    const avgBlockTime = (latest.timestamp - sample.timestamp) / SAMPLE_BLOCKS;
+
+    const now = Math.floor(Date.now() / 1000);
+    const secondsSinceL1Confirm = now - l1Timestamp;
+    return Math.max(
+      0,
+      latest.block_number -
+        Math.ceil(secondsSinceL1Confirm / avgBlockTime) -
+        SAFETY_BUFFER_BLOCKS
+    );
+  }
+
+  private getMessageTransmitter(): Promise<Address> {
+    this.messageTransmitterPromise ??= this.starknetProvider
+      .callContract({
+        contractAddress: getTokenMessenger(this.chainId),
+        entrypoint: "local_message_transmitter",
+      })
+      .then((result) => {
+        const address = num.toHex(result[0]!);
+        return fromAddress(address);
+      });
+    return this.messageTransmitterPromise;
   }
 }
