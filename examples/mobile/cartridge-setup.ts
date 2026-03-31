@@ -136,6 +136,7 @@ function loadNativeModule(): Promise<StarkZapNativeModule> {
 
 let didRegisterCartridgeAdapter = false;
 let adapterRegistrationPromise: Promise<void> | null = null;
+let adapterRegistrationError: unknown = null;
 
 export async function ensureCartridgeAdapterRegistered(
   defaultRedirectUrl?: string
@@ -143,14 +144,22 @@ export async function ensureCartridgeAdapterRegistered(
   if (didRegisterCartridgeAdapter) {
     return;
   }
+  if (adapterRegistrationError) {
+    throw adapterRegistrationError;
+  }
   if (adapterRegistrationPromise) {
     return adapterRegistrationPromise;
   }
 
   adapterRegistrationPromise = (async () => {
-    const native = await loadNativeModule();
-    registerTsCartridgeAdapter(native, defaultRedirectUrl);
-    didRegisterCartridgeAdapter = true;
+    try {
+      const native = await loadNativeModule();
+      registerTsCartridgeAdapter(native, defaultRedirectUrl);
+      didRegisterCartridgeAdapter = true;
+    } catch (error) {
+      adapterRegistrationError = error;
+      throw error;
+    }
   })();
 
   try {
