@@ -6,10 +6,10 @@ import type {
 } from "@/bridge/types/BridgeInterface";
 import {
   DUMMY_SN_ADDRESS,
+  type EthereumCompleteWithdrawFeeEstimation,
+  type EthereumInitiateWithdrawFeeEstimation,
   type EthereumWalletConfig,
   type OftDepositFeeEstimation,
-  EthereumInitiateWithdrawFeeEstimation,
-  EthereumCompleteWithdrawFeeEstimation,
 } from "@/bridge/ethereum/types";
 import type {
   Address,

@@ -205,7 +205,8 @@ export class LayerZeroApi {
     if (!quote) return null;
     try {
       const step = quote.userSteps.find((s) => s.description === description);
-      return step?.transaction.encoded ?? null;
+      if (!step) return null;
+      return step.transaction.encoded as ContractTransaction;
     } catch {
       return null;
     }
