@@ -286,21 +286,39 @@ export class BridgeOperator implements BridgeOperatorInterface {
 
       case Protocol.OFT: {
         const { OftMonitor } = await import("@/bridge/monitor/oft/OftMonitor");
+        const apiKey = this.bridgingConfig?.layerZeroApiKey;
+        if (!apiKey) {
+          throw new Error(
+            "OFT bridging requires a LayerZero API key. " +
+              'Set "bridging.layerZeroApiKey" in the SDK configuration.'
+          );
+        }
+
         return new OftMonitor({
+          chainId: this.starknetWallet.getChainId(),
           starknetProvider: this.starknetWallet.getProvider(),
           ethereumProvider,
           protocol: ethToken.protocol,
+          layerZeroApiKey: apiKey,
         });
       }
 
       case Protocol.OFT_MIGRATED: {
-        const { OftMigratedMonitor } =
-          await import("@/bridge/monitor/oft/OftMigratedMonitor");
-        return new OftMigratedMonitor({
+        const { OftMonitor } = await import("@/bridge/monitor/oft/OftMonitor");
+        const apiKey = this.bridgingConfig?.layerZeroApiKey;
+        if (!apiKey) {
+          throw new Error(
+            "OFT bridging requires a LayerZero API key. " +
+              'Set "bridging.layerZeroApiKey" in the SDK configuration.'
+          );
+        }
+
+        return new OftMonitor({
           chainId: this.starknetWallet.getChainId(),
           starknetProvider: this.starknetWallet.getProvider(),
           ethereumProvider,
-          fetchFn: resolveFetch(undefined),
+          protocol: ethToken.protocol,
+          layerZeroApiKey: apiKey,
         });
       }
 

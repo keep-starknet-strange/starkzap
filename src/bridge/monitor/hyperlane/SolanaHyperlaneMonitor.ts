@@ -223,10 +223,10 @@ export class SolanaHyperlaneMonitor implements BridgeMonitorInterface {
   }
 
   private async checkSolanaDelivery(snTxHash: string): Promise<boolean> {
-    const hyperlane = this.hyperlane!;
-    const multiProvider = this.multiProtocolProvider!;
-    const solanaChain = this.solanaChainName!;
-    const solanaMailbox = this.solanaMailbox!;
+    const hyperlane = this.hyperlane;
+    const multiProvider = this.multiProtocolProvider;
+    const solanaChain = this.solanaChainName;
+    const solanaMailbox = this.solanaMailbox;
 
     try {
       const receipt =

@@ -300,8 +300,8 @@ export class CctpMonitor implements BridgeMonitorInterface {
         keys: [
           [this.messageReceivedKey], // keys[0]: event selector
           [], // keys[1]: caller — ignore
-          [String(nonceLow)], // keys[2]: nonce.low
-          [String(nonceHigh)], // keys[3]: nonce.high
+          [num.toHex(nonceLow)], // keys[2]: nonce.low
+          [num.toHex(nonceHigh)], // keys[3]: nonce.high
         ],
         from_block: { block_number: fromBlock },
         to_block: "latest", // TODO: Possible improvement. Maybe find a toBlock.
