@@ -12,6 +12,7 @@ import { SafeAreaProvider } from "react-native-safe-area-context";
 import "react-native-reanimated";
 
 import { useColorScheme } from "@/hooks/use-color-scheme";
+import "@/cartridge-setup";
 import { AppToast } from "@/components/Toast";
 import { PrivyWrapper } from "@/providers/privy";
 import { appKit } from "@/providers/appkit";

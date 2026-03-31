@@ -68,7 +68,7 @@ Note: this example depends on the local native package via `"starkzap-native": "
 
 - **Entry**: Expo's default `expo-router/entry` (see `package.json` `"main"`). There is no separate `entrypoint.js` in this example; the app boots through Expo Router.
 - `metro.config.js`: `withStarkzap` from `starkzap-native/metro` plus minimal monorepo resolution and package-exports compatibility overrides.
-- `cartridge-setup.ts`: one-time `registerCartridgeTsAdapter` with `expo-web-browser` auth session (imported from the wallet store so `WebBrowser.maybeCompleteAuthSession()` runs at startup).
+- `cartridge-setup.ts`: one-time `registerCartridgeTsAdapter` with `expo-web-browser` auth session. Import it from `app/_layout.tsx` so `WebBrowser.maybeCompleteAuthSession()` runs on cold start (before tabs load). The wallet store imports the same module for `ensureCartridgeAdapterRegistered` during Cartridge connect.
 - `stores/wallet.ts`: creates `StarkZap`, configures paymaster, and handles signer/Privy/Cartridge onboarding.
 - `app/index.tsx`: connection screen and network setup flow.
 - `app/(tabs)/vesu.tsx`: Vesu Lite-inspired market cards with live supply/borrow stats when available, plus vault deposit/withdraw, withdraw max, and borrow/repay health previews.

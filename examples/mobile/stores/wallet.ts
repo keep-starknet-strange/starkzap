@@ -1411,8 +1411,17 @@ export const useWalletStore = create<WalletState>((set, get) => ({
   },
 
   deploy: async () => {
-    const { wallet, chainId, addLog, checkDeploymentStatus } = get();
+    const { wallet, chainId, addLog, checkDeploymentStatus, walletType } =
+      get();
     if (!wallet) return;
+
+    if (walletType === "cartridge") {
+      Alert.alert(
+        "Deploy not available",
+        "Account deployment from this example app is not supported for Cartridge sessions. Disconnect, pick the network on the home screen, and reconnect with Cartridge if needed."
+      );
+      return;
+    }
 
     set({ isConnecting: true });
     addLog("Deploying account...");
