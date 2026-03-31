@@ -170,7 +170,7 @@ export class CCTPBridge extends EthereumBridge {
         fromEthereumAddress("0x0000000000000000000000000000000000000001", {
           getAddress,
         }),
-        await this.ethereumToken.amount(1n),
+        await this.token.amount(1n),
         fastTransfer
       ),
       this.cctpFees.getMinimumFeeBps(
@@ -383,7 +383,7 @@ export class CCTPBridge extends EthereumBridge {
     fastTransferFeeBps?: number,
     fastTransfer?: boolean
   ): Promise<TransactionRequest> {
-    const usdcToken = this.ethereumToken as ERC20EthereumToken;
+    const usdcToken = this.token as ERC20EthereumToken;
     const usdcAddress = await usdcToken.getAddress();
     const feeBps =
       fastTransferFeeBps ??

@@ -50,7 +50,7 @@ export abstract class EthereumBridge implements BridgeInterface<EthereumAddress>
     current: Amount | null;
     timestamp: number;
   };
-  protected readonly ethereumToken: EthereumTokenInterface;
+  protected readonly token: EthereumTokenInterface;
   protected readonly starknetToken: Erc20;
   protected readonly bridge: Contract;
 
@@ -64,7 +64,7 @@ export abstract class EthereumBridge implements BridgeInterface<EthereumAddress>
       current: null,
       timestamp: 0,
     };
-    this.ethereumToken = intoEthereumToken(bridgeToken, config);
+    this.token = intoEthereumToken(bridgeToken, config);
     this.bridge = new Contract(
       bridgeToken.bridgeAddress,
       bridgeAbi,
@@ -87,7 +87,7 @@ export abstract class EthereumBridge implements BridgeInterface<EthereumAddress>
   ): Promise<BridgeDepositFeeEstimation>;
 
   async getAvailableDepositBalance(account: EthereumAddress): Promise<Amount> {
-    return this.ethereumToken.balanceOf(account);
+    return this.token.balanceOf(account);
   }
 
   async getAllowance(): Promise<Amount | null> {
@@ -101,7 +101,7 @@ export abstract class EthereumBridge implements BridgeInterface<EthereumAddress>
       EthereumBridge.ALLOWANCE_CACHE_TTL
     ) {
       const signerAddress = await this.config.signer.getAddress();
-      const allowance = await this.ethereumToken.allowance(
+      const allowance = await this.token.allowance(
         fromEthereumAddress(signerAddress, { getAddress }),
         allowanceSpender
       );
@@ -191,11 +191,7 @@ export abstract class EthereumBridge implements BridgeInterface<EthereumAddress>
       return;
     }
 
-    const tx = await this.ethereumToken.approve(
-      spender,
-      amount,
-      this.config.signer
-    );
+    const tx = await this.token.approve(spender, amount, this.config.signer);
     if (!tx) {
       return;
     }
@@ -243,7 +239,7 @@ export abstract class EthereumBridge implements BridgeInterface<EthereumAddress>
   }
 
   protected async estimateApprovalFee(): Promise<ApprovalFeeEstimation> {
-    if (this.ethereumToken.isNativeEth()) {
+    if (this.token.isNativeEth()) {
       return { approvalFee: this.ethAmount(0n) };
     }
 
@@ -252,7 +248,7 @@ export abstract class EthereumBridge implements BridgeInterface<EthereumAddress>
       return { approvalFee: this.ethAmount(0n) };
     }
 
-    const contract = this.ethereumToken.getContract();
+    const contract = this.token.getContract();
     if (!contract) {
       return {
         approvalFee: this.ethAmount(0n),
@@ -261,9 +257,9 @@ export abstract class EthereumBridge implements BridgeInterface<EthereumAddress>
     }
 
     try {
-      const approvalTransaction = await this.ethereumToken.approve(
+      const approvalTransaction = await this.token.approve(
         spender,
-        await this.ethereumToken.amount(1n),
+        await this.token.amount(1n),
         this.config.signer
       );
       if (!approvalTransaction) {
@@ -343,7 +339,7 @@ export abstract class EthereumBridge implements BridgeInterface<EthereumAddress>
   private async updateAllowanceFromReceipt(
     receipt: ContractTransactionReceipt
   ) {
-    const tokenInterface = this.ethereumToken.getContract()?.interface;
+    const tokenInterface = this.token.getContract()?.interface;
     if (!tokenInterface || !receipt.logs) return;
 
     let newAllowance: bigint | null = null;
@@ -365,7 +361,7 @@ export abstract class EthereumBridge implements BridgeInterface<EthereumAddress>
     }
 
     if (newAllowance !== null) {
-      const amount = await this.ethereumToken.amount(newAllowance);
+      const amount = await this.token.amount(newAllowance);
       this.setCachedAllowance(amount);
     } else {
       this.clearCachedAllowance();

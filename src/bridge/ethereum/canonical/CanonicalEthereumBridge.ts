@@ -69,7 +69,7 @@ export class CanonicalEthereumBridge extends EthereumBridge {
   async getDepositFeeEstimate(
     _options?: BridgeDepositOptions
   ): Promise<EthereumDepositFeeEstimation> {
-    const minimalAmount = await this.ethereumToken.amount(1n);
+    const minimalAmount = await this.token.amount(1n);
 
     const [allowance, l1ToL2MessageFee, approvalFeeEstimation] =
       await Promise.all([
@@ -151,7 +151,7 @@ export class CanonicalEthereumBridge extends EthereumBridge {
     options?: InitiateBridgeWithdrawOptions
   ): Promise<EthereumInitiateWithdrawFeeEstimation> {
     const calls: Call[] = [];
-    const minAmount = await this.ethereumToken.amount(1n);
+    const minAmount = await this.token.amount(1n);
 
     let autoWithdrawFee: Amount | undefined = undefined;
     let autoWithdrawFeeError: FeeErrorCause | undefined;
@@ -169,6 +169,11 @@ export class CanonicalEthereumBridge extends EthereumBridge {
           walletOrAddress: this.starknetWallet,
         });
 
+        if (!feeData.preselectedGasToken) {
+          throw new Error(
+            "The user has no sufficient balance to cover for auto-withdraw."
+          );
+        }
         autoWithdrawFee = feeData.preselectedGasToken.cost;
         autoWithdrawFeeError = undefined;
 
@@ -301,7 +306,7 @@ export class CanonicalEthereumBridge extends EthereumBridge {
   ): Promise<Amount> {
     const { fee } = await this.estimateL1ToL2MessageFee(recipient, amount);
 
-    const bridgedEthAmount = this.ethereumToken.isNativeEth()
+    const bridgedEthAmount = this.token.isNativeEth()
       ? amount
       : this.ethAmount(0n);
     return fee.add(bridgedEthAmount);
@@ -311,15 +316,15 @@ export class CanonicalEthereumBridge extends EthereumBridge {
     feeData: AutoWithdrawFeeOutput,
     preferredFeeToken?: Token
   ): Promise<Call> {
-    const feeTokenAddress =
-      preferredFeeToken && feeData.costsPerToken.has(preferredFeeToken.address)
-        ? preferredFeeToken.address
-        : feeData.preselectedGasToken.tokenAddress;
+    const preferredEntry = preferredFeeToken
+      ? [...feeData.costsPerToken.entries()].find(
+          ([t]) => t.address === preferredFeeToken.address
+        )
+      : undefined;
 
-    const gasCost =
-      (preferredFeeToken &&
-        feeData.costsPerToken.get(preferredFeeToken.address)) ||
-      feeData.preselectedGasToken.cost;
+    const feeTokenAddress =
+      preferredEntry?.[0].address ?? feeData.preselectedGasToken!.tokenAddress;
+    const gasCost = preferredEntry?.[1] ?? feeData.preselectedGasToken!.cost;
 
     return {
       contractAddress: feeTokenAddress,

@@ -55,6 +55,7 @@ const mockBridgeToken = new EthereumBridgeToken({
   },
   starknetAddress: STRK_ADDRESS,
   starknetBridge: BRIDGE_ADDRESS,
+  supportsAutoWithdraw: false,
 });
 
 const mockProvider = {} as RpcProvider;
@@ -99,6 +100,7 @@ describe("AutoWithdrawFeesHandler", () => {
   let fromAddressSpy: ReturnType<typeof vi.spyOn>;
 
   beforeEach(() => {
+    vi.restoreAllMocks();
     fromAddressSpy = vi.spyOn(Erc20, "fromAddress");
   });
 

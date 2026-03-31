@@ -67,17 +67,6 @@ function requiredString(
   return value.trim();
 }
 
-function requiredBoolean(
-  token: BridgeTokenApiRecord,
-  field: keyof BridgeTokenApiRecord
-): boolean {
-  const value = token[field];
-  if (typeof value !== "boolean") {
-    throw new Error(`Missing required field "${field}"`);
-  }
-  return value;
-}
-
 function optionalString(
   token: BridgeTokenApiRecord,
   field: keyof BridgeTokenApiRecord
@@ -201,7 +190,7 @@ function parseToken(
       ),
       starknetAddress: fromAddress(requiredString(token, "l2_token_address")),
       starknetBridge: fromAddress(requiredString(token, "l2_bridge_address")),
-      supportsAutoWithdraw: requiredBoolean(token, "AW_support"),
+      supportsAutoWithdraw: token.AW_support === true,
       ...(coingeckoId ? { coingeckoId } : {}),
     });
   }

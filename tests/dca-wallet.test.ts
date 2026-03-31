@@ -96,13 +96,11 @@ class TestWallet extends BaseWallet {
     defaultDcaProvider?: DcaProvider,
     defaultSwapProvider?: SwapProvider
   ) {
-    super(
-      fromAddress("0xCAFE"),
-      undefined,
+    super({
+      address: fromAddress("0xCAFE"),
       defaultSwapProvider,
-      undefined,
-      defaultDcaProvider
-    );
+      defaultDcaProvider,
+    });
     this.executeSpy.mockResolvedValue({ hash: "0xtx" } as Tx);
   }
 
