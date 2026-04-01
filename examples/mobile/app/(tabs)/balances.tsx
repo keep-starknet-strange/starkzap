@@ -350,7 +350,7 @@ export default function BalancesScreen() {
                 <Ionicons name="refresh" size={12} color={primaryColor} />
               )}
             </TouchableOpacity>
-            {isDeployed === true && (
+            {(walletType === "cartridge" || isDeployed === true) && (
               <TouchableOpacity
                 onPress={() => router.push("/(tabs)/transfers")}
                 hitSlop={6}

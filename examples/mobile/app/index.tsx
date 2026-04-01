@@ -318,6 +318,17 @@ function Step2Cartridge({
       >
         Cartridge session
       </ThemedText>
+      <ThemedText
+        style={[
+          stepStyles.oauthDisclaimerText,
+          stepStyles.oauthDisclaimerTextSmall,
+          { color: textSecondary, marginBottom: 12, alignSelf: "stretch" },
+        ]}
+      >
+        Sessions use sponsored execution. The network you chose in the previous
+        step is fixed for this session—change it by disconnecting and returning
+        to the home screen.
+      </ThemedText>
       <TouchableOpacity
         style={[
           stepStyles.primaryButton,
