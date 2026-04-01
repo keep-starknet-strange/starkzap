@@ -249,6 +249,7 @@ export class CctpMonitor implements BridgeMonitorInterface {
       const response = await this.fetchFn(url, {
         method: "GET",
         headers: { Accept: "application/json" },
+        signal: AbortSignal.timeout(10_000),
       });
       if (!response.ok) return null;
       const data = (await response.json()) as CCTPMessagesResponse;
@@ -340,6 +341,7 @@ export class CctpMonitor implements BridgeMonitorInterface {
       const response = await this.fetchFn(url, {
         method: "GET",
         headers: { Accept: "application/json" },
+        signal: AbortSignal.timeout(10_000),
       });
       if (!response.ok) return null;
       const data = (await response.json()) as CCTPMessagesResponse;

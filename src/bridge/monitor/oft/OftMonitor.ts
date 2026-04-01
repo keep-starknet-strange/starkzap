@@ -223,6 +223,7 @@ export class OftMonitor implements BridgeMonitorInterface {
         headers: {
           Accept: "application/json",
         },
+        signal: AbortSignal.timeout(10_000),
       });
       if (!response.ok) return null;
       const data = (await response.json()) as LzMessagesResponse;
