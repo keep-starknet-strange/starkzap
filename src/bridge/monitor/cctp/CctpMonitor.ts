@@ -298,7 +298,7 @@ export class CctpMonitor implements BridgeMonitorInterface {
         BigInt(nonce)
       );
 
-      const response = await this.starknetProvider.getEvents({
+      const baseFilter = {
         address: messageTransmitter,
         keys: [
           [this.messageReceivedKey], // keys[0]: event selector
@@ -309,14 +309,22 @@ export class CctpMonitor implements BridgeMonitorInterface {
         from_block: { block_number: fromBlock },
         to_block: { block_number: toBlock },
         chunk_size: 100,
-      });
+      };
 
-      // data layout: [source_domain, sender.low, sender.high, ...message_body]
-      const match = response.events.find((e) => {
-        return e.data[0] === "0x0"; // source_domain = Ethereum
-      });
+      let continuationToken: string | undefined;
+      do {
+        const response = await this.starknetProvider.getEvents({
+          ...baseFilter,
+          ...(continuationToken && { continuation_token: continuationToken }),
+        });
 
-      return match?.transaction_hash ?? null;
+        const match = response.events.find((e) => e.data[0] === "0x0"); // source_domain = Ethereum
+        if (match) return match.transaction_hash;
+
+        continuationToken = response.continuation_token;
+      } while (continuationToken);
+
+      return null;
     } catch {
       return null;
     }
