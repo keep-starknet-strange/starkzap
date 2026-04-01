@@ -22,7 +22,7 @@ import {
 } from "@/types";
 import {
   type DepositMonitorResult,
-  DepositState,
+  type DepositState,
   type DepositStateInput,
   type WithdrawalState,
   type WithdrawalStateInput,
