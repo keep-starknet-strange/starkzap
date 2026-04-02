@@ -383,8 +383,8 @@ export class CartridgeWallet extends BaseWallet {
     return this.controller;
   }
 
-  async disconnect(): Promise<void> {
-    this.clearCaches();
+  override async disconnect(): Promise<void> {
+    await super.disconnect();
     this.clearDeploymentCache();
     await this.controller.disconnect();
   }

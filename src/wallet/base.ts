@@ -174,7 +174,6 @@ export abstract class BaseWallet implements WalletInterface {
   abstract getFeeMode(): FeeMode;
   abstract getClassHash(): string;
   abstract estimateFee(calls: Call[]): Promise<EstimateFeeResponseOverhead>;
-  abstract disconnect(): Promise<void>;
 
   callContract(call: Call): ReturnType<RpcProvider["callContract"]> {
     return this.getProvider().callContract(call);
@@ -278,13 +277,6 @@ export abstract class BaseWallet implements WalletInterface {
     return this.swapRegistry.getDefault();
   }
 
-  protected clearCaches(): void {
-    this.erc20s.clear();
-    this.stakingMap.clear();
-    this.stakingInFlight.clear();
-    this.bridging.dispose();
-  }
-
   private assertSwapCalls(calls: Call[], source?: string): void {
     if (calls.length) return;
     throw new Error(
@@ -297,6 +289,13 @@ export abstract class BaseWallet implements WalletInterface {
     if (firstKey !== undefined) {
       cache.delete(firstKey);
     }
+  }
+
+  async disconnect(): Promise<void> {
+    this.erc20s.clear();
+    this.stakingMap.clear();
+    this.stakingInFlight.clear();
+    this.bridging.dispose();
   }
 
   // ============================================================

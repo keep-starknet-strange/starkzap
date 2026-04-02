@@ -464,8 +464,8 @@ export class NativeCartridgeWallet extends BaseWallet {
     }
   }
 
-  async disconnect(): Promise<void> {
-    this.clearCaches();
+  override async disconnect(): Promise<void> {
+    await super.disconnect();
     this.deployedCache = null;
     this.deployedCacheExpiresAt = 0;
     await this.session.disconnect?.();
