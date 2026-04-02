@@ -282,6 +282,7 @@ export abstract class BaseWallet implements WalletInterface {
     this.erc20s.clear();
     this.stakingMap.clear();
     this.stakingInFlight.clear();
+    this.bridging.dispose();
   }
 
   private assertSwapCalls(calls: Call[], source?: string): void {

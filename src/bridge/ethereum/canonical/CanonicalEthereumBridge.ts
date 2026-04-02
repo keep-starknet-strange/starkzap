@@ -7,7 +7,7 @@ import type {
   EthereumWalletConfig,
   InitiateBridgeWithdrawOptions,
 } from "@/bridge";
-import { DUMMY_SN_ADDRESS } from "@/bridge/ethereum/types";
+import { DUMMY_L1_ADDRESS, DUMMY_SN_ADDRESS } from "@/bridge/ethereum/types";
 import {
   type Address,
   Amount,
@@ -183,18 +183,17 @@ export class CanonicalEthereumBridge extends EthereumBridge {
             options.preferredFeeToken
           )
         );
-      } catch {
+      } catch (e) {
+        console.debug(
+          "[CanonicalEthereumBridge] getAutoWithdrawTransferCall failed:",
+          e
+        );
         autoWithdrawFee = undefined;
         autoWithdrawFeeError = FeeErrorCause.AW_FEE_ERROR;
       }
     }
 
-    calls.push(
-      this.buildInitiateWithdrawCall(
-        "0x0000000000000000000000000000000000000001",
-        minAmount
-      )
-    );
+    calls.push(this.buildInitiateWithdrawCall(DUMMY_L1_ADDRESS, minAmount));
 
     try {
       const estimate = await this.starknetWallet.estimateFee(calls);
@@ -204,7 +203,11 @@ export class CanonicalEthereumBridge extends EthereumBridge {
         autoWithdrawFee,
         autoWithdrawFeeError,
       };
-    } catch {
+    } catch (e) {
+      console.debug(
+        "[CanonicalEthereumBridge] getInitiateWithdrawFeeEstimate (L2 fee) failed:",
+        e
+      );
       return {
         l2Fee: Amount.fromRaw(0n, 18, "STRK"),
         l2FeeError: FeeErrorCause.GENERIC_L2_FEE_ERROR,
@@ -274,7 +277,11 @@ export class CanonicalEthereumBridge extends EthereumBridge {
       );
 
       return { fee };
-    } catch {
+    } catch (e) {
+      console.debug(
+        "[CanonicalEthereumBridge] estimateL1ToL2MessageFee failed:",
+        e
+      );
       return {
         fee: Amount.fromRaw(0n, 18, "ETH"),
         l2FeeError: FeeErrorCause.GENERIC_L2_FEE_ERROR,
@@ -291,7 +298,11 @@ export class CanonicalEthereumBridge extends EthereumBridge {
         this.getEthereumGasPrice(),
       ]);
       return { gasFee: this.ethAmount(gasUnits * gasPrice) };
-    } catch {
+    } catch (e) {
+      console.debug(
+        "[CanonicalEthereumBridge] estimateEthereumGasFeeForTx failed:",
+        e
+      );
       return {
         gasFee: this.ethAmount(0n),
         error: FeeErrorCause.GENERIC_L1_FEE_ERROR,

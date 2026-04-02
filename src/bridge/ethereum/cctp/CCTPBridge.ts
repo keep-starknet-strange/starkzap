@@ -134,7 +134,8 @@ export class CCTPBridge extends EthereumBridge {
           fastTransferBpFee: minimumFeeBps,
           ...approvalFeeData,
         };
-      } catch {
+      } catch (e) {
+        console.debug("[CCTPBridge] getDepositFeeEstimate (L1 gas) failed:", e);
         return {
           l1Fee: defaultL1Fee,
           l1FeeError: FeeErrorCause.GENERIC_L1_FEE_ERROR,
@@ -187,7 +188,11 @@ export class CCTPBridge extends EthereumBridge {
         l2Fee: Amount.fromRaw(estimate.overall_fee, 18, isFri ? "STRK" : "ETH"),
         fastTransferBpFee,
       };
-    } catch {
+    } catch (e) {
+      console.debug(
+        "[CCTPBridge] getInitiateWithdrawFeeEstimate (L2 fee) failed:",
+        e
+      );
       return {
         l2Fee: Amount.fromRaw(0n, 18, "STRK"),
         l2FeeError: FeeErrorCause.GENERIC_L2_FEE_ERROR,
@@ -196,6 +201,11 @@ export class CCTPBridge extends EthereumBridge {
     }
   }
 
+  /**
+   * @throws if `options` is not provided or does not have `protocol: "cctp"`.
+   *   CCTP always requires attestation data in options — the parameter is optional
+   *   only to satisfy the base interface signature.
+   */
   async completeWithdraw(
     _recipient: ExternalAddress,
     _amount: Amount,
@@ -277,7 +287,8 @@ export class CCTPBridge extends EthereumBridge {
       return {
         l1Fee: this.ethAmount(FALLBACK_COMPLETE_WITHDRAW_GAS * gasPrice),
       };
-    } catch {
+    } catch (e) {
+      console.debug("[CCTPBridge] getCompleteWithdrawFeeEstimate failed:", e);
       return {
         l1Fee: this.ethAmount(0n),
         l1FeeError: FeeErrorCause.GENERIC_L1_FEE_ERROR,
@@ -441,7 +452,10 @@ export class CCTPBridge extends EthereumBridge {
     const baseUrl = getCircleApiBaseUrl(this.starknetWallet.getChainId());
 
     try {
-      await fetch(`${baseUrl}/v2/reattest/${nonce}`, { method: "POST" });
+      await fetch(`${baseUrl}/v2/reattest/${nonce}`, {
+        method: "POST",
+        signal: AbortSignal.timeout(10_000),
+      });
     } catch {
       // might already be re-attested; ignore and proceed to poll
     }
@@ -453,7 +467,8 @@ export class CCTPBridge extends EthereumBridge {
 
       try {
         const response = await fetch(
-          `${baseUrl}/v2/messages/${STARKNET_DOMAIN_ID}?nonce=${nonce}`
+          `${baseUrl}/v2/messages/${STARKNET_DOMAIN_ID}?nonce=${nonce}`,
+          { signal: AbortSignal.timeout(10_000) }
         );
         if (!response.ok) continue;
 

@@ -283,7 +283,8 @@ export class CctpMonitor implements BridgeMonitorInterface {
       }
 
       return null;
-    } catch {
+    } catch (e) {
+      console.debug("[CctpMonitor] tryFetchAttestation failed:", e);
       return null;
     }
   }
@@ -312,8 +313,12 @@ export class CctpMonitor implements BridgeMonitorInterface {
         chunk_size: 100,
       };
 
+      const MAX_PAGINATION_ITERATIONS = 20;
+      let iterations = 0;
       let continuationToken: string | undefined;
       do {
+        if (++iterations > MAX_PAGINATION_ITERATIONS) break;
+
         const response = await this.starknetProvider.getEvents({
           ...baseFilter,
           ...(continuationToken && { continuation_token: continuationToken }),
@@ -326,7 +331,8 @@ export class CctpMonitor implements BridgeMonitorInterface {
       } while (continuationToken);
 
       return null;
-    } catch {
+    } catch (e) {
+      console.debug("[CctpMonitor] findDepositTxOnSn failed:", e);
       return null;
     }
   }
@@ -357,7 +363,8 @@ export class CctpMonitor implements BridgeMonitorInterface {
           nonce: message.decodedMessage.nonce,
         }),
       };
-    } catch {
+    } catch (e) {
+      console.debug("[CctpMonitor] tryFetchDepositAttestation failed:", e);
       return null;
     }
   }
@@ -369,7 +376,10 @@ export class CctpMonitor implements BridgeMonitorInterface {
     const sample = await this.starknetProvider.getBlock(
       latest.block_number - SAMPLE_BLOCKS
     );
-    const avgBlockTime = (latest.timestamp - sample.timestamp) / SAMPLE_BLOCKS;
+    const avgBlockTime = Math.max(
+      1,
+      (latest.timestamp - sample.timestamp) / SAMPLE_BLOCKS
+    );
 
     const secondsSinceL1Confirm = latest.timestamp - l1Timestamp;
     const estimatedBlock =
@@ -385,21 +395,28 @@ export class CctpMonitor implements BridgeMonitorInterface {
   }
 
   private getMessageTransmitter(): Promise<Address> {
-    this.messageTransmitterPromise ??= this.starknetProvider
-      .callContract({
-        contractAddress: getTokenMessenger(this.chainId),
-        entrypoint: "local_message_transmitter",
-      })
-      .then((result) => {
-        if (!result[0])
-          throw new Error("local_message_transmitter returned empty result");
-        const address = num.toHex(result[0]);
-        return fromAddress(address);
-      })
-      .catch((e) => {
-        this.messageTransmitterPromise = undefined;
-        throw e;
-      });
+    if (!this.messageTransmitterPromise) {
+      const p = this.starknetProvider
+        .callContract({
+          contractAddress: getTokenMessenger(this.chainId),
+          entrypoint: "local_message_transmitter",
+        })
+        .then((result) => {
+          if (!result[0])
+            throw new Error("local_message_transmitter returned empty result");
+          const address = num.toHex(result[0]);
+          return fromAddress(address);
+        })
+        .catch((e) => {
+          // Only clear the cache if this specific promise is still current,
+          // to avoid evicting a replacement that was set by a concurrent caller.
+          if (this.messageTransmitterPromise === p) {
+            this.messageTransmitterPromise = undefined;
+          }
+          throw e;
+        });
+      this.messageTransmitterPromise = p;
+    }
     return this.messageTransmitterPromise;
   }
 }

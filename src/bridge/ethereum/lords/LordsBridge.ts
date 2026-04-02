@@ -17,6 +17,11 @@ export class LordsBridge extends CanonicalEthereumBridge {
     starknetWallet: WalletInterface,
     autoWithdrawFeesHandler: AutoWithdrawFeesHandler
   ) {
+    if (bridgeToken.id !== "lords") {
+      throw new Error(
+        `LordsBridge must be instantiated with the LORDS token (got "${bridgeToken.id}").`
+      );
+    }
     super(
       bridgeToken,
       config,

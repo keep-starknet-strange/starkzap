@@ -78,7 +78,7 @@ export class AutoWithdrawFeesHandler {
       // from the available balance before checking against the gas cost.
       const isFeeTokenTheBridgedToken =
         feeTokenAddress === input.bridgeToken.starknetAddress;
-      if (isFeeTokenTheBridgedToken && balance.lt(input.amount)) continue; // User cannot afford auto-withdraw
+      if (isFeeTokenTheBridgedToken && balance.lt(input.amount)) continue;
 
       const effectiveBalance = isFeeTokenTheBridgedToken
         ? balance.subtract(input.amount)

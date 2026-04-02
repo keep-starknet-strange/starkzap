@@ -228,7 +228,8 @@ export class OftMonitor implements BridgeMonitorInterface {
       if (!response.ok) return null;
       const data = (await response.json()) as LzMessagesResponse;
       return data.data[0] ?? null;
-    } catch {
+    } catch (e) {
+      console.debug("[OftMonitor] tryFetchLayerZeroMessage failed:", e);
       return null;
     }
   }

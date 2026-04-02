@@ -126,6 +126,8 @@ export class SolanaHyperlaneMonitor implements BridgeMonitorInterface {
     ) {
       const delivered = await this.checkSolanaDelivery(snTxHash);
       if (delivered) {
+        // CONFIRMED_ON_L1 maps to COMPLETED in the withdrawal state machine.
+        // "L1" here refers to the external destination chain (Solana), not Ethereum.
         return { ...base, status: BridgeTransferStatus.CONFIRMED_ON_L1 };
       }
     }
@@ -217,7 +219,11 @@ export class SolanaHyperlaneMonitor implements BridgeMonitorInterface {
       }
 
       return false;
-    } catch {
+    } catch (e) {
+      console.debug(
+        "[SolanaHyperlaneMonitor] checkStarknetDelivery failed:",
+        e
+      );
       return false;
     }
   }
@@ -258,10 +264,15 @@ export class SolanaHyperlaneMonitor implements BridgeMonitorInterface {
           0,
           1
         );
-      } catch {
+      } catch (e) {
+        console.debug(
+          "[SolanaHyperlaneMonitor] waitForMessageProcessed failed:",
+          e
+        );
         return false;
       }
-    } catch {
+    } catch (e) {
+      console.debug("[SolanaHyperlaneMonitor] checkSolanaDelivery failed:", e);
       return false;
     }
   }

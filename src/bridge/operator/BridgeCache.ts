@@ -54,6 +54,10 @@ export class BridgeCache {
     this.cache.set(key, { wallet, bridge: guarded });
   }
 
+  public clear() {
+    this.cache.clear();
+  }
+
   private evictOldest(): void {
     const oldest = this.cache.keys().next().value;
     if (oldest !== undefined) {

@@ -49,9 +49,7 @@ export class BridgeOperator implements BridgeOperatorInterface {
   private cache = new BridgeCache();
   private _autoWithdrawFeesHandler: AutoWithdrawFeesHandler | undefined;
   private _ethereumMonitorProvider: Provider | undefined;
-  private _solanaMonitorDeps:
-    | ReturnType<BridgeOperator["buildSolanaMonitorDeps"]>
-    | undefined;
+  private _monitors = new Map<Protocol, BridgeMonitorInterface>();
 
   constructor(
     private readonly starknetWallet: WalletInterface,
@@ -256,7 +254,26 @@ export class BridgeOperator implements BridgeOperatorInterface {
       token.chain === ExternalChain.SOLANA &&
       token.protocol === Protocol.HYPERLANE
     ) {
-      return this.getSolanaHyperlaneMonitor();
+      if (!this._monitors.has(Protocol.HYPERLANE)) {
+        const [{ SolanaHyperlaneMonitor }, { connection, hyperlane }] =
+          await Promise.all([
+            import("@/bridge/monitor/hyperlane/SolanaHyperlaneMonitor"),
+            Promise.all([
+              this.buildSolanaConnection(),
+              loadHyperlane("Solana bridge monitoring"),
+            ]).then(([connection, hyperlane]) => ({ connection, hyperlane })),
+          ]);
+        this._monitors.set(
+          Protocol.HYPERLANE,
+          new SolanaHyperlaneMonitor({
+            chainId: this.starknetWallet.getChainId(),
+            starknetProvider: this.starknetWallet.getProvider(),
+            solanaConnection: connection,
+            hyperlane,
+          })
+        );
+      }
+      return this._monitors.get(Protocol.HYPERLANE)!;
     }
 
     const ethereumProvider = await this.getEthereumMonitorProvider();
@@ -264,35 +281,54 @@ export class BridgeOperator implements BridgeOperatorInterface {
 
     switch (ethToken.protocol) {
       case Protocol.CANONICAL: {
-        const { CanonicalMonitor } =
-          await import("@/bridge/monitor/canonical/CanonicalMonitor");
-        return new CanonicalMonitor({
-          chainId: this.starknetWallet.getChainId(),
-          starknetProvider: this.starknetWallet.getProvider(),
-          ethereumProvider,
-        });
+        if (!this._monitors.has(ethToken.protocol)) {
+          const { CanonicalMonitor } =
+            await import("@/bridge/monitor/canonical/CanonicalMonitor");
+          this._monitors.set(
+            ethToken.protocol,
+            new CanonicalMonitor({
+              chainId: this.starknetWallet.getChainId(),
+              starknetProvider: this.starknetWallet.getProvider(),
+              ethereumProvider,
+            })
+          );
+        }
+        return this._monitors.get(ethToken.protocol)!;
       }
 
       case Protocol.CCTP: {
-        const { CctpMonitor } =
-          await import("@/bridge/monitor/cctp/CctpMonitor");
-        return new CctpMonitor({
-          chainId: this.starknetWallet.getChainId(),
-          starknetProvider: this.starknetWallet.getProvider(),
-          ethereumProvider,
-          fetchFn: resolveFetch(undefined),
-        });
+        if (!this._monitors.has(ethToken.protocol)) {
+          const { CctpMonitor } =
+            await import("@/bridge/monitor/cctp/CctpMonitor");
+          this._monitors.set(
+            ethToken.protocol,
+            new CctpMonitor({
+              chainId: this.starknetWallet.getChainId(),
+              starknetProvider: this.starknetWallet.getProvider(),
+              ethereumProvider,
+              fetchFn: resolveFetch(undefined),
+            })
+          );
+        }
+        return this._monitors.get(ethToken.protocol)!;
       }
 
       case Protocol.OFT:
       case Protocol.OFT_MIGRATED: {
-        const { OftMonitor } = await import("@/bridge/monitor/oft/OftMonitor");
-        return new OftMonitor({
-          chainId: this.starknetWallet.getChainId(),
-          starknetProvider: this.starknetWallet.getProvider(),
-          ethereumProvider,
-          protocol: ethToken.protocol,
-        });
+        if (!this._monitors.has(ethToken.protocol)) {
+          const { OftMonitor } =
+            await import("@/bridge/monitor/oft/OftMonitor");
+          this._monitors.set(
+            ethToken.protocol,
+            new OftMonitor({
+              chainId: this.starknetWallet.getChainId(),
+              starknetProvider: this.starknetWallet.getProvider(),
+              ethereumProvider,
+              protocol: ethToken.protocol,
+            })
+          );
+        }
+        return this._monitors.get(ethToken.protocol)!;
       }
 
       default:
@@ -399,28 +435,6 @@ export class BridgeOperator implements BridgeOperatorInterface {
     }
   }
 
-  private buildSolanaMonitorDeps() {
-    return Promise.all([
-      this.buildSolanaConnection(),
-      loadHyperlane("Solana bridge monitoring"),
-    ]).then(([connection, hyperlane]) => ({ connection, hyperlane }));
-  }
-
-  private async getSolanaHyperlaneMonitor(): Promise<BridgeMonitorInterface> {
-    this._solanaMonitorDeps ??= this.buildSolanaMonitorDeps();
-    const { connection, hyperlane } = await this._solanaMonitorDeps;
-
-    const { SolanaHyperlaneMonitor } =
-      await import("@/bridge/monitor/hyperlane/SolanaHyperlaneMonitor");
-
-    return new SolanaHyperlaneMonitor({
-      chainId: this.starknetWallet.getChainId(),
-      starknetProvider: this.starknetWallet.getProvider(),
-      solanaConnection: connection,
-      hyperlane,
-    });
-  }
-
   private async getEthereumMonitorProvider(): Promise<Provider> {
     if (this._ethereumMonitorProvider) {
       return this._ethereumMonitorProvider;
@@ -469,6 +483,14 @@ export class BridgeOperator implements BridgeOperatorInterface {
           `Unsupported protocol "${token.protocol}" for ${token.chain} chain.`
         );
     }
+  }
+
+  public dispose(): void {
+    this._ethereumMonitorProvider?.destroy();
+    this._ethereumMonitorProvider = undefined;
+    this._monitors.clear();
+    this._autoWithdrawFeesHandler = undefined;
+    this.cache.clear();
   }
 
   private async buildSolanaConnection() {

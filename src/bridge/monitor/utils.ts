@@ -20,7 +20,8 @@ export async function checkStarknetTxStatus(
 
   try {
     receipt = await provider.getTransactionReceipt(txHash);
-  } catch {
+  } catch (e) {
+    console.debug("[checkStarknetTxStatus] getTransactionReceipt failed:", e);
     return BridgeTransferStatus.NOT_SUBMITTED_ON_STARKNET;
   }
 
