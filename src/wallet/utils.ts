@@ -144,13 +144,18 @@ export async function preflightTransaction(
   }
 }
 
-/** Paymaster details for sponsored transactions */
+/** Paymaster details for sponsored or gasToken transactions */
 export function sponsoredDetails(
   timeBounds?: PaymasterTimeBounds,
-  deploymentData?: PAYMASTER_API.ACCOUNT_DEPLOYMENT_DATA
+  deploymentData?: PAYMASTER_API.ACCOUNT_DEPLOYMENT_DATA,
+  gasToken?: string
 ) {
+  const feeMode = gasToken
+    ? { mode: "default" as const, gasToken }
+    : { mode: "sponsored" as const };
+
   return {
-    feeMode: { mode: "sponsored" as const },
+    feeMode,
     ...(timeBounds && { timeBounds }),
     ...(deploymentData && { deploymentData }),
   };

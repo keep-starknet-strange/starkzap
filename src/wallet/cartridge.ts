@@ -309,16 +309,17 @@ export class CartridgeWallet extends BaseWallet {
   async execute(calls: Call[], options: ExecuteOptions = {}): Promise<Tx> {
     const feeMode = options.feeMode ?? this.defaultFeeMode;
     const timeBounds = options.timeBounds ?? this.defaultTimeBounds;
+    const gasToken = options.gasToken;
 
     let transaction_hash: string;
 
-    if (feeMode === "sponsored") {
+    if (feeMode === "sponsored" || gasToken) {
       // Allow provider/controller implementations to handle undeployed accounts
       // atomically via paymaster flow when supported.
       transaction_hash = (
         await this.walletAccount.executePaymasterTransaction(
           calls,
-          sponsoredDetails(timeBounds)
+          sponsoredDetails(timeBounds, undefined, gasToken)
         )
       ).transaction_hash;
     } else {

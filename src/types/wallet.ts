@@ -176,6 +176,16 @@ export interface DeployOptions {
   feeMode?: FeeMode;
   /** Optional time bounds for paymaster-sponsored deployment */
   timeBounds?: PaymasterTimeBounds;
+  /**
+   * ERC-20 token address used to pay gas fees via the paymaster.
+   *
+   * When set, the transaction uses the paymaster with
+   * `{ mode: 'default', gasToken }` instead of full sponsorship.
+   * The user pays gas in the specified token (e.g. USDC, STRK).
+   *
+   * Requires a paymaster to be configured in the SDK.
+   */
+  gasToken?: Address;
 }
 
 // ─── Execute ─────────────────────────────────────────────────────────────────
@@ -186,6 +196,16 @@ export interface ExecuteOptions {
   feeMode?: FeeMode;
   /** Optional time bounds for paymaster transactions */
   timeBounds?: PaymasterTimeBounds;
+  /**
+   * ERC-20 token address used to pay gas fees via the paymaster.
+   *
+   * When set, the transaction uses the paymaster with
+   * `{ mode: 'default', gasToken }` instead of full sponsorship.
+   * The user pays gas in the specified token (e.g. USDC, STRK).
+   *
+   * Requires a paymaster to be configured in the SDK.
+   */
+  gasToken?: Address;
 }
 
 // ─── Preflight ───────────────────────────────────────────────────────────────
