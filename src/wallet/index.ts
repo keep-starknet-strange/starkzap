@@ -291,10 +291,7 @@ export class Wallet extends BaseWallet {
     const gasToken = options.gasToken;
 
     if (requestedFeeMode === "user_pays" && gasToken) {
-      throw new Error(
-        "Cannot combine feeMode 'user_pays' with gasToken. " +
-          "Use feeMode 'sponsored' or omit feeMode when paying with an ERC-20 token."
-      );
+      Wallet.throwGasTokenConflict();
     }
 
     if (feeMode === "sponsored" || gasToken) {
@@ -505,10 +502,7 @@ export class Wallet extends BaseWallet {
     const gasToken = options.gasToken;
 
     if (requestedFeeMode === "user_pays" && gasToken) {
-      throw new Error(
-        "Cannot combine feeMode 'user_pays' with gasToken. " +
-          "Use feeMode 'sponsored' or omit feeMode when paying with an ERC-20 token."
-      );
+      Wallet.throwGasTokenConflict();
     }
 
     const transactionHash =
@@ -573,6 +567,13 @@ export class Wallet extends BaseWallet {
 
   async signMessage(typedData: TypedData): Promise<Signature> {
     return this.account.signMessage(typedData);
+  }
+
+  private static throwGasTokenConflict(): never {
+    throw new Error(
+      "Cannot combine feeMode 'user_pays' with gasToken. " +
+        "Use feeMode 'sponsored' or omit feeMode when paying with an ERC-20 token."
+    );
   }
 
   async preflight(options: PreflightOptions): Promise<PreflightResult> {
