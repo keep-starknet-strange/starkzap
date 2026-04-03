@@ -285,7 +285,11 @@ export class CartridgeWallet extends BaseWallet {
   }
 
   async deploy(options: DeployOptions = {}): Promise<Tx> {
-    if (options.feeMode !== undefined || options.timeBounds !== undefined) {
+    if (
+      options.feeMode !== undefined ||
+      options.timeBounds !== undefined ||
+      options.gasToken !== undefined
+    ) {
       throw new Error(
         "CartridgeWallet.deploy() does not support DeployOptions overrides; deployment mode is controlled by Cartridge Controller."
       );

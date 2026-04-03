@@ -287,9 +287,10 @@ export class Wallet extends BaseWallet {
     this.clearDeploymentCache();
     const feeMode = options.feeMode ?? this.defaultFeeMode;
     const timeBounds = options.timeBounds ?? this.defaultTimeBounds;
+    const gasToken = options.gasToken;
 
-    if (feeMode === "sponsored") {
-      return this.deployPaymasterWith([], timeBounds);
+    if (feeMode === "sponsored" || gasToken) {
+      return this.deployPaymasterWith([], timeBounds, gasToken);
     }
 
     const classHash = this.accountProvider.getClassHash();
