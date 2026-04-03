@@ -148,7 +148,7 @@ export async function preflightTransaction(
 export function sponsoredDetails(
   timeBounds?: PaymasterTimeBounds,
   deploymentData?: PAYMASTER_API.ACCOUNT_DEPLOYMENT_DATA,
-  gasToken?: string
+  gasToken?: Address
 ) {
   const feeMode = gasToken
     ? { mode: "default" as const, gasToken }

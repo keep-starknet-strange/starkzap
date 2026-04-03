@@ -289,6 +289,13 @@ export class Wallet extends BaseWallet {
     const timeBounds = options.timeBounds ?? this.defaultTimeBounds;
     const gasToken = options.gasToken;
 
+    if (feeMode === "user_pays" && gasToken) {
+      throw new Error(
+        "Cannot combine feeMode 'user_pays' with gasToken. " +
+          "Use feeMode 'sponsored' or omit feeMode when paying with an ERC-20 token."
+      );
+    }
+
     if (feeMode === "sponsored" || gasToken) {
       return this.deployPaymasterWith([], timeBounds, gasToken);
     }
@@ -355,7 +362,7 @@ export class Wallet extends BaseWallet {
   private async deployPaymasterWith(
     calls: Call[],
     timeBounds?: PaymasterTimeBounds,
-    gasToken?: string
+    gasToken?: Address
   ): Promise<Tx> {
     this.clearDeploymentCache();
     const classHash = this.accountProvider.getClassHash();
@@ -394,7 +401,7 @@ export class Wallet extends BaseWallet {
   private async deployBraavosViaFactory(
     calls: Call[],
     timeBounds?: PaymasterTimeBounds,
-    gasToken?: string
+    gasToken?: Address
   ): Promise<Tx> {
     const publicKey = await this.accountProvider.getPublicKey();
     const signer = this.accountProvider.getSigner();
@@ -495,6 +502,13 @@ export class Wallet extends BaseWallet {
     const timeBounds = options.timeBounds ?? this.defaultTimeBounds;
     const gasToken = options.gasToken;
 
+    if (feeMode === "user_pays" && gasToken) {
+      throw new Error(
+        "Cannot combine feeMode 'user_pays' with gasToken. " +
+          "Use feeMode 'sponsored' or omit feeMode when paying with an ERC-20 token."
+      );
+    }
+
     const transactionHash =
       feeMode === "sponsored" || gasToken
         ? await this.executeSponsored(calls, timeBounds, gasToken)
@@ -521,7 +535,7 @@ export class Wallet extends BaseWallet {
   private executePaymaster(
     calls: Call[],
     timeBounds: PaymasterTimeBounds | undefined,
-    gasToken?: string
+    gasToken?: Address
   ): Promise<string> {
     return this.account
       .executePaymasterTransaction(
@@ -534,7 +548,7 @@ export class Wallet extends BaseWallet {
   private async executeSponsored(
     calls: Call[],
     timeBounds: PaymasterTimeBounds | undefined,
-    gasToken?: string
+    gasToken?: Address
   ): Promise<string> {
     if (await this.isDeployed()) {
       return this.executePaymaster(calls, timeBounds, gasToken);
