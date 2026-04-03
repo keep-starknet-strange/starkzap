@@ -285,11 +285,12 @@ export class Wallet extends BaseWallet {
 
   async deploy(options: DeployOptions = {}): Promise<Tx> {
     this.clearDeploymentCache();
-    const feeMode = options.feeMode ?? this.defaultFeeMode;
+    const requestedFeeMode = options.feeMode;
+    const feeMode = requestedFeeMode ?? this.defaultFeeMode;
     const timeBounds = options.timeBounds ?? this.defaultTimeBounds;
     const gasToken = options.gasToken;
 
-    if (feeMode === "user_pays" && gasToken) {
+    if (requestedFeeMode === "user_pays" && gasToken) {
       throw new Error(
         "Cannot combine feeMode 'user_pays' with gasToken. " +
           "Use feeMode 'sponsored' or omit feeMode when paying with an ERC-20 token."
@@ -498,11 +499,12 @@ export class Wallet extends BaseWallet {
   }
 
   async execute(calls: Call[], options: ExecuteOptions = {}): Promise<Tx> {
-    const feeMode = options.feeMode ?? this.defaultFeeMode;
+    const requestedFeeMode = options.feeMode;
+    const feeMode = requestedFeeMode ?? this.defaultFeeMode;
     const timeBounds = options.timeBounds ?? this.defaultTimeBounds;
     const gasToken = options.gasToken;
 
-    if (feeMode === "user_pays" && gasToken) {
+    if (requestedFeeMode === "user_pays" && gasToken) {
       throw new Error(
         "Cannot combine feeMode 'user_pays' with gasToken. " +
           "Use feeMode 'sponsored' or omit feeMode when paying with an ERC-20 token."
