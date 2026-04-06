@@ -33,6 +33,7 @@ import {
 } from "@/bridge/ethereum/oft/constants";
 import { Protocol } from "@/types/bridge/protocol";
 import type { Tx } from "@/tx";
+import type { StarkZapLogger } from "@/logger";
 
 const DUMMY_ETH_ADDRESS = "0x0000000000000000000000000000000000000001";
 const DUMMY_DEPOSIT_TX_CACHE_TTL_MS = 60_000;
@@ -51,9 +52,10 @@ export class OftBridge extends EthereumBridge {
     bridgeToken: EthereumBridgeToken,
     config: EthereumWalletConfig,
     starknetWallet: WalletInterface,
-    apiKey: string
+    apiKey: string,
+    logger: StarkZapLogger
   ) {
-    super(bridgeToken, config, starknetWallet);
+    super(bridgeToken, config, starknetWallet, logger);
 
     const chainId = starknetWallet.getChainId();
     if (!chainId.isMainnet()) {

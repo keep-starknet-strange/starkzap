@@ -11,6 +11,7 @@ import { loadEthers } from "@/connect/ethersRuntime";
 import { fromEthereumAddress } from "@/connect/ethersRuntime";
 import { loadSolanaWeb3 } from "@/connect/solanaWeb3Runtime";
 import { fromSolanaAddress } from "@/types/solanaAddress";
+import { type StarkZapLogger, NOOP_LOGGER } from "@/logger";
 
 export type BridgeTokenApiEnv = "mainnet" | "testnet";
 
@@ -24,6 +25,7 @@ export interface BridgeTokenRepositoryOptions {
   cacheTtlMs?: number;
   fetchFn?: typeof fetch;
   now?: () => number;
+  logger?: StarkZapLogger;
 }
 
 interface CacheEntry {
@@ -248,6 +250,7 @@ export class BridgeTokenRepository {
   private readonly cacheTtlMs: number;
   private readonly fetchFn: typeof fetch;
   private readonly now: () => number;
+  private readonly logger: StarkZapLogger;
   private readonly cache = new Map<string, CacheEntry>();
   private readonly inflight = new Map<string, Promise<BridgeToken[]>>();
 
@@ -263,8 +266,8 @@ export class BridgeTokenRepository {
     }
 
     this.fetchFn = resolveFetch(options.fetchFn);
-
     this.now = options.now ?? Date.now;
+    this.logger = options.logger ?? NOOP_LOGGER;
   }
 
   clearCache(): void {
@@ -347,7 +350,7 @@ export class BridgeTokenRepository {
             throw error;
           }
           unavailableChains.add(ExternalChain.ETHEREUM);
-          console.warn(
+          this.logger.warn(
             '[starkzap] Skipping ethereum bridge tokens because optional peer dependency "ethers" is not installed.',
             error
           );
@@ -366,7 +369,7 @@ export class BridgeTokenRepository {
             throw error;
           }
           unavailableChains.add(ExternalChain.SOLANA);
-          console.warn(
+          this.logger.warn(
             '[starkzap] Skipping solana bridge tokens because optional peer dependency "@solana/web3.js" is not installed.',
             error
           );
@@ -401,7 +404,7 @@ export class BridgeTokenRepository {
           if (isExplicitChainRequest) {
             throw e;
           }
-          console.warn(`Ignoring token ${token.symbol} due to`, e);
+          this.logger.warn(`Ignoring token ${token.symbol} due to`, e);
           return null;
         }
       })

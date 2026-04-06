@@ -34,6 +34,8 @@ import {
   OpenZeppelinPreset,
 } from "@/account";
 import { BridgeTokenRepository } from "@/bridge/tokens/repository";
+import type { LoggerConfig } from "@/logger";
+import { createLogger } from "@/logger";
 
 /** Resolved SDK configuration with required rpcUrl and chainId */
 interface ResolvedConfig extends Omit<SDKConfig, "rpcUrl" | "chainId"> {
@@ -171,6 +173,7 @@ export class StarkZap {
     bridging?: BridgingConfig;
     chainId: ChainId;
     explorer?: ExplorerConfig;
+    logging?: LoggerConfig;
     rpcUrl: string;
     staking?: StakingConfig;
   }> {
@@ -463,6 +466,7 @@ export class StarkZap {
         rpcUrl: this.config.rpcUrl,
         chainId: this.config.chainId,
         ...(explorer && { explorer }),
+        ...(this.config.logging && { logging: this.config.logging }),
       },
       this.config.staking,
       this.config.bridging
@@ -541,7 +545,9 @@ export class StarkZap {
    */
   async getBridgingTokens(chain?: ExternalChain): Promise<BridgeToken[]> {
     if (!this.bridgeTokenRepository) {
-      this.bridgeTokenRepository = new BridgeTokenRepository();
+      this.bridgeTokenRepository = new BridgeTokenRepository({
+        logger: createLogger(this.config.logging),
+      });
     }
 
     const env = this.config.chainId.isMainnet() ? "mainnet" : "testnet";

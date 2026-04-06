@@ -45,6 +45,9 @@ export * from "@/bridge";
 // Connect
 export * from "@/connect";
 
+// Logger
+export type { Logger, LoggerConfig, LogLevel } from "@/logger";
+
 // Types
 export * from "@/types";
 

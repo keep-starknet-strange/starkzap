@@ -20,6 +20,8 @@ import {
   type StakingConfig,
   type Token,
 } from "@/types";
+import type { LoggerConfig } from "@/logger";
+import { createLogger, type StarkZapLogger } from "@/logger";
 import {
   type DepositMonitorResult,
   type DepositState,
@@ -98,6 +100,9 @@ export abstract class BaseWallet implements WalletInterface {
   /** Staking configuration, required for staking operations */
   private readonly stakingConfig: StakingConfig | undefined;
 
+  /** Internal SDK logger, threaded from StarkZap configuration. */
+  protected readonly logger: StarkZapLogger;
+
   /**
    * Cache of Erc20 instances keyed by token address.
    * Prevents creating multiple instances for the same token.
@@ -126,10 +131,16 @@ export abstract class BaseWallet implements WalletInterface {
     defaultSwapProvider?: SwapProvider | undefined;
     defaultLendingProvider?: LendingProvider | undefined;
     defaultDcaProvider?: DcaProvider | undefined;
+    logging?: LoggerConfig;
   }) {
     this.address = options.address;
     this.stakingConfig = options.stakingConfig;
-    this.bridging = new BridgeOperator(this, options.bridgingConfig);
+    this.logger = createLogger(options.logging);
+    this.bridging = new BridgeOperator(
+      this,
+      options.bridgingConfig,
+      this.logger
+    );
     this.swapRegistry = new ProviderRegistry("swap");
     this.swapRegistry.register(
       options.defaultSwapProvider ?? new AvnuSwapProvider(),

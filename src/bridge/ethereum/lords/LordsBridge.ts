@@ -9,13 +9,15 @@ import { type Call, CallData, RPC, uint256 } from "starknet";
 import { FeeErrorCause } from "@/types/errors";
 import LORDS_BRIDGE_ABI from "@/abi/ethereum/lordsBridge.json";
 import { AutoWithdrawFeesHandler } from "@/bridge/utils/auto-withdraw-fees-handler";
+import type { StarkZapLogger } from "@/logger";
 
 export class LordsBridge extends CanonicalEthereumBridge {
   constructor(
     bridgeToken: EthereumBridgeToken,
     config: EthereumWalletConfig,
     starknetWallet: WalletInterface,
-    autoWithdrawFeesHandler: AutoWithdrawFeesHandler
+    autoWithdrawFeesHandler: AutoWithdrawFeesHandler,
+    logger: StarkZapLogger
   ) {
     if (bridgeToken.id !== "lords") {
       throw new Error(
@@ -27,6 +29,7 @@ export class LordsBridge extends CanonicalEthereumBridge {
       config,
       starknetWallet,
       autoWithdrawFeesHandler,
+      logger,
       LORDS_BRIDGE_ABI
     );
   }

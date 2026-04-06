@@ -45,6 +45,7 @@ import type {
   WithdrawalStateInput,
   WithdrawMonitorResult,
 } from "@/bridge/monitor/types";
+import type { StarkZapLogger } from "@/logger";
 
 export class BridgeOperator implements BridgeOperatorInterface {
   private cache = new BridgeCache();
@@ -54,7 +55,8 @@ export class BridgeOperator implements BridgeOperatorInterface {
 
   constructor(
     private readonly starknetWallet: WalletInterface,
-    private readonly bridgingConfig?: BridgingConfig
+    private readonly bridgingConfig: BridgingConfig | undefined,
+    private readonly logger: StarkZapLogger
   ) {}
 
   public async deposit(
@@ -313,7 +315,8 @@ export class BridgeOperator implements BridgeOperatorInterface {
         token,
         walletConfig,
         starknetWallet,
-        this.autoWithdrawFeesHandler
+        this.autoWithdrawFeesHandler,
+        this.logger
       );
     }
 
@@ -325,13 +328,14 @@ export class BridgeOperator implements BridgeOperatorInterface {
           token,
           walletConfig,
           starknetWallet,
-          this.autoWithdrawFeesHandler
+          this.autoWithdrawFeesHandler,
+          this.logger
         );
       }
       case Protocol.CCTP: {
         const { CCTPBridge } =
           await import("@/bridge/ethereum/cctp/CCTPBridge");
-        return new CCTPBridge(token, walletConfig, starknetWallet);
+        return new CCTPBridge(token, walletConfig, starknetWallet, this.logger);
       }
       case Protocol.OFT:
       case Protocol.OFT_MIGRATED: {
@@ -343,7 +347,13 @@ export class BridgeOperator implements BridgeOperatorInterface {
           );
         }
         const { OftBridge } = await import("@/bridge/ethereum/oft/OftBridge");
-        return new OftBridge(token, walletConfig, starknetWallet, apiKey);
+        return new OftBridge(
+          token,
+          walletConfig,
+          starknetWallet,
+          apiKey,
+          this.logger
+        );
       }
       default:
         throw new Error(
@@ -403,6 +413,7 @@ export class BridgeOperator implements BridgeOperatorInterface {
           starknetProvider: this.starknetWallet.getProvider(),
           solanaConnection: connection,
           hyperlane,
+          logger: this.logger,
         });
       });
     }
@@ -431,6 +442,7 @@ export class BridgeOperator implements BridgeOperatorInterface {
             starknetProvider: this.starknetWallet.getProvider(),
             ethereumProvider,
             fetchFn: resolveFetch(undefined),
+            logger: this.logger,
           });
         });
 
@@ -445,6 +457,7 @@ export class BridgeOperator implements BridgeOperatorInterface {
             starknetProvider: this.starknetWallet.getProvider(),
             ethereumProvider,
             protocol: oftProtocol,
+            logger: this.logger,
           });
         });
       }

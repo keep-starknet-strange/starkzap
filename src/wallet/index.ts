@@ -41,6 +41,7 @@ import {
   BraavosPreset,
   OpenZeppelinPreset,
 } from "@/account/presets";
+import type { LoggerConfig } from "@/logger";
 
 // Braavos factory address (same on Sepolia and Mainnet)
 const BRAAVOS_FACTORY_ADDRESS =
@@ -138,11 +139,13 @@ export class Wallet extends BaseWallet {
     defaultTimeBounds?: PaymasterTimeBounds;
     stakingConfig: StakingConfig | undefined;
     bridgingConfig?: BridgingConfig | undefined;
+    logging?: LoggerConfig;
   }) {
     super({
       address: options.address,
       stakingConfig: options.stakingConfig,
       bridgingConfig: options.bridgingConfig,
+      ...(options.logging && { logging: options.logging }),
     });
     this.accountProvider = options.accountProvider;
     this.account = options.account;
@@ -227,6 +230,7 @@ export class Wallet extends BaseWallet {
       ...(timeBounds && { defaultTimeBounds: timeBounds }),
       stakingConfig: options.config.staking,
       bridgingConfig: options.config.bridging,
+      ...(config.logging && { logging: config.logging }),
     });
 
     applyProviders(wallet, options);

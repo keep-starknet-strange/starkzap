@@ -1,5 +1,6 @@
 import { CairoFelt252, Contract, RpcProvider } from "starknet";
 import { type Address, type ChainId, getChainId, type Token } from "@/types";
+import type { Logger } from "@/logger";
 import { groupBy } from "@/utils";
 import { mainnetTokens } from "@/erc20/token/presets";
 import { sepoliaTokens } from "@/erc20/token/presets.sepolia";
@@ -76,7 +77,8 @@ async function mapWithConcurrency<T, R>(
 
 async function resolveUnknownToken(
   address: Address,
-  provider: RpcProvider
+  provider: RpcProvider,
+  logger?: Logger
 ): Promise<Token | null> {
   const contract = new Contract({
     abi: ERC20_ABI,
@@ -112,7 +114,7 @@ async function resolveUnknownToken(
       symbol,
     };
   } catch (error) {
-    console.warn(
+    logger?.warn(
       `Could not determine token ${address}: ${
         error instanceof Error ? error.message : String(error)
       }`
@@ -123,7 +125,8 @@ async function resolveUnknownToken(
 
 export async function getTokensFromAddresses(
   tokenAddresses: Address[],
-  provider: RpcProvider
+  provider: RpcProvider,
+  logger?: Logger
 ): Promise<Token[]> {
   const chainId = await getChainId(provider);
   const presetTokens = Object.values(getPresets(chainId));
@@ -146,7 +149,7 @@ export async function getTokensFromAddresses(
     const resolvedUnknownTokens = await mapWithConcurrency(
       unknownTokenAddresses,
       MAX_PARALLEL_TOKEN_REQUESTS,
-      async (address) => resolveUnknownToken(address, provider)
+      async (address) => resolveUnknownToken(address, provider, logger)
     );
     tokens.push(
       ...resolvedUnknownTokens.filter((token): token is Token => token !== null)

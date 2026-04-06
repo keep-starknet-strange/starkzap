@@ -27,6 +27,7 @@ import {
 } from "@/bridge/utils/auto-withdraw-fees-handler";
 import CANONICAL_BRIDGE_ABI from "@/abi/ethereum/canonicalBridge.json";
 import type { Tx } from "@/tx";
+import type { StarkZapLogger } from "@/logger";
 
 export class CanonicalEthereumBridge extends EthereumBridge {
   private static readonly DEFAULT_ESTIMATED_DEPOSIT_GAS_REQUIREMENT = 154744n;
@@ -36,9 +37,10 @@ export class CanonicalEthereumBridge extends EthereumBridge {
     config: EthereumWalletConfig,
     starknetWallet: WalletInterface,
     private readonly autoWithdrawFeesHandler: AutoWithdrawFeesHandler,
+    logger: StarkZapLogger,
     bridgeAbi: InterfaceAbi = CANONICAL_BRIDGE_ABI
   ) {
-    super(bridgeToken, config, starknetWallet, bridgeAbi);
+    super(bridgeToken, config, starknetWallet, logger, bridgeAbi);
   }
 
   async deposit(
@@ -172,7 +174,7 @@ export class CanonicalEthereumBridge extends EthereumBridge {
 
         calls.push(await this.getAutoWithdrawTransferCall(feeData));
       } catch (e) {
-        console.debug(
+        this.logger.debug(
           "[CanonicalEthereumBridge] getAutoWithdrawTransferCall failed:",
           e
         );
@@ -192,7 +194,7 @@ export class CanonicalEthereumBridge extends EthereumBridge {
         autoWithdrawFeeError,
       };
     } catch (e) {
-      console.debug(
+      this.logger.debug(
         "[CanonicalEthereumBridge] getInitiateWithdrawFeeEstimate (L2 fee) failed:",
         e
       );
@@ -266,7 +268,7 @@ export class CanonicalEthereumBridge extends EthereumBridge {
 
       return { fee };
     } catch (e) {
-      console.debug(
+      this.logger.debug(
         "[CanonicalEthereumBridge] estimateL1ToL2MessageFee failed:",
         e
       );
@@ -287,7 +289,7 @@ export class CanonicalEthereumBridge extends EthereumBridge {
       ]);
       return { gasFee: this.ethAmount(gasUnits * gasPrice) };
     } catch (e) {
-      console.debug(
+      this.logger.debug(
         "[CanonicalEthereumBridge] estimateEthereumGasFeeForTx failed:",
         e
       );

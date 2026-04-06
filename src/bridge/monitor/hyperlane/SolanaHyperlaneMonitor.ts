@@ -18,12 +18,14 @@ import {
   hyperlaneChainName,
   setupMultiProtocolProvider,
 } from "@/bridge/solana/registry";
+import type { StarkZapLogger } from "@/logger";
 
 export interface HyperlaneSolanaMonitorOptions {
   chainId: ChainId;
   starknetProvider: RpcProvider;
   solanaConnection: Connection;
   hyperlane: HyperlaneRuntime;
+  logger: StarkZapLogger;
 }
 
 /**
@@ -50,11 +52,14 @@ export class SolanaHyperlaneMonitor implements BridgeMonitorInterface {
   private readonly starknetMailbox: string;
   private readonly solanaChainName: string;
   private readonly solanaMailbox: string;
+  private readonly logger: StarkZapLogger;
 
   private dispatchIdEventKey = num.toHex(hash.starknetKeccak("DispatchId"));
 
   constructor(options: HyperlaneSolanaMonitorOptions) {
-    const { chainId, starknetProvider, solanaConnection, hyperlane } = options;
+    const { chainId, starknetProvider, solanaConnection, hyperlane, logger } =
+      options;
+    this.logger = logger;
     this.starknetProvider = starknetProvider;
     this.solanaConnection = solanaConnection;
     this.hyperlane = hyperlane;
@@ -220,7 +225,7 @@ export class SolanaHyperlaneMonitor implements BridgeMonitorInterface {
 
       return false;
     } catch (e) {
-      console.debug(
+      this.logger.debug(
         "[SolanaHyperlaneMonitor] checkStarknetDelivery failed:",
         e
       );
@@ -265,14 +270,17 @@ export class SolanaHyperlaneMonitor implements BridgeMonitorInterface {
           1
         );
       } catch (e) {
-        console.debug(
+        this.logger.debug(
           "[SolanaHyperlaneMonitor] waitForMessageProcessed failed:",
           e
         );
         return false;
       }
     } catch (e) {
-      console.debug("[SolanaHyperlaneMonitor] checkSolanaDelivery failed:", e);
+      this.logger.debug(
+        "[SolanaHyperlaneMonitor] checkSolanaDelivery failed:",
+        e
+      );
       return false;
     }
   }

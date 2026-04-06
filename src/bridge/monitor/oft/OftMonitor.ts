@@ -18,6 +18,7 @@ import {
 import type { ChainId } from "@/types";
 import type { Protocol } from "@/types/bridge/protocol";
 import { resolveFetch } from "@/utils";
+import type { StarkZapLogger } from "@/logger";
 
 const LAYERZERO_SCAN_MAINNET = "https://scan.layerzero-api.com/v1";
 const LAYERZERO_SCAN_TESTNET = "https://scan-testnet.layerzero-api.com/v1";
@@ -41,6 +42,7 @@ export interface OftMonitorOptions {
   ethereumProvider: Provider;
   protocol: Protocol.OFT | Protocol.OFT_MIGRATED;
   fetchFn?: typeof fetch;
+  logger: StarkZapLogger;
 }
 
 export class OftMonitor implements BridgeMonitorInterface {
@@ -49,6 +51,7 @@ export class OftMonitor implements BridgeMonitorInterface {
   protected readonly ethereumProvider: Provider;
   protected readonly protocol: Protocol.OFT | Protocol.OFT_MIGRATED;
   protected readonly fetchFn: typeof fetch;
+  private readonly logger: StarkZapLogger;
 
   constructor(options: OftMonitorOptions) {
     this.chainId = options.chainId;
@@ -56,6 +59,7 @@ export class OftMonitor implements BridgeMonitorInterface {
     this.ethereumProvider = options.ethereumProvider;
     this.protocol = options.protocol;
     this.fetchFn = resolveFetch(options.fetchFn);
+    this.logger = options.logger;
   }
 
   async monitorDeposit(
@@ -229,7 +233,7 @@ export class OftMonitor implements BridgeMonitorInterface {
       const data = (await response.json()) as LzMessagesResponse;
       return data.data[0] ?? null;
     } catch (e) {
-      console.debug("[OftMonitor] tryFetchLayerZeroMessage failed:", e);
+      this.logger.debug("[OftMonitor] tryFetchLayerZeroMessage failed:", e);
       return null;
     }
   }

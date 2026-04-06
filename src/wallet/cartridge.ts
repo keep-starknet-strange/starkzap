@@ -29,6 +29,7 @@ import {
 } from "@/wallet/utils";
 import { BaseWallet } from "@/wallet/base";
 import { assertSafeHttpUrl } from "@/utils";
+import type { LoggerConfig } from "@/logger";
 
 const NEGATIVE_DEPLOYMENT_CACHE_TTL_MS = 3_000;
 const MAX_CONTROLLER_WAIT_MS = 10_000;
@@ -101,6 +102,7 @@ export interface CartridgeWalletOptions {
   feeMode?: FeeMode;
   timeBounds?: PaymasterTimeBounds;
   explorer?: ExplorerConfig;
+  logging?: LoggerConfig;
 }
 
 /**
@@ -151,6 +153,7 @@ export class CartridgeWallet extends BaseWallet {
       address: fromAddress(walletAccount.address),
       stakingConfig,
       bridgingConfig,
+      ...(options.logging && { logging: options.logging }),
     });
     this.controller = controller;
     this.walletAccount = walletAccount;

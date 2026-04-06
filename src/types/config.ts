@@ -5,6 +5,7 @@ import {
   constants,
 } from "starknet";
 import type { NetworkPreset, NetworkName } from "@/network";
+import type { LoggerConfig } from "@/logger";
 import type { Address } from "@/types";
 
 /** Supported Starknet chain identifiers */
@@ -244,4 +245,27 @@ export interface SDKConfig {
    * @see {@link BridgingConfig}
    */
   bridging?: BridgingConfig;
+
+  /**
+   * Optional logging configuration for SDK diagnostics.
+   *
+   * Provide a {@link LoggerConfig} with a `logger` (e.g. `console`, pino)
+   * and an optional `logLevel` to control verbosity.
+   *
+   * Silent by default (no-op). When provided without `logLevel`,
+   * all severity levels are forwarded to the logger.
+   *
+   * @example
+   * ```ts
+   * // Quick debugging
+   * const sdk = new StarkZap({ network: "mainnet", logging: { logger: console } });
+   *
+   * // Pino with level filter
+   * import pino from "pino";
+   * const sdk = new StarkZap({ network: "mainnet", logging: { logger: pino(), logLevel: "warn" } });
+   * ```
+   *
+   * @see {@link LoggerConfig}
+   */
+  logging?: LoggerConfig;
 }

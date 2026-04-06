@@ -1,6 +1,7 @@
 import type { RpcProvider } from "starknet";
 import type { Provider, TransactionReceipt } from "ethers";
 import { BridgeTransferStatus } from "@/bridge/monitor/types";
+import { type StarkZapLogger, NOOP_LOGGER } from "@/logger";
 
 /**
  * Checks the current status of a Starknet transaction.
@@ -14,22 +15,25 @@ import { BridgeTransferStatus } from "@/bridge/monitor/types";
  */
 export async function checkStarknetTxStatus(
   txHash: string,
-  provider: RpcProvider
+  provider: RpcProvider,
+  logger: StarkZapLogger = NOOP_LOGGER
 ): Promise<BridgeTransferStatus> {
   let receipt: Awaited<ReturnType<RpcProvider["getTransactionReceipt"]>>;
 
   try {
     receipt = await provider.getTransactionReceipt(txHash);
   } catch (e) {
-    console.debug("[checkStarknetTxStatus] getTransactionReceipt failed:", e);
+    logger.error(`SN TX: [${txHash}]`, e);
     return BridgeTransferStatus.NOT_SUBMITTED_ON_STARKNET;
   }
 
   if (receipt.isError()) {
+    logger.error(`SN TX: [${txHash}]`, receipt.value);
     return BridgeTransferStatus.ERROR;
   }
 
   if (receipt.isReverted()) {
+    logger.error(`SN TX: [${txHash}] Reverted`);
     return BridgeTransferStatus.ERROR;
   }
 

@@ -1,4 +1,5 @@
 import type { ChainId } from "@/types";
+import { type StarkZapLogger, NOOP_LOGGER } from "@/logger";
 import {
   ETH_FAST_TRANSFER_FEE_BP,
   ETHEREUM_DOMAIN_ID,
@@ -25,11 +26,11 @@ export enum BridgeDirection {
 export class CCTPFees {
   private static instance: CCTPFees;
 
-  private constructor() {}
+  private constructor(private readonly logger: StarkZapLogger) {}
 
-  static getInstance(): CCTPFees {
+  static getInstance(logger: StarkZapLogger = NOOP_LOGGER): CCTPFees {
     if (!CCTPFees.instance) {
-      CCTPFees.instance = new CCTPFees();
+      CCTPFees.instance = new CCTPFees(logger);
     }
     return CCTPFees.instance;
   }
@@ -45,7 +46,7 @@ export class CCTPFees {
       const fee = feeData.find((f) => f.finalityThreshold === targetThreshold);
       return fee?.minimumFee ?? this.getFallbackFee(direction, fastTransfer);
     } catch (error) {
-      console.error("Failed to get transfer fee, using fallback:", error);
+      this.logger.error("Failed to get transfer fee, using fallback:", error);
       return this.getFallbackFee(direction, fastTransfer);
     }
   }

@@ -66,7 +66,7 @@ export class CCTPBridge extends EthereumBridge {
 
   private static readonly ZERO_ETH = Amount.fromRaw(0n, 18, "ETH");
 
-  private readonly cctpFees = CCTPFees.getInstance();
+  private readonly cctpFees = CCTPFees.getInstance(this.logger);
 
   async deposit(
     recipient: Address,
@@ -136,7 +136,10 @@ export class CCTPBridge extends EthereumBridge {
           ...approvalFeeData,
         };
       } catch (e) {
-        console.debug("[CCTPBridge] getDepositFeeEstimate (L1 gas) failed:", e);
+        this.logger.debug(
+          "[CCTPBridge] getDepositFeeEstimate (L1 gas) failed:",
+          e
+        );
         return {
           l1Fee: defaultL1Fee,
           l1FeeError: FeeErrorCause.GENERIC_L1_FEE_ERROR,
@@ -190,7 +193,7 @@ export class CCTPBridge extends EthereumBridge {
         fastTransferBpFee,
       };
     } catch (e) {
-      console.debug(
+      this.logger.debug(
         "[CCTPBridge] getInitiateWithdrawFeeEstimate (L2 fee) failed:",
         e
       );
@@ -289,7 +292,10 @@ export class CCTPBridge extends EthereumBridge {
         l1Fee: this.ethAmount(FALLBACK_COMPLETE_WITHDRAW_GAS * gasPrice),
       };
     } catch (e) {
-      console.debug("[CCTPBridge] getCompleteWithdrawFeeEstimate failed:", e);
+      this.logger.debug(
+        "[CCTPBridge] getCompleteWithdrawFeeEstimate failed:",
+        e
+      );
       return {
         l1Fee: this.ethAmount(0n),
         l1FeeError: FeeErrorCause.GENERIC_L1_FEE_ERROR,
