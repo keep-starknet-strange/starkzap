@@ -25,6 +25,7 @@ import {
   type WalletInterface,
   type AccountClassConfig,
   type SwapProvider,
+  type Logger,
   type Token,
   fromAddress,
 } from "starkzap";
@@ -208,10 +209,43 @@ const presetTokens = Object.values(getPresets(SDK_CHAIN_ID)).sort((a, b) =>
 );
 const dcaTokens = getDcaDemoTokens();
 
+// SDK logger that pipes into the Activity Log UI
+let sdkLogsVisible = false;
+const sdkLogEntries: HTMLElement[] = [];
+
+const sdkLogger: Logger = {
+  debug: (msg, ...args) => appendSdkLog("debug", msg, args),
+  info: (msg, ...args) => appendSdkLog("info", msg, args),
+  warn: (msg, ...args) => appendSdkLog("warn", msg, args),
+  error: (msg, ...args) => appendSdkLog("error", msg, args),
+};
+
+function appendSdkLog(level: string, message: string, args: unknown[]): void {
+  const container = document.getElementById("log");
+  if (!container) return;
+  const time = new Date().toLocaleTimeString("en-US", { hour12: false });
+  const entry = document.createElement("div");
+  entry.className = `log-entry sdk${sdkLogsVisible ? "" : " hidden"}`;
+  const timeSpan = document.createElement("span");
+  timeSpan.className = "log-time";
+  timeSpan.textContent = time;
+  entry.appendChild(timeSpan);
+  const detail = args.length ? ` ${args.map(String).join(" ")}` : "";
+  entry.appendChild(
+    document.createTextNode(`[starkzap][${level}] ${message}${detail}`)
+  );
+  container.appendChild(entry);
+  sdkLogEntries.push(entry);
+  if (sdkLogsVisible) {
+    container.scrollTop = container.scrollHeight;
+  }
+}
+
 // SDK instance
 const sdk = new StarkZap({
   rpcUrl: RPC_URL,
   chainId: SDK_CHAIN_ID,
+  logging: { logger: sdkLogger },
   ...(ALCHEMY_API_KEY || OFT_PUBLIC_KEY
     ? {
         bridging: {
@@ -1689,7 +1723,9 @@ function renderBridgeTxHistory(records: Readonly<StoredBridgeTx[]>): void {
     const secondaryLabel = isDeposit ? "SN" : "L1";
 
     const checkedAt = tx.statusCheckedAt
-      ? `Checked ${Math.round((Date.now() - tx.statusCheckedAt) / 60000)} min ago`
+      ? `Checked ${Math.round(
+          (Date.now() - tx.statusCheckedAt) / 60000
+        )} min ago`
       : "Not checked yet";
 
     function hashChip(hash: string, label: string, cls: string): string {
@@ -1700,14 +1736,28 @@ function renderBridgeTxHistory(records: Readonly<StoredBridgeTx[]>): void {
     item.innerHTML = `
       <div class="bridge-tx-meta">
         <span class="bridge-tx-tag ${tagClass}">${typeLabel}</span>
-        <span class="bridge-tx-amount">${formatRawAmount(tx.amountRaw, tx.tokenDecimals, tx.tokenSymbol)}</span>
+        <span class="bridge-tx-amount">${formatRawAmount(
+          tx.amountRaw,
+          tx.tokenDecimals,
+          tx.tokenSymbol
+        )}</span>
         ${primaryHash ? hashChip(primaryHash, primaryLabel, "primary") : ""}
-        ${secondaryHash ? hashChip(secondaryHash, secondaryLabel, "secondary") : ""}
+        ${
+          secondaryHash
+            ? hashChip(secondaryHash, secondaryLabel, "secondary")
+            : ""
+        }
       </div>
-      <div class="bridge-tx-status">${statusLabel(tx.lastStatus)} · ${checkedAt}</div>
+      <div class="bridge-tx-status">${statusLabel(
+        tx.lastStatus
+      )} · ${checkedAt}</div>
       <div class="bridge-tx-actions">
         <button class="btn-check-status">Check Status</button>
-        ${needsCompletionStep(tx) ? `<button class="btn-complete">Complete Withdrawal</button>` : ""}
+        ${
+          needsCompletionStep(tx)
+            ? `<button class="btn-complete">Complete Withdrawal</button>`
+            : ""
+        }
         <button class="btn-remove">✕</button>
       </div>
     `;
@@ -4391,6 +4441,20 @@ lendingBorrowPercentInput.addEventListener("input", () => {
 lendingUseEarnInput.addEventListener("change", () => {
   void refreshSelectedLendingContext({ silent: true });
   renderLendingDraft();
+});
+
+// SDK logs toggle
+const sdkLogsToggle = document.getElementById(
+  "sdk-logs-toggle"
+) as HTMLInputElement;
+sdkLogsToggle.addEventListener("change", () => {
+  sdkLogsVisible = sdkLogsToggle.checked;
+  for (const entry of sdkLogEntries) {
+    entry.classList.toggle("hidden", !sdkLogsVisible);
+  }
+  if (sdkLogsVisible) {
+    logContainer.scrollTop = logContainer.scrollHeight;
+  }
 });
 
 // Initial log

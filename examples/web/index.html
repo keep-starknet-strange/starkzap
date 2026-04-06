@@ -603,9 +603,37 @@
         color: var(--accent-primary);
       }
 
+      .log-entry.sdk {
+        color: var(--text-muted);
+        font-style: italic;
+      }
+
       .log-time {
         color: var(--text-muted);
         margin-right: 0.5rem;
+      }
+
+      .log-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+      }
+
+      .sdk-logs-toggle {
+        display: flex;
+        align-items: center;
+        gap: 0.4rem;
+        font-size: 0.75rem;
+        color: var(--text-muted);
+        font-weight: 400;
+        cursor: pointer;
+        user-select: none;
+        white-space: nowrap;
+        flex-shrink: 0;
+      }
+
+      .sdk-logs-toggle input {
+        cursor: pointer;
       }
 
       .hidden {
@@ -1712,7 +1740,13 @@
 
       <!-- Activity Log -->
       <div class="card">
-        <div class="card-title">Activity Log</div>
+        <div class="log-header">
+          <div class="card-title">Activity Log</div>
+          <label class="sdk-logs-toggle">
+            <input type="checkbox" id="sdk-logs-toggle" />
+            Show SDK traces
+          </label>
+        </div>
         <div id="log" class="log-container">
           <div class="log-entry">Ready to connect...</div>
         </div>
