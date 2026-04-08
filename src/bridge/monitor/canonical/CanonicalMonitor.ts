@@ -16,22 +16,26 @@ import {
   getEthereumTxStatus,
 } from "@/bridge/monitor/utils";
 import { deriveStarknetDepositTxHash } from "@/bridge/monitor/canonical/utils";
+import type { StarkZapLogger } from "@/logger";
 
 export interface CanonicalMonitorOptions {
   chainId: ChainId;
   starknetProvider: RpcProvider;
   ethereumProvider: Provider;
+  logger: StarkZapLogger;
 }
 
 export class CanonicalMonitor implements BridgeMonitorInterface {
   private readonly chainId: ChainId;
   private readonly starknetProvider: RpcProvider;
   private readonly ethereumProvider: Provider;
+  private readonly logger: StarkZapLogger;
 
   constructor(options: CanonicalMonitorOptions) {
     this.chainId = options.chainId;
     this.starknetProvider = options.starknetProvider;
     this.ethereumProvider = options.ethereumProvider;
+    this.logger = options.logger;
   }
 
   async monitorDeposit(
@@ -42,7 +46,8 @@ export class CanonicalMonitor implements BridgeMonitorInterface {
     if (starknetTxHash) {
       const status = await checkStarknetTxStatus(
         starknetTxHash,
-        this.starknetProvider
+        this.starknetProvider,
+        this.logger
       );
       return { status, externalTxHash, starknetTxHash };
     }
@@ -69,7 +74,8 @@ export class CanonicalMonitor implements BridgeMonitorInterface {
 
     const snStatus = await checkStarknetTxStatus(
       derivedSnTxHash,
-      this.starknetProvider
+      this.starknetProvider,
+      this.logger
     );
 
     if (snStatus === BridgeTransferStatus.NOT_SUBMITTED_ON_STARKNET) {
@@ -110,7 +116,11 @@ export class CanonicalMonitor implements BridgeMonitorInterface {
       return { ...result, status: completedStatus, externalTxHash };
     }
 
-    const status = await checkStarknetTxStatus(snTxHash, this.starknetProvider);
+    const status = await checkStarknetTxStatus(
+      snTxHash,
+      this.starknetProvider,
+      this.logger
+    );
     return { ...result, status };
   }
 

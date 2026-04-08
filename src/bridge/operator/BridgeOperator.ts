@@ -442,6 +442,7 @@ export class BridgeOperator implements BridgeOperatorInterface {
             chainId: this.starknetWallet.getChainId(),
             starknetProvider: this.starknetWallet.getProvider(),
             ethereumProvider,
+            logger: this.logger,
           });
         });
 

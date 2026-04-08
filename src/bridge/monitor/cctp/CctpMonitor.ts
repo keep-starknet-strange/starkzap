@@ -91,7 +91,8 @@ export class CctpMonitor implements BridgeMonitorInterface {
     if (starknetTxHash) {
       const status = await checkStarknetTxStatus(
         starknetTxHash,
-        this.starknetProvider
+        this.starknetProvider,
+        this.logger
       );
       return { status, externalTxHash, starknetTxHash };
     }
@@ -130,7 +131,8 @@ export class CctpMonitor implements BridgeMonitorInterface {
 
     const snStatus = await checkStarknetTxStatus(
       snTxHash,
-      this.starknetProvider
+      this.starknetProvider,
+      this.logger
     );
     return { status: snStatus, externalTxHash, starknetTxHash: snTxHash };
   }
@@ -158,7 +160,8 @@ export class CctpMonitor implements BridgeMonitorInterface {
 
     const snStatus = await checkStarknetTxStatus(
       snTxHash,
-      this.starknetProvider
+      this.starknetProvider,
+      this.logger
     );
 
     // Only check Circle once the Starknet burn tx has reached soft finality.

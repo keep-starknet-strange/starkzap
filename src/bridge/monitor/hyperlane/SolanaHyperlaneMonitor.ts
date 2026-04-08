@@ -87,7 +87,8 @@ export class SolanaHyperlaneMonitor implements BridgeMonitorInterface {
     if (starknetTxHash) {
       const status = await checkStarknetTxStatus(
         starknetTxHash,
-        this.starknetProvider
+        this.starknetProvider,
+        this.logger
       );
       return { status, externalTxHash, starknetTxHash };
     }
@@ -121,7 +122,8 @@ export class SolanaHyperlaneMonitor implements BridgeMonitorInterface {
 
     const snStatus = await checkStarknetTxStatus(
       snTxHash,
-      this.starknetProvider
+      this.starknetProvider,
+      this.logger
     );
     const base = { protocol: "hyperlane" as const, starknetTxHash: snTxHash };
 

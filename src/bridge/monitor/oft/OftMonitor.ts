@@ -69,7 +69,8 @@ export class OftMonitor implements BridgeMonitorInterface {
     if (starknetTxHash) {
       const status = await checkStarknetTxStatus(
         starknetTxHash,
-        this.starknetProvider
+        this.starknetProvider,
+        this.logger
       );
       return { status, externalTxHash, starknetTxHash };
     }
@@ -103,7 +104,8 @@ export class OftMonitor implements BridgeMonitorInterface {
       const snTxHash = dst.tx.txHash;
       const snStatus = await checkStarknetTxStatus(
         snTxHash,
-        this.starknetProvider
+        this.starknetProvider,
+        this.logger
       );
       return { status: snStatus, externalTxHash, starknetTxHash: snTxHash };
     }
@@ -139,7 +141,8 @@ export class OftMonitor implements BridgeMonitorInterface {
 
     const snStatus = await checkStarknetTxStatus(
       snTxHash,
-      this.starknetProvider
+      this.starknetProvider,
+      this.logger
     );
 
     // Only query LayerZero once the Starknet tx has reached soft finality.

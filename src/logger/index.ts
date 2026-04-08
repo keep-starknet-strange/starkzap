@@ -113,7 +113,8 @@ const noopLogger: Logger = {
  *   is disabled.
  * - Level gating controlled by the resolved {@link LogLevel}.
  *
- * Not exported from the public API.
+ * This class is exported from `@/logger` for use inside the SDK; it is not
+ * re-exported from the package entry (`starkzap`) public API surface.
  */
 export class StarkZapLogger {
   readonly level: LogLevel;
@@ -151,8 +152,15 @@ export class StarkZapLogger {
   }
 
   /**
-   * Returns `true` if the given severity would emit for this instance's minimum
-   * (`LEVEL_PRIORITY[level] >= this.minPriority`).
+   * Returns `true` if the given severity would emit for this instance's
+   * configured minimum.
+   *
+   * Uses `LEVEL_PRIORITY[level] >= this.minPriority`, where `this.minPriority`
+   * comes from the logger's configured {@link LogLevel} at construction.
+   *
+   * The `silent` level is special: it is only a threshold meaning "emit
+   * nothing", not a severity you can query as enabled — `isLevelEnabled("silent")`
+   * is always `false` even when the instance itself is configured at `silent`.
    */
   isLevelEnabled(level: LogLevel): boolean {
     // `silent` is a config threshold ("emit nothing"), not a real severity —
