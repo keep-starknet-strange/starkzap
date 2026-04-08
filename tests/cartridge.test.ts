@@ -1,5 +1,6 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import { CartridgeWallet } from "@/wallet/cartridge";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { CartridgeWallet, _resetControllerCache } from "@/wallet/cartridge";
+import { StarkZap } from "@/sdk";
 import { ChainId } from "@/types";
 
 const { MockController, mockToSessionPolicies } = vi.hoisted(() => {
@@ -10,7 +11,9 @@ const { MockController, mockToSessionPolicies } = vi.hoisted(() => {
       ControllerMock.options.push(options);
     }
 
-    probe = vi.fn().mockResolvedValue(null);
+    async probe(): Promise<unknown> {
+      return null;
+    }
     async connect(): Promise<unknown> {
       return undefined;
     }
@@ -19,7 +22,9 @@ const { MockController, mockToSessionPolicies } = vi.hoisted(() => {
     openSettings = vi.fn();
     username = vi.fn().mockResolvedValue("testuser");
     rpcUrl = vi.fn().mockReturnValue("https://api.cartridge.gg/x/test");
-    isReady = vi.fn().mockReturnValue(true);
+    isReady(): boolean {
+      return true;
+    }
     keychain = {
       deploy: vi.fn().mockResolvedValue({
         code: "SUCCESS",
@@ -68,6 +73,8 @@ vi.mock("@cartridge/controller", () => {
   MockController.prototype.connect = vi
     .fn()
     .mockResolvedValue(mockWalletAccount);
+  MockController.prototype.probe = vi.fn().mockResolvedValue(null);
+  MockController.prototype.isReady = vi.fn().mockReturnValue(true);
 
   return {
     default: MockController,
@@ -94,7 +101,10 @@ vi.mock("starknet", async (importOriginal) => {
 describe("CartridgeWallet", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    _resetControllerCache();
     MockController.options = [];
+    MockController.prototype.probe = vi.fn().mockResolvedValue(null);
+    MockController.prototype.isReady = vi.fn().mockReturnValue(true);
   });
 
   describe("create", () => {
@@ -357,6 +367,141 @@ describe("CartridgeWallet", () => {
       await wallet.disconnect();
 
       expect(controller.disconnect).toHaveBeenCalled();
+    });
+  });
+
+  describe("probe", () => {
+    it("should return null when no session exists", async () => {
+      const result = await CartridgeWallet.probe();
+
+      expect(result).toBeNull();
+    });
+
+    it("should return a CartridgeWallet when a valid session exists", async () => {
+      MockController.prototype.probe = MockController.prototype.connect;
+
+      const result = await CartridgeWallet.probe({
+        rpcUrl: "https://api.cartridge.gg/x/starknet/sepolia",
+      });
+
+      expect(result).toBeInstanceOf(CartridgeWallet);
+      expect(result?.address).toBe(
+        "0x0000000000000000000000000000000000000000000000001234567890abcdef"
+      );
+    });
+
+    it("should return null when controller does not support probe", async () => {
+      const probeBackup = MockController.prototype.probe;
+      // @ts-expect-error simulating older controller without probe
+      delete MockController.prototype.probe;
+
+      try {
+        const result = await CartridgeWallet.probe();
+        expect(result).toBeNull();
+      } finally {
+        MockController.prototype.probe = probeBackup;
+      }
+    });
+
+    it("should wait for controller readiness before probing", async () => {
+      let readyCallCount = 0;
+      MockController.prototype.isReady = vi.fn().mockImplementation(() => {
+        readyCallCount += 1;
+        return readyCallCount > 2;
+      });
+
+      await CartridgeWallet.probe();
+
+      expect(readyCallCount).toBeGreaterThan(1);
+      expect(MockController.prototype.probe).toHaveBeenCalled();
+    });
+
+    it("should forward options to the controller identically to create()", async () => {
+      const policies = [{ target: "0xCONTRACT", method: "transfer" }];
+
+      await CartridgeWallet.probe({
+        rpcUrl: "https://api.cartridge.gg/x/starknet/sepolia",
+        chainId: ChainId.SEPOLIA,
+        policies,
+        preset: "my-preset",
+      });
+
+      const options = (
+        MockController as { options: Array<Record<string, unknown>> }
+      ).options[0];
+      if (!options) {
+        throw new Error("Expected controller options to be recorded");
+      }
+      expect(options.chains).toEqual([
+        { rpcUrl: "https://api.cartridge.gg/x/starknet/sepolia" },
+      ]);
+      expect(options.defaultChainId).toBe(ChainId.SEPOLIA.toFelt252());
+      expect(options.preset).toBe("my-preset");
+      expect(mockToSessionPolicies).toHaveBeenCalledWith(policies);
+    });
+  });
+});
+
+describe("StarkZap", () => {
+  let sdk: StarkZap;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    _resetControllerCache();
+    MockController.options = [];
+    MockController.prototype.probe = vi.fn().mockResolvedValue(null);
+    MockController.prototype.isReady = vi.fn().mockReturnValue(true);
+    sdk = new StarkZap({
+      rpcUrl: "https://api.cartridge.gg/x/starknet/sepolia",
+      chainId: ChainId.SEPOLIA,
+    });
+  });
+
+  describe("probeCartridge", () => {
+    describe("in a non-web environment", () => {
+      it("should throw when window is not defined", async () => {
+        await expect(sdk.probeCartridge()).rejects.toThrow(
+          "Cartridge is only supported in web environments"
+        );
+      });
+    });
+
+    describe("in a web environment", () => {
+      beforeEach(() => {
+        vi.stubGlobal("window", {});
+        vi.stubGlobal("document", { createElement: () => ({}) });
+      });
+
+      afterEach(() => {
+        vi.unstubAllGlobals();
+      });
+
+      it("should return null when no active session exists", async () => {
+        const result = await sdk.probeCartridge();
+
+        expect(result).toBeNull();
+      });
+
+      it("should return a wallet when a valid session exists", async () => {
+        MockController.prototype.probe = MockController.prototype.connect;
+
+        const result = await sdk.probeCartridge();
+
+        expect(result).not.toBeNull();
+        expect(result?.address).toBe(
+          "0x0000000000000000000000000000000000000000000000001234567890abcdef"
+        );
+      });
+
+      it("should throw on RPC chain mismatch", async () => {
+        vi.spyOn(sdk.getProvider(), "getChainId").mockResolvedValue(
+          ChainId.MAINNET.toFelt252()
+        );
+
+        await expect(sdk.probeCartridge()).rejects.toThrow(
+          "RPC chain mismatch"
+        );
+      });
     });
   });
 });

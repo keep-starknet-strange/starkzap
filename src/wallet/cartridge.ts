@@ -35,11 +35,19 @@ const MAX_CONTROLLER_WAIT_MS = 10_000;
 const INITIAL_CONTROLLER_POLL_MS = 100;
 const MAX_CONTROLLER_POLL_MS = 1_000;
 
+let _controller: CartridgeControllerLike | null = null;
+
+/** @internal exposed for test isolation only. */
+export function _resetControllerCache(): void {
+  _controller = null;
+}
+
 type CartridgePolicy = { target: string; method: string };
 
 type CartridgeControllerLike = {
   isReady(): boolean;
   connect(): Promise<unknown>;
+  probe?(): Promise<unknown>;
   disconnect(): Promise<void>;
   rpcUrl(): string;
   username(): Promise<string | undefined>;
@@ -201,7 +209,7 @@ export class CartridgeWallet extends BaseWallet {
       ).toString();
     }
 
-    const controller = new Controller(controllerOptions);
+    const controller = _controller ?? new Controller(controllerOptions);
 
     let waited = 0;
     let pollIntervalMs = INITIAL_CONTROLLER_POLL_MS;
@@ -218,6 +226,8 @@ export class CartridgeWallet extends BaseWallet {
       );
     }
 
+    _controller = controller;
+
     const connectedAccount = await controller.connect();
 
     if (!isCartridgeWalletAccount(connectedAccount)) {
@@ -226,6 +236,104 @@ export class CartridgeWallet extends BaseWallet {
       );
     }
     const walletAccount = connectedAccount as unknown as Account;
+
+    const nodeUrl = assertSafeHttpUrl(
+      options.rpcUrl ?? controller.rpcUrl(),
+      "Cartridge RPC URL"
+    ).toString();
+    const provider = new RpcProvider({ nodeUrl });
+
+    let classHash = "0x0";
+    try {
+      classHash = await provider.getClassHashAt(
+        fromAddress(walletAccount.address)
+      );
+    } catch {
+      // Keep "0x0" for undeployed accounts or unsupported providers.
+    }
+    const chainId = options.chainId ?? (await getChainId(provider));
+
+    return new CartridgeWallet(
+      controller,
+      walletAccount,
+      provider,
+      chainId,
+      classHash,
+      stakingConfig,
+      bridgingConfig,
+      options
+    );
+  }
+
+  /**
+   * Silently checks for an active Cartridge session.
+   */
+  static async probe(
+    options: CartridgeWalletOptions = {},
+    stakingConfig?: StakingConfig | undefined,
+    bridgingConfig?: BridgingConfig | undefined
+  ): Promise<CartridgeWallet | null> {
+    const { default: Controller, toSessionPolicies } =
+      await loadCartridgeControllerModule();
+    const controllerOptions: Record<string, unknown> = {};
+
+    if (options.chainId) {
+      controllerOptions.defaultChainId = options.chainId.toFelt252();
+    }
+
+    if (options.rpcUrl) {
+      const rpcUrl = assertSafeHttpUrl(
+        options.rpcUrl,
+        "Cartridge RPC URL"
+      ).toString();
+      controllerOptions.chains = [{ rpcUrl }];
+    }
+
+    if (options.policies && options.policies.length > 0) {
+      controllerOptions.policies = toSessionPolicies(options.policies);
+    }
+
+    if (options.preset) {
+      controllerOptions.preset = options.preset;
+    }
+
+    if (options.url) {
+      controllerOptions.url = assertSafeHttpUrl(
+        options.url,
+        "Cartridge controller URL"
+      ).toString();
+    }
+
+    const controller = _controller ?? new Controller(controllerOptions);
+
+    let waited = 0;
+    let pollIntervalMs = INITIAL_CONTROLLER_POLL_MS;
+    while (!controller.isReady() && waited < MAX_CONTROLLER_WAIT_MS) {
+      const sleepMs = Math.min(pollIntervalMs, MAX_CONTROLLER_WAIT_MS - waited);
+      await new Promise((resolve) => setTimeout(resolve, sleepMs));
+      waited += sleepMs;
+      pollIntervalMs = Math.min(pollIntervalMs * 2, MAX_CONTROLLER_POLL_MS);
+    }
+
+    if (!controller.isReady()) {
+      throw new Error(
+        "Cartridge Controller failed to initialize. Please try again."
+      );
+    }
+
+    _controller = controller;
+
+    if (typeof controller.probe !== "function") {
+      return null;
+    }
+
+    const probeResult = await controller.probe();
+
+    if (!isCartridgeWalletAccount(probeResult)) {
+      return null;
+    }
+
+    const walletAccount = probeResult as unknown as Account;
 
     const nodeUrl = assertSafeHttpUrl(
       options.rpcUrl ?? controller.rpcUrl(),
@@ -387,6 +495,7 @@ export class CartridgeWallet extends BaseWallet {
     this.clearCaches();
     this.clearDeploymentCache();
     await this.controller.disconnect();
+    _controller = null;
   }
 
   /**

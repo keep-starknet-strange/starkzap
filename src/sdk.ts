@@ -471,6 +471,49 @@ export class StarkZap {
   }
 
   /**
+   * Silently checks for an active Cartridge session.
+   *
+   * Returns CartridgeWallet if a session is active, or `null` if none exists.
+   *
+   * @example
+   * ```ts
+   * const wallet = await sdk.probeCartridge();
+   * if (wallet) {
+   *   console.log("Session restored:", wallet.address);
+   * }
+   * ```
+   */
+  async probeCartridge(
+    options: ConnectCartridgeOptions = {}
+  ): Promise<CartridgeWalletInterface | null> {
+    if (!isWebRuntime()) {
+      throw new Error(
+        "Cartridge is only supported in web environments. Use signer/privy strategies on native or server runtimes."
+      );
+    }
+
+    await this.ensureProviderChainMatchesConfig();
+    const explorer = options.explorer ?? this.config.explorer;
+
+    const { CartridgeWallet } = await import("./wallet/cartridge");
+    const wallet = await CartridgeWallet.probe(
+      {
+        ...(options.policies && { policies: options.policies }),
+        ...(options.preset && { preset: options.preset }),
+        ...(options.url && { url: options.url }),
+        ...(options.feeMode && { feeMode: options.feeMode }),
+        ...(options.timeBounds && { timeBounds: options.timeBounds }),
+        rpcUrl: this.config.rpcUrl,
+        chainId: this.config.chainId,
+        ...(explorer && { explorer }),
+      },
+      this.config.staking,
+      this.config.bridging
+    );
+    return wallet as CartridgeWalletInterface | null;
+  }
+
+  /**
    * Get all tokens that are currently enabled for staking.
    *
    * Returns the list of tokens that can be staked in the protocol.
