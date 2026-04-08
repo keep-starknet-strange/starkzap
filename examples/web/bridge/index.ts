@@ -736,14 +736,10 @@ export class BridgeController {
 
     try {
       const isCctp = record.tokenProtocol === Protocol.CCTP;
-      const txResponse = await wallet.completeWithdraw(
-        recipient,
-        amount,
-        token,
-        extWallet,
+      const completeOptions =
         isCctp && record.cctpAttestation && record.cctpMessage
           ? {
-              protocol: "cctp",
+              protocol: "cctp" as const,
               attestation: record.cctpAttestation,
               message: record.cctpMessage,
               ...(record.cctpNonce !== undefined && {
@@ -753,7 +749,15 @@ export class BridgeController {
                 expirationBlock: record.cctpExpirationBlock,
               }),
             }
-          : undefined
+          : isCctp
+            ? undefined
+            : { protocol: "canonical" as const };
+      const txResponse = await wallet.completeWithdraw(
+        recipient,
+        amount,
+        token,
+        extWallet,
+        completeOptions
       );
 
       this.log(`Complete withdrawal tx: ${txResponse.hash}`, "success");

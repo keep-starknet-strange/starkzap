@@ -142,7 +142,9 @@ export interface BridgeOperatorInterface {
    * @param amount - Amount being withdrawn
    * @param token - Bridge token descriptor
    * @param externalWallet - Connected external wallet on the destination chain
-   * @param options - Protocol-specific completion arguments (e.g. CCTP attestation)
+   * @param options - When provided, must include `protocol: "canonical"` or
+   *   `protocol: "cctp"` with the fields required for that protocol (CCTP needs
+   *   attestation and message). These are the only protocols that require completion.
    * @returns External transaction response containing the destination-chain tx hash
    */
   completeWithdraw(

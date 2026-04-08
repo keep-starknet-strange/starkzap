@@ -918,6 +918,9 @@ export abstract class BaseWallet implements WalletInterface {
    * Only required by protocols where the cross-chain message must be manually
    * finalised after L2 finality (e.g. Canonical bridge, CCTP after Circle
    * attestation). Throws for protocols that deliver automatically.
+   *
+   * When passing `options`, include `protocol: "canonical"` or `protocol: "cctp"`
+   * with the fields required for that protocol.
    */
   completeWithdraw(
     recipient: ExternalAddress,

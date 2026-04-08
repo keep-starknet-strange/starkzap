@@ -94,6 +94,9 @@ function makeErc20Mock(token: Token, balanceRaw: bigint) {
   } as unknown as Erc20;
 }
 
+const INSUFFICIENT_AUTO_WITHDRAW_BALANCE =
+  "The user has no sufficient balance to cover for auto-withdraw.";
+
 // ─── Tests ───────────────────────────────────────────────────────────────────
 
 describe("AutoWithdrawFeesHandler", () => {
@@ -123,6 +126,7 @@ describe("AutoWithdrawFeesHandler", () => {
         bridgeToken: mockBridgeToken,
         amount: Amount.fromRaw(0n, mockStrkToken),
         walletOrAddress: WALLET_ADDRESS,
+        preferredFeeToken: undefined,
       });
 
       const calledUrl = new URL(fetchFn.mock.calls[0]![0] as string);
@@ -149,6 +153,7 @@ describe("AutoWithdrawFeesHandler", () => {
         bridgeToken: mockBridgeToken,
         amount: Amount.fromRaw(0n, mockStrkToken),
         walletOrAddress: WALLET_ADDRESS,
+        preferredFeeToken: undefined,
       });
 
       const calledUrl = new URL(fetchFn.mock.calls[0]![0] as string);
@@ -175,6 +180,7 @@ describe("AutoWithdrawFeesHandler", () => {
         bridgeToken: mockBridgeToken,
         amount: Amount.fromRaw(0n, mockStrkToken),
         walletOrAddress: WALLET_ADDRESS,
+        preferredFeeToken: undefined,
       });
 
       const calledUrl = new URL(fetchFn.mock.calls[0]![0] as string);
@@ -203,6 +209,7 @@ describe("AutoWithdrawFeesHandler", () => {
         bridgeToken: mockBridgeToken,
         amount: Amount.fromRaw(0n, mockStrkToken),
         walletOrAddress: WALLET_ADDRESS,
+        preferredFeeToken: undefined,
       });
 
       const calledUrl = new URL(fetchFn.mock.calls[0]![0] as string);
@@ -233,6 +240,7 @@ describe("AutoWithdrawFeesHandler", () => {
           bridgeToken: mockBridgeToken,
           amount: Amount.fromRaw(0n, mockStrkToken),
           walletOrAddress: WALLET_ADDRESS,
+          preferredFeeToken: undefined,
         })
       ).rejects.toThrow("Bridge not supported: { bridge: '1' }");
     });
@@ -256,6 +264,7 @@ describe("AutoWithdrawFeesHandler", () => {
           bridgeToken: mockBridgeToken,
           amount: Amount.fromRaw(0n, mockStrkToken),
           walletOrAddress: WALLET_ADDRESS,
+          preferredFeeToken: undefined,
         })
       ).rejects.toThrow(
         "Auto-withdraw gas cost request failed: 500 Internal Server Error"
@@ -282,6 +291,7 @@ describe("AutoWithdrawFeesHandler", () => {
         bridgeToken: mockBridgeToken,
         amount: Amount.fromRaw(0n, mockStrkToken),
         walletOrAddress: WALLET_ADDRESS,
+        preferredFeeToken: undefined,
       });
 
       expect(result.relayerAddress).toBe(RELAYER_ADDRESS);
@@ -308,9 +318,11 @@ describe("AutoWithdrawFeesHandler", () => {
         bridgeToken: mockBridgeToken,
         amount: Amount.fromRaw(0n, mockStrkToken),
         walletOrAddress: WALLET_ADDRESS,
+        preferredFeeToken: undefined,
       });
 
       expect(result.costsPerToken.size).toBe(2);
+      expect(result.preselectedGasToken.tokenAddress).toBe(STRK_ADDRESS);
     });
 
     it("excludes fee tokens whose balance is below the gas cost", async () => {
@@ -334,6 +346,7 @@ describe("AutoWithdrawFeesHandler", () => {
         bridgeToken: mockBridgeToken,
         amount: Amount.fromRaw(0n, mockStrkToken),
         walletOrAddress: WALLET_ADDRESS,
+        preferredFeeToken: undefined,
       });
 
       expect(result.costsPerToken.size).toBe(1);
@@ -361,13 +374,14 @@ describe("AutoWithdrawFeesHandler", () => {
         fetchFn,
       });
 
-      const result = await handler.getFeeData({
-        bridgeToken: mockBridgeToken,
-        amount: Amount.fromRaw(withdrawalRaw, mockStrkToken),
-        walletOrAddress: WALLET_ADDRESS,
-      });
-
-      expect(result.costsPerToken.size).toBe(0);
+      await expect(
+        handler.getFeeData({
+          bridgeToken: mockBridgeToken,
+          amount: Amount.fromRaw(withdrawalRaw, mockStrkToken),
+          walletOrAddress: WALLET_ADDRESS,
+          preferredFeeToken: undefined,
+        })
+      ).rejects.toThrow(INSUFFICIENT_AUTO_WITHDRAW_BALANCE);
     });
 
     it("includes the bridge token as a fee token when remaining balance covers the gas cost", async () => {
@@ -393,6 +407,7 @@ describe("AutoWithdrawFeesHandler", () => {
         bridgeToken: mockBridgeToken,
         amount: Amount.fromRaw(withdrawalRaw, mockStrkToken),
         walletOrAddress: WALLET_ADDRESS,
+        preferredFeeToken: undefined,
       });
 
       expect(result.costsPerToken.size).toBe(1);
@@ -420,16 +435,17 @@ describe("AutoWithdrawFeesHandler", () => {
         fetchFn,
       });
 
-      const result = await handler.getFeeData({
-        bridgeToken: mockBridgeToken,
-        amount: Amount.fromRaw(withdrawalRaw, mockStrkToken),
-        walletOrAddress: WALLET_ADDRESS,
-      });
-
-      expect(result.costsPerToken.size).toBe(0);
+      await expect(
+        handler.getFeeData({
+          bridgeToken: mockBridgeToken,
+          amount: Amount.fromRaw(withdrawalRaw, mockStrkToken),
+          walletOrAddress: WALLET_ADDRESS,
+          preferredFeeToken: undefined,
+        })
+      ).rejects.toThrow(INSUFFICIENT_AUTO_WITHDRAW_BALANCE);
     });
 
-    it("returns an empty gasCosts map when no fee token can cover the gas cost", async () => {
+    it("throws when no fee token can cover the gas cost", async () => {
       const fetchFn = makeFetchFn(
         makeGasCostResponse({ [STRK_ADDRESS]: "120000000000000" })
       );
@@ -443,13 +459,74 @@ describe("AutoWithdrawFeesHandler", () => {
         fetchFn,
       });
 
+      await expect(
+        handler.getFeeData({
+          bridgeToken: mockBridgeToken,
+          amount: Amount.fromRaw(0n, mockStrkToken),
+          walletOrAddress: WALLET_ADDRESS,
+          preferredFeeToken: undefined,
+        })
+      ).rejects.toThrow(INSUFFICIENT_AUTO_WITHDRAW_BALANCE);
+    });
+
+    it("selects the preferred fee token when it is affordable", async () => {
+      const fetchFn = makeFetchFn(
+        makeGasCostResponse({
+          [STRK_ADDRESS]: "120000000000000",
+          [ETH_ADDRESS]: "5000000000000",
+        })
+      );
+      fromAddressSpy
+        .mockResolvedValueOnce(makeErc20Mock(mockStrkToken, 200000000000000n))
+        .mockResolvedValueOnce(makeErc20Mock(mockEthToken, 10000000000000n));
+
+      const handler = new AutoWithdrawFeesHandler({
+        chainId: ChainId.SEPOLIA,
+        provider: mockProvider,
+        fetchFn,
+      });
+
       const result = await handler.getFeeData({
         bridgeToken: mockBridgeToken,
         amount: Amount.fromRaw(0n, mockStrkToken),
         walletOrAddress: WALLET_ADDRESS,
+        preferredFeeToken: mockEthToken,
       });
 
-      expect(result.costsPerToken.size).toBe(0);
+      expect(result.preselectedGasToken.tokenAddress).toBe(ETH_ADDRESS);
+      expect(result.costsPerToken.size).toBe(2);
+    });
+
+    it("falls back to the first affordable token when the preferred token is not affordable", async () => {
+      const fetchFn = makeFetchFn(
+        makeGasCostResponse({
+          [STRK_ADDRESS]: "120000000000000",
+          [ETH_ADDRESS]: "5000000000000",
+        })
+      );
+      fromAddressSpy
+        .mockResolvedValueOnce(
+          makeErc20Mock(mockStrkToken, 1000000000000n) // not enough for STRK gas
+        )
+        .mockResolvedValueOnce(
+          makeErc20Mock(mockEthToken, 10000000000000n) // enough for ETH gas
+        );
+
+      const handler = new AutoWithdrawFeesHandler({
+        chainId: ChainId.SEPOLIA,
+        provider: mockProvider,
+        fetchFn,
+      });
+
+      const result = await handler.getFeeData({
+        bridgeToken: mockBridgeToken,
+        amount: Amount.fromRaw(0n, mockStrkToken),
+        walletOrAddress: WALLET_ADDRESS,
+        preferredFeeToken: mockStrkToken,
+      });
+
+      expect(result.preselectedGasToken.tokenAddress).toBe(ETH_ADDRESS);
+      expect(result.costsPerToken.size).toBe(1);
     });
 
     it("calls Erc20.fromAddress with each fee token address and the configured provider", async () => {
@@ -473,6 +550,7 @@ describe("AutoWithdrawFeesHandler", () => {
         bridgeToken: mockBridgeToken,
         amount: Amount.fromRaw(0n, mockStrkToken),
         walletOrAddress: WALLET_ADDRESS,
+        preferredFeeToken: undefined,
       });
 
       expect(fromAddressSpy).toHaveBeenCalledTimes(2);

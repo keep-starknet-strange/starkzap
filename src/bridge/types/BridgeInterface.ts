@@ -72,6 +72,16 @@ export type InitiateBridgeWithdrawOptions = ExecuteOptions &
   (EthereumInitiateBridgeWithdrawOptions | CCTPInitiateWithdrawBridgeOptions);
 
 /**
+ * Complete-withdrawal options for the canonical Ethereum (StarkGate) bridge.
+ *
+ * L1 completion uses burn/recipient context from the withdrawal; no extra
+ * payload is required beyond the discriminant.
+ */
+export interface CanonicalCompleteBridgeWithdrawOptions {
+  protocol: "canonical";
+}
+
+/**
  * CCTP-specific data required to complete a withdrawal on the external chain.
  *
  * All fields are obtained from Circle's iris API after the Starknet
@@ -107,11 +117,14 @@ export interface CCTPCompleteBridgeWithdrawOptions {
 /**
  * Options for `completeWithdraw` operations.
  *
- * Combines wallet execute options with the CCTP-specific fields needed to
- * finalise the withdrawal on the external chain.
+ * The discriminant field `protocol` selects protocol-specific fields: CCTP
+ * requires attestation data; canonical Ethereum completion does not.
+ *
+ * Wallet execute options (`feeMode`, `timeBounds`) are included for API
+ * consistency; L1 completion paths may ignore them.
  */
 export type CompleteBridgeWithdrawOptions = ExecuteOptions &
-  CCTPCompleteBridgeWithdrawOptions;
+  (CanonicalCompleteBridgeWithdrawOptions | CCTPCompleteBridgeWithdrawOptions);
 
 export interface BridgeInterface<A extends ExternalAddress = ExternalAddress> {
   readonly starknetWallet: WalletInterface;
@@ -163,6 +176,10 @@ export interface BridgeInterface<A extends ExternalAddress = ExternalAddress> {
    * finalised (e.g. Canonical bridge after L2 finality, CCTP after Circle
    * attestation). Protocols that deliver automatically (OFT, Hyperlane) do
    * not implement this method.
+   *
+   * When `options` is provided, include `protocol: "canonical"` or
+   * `protocol: "cctp"` with the fields required for that protocol.
+   * These are the only protocols that require completion.
    */
   completeWithdraw?(
     recipient: A,

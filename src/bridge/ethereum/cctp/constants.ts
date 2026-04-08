@@ -67,6 +67,15 @@ export const EMPTY_DESTINATION_CALLER =
 // Fallback L1 gas estimate for completeWithdraw when simulation fails
 export const FALLBACK_COMPLETE_WITHDRAW_GAS = 169_035n;
 
+/**
+ * Thrown by {@link CCTPBridge.completeWithdraw} and
+ * {@link CCTPBridge.getCompleteWithdrawFeeEstimate} when options are missing,
+ * not `{ protocol: "cctp" }`, or lack the Circle attestation payload needed to
+ * call L1 `receiveMessage` / simulate it.
+ */
+export const CCTP_COMPLETE_WITHDRAW_OPTIONS_ERROR_MESSAGE =
+  "Wrong options provided. CCTP requires attestation and message from Circle.";
+
 // Initial attestation polling: Circle typically attests standard transfers
 // in 20–30 min and fast transfers in 1–2 min.
 // 200 attempts × 15 s = 50 min ceiling.

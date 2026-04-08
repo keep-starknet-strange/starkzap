@@ -22,6 +22,7 @@ import { getAddress, Interface, type TransactionRequest } from "ethers";
 import { FeeErrorCause } from "@/types/errors";
 import { BridgeDirection, CCTPFees } from "@/bridge/ethereum/cctp/CCTPFees";
 import {
+  CCTP_COMPLETE_WITHDRAW_OPTIONS_ERROR_MESSAGE,
   EMPTY_DESTINATION_CALLER,
   ETHEREUM_DOMAIN_ID,
   FALLBACK_COMPLETE_WITHDRAW_GAS,
@@ -202,23 +203,16 @@ export class CCTPBridge extends EthereumBridge {
   }
 
   /**
-   * @throws if `options` is not provided or does not have `protocol: "cctp"`.
-   *   CCTP always requires attestation data in options — the parameter is optional
-   *   only to satisfy the base interface signature.
+   * @throws {Error} Message {@link CCTP_COMPLETE_WITHDRAW_OPTIONS_ERROR_MESSAGE}
+   *   when `options` is missing or not `{ protocol: "cctp", ... }` with attestation data.
    */
   async completeWithdraw(
     _recipient: ExternalAddress,
     _amount: Amount,
     options?: CompleteBridgeWithdrawOptions
   ): Promise<ExternalTransactionResponse> {
-    if (!options) {
-      throw new Error(
-        "CCTPCompleteBridgeWithdrawOptions must be provided for protocol CCTP."
-      );
-    }
-
-    if (options.protocol !== "cctp") {
-      throw new Error("Incompatible options provided.");
+    if (!options || options.protocol !== "cctp") {
+      throw new Error(CCTP_COMPLETE_WITHDRAW_OPTIONS_ERROR_MESSAGE);
     }
 
     const { attestation, message, expirationBlock, nonce } = options;
@@ -257,31 +251,38 @@ export class CCTPBridge extends EthereumBridge {
     return { hash: response.hash };
   }
 
+  /**
+   * @throws {Error} Message {@link CCTP_COMPLETE_WITHDRAW_OPTIONS_ERROR_MESSAGE}
+   *   when options are missing or not valid CCTP completion options (needed to simulate
+   *   `receiveMessage`).
+   */
   async getCompleteWithdrawFeeEstimate(
     _amount: Amount,
     _recipient: ExternalAddress,
     options?: CompleteBridgeWithdrawOptions
   ): Promise<EthereumCompleteWithdrawFeeEstimation> {
+    if (options?.protocol !== "cctp") {
+      throw new Error(CCTP_COMPLETE_WITHDRAW_OPTIONS_ERROR_MESSAGE);
+    }
+
     try {
       const gasPrice = await this.getEthereumGasPrice();
 
-      if (options?.attestation && options?.message) {
-        const calldata =
-          CCTPBridge.MESSAGE_TRANSMITTER_INTERFACE.encodeFunctionData(
-            "receiveMessage",
-            [options.message, options.attestation]
-          );
-        try {
-          const gasUnits = await this.config.provider.estimateGas({
-            to: getMessageTransmitter(
-              this.starknetWallet.getChainId()
-            ).toString(),
-            data: calldata,
-          });
-          return { l1Fee: this.ethAmount(gasUnits * gasPrice) };
-        } catch {
-          // fall through to fallback
-        }
+      const calldata =
+        CCTPBridge.MESSAGE_TRANSMITTER_INTERFACE.encodeFunctionData(
+          "receiveMessage",
+          [options.message, options.attestation]
+        );
+      try {
+        const gasUnits = await this.config.provider.estimateGas({
+          to: getMessageTransmitter(
+            this.starknetWallet.getChainId()
+          ).toString(),
+          data: calldata,
+        });
+        return { l1Fee: this.ethAmount(gasUnits * gasPrice) };
+      } catch {
+        // fall through to fallback
       }
 
       return {

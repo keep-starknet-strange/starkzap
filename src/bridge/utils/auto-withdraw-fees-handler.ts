@@ -19,20 +19,31 @@ export interface AutoWithdrawFeesHandlerOptions {
   now?: () => number;
 }
 
+/** Arguments for {@link AutoWithdrawFeesHandler.getFeeData}. */
 export interface AutoWithdrawFeeInput {
+  /** L2 bridge token involved in the withdrawal (used for bridge address and balance rules). */
   bridgeToken: BridgeToken;
+  /** Withdrawal amount; reserved from balance when the fee token is the bridged token. */
   amount: Amount;
+  /** Wallet or account whose balances are checked against quoted gas costs. */
   walletOrAddress: WalletInterface | Address;
+  /**
+   * If set, selects this token when it is among affordable tokens; otherwise the first
+   * affordable token (per service ordering) is used.
+   */
+  preferredFeeToken: Token | undefined;
 }
 
+/** Result of {@link AutoWithdrawFeesHandler.getFeeData}. */
 export interface AutoWithdrawFeeOutput {
+  /** Relayer address returned by the gas-cost service (transfer recipient for the fee). */
   relayerAddress: Address;
-  preselectedGasToken:
-    | {
-        tokenAddress: Address;
-        cost: Amount;
-      }
-    | undefined;
+  /** Token and amount chosen to pay the auto-withdraw gas obligation. */
+  preselectedGasToken: {
+    tokenAddress: Address;
+    cost: Amount;
+  };
+  /** All fee tokens the wallet can currently afford for this withdrawal, mapped to quoted cost. */
   costsPerToken: Map<Token, Amount>;
 }
 
@@ -60,6 +71,25 @@ export class AutoWithdrawFeesHandler {
     this.now = options.now ?? Date.now;
   }
 
+  /**
+   * Fetches StarkGate auto-withdraw gas quotes and picks a payable fee token for the wallet.
+   *
+   * Compares the wallet balance to the quoted gas cost. A token is **affordable** if effective
+   * balance ≥ gas cost.
+   *
+   * When the fee token is the same as the token being withdrawn, `amount` is treated as
+   * already committed to the withdrawal. So affordability is calculated by deducting the
+   * withdrawal amount.
+   *
+   * **Selection:** If `preferredFeeToken` is affordable, it becomes `preselectedGasToken`;
+   * otherwise the first affordable token in service iteration order is used. If no token is
+   * affordable, throws a clear error (no partial/empty success).
+   *
+   * @param input - Bridge context, withdrawal size, balance holder, and optional fee preference.
+   * @returns Relayer address, chosen gas token + cost, and the full map of affordable options.
+   * @throws {Error} When the HTTP response is not OK (message from body when present), or when
+   *   no wallet token can cover auto-withdraw (`"The user has no sufficient balance…"`).
+   */
   async getFeeData(
     input: AutoWithdrawFeeInput
   ): Promise<AutoWithdrawFeeOutput> {
@@ -89,13 +119,28 @@ export class AutoWithdrawFeesHandler {
       }
     }
 
-    const firstEntry = affordableGasCosts.entries().next().value;
+    const affordableEntries = [...affordableGasCosts.entries()];
+    const firstAffordable = affordableEntries[0];
+
+    if (!firstAffordable) {
+      throw new Error(
+        "The user has no sufficient balance to cover for auto-withdraw."
+      );
+    }
+
+    const preferredFeeToken = input.preferredFeeToken;
+    const preselectedToken = preferredFeeToken
+      ? (affordableEntries.find(
+          ([t]) => t.address === preferredFeeToken.address
+        ) ?? firstAffordable)
+      : firstAffordable;
 
     return {
       relayerAddress,
-      preselectedGasToken: firstEntry
-        ? { tokenAddress: firstEntry[0].address, cost: firstEntry[1] }
-        : undefined,
+      preselectedGasToken: {
+        tokenAddress: preselectedToken[0].address,
+        cost: preselectedToken[1],
+      },
       costsPerToken: affordableGasCosts,
     };
   }
@@ -110,6 +155,7 @@ export class AutoWithdrawFeesHandler {
     const response = await this.fetchFn(url.toString(), {
       method: "GET",
       headers: { Accept: "application/json" },
+      signal: AbortSignal.timeout(10_000),
     });
 
     const body: unknown = await response.json();
