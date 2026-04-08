@@ -1,5 +1,5 @@
 import type { ChainId } from "@/types";
-import { type StarkZapLogger, NOOP_LOGGER } from "@/logger";
+import { type StarkZapLogger } from "@/logger";
 import {
   ETH_FAST_TRANSFER_FEE_BP,
   ETHEREUM_DOMAIN_ID,
@@ -24,16 +24,7 @@ export enum BridgeDirection {
 }
 
 export class CCTPFees {
-  private static instance: CCTPFees;
-
-  private constructor(private readonly logger: StarkZapLogger) {}
-
-  static getInstance(logger: StarkZapLogger = NOOP_LOGGER): CCTPFees {
-    if (!CCTPFees.instance) {
-      CCTPFees.instance = new CCTPFees(logger);
-    }
-    return CCTPFees.instance;
-  }
+  constructor(private readonly logger: StarkZapLogger) {}
 
   async getMinimumFeeBps(
     direction: BridgeDirection,

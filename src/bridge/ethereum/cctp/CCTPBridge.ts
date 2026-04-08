@@ -2,6 +2,7 @@ import {
   type Address,
   Amount,
   type EthereumAddress,
+  EthereumBridgeToken,
   type ExternalAddress,
   type ExternalTransactionResponse,
   fromAddress,
@@ -16,6 +17,7 @@ import type {
   CCTPDepositFeeEstimation,
   CCTPInitiateWithdrawFeeEstimation,
   EthereumCompleteWithdrawFeeEstimation,
+  EthereumWalletConfig,
 } from "@/bridge";
 import { ERC20EthereumToken } from "@/bridge/ethereum/EtherToken";
 import { getAddress, Interface, type TransactionRequest } from "ethers";
@@ -39,6 +41,8 @@ import { EthereumBridge } from "@/bridge/ethereum/EthereumBridge";
 import { fromEthereumAddress } from "@/connect/ethersRuntime";
 import type { Tx } from "@/tx";
 import { cairo, type Call, CallData, uint256 } from "starknet";
+import type { WalletInterface } from "@/wallet";
+import { type StarkZapLogger } from "@/logger";
 
 export class CCTPBridge extends EthereumBridge {
   private static readonly MAINNET_TOKEN_MESSENGER = fromEthereumAddress(
@@ -66,7 +70,15 @@ export class CCTPBridge extends EthereumBridge {
 
   private static readonly ZERO_ETH = Amount.fromRaw(0n, 18, "ETH");
 
-  private readonly cctpFees = CCTPFees.getInstance(this.logger);
+  constructor(
+    bridgeToken: EthereumBridgeToken,
+    config: EthereumWalletConfig,
+    starknetWallet: WalletInterface,
+    logger: StarkZapLogger,
+    private readonly cctpFees: CCTPFees
+  ) {
+    super(bridgeToken, config, starknetWallet, logger);
+  }
 
   async deposit(
     recipient: Address,

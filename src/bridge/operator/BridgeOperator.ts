@@ -46,11 +46,13 @@ import type {
   WithdrawMonitorResult,
 } from "@/bridge/monitor/types";
 import type { StarkZapLogger } from "@/logger";
+import { CCTPFees } from "@/bridge/ethereum/cctp/CCTPFees";
 
 export class BridgeOperator implements BridgeOperatorInterface {
   private cache = new BridgeCache();
   private monitorCache = new BridgeMonitorCache();
   private _autoWithdrawFeesHandler: AutoWithdrawFeesHandler | undefined;
+  private _cctpFees: CCTPFees | undefined = undefined;
   private _ethereumMonitorProvider: Promise<Provider> | undefined;
 
   constructor(
@@ -335,7 +337,17 @@ export class BridgeOperator implements BridgeOperatorInterface {
       case Protocol.CCTP: {
         const { CCTPBridge } =
           await import("@/bridge/ethereum/cctp/CCTPBridge");
-        return new CCTPBridge(token, walletConfig, starknetWallet, this.logger);
+        if (!this._cctpFees) {
+          this._cctpFees = new CCTPFees(this.logger);
+        }
+
+        return new CCTPBridge(
+          token,
+          walletConfig,
+          starknetWallet,
+          this.logger,
+          this._cctpFees
+        );
       }
       case Protocol.OFT:
       case Protocol.OFT_MIGRATED: {

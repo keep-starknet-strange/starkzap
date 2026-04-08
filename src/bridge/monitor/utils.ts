@@ -23,12 +23,12 @@ export async function checkStarknetTxStatus(
   try {
     receipt = await provider.getTransactionReceipt(txHash);
   } catch (e) {
-    logger.error(`SN TX: [${txHash}]`, e);
+    logger.info(`SN TX: [${txHash}]`, e);
     return BridgeTransferStatus.NOT_SUBMITTED_ON_STARKNET;
   }
 
   if (receipt.isError()) {
-    logger.error(`SN TX: [${txHash}]`, receipt.value);
+    logger.info(`SN TX: [${txHash}]`, receipt.value);
     return BridgeTransferStatus.ERROR;
   }
 

@@ -41,7 +41,7 @@ import CANONICAL_BRIDGE_ABI from "@/abi/ethereum/canonicalBridge.json";
 import { fromEthereumAddress } from "@/connect/ethersRuntime";
 import { type Call, CallData, uint256 } from "starknet";
 import { Erc20 } from "@/erc20";
-import { type StarkZapLogger, NOOP_LOGGER } from "@/logger";
+import { type StarkZapLogger } from "@/logger";
 
 export abstract class EthereumBridge implements BridgeInterface<EthereumAddress> {
   public static readonly ALLOWANCE_CACHE_TTL = 60_000;
@@ -59,7 +59,7 @@ export abstract class EthereumBridge implements BridgeInterface<EthereumAddress>
     protected readonly bridgeToken: EthereumBridgeToken,
     protected readonly config: EthereumWalletConfig,
     readonly starknetWallet: WalletInterface,
-    protected readonly logger: StarkZapLogger = NOOP_LOGGER,
+    protected readonly logger: StarkZapLogger,
     bridgeAbi: InterfaceAbi = CANONICAL_BRIDGE_ABI
   ) {
     this.allowanceCache = {

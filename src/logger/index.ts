@@ -72,8 +72,6 @@ export interface LoggerConfig {
   logLevel?: LogLevel;
 }
 
-type LogMethod = "trace" | "debug" | "info" | "warn" | "error" | "fatal";
-
 /** A message that is either a plain string or a thunk evaluated only when the level is active. */
 export type LogMessage = string | (() => string);
 
@@ -87,7 +85,10 @@ const LEVEL_PRIORITY: Record<LogLevel, number> = {
   silent: 6,
 };
 
-const LEVEL_TO_LOGGER_METHOD: Record<LogMethod, keyof Logger> = {
+const LEVEL_TO_LOGGER_METHOD: Record<
+  Exclude<LogLevel, "silent">,
+  keyof Logger
+> = {
   fatal: "error",
   error: "error",
   warn: "warn",
@@ -149,15 +150,25 @@ export class StarkZapLogger {
     this.emit("trace", message, args);
   }
 
-  /** Returns `true` if the given level would produce output. */
+  /**
+   * Returns `true` if the given severity would emit for this instance's minimum
+   * (`LEVEL_PRIORITY[level] >= this.minPriority`).
+   */
   isLevelEnabled(level: LogLevel): boolean {
+    // `silent` is a config threshold ("emit nothing"), not a real severity —
+    // never treat it as an enabled log level.
+    if (level === "silent") return false;
     return LEVEL_PRIORITY[level] >= this.minPriority;
   }
 
-  private emit(method: LogMethod, message: LogMessage, args: unknown[]): void {
-    if (LEVEL_PRIORITY[method] < this.minPriority) return;
+  private emit(
+    level: Exclude<LogLevel, "silent">,
+    message: LogMessage,
+    args: unknown[]
+  ): void {
+    if (!this.isLevelEnabled(level)) return;
     const resolved = typeof message === "function" ? message() : message;
-    const target = this.target[LEVEL_TO_LOGGER_METHOD[method]];
+    const target = this.target[LEVEL_TO_LOGGER_METHOD[level]];
     target.call(this.target, resolved, ...args);
   }
 }
