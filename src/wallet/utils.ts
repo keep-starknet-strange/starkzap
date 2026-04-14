@@ -122,12 +122,12 @@ export async function preflightTransaction(
   },
   options: PreflightOptions
 ): Promise<PreflightResult> {
-  const { calls, feeMode } = options;
+  const { calls, feeMode, gasToken } = options;
 
   try {
     const deployed = await wallet.isDeployed();
     if (!deployed) {
-      if (feeMode === "sponsored") {
+      if (feeMode === "sponsored" || gasToken) {
         return { ok: true };
       }
       return { ok: false, reason: "Account not deployed" };

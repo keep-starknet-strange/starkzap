@@ -223,6 +223,13 @@ export interface PreflightOptions {
    * because the paymaster path can deploy + execute atomically.
    */
   feeMode?: FeeMode;
+  /**
+   * ERC-20 token contract address used to pay gas fees via the paymaster.
+   *
+   * When set and the account is undeployed, preflight returns `{ ok: true }`
+   * because the paymaster path handles deployment atomically.
+   */
+  gasToken?: Address;
 }
 
 /** Preflight succeeded — operation can proceed */

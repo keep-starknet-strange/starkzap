@@ -539,6 +539,29 @@ describe("Wallet", () => {
       expect(result.ok).toBe(true);
       expect(simulateSpy).not.toHaveBeenCalled();
     });
+
+    it("should return ok for undeployed account with gasToken", async () => {
+      const signer = new StarkSigner(testPrivateKeys.random());
+      const wallet = await sdk.connectWallet({
+        account: { signer },
+      });
+      vi.spyOn(wallet, "isDeployed").mockResolvedValue(false);
+      const simulateSpy = vi.spyOn(wallet.getAccount(), "simulateTransaction");
+
+      const result = await wallet.preflight({
+        calls: [
+          {
+            contractAddress: "0x123",
+            entrypoint: "transfer",
+            calldata: [],
+          },
+        ],
+        gasToken: fromAddress("0x053c91253bc9"),
+      });
+
+      expect(result.ok).toBe(true);
+      expect(simulateSpy).not.toHaveBeenCalled();
+    });
   });
 
   describe("getAccount", () => {
