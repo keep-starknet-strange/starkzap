@@ -375,6 +375,91 @@ describe("Wallet", () => {
 
       expect(deployed).toBe(false);
     });
+
+    it("should throw when gasToken combined with feeMode 'user_pays'", async () => {
+      const signer = new StarkSigner(testPrivateKeys.key1);
+      const wallet = await sdk.connectWallet({
+        account: { signer },
+      });
+
+      const account = wallet.getAccount();
+      vi.spyOn(account, "estimateAccountDeployFee").mockResolvedValue({
+        resourceBounds: {
+          l1_gas: { max_amount: 1n, max_price_per_unit: 1n },
+          l2_gas: { max_amount: 1n, max_price_per_unit: 1n },
+          l1_data_gas: { max_amount: 1n, max_price_per_unit: 1n },
+        },
+      } as Awaited<ReturnType<typeof account.estimateAccountDeployFee>>);
+
+      await expect(
+        wallet.deploy({
+          feeMode: "user_pays",
+          gasToken: fromAddress("0x053c91253bc9"),
+        })
+      ).rejects.toThrow("Cannot combine feeMode 'user_pays' with gasToken");
+    });
+  });
+
+  describe("execute", () => {
+    it("should throw when gasToken combined with feeMode 'user_pays'", async () => {
+      const signer = new StarkSigner(testPrivateKeys.key1);
+      const wallet = await sdk.connectWallet({
+        account: { signer },
+      });
+
+      await expect(
+        wallet.execute(
+          [
+            {
+              contractAddress: "0x123",
+              entrypoint: "transfer",
+              calldata: [],
+            },
+          ],
+          {
+            feeMode: "user_pays",
+            gasToken: fromAddress("0x053c91253bc9"),
+          }
+        )
+      ).rejects.toThrow("Cannot combine feeMode 'user_pays' with gasToken");
+    });
+
+    it("should not throw when gasToken is set without explicit feeMode", async () => {
+      const signer = new StarkSigner(testPrivateKeys.key1);
+      const wallet = await sdk.connectWallet({
+        account: { signer },
+      });
+
+      const account = wallet.getAccount();
+      vi.spyOn(wallet, "isDeployed").mockResolvedValue(true);
+      const paymasterSpy = vi
+        .spyOn(account, "executePaymasterTransaction")
+        .mockResolvedValue({ transaction_hash: "0xgas" });
+
+      const tx = await wallet.execute(
+        [
+          {
+            contractAddress: "0x123",
+            entrypoint: "transfer",
+            calldata: [],
+          },
+        ],
+        {
+          gasToken: fromAddress("0x053c91253bc9"),
+        }
+      );
+
+      expect(tx.hash).toBe("0xgas");
+      expect(paymasterSpy).toHaveBeenCalledTimes(1);
+      expect(paymasterSpy).toHaveBeenCalledWith(
+        expect.any(Array),
+        expect.objectContaining({
+          feeMode: expect.objectContaining({
+            mode: "default",
+          }),
+        })
+      );
+    });
   });
 
   describe("preflight", () => {

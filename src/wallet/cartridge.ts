@@ -22,10 +22,11 @@ import {
   type StakingConfig,
 } from "@/types";
 import {
+  assertNoGasTokenConflict,
   checkDeployed,
   ensureWalletReady,
+  paymasterDetails,
   preflightTransaction,
-  sponsoredDetails,
 } from "@/wallet/utils";
 import { BaseWallet } from "@/wallet/base";
 import { assertSafeHttpUrl } from "@/utils";
@@ -311,9 +312,12 @@ export class CartridgeWallet extends BaseWallet {
   }
 
   async execute(calls: Call[], options: ExecuteOptions = {}): Promise<Tx> {
-    const feeMode = options.feeMode ?? this.defaultFeeMode;
+    const requestedFeeMode = options.feeMode;
+    const feeMode = requestedFeeMode ?? this.defaultFeeMode;
     const timeBounds = options.timeBounds ?? this.defaultTimeBounds;
     const gasToken = options.gasToken;
+
+    assertNoGasTokenConflict(requestedFeeMode, gasToken);
 
     let transaction_hash: string;
 
@@ -323,7 +327,7 @@ export class CartridgeWallet extends BaseWallet {
       transaction_hash = (
         await this.walletAccount.executePaymasterTransaction(
           calls,
-          sponsoredDetails(timeBounds, undefined, gasToken)
+          paymasterDetails({ timeBounds, gasToken })
         )
       ).transaction_hash;
     } else {

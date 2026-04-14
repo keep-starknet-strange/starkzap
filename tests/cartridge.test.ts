@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { CartridgeWallet } from "@/wallet/cartridge";
-import { ChainId } from "@/types";
+import { ChainId, fromAddress } from "@/types";
 
 const { MockController, mockToSessionPolicies } = vi.hoisted(() => {
   class ControllerMock {
@@ -192,6 +192,13 @@ describe("CartridgeWallet", () => {
         "does not support DeployOptions overrides"
       );
     });
+
+    it("should reject gasToken in deploy options", async () => {
+      const wallet = await CartridgeWallet.create();
+      await expect(
+        wallet.deploy({ gasToken: fromAddress("0x053c91253bc9") })
+      ).rejects.toThrow("does not support DeployOptions overrides");
+    });
   });
 
   describe("execute", () => {
@@ -296,6 +303,54 @@ describe("CartridgeWallet", () => {
 
       expect(controller.keychain.deploy).not.toHaveBeenCalled();
       expect(account.execute).not.toHaveBeenCalled();
+    });
+
+    it("should route to paymaster when gasToken is set", async () => {
+      const wallet = await CartridgeWallet.create();
+      const calls = [
+        {
+          contractAddress: "0x123",
+          entrypoint: "transfer",
+          calldata: ["0x456", "100"],
+        },
+      ];
+
+      const tx = await wallet.execute(calls, {
+        gasToken: fromAddress("0x053c91253bc9"),
+      });
+
+      const account = wallet.getAccount() as unknown as {
+        executePaymasterTransaction: ReturnType<typeof vi.fn>;
+      };
+
+      expect(tx.hash).toBe("0xsponsored");
+      expect(account.executePaymasterTransaction).toHaveBeenCalledTimes(1);
+      expect(account.executePaymasterTransaction).toHaveBeenCalledWith(
+        calls,
+        expect.objectContaining({
+          feeMode: expect.objectContaining({
+            mode: "default",
+          }),
+        })
+      );
+    });
+
+    it("should throw when gasToken combined with feeMode 'user_pays'", async () => {
+      const wallet = await CartridgeWallet.create();
+      const calls = [
+        {
+          contractAddress: "0x123",
+          entrypoint: "transfer",
+          calldata: ["0x456", "100"],
+        },
+      ];
+
+      await expect(
+        wallet.execute(calls, {
+          feeMode: "user_pays",
+          gasToken: fromAddress("0x053c91253bc9"),
+        })
+      ).rejects.toThrow("Cannot combine feeMode 'user_pays' with gasToken");
     });
   });
 

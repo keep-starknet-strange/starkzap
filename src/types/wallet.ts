@@ -164,49 +164,48 @@ export interface EnsureReadyOptions {
   deploy?: DeployMode;
   /** How to pay for deployment if needed (default: wallet's default) */
   feeMode?: FeeMode;
+  /**
+   * ERC-20 token contract address used to pay deployment gas fees.
+   * @see {@link TransactionFeeOptions.gasToken}
+   */
+  gasToken?: Address;
   /** Callback for progress updates */
   onProgress?: (event: ProgressEvent) => void;
+}
+
+// ─── Transaction Fee Options ─────────────────────────────────────────────────
+
+/** Common fee options shared by deploy and execute operations. */
+interface TransactionFeeOptions {
+  /** How fees are paid (default: "user_pays") */
+  feeMode?: FeeMode;
+  /** Optional time bounds for paymaster transactions */
+  timeBounds?: PaymasterTimeBounds;
+  /**
+   * ERC-20 token contract address used to pay gas fees via the paymaster.
+   *
+   * When set, the transaction uses the paymaster with
+   * `{ mode: 'default', gasToken }` instead of full sponsorship.
+   * The user pays gas in the specified token (e.g. the USDC or STRK contract address).
+   *
+   * Requires a paymaster to be configured in the SDK.
+   *
+   * @remarks
+   * - Omit `feeMode` when using `gasToken` (recommended happy path).
+   * - Combining `feeMode: "user_pays"` with `gasToken` throws an error.
+   */
+  gasToken?: Address;
 }
 
 // ─── Deploy ──────────────────────────────────────────────────────────────────
 
 /** Options for `wallet.deploy()` */
-export interface DeployOptions {
-  /** How fees are paid (default: "user_pays") */
-  feeMode?: FeeMode;
-  /** Optional time bounds for paymaster-sponsored deployment */
-  timeBounds?: PaymasterTimeBounds;
-  /**
-   * ERC-20 token address used to pay gas fees via the paymaster.
-   *
-   * When set, the transaction uses the paymaster with
-   * `{ mode: 'default', gasToken }` instead of full sponsorship.
-   * The user pays gas in the specified token (e.g. USDC, STRK).
-   *
-   * Requires a paymaster to be configured in the SDK.
-   */
-  gasToken?: Address;
-}
+export type DeployOptions = TransactionFeeOptions;
 
 // ─── Execute ─────────────────────────────────────────────────────────────────
 
 /** Options for `wallet.execute()` */
-export interface ExecuteOptions {
-  /** How fees are paid */
-  feeMode?: FeeMode;
-  /** Optional time bounds for paymaster transactions */
-  timeBounds?: PaymasterTimeBounds;
-  /**
-   * ERC-20 token address used to pay gas fees via the paymaster.
-   *
-   * When set, the transaction uses the paymaster with
-   * `{ mode: 'default', gasToken }` instead of full sponsorship.
-   * The user pays gas in the specified token (e.g. USDC, STRK).
-   *
-   * Requires a paymaster to be configured in the SDK.
-   */
-  gasToken?: Address;
-}
+export type ExecuteOptions = TransactionFeeOptions;
 
 // ─── Preflight ───────────────────────────────────────────────────────────────
 

@@ -29,10 +29,11 @@ import type {
   StakingConfig,
 } from "@/types";
 import {
+  assertNoGasTokenConflict,
   checkDeployed,
   ensureWalletReady,
+  paymasterDetails,
   preflightTransaction,
-  sponsoredDetails,
 } from "@/wallet/utils";
 import type { WalletInterface } from "@/wallet/interface";
 import { BaseWallet } from "@/wallet/base";
@@ -290,9 +291,7 @@ export class Wallet extends BaseWallet {
     const timeBounds = options.timeBounds ?? this.defaultTimeBounds;
     const gasToken = options.gasToken;
 
-    if (requestedFeeMode === "user_pays" && gasToken) {
-      Wallet.throwGasTokenConflict();
-    }
+    assertNoGasTokenConflict(requestedFeeMode, gasToken);
 
     if (feeMode === "sponsored" || gasToken) {
       return this.deployPaymasterWith([], timeBounds, gasToken);
@@ -374,11 +373,11 @@ export class Wallet extends BaseWallet {
     const deploymentData = await this.accountProvider.getDeploymentData();
     const { transaction_hash } = await this.account.executePaymasterTransaction(
       calls,
-      sponsoredDetails(
-        timeBounds ?? this.defaultTimeBounds,
+      paymasterDetails({
+        timeBounds: timeBounds ?? this.defaultTimeBounds,
         deploymentData,
-        gasToken
-      )
+        gasToken,
+      })
     );
     return new Tx(
       transaction_hash,
@@ -480,11 +479,11 @@ export class Wallet extends BaseWallet {
       : await ozProvider.getDeploymentData();
     const { transaction_hash } = await ozAccount.executePaymasterTransaction(
       allCalls,
-      sponsoredDetails(
-        timeBounds ?? this.defaultTimeBounds,
-        ozDeploymentData,
-        gasToken
-      )
+      paymasterDetails({
+        timeBounds: timeBounds ?? this.defaultTimeBounds,
+        deploymentData: ozDeploymentData,
+        gasToken,
+      })
     );
 
     return new Tx(
@@ -501,9 +500,7 @@ export class Wallet extends BaseWallet {
     const timeBounds = options.timeBounds ?? this.defaultTimeBounds;
     const gasToken = options.gasToken;
 
-    if (requestedFeeMode === "user_pays" && gasToken) {
-      Wallet.throwGasTokenConflict();
-    }
+    assertNoGasTokenConflict(requestedFeeMode, gasToken);
 
     const transactionHash =
       feeMode === "sponsored" || gasToken
@@ -536,7 +533,7 @@ export class Wallet extends BaseWallet {
     return this.account
       .executePaymasterTransaction(
         calls,
-        sponsoredDetails(timeBounds, undefined, gasToken)
+        paymasterDetails({ timeBounds, gasToken })
       )
       .then((r) => r.transaction_hash);
   }
@@ -567,13 +564,6 @@ export class Wallet extends BaseWallet {
 
   async signMessage(typedData: TypedData): Promise<Signature> {
     return this.account.signMessage(typedData);
-  }
-
-  private static throwGasTokenConflict(): never {
-    throw new Error(
-      "Cannot combine feeMode 'user_pays' with gasToken. " +
-        "Use feeMode 'sponsored' or omit feeMode when paying with an ERC-20 token."
-    );
   }
 
   async preflight(options: PreflightOptions): Promise<PreflightResult> {

@@ -12,6 +12,7 @@ import type { Address } from "@/types";
 import type {
   DeployOptions,
   EnsureReadyOptions,
+  FeeMode,
   PreflightOptions,
   PreflightResult,
 } from "@/types";
@@ -68,7 +69,7 @@ export async function ensureWalletReady(
   },
   options: EnsureReadyOptions = {}
 ): Promise<void> {
-  const { deploy = "if_needed", feeMode, onProgress } = options;
+  const { deploy = "if_needed", feeMode, gasToken, onProgress } = options;
 
   try {
     onProgress?.({ step: "CONNECTED" });
@@ -86,7 +87,13 @@ export async function ensureWalletReady(
     }
 
     onProgress?.({ step: "DEPLOYING" });
-    const tx = await wallet.deploy(feeMode ? { feeMode } : undefined);
+    const deployOpts: DeployOptions = {
+      ...(feeMode && { feeMode }),
+      ...(gasToken && { gasToken }),
+    };
+    const tx = await wallet.deploy(
+      Object.keys(deployOpts).length > 0 ? deployOpts : undefined
+    );
     await tx.wait({
       successStates: [
         TransactionFinalityStatus.ACCEPTED_ON_L2,
@@ -144,20 +151,39 @@ export async function preflightTransaction(
   }
 }
 
-/** Paymaster details for sponsored or gasToken transactions */
-export function sponsoredDetails(
-  timeBounds?: PaymasterTimeBounds,
-  deploymentData?: PAYMASTER_API.ACCOUNT_DEPLOYMENT_DATA,
-  gasToken?: Address
+/**
+ * Throw if caller explicitly sets feeMode:"user_pays" alongside gasToken.
+ *
+ * Shared by Wallet and CartridgeWallet to keep validation in sync.
+ */
+export function assertNoGasTokenConflict(
+  requestedFeeMode: FeeMode | undefined,
+  gasToken: Address | undefined
+): void {
+  if (requestedFeeMode === "user_pays" && gasToken) {
+    throw new Error(
+      "Cannot combine feeMode 'user_pays' with gasToken. " +
+        "Use feeMode 'sponsored' or omit feeMode when paying with an ERC-20 token."
+    );
+  }
+}
+
+/** Build PaymasterDetails for sponsored or gasToken transactions. */
+export function paymasterDetails(
+  options: {
+    timeBounds?: PaymasterTimeBounds | undefined;
+    deploymentData?: PAYMASTER_API.ACCOUNT_DEPLOYMENT_DATA | undefined;
+    gasToken?: Address | undefined;
+  } = {}
 ) {
-  const feeMode = gasToken
-    ? { mode: "default" as const, gasToken }
+  const feeMode = options.gasToken
+    ? { mode: "default" as const, gasToken: options.gasToken }
     : { mode: "sponsored" as const };
 
   return {
     feeMode,
-    ...(timeBounds && { timeBounds }),
-    ...(deploymentData && { deploymentData }),
+    ...(options.timeBounds && { timeBounds: options.timeBounds }),
+    ...(options.deploymentData && { deploymentData: options.deploymentData }),
   };
 }
 
