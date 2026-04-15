@@ -66,7 +66,9 @@ export class CCTPFees {
     const domainUrl = getCircleApiBaseUrl(chainId);
     const url = `${domainUrl}/v2/burn/USDC/fees/${source}/${destination}`;
 
-    const response = await fetch(url);
+    const response = await fetch(url, {
+      signal: AbortSignal.timeout(10_000),
+    });
     if (!response.ok) {
       throw new Error(
         `Failed to fetch fees from Circle API: ${response.statusText}`

@@ -227,7 +227,7 @@ export interface BridgeOperatorInterface {
    * internally first.
    *
    * @param token - Bridge token being withdrawn.
-   * @param param - A `WithdrawMonitorResult` or `{ snTxHash, externalTxHash? }`
+   * @param param - A `WithdrawMonitorResult` or `{ starknetTxHash, externalTxHash? }`
    * @returns The simplified `WithdrawalState` for the withdrawal
    */
   getWithdrawalState(

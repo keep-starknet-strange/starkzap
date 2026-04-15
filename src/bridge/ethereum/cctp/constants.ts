@@ -75,9 +75,3 @@ export const FALLBACK_COMPLETE_WITHDRAW_GAS = 169_035n;
  */
 export const CCTP_COMPLETE_WITHDRAW_OPTIONS_ERROR_MESSAGE =
   "Wrong options provided. CCTP requires attestation and message from Circle.";
-
-// Initial attestation polling: Circle typically attests standard transfers
-// in 20–30 min and fast transfers in 1–2 min.
-// 200 attempts × 15 s = 50 min ceiling.
-export const ATTESTATION_POLL_INTERVAL_MS = 15_000;
-export const ATTESTATION_MAX_POLL_ATTEMPTS = 200;

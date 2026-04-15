@@ -51,7 +51,7 @@ export interface BridgeMonitorInterface {
    * transaction hashes. When hashes are provided, `monitorWithdrawal` is called
    * internally first.
    *
-   * @param param - A `WithdrawMonitorResult` or `{ snTxHash, externalTxHash? }`
+   * @param param - A `WithdrawMonitorResult` or `{ starknetTxHash, externalTxHash? }`
    * @returns The simplified `WithdrawalState` for the withdrawal
    */
   getWithdrawalState(param: WithdrawalStateInput): Promise<WithdrawalState>;

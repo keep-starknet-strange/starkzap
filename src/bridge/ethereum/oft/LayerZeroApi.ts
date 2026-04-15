@@ -178,6 +178,7 @@ export class LayerZeroApi {
   }): Promise<LayerZeroQuote[]> {
     const response = await this.fetcher(`${LAYERZERO_API_BASE}/quotes`, {
       method: "POST",
+      signal: AbortSignal.timeout(10_000),
       headers: {
         "Content-Type": "application/json",
         ...(this.config.apiKey ? { "x-api-key": this.config.apiKey } : {}),

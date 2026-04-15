@@ -40,10 +40,15 @@ export interface CanonicalWithdrawMonitorResult extends BaseWithdrawMonitorResul
 }
 
 /**
- * CCTP withdraw result.
+ * CCTP withdraw monitor payload.
  *
- * When `status` is `COMPLETED_ON_STARKNET`, the Circle attestation fields
- * are populated and can be passed directly to `completeWithdraw`.
+ * `attestation`, `message`, and related Circle fields are set only after Circle
+ * returns a **complete** attestation for the Starknet burn. Until then,
+ * `status` may already be {@link BridgeTransferStatus.CONFIRMED_ON_STARKNET}
+ * or {@link BridgeTransferStatus.COMPLETED_ON_STARKNET} while attestation data
+ * is still absent — for example when Circle has not attested yet. Callers must confirm
+ * `attestation` and `message` are defined before passing this result to
+ * `completeWithdraw`.
  */
 export interface CctpWithdrawMonitorResult extends BaseWithdrawMonitorResult {
   protocol: "cctp";
