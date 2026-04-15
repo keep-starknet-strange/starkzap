@@ -1,5 +1,8 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { BRIDGE_TOKEN_CACHE_TTL_MS, BridgeTokenRepository } from "@/bridge";
+import {
+  BRIDGE_TOKEN_CACHE_TTL_MS,
+  BridgeTokenRepository,
+} from "@/bridge/tokens/repository";
 import * as ethersRuntime from "@/connect/ethersRuntime";
 import * as solanaWeb3Runtime from "@/connect/solanaWeb3Runtime";
 import {

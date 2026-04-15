@@ -57,7 +57,7 @@ import {
   VesuLendingProvider,
 } from "@/lending";
 import { ProviderRegistry } from "@/providers/registry";
-import { BridgeOperator } from "@/bridge";
+import { BridgeOperator } from "@/bridge/operator/BridgeOperator";
 import type {
   BridgeDepositOptions,
   CompleteBridgeWithdrawOptions,
