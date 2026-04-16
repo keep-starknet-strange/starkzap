@@ -6,7 +6,7 @@
 
 ---
 
-The complete money toolkit for your app in minutes from wallets, tokens, staking, gasless transactions, confidential transactions, swaps, bridging, lending and borrowing, all within a typescript SDK. 
+The complete money toolkit for your app in minutes from wallets, tokens, staking, gasless transactions, confidential transactions, swaps, bridging, lending and borrowing, all within a typescript SDK.
 
 Works on **web** (React, Vite, etc.), **iOS & Android** (React Native, Expo), and **Node.js** backends.
 
