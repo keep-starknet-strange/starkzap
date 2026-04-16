@@ -1,10 +1,4 @@
-import type {
-  Call,
-  EstimateFeeResponseOverhead,
-  PaymasterTimeBounds,
-  Signature,
-  TypedData,
-} from "starknet";
+import { WalletAccount } from "starknet";
 
 export interface CartridgePolicyPredicate {
   address: string;
@@ -105,24 +99,8 @@ export interface CartridgeExecutionResult {
   recovered_from_rpc_error?: true;
 }
 
-export interface CartridgeNativeAccountLike {
-  address: string;
-  execute: (
-    calls: Call[],
-    details?: {
-      feeMode: { mode: "sponsored" };
-      timeBounds?: PaymasterTimeBounds;
-    }
-  ) => Promise<CartridgeExecutionResult>;
-  signMessage?: (typedData: TypedData) => Promise<Signature>;
-  simulateTransaction?: (
-    invocations: Array<{ type: "INVOKE"; payload: Call[] }>
-  ) => Promise<unknown[]>;
-  estimateInvokeFee?: (calls: Call[]) => Promise<EstimateFeeResponseOverhead>;
-}
-
 export interface CartridgeNativeSessionHandle {
-  account: CartridgeNativeAccountLike;
+  account: WalletAccount;
   username?: () => Promise<string | undefined>;
   disconnect?: () => Promise<void>;
   controller?: unknown;

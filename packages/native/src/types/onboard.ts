@@ -46,4 +46,5 @@ export type OnboardOptions =
 export interface ConnectCartridgeOptions extends NativeOnboardCartridgeConfig {
   feeMode?: FeeMode;
   timeBounds?: PaymasterTimeBounds;
+  // TODO add probe if implemented on native
 }

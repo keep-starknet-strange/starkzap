@@ -143,9 +143,6 @@ class NativeCartridgeSigner extends StarknetSignerInterface {
     typedData: TypedData,
     _accountAddress: string
   ): Promise<Signature> {
-    if (!this.session.account.signMessage) {
-      throw unsupportedSessionFeature("signMessage");
-    }
     return this.session.account.signMessage(typedData);
   }
 
@@ -197,7 +194,7 @@ class NativeCartridgeAccount extends Account {
     const timeBounds =
       (details as UniversalDetailsWithTimeBounds | undefined)?.timeBounds ??
       this.defaultTimeBounds;
-    const response = await this.session.account.execute(
+    const response = await this.session.account.executePaymasterTransaction(
       calls,
       sponsoredDetails(timeBounds)
     );
@@ -209,9 +206,6 @@ class NativeCartridgeAccount extends Account {
     calls: Call | Call[],
     _details?: UniversalDetails
   ): Promise<EstimateFeeResponseOverhead> {
-    if (!this.session.account.estimateInvokeFee) {
-      throw unsupportedSessionFeature("estimateInvokeFee");
-    }
     return this.session.account.estimateInvokeFee(
       Array.isArray(calls) ? calls : [calls]
     );
@@ -221,18 +215,12 @@ class NativeCartridgeAccount extends Account {
     invocations: Array<{ type: "INVOKE"; payload: Call[] }>,
     _details?: SimulateTransactionDetails
   ): Promise<SimulateTransactionOverheadResponse> {
-    if (!this.session.account.simulateTransaction) {
-      throw unsupportedSessionFeature("simulateTransaction");
-    }
     return this.session.account.simulateTransaction(
       invocations
     ) as Promise<SimulateTransactionOverheadResponse>;
   }
 
   override async signMessage(typedData: TypedData): Promise<Signature> {
-    if (!this.session.account.signMessage) {
-      throw unsupportedSessionFeature("signMessage");
-    }
     return this.session.account.signMessage(typedData);
   }
 }
@@ -362,7 +350,7 @@ export class NativeCartridgeWallet extends BaseWallet {
       throw new Error(unsupportedUserPaysMessage());
     }
     const timeBounds = options.timeBounds ?? this.defaultTimeBounds;
-    const response = await this.session.account.execute(
+    const response = await this.session.account.executePaymasterTransaction(
       calls,
       sponsoredDetails(timeBounds)
     );
@@ -376,9 +364,6 @@ export class NativeCartridgeWallet extends BaseWallet {
   }
 
   async signMessage(typedData: TypedData): Promise<Signature> {
-    if (!this.session.account.signMessage) {
-      throw unsupportedSessionFeature("signMessage");
-    }
     return this.session.account.signMessage(typedData);
   }
 
@@ -442,9 +427,6 @@ export class NativeCartridgeWallet extends BaseWallet {
   }
 
   async estimateFee(calls: Call[]): Promise<EstimateFeeResponseOverhead> {
-    if (!this.session.account.estimateInvokeFee) {
-      throw unsupportedSessionFeature("estimateInvokeFee");
-    }
     return this.session.account.estimateInvokeFee(calls);
   }
 
@@ -465,7 +447,6 @@ export class NativeCartridgeWallet extends BaseWallet {
   }
 
   async disconnect(): Promise<void> {
-    this.clearCaches();
     this.deployedCache = null;
     this.deployedCacheExpiresAt = 0;
     await this.session.disconnect?.();

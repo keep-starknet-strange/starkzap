@@ -1,24 +1,25 @@
 import {
-  RpcProvider,
   type Account,
   type Call,
   type PaymasterTimeBounds,
-  type TypedData,
+  RpcProvider,
   type Signature,
+  type TypedData,
+  type WalletAccount,
 } from "starknet";
 import { Tx } from "@/tx";
 import {
   type BridgingConfig,
   ChainId,
-  getChainId,
   type DeployOptions,
   type EnsureReadyOptions,
   type ExecuteOptions,
+  type ExplorerConfig,
   type FeeMode,
+  fromAddress,
+  getChainId,
   type PreflightOptions,
   type PreflightResult,
-  type ExplorerConfig,
-  fromAddress,
   type StakingConfig,
 } from "@/types";
 import {
@@ -35,19 +36,12 @@ const MAX_CONTROLLER_WAIT_MS = 10_000;
 const INITIAL_CONTROLLER_POLL_MS = 100;
 const MAX_CONTROLLER_POLL_MS = 1_000;
 
-let _controller: CartridgeControllerLike | null = null;
-
-/** @internal exposed for test isolation only. */
-export function _resetControllerCache(): void {
-  _controller = null;
-}
-
 type CartridgePolicy = { target: string; method: string };
 
 type CartridgeControllerLike = {
   isReady(): boolean;
-  connect(): Promise<unknown>;
-  probe?(): Promise<unknown>;
+  connect(): Promise<WalletAccount | undefined>;
+  probe?(): Promise<WalletAccount | undefined>;
   disconnect(): Promise<void>;
   rpcUrl(): string;
   username(): Promise<string | undefined>;
@@ -209,7 +203,7 @@ export class CartridgeWallet extends BaseWallet {
       ).toString();
     }
 
-    const controller = _controller ?? new Controller(controllerOptions);
+    const controller = new Controller(controllerOptions);
 
     let waited = 0;
     let pollIntervalMs = INITIAL_CONTROLLER_POLL_MS;
@@ -226,16 +220,13 @@ export class CartridgeWallet extends BaseWallet {
       );
     }
 
-    _controller = controller;
-
     const connectedAccount = await controller.connect();
 
-    if (!isCartridgeWalletAccount(connectedAccount)) {
+    if (!connectedAccount) {
       throw new Error(
         "Cartridge connection failed. Make sure popups are allowed and try again."
       );
     }
-    const walletAccount = connectedAccount as unknown as Account;
 
     const nodeUrl = assertSafeHttpUrl(
       options.rpcUrl ?? controller.rpcUrl(),
@@ -246,7 +237,7 @@ export class CartridgeWallet extends BaseWallet {
     let classHash = "0x0";
     try {
       classHash = await provider.getClassHashAt(
-        fromAddress(walletAccount.address)
+        fromAddress(connectedAccount.address)
       );
     } catch {
       // Keep "0x0" for undeployed accounts or unsupported providers.
@@ -255,7 +246,7 @@ export class CartridgeWallet extends BaseWallet {
 
     return new CartridgeWallet(
       controller,
-      walletAccount,
+      connectedAccount,
       provider,
       chainId,
       classHash,
@@ -304,7 +295,7 @@ export class CartridgeWallet extends BaseWallet {
       ).toString();
     }
 
-    const controller = _controller ?? new Controller(controllerOptions);
+    const controller = new Controller(controllerOptions);
 
     let waited = 0;
     let pollIntervalMs = INITIAL_CONTROLLER_POLL_MS;
@@ -321,19 +312,15 @@ export class CartridgeWallet extends BaseWallet {
       );
     }
 
-    _controller = controller;
-
-    if (typeof controller.probe !== "function") {
+    if (!controller.probe) {
       return null;
     }
 
-    const probeResult = await controller.probe();
+    const connectedAccount = await controller.probe();
 
-    if (!isCartridgeWalletAccount(probeResult)) {
+    if (!connectedAccount) {
       return null;
     }
-
-    const walletAccount = probeResult as unknown as Account;
 
     const nodeUrl = assertSafeHttpUrl(
       options.rpcUrl ?? controller.rpcUrl(),
@@ -344,7 +331,7 @@ export class CartridgeWallet extends BaseWallet {
     let classHash = "0x0";
     try {
       classHash = await provider.getClassHashAt(
-        fromAddress(walletAccount.address)
+        fromAddress(connectedAccount.address)
       );
     } catch {
       // Keep "0x0" for undeployed accounts or unsupported providers.
@@ -353,7 +340,7 @@ export class CartridgeWallet extends BaseWallet {
 
     return new CartridgeWallet(
       controller,
-      walletAccount,
+      connectedAccount,
       provider,
       chainId,
       classHash,
@@ -495,7 +482,6 @@ export class CartridgeWallet extends BaseWallet {
     this.clearCaches();
     this.clearDeploymentCache();
     await this.controller.disconnect();
-    _controller = null;
   }
 
   /**
@@ -504,35 +490,4 @@ export class CartridgeWallet extends BaseWallet {
   async username(): Promise<string | undefined> {
     return this.controller.username();
   }
-}
-
-type CartridgeAccountLike = {
-  address: string;
-  execute: (...args: unknown[]) => Promise<{ transaction_hash: string }>;
-  executePaymasterTransaction: (
-    ...args: unknown[]
-  ) => Promise<{ transaction_hash: string }>;
-  signMessage: (...args: unknown[]) => Promise<Signature>;
-  simulateTransaction: (...args: unknown[]) => unknown;
-  estimateInvokeFee: (...args: unknown[]) => unknown;
-};
-
-function isCartridgeWalletAccount(
-  value: unknown
-): value is CartridgeAccountLike {
-  if (!value || typeof value !== "object") {
-    return false;
-  }
-
-  const account = value as Partial<CartridgeAccountLike> & {
-    address?: unknown;
-  };
-  return (
-    typeof account.address === "string" &&
-    typeof account.execute === "function" &&
-    typeof account.executePaymasterTransaction === "function" &&
-    typeof account.signMessage === "function" &&
-    typeof account.simulateTransaction === "function" &&
-    typeof account.estimateInvokeFee === "function"
-  );
 }

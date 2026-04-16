@@ -34,6 +34,7 @@ import {
   OpenZeppelinPreset,
 } from "@/account";
 import { BridgeTokenRepository } from "@/bridge/tokens/repository";
+import type { CartridgeWalletOptions } from "@/wallet/cartridge";
 
 /** Resolved SDK configuration with required rpcUrl and chainId */
 interface ResolvedConfig extends Omit<SDKConfig, "rpcUrl" | "chainId"> {
@@ -44,6 +45,7 @@ interface ResolvedConfig extends Omit<SDKConfig, "rpcUrl" | "chainId"> {
 export interface ConnectCartridgeBaseOptions {
   feeMode?: FeeMode;
   timeBounds?: PaymasterTimeBounds;
+  probe?: boolean;
 }
 
 export type ConnectCartridgeOptions = OnboardCartridgeConfig &
@@ -453,64 +455,35 @@ export class StarkZap {
     }
 
     const { CartridgeWallet } = await import("./wallet/cartridge");
-    const wallet = await CartridgeWallet.create(
-      {
-        ...(options.policies && { policies: options.policies }),
-        ...(options.preset && { preset: options.preset }),
-        ...(options.url && { url: options.url }),
-        ...(options.feeMode && { feeMode: options.feeMode }),
-        ...(options.timeBounds && { timeBounds: options.timeBounds }),
-        rpcUrl: this.config.rpcUrl,
-        chainId: this.config.chainId,
-        ...(explorer && { explorer }),
-      },
-      this.config.staking,
-      this.config.bridging
-    );
-    return wallet as CartridgeWalletInterface;
-  }
+    const cartridgeWalletOptions: CartridgeWalletOptions = {
+      ...(options.policies && { policies: options.policies }),
+      ...(options.preset && { preset: options.preset }),
+      ...(options.url && { url: options.url }),
+      ...(options.feeMode && { feeMode: options.feeMode }),
+      ...(options.timeBounds && { timeBounds: options.timeBounds }),
+      rpcUrl: this.config.rpcUrl,
+      chainId: this.config.chainId,
+      ...(explorer && { explorer }),
+    };
 
-  /**
-   * Silently checks for an active Cartridge session.
-   *
-   * Returns CartridgeWallet if a session is active, or `null` if none exists.
-   *
-   * @example
-   * ```ts
-   * const wallet = await sdk.probeCartridge();
-   * if (wallet) {
-   *   console.log("Session restored:", wallet.address);
-   * }
-   * ```
-   */
-  async probeCartridge(
-    options: ConnectCartridgeOptions = {}
-  ): Promise<CartridgeWalletInterface | null> {
-    if (!isWebRuntime()) {
-      throw new Error(
-        "Cartridge is only supported in web environments. Use signer/privy strategies on native or server runtimes."
+    let wallet;
+    if (options.probe) {
+      wallet = await CartridgeWallet.probe(
+        cartridgeWalletOptions,
+        this.config.staking,
+        this.config.bridging
       );
     }
 
-    await this.ensureProviderChainMatchesConfig();
-    const explorer = options.explorer ?? this.config.explorer;
+    if (!wallet) {
+      wallet = await CartridgeWallet.create(
+        cartridgeWalletOptions,
+        this.config.staking,
+        this.config.bridging
+      );
+    }
 
-    const { CartridgeWallet } = await import("./wallet/cartridge");
-    const wallet = await CartridgeWallet.probe(
-      {
-        ...(options.policies && { policies: options.policies }),
-        ...(options.preset && { preset: options.preset }),
-        ...(options.url && { url: options.url }),
-        ...(options.feeMode && { feeMode: options.feeMode }),
-        ...(options.timeBounds && { timeBounds: options.timeBounds }),
-        rpcUrl: this.config.rpcUrl,
-        chainId: this.config.chainId,
-        ...(explorer && { explorer }),
-      },
-      this.config.staking,
-      this.config.bridging
-    );
-    return wallet as CartridgeWalletInterface | null;
+    return wallet as CartridgeWalletInterface;
   }
 
   /**
