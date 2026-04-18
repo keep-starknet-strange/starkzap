@@ -156,7 +156,7 @@ describe("BaseWallet swap abstraction", () => {
   it("executes provider prepareSwap calls with options", async () => {
     const wallet = new TestWallet();
     const amountIn = Amount.parse("50", mockToken);
-    const options: ExecuteOptions = { feeMode: "sponsored" };
+    const options: ExecuteOptions = { feeMode: { type: "paymaster" } };
 
     const provider: SwapProvider = {
       id: "provider",
@@ -305,7 +305,7 @@ describe("BaseWallet swap abstraction", () => {
 
   it("supports swap(request, options) via default provider", async () => {
     const amountIn = Amount.parse("50", mockToken);
-    const options: ExecuteOptions = { feeMode: "sponsored" };
+    const options: ExecuteOptions = { feeMode: { type: "paymaster" } };
     const provider: SwapProvider = {
       id: "default",
       supportsChain: () => true,

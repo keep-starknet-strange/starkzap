@@ -22,9 +22,9 @@ import {
   type StakingConfig,
 } from "@/types";
 import {
-  assertNoGasTokenConflict,
   checkDeployed,
   ensureWalletReady,
+  normalizeFeeMode,
   paymasterDetails,
   preflightTransaction,
 } from "@/wallet/utils";
@@ -286,11 +286,7 @@ export class CartridgeWallet extends BaseWallet {
   }
 
   async deploy(options: DeployOptions = {}): Promise<Tx> {
-    if (
-      options.feeMode !== undefined ||
-      options.timeBounds !== undefined ||
-      options.gasToken !== undefined
-    ) {
+    if (options.feeMode !== undefined || options.timeBounds !== undefined) {
       throw new Error(
         "CartridgeWallet.deploy() does not support DeployOptions overrides; deployment mode is controlled by Cartridge Controller."
       );
@@ -312,22 +308,18 @@ export class CartridgeWallet extends BaseWallet {
   }
 
   async execute(calls: Call[], options: ExecuteOptions = {}): Promise<Tx> {
-    const requestedFeeMode = options.feeMode;
-    const feeMode = requestedFeeMode ?? this.defaultFeeMode;
+    const feeMode = normalizeFeeMode(options.feeMode ?? this.defaultFeeMode);
     const timeBounds = options.timeBounds ?? this.defaultTimeBounds;
-    const gasToken = options.gasToken;
-
-    assertNoGasTokenConflict(requestedFeeMode, gasToken);
 
     let transaction_hash: string;
 
-    if (feeMode === "sponsored" || gasToken) {
+    if (feeMode !== "user_pays") {
       // Allow provider/controller implementations to handle undeployed accounts
       // atomically via paymaster flow when supported.
       transaction_hash = (
         await this.walletAccount.executePaymasterTransaction(
           calls,
-          paymasterDetails({ timeBounds, gasToken })
+          paymasterDetails({ feeMode, timeBounds })
         )
       ).transaction_hash;
     } else {

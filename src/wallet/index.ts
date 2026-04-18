@@ -29,9 +29,9 @@ import type {
   StakingConfig,
 } from "@/types";
 import {
-  assertNoGasTokenConflict,
   checkDeployed,
   ensureWalletReady,
+  normalizeFeeMode,
   paymasterDetails,
   preflightTransaction,
 } from "@/wallet/utils";
@@ -286,15 +286,11 @@ export class Wallet extends BaseWallet {
 
   async deploy(options: DeployOptions = {}): Promise<Tx> {
     this.clearDeploymentCache();
-    const requestedFeeMode = options.feeMode;
-    const feeMode = requestedFeeMode ?? this.defaultFeeMode;
+    const feeMode = normalizeFeeMode(options.feeMode ?? this.defaultFeeMode);
     const timeBounds = options.timeBounds ?? this.defaultTimeBounds;
-    const gasToken = options.gasToken;
 
-    assertNoGasTokenConflict(requestedFeeMode, gasToken);
-
-    if (feeMode === "sponsored" || gasToken) {
-      return this.deployPaymasterWith([], timeBounds, gasToken);
+    if (feeMode !== "user_pays") {
+      return this.deployPaymasterWith([], timeBounds, feeMode.gasToken);
     }
 
     const classHash = this.accountProvider.getClassHash();
@@ -374,9 +370,9 @@ export class Wallet extends BaseWallet {
     const { transaction_hash } = await this.account.executePaymasterTransaction(
       calls,
       paymasterDetails({
+        feeMode: { type: "paymaster", ...(gasToken && { gasToken }) },
         timeBounds: timeBounds ?? this.defaultTimeBounds,
         deploymentData,
-        gasToken,
       })
     );
     return new Tx(
@@ -480,9 +476,9 @@ export class Wallet extends BaseWallet {
     const { transaction_hash } = await ozAccount.executePaymasterTransaction(
       allCalls,
       paymasterDetails({
+        feeMode: { type: "paymaster", ...(gasToken && { gasToken }) },
         timeBounds: timeBounds ?? this.defaultTimeBounds,
         deploymentData: ozDeploymentData,
-        gasToken,
       })
     );
 
@@ -495,16 +491,12 @@ export class Wallet extends BaseWallet {
   }
 
   async execute(calls: Call[], options: ExecuteOptions = {}): Promise<Tx> {
-    const requestedFeeMode = options.feeMode;
-    const feeMode = requestedFeeMode ?? this.defaultFeeMode;
+    const feeMode = normalizeFeeMode(options.feeMode ?? this.defaultFeeMode);
     const timeBounds = options.timeBounds ?? this.defaultTimeBounds;
-    const gasToken = options.gasToken;
-
-    assertNoGasTokenConflict(requestedFeeMode, gasToken);
 
     const transactionHash =
-      feeMode === "sponsored" || gasToken
-        ? await this.executeSponsored(calls, timeBounds, gasToken)
+      feeMode !== "user_pays"
+        ? await this.executeSponsored(calls, timeBounds, feeMode.gasToken)
         : await this.executeUserPays(calls);
 
     return new Tx(
@@ -533,7 +525,10 @@ export class Wallet extends BaseWallet {
     return this.account
       .executePaymasterTransaction(
         calls,
-        paymasterDetails({ timeBounds, gasToken })
+        paymasterDetails({
+          feeMode: { type: "paymaster", ...(gasToken && { gasToken }) },
+          timeBounds,
+        })
       )
       .then((r) => r.transaction_hash);
   }

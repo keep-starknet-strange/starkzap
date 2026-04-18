@@ -33,7 +33,7 @@ describe("Sponsorship (AVNU Paymaster)", () => {
           signer: new StarkSigner(privateKey),
           accountClass: OpenZeppelinPreset,
         },
-        feeMode: "sponsored",
+        feeMode: { type: "paymaster" },
       });
 
       expect(wallet).toBeDefined();
@@ -86,7 +86,7 @@ describe("Sponsorship (AVNU Paymaster)", () => {
               calldata: [],
             },
           ],
-          { feeMode: "sponsored" }
+          { feeMode: { type: "paymaster" } }
         );
       } catch (error) {
         // Expected to fail (devnet doesn't have AVNU paymaster)
@@ -105,7 +105,7 @@ describe("Sponsorship (AVNU Paymaster)", () => {
           signer: new StarkSigner(privateKey),
           accountClass: OpenZeppelinPreset,
         },
-        feeMode: "sponsored",
+        feeMode: { type: "paymaster" },
         timeBounds: {
           executeAfter: Math.floor(Date.now() / 1000),
           executeBefore: Math.floor(Date.now() / 1000) + 3600,

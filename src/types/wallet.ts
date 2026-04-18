@@ -65,10 +65,16 @@ export interface AccountConfig {
 
 /**
  * How transaction fees are paid.
- * - `"sponsored"`: Paymaster covers gas
- * - `"user_pays"`: User's account pays gas in ETH/STRK
+ *
+ * - `"user_pays"` — User's account pays gas in ETH/STRK
+ * - `{ type: "paymaster" }` — Paymaster covers gas (sponsored)
+ * - `{ type: "paymaster", gasToken: "0x..." }` — Pay gas via ERC-20 through paymaster
+ * - `"sponsored"` — *(deprecated)* Alias for `{ type: "paymaster" }`
  */
-export type FeeMode = "sponsored" | "user_pays";
+export type FeeMode =
+  | "user_pays"
+  | { type: "paymaster"; gasToken?: Address }
+  | "sponsored";
 
 // ─── Provider Options ────────────────────────────────────────────────────────
 
@@ -109,7 +115,7 @@ export interface ProviderOptions {
  * // Sponsored via AVNU paymaster
  * await sdk.connectWallet({
  *   account: { signer: new StarkSigner(privateKey) },
- *   feeMode: "sponsored",
+ *   feeMode: { type: "paymaster" },
  * });
  * ```
  */
@@ -154,7 +160,7 @@ export interface ProgressEvent {
  * ```ts
  * await wallet.ensureReady({
  *   deploy: "if_needed",
- *   feeMode: "sponsored",
+ *   feeMode: { type: "paymaster" },
  *   onProgress: (e) => console.log(e.step)
  * });
  * ```
@@ -164,11 +170,6 @@ export interface EnsureReadyOptions {
   deploy?: DeployMode;
   /** How to pay for deployment if needed (default: wallet's default) */
   feeMode?: FeeMode;
-  /**
-   * ERC-20 token contract address used to pay deployment gas fees.
-   * @see {@link TransactionFeeOptions.gasToken}
-   */
-  gasToken?: Address;
   /** Callback for progress updates */
   onProgress?: (event: ProgressEvent) => void;
 }
@@ -181,20 +182,6 @@ interface TransactionFeeOptions {
   feeMode?: FeeMode;
   /** Optional time bounds for paymaster transactions */
   timeBounds?: PaymasterTimeBounds;
-  /**
-   * ERC-20 token contract address used to pay gas fees via the paymaster.
-   *
-   * When set, the transaction uses the paymaster with
-   * `{ mode: 'default', gasToken }` instead of full sponsorship.
-   * The user pays gas in the specified token (e.g. the USDC or STRK contract address).
-   *
-   * Requires a paymaster to be configured in the SDK.
-   *
-   * @remarks
-   * - Omit `feeMode` when using `gasToken` (recommended happy path).
-   * - Combining `feeMode: "user_pays"` with `gasToken` throws an error.
-   */
-  gasToken?: Address;
 }
 
 // ─── Deploy ──────────────────────────────────────────────────────────────────
@@ -219,17 +206,14 @@ export interface PreflightOptions {
   /**
    * Fee mode used for preflight assumptions.
    *
-   * When `"sponsored"` and the account is undeployed, preflight returns `{ ok: true }`
+   * When using a paymaster mode (`{ type: "paymaster" }` — with or without
+   * `gasToken`) and the account is undeployed, preflight returns `{ ok: true }`
    * because the paymaster path can deploy + execute atomically.
+   *
+   * The `gasToken` field only affects which token is used for fee payment;
+   * it does not change the preflight deployment decision.
    */
   feeMode?: FeeMode;
-  /**
-   * ERC-20 token contract address used to pay gas fees via the paymaster.
-   *
-   * When set and the account is undeployed, preflight returns `{ ok: true }`
-   * because the paymaster path handles deployment atomically.
-   */
-  gasToken?: Address;
 }
 
 /** Preflight succeeded — operation can proceed */

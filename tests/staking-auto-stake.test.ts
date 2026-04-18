@@ -122,7 +122,7 @@ describe("staking auto stake", () => {
       staking: vi.fn().mockResolvedValue(staking),
     } as unknown as BaseWallet;
 
-    const options = { feeMode: "sponsored" as const };
+    const options = { feeMode: { type: "paymaster" } as const };
     const result = await BaseWallet.prototype.stake.call(
       walletLike,
       poolAddress,

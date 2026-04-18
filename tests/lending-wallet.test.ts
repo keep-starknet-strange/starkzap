@@ -52,7 +52,7 @@ class TestWallet extends BaseWallet {
 
   async preflight(options: {
     calls: Call[];
-    feeMode?: "sponsored" | "user_pays";
+    feeMode?: "user_pays" | { type: "paymaster"; gasToken?: string };
   }) {
     return this.preflightSpy(options);
   }
@@ -142,7 +142,7 @@ describe("BaseWallet lending abstraction", () => {
     const provider = createProvider();
     const wallet = new TestWallet(provider);
     const amount = Amount.parse("100", debtToken);
-    const options: ExecuteOptions = { feeMode: "sponsored" };
+    const options: ExecuteOptions = { feeMode: { type: "paymaster" } };
 
     const tx = await wallet.lending().deposit(
       {
@@ -203,7 +203,7 @@ describe("BaseWallet lending abstraction", () => {
         collateralToken,
         debtToken,
       },
-      feeMode: "sponsored",
+      feeMode: { type: "paymaster" },
     });
 
     expect(result.current.debtValue).toBe(100n);
@@ -215,7 +215,7 @@ describe("BaseWallet lending abstraction", () => {
     });
     expect(wallet.preflightSpy).toHaveBeenCalledWith({
       calls: [lendingCall],
-      feeMode: "sponsored",
+      feeMode: { type: "paymaster" },
     });
   });
 

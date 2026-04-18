@@ -70,7 +70,7 @@ async function executeGameCall(
   calldata: Calldata = []
 ): Promise<void> {
   if (!wallet) return;
-  const feeMode = useUserPaysForSession ? "user_pays" : "sponsored";
+  const feeMode = useUserPaysForSession ? ("user_pays" as const) : ({ type: "paymaster" } as const);
   try {
     await wallet.execute(
       [

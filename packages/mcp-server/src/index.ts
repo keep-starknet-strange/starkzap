@@ -1413,8 +1413,8 @@ async function handleTool(
         maxBatchAmount
       );
 
-      const feeMode: "sponsored" | undefined = parsed.sponsored
-        ? "sponsored"
+      const feeMode = parsed.sponsored
+        ? ({ type: "paymaster" } as const)
         : undefined;
       const tx = await withTimeout("Token transfer submission", () =>
         wallet.transfer(token, transfers, {
@@ -1422,7 +1422,7 @@ async function handleTool(
         })
       );
       const txResult = await waitForTrackedTransaction(tx);
-      if (feeMode === "sponsored") {
+      if (feeMode) {
         await assertWalletAccountClassHash(
           wallet,
           "Sponsored transfer post-check"
@@ -1451,8 +1451,8 @@ async function handleTool(
         entrypoint: call.entrypoint,
         calldata: call.calldata ?? [],
       }));
-      const feeMode: "sponsored" | undefined = parsed.sponsored
-        ? "sponsored"
+      const feeMode = parsed.sponsored
+        ? ({ type: "paymaster" } as const)
         : undefined;
       const tx = await withTimeout("Contract execution submission", () =>
         wallet.execute(calls, {
@@ -1460,7 +1460,7 @@ async function handleTool(
         })
       );
       const txResult = await waitForTrackedTransaction(tx);
-      if (feeMode === "sponsored") {
+      if (feeMode) {
         await assertWalletAccountClassHash(
           wallet,
           "Sponsored execute post-check"
@@ -1501,8 +1501,8 @@ async function handleTool(
           address: wallet.address,
         });
       }
-      const feeMode: "sponsored" | undefined = parsed.sponsored
-        ? "sponsored"
+      const feeMode = parsed.sponsored
+        ? ({ type: "paymaster" } as const)
         : undefined;
       const tx = await withTimeout("Account deployment submission", () =>
         wallet.deploy({

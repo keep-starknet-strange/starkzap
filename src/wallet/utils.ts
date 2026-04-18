@@ -17,6 +17,32 @@ import type {
   PreflightResult,
 } from "@/types";
 
+/** Canonical (non-deprecated) fee mode variants. */
+export type NormalizedFeeMode =
+  | "user_pays"
+  | { type: "paymaster"; gasToken?: Address };
+
+/**
+ * Normalize FeeMode by converting the deprecated `"sponsored"` alias
+ * to its canonical `{ type: "paymaster" }` form.
+ */
+export function normalizeFeeMode(feeMode: FeeMode): NormalizedFeeMode {
+  if (feeMode === "sponsored") return { type: "paymaster" };
+  return feeMode;
+}
+
+/** Type guard: does this fee mode use the paymaster path? */
+export function isPaymasterMode(
+  feeMode: FeeMode | undefined
+): feeMode is { type: "paymaster"; gasToken?: Address } | "sponsored" {
+  return (
+    feeMode === "sponsored" ||
+    (typeof feeMode === "object" &&
+      feeMode !== null &&
+      feeMode.type === "paymaster")
+  );
+}
+
 /**
  * Shared wallet utilities.
  * Used by wallet implementations to avoid code duplication.
@@ -69,7 +95,7 @@ export async function ensureWalletReady(
   },
   options: EnsureReadyOptions = {}
 ): Promise<void> {
-  const { deploy = "if_needed", feeMode, gasToken, onProgress } = options;
+  const { deploy = "if_needed", feeMode, onProgress } = options;
 
   try {
     onProgress?.({ step: "CONNECTED" });
@@ -89,7 +115,6 @@ export async function ensureWalletReady(
     onProgress?.({ step: "DEPLOYING" });
     const deployOpts: DeployOptions = {
       ...(feeMode && { feeMode }),
-      ...(gasToken && { gasToken }),
     };
     const tx = await wallet.deploy(
       Object.keys(deployOpts).length > 0 ? deployOpts : undefined
@@ -122,12 +147,12 @@ export async function preflightTransaction(
   },
   options: PreflightOptions
 ): Promise<PreflightResult> {
-  const { calls, feeMode, gasToken } = options;
+  const { calls, feeMode } = options;
 
   try {
     const deployed = await wallet.isDeployed();
     if (!deployed) {
-      if (feeMode === "sponsored" || gasToken) {
+      if (isPaymasterMode(feeMode)) {
         return { ok: true };
       }
       return { ok: false, reason: "Account not deployed" };
@@ -151,37 +176,18 @@ export async function preflightTransaction(
   }
 }
 
-/**
- * Throw if caller explicitly sets feeMode:"user_pays" alongside gasToken.
- *
- * Shared by Wallet and CartridgeWallet to keep validation in sync.
- */
-export function assertNoGasTokenConflict(
-  requestedFeeMode: FeeMode | undefined,
-  gasToken: Address | undefined
-): void {
-  if (requestedFeeMode === "user_pays" && gasToken) {
-    throw new Error(
-      "Cannot combine feeMode 'user_pays' with gasToken. " +
-        "Use feeMode 'sponsored' or omit feeMode when paying with an ERC-20 token."
-    );
-  }
-}
-
 /** Build PaymasterDetails for sponsored or gasToken transactions. */
-export function paymasterDetails(
-  options: {
-    timeBounds?: PaymasterTimeBounds | undefined;
-    deploymentData?: PAYMASTER_API.ACCOUNT_DEPLOYMENT_DATA | undefined;
-    gasToken?: Address | undefined;
-  } = {}
-) {
-  const feeMode = options.gasToken
-    ? { mode: "default" as const, gasToken: options.gasToken }
+export function paymasterDetails(options: {
+  feeMode: { type: "paymaster"; gasToken?: Address };
+  timeBounds?: PaymasterTimeBounds | undefined;
+  deploymentData?: PAYMASTER_API.ACCOUNT_DEPLOYMENT_DATA | undefined;
+}) {
+  const paymasterFeeMode = options.feeMode.gasToken
+    ? { mode: "default" as const, gasToken: options.feeMode.gasToken }
     : { mode: "sponsored" as const };
 
   return {
-    feeMode,
+    feeMode: paymasterFeeMode,
     ...(options.timeBounds && { timeBounds: options.timeBounds }),
     ...(options.deploymentData && { deploymentData: options.deploymentData }),
   };

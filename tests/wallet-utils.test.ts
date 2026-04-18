@@ -1,9 +1,10 @@
 import { describe, it, expect, vi } from "vitest";
 import type { RpcProvider } from "starknet";
 import {
-  assertNoGasTokenConflict,
   checkDeployed,
   ensureWalletReady,
+  isPaymasterMode,
+  normalizeFeeMode,
   paymasterDetails,
 } from "@/wallet/utils";
 import { fromAddress } from "@/types";
@@ -81,7 +82,7 @@ describe("wallet utils", () => {
       expect(wait).toHaveBeenCalledTimes(1);
     });
 
-    it("forwards gasToken to deploy when provided", async () => {
+    it("forwards paymaster feeMode with gasToken to deploy", async () => {
       const wait = vi.fn().mockResolvedValue(undefined);
       const deploy = vi.fn().mockResolvedValue({ wait });
       const isDeployed = vi.fn().mockResolvedValue(false);
@@ -89,27 +90,30 @@ describe("wallet utils", () => {
 
       await ensureWalletReady(
         { isDeployed, deploy },
-        { deploy: "if_needed", gasToken }
+        { deploy: "if_needed", feeMode: { type: "paymaster", gasToken } }
       );
 
       expect(deploy).toHaveBeenCalledWith(
-        expect.objectContaining({ gasToken })
+        expect.objectContaining({
+          feeMode: { type: "paymaster", gasToken },
+        })
       );
     });
 
-    it("forwards feeMode and gasToken together to deploy", async () => {
+    it("forwards paymaster feeMode without gasToken to deploy", async () => {
       const wait = vi.fn().mockResolvedValue(undefined);
       const deploy = vi.fn().mockResolvedValue({ wait });
       const isDeployed = vi.fn().mockResolvedValue(false);
-      const gasToken = fromAddress("0x053c91253bc9");
 
       await ensureWalletReady(
         { isDeployed, deploy },
-        { deploy: "if_needed", feeMode: "sponsored", gasToken }
+        { deploy: "if_needed", feeMode: { type: "paymaster" } }
       );
 
       expect(deploy).toHaveBeenCalledWith(
-        expect.objectContaining({ feeMode: "sponsored", gasToken })
+        expect.objectContaining({
+          feeMode: { type: "paymaster" },
+        })
       );
     });
   });
@@ -120,7 +124,9 @@ describe("wallet utils", () => {
     );
 
     it("returns { mode: 'default', gasToken } when gasToken is provided", () => {
-      const result = paymasterDetails({ gasToken: gasTokenAddress });
+      const result = paymasterDetails({
+        feeMode: { type: "paymaster", gasToken: gasTokenAddress },
+      });
 
       expect(result.feeMode).toEqual({
         mode: "default",
@@ -129,20 +135,19 @@ describe("wallet utils", () => {
     });
 
     it("returns { mode: 'sponsored' } when gasToken is omitted", () => {
-      const result = paymasterDetails();
-
-      expect(result.feeMode).toEqual({ mode: "sponsored" });
-    });
-
-    it("returns { mode: 'sponsored' } when called with empty options", () => {
-      const result = paymasterDetails({});
+      const result = paymasterDetails({
+        feeMode: { type: "paymaster" },
+      });
 
       expect(result.feeMode).toEqual({ mode: "sponsored" });
     });
 
     it("includes timeBounds when provided", () => {
       const timeBounds = { executeBefore: 12345 };
-      const result = paymasterDetails({ timeBounds });
+      const result = paymasterDetails({
+        feeMode: { type: "paymaster" },
+        timeBounds,
+      });
 
       expect(result.timeBounds).toEqual(timeBounds);
     });
@@ -154,48 +159,84 @@ describe("wallet utils", () => {
         constructor_calldata: ["0x1"],
         version: "0x1" as const,
       };
-      const result = paymasterDetails({ deploymentData });
+      const result = paymasterDetails({
+        feeMode: { type: "paymaster" },
+        deploymentData,
+      });
 
       expect(result.deploymentData).toEqual(deploymentData);
     });
 
     it("omits timeBounds and deploymentData when not provided", () => {
-      const result = paymasterDetails({ gasToken: gasTokenAddress });
+      const result = paymasterDetails({
+        feeMode: { type: "paymaster", gasToken: gasTokenAddress },
+      });
 
       expect(result).not.toHaveProperty("timeBounds");
       expect(result).not.toHaveProperty("deploymentData");
     });
   });
 
-  describe("assertNoGasTokenConflict", () => {
-    const gasToken = fromAddress("0x053c91253bc9");
+  describe("normalizeFeeMode", () => {
+    it('converts deprecated "sponsored" to { type: "paymaster" }', () => {
+      expect(normalizeFeeMode("sponsored")).toEqual({ type: "paymaster" });
+    });
 
-    it("throws when feeMode is 'user_pays' and gasToken is set", () => {
-      expect(() => assertNoGasTokenConflict("user_pays", gasToken)).toThrow(
-        "Cannot combine feeMode 'user_pays' with gasToken"
+    it('passes "user_pays" through unchanged', () => {
+      expect(normalizeFeeMode("user_pays")).toBe("user_pays");
+    });
+
+    it("passes paymaster object through unchanged", () => {
+      const gasToken = fromAddress("0x053c91253bc9");
+      const mode = { type: "paymaster" as const, gasToken };
+      expect(normalizeFeeMode(mode)).toEqual(mode);
+    });
+
+    it("passes paymaster object without gasToken through unchanged", () => {
+      const mode = { type: "paymaster" as const };
+      expect(normalizeFeeMode(mode)).toEqual(mode);
+    });
+  });
+
+  describe("isPaymasterMode", () => {
+    it('returns true for { type: "paymaster" }', () => {
+      expect(isPaymasterMode({ type: "paymaster" })).toBe(true);
+    });
+
+    it("returns true for paymaster with gasToken", () => {
+      const gasToken = fromAddress("0x053c91253bc9");
+      expect(isPaymasterMode({ type: "paymaster", gasToken })).toBe(true);
+    });
+
+    it('returns true for deprecated "sponsored"', () => {
+      expect(isPaymasterMode("sponsored")).toBe(true);
+    });
+
+    it('returns false for "user_pays"', () => {
+      expect(isPaymasterMode("user_pays")).toBe(false);
+    });
+
+    it("returns false for undefined", () => {
+      expect(isPaymasterMode(undefined)).toBe(false);
+    });
+  });
+
+  describe("backward compat: deprecated sponsored alias", () => {
+    it('forwards deprecated "sponsored" feeMode through ensureWalletReady to deploy', async () => {
+      const wait = vi.fn().mockResolvedValue(undefined);
+      const deploy = vi.fn().mockResolvedValue({ wait });
+      const isDeployed = vi.fn().mockResolvedValue(false);
+
+      await ensureWalletReady(
+        { isDeployed, deploy },
+        { deploy: "if_needed", feeMode: "sponsored" }
       );
-    });
 
-    it("does not throw when feeMode is 'sponsored' and gasToken is set", () => {
-      expect(() =>
-        assertNoGasTokenConflict("sponsored", gasToken)
-      ).not.toThrow();
-    });
-
-    it("does not throw when feeMode is undefined and gasToken is set", () => {
-      expect(() => assertNoGasTokenConflict(undefined, gasToken)).not.toThrow();
-    });
-
-    it("does not throw when gasToken is undefined", () => {
-      expect(() =>
-        assertNoGasTokenConflict("user_pays", undefined)
-      ).not.toThrow();
-    });
-
-    it("does not throw when both are undefined", () => {
-      expect(() =>
-        assertNoGasTokenConflict(undefined, undefined)
-      ).not.toThrow();
+      expect(deploy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          feeMode: "sponsored",
+        })
+      );
     });
   });
 });

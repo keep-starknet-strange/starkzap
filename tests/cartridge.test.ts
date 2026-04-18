@@ -152,7 +152,7 @@ describe("CartridgeWallet", () => {
 
     it("should accept feeMode and timeBounds options", async () => {
       const wallet = await CartridgeWallet.create({
-        feeMode: "sponsored",
+        feeMode: { type: "paymaster" },
         timeBounds: { executeBefore: 12345 },
       });
 
@@ -188,15 +188,8 @@ describe("CartridgeWallet", () => {
 
     it("should reject unsupported deploy options", async () => {
       const wallet = await CartridgeWallet.create();
-      await expect(wallet.deploy({ feeMode: "sponsored" })).rejects.toThrow(
-        "does not support DeployOptions overrides"
-      );
-    });
-
-    it("should reject gasToken in deploy options", async () => {
-      const wallet = await CartridgeWallet.create();
       await expect(
-        wallet.deploy({ gasToken: fromAddress("0x053c91253bc9") })
+        wallet.deploy({ feeMode: { type: "paymaster" } })
       ).rejects.toThrow("does not support DeployOptions overrides");
     });
   });
@@ -219,7 +212,7 @@ describe("CartridgeWallet", () => {
 
     it("should use paymaster for sponsored mode", async () => {
       const wallet = await CartridgeWallet.create({
-        feeMode: "sponsored",
+        feeMode: { type: "paymaster" },
       });
       const calls = [
         {
@@ -236,7 +229,7 @@ describe("CartridgeWallet", () => {
 
     it("should not pre-deploy before sponsored execution", async () => {
       const wallet = await CartridgeWallet.create({
-        feeMode: "sponsored",
+        feeMode: { type: "paymaster" },
       });
       const calls = [
         {
@@ -305,7 +298,7 @@ describe("CartridgeWallet", () => {
       expect(account.execute).not.toHaveBeenCalled();
     });
 
-    it("should route to paymaster when gasToken is set", async () => {
+    it("should route to paymaster when gasToken is set via feeMode", async () => {
       const wallet = await CartridgeWallet.create();
       const calls = [
         {
@@ -316,7 +309,10 @@ describe("CartridgeWallet", () => {
       ];
 
       const tx = await wallet.execute(calls, {
-        gasToken: fromAddress("0x053c91253bc9"),
+        feeMode: {
+          type: "paymaster",
+          gasToken: fromAddress("0x053c91253bc9"),
+        },
       });
 
       const account = wallet.getAccount() as unknown as {
@@ -333,24 +329,6 @@ describe("CartridgeWallet", () => {
           }),
         })
       );
-    });
-
-    it("should throw when gasToken combined with feeMode 'user_pays'", async () => {
-      const wallet = await CartridgeWallet.create();
-      const calls = [
-        {
-          contractAddress: "0x123",
-          entrypoint: "transfer",
-          calldata: ["0x456", "100"],
-        },
-      ];
-
-      await expect(
-        wallet.execute(calls, {
-          feeMode: "user_pays",
-          gasToken: fromAddress("0x053c91253bc9"),
-        })
-      ).rejects.toThrow("Cannot combine feeMode 'user_pays' with gasToken");
     });
   });
 

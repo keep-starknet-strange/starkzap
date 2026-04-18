@@ -46,7 +46,7 @@ maybeDescribe("Live Paymaster Smoke (opt-in)", () => {
         accountClass: OpenZeppelinPreset,
       },
       ...(testnetFunder.address && { accountAddress: testnetFunder.address }),
-      feeMode: "sponsored",
+      feeMode: { type: "paymaster" },
     });
 
     expect(sponsoredWallet.address).toBe(userPaysWallet.address);
@@ -67,7 +67,7 @@ maybeDescribe("Live Paymaster Smoke (opt-in)", () => {
     await userPaysTx.wait();
 
     const sponsoredTx = await sponsoredWallet.execute([approveZeroCall], {
-      feeMode: "sponsored",
+      feeMode: { type: "paymaster" },
     });
     await sponsoredTx.wait();
 

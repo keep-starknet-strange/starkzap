@@ -69,7 +69,7 @@ export interface WalletInterface extends BridgeOperatorInterface {
    * Deploy the account contract.
    * Returns a Tx object to track the deployment.
    *
-   * @param options.feeMode - How to pay for deployment ("user_pays" or "sponsored")
+   * @param options.feeMode - How to pay for deployment ("user_pays" or { type: "paymaster" })
    */
   deploy(options?: DeployOptions): Promise<Tx>;
 

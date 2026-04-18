@@ -49,11 +49,11 @@ describe("NativeCartridgeWallet", () => {
     });
 
     const tx = await wallet.execute([{ contractAddress: "0x1" } as Call], {
-      feeMode: "sponsored",
+      feeMode: { type: "paymaster" },
     });
 
     expect(tx.hash).toBe("0xfeed");
-    expect(wallet.getFeeMode()).toBe("sponsored");
+    expect(wallet.getFeeMode()).toEqual({ type: "paymaster" });
     expect(session.account.execute).toHaveBeenCalledTimes(1);
     expect(wallet.getAccount()).toBeInstanceOf(Account);
   });
@@ -72,7 +72,7 @@ describe("NativeCartridgeWallet", () => {
 
     const err = await wallet
       .execute([{ contractAddress: "0x1" } as Call], {
-        feeMode: "sponsored",
+        feeMode: { type: "paymaster" },
       })
       .then(
         () => {
@@ -124,7 +124,7 @@ describe("NativeCartridgeWallet", () => {
   });
 
   it("rejects unsupported default fee mode during creation", async () => {
-    const unsupportedFeeMode = "user_pays" as unknown as "sponsored";
+    const unsupportedFeeMode = "user_pays" as const;
 
     await expect(
       NativeCartridgeWallet.create({
@@ -185,7 +185,7 @@ describe("NativeCartridgeWallet", () => {
 
     await expect(
       wallet.execute([{ contractAddress: "0x1" } as Call], {
-        feeMode: "sponsored",
+        feeMode: { type: "paymaster" },
       })
     ).resolves.toMatchObject({ hash: "0xfeed" });
 
@@ -228,7 +228,7 @@ describe("NativeCartridgeWallet", () => {
     await expect(
       wallet.preflight({
         calls: [{ contractAddress: "0x1" } as Call],
-        feeMode: "sponsored",
+        feeMode: { type: "paymaster" },
       })
     ).resolves.toEqual({
       ok: true,

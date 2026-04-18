@@ -229,7 +229,7 @@ export class StarkZap {
    * // With sponsored transactions
    * const wallet = await sdk.connectWallet({
    *   account: { signer: new StarkSigner(privateKey) },
-   *   feeMode: "sponsored",
+   *   feeMode: { type: "paymaster" },
    * });
    * ```
    */
