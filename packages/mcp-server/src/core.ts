@@ -342,14 +342,30 @@ const swapInputBaseSchema = z
   })
   .strict();
 
+function hasDistinctSwapTokenInputs(value: {
+  tokenIn: string;
+  tokenOut: string;
+}): boolean {
+  return (
+    value.tokenIn.trim().toLowerCase() !== value.tokenOut.trim().toLowerCase()
+  );
+}
+
+const distinctSwapTokenInputIssue = {
+  message: "tokenIn and tokenOut must be different",
+  path: ["tokenOut"],
+};
+
 const swapInputSchema = swapInputBaseSchema.refine(
-  (value) =>
-    value.tokenIn.trim().toLowerCase() !== value.tokenOut.trim().toLowerCase(),
-  {
-    message: "tokenIn and tokenOut must be different",
-    path: ["tokenOut"],
-  }
+  hasDistinctSwapTokenInputs,
+  distinctSwapTokenInputIssue
 );
+
+const swapExecutionInputSchema = swapInputBaseSchema
+  .extend({
+    sponsored: z.boolean().optional(),
+  })
+  .refine(hasDistinctSwapTokenInputs, distinctSwapTokenInputIssue);
 
 const entrypointSchema = z
   .string()
@@ -450,19 +466,7 @@ export const schemas = {
       .max(10, "Maximum 10 calls per estimate batch"),
   }),
   starkzap_get_quote: swapInputSchema,
-  starkzap_swap: swapInputBaseSchema
-    .extend({
-      sponsored: z.boolean().optional(),
-    })
-    .refine(
-      (value) =>
-        value.tokenIn.trim().toLowerCase() !==
-        value.tokenOut.trim().toLowerCase(),
-      {
-        message: "tokenIn and tokenOut must be different",
-        path: ["tokenOut"],
-      }
-    ),
+  starkzap_swap: swapExecutionInputSchema,
   starkzap_build_swap_calls: swapInputSchema,
 } as const;
 
@@ -553,6 +557,7 @@ export function buildTools(maxAmount: string, maxBatchAmount: string): Tool[] {
       },
       inputSchema: {
         type: "object" as const,
+        additionalProperties: false,
         properties: {
           token: {
             type: "string",
@@ -564,6 +569,7 @@ export function buildTools(maxAmount: string, maxBatchAmount: string): Tool[] {
             maxItems: 20,
             items: {
               type: "object",
+              additionalProperties: false,
               properties: {
                 to: {
                   type: "string",
@@ -600,6 +606,7 @@ export function buildTools(maxAmount: string, maxBatchAmount: string): Tool[] {
       },
       inputSchema: {
         type: "object" as const,
+        additionalProperties: false,
         properties: {
           calls: {
             type: "array",
@@ -607,6 +614,7 @@ export function buildTools(maxAmount: string, maxBatchAmount: string): Tool[] {
             maxItems: 10,
             items: {
               type: "object",
+              additionalProperties: false,
               properties: {
                 contractAddress: {
                   type: "string",
