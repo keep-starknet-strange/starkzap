@@ -74,7 +74,12 @@ export interface AccountConfig {
 export type FeeMode =
   | "user_pays"
   | { type: "paymaster"; gasToken?: Address }
-  | "sponsored";
+  | DeprecatedSponsoredFeeMode;
+
+/**
+ * @deprecated Use `{ type: "paymaster" }` instead.
+ */
+type DeprecatedSponsoredFeeMode = "sponsored";
 
 // ─── Provider Options ────────────────────────────────────────────────────────
 

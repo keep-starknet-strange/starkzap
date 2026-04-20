@@ -74,7 +74,18 @@ function unsupportedUserPaysMessage(): string {
   return 'Cartridge wallet currently supports sponsored session execution only. Use feeMode: { type: "paymaster" }.';
 }
 
-export type SupportedNativeCartridgeFeeMode = Exclude<FeeMode, "user_pays">;
+function unsupportedGasTokenMessage(): string {
+  return 'Cartridge wallet does not support gasToken. Use feeMode: { type: "paymaster" } without gasToken.';
+}
+
+/**
+ * Fee modes supported by native Cartridge sessions.
+ * Only sponsored execution is supported — `gasToken` is not available.
+ */
+export type SupportedNativeCartridgeFeeMode =
+  | "sponsored"
+  | { type: "paymaster" };
+
 type UniversalDetailsWithTimeBounds = UniversalDetails & {
   timeBounds?: PaymasterTimeBounds;
 };
@@ -82,14 +93,18 @@ type UniversalDetailsWithTimeBounds = UniversalDetails & {
 export function validateSupportedCartridgeFeeMode(
   feeMode?: FeeMode
 ): SupportedNativeCartridgeFeeMode | undefined {
-  if (
-    feeMode === undefined ||
-    feeMode === "sponsored" ||
-    (typeof feeMode === "object" &&
-      feeMode !== null &&
-      feeMode.type === "paymaster")
-  ) {
+  if (feeMode === undefined || feeMode === "sponsored") {
     return feeMode;
+  }
+  if (
+    typeof feeMode === "object" &&
+    feeMode !== null &&
+    feeMode.type === "paymaster"
+  ) {
+    if (feeMode.gasToken) {
+      throw new Error(unsupportedGasTokenMessage());
+    }
+    return { type: "paymaster" };
   }
 
   throw new Error(unsupportedUserPaysMessage());
