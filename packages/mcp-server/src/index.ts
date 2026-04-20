@@ -347,7 +347,7 @@ function summarizeError(error: unknown): string {
         : stringifySafe(error);
   return raw
     .replace(/https?:\/\/[^\s)]+/gi, "<url>")
-    .replace(/\[[\da-fA-F:]+\](?::\d{2,5})?/gi, "<host>")
+    .replace(/\[[\da-fA-F:]*:[\da-fA-F:]+\](?::\d{2,5})?/gi, "<host>")
     .replace(
       /\b(?:localhost|::1|(?:\d{1,3}\.){3}\d{1,3})(?::\d{2,5})?\b/gi,
       "<host>"
@@ -366,7 +366,7 @@ function createErrorReference(message: string): string {
 function containsSensitiveConnectionHints(value: string): boolean {
   const patterns = [
     /https?:\/\/[^\s)]+/i,
-    /\[[\da-fA-F:]+\](?::\d{2,5})?/i,
+    /\[[\da-fA-F:]*:[\da-fA-F:]+\](?::\d{2,5})?/i,
     /\b(?:\d{1,3}\.){3}\d{1,3}(?::\d{2,5})?\b/,
     /\b(?:localhost|::1)(?::\d{2,5})?\b/i,
     /(?<![\\/])\b(?:[a-z0-9-]+\.)+[a-z]{2,}(?::\d{2,5})?\b/i,
@@ -714,7 +714,7 @@ function normalizeCallForResponse(
   value: unknown,
   index: number
 ): { contractAddress: Address; entrypoint: string; calldata: string[] } {
-  const callPath = `calls_${index}`;
+  const callPath = `calls[${index}]`;
   if (!isRecord(value)) {
     throw new Error(`Invalid ${callPath} returned by SDK: expected object.`);
   }
@@ -757,7 +757,7 @@ function normalizeCallForResponse(
     calldata: calldataValues.map((item, calldataIndex) =>
       normalizeCalldataItemForResponse(
         item,
-        `${callPath}_calldata_${calldataIndex}`
+        `${callPath}.calldata[${calldataIndex}]`
       )
     ),
   };

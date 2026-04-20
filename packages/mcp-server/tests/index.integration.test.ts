@@ -9,6 +9,10 @@ const TEST_TOKEN: Token = {
     "0x04718f5a0fc34cc1af16a1cdee98ffb20c31f5cd61d6ab0720189f9f3f75e66" as Token["address"],
   decimals: 18,
 };
+const TEST_ACCOUNT_ADDRESS =
+  "0x0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
+const OTHER_ACCOUNT_ADDRESS =
+  "0x0323456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
 
 type TestingExports = {
   withTimeout<T>(
@@ -76,7 +80,7 @@ beforeAll(async () => {
   process.env.STARKZAP_MCP_TEST_KEY_MARKER =
     "TEST_KEY_DO_NOT_USE_IN_PRODUCTION";
   process.env.STARKNET_PRIVATE_KEY = "0x1";
-  process.env.STARKNET_ACCOUNT_ADDRESS = "0x2";
+  process.env.STARKNET_ACCOUNT_ADDRESS = TEST_ACCOUNT_ADDRESS;
   process.env.STARKNET_STAKING_CONTRACT =
     "0x03745ab04a431fc02871a139be6b93d9260b0ff3e779ad9c8b377183b23109f1";
   process.env.STARKNET_PAYMASTER_URL = "https://sepolia.paymaster.avnu.fi";
@@ -122,7 +126,7 @@ describe("index integration hardening", () => {
       .fn()
       .mockRejectedValueOnce(new Error("connection refused"))
       .mockResolvedValueOnce({
-        address: fromAddress("0x2"),
+        address: fromAddress(TEST_ACCOUNT_ADDRESS),
         disconnect: vi.fn().mockResolvedValue(undefined),
       });
 
@@ -138,7 +142,7 @@ describe("index integration hardening", () => {
     expect(connectWallet).toHaveBeenCalledTimes(1);
     expect(connectWallet).toHaveBeenCalledWith(
       expect.objectContaining({
-        accountAddress: fromAddress("0x2"),
+        accountAddress: fromAddress(TEST_ACCOUNT_ADDRESS),
       })
     );
 
@@ -147,14 +151,14 @@ describe("index integration hardening", () => {
     expect(connectWallet).toHaveBeenCalledTimes(2);
     expect(connectWallet).toHaveBeenLastCalledWith(
       expect.objectContaining({
-        accountAddress: fromAddress("0x2"),
+        accountAddress: fromAddress(TEST_ACCOUNT_ADDRESS),
       })
     );
   });
 
   it("fails wallet init when SDK ignores the configured account override", async () => {
     const connectWallet = vi.fn().mockResolvedValue({
-      address: fromAddress("0x3"),
+      address: fromAddress(OTHER_ACCOUNT_ADDRESS),
       disconnect: vi.fn().mockResolvedValue(undefined),
     });
 
@@ -166,7 +170,7 @@ describe("index integration hardening", () => {
     );
     expect(connectWallet).toHaveBeenCalledWith(
       expect.objectContaining({
-        accountAddress: fromAddress("0x2"),
+        accountAddress: fromAddress(TEST_ACCOUNT_ADDRESS),
       })
     );
   });
@@ -545,7 +549,7 @@ describe("index integration hardening", () => {
     });
 
     expect(response.isError).toBe(true);
-    expect(response.content[0]?.text).toContain("Invalid calls_0_calldata_0");
+    expect(response.content[0]?.text).toContain("Invalid calls[0].calldata[0]");
   });
 
   it("rejects tx builder call-count mismatches", async () => {
