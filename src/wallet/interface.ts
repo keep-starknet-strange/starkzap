@@ -12,6 +12,7 @@ import type { Erc20 } from "@/erc20";
 import type { Staking, EndurStaking, EndurStakingOptions } from "@/staking";
 import type { LendingClient } from "@/lending";
 import type { DcaClientInterface } from "@/dca";
+import type { Troves, TrovesOptions } from "@/troves";
 import type { PreparedSwap, SwapInput, SwapProvider, SwapQuote } from "@/swap";
 import type {
   Address,
@@ -335,4 +336,16 @@ export interface WalletInterface extends BridgeOperatorInterface {
    * `EndurStaking` mirrors the `Staking` API — use `enter`, `exitIntent`, `getPosition`, etc.
    */
   lstStaking(asset: string, options?: EndurStakingOptions): EndurStaking;
+
+  // ============================================================
+  // Troves — DeFi yield strategies
+  // ============================================================
+
+  /**
+   * Get a Troves client for interacting with Troves DeFi strategies.
+   *
+   * The same instance is returned across calls. Throws on non-mainnet chains
+   * unless `options.apiBase` is provided (Troves is a mainnet-only service).
+   */
+  troves(options?: TrovesOptions): Troves;
 }

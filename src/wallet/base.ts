@@ -42,6 +42,7 @@ import type {
 } from "starknet";
 import { Erc20 } from "@/erc20";
 import { Staking, EndurStaking, type EndurStakingOptions } from "@/staking";
+import { Troves, type TrovesOptions } from "@/troves";
 import type { PreparedSwap, SwapInput, SwapProvider, SwapQuote } from "@/swap";
 import { AvnuSwapProvider } from "@/swap";
 import { resolveSwapInput } from "@/swap/utils";
@@ -116,6 +117,7 @@ export abstract class BaseWallet implements WalletInterface {
   private stakingMap: Map<Address, Staking> = new Map();
   private stakingInFlight: Map<Address, Promise<Staking>> = new Map();
   private lstStakingMap: Map<string, EndurStaking> = new Map();
+  private trovesInstance: Troves | undefined;
 
   private readonly bridging: BridgeOperator;
 
@@ -811,6 +813,20 @@ export abstract class BaseWallet implements WalletInterface {
     );
     this.lstStakingMap.set(key, instance);
     return instance;
+  }
+
+  /**
+   * Get a Troves client for interacting with Troves DeFi strategies.
+   *
+   * The same instance is returned across calls. `options` only takes effect
+   * on the first call — pass them then, or build a `Troves` directly if you
+   * need different settings (e.g. a separate fetcher for tests).
+   */
+  troves(options?: TrovesOptions): Troves {
+    if (!this.trovesInstance) {
+      this.trovesInstance = new Troves(this, options);
+    }
+    return this.trovesInstance;
   }
 
   /** {@inheritDoc WalletInterface.initiateWithdraw} */
