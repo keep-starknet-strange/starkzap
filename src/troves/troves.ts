@@ -266,20 +266,38 @@ export class Troves {
     return this.populateCalls(params, false);
   }
 
+  /**
+   * Returns the deposit calls for an `Amount`-typed request without executing.
+   *
+   * Used by `wallet.tx().trovesDeposit(...)` to compose a Troves deposit
+   * into a larger atomic transaction. Use `deposit()` to execute directly.
+   */
+  async populateDeposit(params: TrovesDepositParams): Promise<Call[]> {
+    return this.populateDepositCalls(toCallParams(params));
+  }
+
+  /**
+   * Returns the withdraw calls for an `Amount`-typed request without executing.
+   *
+   * Used by `wallet.tx().trovesWithdraw(...)` to compose a Troves withdraw
+   * into a larger atomic transaction. Use `withdraw()` to execute directly.
+   */
+  async populateWithdraw(params: TrovesDepositParams): Promise<Call[]> {
+    return this.populateWithdrawCalls(toCallParams(params));
+  }
+
   async deposit(
     params: TrovesDepositParams,
     options?: ExecuteOptions
   ): Promise<Tx> {
-    const calls = await this.populateDepositCalls(toCallParams(params));
-    return this.wallet.execute(calls, options);
+    return this.wallet.execute(await this.populateDeposit(params), options);
   }
 
   async withdraw(
     params: TrovesDepositParams,
     options?: ExecuteOptions
   ): Promise<Tx> {
-    const calls = await this.populateWithdrawCalls(toCallParams(params));
-    return this.wallet.execute(calls, options);
+    return this.wallet.execute(await this.populateWithdraw(params), options);
   }
 }
 

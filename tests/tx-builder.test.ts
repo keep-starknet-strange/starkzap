@@ -103,6 +103,18 @@ const dcaCancelCall: Call = {
   calldata: [10, 11, 12],
 };
 
+const trovesDepositCall: Call = {
+  contractAddress: fromAddress("0x701"),
+  entrypoint: "deposit",
+  calldata: [13, 14, 15],
+};
+
+const trovesWithdrawCall: Call = {
+  contractAddress: fromAddress("0x702"),
+  entrypoint: "redeem",
+  calldata: [16, 17, 18],
+};
+
 // ─── Mock helpers ────────────────────────────────────────────────────────────
 
 function createMockErc20(token: Token) {
@@ -170,6 +182,10 @@ function createMockWallet(
       calls: [dcaCancelCall],
     }),
   };
+  const mockTroves = {
+    populateDeposit: vi.fn().mockResolvedValue([trovesDepositCall]),
+    populateWithdraw: vi.fn().mockResolvedValue([trovesWithdrawCall]),
+  };
   const defaultSwapProvider: SwapProvider = {
     id: "default",
     supportsChain: () => true,
@@ -203,6 +219,7 @@ function createMockWallet(
     staking: vi.fn().mockResolvedValue(mockStaking),
     lending: vi.fn().mockReturnValue(mockLending),
     dca: vi.fn().mockReturnValue(mockDca),
+    troves: vi.fn().mockReturnValue(mockTroves),
     getChainId: vi.fn().mockReturnValue(ChainId.SEPOLIA),
     getDefaultSwapProvider: vi.fn().mockReturnValue(defaultSwapProvider),
     getSwapProvider: vi.fn().mockReturnValue(defaultSwapProvider),
@@ -289,6 +306,12 @@ describe("TxBuilder", () => {
         })
       ).toBe(builder);
       expect(builder.dcaCancel({ orderAddress: "0x123" })).toBe(builder);
+      expect(
+        builder.trovesDeposit({ strategyId: "evergreen_strk", amount })
+      ).toBe(builder);
+      expect(
+        builder.trovesWithdraw({ strategyId: "evergreen_strk", amount })
+      ).toBe(builder);
     });
   });
 
@@ -697,6 +720,78 @@ describe("TxBuilder", () => {
           })
           .calls()
       ).rejects.toThrow('DCA action "cancel" returned no calls');
+    });
+  });
+
+  // ============================================================
+  // Troves operations
+  // ============================================================
+
+  describe("troves", () => {
+    it("should resolve deposit calls via wallet.troves()", async () => {
+      const wallet = createMockWallet();
+      const trovesClient = wallet.troves();
+      (wallet.troves as ReturnType<typeof vi.fn>).mockClear();
+      const params = {
+        strategyId: "evergreen_strk",
+        amount: Amount.parse("100", mockSTRK),
+      };
+
+      const calls = await new TxBuilder(wallet).trovesDeposit(params).calls();
+
+      expect(wallet.troves).toHaveBeenCalledTimes(1);
+      expect(trovesClient.populateDeposit).toHaveBeenCalledWith(params);
+      expect(calls).toEqual([trovesDepositCall]);
+    });
+
+    it("should resolve withdraw calls via wallet.troves()", async () => {
+      const wallet = createMockWallet();
+      const trovesClient = wallet.troves();
+      (wallet.troves as ReturnType<typeof vi.fn>).mockClear();
+      const params = {
+        strategyId: "evergreen_strk",
+        amount: Amount.parse("100", mockSTRK),
+      };
+
+      const calls = await new TxBuilder(wallet).trovesWithdraw(params).calls();
+
+      expect(wallet.troves).toHaveBeenCalledTimes(1);
+      expect(trovesClient.populateWithdraw).toHaveBeenCalledWith(params);
+      expect(calls).toEqual([trovesWithdrawCall]);
+    });
+
+    it("should forward amount2 for multi-asset strategies", async () => {
+      const wallet = createMockWallet();
+      const trovesClient = wallet.troves();
+      const params = {
+        strategyId: "lp_strk_usdc",
+        amount: Amount.parse("100", mockSTRK),
+        amount2: Amount.parse("200", mockUSDC),
+      };
+
+      await new TxBuilder(wallet).trovesDeposit(params).calls();
+
+      expect(trovesClient.populateDeposit).toHaveBeenCalledWith(params);
+    });
+
+    it("should propagate errors from populateDeposit", async () => {
+      const wallet = createMockWallet({
+        troves: vi.fn().mockReturnValue({
+          populateDeposit: vi
+            .fn()
+            .mockRejectedValue(new Error("Strategy unavailable")),
+          populateWithdraw: vi.fn(),
+        }),
+      });
+
+      await expect(
+        new TxBuilder(wallet)
+          .trovesDeposit({
+            strategyId: "evergreen_strk",
+            amount: Amount.parse("100", mockSTRK),
+          })
+          .calls()
+      ).rejects.toThrow("Strategy unavailable");
     });
   });
 
