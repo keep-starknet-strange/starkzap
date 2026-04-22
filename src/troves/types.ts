@@ -1,4 +1,5 @@
 import type { Address } from "@/types/address";
+import type { Amount } from "@/types/amount";
 
 export interface TrovesDepositToken {
   symbol: string;
@@ -80,6 +81,28 @@ export interface TrovesRawCall {
   calldata: (string | number | boolean)[];
 }
 
+/**
+ * Parameters for the noob-safe `deposit` / `withdraw` API.
+ *
+ * `amount` is an `Amount` so token decimals travel with the value — you
+ * can't accidentally deposit 100 wei thinking you typed "100 STRK".
+ *
+ * Build amounts via `Amount.parse("1", STRK)` (human units) or
+ * `Amount.fromRaw(rawBigInt, STRK)` (raw base units).
+ */
+export interface TrovesDepositParams {
+  strategyId: string;
+  amount: Amount;
+  /** Second asset for multi-asset strategies (e.g. LP positions). */
+  amount2?: Amount;
+}
+
+/**
+ * Low-level params for `populate*Calls` — accepts raw base-unit strings
+ * directly. Prefer `TrovesDepositParams` for the typed `deposit`/`withdraw`
+ * API; reach for these only when composing Troves calls into a multicall
+ * with other operations.
+ */
 export interface TrovesCallParams {
   strategyId: string;
   amountRaw: string;

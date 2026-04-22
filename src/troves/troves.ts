@@ -7,6 +7,7 @@ import type {
   TrovesDepositCallsResponse,
   TrovesRawCall,
   TrovesCallParams,
+  TrovesDepositParams,
 } from "@/troves/types";
 import type { WalletInterface } from "@/wallet/interface";
 import { assertSafeHttpUrl } from "@/utils";
@@ -135,10 +136,10 @@ function normalizeCalldata(raw: TrovesRawCall): Call {
  *
  * const strategies = await troves.getStrategies();
  * const stats = await troves.getStats();
- * const tx = await troves.deposit(
- *   { strategyId: "evergreen_strk", amountRaw: "1000000000000000000" },
- *   {}
- * );
+ * const tx = await troves.deposit({
+ *   strategyId: "evergreen_strk",
+ *   amount: Amount.parse("1", STRK),
+ * });
  * ```
  */
 export class Troves {
@@ -265,18 +266,29 @@ export class Troves {
   }
 
   async deposit(
-    params: Omit<TrovesCallParams, "address">,
+    params: TrovesDepositParams,
     options?: ExecuteOptions
   ): Promise<Tx> {
-    const calls = await this.populateDepositCalls(params);
+    const calls = await this.populateDepositCalls(toCallParams(params));
     return this.wallet.execute(calls, options);
   }
 
   async withdraw(
-    params: Omit<TrovesCallParams, "address">,
+    params: TrovesDepositParams,
     options?: ExecuteOptions
   ): Promise<Tx> {
-    const calls = await this.populateWithdrawCalls(params);
+    const calls = await this.populateWithdrawCalls(toCallParams(params));
     return this.wallet.execute(calls, options);
   }
+}
+
+function toCallParams(params: TrovesDepositParams): TrovesCallParams {
+  const callParams: TrovesCallParams = {
+    strategyId: params.strategyId,
+    amountRaw: params.amount.toBase().toString(),
+  };
+  if (params.amount2 !== undefined) {
+    callParams.amount2Raw = params.amount2.toBase().toString();
+  }
+  return callParams;
 }

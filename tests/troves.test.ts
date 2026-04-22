@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import type { Call } from "starknet";
 import type { RpcProvider } from "starknet";
-import { ChainId, fromAddress, type ExecuteOptions } from "@/types";
+import { Amount, ChainId, fromAddress, type ExecuteOptions } from "@/types";
 import { Troves } from "@/troves";
 import { Tx } from "@/tx";
 import type { WalletInterface } from "@/wallet/interface";
@@ -761,7 +761,7 @@ describe("Troves", () => {
       const tx = await troves.deposit(
         {
           strategyId: "evergreen_strk",
-          amountRaw: "1000000000000000000",
+          amount: Amount.fromRaw(1000000000000000000n, 18, "STRK"),
         },
         {}
       );
@@ -773,6 +773,56 @@ describe("Troves", () => {
       expect(calls[0]?.entrypoint).toBe("approve");
       expect(calls[1]?.entrypoint).toBe("deposit");
       expect(tx.hash).toBe("0xmocktxhash");
+    });
+
+    it("should forward amount2 for multi-asset strategies", async () => {
+      const wallet = createMockWallet();
+      const fetcher = vi.fn().mockResolvedValue({
+        ok: true,
+        json: () =>
+          Promise.resolve({
+            success: true,
+            results: [
+              {
+                tokenInfo: {
+                  symbol: "STRK",
+                  name: "Starknet",
+                  address: "0x123",
+                  decimals: 18,
+                },
+                calls: [
+                  {
+                    contractAddress: "0xabc",
+                    entrypoint: "approve",
+                    calldata: ["0xdef", "1"],
+                  },
+                ],
+              },
+            ],
+            strategyId: "lp_strk_usdc",
+            isDeposit: true,
+          }),
+      });
+
+      const troves = new Troves(wallet, { fetcher: fetcher as typeof fetch });
+      await troves.deposit({
+        strategyId: "lp_strk_usdc",
+        amount: Amount.fromRaw(1000000000000000000n, 18, "STRK"),
+        amount2: Amount.fromRaw(2000000n, 6, "USDC"),
+      });
+
+      expect(fetcher).toHaveBeenCalledWith(
+        "https://app.troves.fi/api/deposits/calls",
+        expect.objectContaining({
+          body: JSON.stringify({
+            strategyId: "lp_strk_usdc",
+            amountRaw: "1000000000000000000",
+            amount2Raw: "2000000",
+            isDeposit: true,
+            address: MOCK_ADDRESS,
+          }),
+        })
+      );
     });
   });
 
@@ -814,7 +864,7 @@ describe("Troves", () => {
       const tx = await troves.withdraw(
         {
           strategyId: "evergreen_strk",
-          amountRaw: "1000000000000000000",
+          amount: Amount.fromRaw(1000000000000000000n, 18, "STRK"),
         },
         {}
       );
