@@ -11,7 +11,17 @@ export interface TrovesDepositToken {
 export interface TrovesStrategyAPIResult {
   name: string;
   id: string;
-  apy: number;
+  /**
+   * APY for the strategy.
+   *
+   * Most strategies return a number (e.g. `0.0537` = 5.37%). A few non-yield
+   * strategies (e.g. accumulator vaults) return a marketing label like
+   * `"🤙YOLO"`. When this field is a string, fall back to
+   * `apySplit.baseApy + apySplit.rewardsApy` for the numeric value.
+   *
+   * Numeric strings from the API (e.g. `"0.05"`) are normalized to numbers.
+   */
+  apy: number | string;
   apySplit: {
     baseApy: number;
     rewardsApy: number;

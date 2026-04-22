@@ -2,7 +2,6 @@ import type { Call } from "starknet";
 import { fromAddress, type ExecuteOptions } from "@/types";
 import type { Tx } from "@/tx";
 import type {
-  TrovesStrategyAPIResult,
   TrovesStrategiesResponse,
   TrovesStatsResponse,
   TrovesDepositCallsResponse,
@@ -18,36 +17,21 @@ export interface TrovesOptions {
   timeoutMs?: number;
 }
 
-interface TrovesStrategyRaw extends Omit<TrovesStrategyAPIResult, "apy"> {
-  apy: number | string;
-}
-
-interface TrovesStrategiesResponseRaw extends Omit<
-  TrovesStrategiesResponse,
-  "strategies"
-> {
-  strategies: TrovesStrategyRaw[];
-}
-
-function normalizeApy(value: number | string, strategyId: string): number {
+function normalizeApy(value: number | string): number | string {
   if (typeof value === "number") return value;
+  if (value === "") return value;
   const parsed = Number(value);
-  if (value === "" || !Number.isFinite(parsed)) {
-    throw new Error(
-      `Troves API returned invalid apy "${value}" for strategy "${strategyId}"`
-    );
-  }
-  return parsed;
+  return Number.isFinite(parsed) ? parsed : value;
 }
 
 function normalizeTrovesStrategiesResponse(
-  data: TrovesStrategiesResponseRaw
+  data: TrovesStrategiesResponse
 ): TrovesStrategiesResponse {
   return {
     ...data,
     strategies: data.strategies.map((s) => ({
       ...s,
-      apy: normalizeApy(s.apy, s.id),
+      apy: normalizeApy(s.apy),
       depositToken: s.depositToken.map((t) => ({
         ...t,
         address: fromAddress(t.address),
@@ -80,7 +64,7 @@ function normalizeTrovesDepositCallsResponse(
 }
 
 function validateStrategiesDiscontinuationDates(
-  data: TrovesStrategiesResponseRaw
+  data: TrovesStrategiesResponse
 ): void {
   for (const s of data.strategies) {
     const raw = s.discontinuationInfo?.date;
@@ -184,7 +168,7 @@ export class Troves {
     const path = options?.noCache
       ? "/api/strategies?no_cache=true"
       : "/api/strategies";
-    const data = await this.fetchJson<TrovesStrategiesResponseRaw>(path);
+    const data = await this.fetchJson<TrovesStrategiesResponse>(path);
     validateStrategiesDiscontinuationDates(data);
     return normalizeTrovesStrategiesResponse(data);
   }

@@ -211,7 +211,49 @@ describe("Troves", () => {
       expect(result.strategies[0]?.apy).toBe(0.0537);
     });
 
-    it("should throw on empty apy string", async () => {
+    it("should preserve marketing label apy strings like '🤙YOLO'", async () => {
+      const wallet = createMockWallet();
+      const fetcher = vi.fn().mockResolvedValue({
+        ok: true,
+        json: () =>
+          Promise.resolve({
+            status: true,
+            lastUpdated: new Date().toISOString(),
+            source: "sdk",
+            strategies: [
+              {
+                id: "s1",
+                name: "S1",
+                apy: "🤙YOLO",
+                apySplit: { baseApy: 0, rewardsApy: 0 },
+                depositToken: [
+                  {
+                    symbol: "STRK",
+                    name: "Starknet",
+                    address: "0x123",
+                    decimals: 18,
+                  },
+                ],
+                leverage: 1,
+                contract: [{ name: "Vault", address: "0xabc" }],
+                tvlUsd: 1000000,
+                status: { number: 1, value: "active" },
+                riskFactor: 0.5,
+                isAudited: true,
+                assets: ["strk"],
+                protocols: ["evergreen"],
+                isRetired: false,
+              },
+            ],
+          }),
+      });
+
+      const troves = new Troves(wallet, { fetcher: fetcher as typeof fetch });
+      const result = await troves.getStrategies();
+      expect(result.strategies[0]?.apy).toBe("🤙YOLO");
+    });
+
+    it("should preserve empty apy strings", async () => {
       const wallet = createMockWallet();
       const fetcher = vi.fn().mockResolvedValue({
         ok: true,
@@ -225,7 +267,7 @@ describe("Troves", () => {
                 id: "s1",
                 name: "S1",
                 apy: "",
-                apySplit: { baseApy: 0.04, rewardsApy: 0.01 },
+                apySplit: { baseApy: 0, rewardsApy: 0 },
                 depositToken: [
                   {
                     symbol: "STRK",
@@ -249,52 +291,8 @@ describe("Troves", () => {
       });
 
       const troves = new Troves(wallet, { fetcher: fetcher as typeof fetch });
-      await expect(troves.getStrategies()).rejects.toThrow(
-        'Troves API returned invalid apy "" for strategy "s1"'
-      );
-    });
-
-    it("should throw on non-numeric apy string", async () => {
-      const wallet = createMockWallet();
-      const fetcher = vi.fn().mockResolvedValue({
-        ok: true,
-        json: () =>
-          Promise.resolve({
-            status: true,
-            lastUpdated: new Date().toISOString(),
-            source: "sdk",
-            strategies: [
-              {
-                id: "s1",
-                name: "S1",
-                apy: "not-a-number",
-                apySplit: { baseApy: 0.04, rewardsApy: 0.01 },
-                depositToken: [
-                  {
-                    symbol: "STRK",
-                    name: "Starknet",
-                    address: "0x123",
-                    decimals: 18,
-                  },
-                ],
-                leverage: 1,
-                contract: [{ name: "Vault", address: "0xabc" }],
-                tvlUsd: 1000000,
-                status: { number: 1, value: "active" },
-                riskFactor: 0.5,
-                isAudited: true,
-                assets: ["strk"],
-                protocols: ["evergreen"],
-                isRetired: false,
-              },
-            ],
-          }),
-      });
-
-      const troves = new Troves(wallet, { fetcher: fetcher as typeof fetch });
-      await expect(troves.getStrategies()).rejects.toThrow(
-        'Troves API returned invalid apy "not-a-number" for strategy "s1"'
-      );
+      const result = await troves.getStrategies();
+      expect(result.strategies[0]?.apy).toBe("");
     });
 
     it("should append no_cache=true when requested", async () => {
