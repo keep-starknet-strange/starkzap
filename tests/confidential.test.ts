@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import type { Call } from "starknet";
-import { TongoConfidential } from "@/confidential";
+import { TongoConfidential } from "@/confidential/tongo";
 import type {
   ConfidentialFundDetails,
   ConfidentialTransferDetails,

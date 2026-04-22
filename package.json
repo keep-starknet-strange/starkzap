@@ -23,9 +23,25 @@
       "types": "./dist/src/index.d.ts",
       "import": "./dist/src/index.js"
     },
+    "./bridge": {
+      "types": "./dist/src/bridge/index.d.ts",
+      "import": "./dist/src/bridge/index.js"
+    },
     "./cartridge": {
       "types": "./dist/src/cartridge.d.ts",
       "import": "./dist/src/cartridge.js"
+    },
+    "./confidential": {
+      "types": "./dist/src/confidential/index.d.ts",
+      "import": "./dist/src/confidential/index.js"
+    },
+    "./confidential/tongo": {
+      "types": "./dist/src/confidential/tongo.d.ts",
+      "import": "./dist/src/confidential/tongo.js"
+    },
+    "./connect": {
+      "types": "./dist/src/connect/index.d.ts",
+      "import": "./dist/src/connect/index.js"
     }
   },
   "peerDependencies": {

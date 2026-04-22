@@ -4,6 +4,14 @@ import { type BridgeToken, ExternalChain, Protocol } from "@/types";
 import type { ConnectedExternalWallet } from "@/connect";
 import type { WalletInterface } from "@/wallet";
 
+const { resolveEthereumWalletConfig } = vi.hoisted(() => ({
+  resolveEthereumWalletConfig: vi.fn(),
+}));
+
+vi.mock("@/connect/evmWalletConfig", () => ({
+  resolveEthereumWalletConfig,
+}));
+
 type BridgeOperatorPrivate = {
   createBridge(
     token: BridgeToken,
@@ -63,18 +71,17 @@ describe("BridgeOperator", () => {
       chain: ExternalChain.ETHEREUM,
       protocol: Protocol.OFT,
     });
-    const toEthWalletConfig = vi.fn().mockResolvedValue({
+    resolveEthereumWalletConfig.mockResolvedValue({
       provider: {},
       signer: {},
     });
     const wallet = {
       chain: ExternalChain.ETHEREUM,
-      toEthWalletConfig,
     } as unknown as ConnectedExternalWallet;
 
     await expect(
       operatorPrivate.createBridge(token, wallet, starknetWallet)
     ).rejects.toThrow("OFT bridging requires a LayerZero API key");
-    expect(toEthWalletConfig).toHaveBeenCalledTimes(1);
+    expect(resolveEthereumWalletConfig).toHaveBeenCalledTimes(1);
   });
 });

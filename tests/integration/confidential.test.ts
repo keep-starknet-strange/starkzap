@@ -3,7 +3,7 @@ import { Account, RpcProvider } from "starknet";
 import { Devnet, DevnetProvider } from "starknet-devnet";
 
 import { keccak } from "@scure/starknet";
-import { TongoConfidential } from "@/confidential";
+import { TongoConfidential } from "@/confidential/tongo";
 import { Amount } from "@/types/amount";
 import path from "path";
 import { readFileSync } from "fs";

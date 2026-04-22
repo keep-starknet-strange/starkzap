@@ -23,6 +23,36 @@ import type {
   CartridgeNativeConnectArgs,
 } from "@/cartridge/types";
 
+type WalletProviderOptions = Pick<
+  Exclude<OnboardOptions, { strategy: "cartridge" }>,
+  | "dcaProviders"
+  | "defaultDcaProviderId"
+  | "defaultSwapProviderId"
+  | "swapProviders"
+>;
+
+function applyWalletProviders(
+  wallet: Awaited<ReturnType<CoreStarkZap["connectCartridge"]>>,
+  options: WalletProviderOptions
+): void {
+  if (options.swapProviders?.length) {
+    for (const swapProvider of options.swapProviders) {
+      wallet.registerSwapProvider(swapProvider);
+    }
+  }
+  if (options.defaultSwapProviderId) {
+    wallet.setDefaultSwapProvider(options.defaultSwapProviderId);
+  }
+  if (options.dcaProviders?.length) {
+    for (const dcaProvider of options.dcaProviders) {
+      wallet.dca().registerProvider(dcaProvider);
+    }
+  }
+  if (options.defaultDcaProviderId) {
+    wallet.dca().setDefaultProvider(options.defaultDcaProviderId);
+  }
+}
+
 export class StarkZap extends CoreStarkZap {
   private cartridgeAdapter: CartridgeNativeAdapter | null;
 
@@ -97,10 +127,6 @@ export class StarkZap extends CoreStarkZap {
     const deploy = options.deploy ?? "never";
     const feeMode = validateSupportedCartridgeFeeMode(options.feeMode);
     const timeBounds = options.timeBounds;
-    const swapProviders = options.swapProviders;
-    const defaultSwapProviderId = options.defaultSwapProviderId;
-    const dcaProviders = options.dcaProviders;
-    const defaultDcaProviderId = options.defaultDcaProviderId;
     const shouldEnsureReady = deploy !== "never";
 
     const nativeCartridge =
@@ -114,22 +140,7 @@ export class StarkZap extends CoreStarkZap {
       ...(timeBounds && { timeBounds }),
     });
 
-    if (swapProviders?.length) {
-      for (const swapProvider of swapProviders) {
-        wallet.registerSwapProvider(swapProvider);
-      }
-    }
-    if (defaultSwapProviderId) {
-      wallet.setDefaultSwapProvider(defaultSwapProviderId);
-    }
-    if (dcaProviders?.length) {
-      for (const dcaProvider of dcaProviders) {
-        wallet.dca().registerProvider(dcaProvider);
-      }
-    }
-    if (defaultDcaProviderId) {
-      wallet.dca().setDefaultProvider(defaultDcaProviderId);
-    }
+    applyWalletProviders(wallet, options);
 
     if (shouldEnsureReady) {
       await wallet.ensureReady({

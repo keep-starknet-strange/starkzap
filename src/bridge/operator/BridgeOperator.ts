@@ -13,6 +13,7 @@ import {
   type ConnectedExternalWallet,
   ConnectedSolanaWallet,
 } from "@/connect";
+import { resolveEthereumWalletConfig } from "@/connect/evmWalletConfig";
 import type { WalletInterface } from "@/wallet";
 import type { BridgeOperatorInterface } from "@/bridge/operator/BridgeOperatorInterface";
 import {
@@ -305,8 +306,8 @@ export class BridgeOperator implements BridgeOperatorInterface {
     externalWallet: ConnectedEthereumWallet,
     starknetWallet: WalletInterface
   ): Promise<BridgeInterface<EthereumAddress>> {
-    await loadEthers("Ethereum bridge operations");
-    const walletConfig = await externalWallet.toEthWalletConfig(
+    const walletConfig = await resolveEthereumWalletConfig(
+      externalWallet,
       this.bridgingConfig?.ethereumRpcUrl
     );
 

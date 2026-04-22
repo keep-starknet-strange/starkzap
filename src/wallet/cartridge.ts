@@ -29,6 +29,7 @@ import {
   preflightTransaction,
 } from "@/wallet/utils";
 import { BaseWallet } from "@/wallet/base";
+import { DeploymentState } from "@/wallet/deploymentState";
 import { assertSafeHttpUrl } from "@/utils";
 import type { LoggerConfig } from "@/logger";
 
@@ -137,8 +138,9 @@ export class CartridgeWallet extends BaseWallet {
   private readonly explorerConfig: ExplorerConfig | undefined;
   private readonly defaultFeeMode: FeeMode;
   private readonly defaultTimeBounds: PaymasterTimeBounds | undefined;
-  private deployedCache: boolean | null = null;
-  private deployedCacheExpiresAt = 0;
+  private readonly deploymentState = new DeploymentState(
+    NEGATIVE_DEPLOYMENT_CACHE_TTL_MS
+  );
 
   private constructor(
     controller: CartridgeControllerLike,
@@ -260,28 +262,13 @@ export class CartridgeWallet extends BaseWallet {
   }
 
   async isDeployed(): Promise<boolean> {
-    const now = Date.now();
-    if (this.deployedCache === true) {
-      return true;
-    }
-    if (this.deployedCache === false && now < this.deployedCacheExpiresAt) {
-      return false;
-    }
-
-    const deployed = await checkDeployed(this.provider, this.address);
-    if (deployed) {
-      this.deployedCache = true;
-      this.deployedCacheExpiresAt = Number.POSITIVE_INFINITY;
-    } else {
-      this.deployedCache = false;
-      this.deployedCacheExpiresAt = now + NEGATIVE_DEPLOYMENT_CACHE_TTL_MS;
-    }
-    return deployed;
+    return this.deploymentState.check(() =>
+      checkDeployed(this.provider, this.address)
+    );
   }
 
   private clearDeploymentCache(): void {
-    this.deployedCache = null;
-    this.deployedCacheExpiresAt = 0;
+    this.deploymentState.clear();
   }
 
   async ensureReady(options: EnsureReadyOptions = {}): Promise<void> {

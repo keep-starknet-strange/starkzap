@@ -71,6 +71,13 @@ npm install @fatsolutions/tongo-sdk
 npm install starkzap-native react-native-get-random-values fast-text-encoding @ethersproject/shims buffer
 ```
 
+Optional feature modules are imported from explicit subpaths:
+
+```ts
+import { ConnectedEthereumWallet } from "starkzap/connect";
+import { TongoConfidential } from "starkzap/confidential/tongo";
+```
+
 ---
 
 ## Quick Start

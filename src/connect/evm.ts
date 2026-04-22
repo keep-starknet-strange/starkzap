@@ -1,6 +1,5 @@
 import { describeValue } from "@/connect/utils";
 import { type EthereumAddress, ExternalChain } from "@/types";
-import type { EthereumWalletConfig } from "@/bridge";
 import type { ChainId } from "@/types";
 import { loadEthers } from "@/connect/ethersRuntime";
 import { fromEthereumAddress } from "@/connect/ethersRuntime";
@@ -47,49 +46,6 @@ export class ConnectedEthereumWallet {
     readonly provider: Eip1193Provider,
     readonly network: EthereumNetwork
   ) {}
-
-  public async toEthWalletConfig(
-    ethereumRpcUrl?: string | undefined
-  ): Promise<EthereumWalletConfig> {
-    const ethers = await loadEthers(
-      "ConnectedEthereumWallet.toEthWalletConfig"
-    );
-    const ethChainIdRaw = await this.provider.request<string>({
-      method: "eth_chainId",
-    });
-    const ethChainId = Number(BigInt(ethChainIdRaw));
-    const networkId: number = this.network;
-
-    if (ethChainId !== networkId) {
-      throw new Error(
-        `Cannot create Ethereum Bridge. Expected ethereum chain id to be ${networkId} but got ${ethChainId}.`
-      );
-    }
-
-    const browserProvider = new ethers.BrowserProvider(
-      this.provider,
-      networkId
-    );
-    const signer = await browserProvider.getSigner(this.address);
-
-    let provider;
-    if (ethereumRpcUrl) {
-      const rpcProvider = new ethers.JsonRpcProvider(ethereumRpcUrl, networkId);
-      const rpcNetwork = await rpcProvider.getNetwork();
-      const rpcChainId = Number(rpcNetwork.chainId);
-
-      if (rpcChainId !== networkId) {
-        throw new Error(
-          `Custom Ethereum RPC URL is on chain ${rpcChainId} but the connected wallet is on chain ${networkId}.`
-        );
-      }
-      provider = rpcProvider;
-    } else {
-      provider = browserProvider;
-    }
-
-    return { provider, signer };
-  }
 
   public static async from(
     options: ConnectEthereumWalletOptions,

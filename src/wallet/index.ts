@@ -36,6 +36,7 @@ import {
   preflightTransaction,
 } from "@/wallet/utils";
 import type { WalletInterface } from "@/wallet/interface";
+import { DeploymentState } from "@/wallet/deploymentState";
 import { BaseWallet } from "@/wallet/base";
 import {
   BRAAVOS_IMPL_CLASS_HASH,
@@ -125,8 +126,9 @@ export class Wallet extends BaseWallet {
   private readonly explorerConfig: ExplorerConfig | undefined;
   private readonly defaultFeeMode: FeeMode;
   private readonly defaultTimeBounds: PaymasterTimeBounds | undefined;
-  private deployedCache: boolean | null = null;
-  private deployedCacheExpiresAt = 0;
+  private readonly deploymentState = new DeploymentState(
+    NEGATIVE_DEPLOYMENT_CACHE_TTL_MS
+  );
   private sponsoredDeployLock: Promise<void> | null = null;
 
   private constructor(options: {
@@ -240,30 +242,13 @@ export class Wallet extends BaseWallet {
   }
 
   async isDeployed(): Promise<boolean> {
-    const now = Date.now();
-
-    // Return cached result if we know it's deployed
-    if (this.deployedCache === true) {
-      return true;
-    }
-    if (this.deployedCache === false && now < this.deployedCacheExpiresAt) {
-      return false;
-    }
-
-    const deployed = await checkDeployed(this.provider, this.address);
-    if (deployed) {
-      this.deployedCache = true;
-      this.deployedCacheExpiresAt = Number.POSITIVE_INFINITY;
-    } else {
-      this.deployedCache = false;
-      this.deployedCacheExpiresAt = now + NEGATIVE_DEPLOYMENT_CACHE_TTL_MS;
-    }
-    return deployed;
+    return this.deploymentState.check(() =>
+      checkDeployed(this.provider, this.address)
+    );
   }
 
   private clearDeploymentCache(): void {
-    this.deployedCache = null;
-    this.deployedCacheExpiresAt = 0;
+    this.deploymentState.clear();
   }
 
   private async withSponsoredDeployLock<T>(work: () => Promise<T>): Promise<T> {
