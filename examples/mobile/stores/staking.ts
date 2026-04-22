@@ -6,7 +6,6 @@ import {
   Amount,
   getLSTConfig,
   getSupportedLSTAssets,
-  fromAddress,
   type LSTConfig,
   type Validator,
   type PoolMember,
@@ -20,7 +19,7 @@ import {
   showTransactionToast,
   updateTransactionToast,
 } from "@/components/Toast";
-import { getExplorerUrl } from "@/utils";
+import { cropAddress, getExplorerUrl } from "@/utils";
 
 // Get validators for network
 export function getValidatorsForNetwork(
@@ -123,12 +122,15 @@ interface StakingState {
   clearStaking: () => void;
 }
 
-/** Generate a unique key for a position */
+interface LstProbeHit {
+  config: LSTConfig;
+  position: PoolMember;
+}
+
 function makePositionKey(validatorKey: string, token: Token): string {
   return `${validatorKey}:${token.address}`;
 }
 
-/** Build a synthetic StakingPosition entry for an Endur LST asset. */
 function buildLstPositionEntry(
   config: LSTConfig,
   chainId: ChainId
@@ -141,11 +143,11 @@ function buildLstPositionEntry(
   };
   const validator: Validator = {
     name: `Endur (${config.lstSymbol})`,
-    stakerAddress: fromAddress(config.lstAddress),
+    stakerAddress: config.lstAddress,
     logoUrl: null,
   };
   const pool: Pool = {
-    poolContract: fromAddress(config.lstAddress),
+    poolContract: config.lstAddress,
     token,
     amount: Amount.fromRaw(0n, token),
   };
@@ -259,56 +261,49 @@ export const useStakingStore = create<StakingState>((set, get) => ({
 
   discoverLstPositions: async (wallet, chainId, addLog) => {
     const log = addLog ?? (() => {});
+    const chainLiteral = chainId.toLiteral();
+    const walletAddress = wallet.address;
     const assets = getSupportedLSTAssets(chainId);
     log(
-      `LST discover: chain=${chainId.toLiteral()} assets=[${assets.join(", ") || "none"}] addr=${wallet.address.slice(0, 10)}...`
+      `LST discover: chain=${chainLiteral} assets=[${assets.join(", ") || "none"}] addr=${cropAddress(walletAddress)}`
     );
-    if (assets.length === 0) return;
     const discovered = await Promise.all(
-      assets.map(async (asset) => {
+      assets.map(async (asset): Promise<LstProbeHit | null> => {
         const config = getLSTConfig(chainId, asset);
-        if (!config) {
-          log(`LST ${asset}: no config`);
-          return null;
-        }
+        if (!config) return null;
         try {
-          const position = await wallet.lstStaking(asset).getPosition(wallet);
-          if (!position) {
-            log(`LST ${asset}: no shares (getPosition → null)`);
-            return null;
-          }
-          if (position.staked.isZero()) {
-            log(`LST ${asset}: zero shares`);
-            return null;
-          }
+          const poolMember = await wallet.lstStaking(asset).getPosition(wallet);
+          if (!poolMember || poolMember.staked.isZero()) return null;
           log(
-            `LST ${asset}: ${position.staked.toFormatted(true)} (${config.lstSymbol})`
+            `LST ${asset}: ${poolMember.staked.toFormatted(true)} (${config.lstSymbol})`
           );
-          return { config, position };
+          return { config, position: poolMember };
         } catch (error) {
-          log(`LST ${asset}: probe failed — ${error}`);
+          const message =
+            error instanceof Error ? error.message : String(error);
+          log(`LST ${asset}: probe failed — ${message}`);
           return null;
         }
       })
     );
-    const hits = discovered.filter(
-      (d): d is { config: LSTConfig; position: PoolMember } => d !== null
-    );
+    const hits = discovered.filter((d): d is LstProbeHit => d !== null);
     log(`LST discover: ${hits.length} position(s) found`);
     if (hits.length === 0) return;
     set((state) => {
-      const positions = { ...state.positions };
+      const next: Record<string, StakingPosition> = { ...state.positions };
+      let mutated = false;
       for (const hit of hits) {
         const entry = buildLstPositionEntry(hit.config, chainId);
-        if (positions[entry.key]) continue;
-        positions[entry.key] = {
+        if (next[entry.key]) continue;
+        next[entry.key] = {
           ...entry,
           position: hit.position,
           isMember: true,
           isLoading: false,
         };
+        mutated = true;
       }
-      return { positions };
+      return mutated ? { positions: next } : state;
     });
   },
 
