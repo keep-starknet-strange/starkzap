@@ -17,7 +17,7 @@
     "dev": "tsup src/index.ts --format esm --watch",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "check": "npm run typecheck && npm run test",
+    "check": "npm run typecheck && npm run test && npm run build",
     "prepublishOnly": "npm run check && npm pack --dry-run >/dev/null && npm view starkzap@2.0.0 version >/dev/null"
   },
   "dependencies": {

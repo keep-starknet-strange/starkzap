@@ -144,6 +144,72 @@ describe("schema hardening", () => {
     expect(parsed.success).toBe(false);
   });
 
+  it("bounds get-balances token batches at 32", () => {
+    const tokens = Array.from({ length: 33 }, (_, index) => `TOKEN_${index}`);
+    const parsed = schemas.starkzap_get_balances.safeParse({ tokens });
+    expect(parsed.success).toBe(false);
+  });
+
+  it("rejects duplicate token identifiers in get-balances schema", () => {
+    const parsed = schemas.starkzap_get_balances.safeParse({
+      tokens: ["STRK", "strk"],
+    });
+    expect(parsed.success).toBe(false);
+  });
+
+  it("validates swap slippage bps bounds", () => {
+    const parsed = schemas.starkzap_get_quote.safeParse({
+      tokenIn: "STRK",
+      tokenOut: "USDC",
+      amountIn: "1",
+      slippageBps: 10_000,
+    });
+    expect(parsed.success).toBe(false);
+  });
+
+  it("rejects same token pairs in swap schemas", () => {
+    const parsed = schemas.starkzap_get_quote.safeParse({
+      tokenIn: "STRK",
+      tokenOut: "strk",
+      amountIn: "1",
+    });
+    expect(parsed.success).toBe(false);
+  });
+
+  it("rejects unknown fields in hardened swap/get-balances schemas", () => {
+    const balancesParsed = schemas.starkzap_get_balances.safeParse({
+      tokens: ["STRK"],
+      unexpected: true,
+    });
+    expect(balancesParsed.success).toBe(false);
+
+    const quoteParsed = schemas.starkzap_get_quote.safeParse({
+      tokenIn: "STRK",
+      tokenOut: "USDC",
+      amountIn: "1",
+      unexpected: true,
+    });
+    expect(quoteParsed.success).toBe(false);
+  });
+
+  it("bounds token identifiers in swap schemas", () => {
+    const tooLong = "A".repeat(129);
+    const parsed = schemas.starkzap_get_quote.safeParse({
+      tokenIn: tooLong,
+      tokenOut: "USDC",
+      amountIn: "1",
+    });
+    expect(parsed.success).toBe(false);
+  });
+
+  it("bounds token identifiers in get-balances schema", () => {
+    const tooLong = "A".repeat(129);
+    const parsed = schemas.starkzap_get_balances.safeParse({
+      tokens: [tooLong],
+    });
+    expect(parsed.success).toBe(false);
+  });
+
   it("bounds calldata payload size", () => {
     const oversized = "a".repeat(257);
     const parsed = schemas.starkzap_execute.safeParse({
@@ -219,6 +285,10 @@ describe("tool gating and parity", () => {
     });
     const names = new Set(readOnlyOnly.map((tool) => tool.name));
     expect(names.has("starkzap_get_account")).toBe(true);
+    expect(names.has("starkzap_get_balances")).toBe(true);
+    expect(names.has("starkzap_get_quote")).toBe(true);
+    expect(names.has("starkzap_build_swap_calls")).toBe(true);
+    expect(names.has("starkzap_swap")).toBe(false);
   });
 
   it("hides staking tools when staking config is absent", () => {
@@ -258,6 +328,41 @@ describe("tool gating and parity", () => {
       expect(typeof tool.annotations?.readOnlyHint).toBe("boolean");
       expect(typeof tool.annotations?.destructiveHint).toBe("boolean");
     }
+  });
+
+  it("marks build_swap_calls as non-idempotent despite being read-only", () => {
+    const tools = buildTools("100", "150");
+    const buildSwapCalls = tools.find(
+      (tool) => tool.name === "starkzap_build_swap_calls"
+    );
+    expect(buildSwapCalls).toBeDefined();
+    expect(buildSwapCalls?.annotations?.readOnlyHint).toBe(true);
+    expect(buildSwapCalls?.annotations?.idempotentHint).toBe(false);
+  });
+
+  it("keeps swap tool inputSchema constraints aligned with runtime validation", () => {
+    const tools = buildTools("100", "150");
+    const quoteTool = tools.find((tool) => tool.name === "starkzap_get_quote");
+    expect(quoteTool).toBeDefined();
+
+    const inputSchema = quoteTool?.inputSchema as
+      | {
+          properties?: Record<
+            string,
+            { minLength?: number; maxLength?: number; pattern?: string }
+          >;
+        }
+      | undefined;
+    expect(inputSchema?.properties?.tokenIn?.minLength).toBe(1);
+    expect(inputSchema?.properties?.tokenIn?.maxLength).toBe(128);
+    expect(inputSchema?.properties?.tokenIn?.pattern).toBe(".*\\S.*");
+    expect(inputSchema?.properties?.tokenOut?.minLength).toBe(1);
+    expect(inputSchema?.properties?.tokenOut?.maxLength).toBe(128);
+    expect(inputSchema?.properties?.tokenOut?.pattern).toBe(".*\\S.*");
+    expect(inputSchema?.properties?.provider?.maxLength).toBe(64);
+    expect(inputSchema?.properties?.provider?.pattern).toBe(
+      "^[A-Za-z0-9._:-]+$"
+    );
   });
 });
 

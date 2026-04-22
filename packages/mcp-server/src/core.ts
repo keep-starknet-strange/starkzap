@@ -6,6 +6,9 @@ import { z } from "zod";
 export const FELT_REGEX = /^0x[0-9a-fA-F]{1,64}$/;
 export const VALID_NETWORKS = ["mainnet", "sepolia"] as const;
 export type Network = (typeof VALID_NETWORKS)[number];
+const STARK_CURVE_ORDER = BigInt(
+  "0x0800000000000011000000000000000000000000000000000000000000000001"
+);
 
 export interface CliConfig {
   network: Network;
@@ -26,6 +29,23 @@ const tokensByNetwork: Record<Network, Record<string, Token>> = {
 export function normalizeStarknetAddress(address: string): string {
   return fromAddress(address).toLowerCase();
 }
+
+export function normalizePrivateKeyHex(value: string): string {
+  const hex = value.slice(2);
+  return `0x${hex.padStart(64, "0")}`;
+}
+
+export const privateKeySchema = z
+  .string()
+  .regex(
+    /^0x[0-9a-fA-F]{1,64}$/,
+    "Must be a 0x-prefixed hex private key (1-64 hex chars)"
+  )
+  .transform(normalizePrivateKeyHex)
+  .refine((value) => {
+    const key = BigInt(value);
+    return key !== 0n && key < STARK_CURVE_ORDER;
+  }, "Private key must be cryptographically valid (non-zero and less than Stark curve order)");
 
 function getReferenceToken(network: Network): Token {
   const tokens = tokensByNetwork[network];
@@ -283,6 +303,70 @@ export const amountSchema = z
     message: "Amount must be greater than zero",
   });
 
+const tokenIdentifierSchema = z
+  .string()
+  .trim()
+  .min(1, "Token identifier cannot be empty")
+  .max(128, "Token identifier too long (max 128 chars)");
+
+const tokenBatchSchema = z
+  .array(tokenIdentifierSchema)
+  .min(1)
+  .max(32, "Maximum 32 tokens per balance batch")
+  .refine(
+    (tokens) =>
+      new Set(tokens.map((token) => token.toLowerCase())).size ===
+      tokens.length,
+    { message: "Duplicate tokens are not allowed" }
+  );
+
+const slippageBpsSchema = z.number().int().min(0).max(9999);
+export const PROVIDER_ID_REGEX = /^[A-Za-z0-9._:-]+$/;
+
+const providerSchema = z
+  .string()
+  .min(1)
+  .max(64)
+  .regex(
+    PROVIDER_ID_REGEX,
+    "Provider id may only contain letters, numbers, dot, underscore, colon, and hyphen"
+  );
+
+const swapInputBaseSchema = z
+  .object({
+    tokenIn: tokenIdentifierSchema,
+    tokenOut: tokenIdentifierSchema,
+    amountIn: amountSchema,
+    slippageBps: slippageBpsSchema.optional(),
+    provider: providerSchema.optional(),
+  })
+  .strict();
+
+function hasDistinctSwapTokenInputs(value: {
+  tokenIn: string;
+  tokenOut: string;
+}): boolean {
+  return (
+    value.tokenIn.trim().toLowerCase() !== value.tokenOut.trim().toLowerCase()
+  );
+}
+
+const distinctSwapTokenInputIssue = {
+  message: "tokenIn and tokenOut must be different",
+  path: ["tokenOut"],
+};
+
+const swapInputSchema = swapInputBaseSchema.refine(
+  hasDistinctSwapTokenInputs,
+  distinctSwapTokenInputIssue
+);
+
+const swapExecutionInputSchema = swapInputBaseSchema
+  .extend({
+    sponsored: z.boolean().optional(),
+  })
+  .refine(hasDistinctSwapTokenInputs, distinctSwapTokenInputIssue);
+
 const entrypointSchema = z
   .string()
   .max(64, "Entrypoint name too long (max 64 chars)")
@@ -311,6 +395,11 @@ export const schemas = {
   starkzap_get_balance: z.object({
     token: z.string().min(1),
   }),
+  starkzap_get_balances: z
+    .object({
+      tokens: tokenBatchSchema,
+    })
+    .strict(),
   starkzap_transfer: z.object({
     token: z.string().min(1),
     transfers: z
@@ -376,6 +465,9 @@ export const schemas = {
       .min(1)
       .max(10, "Maximum 10 calls per estimate batch"),
   }),
+  starkzap_get_quote: swapInputSchema,
+  starkzap_swap: swapExecutionInputSchema,
+  starkzap_build_swap_calls: swapInputSchema,
 } as const;
 
 export function buildTools(maxAmount: string, maxBatchAmount: string): Tool[] {
@@ -387,7 +479,7 @@ export function buildTools(maxAmount: string, maxBatchAmount: string): Tool[] {
       annotations: {
         readOnlyHint: true,
         destructiveHint: false,
-        idempotentHint: true,
+        idempotentHint: false,
         openWorldHint: true,
       },
       inputSchema: {
@@ -402,7 +494,7 @@ export function buildTools(maxAmount: string, maxBatchAmount: string): Tool[] {
       annotations: {
         readOnlyHint: true,
         destructiveHint: false,
-        idempotentHint: true,
+        idempotentHint: false,
         openWorldHint: true,
       },
       inputSchema: {
@@ -415,6 +507,39 @@ export function buildTools(maxAmount: string, maxBatchAmount: string): Tool[] {
           },
         },
         required: ["token"],
+      },
+    },
+    {
+      name: "starkzap_get_balances",
+      description:
+        "Get ERC20 balances for multiple tokens in one tool call. Returns human-readable and raw values for each token.",
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: false,
+        openWorldHint: true,
+      },
+      inputSchema: {
+        type: "object" as const,
+        additionalProperties: false,
+        properties: {
+          tokens: {
+            type: "array",
+            minItems: 1,
+            maxItems: 32,
+            uniqueItems: true,
+            items: {
+              type: "string",
+              minLength: 1,
+              maxLength: 128,
+              pattern: ".*\\S.*",
+              description:
+                "Token symbol (ETH, STRK, USDC, etc.) or contract address",
+            },
+            description: "One or more token symbols/addresses (max 32)",
+          },
+        },
+        required: ["tokens"],
       },
     },
     {
@@ -432,6 +557,7 @@ export function buildTools(maxAmount: string, maxBatchAmount: string): Tool[] {
       },
       inputSchema: {
         type: "object" as const,
+        additionalProperties: false,
         properties: {
           token: {
             type: "string",
@@ -443,6 +569,7 @@ export function buildTools(maxAmount: string, maxBatchAmount: string): Tool[] {
             maxItems: 20,
             items: {
               type: "object",
+              additionalProperties: false,
               properties: {
                 to: {
                   type: "string",
@@ -479,6 +606,7 @@ export function buildTools(maxAmount: string, maxBatchAmount: string): Tool[] {
       },
       inputSchema: {
         type: "object" as const,
+        additionalProperties: false,
         properties: {
           calls: {
             type: "array",
@@ -486,6 +614,7 @@ export function buildTools(maxAmount: string, maxBatchAmount: string): Tool[] {
             maxItems: 10,
             items: {
               type: "object",
+              additionalProperties: false,
               properties: {
                 contractAddress: {
                   type: "string",
@@ -513,6 +642,166 @@ export function buildTools(maxAmount: string, maxBatchAmount: string): Tool[] {
           },
         },
         required: ["calls"],
+      },
+    },
+    {
+      name: "starkzap_get_quote",
+      description:
+        `Get a swap quote for tokenIn -> tokenOut via the wallet's configured swap provider. ` +
+        `Maximum ${maxAmount} tokens for amountIn per operation.`,
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: true,
+      },
+      inputSchema: {
+        type: "object" as const,
+        additionalProperties: false,
+        properties: {
+          tokenIn: {
+            type: "string",
+            minLength: 1,
+            maxLength: 128,
+            pattern: ".*\\S.*",
+            description: "Input token symbol or contract address",
+          },
+          tokenOut: {
+            type: "string",
+            minLength: 1,
+            maxLength: 128,
+            pattern: ".*\\S.*",
+            description: "Output token symbol or contract address",
+          },
+          amountIn: {
+            type: "string",
+            maxLength: 32,
+            pattern: "^\\d+(\\.\\d+)?$",
+            description: 'Human-readable amount in tokenIn units (e.g. "10.5")',
+          },
+          slippageBps: {
+            type: "number",
+            minimum: 0,
+            maximum: 9999,
+            description: "Optional slippage tolerance in basis points (0-9999)",
+          },
+          provider: {
+            type: "string",
+            maxLength: 64,
+            pattern: "^[A-Za-z0-9._:-]+$",
+            description:
+              "Optional swap provider id (defaults to wallet provider, e.g. avnu)",
+          },
+        },
+        required: ["tokenIn", "tokenOut", "amountIn"],
+      },
+    },
+    {
+      name: "starkzap_swap",
+      description:
+        `Execute a token swap via the wallet's configured swap provider. ` +
+        `Maximum ${maxAmount} tokens for amountIn per operation.`,
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: true,
+        idempotentHint: false,
+        openWorldHint: true,
+      },
+      inputSchema: {
+        type: "object" as const,
+        additionalProperties: false,
+        properties: {
+          tokenIn: {
+            type: "string",
+            minLength: 1,
+            maxLength: 128,
+            pattern: ".*\\S.*",
+            description: "Input token symbol or contract address",
+          },
+          tokenOut: {
+            type: "string",
+            minLength: 1,
+            maxLength: 128,
+            pattern: ".*\\S.*",
+            description: "Output token symbol or contract address",
+          },
+          amountIn: {
+            type: "string",
+            maxLength: 32,
+            pattern: "^\\d+(\\.\\d+)?$",
+            description: 'Human-readable amount in tokenIn units (e.g. "10.5")',
+          },
+          slippageBps: {
+            type: "number",
+            minimum: 0,
+            maximum: 9999,
+            description: "Optional slippage tolerance in basis points (0-9999)",
+          },
+          provider: {
+            type: "string",
+            maxLength: 64,
+            pattern: "^[A-Za-z0-9._:-]+$",
+            description:
+              "Optional swap provider id (defaults to wallet provider, e.g. avnu)",
+          },
+          sponsored: {
+            type: "boolean",
+            description: "Use paymaster for gasless tx (default: false)",
+          },
+        },
+        required: ["tokenIn", "tokenOut", "amountIn"],
+      },
+    },
+    {
+      name: "starkzap_build_swap_calls",
+      description:
+        `Build unsigned swap calls (approval + route) without executing. ` +
+        `Maximum ${maxAmount} tokens for amountIn per operation.`,
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: false,
+        openWorldHint: true,
+      },
+      inputSchema: {
+        type: "object" as const,
+        additionalProperties: false,
+        properties: {
+          tokenIn: {
+            type: "string",
+            minLength: 1,
+            maxLength: 128,
+            pattern: ".*\\S.*",
+            description: "Input token symbol or contract address",
+          },
+          tokenOut: {
+            type: "string",
+            minLength: 1,
+            maxLength: 128,
+            pattern: ".*\\S.*",
+            description: "Output token symbol or contract address",
+          },
+          amountIn: {
+            type: "string",
+            maxLength: 32,
+            pattern: "^\\d+(\\.\\d+)?$",
+            description: 'Human-readable amount in tokenIn units (e.g. "10.5")',
+          },
+          slippageBps: {
+            type: "number",
+            minimum: 0,
+            maximum: 9999,
+            description: "Optional slippage tolerance in basis points (0-9999)",
+          },
+          provider: {
+            type: "string",
+            maxLength: 64,
+            pattern: "^[A-Za-z0-9._:-]+$",
+            description:
+              "Optional swap provider id (defaults to wallet provider, e.g. avnu)",
+          },
+        },
+        required: ["tokenIn", "tokenOut", "amountIn"],
       },
     },
     {
@@ -740,6 +1029,9 @@ export function buildTools(maxAmount: string, maxBatchAmount: string): Tool[] {
 export const READ_ONLY_TOOLS = new Set([
   "starkzap_get_account",
   "starkzap_get_balance",
+  "starkzap_get_balances",
+  "starkzap_get_quote",
+  "starkzap_build_swap_calls",
   "starkzap_get_pool_position",
   "starkzap_estimate_fee",
 ]);
@@ -814,14 +1106,28 @@ function getArrayBounds(
   };
 }
 
+function getObjectSchema(type: z.ZodTypeAny): z.AnyZodObject | null {
+  const unwrapped = unwrapZodType(type);
+  if (unwrapped instanceof z.ZodObject) {
+    return unwrapped;
+  }
+  return null;
+}
+
 export function schemaParityMismatches(tools: readonly Tool[]): string[] {
   const mismatches: string[] = [];
   const schemaEntries = Object.entries(schemas) as Array<
-    [keyof typeof schemas, z.AnyZodObject]
+    [keyof typeof schemas, z.ZodTypeAny]
   >;
   const toolByName = new Map(tools.map((tool) => [tool.name, tool]));
 
-  for (const [name, schema] of schemaEntries) {
+  for (const [name, rawSchema] of schemaEntries) {
+    const schema = getObjectSchema(rawSchema);
+    if (!schema) {
+      mismatches.push(`Schema "${name}" is not an object schema`);
+      continue;
+    }
+
     const tool = toolByName.get(name);
     if (!tool) {
       mismatches.push(`Missing tool definition for schema "${name}"`);

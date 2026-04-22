@@ -37,7 +37,9 @@ import {
   FELT_REGEX,
   formatZodError,
   isClassHashNotFoundError,
+  privateKeySchema,
   parseCliConfig,
+  PROVIDER_ID_REGEX,
   READ_ONLY_TOOLS,
   requireResourceBounds,
   schemas,
@@ -53,9 +55,6 @@ const require = createRequire(import.meta.url);
 // CLI args
 // ---------------------------------------------------------------------------
 const cliArgs = process.argv.slice(2);
-const STARK_CURVE_ORDER = BigInt(
-  "0x0800000000000011000000000000000000000000000000000000000000000001"
-);
 
 const cliConfig = (() => {
   try {
@@ -81,14 +80,6 @@ const {
 // ---------------------------------------------------------------------------
 // Environment
 // ---------------------------------------------------------------------------
-const privateKeySchema = z
-  .string()
-  .regex(/^0x[0-9a-fA-F]{64}$/, "Must be a 0x-prefixed 32-byte hex private key")
-  .refine((value) => {
-    const key = BigInt(value);
-    return key !== 0n && key < STARK_CURVE_ORDER;
-  }, "Private key must be cryptographically valid (non-zero and less than Stark curve order)");
-
 const contractAddressSchema = z
   .string()
   .regex(FELT_REGEX, "Must be a 0x-prefixed hex string (1-64 hex chars)")
@@ -130,6 +121,7 @@ function isSecureRpcUrl(rawUrl: string): boolean {
 
 const envSchema = z.object({
   STARKNET_PRIVATE_KEY: privateKeySchema,
+  STARKNET_ACCOUNT_ADDRESS: contractAddressSchema.optional(),
   STARKNET_RPC_URL: z
     .string()
     .url()
@@ -426,14 +418,28 @@ async function getWallet(): Promise<Wallet> {
     );
   }
   if (!walletInitPromise) {
+    const accountAddressOverride = env.STARKNET_ACCOUNT_ADDRESS
+      ? validateAddressOrThrow(env.STARKNET_ACCOUNT_ADDRESS, "account")
+      : undefined;
     walletInitPromise = withTimeout("Wallet initialization", () =>
       getSdk().connectWallet({
         account: {
           signer: new StarkSigner(env.STARKNET_PRIVATE_KEY),
         },
+        ...(accountAddressOverride && {
+          accountAddress: accountAddressOverride,
+        }),
       })
     )
       .then((wallet) => {
+        if (
+          accountAddressOverride &&
+          fromAddress(wallet.address) !== accountAddressOverride
+        ) {
+          throw new Error(
+            `Requested account override ${accountAddressOverride}, but SDK connected ${fromAddress(wallet.address)}.`
+          );
+        }
         walletSingleton = wallet;
         walletInitFailureCount = 0;
         walletInitBackoffUntilMs = 0;
@@ -461,26 +467,94 @@ async function assertWalletAccountClassHash(
   wallet: Wallet,
   context: string
 ): Promise<void> {
-  const provider = wallet.getProvider();
-  let deployedClassHash: string;
+  const deploymentStatus = await getWalletDeploymentStatus(
+    wallet,
+    "Wallet account class-hash verification"
+  );
+  if (!deploymentStatus.deployed) {
+    throw new Error(
+      `${context} succeeded but wallet account is still not deployed on-chain.`
+    );
+  }
+  const expectedClassHash = fromAddress(wallet.getClassHash());
+  if (deploymentStatus.deployedClassHash !== expectedClassHash) {
+    throw new Error(
+      `${context} detected account class hash mismatch at ${wallet.address}. expected=${expectedClassHash} actual=${deploymentStatus.deployedClassHash}`
+    );
+  }
+}
+
+function withTransactionReference(
+  error: unknown,
+  txResult: { hash: string; explorerUrl?: string }
+): Error {
+  const reason =
+    error instanceof Error
+      ? error.message
+      : isRecord(error) && typeof error.message === "string"
+        ? error.message
+        : summarizeError(error);
+  const wrapped = new Error(
+    `${reason} Transaction hash: ${txResult.hash}. Reconcile on-chain state before retrying.`
+  );
+  (wrapped as Error & { cause?: unknown }).cause = error;
+  return wrapped;
+}
+
+async function assertWalletAccountClassHashAfterSubmission(
+  wallet: Wallet,
+  context: string,
+  txResult: { hash: string; explorerUrl?: string }
+): Promise<void> {
   try {
-    deployedClassHash = fromAddress(
-      await withTimeout("Wallet account class-hash verification", () =>
-        provider.getClassHashAt(wallet.address)
+    await assertWalletAccountClassHash(wallet, context);
+  } catch (error) {
+    throw withTransactionReference(error, txResult);
+  }
+}
+
+type WalletDeploymentStatus =
+  | { deployed: false }
+  | { deployed: true; deployedClassHash: string };
+
+async function getWalletDeploymentStatus(
+  wallet: Wallet,
+  timeoutLabel: string
+): Promise<WalletDeploymentStatus> {
+  try {
+    const deployedClassHash = fromAddress(
+      await withTimeout(timeoutLabel, () =>
+        wallet.getProvider().getClassHashAt(wallet.address)
       )
     );
+    return {
+      deployed: true,
+      deployedClassHash,
+    };
   } catch (error) {
     if (isClassHashNotFoundError(error)) {
-      throw new Error(
-        `${context} succeeded but wallet account is still not deployed on-chain.`
-      );
+      return { deployed: false };
     }
     throw error;
   }
+}
+
+async function assertWalletAccountClassHashIfDeployed(
+  wallet: Wallet,
+  context: string
+): Promise<void> {
+  const deploymentStatus = await getWalletDeploymentStatus(
+    wallet,
+    `${context} deployment check`
+  );
+  if (!deploymentStatus.deployed) {
+    return;
+  }
+
   const expectedClassHash = fromAddress(wallet.getClassHash());
-  if (deployedClassHash !== expectedClassHash) {
+  if (deploymentStatus.deployedClassHash !== expectedClassHash) {
     throw new Error(
-      `${context} detected account class hash mismatch at ${wallet.address}. expected=${expectedClassHash} actual=${deployedClassHash}`
+      `${context} detected account class hash mismatch at ${wallet.address}. expected=${expectedClassHash} actual=${deploymentStatus.deployedClassHash}`
     );
   }
 }
@@ -533,6 +607,10 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
 }
 
+const FELT252_UPPER_BOUND = BigInt(
+  "0x800000000000011000000000000000000000000000000000000000000000001"
+);
+
 type AmountMethod =
   | "toUnit"
   | "toFormatted"
@@ -577,6 +655,58 @@ function parseAmountWithContext(
   }
 }
 
+function assertDistinctSwapTokens(
+  tokenIn: Token,
+  tokenOut: Token,
+  context: string
+): void {
+  const normalizedIn = fromAddress(tokenIn.address);
+  const normalizedOut = fromAddress(tokenOut.address);
+  if (normalizedIn === normalizedOut) {
+    throw new Error(
+      `${context}: tokenIn and tokenOut resolve to the same token (${sanitizeTokenSymbol(tokenIn.symbol)}).`
+    );
+  }
+}
+
+function assertUniqueResolvedTokens(tokens: readonly Token[]): void {
+  const seen = new Map<string, string>();
+  for (const token of tokens) {
+    const normalizedAddress = fromAddress(token.address);
+    const previousSymbol = seen.get(normalizedAddress);
+    if (previousSymbol) {
+      throw new Error(
+        `Duplicate token requested after resolution: ${sanitizeTokenSymbol(previousSymbol)} and ${sanitizeTokenSymbol(token.symbol)} resolve to ${normalizedAddress}.`
+      );
+    }
+    seen.set(normalizedAddress, token.symbol);
+  }
+}
+
+async function mapWithConcurrencyLimit<T, R>(
+  items: readonly T[],
+  limit: number,
+  mapper: (item: T, index: number) => Promise<R>
+): Promise<R[]> {
+  if (!Number.isInteger(limit) || limit <= 0) {
+    throw new Error(`Invalid concurrency limit: ${limit}`);
+  }
+  const results = new Array<R>(items.length);
+  let nextIndex = 0;
+  const workers = Array.from(
+    { length: Math.min(limit, items.length) },
+    async () => {
+      while (nextIndex < items.length) {
+        const currentIndex = nextIndex;
+        nextIndex += 1;
+        results[currentIndex] = await mapper(items[currentIndex], currentIndex);
+      }
+    }
+  );
+  await Promise.all(workers);
+  return results;
+}
+
 function assertOverallFeeIsBigInt(fee: unknown): asserts fee is {
   overall_fee: bigint;
 } {
@@ -585,6 +715,194 @@ function assertOverallFeeIsBigInt(fee: unknown): asserts fee is {
       `Fee estimate response has invalid overall_fee type. Response: ${summarizeError(fee)}`
     );
   }
+}
+
+function assertSwapQuoteShape(quote: unknown): asserts quote is {
+  amountInBase: bigint;
+  amountOutBase: bigint;
+  routeCallCount?: number;
+  priceImpactBps?: bigint | null;
+  provider?: string;
+} {
+  if (!isRecord(quote)) {
+    throw new Error(
+      "Invalid swap quote returned by SDK: expected object shape."
+    );
+  }
+  if (typeof quote.amountInBase !== "bigint") {
+    throw new Error(
+      "Invalid swap quote returned by SDK: amountInBase must be bigint."
+    );
+  }
+  if (quote.amountInBase <= 0n) {
+    throw new Error(
+      "Invalid swap quote returned by SDK: amountInBase must be a positive bigint."
+    );
+  }
+  if (typeof quote.amountOutBase !== "bigint") {
+    throw new Error(
+      "Invalid swap quote returned by SDK: amountOutBase must be bigint."
+    );
+  }
+  if (quote.amountOutBase <= 0n) {
+    throw new Error(
+      "Invalid swap quote returned by SDK: amountOutBase must be a positive bigint."
+    );
+  }
+  const routeCallCount = quote.routeCallCount;
+  if (routeCallCount !== undefined) {
+    if (
+      typeof routeCallCount !== "number" ||
+      !Number.isInteger(routeCallCount) ||
+      routeCallCount < 0
+    ) {
+      throw new Error(
+        "Invalid swap quote returned by SDK: routeCallCount must be a non-negative integer."
+      );
+    }
+  }
+  if (
+    quote.priceImpactBps !== undefined &&
+    quote.priceImpactBps !== null &&
+    typeof quote.priceImpactBps !== "bigint"
+  ) {
+    throw new Error(
+      "Invalid swap quote returned by SDK: priceImpactBps must be bigint or null."
+    );
+  }
+  if (
+    quote.provider !== undefined &&
+    (typeof quote.provider !== "string" ||
+      quote.provider.length === 0 ||
+      quote.provider.length > 64 ||
+      !PROVIDER_ID_REGEX.test(quote.provider))
+  ) {
+    throw new Error(
+      "Invalid swap quote returned by SDK: provider must be a safe provider id."
+    );
+  }
+}
+
+function amountFromRawForSwapResponse(
+  raw: bigint,
+  token: Token,
+  context: string
+): ReturnType<typeof Amount.fromRaw> {
+  try {
+    return Amount.fromRaw(raw, token);
+  } catch (error) {
+    throw new Error(
+      `Invalid swap quote returned by SDK: ${context} could not be formatted. ${summarizeError(error)}`
+    );
+  }
+}
+
+function normalizeCallCalldataForResponse(
+  calldata: unknown,
+  label: string
+): string[] {
+  const MAX_CALLDATA_ITEMS = 2048;
+  const MAX_CALLDATA_ITEM_CHARS = 256;
+  const CALLDATA_DECIMAL_REGEX = /^\d+$/;
+  const CALLDATA_HEX_REGEX = /^0x[0-9a-fA-F]{1,64}$/;
+  const assertFelt252Value = (value: bigint, index: number): void => {
+    if (value >= FELT252_UPPER_BOUND) {
+      throw new Error(
+        `Invalid ${label} returned by SDK: calldata_${index} exceeds felt range.`
+      );
+    }
+  };
+
+  if (!Array.isArray(calldata)) {
+    throw new Error(
+      `Invalid ${label} returned by SDK: calldata must be an array.`
+    );
+  }
+  if (calldata.length > MAX_CALLDATA_ITEMS) {
+    throw new Error(
+      `Invalid ${label} returned by SDK: calldata exceeds ${MAX_CALLDATA_ITEMS} items.`
+    );
+  }
+  return calldata.map((item, index) => {
+    if (typeof item === "bigint") {
+      if (item < 0n) {
+        throw new Error(
+          `Invalid ${label} returned by SDK: calldata_${index} must be non-negative.`
+        );
+      }
+      assertFelt252Value(item, index);
+      return `0x${item.toString(16)}`;
+    }
+    if (typeof item === "number") {
+      if (!Number.isSafeInteger(item) || item < 0) {
+        throw new Error(
+          `Invalid ${label} returned by SDK: calldata_${index} must be a non-negative safe integer.`
+        );
+      }
+      assertFelt252Value(BigInt(item), index);
+      return item.toString(10);
+    }
+    if (typeof item === "string") {
+      const trimmed = item.trim();
+      if (!trimmed || trimmed.length > MAX_CALLDATA_ITEM_CHARS) {
+        throw new Error(
+          `Invalid ${label} returned by SDK: calldata_${index} must be a felt-like hex or decimal string.`
+        );
+      }
+      if (CALLDATA_DECIMAL_REGEX.test(trimmed)) {
+        const decimalValue = BigInt(trimmed);
+        assertFelt252Value(decimalValue, index);
+        return trimmed;
+      }
+      if (CALLDATA_HEX_REGEX.test(trimmed)) {
+        assertFelt252Value(BigInt(trimmed), index);
+        return trimmed;
+      }
+      throw new Error(
+        `Invalid ${label} returned by SDK: calldata_${index} must be a felt-like hex or decimal string.`
+      );
+    }
+    throw new Error(
+      `Invalid ${label} returned by SDK: calldata_${index} has unsupported type.`
+    );
+  });
+}
+
+function normalizeCallForResponse(
+  call: unknown,
+  label: string
+): { contractAddress: Address; entrypoint: string; calldata: string[] } {
+  const ENTRYPOINT_IDENTIFIER_REGEX = /^[a-zA-Z_][a-zA-Z0-9_]*$/;
+  if (!isRecord(call)) {
+    throw new Error(
+      `Invalid ${label} returned by SDK: call must be an object.`
+    );
+  }
+  if (typeof call.contractAddress !== "string") {
+    throw new Error(
+      `Invalid ${label} returned by SDK: contractAddress must be a string.`
+    );
+  }
+  const contractAddress = validateAddressOrThrow(
+    call.contractAddress,
+    "contract"
+  );
+  const entrypoint =
+    typeof call.entrypoint === "string" ? call.entrypoint.trim() : "";
+  if (
+    entrypoint.length === 0 ||
+    entrypoint.length > 64 ||
+    !ENTRYPOINT_IDENTIFIER_REGEX.test(entrypoint)
+  ) {
+    throw new Error(
+      `Invalid ${label} returned by SDK: entrypoint must be a valid Cairo identifier.`
+    );
+  }
+  return {
+    contractAddress,
+    entrypoint,
+    calldata: normalizeCallCalldataForResponse(call.calldata ?? [], label),
+  };
 }
 
 function requireFeeUnit(unit: unknown): string {
@@ -1281,8 +1599,15 @@ function buildToolErrorText(error: unknown): string {
     "Total ",
     "Could ",
     "Rate ",
+    "Duplicate ",
+    "Sponsored transfer",
+    "Sponsored execute",
+    "Sponsored swap",
+    "Deploy account post-check",
     "Transaction ",
     "Address ",
+    "Swap ",
+    "Build swap calls:",
     "starkzap_",
   ];
   const hasSafePrefix = safeMessagePrefixes.some((prefix) =>
@@ -1386,6 +1711,96 @@ async function handleTool(
       });
     }
 
+    case "starkzap_get_balances": {
+      const parsed = args as z.infer<typeof schemas.starkzap_get_balances>;
+      const resolvedTokens = parsed.tokens.map((tokenInput) =>
+        resolveToken(tokenInput)
+      );
+      assertUniqueResolvedTokens(resolvedTokens);
+      const balances = await mapWithConcurrencyLimit(
+        resolvedTokens,
+        8,
+        async (token) => {
+          const balance = await withTimeout(
+            `Token balance query (${token.symbol})`,
+            () => wallet.balanceOf(token)
+          );
+          assertAmountMethods(balance, "balance", [
+            "toUnit",
+            "toFormatted",
+            "toBase",
+            "getDecimals",
+          ]);
+          return {
+            token: sanitizeTokenSymbol(token.symbol),
+            address: token.address,
+            balance: balance.toUnit(),
+            formatted: balance.toFormatted(),
+            raw: balance.toBase().toString(),
+            decimals: balance.getDecimals(),
+          };
+        }
+      );
+      return ok({
+        balances,
+      });
+    }
+
+    case "starkzap_get_quote": {
+      const parsed = args as z.infer<typeof schemas.starkzap_get_quote>;
+      const tokenIn = resolveToken(parsed.tokenIn);
+      const tokenOut = resolveToken(parsed.tokenOut);
+      assertDistinctSwapTokens(tokenIn, tokenOut, "Swap quote");
+      const amountIn = parseAmountWithContext(
+        parsed.amountIn,
+        tokenIn,
+        "quote"
+      );
+      assertAmountWithinCap(amountIn, tokenIn, maxAmount);
+      const quote = await withTimeout("Swap quote query", () =>
+        wallet.getQuote({
+          tokenIn,
+          tokenOut,
+          amountIn,
+          ...(parsed.slippageBps !== undefined && {
+            slippageBps: BigInt(parsed.slippageBps),
+          }),
+          ...(parsed.provider !== undefined && { provider: parsed.provider }),
+        })
+      );
+      assertSwapQuoteShape(quote);
+      const quotedInAmount = amountFromRawForSwapResponse(
+        quote.amountInBase,
+        tokenIn,
+        "amountInBase"
+      );
+      const quotedOutAmount = amountFromRawForSwapResponse(
+        quote.amountOutBase,
+        tokenOut,
+        "amountOutBase"
+      );
+      return ok({
+        tokenIn: sanitizeTokenSymbol(tokenIn.symbol),
+        tokenInAddress: tokenIn.address,
+        tokenOut: sanitizeTokenSymbol(tokenOut.symbol),
+        tokenOutAddress: tokenOut.address,
+        amountIn: quotedInAmount.toUnit(),
+        amountInRaw: quote.amountInBase.toString(),
+        amountOut: quotedOutAmount.toUnit(),
+        amountOutRaw: quote.amountOutBase.toString(),
+        ...(quote.routeCallCount !== undefined && {
+          routeCallCount: quote.routeCallCount,
+        }),
+        ...(quote.priceImpactBps !== undefined && {
+          priceImpactBps:
+            quote.priceImpactBps === null
+              ? null
+              : quote.priceImpactBps.toString(),
+        }),
+        ...(quote.provider !== undefined && { provider: quote.provider }),
+      });
+    }
+
     case "starkzap_transfer": {
       const parsed = args as z.infer<typeof schemas.starkzap_transfer>;
       const token = resolveToken(parsed.token);
@@ -1413,19 +1828,24 @@ async function handleTool(
         maxBatchAmount
       );
 
-      const feeMode = parsed.sponsored
-        ? ({ type: "paymaster" } as const)
-        : undefined;
+      const feeMode = parsed.sponsored ? "sponsored" : undefined;
+      if (parsed.sponsored) {
+        await assertWalletAccountClassHashIfDeployed(
+          wallet,
+          "Sponsored transfer preflight"
+        );
+      }
       const tx = await withTimeout("Token transfer submission", () =>
         wallet.transfer(token, transfers, {
           ...(feeMode && { feeMode }),
         })
       );
       const txResult = await waitForTrackedTransaction(tx);
-      if (feeMode) {
-        await assertWalletAccountClassHash(
+      if (parsed.sponsored) {
+        await assertWalletAccountClassHashAfterSubmission(
           wallet,
-          "Sponsored transfer post-check"
+          "Sponsored transfer post-check",
+          txResult
         );
       }
       return ok({
@@ -1451,25 +1871,182 @@ async function handleTool(
         entrypoint: call.entrypoint,
         calldata: call.calldata ?? [],
       }));
-      const feeMode = parsed.sponsored
-        ? ({ type: "paymaster" } as const)
-        : undefined;
+      const feeMode = parsed.sponsored ? "sponsored" : undefined;
+      if (parsed.sponsored) {
+        await assertWalletAccountClassHashIfDeployed(
+          wallet,
+          "Sponsored execute preflight"
+        );
+      }
       const tx = await withTimeout("Contract execution submission", () =>
         wallet.execute(calls, {
           ...(feeMode && { feeMode }),
         })
       );
       const txResult = await waitForTrackedTransaction(tx);
-      if (feeMode) {
-        await assertWalletAccountClassHash(
+      if (parsed.sponsored) {
+        await assertWalletAccountClassHashAfterSubmission(
           wallet,
-          "Sponsored execute post-check"
+          "Sponsored execute post-check",
+          txResult
         );
       }
       return ok({
         hash: txResult.hash,
         explorerUrl: txResult.explorerUrl,
         callCount: calls.length,
+      });
+    }
+
+    case "starkzap_swap": {
+      const parsed = args as z.infer<typeof schemas.starkzap_swap>;
+      const tokenIn = resolveToken(parsed.tokenIn);
+      const tokenOut = resolveToken(parsed.tokenOut);
+      assertDistinctSwapTokens(tokenIn, tokenOut, "Swap execution");
+      const amountIn = parseAmountWithContext(parsed.amountIn, tokenIn, "swap");
+      assertAmountWithinCap(amountIn, tokenIn, maxAmount);
+      const quote = await withTimeout("Swap quote precheck", () =>
+        wallet.getQuote({
+          tokenIn,
+          tokenOut,
+          amountIn,
+          ...(parsed.slippageBps !== undefined && {
+            slippageBps: BigInt(parsed.slippageBps),
+          }),
+          ...(parsed.provider !== undefined && { provider: parsed.provider }),
+        })
+      );
+      assertSwapQuoteShape(quote);
+      const quotedOutAmount = amountFromRawForSwapResponse(
+        quote.amountOutBase,
+        tokenOut,
+        "amountOutBase"
+      );
+      const feeMode: "sponsored" | undefined = parsed.sponsored
+        ? "sponsored"
+        : undefined;
+      if (parsed.sponsored) {
+        await assertWalletAccountClassHashIfDeployed(
+          wallet,
+          "Sponsored swap preflight"
+        );
+      }
+      const tx = await withTimeout("Swap transaction submission", () =>
+        wallet.swap(
+          {
+            tokenIn,
+            tokenOut,
+            amountIn,
+            ...(parsed.slippageBps !== undefined && {
+              slippageBps: BigInt(parsed.slippageBps),
+            }),
+            ...(parsed.provider !== undefined && { provider: parsed.provider }),
+          },
+          {
+            ...(feeMode && { feeMode }),
+          }
+        )
+      );
+      const txResult = await waitForTrackedTransaction(tx);
+      if (parsed.sponsored) {
+        await assertWalletAccountClassHashAfterSubmission(
+          wallet,
+          "Sponsored swap post-check",
+          txResult
+        );
+      }
+      return ok({
+        hash: txResult.hash,
+        explorerUrl: txResult.explorerUrl,
+        tokenIn: sanitizeTokenSymbol(tokenIn.symbol),
+        tokenInAddress: tokenIn.address,
+        tokenOut: sanitizeTokenSymbol(tokenOut.symbol),
+        tokenOutAddress: tokenOut.address,
+        amountIn: amountIn.toUnit(),
+        amountInRaw: amountIn.toBase().toString(),
+        amountOut: quotedOutAmount.toUnit(),
+        amountOutRaw: quote.amountOutBase.toString(),
+        amountOutSource: "pretrade_quote",
+        ...(quote.routeCallCount !== undefined && {
+          routeCallCount: quote.routeCallCount,
+        }),
+        ...(quote.priceImpactBps !== undefined && {
+          priceImpactBps:
+            quote.priceImpactBps === null
+              ? null
+              : quote.priceImpactBps.toString(),
+        }),
+        ...(quote.provider !== undefined && { provider: quote.provider }),
+      });
+    }
+
+    case "starkzap_build_swap_calls": {
+      const parsed = args as z.infer<typeof schemas.starkzap_build_swap_calls>;
+      const tokenIn = resolveToken(parsed.tokenIn);
+      const tokenOut = resolveToken(parsed.tokenOut);
+      assertDistinctSwapTokens(tokenIn, tokenOut, "Build swap calls");
+      const amountIn = parseAmountWithContext(
+        parsed.amountIn,
+        tokenIn,
+        "build_swap_calls"
+      );
+      assertAmountWithinCap(amountIn, tokenIn, maxAmount);
+      const rawCalls = await withTimeout("Swap call build", async () =>
+        wallet
+          .tx()
+          .swap({
+            tokenIn,
+            tokenOut,
+            amountIn,
+            ...(parsed.slippageBps !== undefined && {
+              slippageBps: BigInt(parsed.slippageBps),
+            }),
+            ...(parsed.provider !== undefined && { provider: parsed.provider }),
+          })
+          .calls()
+      );
+      if (
+        !Array.isArray(rawCalls) ||
+        rawCalls.length === 0 ||
+        rawCalls.length > 10
+      ) {
+        throw new Error(
+          "Invalid swap calls returned by SDK: expected 1-10 calls."
+        );
+      }
+      const formattedCalls = rawCalls.map((call, index) =>
+        normalizeCallForResponse(call, `swap_call_${index}`)
+      );
+      const totalCalldataItems = formattedCalls.reduce(
+        (sum, call) => sum + call.calldata.length,
+        0
+      );
+      const MAX_SWAP_CALLDATA_ITEMS = 4096;
+      if (totalCalldataItems > MAX_SWAP_CALLDATA_ITEMS) {
+        throw new Error(
+          `Invalid swap calls returned by SDK: calldata item count exceeds ${MAX_SWAP_CALLDATA_ITEMS}.`
+        );
+      }
+      const totalCalldataChars = formattedCalls.reduce(
+        (sum, call) =>
+          sum +
+          call.calldata.reduce((callSum, value) => callSum + value.length, 0),
+        0
+      );
+      const MAX_SWAP_CALLDATA_CHARS = 65_536;
+      if (totalCalldataChars > MAX_SWAP_CALLDATA_CHARS) {
+        throw new Error(
+          `Invalid swap calls returned by SDK: calldata payload exceeds ${MAX_SWAP_CALLDATA_CHARS} characters.`
+        );
+      }
+      return ok({
+        tokenIn: sanitizeTokenSymbol(tokenIn.symbol),
+        tokenInAddress: tokenIn.address,
+        tokenOut: sanitizeTokenSymbol(tokenOut.symbol),
+        tokenOutAddress: tokenOut.address,
+        amountIn: amountIn.toUnit(),
+        amountInRaw: amountIn.toBase().toString(),
+        calls: formattedCalls,
       });
     }
 
@@ -1501,16 +2078,18 @@ async function handleTool(
           address: wallet.address,
         });
       }
-      const feeMode = parsed.sponsored
-        ? ({ type: "paymaster" } as const)
-        : undefined;
+      const feeMode = parsed.sponsored ? "sponsored" : undefined;
       const tx = await withTimeout("Account deployment submission", () =>
         wallet.deploy({
           ...(feeMode && { feeMode }),
         })
       );
       const txResult = await waitForTrackedTransaction(tx);
-      await assertWalletAccountClassHash(wallet, "Deploy account post-check");
+      await assertWalletAccountClassHashAfterSubmission(
+        wallet,
+        "Deploy account post-check",
+        txResult
+      );
       return ok({
         status: "deployed",
         hash: txResult.hash,
