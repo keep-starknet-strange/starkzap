@@ -344,8 +344,13 @@ export interface WalletInterface extends BridgeOperatorInterface {
   /**
    * Get a Troves client for interacting with Troves DeFi strategies.
    *
-   * The same instance is returned across calls. Throws on non-mainnet chains
-   * unless `options.apiBase` is provided (Troves is a mainnet-only service).
+   * The same instance is returned across calls. **Options only apply on the
+   * first call** — subsequent calls ignore them and return the cached
+   * instance. Construct `Troves` directly if you need different settings
+   * after the cache is warm.
+   *
+   * Throws on non-mainnet chains unless `options.apiBase` is provided
+   * (Troves is a mainnet-only service).
    */
   troves(options?: TrovesOptions): Troves;
 }

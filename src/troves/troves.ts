@@ -1,5 +1,5 @@
 import type { Call } from "starknet";
-import { fromAddress, type ExecuteOptions } from "@/types";
+import { fromAddress, type ChainId, type ExecuteOptions } from "@/types";
 import type { Tx } from "@/tx";
 import type {
   TrovesStrategiesResponse,
@@ -27,7 +27,7 @@ export interface TrovesOptions {
 }
 
 function resolveApiBase(
-  chainId: ReturnType<WalletInterface["getChainId"]>,
+  chainId: ChainId,
   override: string | undefined
 ): string {
   if (override !== undefined) {
@@ -46,6 +46,7 @@ function resolveApiBase(
 
 function normalizeApy(value: number | string): number | string {
   if (typeof value === "number") return value;
+  // Number("") returns 0; bail out early so we don't silently coerce empty to zero.
   if (value === "") return value;
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : value;
