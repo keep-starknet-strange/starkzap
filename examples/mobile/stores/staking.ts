@@ -84,7 +84,8 @@ interface StakingState {
   ) => Promise<void>;
   discoverLstPositions: (
     wallet: WalletInterface,
-    chainId: ChainId
+    chainId: ChainId,
+    addLog?: (msg: string) => void
   ) => Promise<void>;
   removePosition: (key: string) => void;
   loadPosition: (key: string, wallet: WalletInterface) => Promise<void>;
@@ -256,27 +257,48 @@ export const useStakingStore = create<StakingState>((set, get) => ({
     await get().loadPosition(entry.key, wallet);
   },
 
-  discoverLstPositions: async (wallet, chainId) => {
+  discoverLstPositions: async (wallet, chainId, addLog) => {
+    const log = addLog ?? (() => {});
     const assets = getSupportedLSTAssets(chainId);
+    log(
+      `LST discover: chain=${chainId.toLiteral()} assets=[${assets.join(", ") || "none"}] addr=${wallet.address.slice(0, 10)}...`
+    );
+    if (assets.length === 0) return;
     const discovered = await Promise.all(
       assets.map(async (asset) => {
         const config = getLSTConfig(chainId, asset);
-        if (!config) return null;
+        if (!config) {
+          log(`LST ${asset}: no config`);
+          return null;
+        }
         try {
           const position = await wallet.lstStaking(asset).getPosition(wallet);
-          if (!position || position.staked.isZero()) return null;
+          if (!position) {
+            log(`LST ${asset}: no shares (getPosition → null)`);
+            return null;
+          }
+          if (position.staked.isZero()) {
+            log(`LST ${asset}: zero shares`);
+            return null;
+          }
+          log(
+            `LST ${asset}: ${position.staked.toFormatted(true)} (${config.lstSymbol})`
+          );
           return { config, position };
         } catch (error) {
-          console.error(`Failed to probe LST ${asset}:`, error);
+          log(`LST ${asset}: probe failed — ${error}`);
           return null;
         }
       })
     );
-    if (discovered.every((d) => d === null)) return;
+    const hits = discovered.filter(
+      (d): d is { config: LSTConfig; position: PoolMember } => d !== null
+    );
+    log(`LST discover: ${hits.length} position(s) found`);
+    if (hits.length === 0) return;
     set((state) => {
       const positions = { ...state.positions };
-      for (const hit of discovered) {
-        if (!hit) continue;
+      for (const hit of hits) {
         const entry = buildLstPositionEntry(hit.config, chainId);
         if (positions[entry.key]) continue;
         positions[entry.key] = {
