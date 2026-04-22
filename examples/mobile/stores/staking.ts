@@ -19,7 +19,7 @@ import {
   showTransactionToast,
   updateTransactionToast,
 } from "@/components/Toast";
-import { cropAddress, getExplorerUrl } from "@/utils";
+import { getExplorerUrl } from "@/utils";
 
 // Get validators for network
 export function getValidatorsForNetwork(
@@ -83,8 +83,7 @@ interface StakingState {
   ) => Promise<void>;
   discoverLstPositions: (
     wallet: WalletInterface,
-    chainId: ChainId,
-    addLog?: (msg: string) => void
+    chainId: ChainId
   ) => Promise<void>;
   removePosition: (key: string) => void;
   loadPosition: (key: string, wallet: WalletInterface) => Promise<void>;
@@ -259,14 +258,8 @@ export const useStakingStore = create<StakingState>((set, get) => ({
     await get().loadPosition(entry.key, wallet);
   },
 
-  discoverLstPositions: async (wallet, chainId, addLog) => {
-    const log = addLog ?? (() => {});
-    const chainLiteral = chainId.toLiteral();
-    const walletAddress = wallet.address;
+  discoverLstPositions: async (wallet, chainId) => {
     const assets = getSupportedLSTAssets(chainId);
-    log(
-      `LST discover: chain=${chainLiteral} assets=[${assets.join(", ") || "none"}] addr=${cropAddress(walletAddress)}`
-    );
     const discovered = await Promise.all(
       assets.map(async (asset): Promise<LstProbeHit | null> => {
         const config = getLSTConfig(chainId, asset);
@@ -274,20 +267,13 @@ export const useStakingStore = create<StakingState>((set, get) => ({
         try {
           const poolMember = await wallet.lstStaking(asset).getPosition(wallet);
           if (!poolMember || poolMember.staked.isZero()) return null;
-          log(
-            `LST ${asset}: ${poolMember.staked.toFormatted(true)} (${config.lstSymbol})`
-          );
           return { config, position: poolMember };
-        } catch (error) {
-          const message =
-            error instanceof Error ? error.message : String(error);
-          log(`LST ${asset}: probe failed — ${message}`);
+        } catch {
           return null;
         }
       })
     );
     const hits = discovered.filter((d): d is LstProbeHit => d !== null);
-    log(`LST discover: ${hits.length} position(s) found`);
     if (hits.length === 0) return;
     set((state) => {
       const next: Record<string, StakingPosition> = { ...state.positions };

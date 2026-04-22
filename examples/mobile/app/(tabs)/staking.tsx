@@ -198,12 +198,11 @@ export default function StakingScreen() {
     if (wallet) {
       fetchBalances(wallet, chainId);
       loadAllPositions(wallet);
-      discoverLstPositions(wallet, chainId, addLog);
+      discoverLstPositions(wallet, chainId);
     }
   }, [
     wallet,
     chainId,
-    addLog,
     clearStaking,
     fetchBalances,
     loadAllPositions,
@@ -215,16 +214,9 @@ export default function StakingScreen() {
     await Promise.all([
       fetchBalances(wallet, chainId),
       loadAllPositions(wallet),
-      discoverLstPositions(wallet, chainId, addLog),
+      discoverLstPositions(wallet, chainId),
     ]);
-  }, [
-    wallet,
-    chainId,
-    addLog,
-    fetchBalances,
-    loadAllPositions,
-    discoverLstPositions,
-  ]);
+  }, [wallet, chainId, fetchBalances, loadAllPositions, discoverLstPositions]);
 
   const handleDisconnect = useCallback(async () => {
     clearBalances();
