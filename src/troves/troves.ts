@@ -8,6 +8,7 @@ import type {
   TrovesRawCall,
   TrovesCallParams,
   TrovesDepositParams,
+  TrovesWithdrawParams,
 } from "@/troves/types";
 import type { WalletInterface } from "@/wallet/interface";
 import { assertSafeHttpUrl } from "@/utils";
@@ -282,7 +283,7 @@ export class Troves {
    * Used by `wallet.tx().trovesWithdraw(...)` to compose a Troves withdraw
    * into a larger atomic transaction. Use `withdraw()` to execute directly.
    */
-  async populateWithdraw(params: TrovesDepositParams): Promise<Call[]> {
+  async populateWithdraw(params: TrovesWithdrawParams): Promise<Call[]> {
     return this.populateWithdrawCalls(toCallParams(params));
   }
 
@@ -294,7 +295,7 @@ export class Troves {
   }
 
   async withdraw(
-    params: TrovesDepositParams,
+    params: TrovesWithdrawParams,
     options?: ExecuteOptions
   ): Promise<Tx> {
     return this.wallet.execute(await this.populateWithdraw(params), options);

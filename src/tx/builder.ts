@@ -11,7 +11,7 @@ import type {
   LendingRepayRequest,
   LendingWithdrawRequest,
 } from "@/lending";
-import type { TrovesDepositParams } from "@/troves";
+import type { TrovesDepositParams, TrovesWithdrawParams } from "@/troves";
 import type {
   Address,
   Amount,
@@ -319,21 +319,7 @@ export class TxBuilder {
   }
 
   /**
-   * Add a Troves deposit operation.
-   *
-   * Composes the strategy's deposit calls into the transaction without
-   * executing — chain alongside other operations and call `.send()` to
-   * submit them atomically.
-   *
-   * @example
-   * ```ts
-   * await wallet.tx()
-   *   .trovesDeposit({
-   *     strategyId: "evergreen_strk",
-   *     amount: Amount.parse("100", STRK),
-   *   })
-   *   .send();
-   * ```
+   * Add a Troves strategy deposit operation.
    */
   trovesDeposit(params: TrovesDepositParams): this {
     this.queueAsyncCalls(this.wallet.troves().populateDeposit(params));
@@ -341,13 +327,9 @@ export class TxBuilder {
   }
 
   /**
-   * Add a Troves withdraw operation.
-   *
-   * Composes the strategy's withdraw calls into the transaction without
-   * executing — chain alongside other operations and call `.send()` to
-   * submit them atomically.
+   * Add a Troves strategy withdraw operation.
    */
-  trovesWithdraw(params: TrovesDepositParams): this {
+  trovesWithdraw(params: TrovesWithdrawParams): this {
     this.queueAsyncCalls(this.wallet.troves().populateWithdraw(params));
     return this;
   }

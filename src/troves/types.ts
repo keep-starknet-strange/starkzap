@@ -82,7 +82,7 @@ export interface TrovesRawCall {
 }
 
 /**
- * Parameters for the noob-safe `deposit` / `withdraw` API.
+ * Parameters for the noob-safe `deposit` API.
  *
  * `amount` is an `Amount` so token decimals travel with the value — you
  * can't accidentally deposit 100 wei thinking you typed "100 STRK".
@@ -96,6 +96,13 @@ export interface TrovesDepositParams {
   /** Second asset for multi-asset strategies (e.g. LP positions). */
   amount2?: Amount;
 }
+
+/**
+ * Parameters for the noob-safe `withdraw` API. Same shape as
+ * {@link TrovesDepositParams} — aliased for call-site clarity, mirroring
+ * the codebase's `LendingDepositRequest` / `LendingWithdrawRequest` split.
+ */
+export type TrovesWithdrawParams = TrovesDepositParams;
 
 /**
  * Low-level params for `populate*Calls` — accepts raw base-unit strings

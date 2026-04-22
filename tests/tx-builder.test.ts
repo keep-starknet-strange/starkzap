@@ -793,6 +793,26 @@ describe("TxBuilder", () => {
           .calls()
       ).rejects.toThrow("Strategy unavailable");
     });
+
+    it("should propagate errors from populateWithdraw", async () => {
+      const wallet = createMockWallet({
+        troves: vi.fn().mockReturnValue({
+          populateDeposit: vi.fn(),
+          populateWithdraw: vi
+            .fn()
+            .mockRejectedValue(new Error("Vault paused")),
+        }),
+      });
+
+      await expect(
+        new TxBuilder(wallet)
+          .trovesWithdraw({
+            strategyId: "evergreen_strk",
+            amount: Amount.parse("100", mockSTRK),
+          })
+          .calls()
+      ).rejects.toThrow("Vault paused");
+    });
   });
 
   // ============================================================
