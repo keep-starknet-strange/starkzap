@@ -36,6 +36,8 @@ import {
   type StakingPosition as StakingPositionType,
 } from "@/stores/staking";
 import { showCopiedToast } from "@/components/Toast";
+import { cropAddress } from "@/utils";
+import { getSupportedLSTAssets } from "starkzap-native";
 import type { Amount, Pool, Token, Validator } from "starkzap-native";
 
 function TinyTokenLogo({ token }: { token: Token }) {
@@ -88,11 +90,6 @@ function parseBalanceToNumber(amount: Amount | null): number {
   return parseFloat(s.replace(/,/g, "")) || 0;
 }
 
-function cropAddress(addr: string): string {
-  if (addr.length <= 10) return addr;
-  return `${addr.slice(0, 5)}...${addr.slice(-5)}`;
-}
-
 export default function StakingScreen() {
   const {
     wallet,
@@ -122,8 +119,7 @@ export default function StakingScreen() {
   const strkBalance = getBalance(strkToken);
   const usdcBalance = getBalance(usdcToken);
   const wbtcBalance = getBalance(wbtcToken);
-  const isSepolia =
-    chainId.isSepolia?.() ?? chainId.toLiteral?.() === "SN_SEPOLIA";
+  const isSepolia = chainId.isSepolia();
   const totalUsd =
     isSepolia && (strkBalance || wbtcBalance || usdcBalance)
       ? parseBalanceToNumber(usdcBalance) * SEPOLIA_USD_RATES.USDC +
@@ -150,8 +146,10 @@ export default function StakingScreen() {
     exitIntent,
     exit,
     clearStaking,
+    addLstPosition,
   } = useStakingStore();
 
+  const [showLstPicker, setShowLstPicker] = useState(false);
   const [showValidatorPicker, setShowValidatorPicker] = useState(false);
   const [showPoolPicker, setShowPoolPicker] = useState(false);
   const [showAddStakeModal, setShowAddStakeModal] = useState(false);
@@ -190,27 +188,24 @@ export default function StakingScreen() {
   // Check if any position is loading
   const isLoadingAny = positionsList.some((p) => p.isLoading);
 
-  // Filter validators by search query
   const filteredValidators = validatorEntries.filter(([, validator]) =>
     validator.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   useEffect(() => {
     clearStaking();
-  }, [chainId, clearStaking]);
-
-  useEffect(() => {
     if (wallet) {
       fetchBalances(wallet, chainId);
       loadAllPositions(wallet);
     }
-  }, [wallet, chainId, fetchBalances, loadAllPositions]);
+  }, [wallet, chainId, clearStaking, fetchBalances, loadAllPositions]);
 
   const handleRefresh = useCallback(async () => {
-    if (wallet) {
-      await fetchBalances(wallet, chainId);
-      await loadAllPositions(wallet);
-    }
+    if (!wallet) return;
+    await Promise.all([
+      fetchBalances(wallet, chainId),
+      loadAllPositions(wallet),
+    ]);
   }, [wallet, chainId, fetchBalances, loadAllPositions]);
 
   const handleDisconnect = useCallback(async () => {
@@ -357,6 +352,15 @@ export default function StakingScreen() {
     [wallet, chainId, addLog, exit, fetchBalances]
   );
 
+  const handleSelectLstAsset = useCallback(
+    async (asset: string) => {
+      if (!wallet) return;
+      setShowLstPicker(false);
+      await addLstPosition(asset, wallet, chainId);
+    },
+    [wallet, chainId, addLstPosition]
+  );
+
   const handleRemovePosition = useCallback(
     (key: string) => {
       setStakeAmountByKey((prev) => {
@@ -374,6 +378,33 @@ export default function StakingScreen() {
   }
 
   const contentPaddingTop = 0;
+
+  const addPositionButtons = (
+    <>
+      <TouchableOpacity
+        style={[styles.addValidatorButton, { borderColor }]}
+        onPress={() => setShowValidatorPicker(true)}
+        activeOpacity={0.88}
+      >
+        <ThemedText
+          style={[styles.addValidatorButtonText, { color: primaryColor }]}
+        >
+          + Select Validator & Token
+        </ThemedText>
+      </TouchableOpacity>
+      <TouchableOpacity
+        style={[styles.addValidatorButton, { borderColor, marginTop: 8 }]}
+        onPress={() => setShowLstPicker(true)}
+        activeOpacity={0.88}
+      >
+        <ThemedText
+          style={[styles.addValidatorButtonText, { color: primaryColor }]}
+        >
+          + Stake via Endur LST
+        </ThemedText>
+      </TouchableOpacity>
+    </>
+  );
 
   return (
     <SafeAreaView style={styles.container} edges={["top"]}>
@@ -497,20 +528,7 @@ export default function StakingScreen() {
                   Get Started
                 </ThemedText>
               </View>
-              <TouchableOpacity
-                style={[styles.addValidatorButton, { borderColor }]}
-                onPress={() => setShowValidatorPicker(true)}
-                activeOpacity={0.88}
-              >
-                <ThemedText
-                  style={[
-                    styles.addValidatorButtonText,
-                    { color: primaryColor },
-                  ]}
-                >
-                  + Select Validator & Token
-                </ThemedText>
-              </TouchableOpacity>
+              {addPositionButtons}
             </View>
           ) : (
             <>
@@ -746,20 +764,7 @@ export default function StakingScreen() {
                     Add Position
                   </ThemedText>
                 </View>
-                <TouchableOpacity
-                  style={[styles.addValidatorButton, { borderColor }]}
-                  onPress={() => setShowValidatorPicker(true)}
-                  activeOpacity={0.88}
-                >
-                  <ThemedText
-                    style={[
-                      styles.addValidatorButtonText,
-                      { color: primaryColor },
-                    ]}
-                  >
-                    + Select Validator & Token
-                  </ThemedText>
-                </TouchableOpacity>
+                {addPositionButtons}
               </View>
             </>
           )}
@@ -769,6 +774,72 @@ export default function StakingScreen() {
           Pull down to refresh positions
         </ThemedText>
       </ScrollView>
+
+      <Modal
+        visible={showLstPicker}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={() => setShowLstPicker(false)}
+      >
+        <SafeAreaView
+          style={[styles.modalContainer, { backgroundColor: cardBg }]}
+        >
+          <View
+            style={[styles.modalHeader, { borderBottomColor: borderColor }]}
+          >
+            <ThemedText type="title">Endur LST</ThemedText>
+            <TouchableOpacity
+              style={[
+                styles.modalCloseButton,
+                { backgroundColor: borderColor },
+              ]}
+              onPress={() => setShowLstPicker(false)}
+              activeOpacity={0.88}
+            >
+              <ThemedText
+                style={[styles.modalCloseText, { color: primaryColor }]}
+              >
+                Close
+              </ThemedText>
+            </TouchableOpacity>
+          </View>
+          <View style={styles.modalContent}>
+            <ThemedText
+              style={[styles.modalSubtitle, { color: textSecondary }]}
+            >
+              Pick an asset to deposit into the Endur liquid-staking vault.
+              Yield accrues in the share price — redeem any time.
+            </ThemedText>
+            <FlatList
+              data={getSupportedLSTAssets(chainId)}
+              keyExtractor={(asset) => asset}
+              ListEmptyComponent={
+                <ThemedText
+                  style={[styles.emptyText, { color: textSecondary }]}
+                >
+                  No LST assets on this network.
+                </ThemedText>
+              }
+              renderItem={({ item: asset }) => (
+                <TouchableOpacity
+                  style={[
+                    styles.poolCard,
+                    { backgroundColor: inputBg, borderColor },
+                  ]}
+                  onPress={() => handleSelectLstAsset(asset)}
+                  activeOpacity={0.88}
+                >
+                  <ThemedText
+                    style={[styles.poolTokenSymbol, { color: primaryColor }]}
+                  >
+                    {asset}
+                  </ThemedText>
+                </TouchableOpacity>
+              )}
+            />
+          </View>
+        </SafeAreaView>
+      </Modal>
 
       {/* Validator Picker Modal */}
       <Modal

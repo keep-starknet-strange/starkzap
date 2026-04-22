@@ -4,6 +4,8 @@ import {
   sepoliaValidators,
   mainnetValidators,
   Amount,
+  getLSTConfig,
+  fromAddress,
   type Validator,
   type PoolMember,
   type Pool,
@@ -16,14 +18,7 @@ import {
   showTransactionToast,
   updateTransactionToast,
 } from "@/components/Toast";
-
-/** Get explorer URL for a transaction hash */
-function getExplorerUrl(txHash: string, chainId: ChainId): string {
-  const baseUrl = chainId.isSepolia()
-    ? "https://sepolia.voyager.online/tx"
-    : "https://voyager.online/tx";
-  return `${baseUrl}/${txHash}`;
-}
+import { getExplorerUrl } from "@/utils";
 
 // Get validators for network
 export function getValidatorsForNetwork(
@@ -44,6 +39,8 @@ export interface StakingPosition {
   position: PoolMember | null;
   isMember: boolean;
   isLoading: boolean;
+  /** Set for Endur LST positions — routes actions via wallet.lstStaking(asset). */
+  lstAsset?: string;
 }
 
 /** Cached pools for a validator */
@@ -75,6 +72,11 @@ interface StakingState {
     validatorKey: string,
     validator: Validator,
     pool: Pool,
+    wallet: WalletInterface,
+    chainId: ChainId
+  ) => Promise<void>;
+  addLstPosition: (
+    asset: string,
     wallet: WalletInterface,
     chainId: ChainId
   ) => Promise<void>;
@@ -195,6 +197,54 @@ export const useStakingStore = create<StakingState>((set, get) => ({
     }
   },
 
+  addLstPosition: async (asset, wallet, chainId) => {
+    const config = getLSTConfig(chainId, asset);
+    if (!config) {
+      Alert.alert("Unsupported", `No Endur LST for ${asset} on this network.`);
+      return;
+    }
+    const token: Token = {
+      name: config.symbol,
+      symbol: config.symbol,
+      address: config.assetAddress,
+      decimals: config.decimals,
+    };
+    const validator: Validator = {
+      name: `Endur (${config.lstSymbol})`,
+      stakerAddress: fromAddress(config.lstAddress),
+      logoUrl: null,
+    };
+    const pool: Pool = {
+      poolContract: fromAddress(config.lstAddress),
+      token,
+      amount: Amount.fromRaw(0n, token),
+    };
+    const validatorKey = `endur:${config.symbol}`;
+    const key = makePositionKey(validatorKey, token);
+    if (get().positions[key]) {
+      Alert.alert("Already added", `Endur ${config.symbol} is already listed.`);
+      return;
+    }
+    set((state) => ({
+      positions: {
+        ...state.positions,
+        [key]: {
+          key,
+          validatorKey,
+          validator,
+          token,
+          pool,
+          chainId,
+          position: null,
+          isMember: false,
+          isLoading: true,
+          lstAsset: config.symbol,
+        },
+      },
+    }));
+    await get().loadPosition(key, wallet);
+  },
+
   removePosition: (key) => {
     set((state) => {
       const { [key]: _, ...rest } = state.positions;
@@ -218,11 +268,20 @@ export const useStakingStore = create<StakingState>((set, get) => ({
     }));
 
     try {
-      const poolAddress = positionData.pool.poolContract;
-      const [position, isMember] = await Promise.all([
-        wallet.getPoolPosition(poolAddress),
-        wallet.isPoolMember(poolAddress),
-      ]);
+      let position: PoolMember | null;
+      let isMember: boolean;
+      if (positionData.lstAsset) {
+        position = await wallet
+          .lstStaking(positionData.lstAsset)
+          .getPosition(wallet);
+        isMember = position !== null && !position.staked.isZero();
+      } else {
+        const poolAddress = positionData.pool.poolContract;
+        [position, isMember] = await Promise.all([
+          wallet.getPoolPosition(poolAddress),
+          wallet.isPoolMember(poolAddress),
+        ]);
+      }
 
       set((state) => ({
         positions: {
@@ -273,9 +332,9 @@ export const useStakingStore = create<StakingState>((set, get) => ({
 
     try {
       const amount = Amount.parse(amountStr, positionData.token);
-      const poolAddress = positionData.pool.poolContract;
-
-      const tx = await wallet.enterPool(poolAddress, amount);
+      const tx = positionData.lstAsset
+        ? await wallet.lstStaking(positionData.lstAsset).enter(wallet, amount)
+        : await wallet.enterPool(positionData.pool.poolContract, amount);
       addLog(`Stake tx submitted: ${tx.hash.slice(0, 10)}...`);
 
       // Show pending toast
@@ -321,9 +380,9 @@ export const useStakingStore = create<StakingState>((set, get) => ({
 
     try {
       const amount = Amount.parse(amountStr, positionData.token);
-      const poolAddress = positionData.pool.poolContract;
-
-      const tx = await wallet.addToPool(poolAddress, amount);
+      const tx = positionData.lstAsset
+        ? await wallet.lstStaking(positionData.lstAsset).add(wallet, amount)
+        : await wallet.addToPool(positionData.pool.poolContract, amount);
       addLog(`Add stake tx submitted: ${tx.hash.slice(0, 10)}...`);
 
       // Show pending toast
@@ -416,9 +475,11 @@ export const useStakingStore = create<StakingState>((set, get) => ({
 
     try {
       const amount = Amount.parse(amountStr, positionData.token);
-      const poolAddress = positionData.pool.poolContract;
-
-      const tx = await wallet.exitPoolIntent(poolAddress, amount);
+      const tx = positionData.lstAsset
+        ? await wallet
+            .lstStaking(positionData.lstAsset)
+            .exitIntent(wallet, amount)
+        : await wallet.exitPoolIntent(positionData.pool.poolContract, amount);
       addLog(`Exit intent tx submitted: ${tx.hash.slice(0, 10)}...`);
 
       // Show pending toast
@@ -463,9 +524,9 @@ export const useStakingStore = create<StakingState>((set, get) => ({
     );
 
     try {
-      const poolAddress = positionData.pool.poolContract;
-
-      const tx = await wallet.exitPool(poolAddress);
+      const tx = positionData.lstAsset
+        ? await wallet.lstStaking(positionData.lstAsset).exit(wallet)
+        : await wallet.exitPool(positionData.pool.poolContract);
       addLog(`Exit tx submitted: ${tx.hash.slice(0, 10)}...`);
 
       // Show pending toast
