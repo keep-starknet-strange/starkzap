@@ -10,4 +10,5 @@ export type {
   TrovesCallTokenInfo,
   TrovesCallResult,
   TrovesRawCall,
+  TrovesCallParams,
 } from "@/troves/types";

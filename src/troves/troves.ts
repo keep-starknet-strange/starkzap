@@ -3,6 +3,7 @@ import { fromAddress, type ExecuteOptions } from "@/types";
 import type { Tx } from "@/tx";
 import type {
   TrovesStrategiesResponse,
+  TrovesStrategiesResponseRaw,
   TrovesStatsResponse,
   TrovesDepositCallsResponse,
   TrovesRawCall,
@@ -17,13 +18,25 @@ export interface TrovesOptions {
   timeoutMs?: number;
 }
 
+function normalizeApy(value: number | string, strategyId: string): number {
+  if (typeof value === "number") return value;
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) {
+    throw new Error(
+      `Troves API returned invalid apy "${value}" for strategy "${strategyId}"`
+    );
+  }
+  return parsed;
+}
+
 function normalizeTrovesStrategiesResponse(
-  data: TrovesStrategiesResponse
+  data: TrovesStrategiesResponseRaw
 ): TrovesStrategiesResponse {
   return {
     ...data,
     strategies: data.strategies.map((s) => ({
       ...s,
+      apy: normalizeApy(s.apy, s.id),
       depositToken: s.depositToken.map((t) => ({
         ...t,
         address: fromAddress(t.address),
@@ -56,7 +69,7 @@ function normalizeTrovesDepositCallsResponse(
 }
 
 function validateStrategiesDiscontinuationDates(
-  data: TrovesStrategiesResponse
+  data: TrovesStrategiesResponseRaw
 ): void {
   for (const s of data.strategies) {
     const raw = s.discontinuationInfo?.date;
@@ -160,7 +173,7 @@ export class Troves {
     const path = options?.noCache
       ? "/api/strategies?no_cache=true"
       : "/api/strategies";
-    const data = await this.fetchJson<TrovesStrategiesResponse>(path);
+    const data = await this.fetchJson<TrovesStrategiesResponseRaw>(path);
     validateStrategiesDiscontinuationDates(data);
     return normalizeTrovesStrategiesResponse(data);
   }
@@ -173,7 +186,7 @@ export class Troves {
     params: TrovesCallParams,
     isDeposit: boolean
   ): Promise<Call[]> {
-    const address = params.address ?? String(this.wallet.address);
+    const address = params.address ?? this.wallet.address;
     const body = {
       strategyId: params.strategyId,
       amountRaw: params.amountRaw,
@@ -209,20 +222,24 @@ export class Troves {
     return calls;
   }
 
+  /**
+   * Returns the raw calls for depositing into a Troves strategy without executing them.
+   * Compose with other calls (e.g. a preceding swap) and submit via `wallet.execute()`.
+   */
   async populateDepositCalls(params: TrovesCallParams): Promise<Call[]> {
     return this.populateCalls(params, true);
   }
 
+  /**
+   * Returns the raw calls for withdrawing from a Troves strategy without executing them.
+   * Compose with other calls (e.g. a following swap) and submit via `wallet.execute()`.
+   */
   async populateWithdrawCalls(params: TrovesCallParams): Promise<Call[]> {
     return this.populateCalls(params, false);
   }
 
   async deposit(
-    params: {
-      strategyId: string;
-      amountRaw: string;
-      amount2Raw?: string;
-    },
+    params: Omit<TrovesCallParams, "address">,
     options?: ExecuteOptions
   ): Promise<Tx> {
     const calls = await this.populateDepositCalls(params);
@@ -230,11 +247,7 @@ export class Troves {
   }
 
   async withdraw(
-    params: {
-      strategyId: string;
-      amountRaw: string;
-      amount2Raw?: string;
-    },
+    params: Omit<TrovesCallParams, "address">,
     options?: ExecuteOptions
   ): Promise<Tx> {
     const calls = await this.populateWithdrawCalls(params);
