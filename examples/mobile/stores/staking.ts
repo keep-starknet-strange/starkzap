@@ -268,7 +268,11 @@ export const useStakingStore = create<StakingState>((set, get) => ({
           const poolMember = await wallet.lstStaking(asset).getPosition(wallet);
           if (!poolMember || poolMember.staked.isZero()) return null;
           return { config, position: poolMember };
-        } catch {
+        } catch (err) {
+          console.warn(
+            `[LST] probe failed for ${asset} on ${chainId.toLiteral()}:`,
+            err
+          );
           return null;
         }
       })
@@ -322,7 +326,7 @@ export const useStakingStore = create<StakingState>((set, get) => ({
         position = await wallet
           .lstStaking(positionData.lstAsset)
           .getPosition(wallet);
-        isMember = position !== null && !position.staked.isZero();
+        isMember = position !== null;
       } else {
         const poolAddress = positionData.pool.poolContract;
         [position, isMember] = await Promise.all([
@@ -468,6 +472,17 @@ export const useStakingStore = create<StakingState>((set, get) => ({
   claimRewards: async (key, wallet, addLog) => {
     const positionData = get().positions[key];
     if (!positionData) return;
+
+    if (positionData.lstAsset) {
+      addLog(
+        `${positionData.token.symbol} LST yield accrues in the share price — use Exit / Exit Intent to realise it.`
+      );
+      Alert.alert(
+        "Not applicable",
+        "Endur LST yield is baked into the share price. Redeem shares via Exit or Exit Intent to realise gains."
+      );
+      return;
+    }
 
     set({ isClaimingRewards: true });
     addLog(

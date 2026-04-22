@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   StyleSheet,
   ScrollView,
@@ -173,6 +173,10 @@ export default function StakingScreen() {
   }, []);
 
   const validators = getValidatorsForNetwork(chainId);
+  const supportedLstAssets = useMemo(
+    () => getSupportedLSTAssets(chainId),
+    [chainId]
+  );
   const validatorEntries = Object.entries(validators);
   const networkName =
     NETWORKS.find((n) => n.chainId.toLiteral() === chainId.toLiteral())?.name ??
@@ -821,7 +825,7 @@ export default function StakingScreen() {
               Yield accrues in the share price — redeem any time.
             </ThemedText>
             <FlatList
-              data={getSupportedLSTAssets(chainId)}
+              data={supportedLstAssets}
               keyExtractor={(asset) => asset}
               ListEmptyComponent={
                 <ThemedText

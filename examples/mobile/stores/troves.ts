@@ -33,7 +33,7 @@ interface TrovesState {
     chainId: ChainId,
     amountStr: string,
     addLog: (msg: string) => void
-  ) => Promise<void>;
+  ) => Promise<boolean>;
   clear: () => void;
 }
 
@@ -58,11 +58,16 @@ async function loadPosition(
   }
 }
 
+let loadStrategiesVersion = 0;
+
 export const useTrovesStore = create<TrovesState>((set, get) => ({
   ...INITIAL,
 
   loadStrategies: async (wallet, chainId) => {
+    const reqVer = ++loadStrategiesVersion;
+    const isCurrent = () => reqVer === loadStrategiesVersion;
     if (!chainId.isMainnet()) {
+      if (!isCurrent()) return;
       set({
         ...INITIAL,
         unsupportedReason:
@@ -70,6 +75,7 @@ export const useTrovesStore = create<TrovesState>((set, get) => ({
       });
       return;
     }
+    if (!isCurrent()) return;
     set({ isLoadingStrategies: true, unsupportedReason: null });
     try {
       const troves = wallet.troves();
@@ -77,6 +83,7 @@ export const useTrovesStore = create<TrovesState>((set, get) => ({
         troves.getStrategies(),
         troves.getStats().catch(() => null),
       ]);
+      if (!isCurrent()) return;
       const strategies = strategiesResponse.strategies.filter(
         (s: TrovesStrategyAPIResult) => !s.isRetired && !s.isDeprecated
       );
@@ -85,6 +92,7 @@ export const useTrovesStore = create<TrovesState>((set, get) => ({
           loadPosition(s.id, wallet)
         )
       );
+      if (!isCurrent()) return;
       set({
         strategies,
         tvlUsd: stats?.tvl ?? null,
@@ -92,6 +100,7 @@ export const useTrovesStore = create<TrovesState>((set, get) => ({
         isLoadingStrategies: false,
       });
     } catch (error) {
+      if (!isCurrent()) return;
       set({
         isLoadingStrategies: false,
         unsupportedReason:
@@ -109,6 +118,7 @@ export const useTrovesStore = create<TrovesState>((set, get) => ({
     amountStr,
     addLog
   ) => {
+    if (get().isBusy) return false;
     const verb = action === "deposit" ? "deposit" : "withdraw";
     const arrow = action === "deposit" ? "→" : "←";
     set({ isBusy: true });
@@ -142,13 +152,18 @@ export const useTrovesStore = create<TrovesState>((set, get) => ({
       set((state) => ({
         positions: { ...state.positions, [strategyId]: position },
       }));
+      return true;
     } catch (error) {
       addLog(`Troves ${verb} failed: ${error}`);
       Alert.alert(`Troves ${verb} failed`, String(error));
+      return false;
     } finally {
       set({ isBusy: false });
     }
   },
 
-  clear: () => set({ ...INITIAL }),
+  clear: () => {
+    loadStrategiesVersion++;
+    set({ ...INITIAL });
+  },
 }));

@@ -187,7 +187,7 @@ export default function TrovesScreen() {
     if (!wallet || !sheetStrategy) return;
     const token = sheetStrategy.depositTokens[sheetTokenIndex];
     if (!token) return;
-    await execute(
+    const ok = await execute(
       sheetAction,
       sheetStrategy.id,
       token,
@@ -196,6 +196,7 @@ export default function TrovesScreen() {
       sheetAmount,
       addLog
     );
+    if (!ok) return;
     setSheetStrategy(null);
     setSheetAmount("");
     await fetchBalances(wallet, chainId);
