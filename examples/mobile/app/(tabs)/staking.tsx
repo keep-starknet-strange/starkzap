@@ -147,6 +147,7 @@ export default function StakingScreen() {
     exit,
     clearStaking,
     addLstPosition,
+    discoverLstPositions,
   } = useStakingStore();
 
   const [showLstPicker, setShowLstPicker] = useState(false);
@@ -197,16 +198,25 @@ export default function StakingScreen() {
     if (wallet) {
       fetchBalances(wallet, chainId);
       loadAllPositions(wallet);
+      discoverLstPositions(wallet, chainId);
     }
-  }, [wallet, chainId, clearStaking, fetchBalances, loadAllPositions]);
+  }, [
+    wallet,
+    chainId,
+    clearStaking,
+    fetchBalances,
+    loadAllPositions,
+    discoverLstPositions,
+  ]);
 
   const handleRefresh = useCallback(async () => {
     if (!wallet) return;
     await Promise.all([
       fetchBalances(wallet, chainId),
       loadAllPositions(wallet),
+      discoverLstPositions(wallet, chainId),
     ]);
-  }, [wallet, chainId, fetchBalances, loadAllPositions]);
+  }, [wallet, chainId, fetchBalances, loadAllPositions, discoverLstPositions]);
 
   const handleDisconnect = useCallback(async () => {
     clearBalances();

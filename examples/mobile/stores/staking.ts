@@ -5,7 +5,9 @@ import {
   mainnetValidators,
   Amount,
   getLSTConfig,
+  getSupportedLSTAssets,
   fromAddress,
+  type LSTConfig,
   type Validator,
   type PoolMember,
   type Pool,
@@ -80,6 +82,10 @@ interface StakingState {
     wallet: WalletInterface,
     chainId: ChainId
   ) => Promise<void>;
+  discoverLstPositions: (
+    wallet: WalletInterface,
+    chainId: ChainId
+  ) => Promise<void>;
   removePosition: (key: string) => void;
   loadPosition: (key: string, wallet: WalletInterface) => Promise<void>;
   loadAllPositions: (wallet: WalletInterface) => Promise<void>;
@@ -119,6 +125,42 @@ interface StakingState {
 /** Generate a unique key for a position */
 function makePositionKey(validatorKey: string, token: Token): string {
   return `${validatorKey}:${token.address}`;
+}
+
+/** Build a synthetic StakingPosition entry for an Endur LST asset. */
+function buildLstPositionEntry(
+  config: LSTConfig,
+  chainId: ChainId
+): StakingPosition {
+  const token: Token = {
+    name: config.symbol,
+    symbol: config.symbol,
+    address: config.assetAddress,
+    decimals: config.decimals,
+  };
+  const validator: Validator = {
+    name: `Endur (${config.lstSymbol})`,
+    stakerAddress: fromAddress(config.lstAddress),
+    logoUrl: null,
+  };
+  const pool: Pool = {
+    poolContract: fromAddress(config.lstAddress),
+    token,
+    amount: Amount.fromRaw(0n, token),
+  };
+  const validatorKey = `endur:${config.symbol}`;
+  return {
+    key: makePositionKey(validatorKey, token),
+    validatorKey,
+    validator,
+    token,
+    pool,
+    chainId,
+    position: null,
+    isMember: false,
+    isLoading: true,
+    lstAsset: config.symbol,
+  };
 }
 
 export const useStakingStore = create<StakingState>((set, get) => ({
@@ -203,46 +245,49 @@ export const useStakingStore = create<StakingState>((set, get) => ({
       Alert.alert("Unsupported", `No Endur LST for ${asset} on this network.`);
       return;
     }
-    const token: Token = {
-      name: config.symbol,
-      symbol: config.symbol,
-      address: config.assetAddress,
-      decimals: config.decimals,
-    };
-    const validator: Validator = {
-      name: `Endur (${config.lstSymbol})`,
-      stakerAddress: fromAddress(config.lstAddress),
-      logoUrl: null,
-    };
-    const pool: Pool = {
-      poolContract: fromAddress(config.lstAddress),
-      token,
-      amount: Amount.fromRaw(0n, token),
-    };
-    const validatorKey = `endur:${config.symbol}`;
-    const key = makePositionKey(validatorKey, token);
-    if (get().positions[key]) {
+    const entry = buildLstPositionEntry(config, chainId);
+    if (get().positions[entry.key]) {
       Alert.alert("Already added", `Endur ${config.symbol} is already listed.`);
       return;
     }
     set((state) => ({
-      positions: {
-        ...state.positions,
-        [key]: {
-          key,
-          validatorKey,
-          validator,
-          token,
-          pool,
-          chainId,
-          position: null,
-          isMember: false,
-          isLoading: true,
-          lstAsset: config.symbol,
-        },
-      },
+      positions: { ...state.positions, [entry.key]: entry },
     }));
-    await get().loadPosition(key, wallet);
+    await get().loadPosition(entry.key, wallet);
+  },
+
+  discoverLstPositions: async (wallet, chainId) => {
+    const assets = getSupportedLSTAssets(chainId);
+    const discovered = await Promise.all(
+      assets.map(async (asset) => {
+        const config = getLSTConfig(chainId, asset);
+        if (!config) return null;
+        try {
+          const position = await wallet.lstStaking(asset).getPosition(wallet);
+          if (!position || position.staked.isZero()) return null;
+          return { config, position };
+        } catch (error) {
+          console.error(`Failed to probe LST ${asset}:`, error);
+          return null;
+        }
+      })
+    );
+    if (discovered.every((d) => d === null)) return;
+    set((state) => {
+      const positions = { ...state.positions };
+      for (const hit of discovered) {
+        if (!hit) continue;
+        const entry = buildLstPositionEntry(hit.config, chainId);
+        if (positions[entry.key]) continue;
+        positions[entry.key] = {
+          ...entry,
+          position: hit.position,
+          isMember: true,
+          isLoading: false,
+        };
+      }
+      return { positions };
+    });
   },
 
   removePosition: (key) => {
