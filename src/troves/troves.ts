@@ -9,12 +9,38 @@ import type {
   TrovesCallParams,
 } from "@/troves/types";
 import type { WalletInterface } from "@/wallet/interface";
+import { assertSafeHttpUrl } from "@/utils";
 
-const TROVES_API_BASE = "https://app.troves.fi";
+const TROVES_API_BASE_DEFAULT = "https://app.troves.fi";
 
 export interface TrovesOptions {
   fetcher?: typeof fetch;
   timeoutMs?: number;
+  /**
+   * Override the Troves API base URL.
+   *
+   * Required to use Troves on a non-mainnet chain — the SDK throws on
+   * Sepolia by default since Troves is a mainnet-only service.
+   */
+  apiBase?: string;
+}
+
+function resolveApiBase(
+  chainId: ReturnType<WalletInterface["getChainId"]>,
+  override: string | undefined
+): string {
+  if (override !== undefined) {
+    return assertSafeHttpUrl(override, "TrovesOptions.apiBase")
+      .toString()
+      .replace(/\/+$/, "");
+  }
+  if (!chainId.isMainnet()) {
+    throw new Error(
+      `Troves only supports Starknet Mainnet. Current chain is "${chainId.toLiteral()}". ` +
+        `Pass TrovesOptions.apiBase to override (e.g. for a custom backend).`
+    );
+  }
+  return TROVES_API_BASE_DEFAULT;
 }
 
 function normalizeApy(value: number | string): number | string {
@@ -116,12 +142,16 @@ function normalizeCalldata(raw: TrovesRawCall): Call {
  * ```
  */
 export class Troves {
-  private readonly wallet: Pick<WalletInterface, "address" | "execute">;
+  private readonly wallet: Pick<
+    WalletInterface,
+    "address" | "execute" | "getChainId"
+  >;
   private readonly fetcher: typeof fetch;
   private readonly timeoutMs: number;
+  private readonly apiBase: string;
 
   constructor(
-    wallet: Pick<WalletInterface, "address" | "execute">,
+    wallet: Pick<WalletInterface, "address" | "execute" | "getChainId">,
     options?: TrovesOptions
   ) {
     this.wallet = wallet;
@@ -129,6 +159,7 @@ export class Troves {
       options?.fetcher ??
       ((url: RequestInfo | URL, init?: RequestInit) => fetch(url, init));
     this.timeoutMs = options?.timeoutMs ?? 15000;
+    this.apiBase = resolveApiBase(wallet.getChainId(), options?.apiBase);
   }
 
   private async fetchJson<T>(path: string, init?: RequestInit): Promise<T> {
@@ -136,7 +167,7 @@ export class Troves {
     const timer = setTimeout(() => controller.abort(), this.timeoutMs);
     let res: Response;
     try {
-      res = await this.fetcher(`${TROVES_API_BASE}${path}`, {
+      res = await this.fetcher(`${this.apiBase}${path}`, {
         ...init,
         signal: controller.signal,
       });

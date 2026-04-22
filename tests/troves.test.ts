@@ -9,7 +9,7 @@ import type { WalletInterface } from "@/wallet/interface";
 const MOCK_ADDRESS =
   "0x0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
 
-function createMockWallet() {
+function createMockWallet(chainId: ChainId = ChainId.MAINNET) {
   const execute =
     vi.fn<(calls: Call[], options?: ExecuteOptions) => Promise<Tx>>();
   execute.mockResolvedValue(
@@ -19,10 +19,80 @@ function createMockWallet() {
   return {
     address: fromAddress(MOCK_ADDRESS),
     execute,
-  } satisfies Pick<WalletInterface, "address" | "execute">;
+    getChainId: () => chainId,
+  } satisfies Pick<WalletInterface, "address" | "execute" | "getChainId">;
 }
 
 describe("Troves", () => {
+  describe("constructor", () => {
+    it("should default to the mainnet API base", async () => {
+      const wallet = createMockWallet();
+      const fetcher = vi.fn().mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve({ tvl: 0, lastUpdated: "" }),
+      });
+      const troves = new Troves(wallet, { fetcher: fetcher as typeof fetch });
+      await troves.getStats();
+      expect(fetcher).toHaveBeenCalledWith(
+        "https://app.troves.fi/api/stats",
+        expect.any(Object)
+      );
+    });
+
+    it("should throw on Sepolia without an apiBase override", () => {
+      const wallet = createMockWallet(ChainId.SEPOLIA);
+      expect(() => new Troves(wallet)).toThrow(
+        /Troves only supports Starknet Mainnet/
+      );
+    });
+
+    it("should accept Sepolia when apiBase is provided", async () => {
+      const wallet = createMockWallet(ChainId.SEPOLIA);
+      const fetcher = vi.fn().mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve({ tvl: 0, lastUpdated: "" }),
+      });
+      const troves = new Troves(wallet, {
+        fetcher: fetcher as typeof fetch,
+        apiBase: "https://staging.troves.fi",
+      });
+      await troves.getStats();
+      expect(fetcher).toHaveBeenCalledWith(
+        "https://staging.troves.fi/api/stats",
+        expect.any(Object)
+      );
+    });
+
+    it("should strip a trailing slash from apiBase to avoid double slashes", async () => {
+      const wallet = createMockWallet();
+      const fetcher = vi.fn().mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve({ tvl: 0, lastUpdated: "" }),
+      });
+      const troves = new Troves(wallet, {
+        fetcher: fetcher as typeof fetch,
+        apiBase: "https://staging.troves.fi/",
+      });
+      await troves.getStats();
+      expect(fetcher).toHaveBeenCalledWith(
+        "https://staging.troves.fi/api/stats",
+        expect.any(Object)
+      );
+    });
+
+    it("should reject invalid apiBase URLs", () => {
+      const wallet = createMockWallet();
+      expect(() => new Troves(wallet, { apiBase: "not-a-url" })).toThrow();
+    });
+
+    it("should reject non-http(s) apiBase URLs", () => {
+      const wallet = createMockWallet();
+      expect(
+        () => new Troves(wallet, { apiBase: "ftp://staging.troves.fi" })
+      ).toThrow();
+    });
+  });
+
   describe("getStrategies", () => {
     it("should fetch strategies from API", async () => {
       const wallet = createMockWallet();
