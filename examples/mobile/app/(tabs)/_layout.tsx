@@ -80,6 +80,15 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
+        name="troves"
+        options={{
+          title: "Troves",
+          tabBarIcon: ({ color }) => (
+            <IconSymbol size={28} name="cube.box.fill" color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
         name="confidential"
         options={{
           title: "Confidential",
