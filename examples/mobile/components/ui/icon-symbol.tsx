@@ -40,6 +40,7 @@ const MAPPING = {
     name: "bridge",
   },
   "lock.shield.fill": { family: "material-community", name: "shield-lock" },
+  "cube.box.fill": { family: "material-community", name: "cube" },
 } as IconMapping;
 
 /**
