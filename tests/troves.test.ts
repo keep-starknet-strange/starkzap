@@ -1,7 +1,13 @@
 import { describe, expect, it, vi } from "vitest";
 import type { Call } from "starknet";
 import type { RpcProvider } from "starknet";
-import { Amount, ChainId, fromAddress, type ExecuteOptions } from "@/types";
+import {
+  Amount,
+  ChainId,
+  fromAddress,
+  type Address,
+  type ExecuteOptions,
+} from "@/types";
 import { Troves } from "@/troves";
 import { Tx } from "@/tx";
 import type { WalletInterface } from "@/wallet/interface";
@@ -15,12 +21,17 @@ function createMockWallet(chainId: ChainId = ChainId.MAINNET) {
   execute.mockResolvedValue(
     new Tx("0xmocktxhash", {} as RpcProvider, ChainId.MAINNET)
   );
+  const callContract = vi.fn<(call: Call) => Promise<string[]>>();
 
   return {
     address: fromAddress(MOCK_ADDRESS),
     execute,
     getChainId: () => chainId,
-  } satisfies Pick<WalletInterface, "address" | "execute" | "getChainId">;
+    callContract,
+  } satisfies Pick<
+    WalletInterface,
+    "address" | "execute" | "getChainId" | "callContract"
+  >;
 }
 
 describe("Troves", () => {
@@ -875,6 +886,212 @@ describe("Troves", () => {
       expect(calls).toHaveLength(1);
       expect(calls[0]?.entrypoint).toBe("redeem");
       expect(tx.hash).toBe("0xmocktxhash");
+    });
+  });
+
+  describe("getPosition", () => {
+    const VAULT = "0xabc";
+    const U256 = (value: bigint): [string, string] => [
+      (value & ((1n << 128n) - 1n)).toString(),
+      (value >> 128n).toString(),
+    ];
+    const STRK_TOKEN = {
+      symbol: "STRK",
+      name: "Starknet",
+      address: "0x123",
+      decimals: 18,
+    };
+    const USDC_TOKEN = {
+      symbol: "USDC",
+      name: "USD Coin",
+      address: "0x456",
+      decimals: 6,
+    };
+    const BASE_STRATEGY = {
+      leverage: 1,
+      tvlUsd: 1000000,
+      status: { number: 1, value: "active" },
+      riskFactor: 0.5,
+      isAudited: true,
+      protocols: ["evergreen"],
+      isRetired: false,
+    };
+
+    function fetcherForStrategies(strategies: unknown[]) {
+      return vi.fn().mockResolvedValue({
+        ok: true,
+        json: () =>
+          Promise.resolve({
+            status: true,
+            lastUpdated: new Date().toISOString(),
+            source: "sdk",
+            strategies,
+          }),
+      });
+    }
+
+    it("should return a single-asset position via convert_to_assets u256", async () => {
+      const wallet = createMockWallet();
+      const shares = 3_000_000_000_000_000_000n; // 3e18
+      const assets = 3_750_000_000_000_000_000n; // 3.75e18
+      wallet.callContract
+        .mockResolvedValueOnce(U256(shares))
+        .mockResolvedValueOnce(U256(assets));
+
+      const fetcher = fetcherForStrategies([
+        {
+          id: "vesu_rebal",
+          name: "Vesu Rebalance",
+          apy: 0.1,
+          apySplit: { baseApy: 0.1, rewardsApy: 0 },
+          depositToken: [STRK_TOKEN],
+          contract: [{ name: "Vault", address: VAULT }],
+          assets: ["strk"],
+          ...BASE_STRATEGY,
+        },
+      ]);
+
+      const troves = new Troves(wallet, { fetcher: fetcher as typeof fetch });
+      const pos = await troves.getPosition("vesu_rebal");
+
+      expect(pos).not.toBeNull();
+      expect(pos?.strategyId).toBe("vesu_rebal");
+      expect(pos?.vaultAddress).toBe(fromAddress(VAULT));
+      expect(pos?.shares).toBe(shares);
+      expect(pos?.amounts).toHaveLength(1);
+      expect(pos?.amounts[0]?.toBase()).toBe(assets);
+      expect(pos?.amounts[0]?.getSymbol()).toBe("STRK");
+
+      expect(wallet.callContract).toHaveBeenNthCalledWith(1, {
+        contractAddress: fromAddress(VAULT),
+        entrypoint: "balance_of",
+        calldata: [fromAddress(MOCK_ADDRESS)],
+      });
+      expect(wallet.callContract).toHaveBeenNthCalledWith(2, {
+        contractAddress: fromAddress(VAULT),
+        entrypoint: "convert_to_assets",
+        calldata: U256(shares),
+      });
+    });
+
+    it("should return a dual-asset position for CL vaults (MyPosition)", async () => {
+      const wallet = createMockWallet();
+      const shares = 1_000_000_000_000_000_000n;
+      const liquidity = 42_000_000n;
+      const amount0 = 5_000_000_000_000_000_000n; // 5 STRK
+      const amount1 = 2_500_000n; // 2.5 USDC
+      wallet.callContract
+        .mockResolvedValueOnce(U256(shares))
+        .mockResolvedValueOnce([
+          ...U256(liquidity),
+          ...U256(amount0),
+          ...U256(amount1),
+        ]);
+
+      const fetcher = fetcherForStrategies([
+        {
+          id: "ekubo_cl_strkusdc",
+          name: "Ekubo STRK/USDC",
+          apy: 0.5,
+          apySplit: { baseApy: 0.5, rewardsApy: 0 },
+          depositToken: [STRK_TOKEN, USDC_TOKEN],
+          contract: [{ name: "Vault", address: VAULT }],
+          assets: ["strk", "usdc"],
+          ...BASE_STRATEGY,
+        },
+      ]);
+
+      const troves = new Troves(wallet, { fetcher: fetcher as typeof fetch });
+      const pos = await troves.getPosition("ekubo_cl_strkusdc");
+
+      expect(pos?.amounts).toHaveLength(2);
+      expect(pos?.amounts[0]?.toBase()).toBe(amount0);
+      expect(pos?.amounts[0]?.getSymbol()).toBe("STRK");
+      expect(pos?.amounts[1]?.toBase()).toBe(amount1);
+      expect(pos?.amounts[1]?.getSymbol()).toBe("USDC");
+    });
+
+    it("should return null when the wallet holds no shares", async () => {
+      const wallet = createMockWallet();
+      wallet.callContract.mockResolvedValueOnce(U256(0n));
+      const fetcher = fetcherForStrategies([
+        {
+          id: "vesu_rebal",
+          name: "Vesu Rebalance",
+          apy: 0.1,
+          apySplit: { baseApy: 0.1, rewardsApy: 0 },
+          depositToken: [STRK_TOKEN],
+          contract: [{ name: "Vault", address: VAULT }],
+          assets: ["strk"],
+          ...BASE_STRATEGY,
+        },
+      ]);
+
+      const troves = new Troves(wallet, { fetcher: fetcher as typeof fetch });
+      const pos = await troves.getPosition("vesu_rebal");
+
+      expect(pos).toBeNull();
+      // Skipped the convert_to_assets call entirely.
+      expect(wallet.callContract).toHaveBeenCalledTimes(1);
+    });
+
+    it("should return null for strategies with no Vault contract (e.g. TVA)", async () => {
+      const wallet = createMockWallet();
+      const fetcher = fetcherForStrategies([
+        {
+          id: "btc_yolo",
+          name: "WBTC YOLO",
+          apy: "🤙YOLO",
+          apySplit: { baseApy: 0, rewardsApy: 0 },
+          depositToken: [STRK_TOKEN],
+          contract: [],
+          assets: ["wbtc"],
+          ...BASE_STRATEGY,
+        },
+      ]);
+
+      const troves = new Troves(wallet, { fetcher: fetcher as typeof fetch });
+      const pos = await troves.getPosition("btc_yolo");
+
+      expect(pos).toBeNull();
+      // No on-chain reads attempted.
+      expect(wallet.callContract).not.toHaveBeenCalled();
+    });
+
+    it("should throw when the strategy id is unknown", async () => {
+      const wallet = createMockWallet();
+      const fetcher = fetcherForStrategies([]);
+      const troves = new Troves(wallet, { fetcher: fetcher as typeof fetch });
+
+      await expect(troves.getPosition("nope")).rejects.toThrow(
+        'Troves strategy "nope" not found'
+      );
+    });
+
+    it("should accept an explicit address override", async () => {
+      const wallet = createMockWallet();
+      const override = fromAddress("0xdead") as Address;
+      wallet.callContract.mockResolvedValueOnce(U256(0n));
+
+      const fetcher = fetcherForStrategies([
+        {
+          id: "vesu_rebal",
+          name: "Vesu Rebalance",
+          apy: 0.1,
+          apySplit: { baseApy: 0.1, rewardsApy: 0 },
+          depositToken: [STRK_TOKEN],
+          contract: [{ name: "Vault", address: VAULT }],
+          assets: ["strk"],
+          ...BASE_STRATEGY,
+        },
+      ]);
+
+      const troves = new Troves(wallet, { fetcher: fetcher as typeof fetch });
+      await troves.getPosition("vesu_rebal", override);
+
+      expect(wallet.callContract).toHaveBeenCalledWith(
+        expect.objectContaining({ calldata: [override] })
+      );
     });
   });
 });

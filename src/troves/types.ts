@@ -105,6 +105,23 @@ export interface TrovesDepositParams {
 export type TrovesWithdrawParams = TrovesDepositParams;
 
 /**
+ * The wallet's position in a Troves strategy.
+ *
+ * `amounts` lists the underlying tokens backing the position in the same
+ * order as the strategy's `depositToken[]` — one entry for ERC4626-style
+ * strategies, two for dual-asset LP strategies (e.g. Ekubo Automated LPs).
+ */
+export interface TrovesPosition {
+  strategyId: string;
+  /** Vault contract address that holds the user's shares. */
+  vaultAddress: Address;
+  /** Raw share balance from the vault. */
+  shares: bigint;
+  /** Underlying asset amounts backing these shares right now. */
+  amounts: Amount[];
+}
+
+/**
  * Low-level params for `populate*Calls` — accepts raw base-unit strings
  * directly. Prefer `TrovesDepositParams` for the typed `deposit`/`withdraw`
  * API; reach for these only when composing Troves calls into a multicall

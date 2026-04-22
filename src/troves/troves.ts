@@ -1,5 +1,11 @@
 import type { Call } from "starknet";
-import { fromAddress, type ChainId, type ExecuteOptions } from "@/types";
+import {
+  Amount,
+  fromAddress,
+  type Address,
+  type ChainId,
+  type ExecuteOptions,
+} from "@/types";
 import type { Tx } from "@/tx";
 import type {
   TrovesStrategiesResponse,
@@ -9,6 +15,7 @@ import type {
   TrovesCallParams,
   TrovesDepositParams,
   TrovesWithdrawParams,
+  TrovesPosition,
 } from "@/troves/types";
 import type { WalletInterface } from "@/wallet/interface";
 import { assertSafeHttpUrl } from "@/utils";
@@ -147,14 +154,17 @@ function normalizeCalldata(raw: TrovesRawCall): Call {
 export class Troves {
   private readonly wallet: Pick<
     WalletInterface,
-    "address" | "execute" | "getChainId"
+    "address" | "execute" | "getChainId" | "callContract"
   >;
   private readonly fetcher: typeof fetch;
   private readonly timeoutMs: number;
   private readonly apiBase: string;
 
   constructor(
-    wallet: Pick<WalletInterface, "address" | "execute" | "getChainId">,
+    wallet: Pick<
+      WalletInterface,
+      "address" | "execute" | "getChainId" | "callContract"
+    >,
     options?: TrovesOptions
   ) {
     this.wallet = wallet;
@@ -209,6 +219,76 @@ export class Troves {
 
   async getStats(): Promise<TrovesStatsResponse> {
     return this.fetchJson<TrovesStatsResponse>("/api/stats");
+  }
+
+  /**
+   * Get the wallet's position in a Troves strategy.
+   *
+   * Reads on-chain via two view calls on the strategy's `Vault` contract:
+   * `balance_of` for the share count, then `convert_to_assets` to express
+   * the holding in its underlying tokens. The SDK infers single- vs
+   * dual-asset layout from `strategy.depositToken.length`.
+   *
+   * Returns `null` when the wallet holds no shares, or when the strategy
+   * has no readable vault contract (e.g. accumulator / TVA strategies).
+   *
+   * @throws Error if the strategy id is unknown
+   *
+   * @example
+   * ```ts
+   * const pos = await wallet.troves().getPosition("ekubo_cl_strketh");
+   * if (pos) {
+   *   console.log(`shares: ${pos.shares}`);
+   *   pos.amounts.forEach((a) => console.log(a.toFormatted()));
+   * }
+   * ```
+   */
+  async getPosition(
+    strategyId: string,
+    address?: Address
+  ): Promise<TrovesPosition | null> {
+    const { strategies } = await this.getStrategies();
+    const strategy = strategies.find((s) => s.id === strategyId);
+    if (!strategy) {
+      throw new Error(`Troves strategy "${strategyId}" not found`);
+    }
+
+    const vault = strategy.contract.find((c) => c.name === "Vault");
+    if (!vault) return null;
+
+    const owner = address ?? this.wallet.address;
+
+    const balanceResult = await this.wallet.callContract({
+      contractAddress: vault.address,
+      entrypoint: "balance_of",
+      calldata: [owner],
+    });
+    const shares = parseU256(balanceResult, 0);
+    if (shares === 0n) return null;
+
+    const convertResult = await this.wallet.callContract({
+      contractAddress: vault.address,
+      entrypoint: "convert_to_assets",
+      calldata: u256ToCalldata(shares),
+    });
+
+    const tokens = strategy.depositToken;
+    const isDualAsset = tokens.length === 2;
+    // Dual-asset vaults return `MyPosition { liquidity, amount0, amount1 }` —
+    // skip the leading liquidity u256 and read the two asset amounts that follow.
+    const amounts: Amount[] = isDualAsset
+      ? [
+          Amount.fromRaw(parseU256(convertResult, 2), tokens[0]!),
+          Amount.fromRaw(parseU256(convertResult, 4), tokens[1]!),
+        ]
+      : [Amount.fromRaw(parseU256(convertResult, 0), tokens[0]!)];
+
+    return {
+      strategyId,
+      vaultAddress: vault.address,
+      shares,
+      amounts,
+    };
   }
 
   private async populateCalls(
@@ -311,4 +391,21 @@ function toCallParams(params: TrovesDepositParams): TrovesCallParams {
     callParams.amount2Raw = params.amount2.toBase().toString();
   }
   return callParams;
+}
+
+const U128_MASK = (1n << 128n) - 1n;
+
+function parseU256(felts: string[], offset: number): bigint {
+  const low = felts[offset];
+  const high = felts[offset + 1];
+  if (low === undefined || high === undefined) {
+    throw new Error(
+      `Troves vault returned a truncated u256 (expected 2 felts at offset ${offset}, got ${felts.length - offset})`
+    );
+  }
+  return BigInt(low) | (BigInt(high) << 128n);
+}
+
+function u256ToCalldata(value: bigint): string[] {
+  return [(value & U128_MASK).toString(), (value >> 128n).toString()];
 }

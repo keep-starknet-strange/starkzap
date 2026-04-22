@@ -13,4 +13,5 @@ export type {
   TrovesCallParams,
   TrovesDepositParams,
   TrovesWithdrawParams,
+  TrovesPosition,
 } from "@/troves/types";
