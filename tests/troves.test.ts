@@ -156,10 +156,10 @@ describe("Troves", () => {
       expect(result.status).toBe(true);
       expect(result.strategies).toHaveLength(1);
       expect(result.strategies[0]?.id).toBe("evergreen_strk");
-      expect(result.strategies[0]?.depositToken[0]?.address).toBe(
+      expect(result.strategies[0]?.depositTokens[0]?.address).toBe(
         fromAddress("0x123")
       );
-      expect(result.strategies[0]?.contract[0]?.address).toBe(
+      expect(result.strategies[0]?.contracts[0]?.address).toBe(
         fromAddress("0xabc")
       );
     });

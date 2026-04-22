@@ -7,6 +7,7 @@ export type {
   TrovesStatsResponse,
   TrovesDepositCallsResponse,
   TrovesDepositToken,
+  TrovesContract,
   TrovesCallTokenInfo,
   TrovesCallResult,
   TrovesRawCall,

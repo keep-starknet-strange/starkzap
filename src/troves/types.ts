@@ -9,6 +9,12 @@ export interface TrovesDepositToken {
   logo?: string;
 }
 
+/** A contract address (with a human-readable role) associated with a strategy. */
+export interface TrovesContract {
+  name: string;
+  address: Address;
+}
+
 export interface TrovesStrategyAPIResult {
   name: string;
   id: string;
@@ -27,12 +33,9 @@ export interface TrovesStrategyAPIResult {
     baseApy: number;
     rewardsApy: number;
   };
-  depositToken: TrovesDepositToken[];
+  depositTokens: TrovesDepositToken[];
   leverage: number;
-  contract: Array<{
-    name: string;
-    address: Address;
-  }>;
+  contracts: TrovesContract[];
   tvlUsd: number;
   status: {
     number: number;

@@ -8,9 +8,12 @@ import {
 } from "@/types";
 import type { Tx } from "@/tx";
 import type {
+  TrovesStrategyAPIResult,
   TrovesStrategiesResponse,
   TrovesStatsResponse,
   TrovesDepositCallsResponse,
+  TrovesDepositToken,
+  TrovesContract,
   TrovesRawCall,
   TrovesCallParams,
   TrovesDepositParams,
@@ -52,6 +55,28 @@ function resolveApiBase(
   return TROVES_API_BASE_DEFAULT;
 }
 
+/**
+ * Wire-format shape for strategies returned by the Troves API. Kept
+ * module-private because it uses the upstream's singular-array field
+ * names (`depositToken`, `contract`); the public `TrovesStrategyAPIResult`
+ * exposes these as `depositTokens` / `contracts`.
+ */
+interface TrovesStrategyRaw extends Omit<
+  TrovesStrategyAPIResult,
+  "apy" | "depositTokens" | "contracts"
+> {
+  apy: number | string;
+  depositToken: TrovesDepositToken[];
+  contract: TrovesContract[];
+}
+
+interface TrovesStrategiesResponseRaw extends Omit<
+  TrovesStrategiesResponse,
+  "strategies"
+> {
+  strategies: TrovesStrategyRaw[];
+}
+
 function normalizeApy(value: number | string): number | string {
   if (typeof value === "number") return value;
   // Number("") returns 0; bail out early so we don't silently coerce empty to zero.
@@ -61,22 +86,24 @@ function normalizeApy(value: number | string): number | string {
 }
 
 function normalizeTrovesStrategiesResponse(
-  data: TrovesStrategiesResponse
+  data: TrovesStrategiesResponseRaw
 ): TrovesStrategiesResponse {
   return {
     ...data,
-    strategies: data.strategies.map((s) => ({
-      ...s,
-      apy: normalizeApy(s.apy),
-      depositToken: s.depositToken.map((t) => ({
-        ...t,
-        address: fromAddress(t.address),
-      })),
-      contract: s.contract.map((c) => ({
-        ...c,
-        address: fromAddress(c.address),
-      })),
-    })),
+    strategies: data.strategies.map(
+      ({ apy, depositToken, contract, ...rest }) => ({
+        ...rest,
+        apy: normalizeApy(apy),
+        depositTokens: depositToken.map((t) => ({
+          ...t,
+          address: fromAddress(t.address),
+        })),
+        contracts: contract.map((c) => ({
+          ...c,
+          address: fromAddress(c.address),
+        })),
+      })
+    ),
   };
 }
 
@@ -100,7 +127,7 @@ function normalizeTrovesDepositCallsResponse(
 }
 
 function validateStrategiesDiscontinuationDates(
-  data: TrovesStrategiesResponse
+  data: TrovesStrategiesResponseRaw
 ): void {
   for (const s of data.strategies) {
     const raw = s.discontinuationInfo?.date;
@@ -178,12 +205,17 @@ export class Troves {
   private async fetchJson<T>(path: string, init?: RequestInit): Promise<T> {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), this.timeoutMs);
-    let res: Response;
     try {
-      res = await this.fetcher(`${this.apiBase}${path}`, {
+      const res = await this.fetcher(`${this.apiBase}${path}`, {
         ...init,
         signal: controller.signal,
       });
+      if (!res.ok) {
+        throw new Error(
+          `Troves API failed: ${res.status} ${res.statusText} - ${path}`
+        );
+      }
+      return (await res.json()) as T;
     } catch (error) {
       const name =
         error && typeof error === "object" && "name" in error
@@ -198,12 +230,6 @@ export class Troves {
     } finally {
       clearTimeout(timer);
     }
-    if (!res.ok) {
-      throw new Error(
-        `Troves API failed: ${res.status} ${res.statusText} - ${path}`
-      );
-    }
-    return res.json() as Promise<T>;
   }
 
   async getStrategies(options?: {
@@ -212,7 +238,7 @@ export class Troves {
     const path = options?.noCache
       ? "/api/strategies?no_cache=true"
       : "/api/strategies";
-    const data = await this.fetchJson<TrovesStrategiesResponse>(path);
+    const data = await this.fetchJson<TrovesStrategiesResponseRaw>(path);
     validateStrategiesDiscontinuationDates(data);
     return normalizeTrovesStrategiesResponse(data);
   }
@@ -227,7 +253,7 @@ export class Troves {
    * Reads on-chain via two view calls on the strategy's `Vault` contract:
    * `balance_of` for the share count, then `convert_to_assets` to express
    * the holding in its underlying tokens. The SDK infers single- vs
-   * dual-asset layout from `strategy.depositToken.length`.
+   * dual-asset layout from `strategy.depositTokens.length`.
    *
    * Returns `null` when the wallet holds no shares, or when the strategy
    * has no readable vault contract (e.g. accumulator / TVA strategies).
@@ -253,7 +279,7 @@ export class Troves {
       throw new Error(`Troves strategy "${strategyId}" not found`);
     }
 
-    const vault = strategy.contract.find((c) => c.name === "Vault");
+    const vault = strategy.contracts.find((c) => c.name === "Vault");
     if (!vault) return null;
 
     const owner = address ?? this.wallet.address;
@@ -272,7 +298,7 @@ export class Troves {
       calldata: u256ToCalldata(shares),
     });
 
-    const tokens = strategy.depositToken;
+    const tokens = strategy.depositTokens;
     const isDualAsset = tokens.length === 2;
     // Dual-asset vaults return `MyPosition { liquidity, amount0, amount1 }` —
     // skip the leading liquidity u256 and read the two asset amounts that follow.
