@@ -59,24 +59,6 @@ export interface TrovesStrategiesResponse {
   strategies: TrovesStrategyAPIResult[];
 }
 
-/**
- * Raw strategy shape from the Troves API before normalization.
- * `apy` may arrive as a string upstream; consumers see a `number` after parsing.
- */
-export interface TrovesStrategyRaw extends Omit<
-  TrovesStrategyAPIResult,
-  "apy"
-> {
-  apy: number | string;
-}
-
-export interface TrovesStrategiesResponseRaw extends Omit<
-  TrovesStrategiesResponse,
-  "strategies"
-> {
-  strategies: TrovesStrategyRaw[];
-}
-
 export interface TrovesStatsResponse {
   tvl: number;
   lastUpdated: string;

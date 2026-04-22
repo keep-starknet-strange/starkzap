@@ -2,8 +2,8 @@ import type { Call } from "starknet";
 import { fromAddress, type ExecuteOptions } from "@/types";
 import type { Tx } from "@/tx";
 import type {
+  TrovesStrategyAPIResult,
   TrovesStrategiesResponse,
-  TrovesStrategiesResponseRaw,
   TrovesStatsResponse,
   TrovesDepositCallsResponse,
   TrovesRawCall,
@@ -18,10 +18,21 @@ export interface TrovesOptions {
   timeoutMs?: number;
 }
 
+interface TrovesStrategyRaw extends Omit<TrovesStrategyAPIResult, "apy"> {
+  apy: number | string;
+}
+
+interface TrovesStrategiesResponseRaw extends Omit<
+  TrovesStrategiesResponse,
+  "strategies"
+> {
+  strategies: TrovesStrategyRaw[];
+}
+
 function normalizeApy(value: number | string, strategyId: string): number {
   if (typeof value === "number") return value;
   const parsed = Number(value);
-  if (!Number.isFinite(parsed)) {
+  if (value === "" || !Number.isFinite(parsed)) {
     throw new Error(
       `Troves API returned invalid apy "${value}" for strategy "${strategyId}"`
     );
@@ -223,16 +234,16 @@ export class Troves {
   }
 
   /**
-   * Returns the raw calls for depositing into a Troves strategy without executing them.
-   * Compose with other calls (e.g. a preceding swap) and submit via `wallet.execute()`.
+   * Returns the deposit calls without executing — kept separate from `deposit()`
+   * so callers can compose them atomically with other calls.
    */
   async populateDepositCalls(params: TrovesCallParams): Promise<Call[]> {
     return this.populateCalls(params, true);
   }
 
   /**
-   * Returns the raw calls for withdrawing from a Troves strategy without executing them.
-   * Compose with other calls (e.g. a following swap) and submit via `wallet.execute()`.
+   * Returns the withdraw calls without executing — kept separate from `withdraw()`
+   * so callers can compose them atomically with other calls.
    */
   async populateWithdrawCalls(params: TrovesCallParams): Promise<Call[]> {
     return this.populateCalls(params, false);
