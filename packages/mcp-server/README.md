@@ -18,7 +18,7 @@ cd packages/mcp-server
 npm install
 npm run build
 
-# Read-only mode (balance checks, fee estimates, and pool position if staking is configured)
+# Read-only mode (balance checks, call building, fee estimates, and pool position if staking is configured)
 STARKNET_PRIVATE_KEY=0x... node dist/index.js --network mainnet
 
 # Enable transfers and staking writes
@@ -53,29 +53,30 @@ This server handles real funds. The following protections are built in:
 
 ### Environment Variables
 
-| Variable                             | Required | Description                                                                                     |
-| ------------------------------------ | -------- | ----------------------------------------------------------------------------------------------- |
-| `STARKNET_PRIVATE_KEY`               | Yes      | Stark curve private key (`0x` + exactly 64 hex chars, cryptographically valid)                  |
-| `STARKNET_RPC_URL`                   | No       | Custom RPC endpoint (overrides network preset; HTTPS required except localhost HTTP)            |
-| `STARKNET_PAYMASTER_URL`             | No       | Custom paymaster endpoint for sponsored tx (HTTPS required except localhost HTTP)               |
-| `AVNU_PAYMASTER_API_KEY`             | No       | API key sent as `x-paymaster-api-key` for sponsored tx on AVNU paymaster                        |
-| `STARKNET_RPC_TIMEOUT_MS`            | No       | RPC timeout in milliseconds (default: `30000`)                                                  |
-| `STARKNET_POOL_CACHE_TTL_MS`         | No       | Pool class-hash cache TTL in ms (default: `30000`, set `0` to disable cache)                    |
-| `STARKNET_STAKING_CONTRACT`          | No       | Staking contract address (enables staking tools)                                                |
-| `STARKNET_STAKING_POOL_CLASS_HASHES` | No       | Comma-separated allowlist of pool contract class hashes (0x...) for strict pool-type validation |
+| Variable                             | Required | Description                                                                                                                                                                                                                                                                                                                             |
+| ------------------------------------ | -------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `STARKNET_PRIVATE_KEY`               | Yes      | Stark curve private key (`0x` + 1-64 hex chars; shorter keys are left-padded to 32 bytes before validation)                                                                                                                                                                                                                             |
+| `STARKNET_ACCOUNT_ADDRESS`           | No       | Override derived account address for an existing funded/deployed account. This is useful for pre-existing accounts from external tooling such as `sncast`. Only safe when that account contract is controlled by `STARKNET_PRIVATE_KEY`; pointing at a different deployed address makes writes fail with signature or class-hash errors |
+| `STARKNET_RPC_URL`                   | No       | Custom RPC endpoint (overrides network preset; HTTPS required except localhost HTTP)                                                                                                                                                                                                                                                    |
+| `STARKNET_PAYMASTER_URL`             | No       | Custom paymaster endpoint for sponsored tx (HTTPS required except localhost HTTP)                                                                                                                                                                                                                                                       |
+| `AVNU_PAYMASTER_API_KEY`             | No       | API key sent as `x-paymaster-api-key` for sponsored tx on AVNU paymaster                                                                                                                                                                                                                                                                |
+| `STARKNET_RPC_TIMEOUT_MS`            | No       | RPC timeout in milliseconds (default: `30000`)                                                                                                                                                                                                                                                                                          |
+| `STARKNET_POOL_CACHE_TTL_MS`         | No       | Pool class-hash cache TTL in ms (default: `30000`, set `0` to disable cache)                                                                                                                                                                                                                                                            |
+| `STARKNET_STAKING_CONTRACT`          | No       | Staking contract address (enables staking tools)                                                                                                                                                                                                                                                                                        |
+| `STARKNET_STAKING_POOL_CLASS_HASHES` | No       | Comma-separated allowlist of pool contract class hashes (0x...) for strict pool-type validation                                                                                                                                                                                                                                         |
 
 ### CLI Arguments
 
-| Argument                 | Default                | Description                                                                                               |
-| ------------------------ | ---------------------- | --------------------------------------------------------------------------------------------------------- |
-| `--network`              | `mainnet`              | Network preset: `mainnet` or `sepolia` (validated at startup)                                             |
-| `--max-amount`           | `1000`                 | Max tokens per individual amount-bearing operation                                                        |
-| `--max-batch-amount`     | `same as --max-amount` | Max total tokens across one `starkzap_transfer` batch call                                                |
-| `--rate-limit-rpm`       | `0` (disabled)         | Global MCP tool-call rate limit per minute                                                                |
-| `--read-rate-limit-rpm`  | `0` (disabled)         | Optional read-only bucket (`starkzap_get_balance`, `starkzap_get_pool_position`, `starkzap_estimate_fee`) |
-| `--write-rate-limit-rpm` | `0` (disabled)         | Optional state-changing bucket (transfer/staking/deploy/execute)                                          |
-| `--enable-write`         | off                    | Enable state-changing tools (transfer, stake, deploy)                                                     |
-| `--enable-execute`       | off                    | Enable only the unrestricted `starkzap_execute` tool                                                      |
+| Argument                 | Default                | Description                                                                                                                       |
+| ------------------------ | ---------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| `--network`              | `mainnet`              | Network preset: `mainnet` or `sepolia` (validated at startup)                                                                     |
+| `--max-amount`           | `1000`                 | Max tokens per individual amount-bearing operation                                                                                |
+| `--max-batch-amount`     | `same as --max-amount` | Max total tokens across one `starkzap_transfer` batch call                                                                        |
+| `--rate-limit-rpm`       | `0` (disabled)         | Global MCP tool-call rate limit per minute                                                                                        |
+| `--read-rate-limit-rpm`  | `0` (disabled)         | Optional read-only bucket (`starkzap_get_balance`, `starkzap_get_pool_position`, `starkzap_estimate_fee`, `starkzap_build_calls`) |
+| `--write-rate-limit-rpm` | `0` (disabled)         | Optional state-changing bucket (transfer/staking/deploy/execute)                                                                  |
+| `--enable-write`         | off                    | Enable state-changing tools (transfer, stake, deploy)                                                                             |
+| `--enable-execute`       | off                    | Enable only the unrestricted `starkzap_execute` tool                                                                              |
 
 ## MCP Client Configuration
 
@@ -135,6 +136,7 @@ const mcpServer = new McpServerStdio({
 | `starkzap_get_balance`    | Get ERC20 token balance (human-readable + raw)              |
 | `starkzap_transfer`       | Transfer tokens to one or more recipients                   |
 | `starkzap_execute`        | Execute raw contract calls atomically                       |
+| `starkzap_build_calls`    | Build and normalize contract calls without execution        |
 | `starkzap_deploy_account` | Deploy the account contract on-chain                        |
 | `starkzap_estimate_fee`   | Estimate gas cost for contract calls                        |
 
@@ -209,8 +211,8 @@ Use this sequence when validating real writes (not just tests):
 
 Troubleshooting from live runs:
 
-- If startup says private key is invalid, check key length: it must be 64 hex chars after `0x` (32 bytes). If your source omits a leading zero, left-pad before use.
-- If your expected wallet address does not match, trust `starkzap_get_account` output. The MCP uses StarkZap wallet derivation from the private key.
+- If startup says private key is invalid, check that it is a `0x`-prefixed hex string representing a valid Stark curve scalar. Shorter hex values are accepted and normalized by left-padding to 32 bytes.
+- If your expected wallet address does not match, trust `starkzap_get_account` output. The MCP either derives from `STARKNET_PRIVATE_KEY` or uses `STARKNET_ACCOUNT_ADDRESS` when provided. For pre-existing `sncast` accounts, set `STARKNET_ACCOUNT_ADDRESS` explicitly.
 - If sponsored deploy/transfer fails with paymaster errors (e.g. invalid API key), use funded user-pays mode or configure a valid paymaster setup in your environment.
 - In sponsored mode, account class-hash validation runs after tx confirmation as a safety audit check. This detects unexpected account classes but cannot prevent a misbehaving paymaster from submitting the first tx.
 - If write tx fails with undeployed account errors, run `starkzap_deploy_account` first, then retry transfer.

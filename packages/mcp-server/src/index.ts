@@ -31,12 +31,17 @@ import {
   assertPoolTokenHintMatches,
   assertSchemaParity,
   buildTools,
+  CALLDATA_ITEM_REGEX,
   createTokenResolver,
+  ENTRYPOINT_IDENTIFIER_REGEX,
   enforcePerMinuteRateLimit,
   extractPoolToken,
   FELT_REGEX,
   formatZodError,
   isClassHashNotFoundError,
+  MAX_BUILD_CALLS_SERIALIZED_CHARS,
+  MAX_BUILD_CALLS_TOTAL_CALLDATA_ITEMS,
+  privateKeySchema,
   parseCliConfig,
   READ_ONLY_TOOLS,
   requireResourceBounds,
@@ -48,14 +53,15 @@ import {
 } from "./core.js";
 
 const require = createRequire(import.meta.url);
+// Published starkzap@2.0.0 still exposes "sponsored" in its distributed
+// FeeMode type/runtime. Switch to { type: "paymaster" } after the package
+// release that carries the canonical paymaster object form.
+const SPONSORED_FEE_MODE = "sponsored" as const;
 
 // ---------------------------------------------------------------------------
 // CLI args
 // ---------------------------------------------------------------------------
 const cliArgs = process.argv.slice(2);
-const STARK_CURVE_ORDER = BigInt(
-  "0x0800000000000011000000000000000000000000000000000000000000000001"
-);
 
 const cliConfig = (() => {
   try {
@@ -81,14 +87,6 @@ const {
 // ---------------------------------------------------------------------------
 // Environment
 // ---------------------------------------------------------------------------
-const privateKeySchema = z
-  .string()
-  .regex(/^0x[0-9a-fA-F]{64}$/, "Must be a 0x-prefixed 32-byte hex private key")
-  .refine((value) => {
-    const key = BigInt(value);
-    return key !== 0n && key < STARK_CURVE_ORDER;
-  }, "Private key must be cryptographically valid (non-zero and less than Stark curve order)");
-
 const contractAddressSchema = z
   .string()
   .regex(FELT_REGEX, "Must be a 0x-prefixed hex string (1-64 hex chars)")
@@ -130,6 +128,7 @@ function isSecureRpcUrl(rawUrl: string): boolean {
 
 const envSchema = z.object({
   STARKNET_PRIVATE_KEY: privateKeySchema,
+  STARKNET_ACCOUNT_ADDRESS: contractAddressSchema.optional(),
   STARKNET_RPC_URL: z
     .string()
     .url()
@@ -348,7 +347,7 @@ function summarizeError(error: unknown): string {
         : stringifySafe(error);
   return raw
     .replace(/https?:\/\/[^\s)]+/gi, "<url>")
-    .replace(/\[[\da-fA-F:]+\](?::\d{2,5})?/gi, "<host>")
+    .replace(/\[[\da-fA-F:]*:[\da-fA-F:]+\](?::\d{2,5})?/gi, "<host>")
     .replace(
       /\b(?:localhost|::1|(?:\d{1,3}\.){3}\d{1,3})(?::\d{2,5})?\b/gi,
       "<host>"
@@ -367,7 +366,7 @@ function createErrorReference(message: string): string {
 function containsSensitiveConnectionHints(value: string): boolean {
   const patterns = [
     /https?:\/\/[^\s)]+/i,
-    /\[[\da-fA-F:]+\](?::\d{2,5})?/i,
+    /\[[\da-fA-F:]*:[\da-fA-F:]+\](?::\d{2,5})?/i,
     /\b(?:\d{1,3}\.){3}\d{1,3}(?::\d{2,5})?\b/,
     /\b(?:localhost|::1)(?::\d{2,5})?\b/i,
     /(?<![\\/])\b(?:[a-z0-9-]+\.)+[a-z]{2,}(?::\d{2,5})?\b/i,
@@ -426,14 +425,28 @@ async function getWallet(): Promise<Wallet> {
     );
   }
   if (!walletInitPromise) {
+    const accountAddressOverride = env.STARKNET_ACCOUNT_ADDRESS
+      ? validateAddressOrThrow(env.STARKNET_ACCOUNT_ADDRESS, "account")
+      : undefined;
     walletInitPromise = withTimeout("Wallet initialization", () =>
       getSdk().connectWallet({
         account: {
           signer: new StarkSigner(env.STARKNET_PRIVATE_KEY),
         },
+        ...(accountAddressOverride && {
+          accountAddress: accountAddressOverride,
+        }),
       })
     )
       .then((wallet) => {
+        if (
+          accountAddressOverride &&
+          fromAddress(wallet.address) !== accountAddressOverride
+        ) {
+          throw new Error(
+            `Requested account override ${accountAddressOverride}, but SDK connected ${fromAddress(wallet.address)}.`
+          );
+        }
         walletSingleton = wallet;
         walletInitFailureCount = 0;
         walletInitBackoffUntilMs = 0;
@@ -461,26 +474,94 @@ async function assertWalletAccountClassHash(
   wallet: Wallet,
   context: string
 ): Promise<void> {
-  const provider = wallet.getProvider();
-  let deployedClassHash: string;
+  const deploymentStatus = await getWalletDeploymentStatus(
+    wallet,
+    "Wallet account class-hash verification"
+  );
+  if (!deploymentStatus.deployed) {
+    throw new Error(
+      `${context} succeeded but wallet account is still not deployed on-chain.`
+    );
+  }
+  const expectedClassHash = fromAddress(wallet.getClassHash());
+  if (deploymentStatus.deployedClassHash !== expectedClassHash) {
+    throw new Error(
+      `${context} detected account class hash mismatch at ${wallet.address}. expected=${expectedClassHash} actual=${deploymentStatus.deployedClassHash}`
+    );
+  }
+}
+
+function withTransactionReference(
+  error: unknown,
+  txResult: { hash: string; explorerUrl?: string }
+): Error {
+  const reason =
+    error instanceof Error
+      ? error.message
+      : isRecord(error) && typeof error.message === "string"
+        ? error.message
+        : summarizeError(error);
+  const wrapped = new Error(
+    `${reason} Transaction hash: ${txResult.hash}. Reconcile on-chain state before retrying.`
+  );
+  (wrapped as Error & { cause?: unknown }).cause = error;
+  return wrapped;
+}
+
+async function assertWalletAccountClassHashAfterSubmission(
+  wallet: Wallet,
+  context: string,
+  txResult: { hash: string; explorerUrl?: string }
+): Promise<void> {
   try {
-    deployedClassHash = fromAddress(
-      await withTimeout("Wallet account class-hash verification", () =>
-        provider.getClassHashAt(wallet.address)
+    await assertWalletAccountClassHash(wallet, context);
+  } catch (error) {
+    throw withTransactionReference(error, txResult);
+  }
+}
+
+type WalletDeploymentStatus =
+  | { deployed: false }
+  | { deployed: true; deployedClassHash: string };
+
+async function getWalletDeploymentStatus(
+  wallet: Wallet,
+  timeoutLabel: string
+): Promise<WalletDeploymentStatus> {
+  try {
+    const deployedClassHash = fromAddress(
+      await withTimeout(timeoutLabel, () =>
+        wallet.getProvider().getClassHashAt(wallet.address)
       )
     );
+    return {
+      deployed: true,
+      deployedClassHash,
+    };
   } catch (error) {
     if (isClassHashNotFoundError(error)) {
-      throw new Error(
-        `${context} succeeded but wallet account is still not deployed on-chain.`
-      );
+      return { deployed: false };
     }
     throw error;
   }
+}
+
+async function assertWalletAccountClassHashIfDeployed(
+  wallet: Wallet,
+  context: string
+): Promise<void> {
+  const deploymentStatus = await getWalletDeploymentStatus(
+    wallet,
+    `${context} deployment check`
+  );
+  if (!deploymentStatus.deployed) {
+    return;
+  }
+
   const expectedClassHash = fromAddress(wallet.getClassHash());
-  if (deployedClassHash !== expectedClassHash) {
+  if (deploymentStatus.deployedClassHash !== expectedClassHash) {
     throw new Error(
-      `${context} detected account class hash mismatch at ${wallet.address}. expected=${expectedClassHash} actual=${deployedClassHash}`
+      `${context} detected account class hash mismatch at ${wallet.address}. expected=${expectedClassHash} actual=${deploymentStatus.deployedClassHash}`
     );
   }
 }
@@ -573,6 +654,136 @@ function parseAmountWithContext(
     const reason = error instanceof Error ? error.message : String(error);
     throw new Error(
       `Invalid ${context} amount "${literal}" for ${token.symbol}. ${reason}`
+    );
+  }
+}
+
+function normalizeCalldataItemForResponse(
+  value: unknown,
+  path: string
+): string {
+  if (typeof value === "string") {
+    if (value.length > 256) {
+      throw new Error(`Invalid ${path}: value exceeds 256 characters.`);
+    }
+    if (!CALLDATA_ITEM_REGEX.test(value)) {
+      throw new Error(
+        `Invalid ${path}: must be a felt-like hex (0x...) or decimal string.`
+      );
+    }
+    return value;
+  }
+  if (typeof value === "bigint") {
+    if (value < 0n) {
+      throw new Error(`Invalid ${path}: bigint values must be non-negative.`);
+    }
+    const normalized = value.toString();
+    if (normalized.length > 256) {
+      throw new Error(`Invalid ${path}: value exceeds 256 characters.`);
+    }
+    if (!CALLDATA_ITEM_REGEX.test(normalized)) {
+      throw new Error(
+        `Invalid ${path}: must be a felt-like hex (0x...) or decimal string.`
+      );
+    }
+    return normalized;
+  }
+  if (typeof value === "number") {
+    if (!Number.isSafeInteger(value) || value < 0) {
+      throw new Error(
+        `Invalid ${path}: number values must be non-negative safe integers.`
+      );
+    }
+    const normalized = value.toString();
+    if (normalized.length > 256) {
+      throw new Error(`Invalid ${path}: value exceeds 256 characters.`);
+    }
+    if (!CALLDATA_ITEM_REGEX.test(normalized)) {
+      throw new Error(
+        `Invalid ${path}: must be a felt-like hex (0x...) or decimal string.`
+      );
+    }
+    return normalized;
+  }
+  throw new Error(
+    `Invalid ${path}: unsupported calldata type "${typeof value}".`
+  );
+}
+
+function normalizeCallForResponse(
+  value: unknown,
+  index: number
+): { contractAddress: Address; entrypoint: string; calldata: string[] } {
+  const callPath = `calls[${index}]`;
+  if (!isRecord(value)) {
+    throw new Error(`Invalid ${callPath} returned by SDK: expected object.`);
+  }
+  const contractAddressRaw = value.contractAddress;
+  if (typeof contractAddressRaw !== "string") {
+    throw new Error(
+      `Invalid ${callPath}.contractAddress returned by SDK: expected string.`
+    );
+  }
+  const contractAddress = validateAddressOrThrow(
+    contractAddressRaw,
+    `${callPath}.contractAddress`
+  );
+  const entrypoint = value.entrypoint;
+  if (
+    typeof entrypoint !== "string" ||
+    entrypoint.length > 64 ||
+    !ENTRYPOINT_IDENTIFIER_REGEX.test(entrypoint)
+  ) {
+    throw new Error(
+      `Invalid ${callPath}.entrypoint returned by SDK: expected Cairo identifier.`
+    );
+  }
+  const calldataRaw = value.calldata;
+  const calldataValues =
+    calldataRaw === undefined || calldataRaw === null ? [] : calldataRaw;
+  if (!Array.isArray(calldataValues)) {
+    throw new Error(
+      `Invalid ${callPath}.calldata returned by SDK: expected array.`
+    );
+  }
+  if (calldataValues.length > 2048) {
+    throw new Error(
+      `Invalid ${callPath}.calldata returned by SDK: maximum 2048 items.`
+    );
+  }
+  return {
+    contractAddress,
+    entrypoint,
+    calldata: calldataValues.map((item, calldataIndex) =>
+      normalizeCalldataItemForResponse(
+        item,
+        `${callPath}.calldata[${calldataIndex}]`
+      )
+    ),
+  };
+}
+
+function assertBuildCallsBatchBounds(
+  calls: Array<{ calldata: string[] }>,
+  label: string
+): void {
+  const totalCalldataItems = calls.reduce(
+    (total, call) => total + call.calldata.length,
+    0
+  );
+  if (totalCalldataItems > MAX_BUILD_CALLS_TOTAL_CALLDATA_ITEMS) {
+    throw new Error(
+      `${label}: total calldata items ${totalCalldataItems} exceeds maximum ${MAX_BUILD_CALLS_TOTAL_CALLDATA_ITEMS}. Split the request into smaller batches.`
+    );
+  }
+
+  const responseChars = JSON.stringify({
+    callCount: calls.length,
+    calls,
+  }).length;
+  if (responseChars > MAX_BUILD_CALLS_SERIALIZED_CHARS) {
+    throw new Error(
+      `${label}: serialized size ${responseChars} exceeds maximum ${MAX_BUILD_CALLS_SERIALIZED_CHARS} characters. Split the request into smaller batches.`
     );
   }
 }
@@ -1281,6 +1492,9 @@ function buildToolErrorText(error: unknown): string {
     "Total ",
     "Could ",
     "Rate ",
+    "Sponsored transfer",
+    "Sponsored execute",
+    "Deploy account post-check",
     "Transaction ",
     "Address ",
     "starkzap_",
@@ -1338,28 +1552,19 @@ async function handleTool(
 
   switch (name) {
     case "starkzap_get_account": {
-      const provider = wallet.getProvider();
       const expectedClassHash = fromAddress(wallet.getClassHash());
-      let deployed = false;
-      let deployedClassHash: string | undefined;
-      try {
-        deployedClassHash = fromAddress(
-          await withTimeout("Account deployment check", () =>
-            provider.getClassHashAt(wallet.address)
-          )
-        );
-        deployed = true;
-      } catch (error) {
-        if (!isClassHashNotFoundError(error)) {
-          throw error;
-        }
-      }
+      const deploymentStatus = await getWalletDeploymentStatus(
+        wallet,
+        "Account deployment check"
+      );
 
       return ok({
         address: wallet.address,
-        deployed,
+        deployed: deploymentStatus.deployed,
         expectedClassHash,
-        deployedClassHash: deployedClassHash ?? null,
+        deployedClassHash: deploymentStatus.deployed
+          ? deploymentStatus.deployedClassHash
+          : null,
       });
     }
 
@@ -1413,19 +1618,24 @@ async function handleTool(
         maxBatchAmount
       );
 
-      const feeMode = parsed.sponsored
-        ? ({ type: "paymaster" } as const)
-        : undefined;
+      const feeMode = parsed.sponsored ? SPONSORED_FEE_MODE : undefined;
+      if (parsed.sponsored) {
+        await assertWalletAccountClassHashIfDeployed(
+          wallet,
+          "Sponsored transfer preflight"
+        );
+      }
       const tx = await withTimeout("Token transfer submission", () =>
         wallet.transfer(token, transfers, {
           ...(feeMode && { feeMode }),
         })
       );
       const txResult = await waitForTrackedTransaction(tx);
-      if (feeMode) {
-        await assertWalletAccountClassHash(
+      if (parsed.sponsored) {
+        await assertWalletAccountClassHashAfterSubmission(
           wallet,
-          "Sponsored transfer post-check"
+          "Sponsored transfer post-check",
+          txResult
         );
       }
       return ok({
@@ -1451,19 +1661,24 @@ async function handleTool(
         entrypoint: call.entrypoint,
         calldata: call.calldata ?? [],
       }));
-      const feeMode = parsed.sponsored
-        ? ({ type: "paymaster" } as const)
-        : undefined;
+      const feeMode = parsed.sponsored ? SPONSORED_FEE_MODE : undefined;
+      if (parsed.sponsored) {
+        await assertWalletAccountClassHashIfDeployed(
+          wallet,
+          "Sponsored execute preflight"
+        );
+      }
       const tx = await withTimeout("Contract execution submission", () =>
         wallet.execute(calls, {
           ...(feeMode && { feeMode }),
         })
       );
       const txResult = await waitForTrackedTransaction(tx);
-      if (feeMode) {
-        await assertWalletAccountClassHash(
+      if (parsed.sponsored) {
+        await assertWalletAccountClassHashAfterSubmission(
           wallet,
-          "Sponsored execute post-check"
+          "Sponsored execute post-check",
+          txResult
         );
       }
       return ok({
@@ -1473,27 +1688,61 @@ async function handleTool(
       });
     }
 
+    case "starkzap_build_calls": {
+      const parsed = args as z.infer<typeof schemas.starkzap_build_calls>;
+      const contractAddresses = validateAddressBatch(
+        parsed.calls.map((call) => call.contractAddress),
+        "contract",
+        "calls.contractAddress"
+      );
+      const requestedCalls = parsed.calls.map((call, index) => ({
+        contractAddress: contractAddresses[index],
+        entrypoint: call.entrypoint,
+        calldata: call.calldata ?? [],
+      }));
+      assertBuildCallsBatchBounds(
+        requestedCalls,
+        "Invalid build calls request"
+      );
+      const txBuilder = wallet.tx();
+      txBuilder.add(...requestedCalls);
+      const builtCallsResponse = await withTimeout("Build calls query", () =>
+        txBuilder.calls()
+      );
+      if (!Array.isArray(builtCallsResponse)) {
+        throw new Error(
+          "Invalid build calls response from SDK: expected array."
+        );
+      }
+      if (builtCallsResponse.length !== requestedCalls.length) {
+        throw new Error(
+          `Invalid build calls response from SDK: expected ${requestedCalls.length} calls, received ${builtCallsResponse.length}.`
+        );
+      }
+      const normalizedCalls = builtCallsResponse.map((call, index) =>
+        normalizeCallForResponse(call, index)
+      );
+      assertBuildCallsBatchBounds(
+        normalizedCalls,
+        "Invalid build calls response from SDK"
+      );
+      return ok({
+        callCount: normalizedCalls.length,
+        calls: normalizedCalls,
+      });
+    }
+
     case "starkzap_deploy_account": {
       const parsed = args as z.infer<typeof schemas.starkzap_deploy_account>;
-      const provider = wallet.getProvider();
-      let isDeployedOnChain = false;
-      let deployedClassHash: string | undefined;
-      try {
-        const classHash = await withTimeout("Account deployment check", () =>
-          provider.getClassHashAt(wallet.address)
-        );
-        deployedClassHash = fromAddress(classHash);
-        isDeployedOnChain = true;
-      } catch (error) {
-        if (!isClassHashNotFoundError(error)) {
-          throw error;
-        }
-      }
-      if (isDeployedOnChain) {
+      const deploymentStatus = await getWalletDeploymentStatus(
+        wallet,
+        "Account deployment check"
+      );
+      if (deploymentStatus.deployed) {
         const expectedClassHash = fromAddress(wallet.getClassHash());
-        if (deployedClassHash !== expectedClassHash) {
+        if (deploymentStatus.deployedClassHash !== expectedClassHash) {
           throw new Error(
-            `Address ${wallet.address} is deployed with unexpected class hash ${deployedClassHash}. Expected ${expectedClassHash}. Use the private key that controls this deployed account, or use a different private key and deploy it first with starkzap_deploy_account.`
+            `Address ${wallet.address} is deployed with unexpected class hash ${deploymentStatus.deployedClassHash}. Expected ${expectedClassHash}. Use the private key that controls this deployed account, or use a different private key and deploy it first with starkzap_deploy_account.`
           );
         }
         return ok({
@@ -1501,16 +1750,18 @@ async function handleTool(
           address: wallet.address,
         });
       }
-      const feeMode = parsed.sponsored
-        ? ({ type: "paymaster" } as const)
-        : undefined;
+      const feeMode = parsed.sponsored ? SPONSORED_FEE_MODE : undefined;
       const tx = await withTimeout("Account deployment submission", () =>
         wallet.deploy({
           ...(feeMode && { feeMode }),
         })
       );
       const txResult = await waitForTrackedTransaction(tx);
-      await assertWalletAccountClassHash(wallet, "Deploy account post-check");
+      await assertWalletAccountClassHashAfterSubmission(
+        wallet,
+        "Deploy account post-check",
+        txResult
+      );
       return ok({
         status: "deployed",
         hash: txResult.hash,

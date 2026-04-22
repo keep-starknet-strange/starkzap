@@ -6,6 +6,9 @@ import { z } from "zod";
 export const FELT_REGEX = /^0x[0-9a-fA-F]{1,64}$/;
 export const VALID_NETWORKS = ["mainnet", "sepolia"] as const;
 export type Network = (typeof VALID_NETWORKS)[number];
+const STARK_CURVE_ORDER = BigInt(
+  "0x0800000000000011000000000000000000000000000000000000000000000001"
+);
 
 export interface CliConfig {
   network: Network;
@@ -26,6 +29,23 @@ const tokensByNetwork: Record<Network, Record<string, Token>> = {
 export function normalizeStarknetAddress(address: string): string {
   return fromAddress(address).toLowerCase();
 }
+
+export function normalizePrivateKeyHex(value: string): string {
+  const hex = value.slice(2);
+  return `0x${hex.padStart(64, "0")}`;
+}
+
+export const privateKeySchema = z
+  .string()
+  .regex(
+    /^0x[0-9a-fA-F]{1,64}$/,
+    "Must be a 0x-prefixed hex private key (1-64 hex chars)"
+  )
+  .transform(normalizePrivateKeyHex)
+  .refine((value) => {
+    const key = BigInt(value);
+    return key !== 0n && key < STARK_CURVE_ORDER;
+  }, "Private key must be cryptographically valid (non-zero and less than Stark curve order)");
 
 function getReferenceToken(network: Network): Token {
   const tokens = tokensByNetwork[network];
@@ -283,11 +303,16 @@ export const amountSchema = z
     message: "Amount must be greater than zero",
   });
 
+export const ENTRYPOINT_IDENTIFIER_REGEX = /^[a-zA-Z_][a-zA-Z0-9_]*$/;
+export const CALLDATA_ITEM_REGEX = /^(0x[0-9a-fA-F]{1,64}|[0-9]+)$/;
+export const MAX_BUILD_CALLS_TOTAL_CALLDATA_ITEMS = 2048;
+export const MAX_BUILD_CALLS_SERIALIZED_CHARS = 262_144;
+
 const entrypointSchema = z
   .string()
   .max(64, "Entrypoint name too long (max 64 chars)")
   .regex(
-    /^[a-zA-Z_][a-zA-Z0-9_]*$/,
+    ENTRYPOINT_IDENTIFIER_REGEX,
     "Entrypoint must match Cairo identifier format"
   );
 
@@ -295,7 +320,7 @@ const calldataItemSchema = z
   .string()
   .max(256, "Calldata item too large (max 256 chars)")
   .regex(
-    /^(0x[0-9a-fA-F]{1,64}|[0-9]+)$/,
+    CALLDATA_ITEM_REGEX,
     "Calldata must be a felt-like hex (0x...) or decimal string"
   );
 
@@ -324,19 +349,39 @@ export const schemas = {
       .max(20, "Maximum 20 transfers per batch"),
     sponsored: z.boolean().optional(),
   }),
-  starkzap_execute: z.object({
-    calls: z
-      .array(
-        z.object({
-          contractAddress: addressSchema,
-          entrypoint: entrypointSchema,
-          calldata: calldataSchema,
-        })
-      )
-      .min(1)
-      .max(10, "Maximum 10 calls per batch"),
-    sponsored: z.boolean().optional(),
-  }),
+  starkzap_execute: z
+    .object({
+      calls: z
+        .array(
+          z
+            .object({
+              contractAddress: addressSchema,
+              entrypoint: entrypointSchema,
+              calldata: calldataSchema,
+            })
+            .strict()
+        )
+        .min(1)
+        .max(10, "Maximum 10 calls per batch"),
+      sponsored: z.boolean().optional(),
+    })
+    .strict(),
+  starkzap_build_calls: z
+    .object({
+      calls: z
+        .array(
+          z
+            .object({
+              contractAddress: addressSchema,
+              entrypoint: entrypointSchema,
+              calldata: calldataSchema,
+            })
+            .strict()
+        )
+        .min(1)
+        .max(10, "Maximum 10 calls per build batch"),
+    })
+    .strict(),
   starkzap_deploy_account: z.object({
     sponsored: z.boolean().optional(),
   }),
@@ -479,6 +524,7 @@ export function buildTools(maxAmount: string, maxBatchAmount: string): Tool[] {
       },
       inputSchema: {
         type: "object" as const,
+        additionalProperties: false,
         properties: {
           calls: {
             type: "array",
@@ -486,9 +532,11 @@ export function buildTools(maxAmount: string, maxBatchAmount: string): Tool[] {
             maxItems: 10,
             items: {
               type: "object",
+              additionalProperties: false,
               properties: {
                 contractAddress: {
                   type: "string",
+                  pattern: "^0x[0-9a-fA-F]{1,64}$",
                   description: "Contract address",
                 },
                 entrypoint: {
@@ -500,7 +548,11 @@ export function buildTools(maxAmount: string, maxBatchAmount: string): Tool[] {
                 calldata: {
                   type: "array",
                   maxItems: 2048,
-                  items: { type: "string" },
+                  items: {
+                    type: "string",
+                    maxLength: 256,
+                    pattern: "^(0x[0-9a-fA-F]{1,64}|[0-9]+)$",
+                  },
                   description: "Calldata as array of strings",
                 },
               },
@@ -510,6 +562,57 @@ export function buildTools(maxAmount: string, maxBatchAmount: string): Tool[] {
           sponsored: {
             type: "boolean",
             description: "Use paymaster for gasless tx (default: false)",
+          },
+        },
+        required: ["calls"],
+      },
+    },
+    {
+      name: "starkzap_build_calls",
+      description:
+        "Build and normalize one or more raw contract calls without executing. Useful for deterministic multicall composition and preflight inspection. Maximum 10 calls per build batch.",
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: true,
+      },
+      inputSchema: {
+        type: "object" as const,
+        additionalProperties: false,
+        properties: {
+          calls: {
+            type: "array",
+            minItems: 1,
+            maxItems: 10,
+            items: {
+              type: "object",
+              additionalProperties: false,
+              properties: {
+                contractAddress: {
+                  type: "string",
+                  pattern: "^0x[0-9a-fA-F]{1,64}$",
+                  description: "Contract address",
+                },
+                entrypoint: {
+                  type: "string",
+                  maxLength: 64,
+                  pattern: "^[a-zA-Z_][a-zA-Z0-9_]*$",
+                  description: "Function name to call",
+                },
+                calldata: {
+                  type: "array",
+                  maxItems: 2048,
+                  items: {
+                    type: "string",
+                    maxLength: 256,
+                    pattern: "^(0x[0-9a-fA-F]{1,64}|[0-9]+)$",
+                  },
+                  description: "Calldata as array of strings",
+                },
+              },
+              required: ["contractAddress", "entrypoint"],
+            },
           },
         },
         required: ["calls"],
@@ -742,6 +845,7 @@ export const READ_ONLY_TOOLS = new Set([
   "starkzap_get_balance",
   "starkzap_get_pool_position",
   "starkzap_estimate_fee",
+  "starkzap_build_calls",
 ]);
 
 export const STAKING_TOOLS = new Set([
@@ -814,12 +918,43 @@ function getArrayBounds(
   };
 }
 
+function getObjectAdditionalProperties(type: z.ZodTypeAny): boolean | null {
+  const unwrapped = unwrapZodType(type);
+  if (!(unwrapped instanceof z.ZodObject)) {
+    return null;
+  }
+  const unknownKeys = (
+    unwrapped as {
+      _def?: { unknownKeys?: unknown };
+    }
+  )._def?.unknownKeys;
+  if (unknownKeys === "strict") {
+    return false;
+  }
+  if (unknownKeys === "strip" || unknownKeys === "passthrough") {
+    return true;
+  }
+  return null;
+}
+
+function getArrayItemObjectAdditionalProperties(
+  type: z.ZodTypeAny
+): boolean | null {
+  const unwrapped = unwrapZodType(type);
+  if (!(unwrapped instanceof z.ZodArray)) {
+    return null;
+  }
+  return getObjectAdditionalProperties(unwrapped.element);
+}
+
 export function schemaParityMismatches(tools: readonly Tool[]): string[] {
   const mismatches: string[] = [];
   const schemaEntries = Object.entries(schemas) as Array<
     [keyof typeof schemas, z.AnyZodObject]
   >;
   const toolByName = new Map(tools.map((tool) => [tool.name, tool]));
+  const toAdditionalPropertiesBoolean = (value: unknown): boolean =>
+    value !== undefined ? value !== false : true;
 
   for (const [name, schema] of schemaEntries) {
     const tool = toolByName.get(name);
@@ -833,6 +968,7 @@ export function schemaParityMismatches(tools: readonly Tool[]): string[] {
           type?: string;
           properties?: Record<string, unknown>;
           required?: string[];
+          additionalProperties?: unknown;
         }
       | undefined;
 
@@ -857,6 +993,20 @@ export function schemaParityMismatches(tools: readonly Tool[]): string[] {
       );
     }
 
+    const expectedRootAdditionalProperties =
+      getObjectAdditionalProperties(schema);
+    const rootAdditionalProperties = toAdditionalPropertiesBoolean(
+      inputSchema.additionalProperties
+    );
+    if (
+      expectedRootAdditionalProperties !== null &&
+      rootAdditionalProperties !== expectedRootAdditionalProperties
+    ) {
+      mismatches.push(
+        `Tool "${name}" root strictness mismatch: zod additionalProperties=${expectedRootAdditionalProperties}, inputSchema additionalProperties=${rootAdditionalProperties}.`
+      );
+    }
+
     for (const [fieldName, fieldSchema] of Object.entries(schema.shape)) {
       const bounds = getArrayBounds(fieldSchema as z.ZodTypeAny);
       if (!bounds) {
@@ -875,6 +1025,24 @@ export function schemaParityMismatches(tools: readonly Tool[]): string[] {
         mismatches.push(
           `Tool "${name}" array bounds mismatch for "${fieldName}": zod=[min:${bounds.min},max:${bounds.max}], inputSchema=[min:${inputMin},max:${inputMax}]`
         );
+      }
+
+      const expectedItemAdditionalProperties =
+        getArrayItemObjectAdditionalProperties(fieldSchema as z.ZodTypeAny);
+      if (expectedItemAdditionalProperties !== null) {
+        const inputItems = (inputField as { items?: unknown } | undefined)
+          ?.items as { additionalProperties?: unknown } | undefined;
+        const itemAdditionalProperties = toAdditionalPropertiesBoolean(
+          inputItems?.additionalProperties
+        );
+        if (
+          expectedItemAdditionalProperties !== null &&
+          itemAdditionalProperties !== expectedItemAdditionalProperties
+        ) {
+          mismatches.push(
+            `Tool "${name}" ${fieldName}.items strictness mismatch: zod additionalProperties=${expectedItemAdditionalProperties}, inputSchema additionalProperties=${itemAdditionalProperties}.`
+          );
+        }
       }
     }
   }
