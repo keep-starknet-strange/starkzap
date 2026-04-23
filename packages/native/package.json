@@ -2,6 +2,15 @@
   "name": "starkzap-native",
   "version": "2.0.0",
   "description": "React Native companion package for Starkzap",
+  "homepage": "https://github.com/keep-starknet-strange/starkzap/tree/main/packages/native#readme",
+  "bugs": {
+    "url": "https://github.com/keep-starknet-strange/starkzap/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/keep-starknet-strange/starkzap.git",
+    "directory": "packages/native"
+  },
   "license": "MIT",
   "author": "0xLucqs",
   "type": "module",

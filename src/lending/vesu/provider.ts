@@ -89,6 +89,19 @@ interface VesuPositionsResponse {
   data?: VesuPositionApiItem[];
 }
 
+function pickChainOverride<T>(
+  overrideValue: T | null | undefined,
+  baseValue: T | undefined
+): T | undefined {
+  if (overrideValue === null) {
+    return undefined;
+  }
+  if (overrideValue !== undefined) {
+    return overrideValue;
+  }
+  return baseValue;
+}
+
 export interface VesuLendingProviderOptions {
   fetcher?: typeof fetch;
   chainConfigs?: Partial<
@@ -128,21 +141,20 @@ export class VesuLendingProvider implements LendingProvider {
       const ovr = options.chainConfigs?.[chain];
       if (!base && !ovr) continue;
 
-      // For each field: explicit `null` in override clears it,
-      // `undefined` falls back to base, anything else is used as-is.
-      const pick = <T>(
-        o: T | null | undefined,
-        b: T | undefined
-      ): T | undefined => (o === null ? undefined : o !== undefined ? o : b);
-
       const merged: VesuChainConfig = {};
-      const pool = pick(ovr?.poolFactory, base?.poolFactory);
+      const pool = pickChainOverride(ovr?.poolFactory, base?.poolFactory);
       if (pool != null) merged.poolFactory = fromAddress(pool);
-      const defPool = pick(ovr?.defaultPool, base?.defaultPool);
+      const defPool = pickChainOverride(ovr?.defaultPool, base?.defaultPool);
       if (defPool != null) merged.defaultPool = fromAddress(defPool);
-      const markets = pick(ovr?.marketsApiUrl, base?.marketsApiUrl);
+      const markets = pickChainOverride(
+        ovr?.marketsApiUrl,
+        base?.marketsApiUrl
+      );
       if (markets != null) merged.marketsApiUrl = markets;
-      const positions = pick(ovr?.positionsApiUrl, base?.positionsApiUrl);
+      const positions = pickChainOverride(
+        ovr?.positionsApiUrl,
+        base?.positionsApiUrl
+      );
       if (positions != null) merged.positionsApiUrl = positions;
 
       chainConfigs[chain] = merged;

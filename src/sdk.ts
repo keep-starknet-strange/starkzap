@@ -7,9 +7,14 @@ import {
   type SDKConfig,
   type StakingConfig,
 } from "@/types/config";
-import type { ConnectWalletOptions, FeeMode } from "@/types/wallet";
+import type {
+  ConnectWalletOptions,
+  DeployMode,
+  EnsureReadyOptions,
+  FeeMode,
+} from "@/types/wallet";
 import { type NetworkPreset, networks } from "@/network";
-import { Wallet } from "@/wallet";
+import { applyProviders, Wallet } from "@/wallet";
 import type { WalletInterface } from "@/wallet/interface";
 import type {
   AccountClassConfig,
@@ -280,6 +285,75 @@ export class StarkZap {
     return preset;
   }
 
+  private getOnboardConnectOptions(
+    options: OnboardOptions
+  ): Omit<ConnectWalletOptions, "account" | "accountAddress"> {
+    const connectOptions: Omit<
+      ConnectWalletOptions,
+      "account" | "accountAddress"
+    > = {};
+
+    if (options.feeMode) {
+      connectOptions.feeMode = options.feeMode;
+    }
+    if (options.timeBounds) {
+      connectOptions.timeBounds = options.timeBounds;
+    }
+    if (options.swapProviders) {
+      connectOptions.swapProviders = options.swapProviders;
+    }
+    if (options.defaultSwapProviderId) {
+      connectOptions.defaultSwapProviderId = options.defaultSwapProviderId;
+    }
+    if (options.dcaProviders) {
+      connectOptions.dcaProviders = options.dcaProviders;
+    }
+    if (options.defaultDcaProviderId) {
+      connectOptions.defaultDcaProviderId = options.defaultDcaProviderId;
+    }
+
+    return connectOptions;
+  }
+
+  private getEnsureReadyOptions(
+    options: OnboardOptions,
+    deploy: DeployMode
+  ): EnsureReadyOptions {
+    const ensureReadyOptions: EnsureReadyOptions = { deploy };
+
+    if (options.feeMode) {
+      ensureReadyOptions.feeMode = options.feeMode;
+    }
+    if (options.onProgress) {
+      ensureReadyOptions.onProgress = options.onProgress;
+    }
+
+    return ensureReadyOptions;
+  }
+
+  private async finalizeOnboard<TWallet extends WalletInterface>(
+    wallet: TWallet,
+    options: OnboardOptions,
+    deploy: DeployMode,
+    metadata?: Record<string, unknown>
+  ): Promise<OnboardResult<TWallet>> {
+    if (deploy !== "never") {
+      await wallet.ensureReady(this.getEnsureReadyOptions(options, deploy));
+    }
+
+    const result: OnboardResult<TWallet> = {
+      wallet,
+      strategy: options.strategy,
+      deployed: await wallet.isDeployed(),
+    };
+
+    if (metadata !== undefined) {
+      result.metadata = metadata;
+    }
+
+    return result;
+  }
+
   /**
    * High-level onboarding API for app integrations.
    *
@@ -292,13 +366,7 @@ export class StarkZap {
    */
   async onboard(options: OnboardOptions): Promise<OnboardResult> {
     const deploy = options.deploy ?? "if_needed";
-    const feeMode = options.feeMode;
-    const timeBounds = options.timeBounds;
-    const swapProviders = options.swapProviders;
-    const defaultSwapProviderId = options.defaultSwapProviderId;
-    const dcaProviders = options.dcaProviders;
-    const defaultDcaProviderId = options.defaultDcaProviderId;
-    const shouldEnsureReady = deploy !== "never";
+    const connectOptions = this.getOnboardConnectOptions(options);
 
     if (options.strategy === "signer") {
       const wallet = await this.connectWallet({
@@ -309,27 +377,10 @@ export class StarkZap {
             OpenZeppelinPreset
           ),
         },
-        ...(feeMode && { feeMode }),
-        ...(timeBounds && { timeBounds }),
-        ...(swapProviders && { swapProviders }),
-        ...(defaultSwapProviderId && { defaultSwapProviderId }),
-        ...(dcaProviders && { dcaProviders }),
-        ...(defaultDcaProviderId && { defaultDcaProviderId }),
+        ...connectOptions,
       });
 
-      if (shouldEnsureReady) {
-        await wallet.ensureReady({
-          deploy,
-          ...(feeMode && { feeMode }),
-          ...(options.onProgress && { onProgress: options.onProgress }),
-        });
-      }
-
-      return {
-        wallet,
-        strategy: options.strategy,
-        deployed: await wallet.isDeployed(),
-      };
+      return this.finalizeOnboard(wallet, options, deploy);
     }
 
     if (options.strategy === "privy") {
@@ -354,67 +405,23 @@ export class StarkZap {
             ArgentXV050Preset
           ),
         },
-        ...(feeMode && { feeMode }),
-        ...(timeBounds && { timeBounds }),
-        ...(swapProviders && { swapProviders }),
-        ...(defaultSwapProviderId && { defaultSwapProviderId }),
-        ...(dcaProviders && { dcaProviders }),
-        ...(defaultDcaProviderId && { defaultDcaProviderId }),
+        ...connectOptions,
       });
 
-      if (shouldEnsureReady) {
-        await wallet.ensureReady({
-          deploy,
-          ...(feeMode && { feeMode }),
-          ...(options.onProgress && { onProgress: options.onProgress }),
-        });
-      }
-
-      return {
-        wallet,
-        strategy: options.strategy,
-        deployed: await wallet.isDeployed(),
-        ...(privy.metadata && { metadata: privy.metadata }),
-      };
+      return this.finalizeOnboard(wallet, options, deploy, privy.metadata);
     }
 
     if (options.strategy === "cartridge") {
       const wallet = await this.connectCartridge({
         ...(options.cartridge ?? {}),
-        ...(feeMode && { feeMode }),
-        ...(timeBounds && { timeBounds }),
+        ...(connectOptions.feeMode && { feeMode: connectOptions.feeMode }),
+        ...(connectOptions.timeBounds && {
+          timeBounds: connectOptions.timeBounds,
+        }),
       });
+      applyProviders(wallet, options);
 
-      if (swapProviders?.length) {
-        for (const swapProvider of swapProviders) {
-          wallet.registerSwapProvider(swapProvider);
-        }
-      }
-      if (defaultSwapProviderId) {
-        wallet.setDefaultSwapProvider(defaultSwapProviderId);
-      }
-      if (dcaProviders?.length) {
-        for (const dcaProvider of dcaProviders) {
-          wallet.dca().registerProvider(dcaProvider);
-        }
-      }
-      if (defaultDcaProviderId) {
-        wallet.dca().setDefaultProvider(defaultDcaProviderId);
-      }
-
-      if (shouldEnsureReady) {
-        await wallet.ensureReady({
-          deploy,
-          ...(feeMode && { feeMode }),
-          ...(options.onProgress && { onProgress: options.onProgress }),
-        });
-      }
-
-      return {
-        wallet,
-        strategy: options.strategy,
-        deployed: await wallet.isDeployed(),
-      };
+      return this.finalizeOnboard(wallet, options, deploy);
     }
 
     const _never: never = options;
