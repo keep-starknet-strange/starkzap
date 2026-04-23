@@ -46,7 +46,7 @@
   },
   "dependencies": {
     "expo": "^55.0.8",
-    "starkzap": "file:../.."
+    "starkzap": "^3.0.0"
   },
   "peerDependencies": {
     "@ethersproject/shims": "^5.7.0",
