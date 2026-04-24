@@ -10,7 +10,6 @@
     "web": "expo start --web"
   },
   "dependencies": {
-    "starkzap-native": "file:../../packages/native",
     "@ethersproject/shims": "^5.7.0",
     "@expo/vector-icons": "^15.0.2",
     "@react-native-async-storage/async-storage": "2.2.0",
@@ -42,6 +41,7 @@
     "react-native-web": "~0.21.0",
     "react-native-worklets": "0.5.1",
     "starknet": "^9.2.1",
+    "starkzap-native": "file:../../packages/native",
     "zod": "^4.1.11",
     "zustand": "^5.0.8"
   },

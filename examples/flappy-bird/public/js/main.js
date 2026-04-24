@@ -8,12 +8,13 @@ var states = Object.freeze({
 
 var currentstate;
 
-var gravity = 0.25;
+var gravity = 0.1;
 var velocity = 0;
 var position = 180;
 var rotation = 0;
-var jump = -4.6;
+var jump = -2;
 var flyArea = $("#flyarea").height();
+var pipeSpawnInterval = 2100;
 
 var score = 0;
 var highscore = 0;
@@ -23,6 +24,12 @@ var pipewidth = 52;
 var pipes = new Array();
 
 var replayclickable = false;
+var canUseSaveMe = false;
+var saveMeInProgress = false;
+var reviveCountdownTimer = null;
+var revivePipeStartTimer = null;
+var revivePipeSpawnDelay = 1500;
+var waitingForReviveMovement = false;
 
 //sounds
 var volume = 30;
@@ -50,6 +57,24 @@ $(document).ready(function() {
 
    //start with the splash screen
    showSplash();
+
+   $("#save-me").click(function () {
+     if (!canUseSaveMe || saveMeInProgress)
+       return;
+     if (typeof window.__saveMe !== "function")
+       return;
+
+     saveMeInProgress = true;
+     window.__saveMe().then(function (saved) {
+       if (saved) {
+         resurrectPlayer();
+         return;
+       }
+       saveMeInProgress = false;
+     }).catch(function () {
+       saveMeInProgress = false;
+     });
+   });
 });
 
 function getCookie(cname)
@@ -81,6 +106,10 @@ function showSplash()
    position = 180;
    rotation = 0;
    score = 0;
+   canUseSaveMe = false;
+   saveMeInProgress = false;
+   replayclickable = false;
+   clearReviveCountdown();
 
    //update the player in preparation for the next game
    $("#player").css({ y: 0, x: 0 });
@@ -105,9 +134,106 @@ function showSplash()
    $("#splash").transition({ opacity: 1 }, 2000, 'ease');
 }
 
+function clearReviveCountdown()
+{
+   if (reviveCountdownTimer != null) {
+     clearInterval(reviveCountdownTimer);
+     reviveCountdownTimer = null;
+   }
+
+   $("#revive-countdown").stop(true, true).hide().text("");
+}
+
+function clearRevivePipeStartTimer()
+{
+   if (revivePipeStartTimer != null) {
+     clearTimeout(revivePipeStartTimer);
+     revivePipeStartTimer = null;
+   }
+}
+
+function queueRevivePipeSpawn()
+{
+   if (!waitingForReviveMovement)
+     return;
+
+   clearRevivePipeStartTimer();
+   revivePipeStartTimer = setTimeout(function () {
+     updatePipes();
+     loopPipeloop = setInterval(updatePipes, pipeSpawnInterval);
+     revivePipeStartTimer = null;
+     waitingForReviveMovement = false;
+   }, revivePipeSpawnDelay);
+}
+
+function startReviveCountdown(seconds, onComplete)
+{
+   clearReviveCountdown();
+
+   var countdown = seconds;
+   var countdownElement = $("#revive-countdown");
+
+   countdownElement.text(countdown).show();
+   soundSwoosh.stop();
+   soundSwoosh.play();
+
+   reviveCountdownTimer = setInterval(function () {
+     countdown -= 1;
+
+     if (countdown <= 0) {
+       clearReviveCountdown();
+       soundJump.stop();
+       soundJump.play();
+       if (typeof onComplete === "function")
+         onComplete();
+       return;
+     }
+
+     countdownElement.text(countdown);
+   }, 1000);
+}
+
+function resurrectPlayer()
+{
+   currentstate = states.ScoreScreen;
+   canUseSaveMe = false;
+   saveMeInProgress = false;
+   replayclickable = false;
+   waitingForReviveMovement = false;
+
+   $("#scoreboard").css("display", "none");
+   clearRevivePipeStartTimer();
+
+   $(".pipe").remove();
+   pipes = new Array();
+
+   $("#player").css({ y: 0, x: 0 });
+   velocity = 0;
+   position = 180;
+   rotation = 0;
+   updatePlayer($("#player"));
+   setBigScore(true);
+
+   startReviveCountdown(3, function () {
+     currentstate = states.GameScreen;
+     waitingForReviveMovement = true;
+
+     $(".animated").css('animation-play-state', 'running');
+     $(".animated").css('-webkit-animation-play-state', 'running');
+
+     setBigScore();
+
+     var updaterate = 1000.0 / 60.0;
+     loopGameloop = setInterval(gameloop, updaterate);
+   });
+}
+
 function startGame()
 {
-   if (window.__starknetOnStart) window.__starknetOnStart();
+   clearReviveCountdown();
+   clearRevivePipeStartTimer();
+   waitingForReviveMovement = false;
+   replayclickable = false;
    currentstate = states.GameScreen;
 
    //fade out the splash
@@ -127,7 +253,7 @@ function startGame()
    //start up our loops
    var updaterate = 1000.0 / 60.0 ; //60 times a second
    loopGameloop = setInterval(gameloop, updaterate);
-   loopPipeloop = setInterval(updatePipes, 1400);
+   loopPipeloop = setInterval(updatePipes, pipeSpawnInterval);
 
    //jump from the start!
    playerJump();
@@ -238,23 +364,25 @@ function gameloop() {
 }
 
 //Handle space bar
-$(document).keydown(function(e){
-   //space bar!
-   if(e.keyCode == 32)
-   {
-      //in ScoreScreen, hitting space should click the "replay" button. else it's just a regular spacebar hit
-      if(currentstate == states.ScoreScreen)
-         $("#replay").click();
-      else
-         screenClick();
-   }
+$(document).keydown(function (e) {
+  //space bar!
+  if (e.keyCode == 32) {
+    //in ScoreScreen, hitting space should click the "replay" button. else it's just a regular spacebar hit
+    if (currentstate == states.ScoreScreen) {
+      if (saveMeInProgress || canUseSaveMe)
+        return;
+      $("#replay").click();
+    }
+    else
+      screenClick();
+  }
 });
 
 //Handle mouse down OR touch start
-if("ontouchstart" in window)
-   $(document).on("touchstart", screenClick);
+if ("ontouchstart" in window)
+  $(document).on("touchstart", screenClick);
 else
-   $(document).on("mousedown", screenClick);
+  $(document).on("mousedown", screenClick);
 
 function screenClick()
 {
@@ -264,7 +392,6 @@ function screenClick()
    }
    else if(currentstate == states.SplashScreen)
    {
-      if (typeof window.__starknetCanStart === "function" && !window.__starknetCanStart()) return;
       startGame();
    }
 }
@@ -272,6 +399,10 @@ function screenClick()
 function playerJump()
 {
    velocity = jump;
+
+   if (waitingForReviveMovement && loopPipeloop == null && revivePipeStartTimer == null)
+     queueRevivePipeSpawn();
+
    //play jump sound
    soundJump.stop();
    soundJump.play();
@@ -286,7 +417,7 @@ function setBigScore(erase)
       return;
 
    var digits = score.toString().split('');
-   for(var i = 0; i < digits.length; i++)
+   for(var i=0; i<digits.length; i++)
       elemscore.append("<img src='assets/font_big_" + digits[i] + ".png' alt='" + digits[i] + "'>");
 }
 
@@ -296,7 +427,7 @@ function setSmallScore()
    elemscore.empty();
 
    var digits = score.toString().split('');
-   for(var i = 0; i < digits.length; i++)
+   for(var i=0; i<digits.length; i++)
       elemscore.append("<img src='assets/font_small_" + digits[i] + ".png' alt='" + digits[i] + "'>");
 }
 
@@ -306,7 +437,7 @@ function setHighScore()
    elemscore.empty();
 
    var digits = highscore.toString().split('');
-   for(var i = 0; i < digits.length; i++)
+   for(var i=0; i<digits.length; i++)
       elemscore.append("<img src='assets/font_small_" + digits[i] + ".png' alt='" + digits[i] + "'>");
 }
 
@@ -336,7 +467,11 @@ function setMedal()
 
 function playerDead()
 {
-   if (window.__starknetOnGameOver) window.__starknetOnGameOver();
+   clearReviveCountdown();
+   clearRevivePipeStartTimer();
+   waitingForReviveMovement = false;
+   replayclickable = false;
+
    //stop animating everything!
    $(".animated").css('animation-play-state', 'paused');
    $(".animated").css('-webkit-animation-play-state', 'paused');
@@ -401,12 +536,13 @@ function showScore()
 
    //show the scoreboard
    $("#scoreboard").css({ y: '40px', opacity: 0 }); //move it down so we can slide it up
-   $("#replay").css({ y: '40px', opacity: 0 });
+   $("#actions").css({ y: '40px', opacity: 0 });
+   canUseSaveMe = typeof window.__saveMe === "function";
    $("#scoreboard").transition({ y: '0px', opacity: 1}, 600, 'ease', function() {
       //When the animation is done, animate in the replay button and SWOOSH!
       soundSwoosh.stop();
       soundSwoosh.play();
-      $("#replay").transition({ y: '0px', opacity: 1}, 600, 'ease');
+      $("#actions").transition({ y: '0px', opacity: 1}, 600, 'ease');
 
       //also animate in the MEDAL! WOO!
       if(wonmedal)
@@ -421,6 +557,9 @@ function showScore()
 }
 
 $("#replay").click(function() {
+   if (saveMeInProgress)
+     return;
+
    //make sure we can only click once
    if(!replayclickable)
       return;
@@ -447,7 +586,6 @@ function playerScore()
    soundScore.stop();
    soundScore.play();
    setBigScore();
-   if (window.__starknetOnScore) window.__starknetOnScore();
 }
 
 function updatePipes()
@@ -485,6 +623,6 @@ var isIncompatible = {
    return navigator.userAgent.match(/IEMobile/i);
    },
    any: function() {
-   return (isIncompatible.Android() || isIncompatible.BlackBerry() || isIncompatible.iOS() || isIncompatible.Opera() || isIncompatible.Safari() || isIncompatible.Windows());
+      return (isIncompatible.Android() || isIncompatible.BlackBerry() || isIncompatible.iOS() || isIncompatible.Opera() || isIncompatible.Safari() || isIncompatible.Windows());
    }
 };

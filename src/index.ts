@@ -27,6 +27,8 @@ export * from "@/erc20";
 // Staking
 export * from "@/staking";
 
+// Payment (Chainrails cross-chain payments)
+export * from "@/payment";
 // Swap
 export * from "@/swap";
 

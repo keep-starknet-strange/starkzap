@@ -7,6 +7,7 @@ import {
 import type { NetworkPreset, NetworkName } from "@/network";
 import type { LoggerConfig } from "@/logger";
 import type { Address } from "@/types";
+import type { PaymentConfig } from "@/payment/types";
 
 /** Supported Starknet chain identifiers */
 export type ChainIdLiteral = "SN_MAIN" | "SN_SEPOLIA";
@@ -236,6 +237,28 @@ export interface SDKConfig {
    * @see {@link StakingConfig}
    */
   staking?: StakingConfig;
+
+  /**
+   * Optional: configuration for the Payment module (Chainrails).
+   *
+   * Enables cross-chain, multi-token payment acceptance.
+   * Payments can originate from any supported chain/token and
+   * settle on Starknet (or any destination chain).
+   *
+   * @example
+   * ```ts
+   * const sdk = new StarkZap({
+   *   network: "mainnet",
+   *   payment: {
+   *     apiKey: "cr_live_...",
+   *     environment: "production", // optional, defaults to "production"
+   *   },
+   * });
+   * ```
+   *
+   * @see {@link PaymentConfig}
+   */
+  payment?: PaymentConfig;
 
   /**
    * Optional: configuration for cross-chain bridging.

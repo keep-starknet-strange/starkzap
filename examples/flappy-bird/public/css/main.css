@@ -142,8 +142,8 @@ Screen - Game
    background-position: 0px 100%;
    background-color: #4ec0ca;
 
-   -webkit-animation: animSky 7s linear infinite;
-   animation: animSky 7s linear infinite;
+   -webkit-animation: animSky 11s linear infinite;
+   animation: animSky 11s linear infinite;
 }
 
 #flyarea
@@ -163,8 +163,8 @@ Screen - Game
    background-image: url('../assets/ceiling.png');
    background-repeat: repeat-x;
 
-   -webkit-animation: animCeiling 481ms linear infinite;
-   animation: animCeiling 481ms linear infinite;
+   -webkit-animation: animCeiling 720ms linear infinite;
+   animation: animCeiling 720ms linear infinite;
 }
 
 #land
@@ -178,8 +178,8 @@ Screen - Game
    background-position: 0px 0px;
    background-color: #ded895;
 
-   -webkit-animation: animLand 2516ms linear infinite;
-   animation: animLand 2516ms linear infinite;
+   -webkit-animation: animLand 3770ms linear infinite;
+   animation: animLand 3770ms linear infinite;
 }
 
 #bigscore
@@ -194,6 +194,21 @@ Screen - Game
 {
    display: inline-block;
    padding: 1px;
+}
+
+#revive-countdown
+{
+   position: absolute;
+   top: 42%;
+   left: 50%;
+   transform: translate(-50%, -50%);
+   z-index: 1500;
+   display: none;
+   color: #fff;
+   font-size: 64px;
+   font-weight: bold;
+   line-height: 1;
+   text-shadow: 0 3px 0 rgba(0, 0, 0, 0.4);
 }
 
 #splash
@@ -263,15 +278,17 @@ Screen - Game
    padding-left: 2px;
 }
 
-#replay
+#actions
 {
    position: absolute;
    opacity: 0;
    top: 205px;
-   left: 61px;
+   left: 0;
    height: 115px;
-   width: 70px;
+   width: 100%;
    cursor: pointer;
+   display: flex;
+   justify-content: space-between;
 }
 
 .boundingbox
@@ -310,8 +327,8 @@ Screen - Game
    height: 100%;
    z-index: 10;
 
-   -webkit-animation: animPipe 7500ms linear;
-   animation: animPipe 7500ms linear;
+   -webkit-animation: animPipe 11250ms linear;
+   animation: animPipe 11250ms linear;
 }
 
 .pipe_upper

@@ -7,10 +7,14 @@ import {
 } from "react-native";
 import { Text, View } from "@/components/Themed";
 import { useStarknetConnector } from "@/app/context/StarknetConnector";
+import { PaymentModal, usePaymentSession } from "starkzap-native";
 
 export default function AccountGate() {
   const { connectCartridge, connecting, error, account } =
     useStarknetConnector();
+  const paymentSession = usePaymentSession({
+    session_url: `https://chainrails-sdk-server-nu.vercel.app/session?amount=0.1&destinationChain=BASE&recipient=0xda3ecb2e5362295e2b802669dd47127a61d9ce54&token=USDC`,
+  });
 
   if (account?.address) {
     return null;
@@ -47,7 +51,27 @@ export default function AccountGate() {
             <Text style={styles.primaryText}>Connect Cartridge</Text>
           )}
         </Pressable>
+
+        <Pressable
+          accessibilityRole="button"
+          onPress={paymentSession.open}
+          disabled={connecting}
+          style={({ pressed }) => [
+            styles.primaryButton,
+            {
+              backgroundColor: "gray",
+              opacity: connecting ? 0.6 : pressed ? 0.8 : 1,
+              position: "fixed",
+              top: "100%",
+              marginInline: "auto",
+              width: "100%",
+            },
+          ]}
+        >
+          <Text style={styles.primaryText}>Buy me a Coffee</Text>
+        </Pressable>
       </View>
+      <PaymentModal {...paymentSession} />
     </KeyboardAvoidingView>
   );
 }

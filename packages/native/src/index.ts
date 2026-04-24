@@ -28,3 +28,8 @@ export type {
   NormalizedCartridgeSessionPolicies,
 } from "@/cartridge/types";
 export { CartridgeRecoveredRpcExecutionError } from "@/wallet/cartridge";
+export {
+  PaymentModal,
+  usePaymentModal,
+  usePaymentSession,
+} from "@chainrails/react-native";

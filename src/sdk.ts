@@ -41,6 +41,7 @@ import {
 import { BridgeTokenRepository } from "@/bridge/tokens/repository";
 import type { LoggerConfig } from "@/logger";
 import { createLogger } from "@/logger";
+import { Payment } from "./payment";
 
 /** Resolved SDK configuration with required rpcUrl and chainId */
 interface ResolvedConfig extends Omit<SDKConfig, "rpcUrl" | "chainId"> {
@@ -70,6 +71,13 @@ function isWebRuntime(): boolean {
     typeof navigator !== "undefined" && navigator.product === "ReactNative";
 
   return hasDom && !isReactNative;
+}
+
+function isNativeRuntime(): boolean {
+  const isReactNative =
+    typeof navigator !== "undefined" && navigator.product === "ReactNative";
+
+  return isReactNative;
 }
 
 /**
@@ -105,6 +113,7 @@ export class StarkZap {
   private readonly provider: RpcProvider;
   private bridgeTokenRepository: BridgeTokenRepository | null = null;
   private chainValidationPromise: Promise<void> | null = null;
+  private paymentInstance: Payment | null = null;
 
   constructor(config: SDKConfig) {
     this.config = this.resolveConfig(config);
@@ -570,6 +579,57 @@ export class StarkZap {
    */
   getProvider(): RpcProvider {
     return this.provider;
+  }
+
+  // ════════════════════════════════════════════════════════
+  // Payment (Chainrails)
+  // ════════════════════════════════════════════════════════
+
+  /**
+   * Get the Payment module for cross-chain payment acceptance.
+   *
+   * Requires `payment.apiKey` to be set in the SDK config unless when used on the browser.
+   *
+   * @returns A {@link Payment} instance bound to the configured API key.
+   * @throws Error if payment is not configured in non-browser runtimes.
+   *
+   * @example
+   * ```ts
+   * const sdk = new StarkZap({
+   *   network: "mainnet",
+   *   payment: { apiKey: "cr_live_..." },
+   * });
+   *
+   * const payment = sdk.payment();
+   *
+   * // Get quotes from every source chain
+   * const quotes = await payment.getQuotes({
+   *   destinationChain: "STARKNET",
+   *   tokenOut: "0x053c91...",
+   *   amount: "10",
+   *   recipient: "0xabc...",
+   * });
+   *
+   * // Create an intent
+   * const intent = await payment.createIntent({ ... });
+   * ```
+   */
+  payment(): Payment {
+    if (!this.config.payment) {
+      if (isWebRuntime() || isNativeRuntime()) {
+        if (!this.paymentInstance) {
+          this.paymentInstance = new Payment({ apiKey: "" });
+        }
+        return this.paymentInstance;
+      }
+      throw new Error(
+        "Payment is not configured. Provide a `payment` config with an `apiKey` when creating StarkZap."
+      );
+    }
+    if (!this.paymentInstance) {
+      this.paymentInstance = new Payment(this.config.payment);
+    }
+    return this.paymentInstance;
   }
 
   /**
