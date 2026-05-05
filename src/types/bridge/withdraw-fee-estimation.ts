@@ -2,11 +2,15 @@ import type {
   EthereumInitiateWithdrawFeeEstimation,
   EthereumCompleteWithdrawFeeEstimation,
 } from "@/bridge/ethereum";
-import type { SolanaWithdrawFeeEstimation } from "@/bridge/solana/types";
+import type {
+  SolanaLayerSwapInitiateWithdrawFeeEstimation,
+  SolanaWithdrawFeeEstimation,
+} from "@/bridge/solana/types";
 
 export type BridgeInitiateWithdrawFeeEstimation =
   | EthereumInitiateWithdrawFeeEstimation
-  | SolanaWithdrawFeeEstimation;
+  | SolanaWithdrawFeeEstimation
+  | SolanaLayerSwapInitiateWithdrawFeeEstimation;
 
 export type BridgeCompleteWithdrawFeeEstimation =
   EthereumCompleteWithdrawFeeEstimation;

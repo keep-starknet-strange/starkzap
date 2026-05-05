@@ -26,6 +26,7 @@ import {
 import type { EthereumAddress } from "@/types";
 import type { WalletInterface } from "@/wallet";
 import type { EthereumWalletConfig } from "@/bridge/ethereum/types";
+import { NOOP_LOGGER } from "@/logger";
 
 const API_KEY = process.env["LAYERSWAP_API_KEY"] ?? "";
 const ETH_PRIVATE_KEY = process.env["ETH_PRIVATE_KEY"] ?? "";
@@ -53,6 +54,7 @@ function layerSwapEthToken(): EthereumBridgeToken {
       "0x049d36570d4e46f48e99674bd3fcc84644ddd6b96f7c741b1562b82f9e004dc7"
     ),
     starknetBridge: fromAddress("0x0"),
+    supportsAutoWithdraw: false,
   });
 }
 
@@ -88,7 +90,8 @@ describe("LayerSwap E2E (real wallet)", () => {
         token,
         ethConfig,
         starknetWallet,
-        API_KEY
+        API_KEY,
+        NOOP_LOGGER
       );
 
       // 1. Check balance
@@ -99,14 +102,13 @@ describe("LayerSwap E2E (real wallet)", () => {
       console.log(`Available balance: ${balance.toFormatted()}`);
 
       const depositAmount = Amount.parse(DEPOSIT_AMOUNT, 18, "ETH");
-      expect(balance.toRaw() > depositAmount.toRaw()).toBe(true);
+      expect(balance.toBase() > depositAmount.toBase()).toBe(true);
 
       // 2. Get fee estimate
       const fees = await bridge.getDepositFeeEstimate();
       console.log("Fee estimate:", {
         l1Fee: fees.l1Fee.toFormatted(),
         serviceFee: fees.serviceFee.toFormatted(),
-        receiveAmount: fees.receiveAmount.toFormatted(),
         avgCompletionTime: fees.avgCompletionTime,
       });
 

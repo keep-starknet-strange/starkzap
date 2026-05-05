@@ -23,6 +23,7 @@ import {
 import type { EthereumAddress } from "@/types";
 import type { WalletInterface } from "@/wallet";
 import type { EthereumWalletConfig } from "@/bridge/ethereum/types";
+import { NOOP_LOGGER } from "@/logger";
 
 const API_KEY = process.env["LAYERSWAP_API_KEY"] ?? "";
 const hasApiKey = API_KEY.length > 0;
@@ -128,7 +129,9 @@ describe("LayerSwap API (live)", () => {
     "should fetch available source networks for Starknet Sepolia",
     async () => {
       const api = new LayerSwapApi({ apiKey: API_KEY });
-      const sources = await api.getSources("STARKNET_SEPOLIA");
+      const sources = await api.getSources({
+        destinationNetwork: "STARKNET_SEPOLIA",
+      });
 
       console.log(
         "Available sources for STARKNET_SEPOLIA:",
@@ -150,7 +153,9 @@ describe("LayerSwap API (live)", () => {
     "should fetch available destination networks from Ethereum Sepolia",
     async () => {
       const api = new LayerSwapApi({ apiKey: API_KEY });
-      const destinations = await api.getDestinations("ETHEREUM_SEPOLIA");
+      const destinations = await api.getDestinations({
+        sourceNetwork: "ETHEREUM_SEPOLIA",
+      });
 
       console.log(
         "Available destinations from ETHEREUM_SEPOLIA:",
@@ -247,6 +252,7 @@ function layerSwapEthToken(): EthereumBridgeToken {
       "0x049d36570d4e46f48e99674bd3fcc84644ddd6b96f7c741b1562b82f9e004dc7"
     ),
     starknetBridge: fromAddress("0x0"),
+    supportsAutoWithdraw: false,
   });
 }
 
@@ -258,7 +264,8 @@ describe("LayerSwapBridge (live)", () => {
         layerSwapEthToken(),
         mockEthereumWalletConfig(),
         mockStarknetWallet(ChainId.SEPOLIA),
-        API_KEY
+        API_KEY,
+        NOOP_LOGGER
       );
 
       const estimation = await bridge.getDepositFeeEstimate();
@@ -266,11 +273,10 @@ describe("LayerSwapBridge (live)", () => {
       console.log("Fee estimation:", {
         l1Fee: estimation.l1Fee.toFormatted(),
         serviceFee: estimation.serviceFee.toFormatted(),
-        receiveAmount: estimation.receiveAmount.toFormatted(),
         avgCompletionTime: estimation.avgCompletionTime,
       });
 
-      expect(estimation.receiveAmount).toBeDefined();
+      expect(estimation.serviceFee).toBeDefined();
       expect(estimation.avgCompletionTime).toBeDefined();
     }
   );
@@ -282,7 +288,8 @@ describe("LayerSwapBridge (live)", () => {
         layerSwapEthToken(),
         mockEthereumWalletConfig(),
         mockStarknetWallet(ChainId.SEPOLIA),
-        API_KEY
+        API_KEY,
+        NOOP_LOGGER
       );
 
       const allowance = await bridge.getAllowance();
@@ -344,7 +351,7 @@ describe("LayerSwap swap creation (live)", () => {
 
     // Fetch swap status
     const swapStatus = await api.getSwap(swap.id);
-    console.log("Swap status:", swapStatus.status);
-    expect(swapStatus.id).toBe(swap.id);
+    console.log("Swap status:", swapStatus.swap.status);
+    expect(swapStatus.swap.id).toBe(swap.id);
   });
 });

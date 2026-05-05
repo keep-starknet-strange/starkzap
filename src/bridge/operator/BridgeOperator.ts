@@ -435,6 +435,7 @@ export class BridgeOperator implements BridgeOperatorInterface {
           walletConfig,
           starknetWallet,
           apiKey,
+          this.logger,
           baseUrl ? { baseUrl } : undefined
         );
       }
@@ -446,6 +447,26 @@ export class BridgeOperator implements BridgeOperatorInterface {
   }
 
   private async monitor(token: BridgeToken): Promise<BridgeMonitorInterface> {
+    if (token.protocol === Protocol.LAYERSWAP) {
+      return this.getOrCreateMonitor(Protocol.LAYERSWAP, async () => {
+        const apiKey = this.bridgingConfig?.layerSwapApiKey;
+        if (!apiKey) {
+          throw new Error(
+            "LayerSwap bridge monitoring requires an API key. " +
+              'Set "bridging.layerSwapApiKey" in the SDK configuration.'
+          );
+        }
+        const { LayerSwapMonitor } =
+          await import("@/bridge/monitor/layerswap/LayerSwapMonitor");
+        const baseUrl = this.bridgingConfig?.layerSwapBaseUrl;
+        return new LayerSwapMonitor({
+          apiKey,
+          logger: this.logger,
+          ...(baseUrl !== undefined && { baseUrl }),
+        });
+      });
+    }
+
     if (
       token.chain === ExternalChain.SOLANA &&
       token.protocol === Protocol.HYPERLANE

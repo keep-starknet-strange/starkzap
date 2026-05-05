@@ -1,23 +1,47 @@
 import { EthereumBridge } from "@/bridge/ethereum/EthereumBridge";
-import type { BridgeDepositOptions } from "@/bridge/types/BridgeInterface";
+import type {
+  BridgeDepositOptions,
+  CompleteBridgeWithdrawOptions,
+  InitiateBridgeWithdrawOptions,
+} from "@/bridge/types/BridgeInterface";
 import { LayerSwapApi } from "@/bridge/ethereum/layerswap/LayerSwapApi";
 import type {
   LayerSwapApiConfig,
   LsDepositAction,
 } from "@/bridge/ethereum/layerswap/types";
 import type {
+  EthereumCompleteWithdrawFeeEstimation,
   EthereumWalletConfig,
   LayerSwapDepositFeeEstimation,
+  LayerSwapInitiateWithdrawFeeEstimation,
 } from "@/bridge/ethereum/types";
 import {
   type Address,
   Amount,
   type EthereumAddress,
   EthereumBridgeToken,
+  type ExternalAddress,
   type ExternalTransactionResponse,
+  fromAddress,
 } from "@/types";
+import { FeeErrorCause } from "@/types/errors";
 import type { WalletInterface } from "@/wallet";
 import type { StarkZapLogger } from "@/logger";
+import type { TransactionRequest } from "ethers";
+import type { Tx } from "@/tx";
+import { type Call, CallData, uint256 } from "starknet";
+
+// Fallback gas units when `provider.estimateGas` fails (e.g. the user has no
+// source-token balance yet). Native ETH send ≈ 21k; ERC20 transfer ≈ 45–65k
+// depending on destination slot warmth. Chosen as conservative upper bounds.
+const NATIVE_DEPOSIT_FALLBACK_GAS = 21_000n;
+const ERC20_DEPOSIT_FALLBACK_GAS = 65_000n;
+
+// Dummy Starknet address used for withdraw fee estimation when no real
+// external recipient is known.
+const DUMMY_SN_RECIPIENT = fromAddress(
+  "0x023123100123103023123acb1231231231231031231ca123f23123123123100a"
+);
 
 /**
  * LayerSwap bridge provider for cross-chain deposits via the LayerSwap API.
@@ -63,7 +87,7 @@ export class LayerSwapBridge extends EthereumBridge {
       destinationNetwork: this.destNetwork,
       destinationToken: this.bridgeToken.symbol,
       amount: amount.toUnit(),
-      destinationAddress: recipient,
+      destinationAddress: recipient.toString(),
       sourceAddress: signerAddress,
       refundAddress: signerAddress,
     });
@@ -98,49 +122,172 @@ export class LayerSwapBridge extends EthereumBridge {
   async getDepositFeeEstimate(
     _options?: BridgeDepositOptions
   ): Promise<LayerSwapDepositFeeEstimation> {
-    const quote = await this.api.getQuote({
-      sourceNetwork: this.sourceNetwork,
-      sourceToken: this.bridgeToken.symbol,
-      destinationNetwork: this.destNetwork,
-      destinationToken: this.bridgeToken.symbol,
-      amount: "0",
-    });
+    const [quote, sourceTxFee] = await Promise.all([
+      this.api
+        .getQuote({
+          sourceNetwork: this.sourceNetwork,
+          sourceToken: this.bridgeToken.symbol,
+          destinationNetwork: this.destNetwork,
+          destinationToken: this.bridgeToken.symbol,
+          // LayerSwap treats `0` as "quote at the route minimum". Pass the
+          // user's amount here once `BridgeInterface.getDepositFeeEstimate`
+          // grows an `amount` arg, for an exact quote.
+          amount: "0",
+        })
+        .catch((e: unknown) => {
+          this.logger.debug(
+            "[LayerSwapBridge] getDepositFeeEstimate (quote) failed:",
+            e
+          );
+          return null;
+        }),
+      this.estimateSourceTxFee(),
+    ]);
 
     const decimals = this.bridgeToken.decimals;
     const symbol = this.bridgeToken.symbol;
-
     const zeroEth = Amount.fromRaw(0n, 18, "ETH");
+    const zeroBridgeToken = Amount.fromRaw(0n, decimals, symbol);
 
     return {
-      // EthereumDepositFeeEstimation base fields
-      l1Fee: Amount.parse(String(quote.blockchain_fee), decimals, symbol),
+      // EthereumDepositFeeEstimation base fields — `l1Fee` is the user's
+      // ETH gas for the source tx, matching Canonical/CCTP/OFT semantics.
+      l1Fee: sourceTxFee.l1Fee,
+      ...(sourceTxFee.l1FeeError !== undefined && {
+        l1FeeError: sourceTxFee.l1FeeError,
+      }),
       l2Fee: zeroEth,
       approvalFee: zeroEth,
-      // LayerSwap-specific fields
-      serviceFee: Amount.parse(String(quote.service_fee), decimals, symbol),
-      receiveAmount: Amount.parse(
-        String(quote.receive_amount),
-        decimals,
-        symbol
-      ),
-      avgCompletionTime: quote.avg_completion_time,
+      // LayerSwap-specific fees — bridge-token denominated, deducted from input.
+      blockchainFee: quote
+        ? Amount.parse(String(quote.blockchain_fee), decimals, symbol)
+        : zeroBridgeToken,
+      serviceFee: quote
+        ? Amount.parse(String(quote.service_fee), decimals, symbol)
+        : zeroBridgeToken,
+      avgCompletionTime: quote?.avg_completion_time ?? "",
+      ...(quote === null && {
+        quoteError: FeeErrorCause.GENERIC_L2_FEE_ERROR,
+      }),
     };
   }
 
-  async getAvailableDepositBalance(account: EthereumAddress): Promise<Amount> {
-    const isNativeEth =
-      this.bridgeToken.address === "0x0000000000000000000000000000000000000000";
+  /**
+   * Initiate a withdrawal from Starknet → Ethereum via LayerSwap.
+   *
+   * Creates a LayerSwap swap with source=Starknet, destination=Ethereum, and
+   * executes the Starknet transfer into LayerSwap's deposit address.
+   * LayerSwap auto-delivers the funds on Ethereum — no `completeWithdraw` step.
+   */
+  override async initiateWithdraw(
+    recipient: ExternalAddress,
+    amount: Amount,
+    options?: InitiateBridgeWithdrawOptions
+  ): Promise<Tx> {
+    const starknetAddress = this.starknetWallet.address.toString();
 
-    if (isNativeEth) {
-      const balance = await this.config.provider.getBalance!(account);
-      return Amount.fromRaw(
-        balance,
-        this.bridgeToken.decimals,
-        this.bridgeToken.symbol
+    const response = await this.api.createSwap({
+      sourceNetwork: this.destNetwork,
+      sourceToken: this.bridgeToken.symbol,
+      destinationNetwork: this.sourceNetwork,
+      destinationToken: this.bridgeToken.symbol,
+      amount: amount.toUnit(),
+      destinationAddress: recipient.toString(),
+      sourceAddress: starknetAddress,
+      refundAddress: starknetAddress,
+    });
+
+    const swap = response.swap;
+    const actions =
+      response.deposit_actions.length > 0
+        ? response.deposit_actions
+        : await this.api.getDepositActions(swap.id, starknetAddress);
+    const action = actions.find(
+      (a) => a.network.name === this.destNetwork && a.type === "transfer"
+    );
+
+    if (!action) {
+      throw new Error(
+        `No transfer deposit action for swap "${swap.id}" on network "${this.destNetwork}".`
       );
     }
 
-    return super.getAvailableDepositBalance(account);
+    const calls = this.buildStarknetTransferCalls(action);
+    const tx = await this.starknetWallet.execute(calls, options);
+
+    // Nudge LayerSwap to detect the Starknet tx faster. Non-critical — the
+    // poller on their end picks it up regardless.
+    this.api.speedUpDeposit(swap.id, tx.hash).catch(() => {});
+
+    return tx;
+  }
+
+  async getInitiateWithdrawFeeEstimate(
+    _options?: InitiateBridgeWithdrawOptions
+  ): Promise<LayerSwapInitiateWithdrawFeeEstimation> {
+    const dummyCalls = this.buildDummyStarknetTransferCalls();
+
+    const [quote, l2] = await Promise.all([
+      this.api
+        .getQuote({
+          sourceNetwork: this.destNetwork,
+          sourceToken: this.bridgeToken.symbol,
+          destinationNetwork: this.sourceNetwork,
+          destinationToken: this.bridgeToken.symbol,
+          amount: "0",
+        })
+        .catch((e: unknown) => {
+          this.logger.debug(
+            "[LayerSwapBridge] getInitiateWithdrawFeeEstimate (quote) failed:",
+            e
+          );
+          return null;
+        }),
+      this.estimateStarknetFee(dummyCalls),
+    ]);
+
+    const decimals = this.bridgeToken.decimals;
+    const symbol = this.bridgeToken.symbol;
+    const zeroBridgeToken = Amount.fromRaw(0n, decimals, symbol);
+
+    return {
+      l2Fee: l2.fee,
+      ...(l2.error !== undefined && { l2FeeError: l2.error }),
+      blockchainFee: quote
+        ? Amount.parse(String(quote.blockchain_fee), decimals, symbol)
+        : zeroBridgeToken,
+      serviceFee: quote
+        ? Amount.parse(String(quote.service_fee), decimals, symbol)
+        : zeroBridgeToken,
+      avgCompletionTime: quote?.avg_completion_time ?? "",
+      ...(quote === null && {
+        quoteError: FeeErrorCause.GENERIC_L2_FEE_ERROR,
+      }),
+    };
+  }
+
+  /**
+   * LayerSwap delivers funds automatically on the destination chain — the
+   * user never calls `completeWithdraw`.
+   */
+  override async completeWithdraw(
+    _recipient: ExternalAddress,
+    _amount: Amount,
+    _options?: CompleteBridgeWithdrawOptions
+  ): Promise<ExternalTransactionResponse> {
+    throw new Error(
+      "LayerSwap withdrawals are delivered automatically — no completeWithdraw step is required."
+    );
+  }
+
+  override async getCompleteWithdrawFeeEstimate(
+    _amount: Amount,
+    _recipient: ExternalAddress,
+    _options?: CompleteBridgeWithdrawOptions
+  ): Promise<EthereumCompleteWithdrawFeeEstimation> {
+    throw new Error(
+      "LayerSwap withdrawals are delivered automatically — no completion fee applies."
+    );
   }
 
   // LayerSwap handles approvals within deposit actions.
@@ -152,6 +299,139 @@ export class LayerSwapBridge extends EthereumBridge {
   // Private helpers
   // ============================================================
 
+  /**
+   * Estimate the user's ETH gas for the source-chain deposit tx.
+   *
+   * Builds a dummy self-transfer (native ETH) or ERC20 `transfer(self, 1)`
+   * and calls `provider.estimateGas`. Falls back to a conservative static
+   * gas ceiling × live gas price when the RPC estimate fails (e.g. the user
+   * has zero source-token balance so the ERC20 transfer would revert).
+   *
+   * Mirrors the pattern in Canonical/CCTP/OFT without pulling a shared
+   * helper into `EthereumBridge`.
+   */
+  private async estimateSourceTxFee(): Promise<{
+    l1Fee: Amount;
+    l1FeeError?: FeeErrorCause;
+  }> {
+    const isNative = this.token.isNativeEth();
+    const fallbackGas = isNative
+      ? NATIVE_DEPOSIT_FALLBACK_GAS
+      : ERC20_DEPOSIT_FALLBACK_GAS;
+
+    try {
+      const [from, gasPrice] = await Promise.all([
+        this.config.signer.getAddress(),
+        this.getEthereumGasPrice(),
+      ]);
+
+      let tx: TransactionRequest;
+      if (isNative) {
+        tx = { to: from, value: 1n, from };
+      } else {
+        const contract = this.token.getContract();
+        if (!contract) {
+          return {
+            l1Fee: this.ethAmount(fallbackGas * gasPrice),
+            l1FeeError: FeeErrorCause.NO_TOKEN_CONTRACT,
+          };
+        }
+        const populated = await contract
+          .getFunction("transfer")
+          .populateTransaction(from, 1n);
+        tx = { ...populated, from };
+      }
+
+      try {
+        const gasUnits = await this.config.provider.estimateGas(tx);
+        return { l1Fee: this.ethAmount(gasUnits * gasPrice) };
+      } catch (e) {
+        this.logger.debug(
+          "[LayerSwapBridge] estimateSourceTxFee (estimateGas) failed:",
+          e
+        );
+        return {
+          l1Fee: this.ethAmount(fallbackGas * gasPrice),
+          l1FeeError: FeeErrorCause.GENERIC_L1_FEE_ERROR,
+        };
+      }
+    } catch (e) {
+      this.logger.debug(
+        "[LayerSwapBridge] estimateSourceTxFee (gas price) failed:",
+        e
+      );
+      return {
+        l1Fee: this.ethAmount(0n),
+        l1FeeError: FeeErrorCause.GENERIC_L1_FEE_ERROR,
+      };
+    }
+  }
+
+  /**
+   * Parse LayerSwap's Starknet deposit action into executable calls.
+   *
+   * LayerSwap ships the full Starknet call(s) as a JSON string in `call_data`.
+   * Their reference UI does `account.execute(JSON.parse(callData))` — so the
+   * parsed value is either a single `Call` or `Call[]`.
+   */
+  private buildStarknetTransferCalls(action: LsDepositAction): Call[] {
+    if (!action.call_data) {
+      throw new Error(
+        `Starknet deposit action (order ${action.order}) has no call_data.`
+      );
+    }
+
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(action.call_data);
+    } catch (e) {
+      throw new Error(
+        `Failed to parse LayerSwap Starknet call_data as JSON: ${
+          (e as Error).message
+        }`
+      );
+    }
+
+    const calls = (Array.isArray(parsed) ? parsed : [parsed]) as Call[];
+    if (calls.length === 0) {
+      throw new Error(
+        `LayerSwap returned no Starknet calls (order ${action.order}).`
+      );
+    }
+    return calls;
+  }
+
+  private buildDummyStarknetTransferCalls(): Call[] {
+    return [
+      {
+        contractAddress: this.bridgeToken.starknetAddress.toString(),
+        entrypoint: "transfer",
+        calldata: CallData.compile({
+          recipient: DUMMY_SN_RECIPIENT.toString(),
+          amount: uint256.bnToUint256(1n),
+        }),
+      },
+    ];
+  }
+
+  private async estimateStarknetFee(
+    calls: Call[]
+  ): Promise<{ fee: Amount; error?: FeeErrorCause }> {
+    try {
+      const estimate = await this.starknetWallet.estimateFee(calls);
+      const isFri = estimate.unit === "FRI";
+      return {
+        fee: Amount.fromRaw(estimate.overall_fee, 18, isFri ? "STRK" : "ETH"),
+      };
+    } catch (e) {
+      this.logger.debug("[LayerSwapBridge] estimateStarknetFee failed:", e);
+      return {
+        fee: Amount.fromRaw(0n, 18, "STRK"),
+        error: FeeErrorCause.GENERIC_L2_FEE_ERROR,
+      };
+    }
+  }
+
   private async executeEvmDepositAction(
     action: LsDepositAction
   ): Promise<ExternalTransactionResponse> {
@@ -161,9 +441,12 @@ export class LayerSwapBridge extends EthereumBridge {
       );
     }
 
+    // `value` is only meaningful for native ETH transfers. For ERC20 the
+    // action ships `call_data = transfer(depositAddr, amount)` and sending
+    // non-zero msg.value to a non-payable ERC20 function reverts.
     const tx: Record<string, unknown> = {
       to: action.to_address,
-      value: BigInt(action.amount_in_base_units),
+      value: action.call_data ? 0n : BigInt(action.amount_in_base_units),
     };
 
     if (action.call_data) {

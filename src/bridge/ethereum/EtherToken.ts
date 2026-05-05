@@ -38,11 +38,18 @@ export type EthereumTokenInterface = {
   isNativeEth(): boolean;
 };
 
+const NATIVE_ETH_ADDRESS = "0x0000000000000000000000000000000000000000";
+
 export function intoEthereumToken(
   bridgeToken: EthereumBridgeToken,
   config: EthereumWalletConfig
 ): EthereumTokenInterface {
-  return bridgeToken.id === "eth"
+  // Native ETH can be identified either by the canonical `"eth"` id or by a
+  // zero-address token (used by providers like LayerSwap that assign their
+  // own ids like `"eth-layerswap"` while still referring to native ETH).
+  const isNativeEth =
+    bridgeToken.id === "eth" || bridgeToken.address === NATIVE_ETH_ADDRESS;
+  return isNativeEth
     ? EtherToken.create(config.provider)
     : ERC20EthereumToken.create(bridgeToken.address, config.provider);
 }

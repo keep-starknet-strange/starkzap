@@ -5,6 +5,7 @@ import {
   type BridgeToken,
   type CCTPDepositFeeEstimation,
   type CCTPInitiateWithdrawFeeEstimation,
+  type LayerSwapDepositFeeEstimation,
   type ChainId,
   ConnectedEthereumWallet,
   ConnectedSolanaWallet,
@@ -959,10 +960,16 @@ export function formatFeeEstimate(estimate: AnyFeeEstimate): string {
         `Fast Transfer Fee: ${(cctp.fastTransferBpFee / 100).toFixed(2)}%`
       );
     }
+    const ls = estimate as LayerSwapDepositFeeEstimation;
+    if (ls.avgCompletionTime !== undefined) {
+      lines.push(`Blockchain Fee: ${ls.blockchainFee.toFormatted(false)}`);
+      lines.push(`Service Fee: ${ls.serviceFee.toFormatted(false)}`);
+      lines.push(`Est. Time: ${ls.avgCompletionTime}`);
+    }
   } else if (isSolanaLayerSwapFee(estimate)) {
+    lines.push(`Local Fee: ${estimate.localFee.toFormatted(false)}`);
     lines.push(`Blockchain Fee: ${estimate.blockchainFee.toFormatted(false)}`);
     lines.push(`Service Fee: ${estimate.serviceFee.toFormatted(false)}`);
-    lines.push(`Receive: ${estimate.receiveAmount.toFormatted(false)}`);
     lines.push(`Est. Time: ${estimate.avgCompletionTime}`);
   } else if (isHyperlaneFee(estimate)) {
     lines.push(
