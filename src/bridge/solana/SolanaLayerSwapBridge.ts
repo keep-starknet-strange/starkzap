@@ -4,6 +4,7 @@ import type {
   InitiateBridgeWithdrawOptions,
 } from "@/bridge/types/BridgeInterface";
 import { LayerSwapApi } from "@/bridge/ethereum/layerswap/LayerSwapApi";
+import { normalizeLsTxHash } from "@/bridge/ethereum/layerswap/hashes";
 import type {
   LayerSwapApiConfig,
   LsDepositAction,
@@ -17,10 +18,10 @@ import {
   type Address,
   Amount,
   type ExternalTransactionResponse,
-  fromAddress,
   type SolanaAddress,
   type SolanaBridgeToken,
 } from "@/types";
+import { DUMMY_SN_ADDRESS } from "@/bridge/ethereum/types";
 import { FeeErrorCause } from "@/types/errors";
 import type { WalletInterface } from "@/wallet";
 import { loadSolanaWeb3 } from "@/connect/solanaWeb3Runtime";
@@ -38,13 +39,6 @@ const SOLANA_DEPOSIT_BASE_FEE_LAMPORTS = 5_000n;
 // StarkGate's bridge token registry uses the System Program ID as the
 // `address` marker for native SOL (there is no SPL mint for SOL).
 const NATIVE_SOL_MARKER = "11111111111111111111111111111111";
-
-// Dummy Starknet recipient used for withdraw fee estimation before a real
-// swap exists — we only need it to satisfy the `transfer` calldata shape so
-// `estimateFee` returns a gas estimate.
-const DUMMY_SN_RECIPIENT = fromAddress(
-  "0x023123100123103023123acb1231231231231031231ca123f23123123123100a"
-);
 
 /**
  * LayerSwap bridge provider for Solana → Starknet deposits.
@@ -116,11 +110,8 @@ export class SolanaLayerSwapBridge implements BridgeInterface<SolanaAddress> {
 
     const signature = await this.executeSolanaDepositAction(action);
 
-    try {
-      await this.api.speedUpDeposit(swap.id, signature);
-    } catch {
-      // Non-critical — LayerSwap will detect the deposit on its own.
-    }
+    // Nudge LayerSwap to detect the source-chain tx faster.
+    this.api.speedUpDeposit(swap.id, signature).catch(() => {});
 
     return { hash: signature };
   }
@@ -139,7 +130,13 @@ export class SolanaLayerSwapBridge implements BridgeInterface<SolanaAddress> {
         // grows an `amount` arg, for an exact quote.
         amount: "0",
       })
-      .catch(() => null);
+      .catch((e: unknown) => {
+        this.logger.debug(
+          "[SolanaLayerSwapBridge] getDepositFeeEstimate (quote) failed:",
+          e
+        );
+        return null;
+      });
 
     const decimals = this.bridgeToken.decimals;
     const symbol = this.bridgeToken.symbol;
@@ -246,7 +243,9 @@ export class SolanaLayerSwapBridge implements BridgeInterface<SolanaAddress> {
     const calls = this.buildStarknetTransferCalls(action);
     const tx = await this.starknetWallet.execute(calls, options);
 
-    this.api.speedUpDeposit(swap.id, tx.hash).catch(() => {});
+    this.api
+      .speedUpDeposit(swap.id, normalizeLsTxHash(tx.hash, "starknet"))
+      .catch(() => {});
 
     return tx;
   }
@@ -328,13 +327,26 @@ export class SolanaLayerSwapBridge implements BridgeInterface<SolanaAddress> {
       );
     }
 
-    const calls = (Array.isArray(parsed) ? parsed : [parsed]) as Call[];
-    if (calls.length === 0) {
+    const raw = (Array.isArray(parsed) ? parsed : [parsed]) as unknown[];
+    if (raw.length === 0) {
       throw new Error(
         `LayerSwap returned no Starknet calls (order ${action.order}).`
       );
     }
-    return calls;
+
+    return raw.map((entry, i) => {
+      if (
+        typeof entry !== "object" ||
+        entry === null ||
+        typeof (entry as Call).contractAddress !== "string" ||
+        typeof (entry as Call).entrypoint !== "string"
+      ) {
+        throw new Error(
+          `LayerSwap Starknet call_data entry ${i} is missing required Call fields.`
+        );
+      }
+      return entry as Call;
+    });
   }
 
   private buildDummyStarknetTransferCalls(): Call[] {
@@ -343,7 +355,7 @@ export class SolanaLayerSwapBridge implements BridgeInterface<SolanaAddress> {
         contractAddress: this.bridgeToken.starknetAddress.toString(),
         entrypoint: "transfer",
         calldata: CallData.compile({
-          recipient: DUMMY_SN_RECIPIENT.toString(),
+          recipient: DUMMY_SN_ADDRESS.toString(),
           amount: uint256.bnToUint256(1n),
         }),
       },

@@ -68,6 +68,9 @@ const NETWORK_STORAGE_KEY = "starkzap:web:network";
 const ALCHEMY_API_KEY = import.meta.env.VITE_ALCHEMY_API_KEY as
   | string
   | undefined;
+const SOLANA_RPC_URL = import.meta.env.VITE_SOLANA_RPC_URL as
+  | string
+  | undefined;
 const DEFAULT_RPC_URLS: Record<AppNetwork, string> = {
   [MAINNET_NETWORK]: ALCHEMY_API_KEY
     ? `https://starknet-mainnet.g.alchemy.com/starknet/version/rpc/v0_10/${ALCHEMY_API_KEY}`
@@ -247,24 +250,37 @@ function appendSdkLog(level: string, message: string, args: unknown[]): void {
   }
 }
 
+const ETH_BRIDGING_RPC_URL = ALCHEMY_API_KEY
+  ? NETWORK === "mainnet"
+    ? `https://eth-mainnet.g.alchemy.com/v2/${ALCHEMY_API_KEY}`
+    : `https://eth-sepolia.g.alchemy.com/v2/${ALCHEMY_API_KEY}`
+  : undefined;
+
+// VITE_SOLANA_RPC_URL takes precedence over the Alchemy default — handy when
+// pointing at non-mainnet Solana clusters (Alchemy only serves
+// solana-mainnet) or any third-party RPC. Without this override the SDK
+// falls back to clusterApiUrl(...) which gets 403'd from browsers.
+const SOL_BRIDGING_RPC_URL =
+  SOLANA_RPC_URL ??
+  (NETWORK === "mainnet" && ALCHEMY_API_KEY
+    ? `https://solana-mainnet.g.alchemy.com/v2/${ALCHEMY_API_KEY}`
+    : undefined);
+
 // SDK instance
 const sdk = new StarkZap({
   rpcUrl: RPC_URL,
   chainId: SDK_CHAIN_ID,
   logging: { logger: sdkLogger },
-  ...(ALCHEMY_API_KEY || OFT_PUBLIC_KEY || LAYERSWAP_API_KEY
+  ...(ETH_BRIDGING_RPC_URL ||
+  SOL_BRIDGING_RPC_URL ||
+  OFT_PUBLIC_KEY ||
+  LAYERSWAP_API_KEY
     ? {
         bridging: {
-          ...(ALCHEMY_API_KEY && {
-            ethereumRpcUrl:
-              NETWORK === "mainnet"
-                ? `https://eth-mainnet.g.alchemy.com/v2/${ALCHEMY_API_KEY}`
-                : `https://eth-sepolia.g.alchemy.com/v2/${ALCHEMY_API_KEY}`,
-            solanaRpcUrl:
-              NETWORK === "mainnet"
-                ? `https://solana-mainnet.g.alchemy.com/v2/${ALCHEMY_API_KEY}`
-                : undefined,
+          ...(ETH_BRIDGING_RPC_URL && {
+            ethereumRpcUrl: ETH_BRIDGING_RPC_URL,
           }),
+          ...(SOL_BRIDGING_RPC_URL && { solanaRpcUrl: SOL_BRIDGING_RPC_URL }),
           ...(OFT_PUBLIC_KEY && { layerZeroApiKey: OFT_PUBLIC_KEY }),
           ...(LAYERSWAP_API_KEY && { layerSwapApiKey: LAYERSWAP_API_KEY }),
           ...(LAYERSWAP_BASE_URL && { layerSwapBaseUrl: LAYERSWAP_BASE_URL }),

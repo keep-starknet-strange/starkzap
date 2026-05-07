@@ -6,6 +6,8 @@ import {
   type CCTPDepositFeeEstimation,
   type CCTPInitiateWithdrawFeeEstimation,
   type LayerSwapDepositFeeEstimation,
+  type LayerSwapInitiateWithdrawFeeEstimation,
+  type SolanaLayerSwapInitiateWithdrawFeeEstimation,
   type ChainId,
   ConnectedEthereumWallet,
   ConnectedSolanaWallet,
@@ -399,7 +401,7 @@ export class BridgeController {
             t.chain === ExternalChain.ETHEREUM
         );
         if (!hasEthLayerSwap) {
-          tokens.push(...getEthereumLayerSwapTestTokens());
+          tokens.push(...getEthereumLayerSwapTestTokens(this.chainId));
         }
       }
       if (chains.includes(ExternalChain.SOLANA)) {
@@ -409,7 +411,7 @@ export class BridgeController {
             t.chain === ExternalChain.SOLANA
         );
         if (!hasSolLayerSwap) {
-          tokens.push(...getSolanaLayerSwapTestTokens());
+          tokens.push(...getSolanaLayerSwapTestTokens(this.chainId));
         }
       }
 
@@ -926,7 +928,14 @@ function isEthereumDepositFee(
 function isSolanaLayerSwapFee(
   estimate: AnyFeeEstimate
 ): estimate is SolanaLayerSwapDepositFeeEstimation {
-  return "serviceFee" in estimate && "avgCompletionTime" in estimate;
+  // `localFee` is the Solana-deposit discriminator. Without it, the LayerSwap
+  // withdrawal shapes (Ethereum & Solana) — which also carry serviceFee +
+  // avgCompletionTime — fall into this branch and crash on `localFee.toFormatted`.
+  return (
+    "localFee" in estimate &&
+    "serviceFee" in estimate &&
+    "avgCompletionTime" in estimate
+  );
 }
 
 function isHyperlaneFee(
@@ -1003,6 +1012,14 @@ export function formatFeeEstimate(estimate: AnyFeeEstimate): string {
         `Fast Transfer Fee: ${(cctp.fastTransferBpFee / 100).toFixed(2)}%`
       );
     }
+    const ls = estimate as
+      | LayerSwapInitiateWithdrawFeeEstimation
+      | SolanaLayerSwapInitiateWithdrawFeeEstimation;
+    if (ls.avgCompletionTime !== undefined) {
+      lines.push(`Blockchain Fee: ${ls.blockchainFee.toFormatted(false)}`);
+      lines.push(`Service Fee: ${ls.serviceFee.toFormatted(false)}`);
+      lines.push(`Est. Time: ${ls.avgCompletionTime}`);
+    }
   }
 
   return lines.join("\n");
@@ -1011,8 +1028,24 @@ export function formatFeeEstimate(estimate: AnyFeeEstimate): string {
 /**
  * Hardcoded LayerSwap tokens for testing until StarkGate API includes them.
  * Remove this once StarkGate serves protocol:"layerswap" tokens.
+ *
+ * Addresses must match the configured network — picking the wrong USDC
+ * makes `balanceOf` revert on a non-existent contract and the UI shows "—".
  */
-function getEthereumLayerSwapTestTokens(): EthereumBridgeToken[] {
+function getEthereumLayerSwapTestTokens(
+  chainId: ChainId
+): EthereumBridgeToken[] {
+  const isMainnet = chainId.isMainnet();
+  const usdcL1 = isMainnet
+    ? "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48"
+    : "0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238";
+  // LayerSwap settles in native USDC, not StarkGate-bridged USDC.e — these
+  // are separate ERC20 contracts on Starknet, and `balanceOf` returns 0 on
+  // the wrong one.
+  const usdcSn = isMainnet
+    ? "0x033068f6539f8e6e6b131e6b2b814e6c34a5224bc66947c47dab9dfee93b35fb"
+    : "0x0512feac6339ff7889822cb5aa2a86c848e9d392bb0e3e237c008674feed8343";
+
   return [
     new EthereumBridgeToken({
       id: "eth-layerswap",
@@ -1023,6 +1056,7 @@ function getEthereumLayerSwapTestTokens(): EthereumBridgeToken[] {
       address: "0x0000000000000000000000000000000000000000" as EthereumAddress,
       l1Bridge: "0x0000000000000000000000000000000000000000" as EthereumAddress,
       starknetAddress: fromAddress(
+        // Canonical Starknet ETH ERC20 — same address on mainnet & Sepolia.
         "0x049d36570d4e46f48e99674bd3fcc84644ddd6b96f7c741b1562b82f9e004dc7"
       ),
       starknetBridge: fromAddress("0x0"),
@@ -1033,17 +1067,22 @@ function getEthereumLayerSwapTestTokens(): EthereumBridgeToken[] {
       symbol: "USDC",
       decimals: 6,
       protocol: Protocol.LAYERSWAP,
-      address: "0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238" as EthereumAddress,
+      address: usdcL1 as EthereumAddress,
       l1Bridge: "0x0000000000000000000000000000000000000000" as EthereumAddress,
-      starknetAddress: fromAddress(
-        "0x053c91253bc9682c04929ca02ed00b3e423f6710d2ee7e0d5ebb06f3ecf368a8"
-      ),
+      starknetAddress: fromAddress(usdcSn),
       starknetBridge: fromAddress("0x0"),
     }),
   ];
 }
 
-function getSolanaLayerSwapTestTokens(): SolanaBridgeToken[] {
+function getSolanaLayerSwapTestTokens(chainId: ChainId): SolanaBridgeToken[] {
+  const isMainnet = chainId.isMainnet();
+  // Same native-vs-bridged note as for the Ethereum LayerSwap USDC token —
+  // LayerSwap settles in native USDC.
+  const usdcSn = isMainnet
+    ? "0x033068f6539f8e6e6b131e6b2b814e6c34a5224bc66947c47dab9dfee93b35fb"
+    : "0x0512feac6339ff7889822cb5aa2a86c848e9d392bb0e3e237c008674feed8343";
+
   return [
     new SolanaBridgeToken({
       id: "usdc-solana-layerswap",
@@ -1053,9 +1092,7 @@ function getSolanaLayerSwapTestTokens(): SolanaBridgeToken[] {
       protocol: Protocol.LAYERSWAP,
       address: "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v" as SolanaAddress,
       l1Bridge: "11111111111111111111111111111111" as SolanaAddress,
-      starknetAddress: fromAddress(
-        "0x053c91253bc9682c04929ca02ed00b3e423f6710d2ee7e0d5ebb06f3ecf368a8"
-      ),
+      starknetAddress: fromAddress(usdcSn),
       starknetBridge: fromAddress("0x0"),
     }),
   ];

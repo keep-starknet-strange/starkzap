@@ -277,16 +277,13 @@ export class LayerSwapApi {
       throw new LayerSwapApiError(
         response.status,
         json.error?.code,
-        json.error?.message ?? `LayerSwap API error (HTTP ${response.status})`
+        json.error?.message ?? `LayerSwap API error (HTTP ${response.status})`,
+        json.error?.metadata
       );
     }
-    if (json.data === null || json.data === undefined) {
-      throw new LayerSwapApiError(
-        response.status,
-        undefined,
-        "LayerSwap API returned empty data"
-      );
-    }
-    return json.data;
+    // Successful responses with no payload (e.g. `deposit_speedup`) return
+    // `{ data: null, error: null }`. Treat null/undefined as the empty result
+    // and let typed callers fail at use-site if the contract is broken.
+    return json.data as T;
   }
 }

@@ -9,9 +9,11 @@ import {
   WithdrawalState,
 } from "@/bridge/monitor/types";
 import { LayerSwapApi } from "@/bridge/ethereum/layerswap/LayerSwapApi";
-import type {
-  LayerSwapApiConfig,
-  LsSwap,
+import { normalizeLsTxHash } from "@/bridge/ethereum/layerswap/hashes";
+import {
+  LayerSwapApiError,
+  type LayerSwapApiConfig,
+  type LsSwap,
 } from "@/bridge/ethereum/layerswap/types";
 import type { StarkZapLogger } from "@/logger";
 
@@ -68,7 +70,9 @@ export class LayerSwapMonitor implements BridgeMonitorInterface {
     snTxHash: string,
     externalTxHash?: string
   ): Promise<WithdrawMonitorResult> {
-    const swap = await this.findSwapByHash(snTxHash);
+    const swap = await this.findSwapByHash(
+      normalizeLsTxHash(snTxHash, "starknet")
+    );
     if (!swap) {
       return {
         protocol: "layerswap",
@@ -134,8 +138,15 @@ export class LayerSwapMonitor implements BridgeMonitorInterface {
       const response = await this.api.getSwapByTransactionHash(txHash);
       return response.swap;
     } catch (e) {
+      // 404 is the legitimate "swap not yet indexed" signal — surface it as
+      // null so callers map it to NOT_SUBMITTED_*. Any other failure (rate
+      // limit, 5xx, network) is propagated so a poller can retry rather than
+      // misread a transient error as "not found".
+      if (e instanceof LayerSwapApiError && e.statusCode === 404) {
+        return null;
+      }
       this.logger.debug("[LayerSwapMonitor] findSwapByHash failed:", e);
-      return null;
+      throw e;
     }
   }
 

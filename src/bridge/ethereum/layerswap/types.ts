@@ -305,15 +305,18 @@ export interface LayerSwapApiConfig {
 export class LayerSwapApiError extends Error {
   readonly statusCode: number;
   readonly errorCode: string | undefined;
+  readonly metadata: Record<string, unknown> | undefined;
 
   constructor(
     statusCode: number,
     errorCode: string | undefined,
-    message: string
+    message: string,
+    metadata?: Record<string, unknown>
   ) {
     super(message);
     this.statusCode = statusCode;
     this.errorCode = errorCode;
+    this.metadata = metadata;
     this.name = "LayerSwapApiError";
   }
 }

@@ -5,15 +5,17 @@ import type {
   InitiateBridgeWithdrawOptions,
 } from "@/bridge/types/BridgeInterface";
 import { LayerSwapApi } from "@/bridge/ethereum/layerswap/LayerSwapApi";
+import { normalizeLsTxHash } from "@/bridge/ethereum/layerswap/hashes";
 import type {
   LayerSwapApiConfig,
   LsDepositAction,
 } from "@/bridge/ethereum/layerswap/types";
-import type {
-  EthereumCompleteWithdrawFeeEstimation,
-  EthereumWalletConfig,
-  LayerSwapDepositFeeEstimation,
-  LayerSwapInitiateWithdrawFeeEstimation,
+import {
+  DUMMY_SN_ADDRESS,
+  type EthereumCompleteWithdrawFeeEstimation,
+  type EthereumWalletConfig,
+  type LayerSwapDepositFeeEstimation,
+  type LayerSwapInitiateWithdrawFeeEstimation,
 } from "@/bridge/ethereum/types";
 import {
   type Address,
@@ -22,7 +24,6 @@ import {
   EthereumBridgeToken,
   type ExternalAddress,
   type ExternalTransactionResponse,
-  fromAddress,
 } from "@/types";
 import { FeeErrorCause } from "@/types/errors";
 import type { WalletInterface } from "@/wallet";
@@ -36,12 +37,6 @@ import { type Call, CallData, uint256 } from "starknet";
 // depending on destination slot warmth. Chosen as conservative upper bounds.
 const NATIVE_DEPOSIT_FALLBACK_GAS = 21_000n;
 const ERC20_DEPOSIT_FALLBACK_GAS = 65_000n;
-
-// Dummy Starknet address used for withdraw fee estimation when no real
-// external recipient is known.
-const DUMMY_SN_RECIPIENT = fromAddress(
-  "0x023123100123103023123acb1231231231231031231ca123f23123123123100a"
-);
 
 /**
  * LayerSwap bridge provider for cross-chain deposits via the LayerSwap API.
@@ -110,11 +105,8 @@ export class LayerSwapBridge extends EthereumBridge {
 
     const { hash } = await this.executeEvmDepositAction(action);
 
-    try {
-      await this.api.speedUpDeposit(swap.id, hash);
-    } catch {
-      // Non-critical — LayerSwap will detect the deposit on its own.
-    }
+    // Nudge LayerSwap to detect the source-chain tx faster.
+    this.api.speedUpDeposit(swap.id, hash).catch(() => {});
 
     return { hash };
   }
@@ -217,7 +209,9 @@ export class LayerSwapBridge extends EthereumBridge {
 
     // Nudge LayerSwap to detect the Starknet tx faster. Non-critical — the
     // poller on their end picks it up regardless.
-    this.api.speedUpDeposit(swap.id, tx.hash).catch(() => {});
+    this.api
+      .speedUpDeposit(swap.id, normalizeLsTxHash(tx.hash, "starknet"))
+      .catch(() => {});
 
     return tx;
   }
@@ -392,13 +386,26 @@ export class LayerSwapBridge extends EthereumBridge {
       );
     }
 
-    const calls = (Array.isArray(parsed) ? parsed : [parsed]) as Call[];
-    if (calls.length === 0) {
+    const raw = (Array.isArray(parsed) ? parsed : [parsed]) as unknown[];
+    if (raw.length === 0) {
       throw new Error(
         `LayerSwap returned no Starknet calls (order ${action.order}).`
       );
     }
-    return calls;
+
+    return raw.map((entry, i) => {
+      if (
+        typeof entry !== "object" ||
+        entry === null ||
+        typeof (entry as Call).contractAddress !== "string" ||
+        typeof (entry as Call).entrypoint !== "string"
+      ) {
+        throw new Error(
+          `LayerSwap Starknet call_data entry ${i} is missing required Call fields.`
+        );
+      }
+      return entry as Call;
+    });
   }
 
   private buildDummyStarknetTransferCalls(): Call[] {
@@ -407,7 +414,7 @@ export class LayerSwapBridge extends EthereumBridge {
         contractAddress: this.bridgeToken.starknetAddress.toString(),
         entrypoint: "transfer",
         calldata: CallData.compile({
-          recipient: DUMMY_SN_RECIPIENT.toString(),
+          recipient: DUMMY_SN_ADDRESS.toString(),
           amount: uint256.bnToUint256(1n),
         }),
       },
@@ -441,23 +448,20 @@ export class LayerSwapBridge extends EthereumBridge {
       );
     }
 
-    // `value` is only meaningful for native ETH transfers. For ERC20 the
-    // action ships `call_data = transfer(depositAddr, amount)` and sending
-    // non-zero msg.value to a non-payable ERC20 function reverts.
-    const tx: Record<string, unknown> = {
+    // Native chain currency has `token.contract === null`. Native deposits
+    // can still ship `call_data` (a watcher contract that records the
+    // deposit) and that call needs `msg.value`. ERC20 deposits ship
+    // `call_data = transfer(depositAddr, amount)` to a non-payable function
+    // and must use value=0.
+    const isNative = !action.token.contract;
+    const tx: TransactionRequest = {
       to: action.to_address,
-      value: action.call_data ? 0n : BigInt(action.amount_in_base_units),
+      value: isNative ? BigInt(action.amount_in_base_units) : 0n,
+      ...(action.call_data && { data: action.call_data }),
+      ...(action.gas_limit && { gasLimit: BigInt(action.gas_limit) }),
     };
 
-    if (action.call_data) {
-      tx["data"] = action.call_data;
-    }
-
-    if (action.gas_limit) {
-      tx["gasLimit"] = BigInt(action.gas_limit);
-    }
-
-    const response = await this.config.signer.sendTransaction(tx);
+    const response = await this.execute(tx);
     const receipt = await response.wait();
     if (!receipt?.status) {
       throw new Error(
