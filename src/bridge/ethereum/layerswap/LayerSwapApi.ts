@@ -272,7 +272,18 @@ export class LayerSwapApi {
   }
 
   private async unwrap<T>(response: Response): Promise<T> {
-    const json = (await response.json()) as LsApiResponse<T>;
+    let json: LsApiResponse<T>;
+    try {
+      json = (await response.json()) as LsApiResponse<T>;
+    } catch {
+      // CDN/edge errors (e.g. 502 with HTML body) won't be JSON. Surface
+      // them as a structured LayerSwapApiError instead of a raw SyntaxError.
+      throw new LayerSwapApiError(
+        response.status,
+        undefined,
+        `LayerSwap API returned non-JSON response (HTTP ${response.status})`
+      );
+    }
     if (!response.ok || json.error) {
       throw new LayerSwapApiError(
         response.status,

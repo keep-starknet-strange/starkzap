@@ -6,12 +6,16 @@ import type {
 } from "@/bridge/types/BridgeInterface";
 import { LayerSwapApi } from "@/bridge/ethereum/layerswap/LayerSwapApi";
 import { normalizeLsTxHash } from "@/bridge/ethereum/layerswap/hashes";
+import {
+  buildDummyStarknetTransferCalls,
+  estimateStarknetFee,
+  parseLayerSwapStarknetCalls,
+} from "@/bridge/ethereum/layerswap/starknet";
 import type {
   LayerSwapApiConfig,
   LsDepositAction,
 } from "@/bridge/ethereum/layerswap/types";
 import {
-  DUMMY_SN_ADDRESS,
   type EthereumCompleteWithdrawFeeEstimation,
   type EthereumWalletConfig,
   type LayerSwapDepositFeeEstimation,
@@ -30,7 +34,6 @@ import type { WalletInterface } from "@/wallet";
 import type { StarkZapLogger } from "@/logger";
 import type { TransactionRequest } from "ethers";
 import type { Tx } from "@/tx";
-import { type Call, CallData, uint256 } from "starknet";
 
 // Fallback gas units when `provider.estimateGas` fails (e.g. the user has no
 // source-token balance yet). Native ETH send ≈ 21k; ERC20 transfer ≈ 45–65k
@@ -105,8 +108,11 @@ export class LayerSwapBridge extends EthereumBridge {
 
     const { hash } = await this.executeEvmDepositAction(action);
 
-    // Nudge LayerSwap to detect the source-chain tx faster.
-    this.api.speedUpDeposit(swap.id, hash).catch(() => {});
+    // Nudge LayerSwap to detect the source-chain tx faster. Non-critical —
+    // their poller picks it up regardless.
+    this.api.speedUpDeposit(swap.id, hash).catch((e: unknown) => {
+      this.logger.debug("[LayerSwapBridge] speedUpDeposit failed:", e);
+    });
 
     return { hash };
   }
@@ -204,14 +210,19 @@ export class LayerSwapBridge extends EthereumBridge {
       );
     }
 
-    const calls = this.buildStarknetTransferCalls(action);
+    const calls = parseLayerSwapStarknetCalls(
+      action,
+      this.bridgeToken.starknetAddress.toString()
+    );
     const tx = await this.starknetWallet.execute(calls, options);
 
     // Nudge LayerSwap to detect the Starknet tx faster. Non-critical — the
     // poller on their end picks it up regardless.
     this.api
       .speedUpDeposit(swap.id, normalizeLsTxHash(tx.hash, "starknet"))
-      .catch(() => {});
+      .catch((e: unknown) => {
+        this.logger.debug("[LayerSwapBridge] speedUpDeposit failed:", e);
+      });
 
     return tx;
   }
@@ -219,7 +230,9 @@ export class LayerSwapBridge extends EthereumBridge {
   async getInitiateWithdrawFeeEstimate(
     _options?: InitiateBridgeWithdrawOptions
   ): Promise<LayerSwapInitiateWithdrawFeeEstimation> {
-    const dummyCalls = this.buildDummyStarknetTransferCalls();
+    const dummyCalls = buildDummyStarknetTransferCalls(
+      this.bridgeToken.starknetAddress.toString()
+    );
 
     const [quote, l2] = await Promise.all([
       this.api
@@ -237,7 +250,12 @@ export class LayerSwapBridge extends EthereumBridge {
           );
           return null;
         }),
-      this.estimateStarknetFee(dummyCalls),
+      estimateStarknetFee(
+        this.starknetWallet,
+        dummyCalls,
+        this.logger,
+        "LayerSwapBridge"
+      ),
     ]);
 
     const decimals = this.bridgeToken.decimals;
@@ -357,84 +375,6 @@ export class LayerSwapBridge extends EthereumBridge {
       return {
         l1Fee: this.ethAmount(0n),
         l1FeeError: FeeErrorCause.GENERIC_L1_FEE_ERROR,
-      };
-    }
-  }
-
-  /**
-   * Parse LayerSwap's Starknet deposit action into executable calls.
-   *
-   * LayerSwap ships the full Starknet call(s) as a JSON string in `call_data`.
-   * Their reference UI does `account.execute(JSON.parse(callData))` — so the
-   * parsed value is either a single `Call` or `Call[]`.
-   */
-  private buildStarknetTransferCalls(action: LsDepositAction): Call[] {
-    if (!action.call_data) {
-      throw new Error(
-        `Starknet deposit action (order ${action.order}) has no call_data.`
-      );
-    }
-
-    let parsed: unknown;
-    try {
-      parsed = JSON.parse(action.call_data);
-    } catch (e) {
-      throw new Error(
-        `Failed to parse LayerSwap Starknet call_data as JSON: ${
-          (e as Error).message
-        }`
-      );
-    }
-
-    const raw = (Array.isArray(parsed) ? parsed : [parsed]) as unknown[];
-    if (raw.length === 0) {
-      throw new Error(
-        `LayerSwap returned no Starknet calls (order ${action.order}).`
-      );
-    }
-
-    return raw.map((entry, i) => {
-      if (
-        typeof entry !== "object" ||
-        entry === null ||
-        typeof (entry as Call).contractAddress !== "string" ||
-        typeof (entry as Call).entrypoint !== "string"
-      ) {
-        throw new Error(
-          `LayerSwap Starknet call_data entry ${i} is missing required Call fields.`
-        );
-      }
-      return entry as Call;
-    });
-  }
-
-  private buildDummyStarknetTransferCalls(): Call[] {
-    return [
-      {
-        contractAddress: this.bridgeToken.starknetAddress.toString(),
-        entrypoint: "transfer",
-        calldata: CallData.compile({
-          recipient: DUMMY_SN_ADDRESS.toString(),
-          amount: uint256.bnToUint256(1n),
-        }),
-      },
-    ];
-  }
-
-  private async estimateStarknetFee(
-    calls: Call[]
-  ): Promise<{ fee: Amount; error?: FeeErrorCause }> {
-    try {
-      const estimate = await this.starknetWallet.estimateFee(calls);
-      const isFri = estimate.unit === "FRI";
-      return {
-        fee: Amount.fromRaw(estimate.overall_fee, 18, isFri ? "STRK" : "ETH"),
-      };
-    } catch (e) {
-      this.logger.debug("[LayerSwapBridge] estimateStarknetFee failed:", e);
-      return {
-        fee: Amount.fromRaw(0n, 18, "STRK"),
-        error: FeeErrorCause.GENERIC_L2_FEE_ERROR,
       };
     }
   }
