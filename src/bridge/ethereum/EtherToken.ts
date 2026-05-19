@@ -45,7 +45,7 @@ export function intoEthereumToken(
   config: EthereumWalletConfig
 ): EthereumTokenInterface {
   // Native ETH can be identified either by the canonical `"eth"` id or by a
-  // zero-address token (used by providers like LayerSwap that assign their
+  // zero-address token (used by providers like Layerswap that assign their
   // own ids like `"eth-layerswap"` while still referring to native ETH).
   const isNativeEth =
     bridgeToken.id === "eth" || bridgeToken.address === NATIVE_ETH_ADDRESS;

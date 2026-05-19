@@ -4,22 +4,22 @@ import type {
   CompleteBridgeWithdrawOptions,
   InitiateBridgeWithdrawOptions,
 } from "@/bridge/types/BridgeInterface";
-import { LayerSwapApi } from "@/bridge/ethereum/layerswap/LayerSwapApi";
+import { LayerswapApi } from "@/bridge/ethereum/layerswap/LayerswapApi";
 import { normalizeLsTxHash } from "@/bridge/ethereum/layerswap/hashes";
 import {
   buildDummyStarknetTransferCalls,
   estimateStarknetFee,
-  parseLayerSwapStarknetCalls,
+  parseLayerswapStarknetCalls,
 } from "@/bridge/ethereum/layerswap/starknet";
 import type {
-  LayerSwapApiConfig,
+  LayerswapApiConfig,
   LsDepositAction,
 } from "@/bridge/ethereum/layerswap/types";
 import {
   type EthereumCompleteWithdrawFeeEstimation,
   type EthereumWalletConfig,
-  type LayerSwapDepositFeeEstimation,
-  type LayerSwapInitiateWithdrawFeeEstimation,
+  type LayerswapDepositFeeEstimation,
+  type LayerswapInitiateWithdrawFeeEstimation,
 } from "@/bridge/ethereum/types";
 import {
   type Address,
@@ -42,18 +42,18 @@ const NATIVE_DEPOSIT_FALLBACK_GAS = 21_000n;
 const ERC20_DEPOSIT_FALLBACK_GAS = 65_000n;
 
 /**
- * LayerSwap bridge provider for cross-chain deposits via the LayerSwap API.
+ * Layerswap bridge provider for cross-chain deposits via the Layerswap API.
  *
  * Handles Ethereum → Starknet transfers. The deposit flow:
- * 1. Creates a swap on LayerSwap API
+ * 1. Creates a swap on Layerswap API
  * 2. Retrieves deposit actions (EVM transactions to execute)
  * 3. Executes the deposit on Ethereum via the connected signer
- * 4. Notifies LayerSwap for faster detection
+ * 4. Notifies Layerswap for faster detection
  *
  * Routed by {@link BridgeOperator} when `token.protocol === Protocol.LAYERSWAP`.
  */
-export class LayerSwapBridge extends EthereumBridge {
-  private readonly api: LayerSwapApi;
+export class LayerswapBridge extends EthereumBridge {
+  private readonly api: LayerswapApi;
   private readonly sourceNetwork: string;
   private readonly destNetwork: string;
 
@@ -63,10 +63,10 @@ export class LayerSwapBridge extends EthereumBridge {
     starknetWallet: WalletInterface,
     apiKey: string,
     logger: StarkZapLogger,
-    apiConfig?: Omit<LayerSwapApiConfig, "apiKey">
+    apiConfig?: Omit<LayerswapApiConfig, "apiKey">
   ) {
     super(bridgeToken, config, starknetWallet, logger);
-    this.api = new LayerSwapApi({ apiKey, ...apiConfig });
+    this.api = new LayerswapApi({ apiKey, ...apiConfig });
     const mainnet = starknetWallet.getChainId().isMainnet();
     this.sourceNetwork = mainnet ? "ETHEREUM_MAINNET" : "ETHEREUM_SEPOLIA";
     this.destNetwork = mainnet ? "STARKNET_MAINNET" : "STARKNET_SEPOLIA";
@@ -108,10 +108,10 @@ export class LayerSwapBridge extends EthereumBridge {
 
     const { hash } = await this.executeEvmDepositAction(action);
 
-    // Nudge LayerSwap to detect the source-chain tx faster. Non-critical —
+    // Nudge Layerswap to detect the source-chain tx faster. Non-critical —
     // their poller picks it up regardless.
     this.api.speedUpDeposit(swap.id, hash).catch((e: unknown) => {
-      this.logger.debug("[LayerSwapBridge] speedUpDeposit failed:", e);
+      this.logger.debug("[LayerswapBridge] speedUpDeposit failed:", e);
     });
 
     return { hash };
@@ -119,7 +119,7 @@ export class LayerSwapBridge extends EthereumBridge {
 
   async getDepositFeeEstimate(
     _options?: BridgeDepositOptions
-  ): Promise<LayerSwapDepositFeeEstimation> {
+  ): Promise<LayerswapDepositFeeEstimation> {
     const [quote, sourceTxFee] = await Promise.all([
       this.api
         .getQuote({
@@ -127,14 +127,14 @@ export class LayerSwapBridge extends EthereumBridge {
           sourceToken: this.bridgeToken.symbol,
           destinationNetwork: this.destNetwork,
           destinationToken: this.bridgeToken.symbol,
-          // LayerSwap treats `0` as "quote at the route minimum". Pass the
+          // Layerswap treats `0` as "quote at the route minimum". Pass the
           // user's amount here once `BridgeInterface.getDepositFeeEstimate`
           // grows an `amount` arg, for an exact quote.
           amount: "0",
         })
         .catch((e: unknown) => {
           this.logger.debug(
-            "[LayerSwapBridge] getDepositFeeEstimate (quote) failed:",
+            "[LayerswapBridge] getDepositFeeEstimate (quote) failed:",
             e
           );
           return null;
@@ -156,7 +156,7 @@ export class LayerSwapBridge extends EthereumBridge {
       }),
       l2Fee: zeroEth,
       approvalFee: zeroEth,
-      // LayerSwap-specific fees — bridge-token denominated, deducted from input.
+      // Layerswap-specific fees — bridge-token denominated, deducted from input.
       blockchainFee: quote
         ? Amount.parse(String(quote.blockchain_fee), decimals, symbol)
         : zeroBridgeToken,
@@ -171,11 +171,11 @@ export class LayerSwapBridge extends EthereumBridge {
   }
 
   /**
-   * Initiate a withdrawal from Starknet → Ethereum via LayerSwap.
+   * Initiate a withdrawal from Starknet → Ethereum via Layerswap.
    *
-   * Creates a LayerSwap swap with source=Starknet, destination=Ethereum, and
-   * executes the Starknet transfer into LayerSwap's deposit address.
-   * LayerSwap auto-delivers the funds on Ethereum — no `completeWithdraw` step.
+   * Creates a Layerswap swap with source=Starknet, destination=Ethereum, and
+   * executes the Starknet transfer into Layerswap's deposit address.
+   * Layerswap auto-delivers the funds on Ethereum — no `completeWithdraw` step.
    */
   override async initiateWithdraw(
     recipient: ExternalAddress,
@@ -210,18 +210,18 @@ export class LayerSwapBridge extends EthereumBridge {
       );
     }
 
-    const calls = parseLayerSwapStarknetCalls(
+    const calls = parseLayerswapStarknetCalls(
       action,
       this.bridgeToken.starknetAddress.toString()
     );
     const tx = await this.starknetWallet.execute(calls, options);
 
-    // Nudge LayerSwap to detect the Starknet tx faster. Non-critical — the
+    // Nudge Layerswap to detect the Starknet tx faster. Non-critical — the
     // poller on their end picks it up regardless.
     this.api
       .speedUpDeposit(swap.id, normalizeLsTxHash(tx.hash, "starknet"))
       .catch((e: unknown) => {
-        this.logger.debug("[LayerSwapBridge] speedUpDeposit failed:", e);
+        this.logger.debug("[LayerswapBridge] speedUpDeposit failed:", e);
       });
 
     return tx;
@@ -229,7 +229,7 @@ export class LayerSwapBridge extends EthereumBridge {
 
   async getInitiateWithdrawFeeEstimate(
     _options?: InitiateBridgeWithdrawOptions
-  ): Promise<LayerSwapInitiateWithdrawFeeEstimation> {
+  ): Promise<LayerswapInitiateWithdrawFeeEstimation> {
     const dummyCalls = buildDummyStarknetTransferCalls(
       this.bridgeToken.starknetAddress.toString()
     );
@@ -245,7 +245,7 @@ export class LayerSwapBridge extends EthereumBridge {
         })
         .catch((e: unknown) => {
           this.logger.debug(
-            "[LayerSwapBridge] getInitiateWithdrawFeeEstimate (quote) failed:",
+            "[LayerswapBridge] getInitiateWithdrawFeeEstimate (quote) failed:",
             e
           );
           return null;
@@ -254,7 +254,7 @@ export class LayerSwapBridge extends EthereumBridge {
         this.starknetWallet,
         dummyCalls,
         this.logger,
-        "LayerSwapBridge"
+        "LayerswapBridge"
       ),
     ]);
 
@@ -279,7 +279,7 @@ export class LayerSwapBridge extends EthereumBridge {
   }
 
   /**
-   * LayerSwap delivers funds automatically on the destination chain — the
+   * Layerswap delivers funds automatically on the destination chain — the
    * user never calls `completeWithdraw`.
    */
   override async completeWithdraw(
@@ -288,7 +288,7 @@ export class LayerSwapBridge extends EthereumBridge {
     _options?: CompleteBridgeWithdrawOptions
   ): Promise<ExternalTransactionResponse> {
     throw new Error(
-      "LayerSwap withdrawals are delivered automatically — no completeWithdraw step is required."
+      "Layerswap withdrawals are delivered automatically — no completeWithdraw step is required."
     );
   }
 
@@ -298,11 +298,11 @@ export class LayerSwapBridge extends EthereumBridge {
     _options?: CompleteBridgeWithdrawOptions
   ): Promise<EthereumCompleteWithdrawFeeEstimation> {
     throw new Error(
-      "LayerSwap withdrawals are delivered automatically — no completion fee applies."
+      "Layerswap withdrawals are delivered automatically — no completion fee applies."
     );
   }
 
-  // LayerSwap handles approvals within deposit actions.
+  // Layerswap handles approvals within deposit actions.
   protected async getAllowanceSpender(): Promise<EthereumAddress | null> {
     return null;
   }
@@ -359,7 +359,7 @@ export class LayerSwapBridge extends EthereumBridge {
         return { l1Fee: this.ethAmount(gasUnits * gasPrice) };
       } catch (e) {
         this.logger.debug(
-          "[LayerSwapBridge] estimateSourceTxFee (estimateGas) failed:",
+          "[LayerswapBridge] estimateSourceTxFee (estimateGas) failed:",
           e
         );
         return {
@@ -369,7 +369,7 @@ export class LayerSwapBridge extends EthereumBridge {
       }
     } catch (e) {
       this.logger.debug(
-        "[LayerSwapBridge] estimateSourceTxFee (gas price) failed:",
+        "[LayerswapBridge] estimateSourceTxFee (gas price) failed:",
         e
       );
       return {
@@ -405,7 +405,7 @@ export class LayerSwapBridge extends EthereumBridge {
     const receipt = await response.wait();
     if (!receipt?.status) {
       throw new Error(
-        `LayerSwap deposit action (order ${action.order}) failed on-chain.`
+        `Layerswap deposit action (order ${action.order}) failed on-chain.`
       );
     }
 

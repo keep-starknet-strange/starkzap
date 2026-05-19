@@ -7,14 +7,14 @@ import type { WalletInterface } from "@/wallet";
 import { type Call, CallData, num, uint256 } from "starknet";
 
 /**
- * Parse and validate LayerSwap's Starknet deposit-action `call_data`.
+ * Parse and validate Layerswap's Starknet deposit-action `call_data`.
  *
- * LayerSwap delivers Starknet calls as a JSON-encoded `Call` or `Call[]`.
+ * Layerswap delivers Starknet calls as a JSON-encoded `Call` or `Call[]`.
  * Since these calls are signed by the user's Starknet wallet, we constrain
  * them to a `transfer` on the bridge token contract — anything else is
  * rejected as an unexpected (potentially malicious) call.
  */
-export function parseLayerSwapStarknetCalls(
+export function parseLayerswapStarknetCalls(
   action: LsDepositAction,
   expectedContractAddress: string
 ): Call[] {
@@ -29,7 +29,7 @@ export function parseLayerSwapStarknetCalls(
     parsed = JSON.parse(action.call_data);
   } catch (e) {
     throw new Error(
-      `Failed to parse LayerSwap Starknet call_data as JSON: ${
+      `Failed to parse Layerswap Starknet call_data as JSON: ${
         (e as Error).message
       }`
     );
@@ -38,7 +38,7 @@ export function parseLayerSwapStarknetCalls(
   const raw = (Array.isArray(parsed) ? parsed : [parsed]) as unknown[];
   if (raw.length === 0) {
     throw new Error(
-      `LayerSwap returned no Starknet calls (order ${action.order}).`
+      `Layerswap returned no Starknet calls (order ${action.order}).`
     );
   }
 
@@ -52,18 +52,18 @@ export function parseLayerSwapStarknetCalls(
       typeof (entry as Call).entrypoint !== "string"
     ) {
       throw new Error(
-        `LayerSwap Starknet call_data entry ${i} is missing required Call fields.`
+        `Layerswap Starknet call_data entry ${i} is missing required Call fields.`
       );
     }
     const call = entry as Call;
     if (num.toHex64(call.contractAddress) !== expected) {
       throw new Error(
-        `LayerSwap call_data entry ${i} targets unexpected contract "${call.contractAddress}" (expected bridge token "${expectedContractAddress}").`
+        `Layerswap call_data entry ${i} targets unexpected contract "${call.contractAddress}" (expected bridge token "${expectedContractAddress}").`
       );
     }
     if (call.entrypoint !== "transfer") {
       throw new Error(
-        `LayerSwap call_data entry ${i} uses unexpected entrypoint "${call.entrypoint}" (expected "transfer").`
+        `Layerswap call_data entry ${i} uses unexpected entrypoint "${call.entrypoint}" (expected "transfer").`
       );
     }
     return call;

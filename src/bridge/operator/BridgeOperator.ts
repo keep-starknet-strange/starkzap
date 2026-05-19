@@ -368,17 +368,17 @@ export class BridgeOperator implements BridgeOperatorInterface {
         );
       }
       case Protocol.LAYERSWAP: {
-        const apiKey = this.bridgingConfig?.layerSwapApiKey;
+        const apiKey = this.bridgingConfig?.layerswapApiKey;
         if (!apiKey) {
           throw new Error(
-            "LayerSwap bridging requires an API key. " +
-              'Set "bridging.layerSwapApiKey" in the SDK configuration.'
+            "Layerswap bridging requires an API key. " +
+              'Set "bridging.layerswapApiKey" in the SDK configuration.'
           );
         }
-        const { LayerSwapBridge } =
-          await import("@/bridge/ethereum/layerswap/LayerSwapBridge");
-        const baseUrl = this.bridgingConfig?.layerSwapBaseUrl;
-        return new LayerSwapBridge(
+        const { LayerswapBridge } =
+          await import("@/bridge/ethereum/layerswap/LayerswapBridge");
+        const baseUrl = this.bridgingConfig?.layerswapBaseUrl;
+        return new LayerswapBridge(
           token,
           walletConfig,
           starknetWallet,
@@ -420,17 +420,17 @@ export class BridgeOperator implements BridgeOperatorInterface {
           starknetWallet
         );
       case Protocol.LAYERSWAP: {
-        const apiKey = this.bridgingConfig?.layerSwapApiKey;
+        const apiKey = this.bridgingConfig?.layerswapApiKey;
         if (!apiKey) {
           throw new Error(
-            "LayerSwap bridging requires an API key. " +
-              'Set "bridging.layerSwapApiKey" in the SDK configuration.'
+            "Layerswap bridging requires an API key. " +
+              'Set "bridging.layerswapApiKey" in the SDK configuration.'
           );
         }
-        const { SolanaLayerSwapBridge } =
-          await import("@/bridge/solana/SolanaLayerSwapBridge");
-        const baseUrl = this.bridgingConfig?.layerSwapBaseUrl;
-        return new SolanaLayerSwapBridge(
+        const { SolanaLayerswapBridge } =
+          await import("@/bridge/solana/SolanaLayerswapBridge");
+        const baseUrl = this.bridgingConfig?.layerswapBaseUrl;
+        return new SolanaLayerswapBridge(
           token,
           walletConfig,
           starknetWallet,
@@ -449,17 +449,17 @@ export class BridgeOperator implements BridgeOperatorInterface {
   private async monitor(token: BridgeToken): Promise<BridgeMonitorInterface> {
     if (token.protocol === Protocol.LAYERSWAP) {
       return this.getOrCreateMonitor(Protocol.LAYERSWAP, async () => {
-        const apiKey = this.bridgingConfig?.layerSwapApiKey;
+        const apiKey = this.bridgingConfig?.layerswapApiKey;
         if (!apiKey) {
           throw new Error(
-            "LayerSwap bridge monitoring requires an API key. " +
-              'Set "bridging.layerSwapApiKey" in the SDK configuration.'
+            "Layerswap bridge monitoring requires an API key. " +
+              'Set "bridging.layerswapApiKey" in the SDK configuration.'
           );
         }
-        const { LayerSwapMonitor } =
-          await import("@/bridge/monitor/layerswap/LayerSwapMonitor");
-        const baseUrl = this.bridgingConfig?.layerSwapBaseUrl;
-        return new LayerSwapMonitor({
+        const { LayerswapMonitor } =
+          await import("@/bridge/monitor/layerswap/LayerswapMonitor");
+        const baseUrl = this.bridgingConfig?.layerswapBaseUrl;
+        return new LayerswapMonitor({
           apiKey,
           logger: this.logger,
           ...(baseUrl !== undefined && { baseUrl }),

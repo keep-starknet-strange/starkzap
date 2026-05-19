@@ -8,36 +8,36 @@ import {
   DepositState,
   WithdrawalState,
 } from "@/bridge/monitor/types";
-import { LayerSwapApi } from "@/bridge/ethereum/layerswap/LayerSwapApi";
+import { LayerswapApi } from "@/bridge/ethereum/layerswap/LayerswapApi";
 import { normalizeLsTxHash } from "@/bridge/ethereum/layerswap/hashes";
 import {
-  LayerSwapApiError,
-  type LayerSwapApiConfig,
+  LayerswapApiError,
+  type LayerswapApiConfig,
   type LsSwap,
 } from "@/bridge/ethereum/layerswap/types";
 import type { StarkZapLogger } from "@/logger";
 
-export interface LayerSwapMonitorOptions {
+export interface LayerswapMonitorOptions {
   apiKey: string;
   logger: StarkZapLogger;
   baseUrl?: string;
 }
 
 /**
- * LayerSwap lifecycle status → internal transfer-status mapping. Input for
+ * Layerswap lifecycle status → internal transfer-status mapping. Input for
  * deposit (`external → Starknet`) and withdrawal (`Starknet → external`)
  * differ only in which side is "source" vs "destination" — the swap lifecycle
  * itself is symmetric.
  */
-export class LayerSwapMonitor implements BridgeMonitorInterface {
-  private readonly api: LayerSwapApi;
+export class LayerswapMonitor implements BridgeMonitorInterface {
+  private readonly api: LayerswapApi;
   private readonly logger: StarkZapLogger;
 
-  constructor(options: LayerSwapMonitorOptions) {
-    const apiConfig: LayerSwapApiConfig = options.baseUrl
+  constructor(options: LayerswapMonitorOptions) {
+    const apiConfig: LayerswapApiConfig = options.baseUrl
       ? { apiKey: options.apiKey, baseUrl: options.baseUrl }
       : { apiKey: options.apiKey };
-    this.api = new LayerSwapApi(apiConfig);
+    this.api = new LayerswapApi(apiConfig);
     this.logger = options.logger;
   }
 
@@ -142,10 +142,10 @@ export class LayerSwapMonitor implements BridgeMonitorInterface {
       // null so callers map it to NOT_SUBMITTED_*. Any other failure (rate
       // limit, 5xx, network) is propagated so a poller can retry rather than
       // misread a transient error as "not found".
-      if (e instanceof LayerSwapApiError && e.statusCode === 404) {
+      if (e instanceof LayerswapApiError && e.statusCode === 404) {
         return null;
       }
-      this.logger.debug("[LayerSwapMonitor] findSwapByHash failed:", e);
+      this.logger.debug("[LayerswapMonitor] findSwapByHash failed:", e);
       throw e;
     }
   }
