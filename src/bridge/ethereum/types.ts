@@ -48,21 +48,15 @@ export type OftDepositFeeEstimation = EthereumDepositFeeEstimation & {
   interchainFee: Amount;
 };
 
-/**
- * Quote is requested at the Layerswap route minimum (`amount: 0`), so
- * percentage-scaled components will differ for larger deposits — re-quote
- * at swap-creation time for exact numbers.
- */
-export type LayerswapDepositFeeEstimation = EthereumDepositFeeEstimation & {
-  /** Destination-chain settlement cost quoted by Layerswap (bridge token, deducted from input). */
+export type LayerswapQuoteFields = {
   blockchainFee: Amount;
-  /** Layerswap service fee portion at the route minimum tier (bridge token, deducted from input). */
   serviceFee: Amount;
-  /** Estimated completion time (e.g. "00:02:00"). */
   avgCompletionTime: string;
-  /** Set when the Layerswap quote fetch fails; `blockchainFee` / `serviceFee` / `avgCompletionTime` will be zero/empty. */
   quoteError?: FeeErrorCause;
 };
+
+export type LayerswapDepositFeeEstimation = EthereumDepositFeeEstimation &
+  LayerswapQuoteFields;
 
 export type EthereumInitiateWithdrawFeeEstimation = {
   l2Fee: Amount;
@@ -71,22 +65,8 @@ export type EthereumInitiateWithdrawFeeEstimation = {
   autoWithdrawFeeError?: FeeErrorCause | undefined;
 };
 
-/**
- * Quote is requested at the Layerswap route minimum (`amount: 0`), so
- * percentage-scaled components will differ for larger withdrawals — re-quote
- * at swap-creation time for exact numbers.
- */
 export type LayerswapInitiateWithdrawFeeEstimation =
-  EthereumInitiateWithdrawFeeEstimation & {
-    /** Destination-chain settlement cost quoted by Layerswap (bridge token, deducted from input). */
-    blockchainFee: Amount;
-    /** Layerswap service fee portion at the route minimum tier (bridge token, deducted from input). */
-    serviceFee: Amount;
-    /** Estimated completion time (e.g. "00:02:00"). */
-    avgCompletionTime: string;
-    /** Set when the Layerswap quote fetch fails; `blockchainFee` / `serviceFee` / `avgCompletionTime` will be zero/empty. */
-    quoteError?: FeeErrorCause;
-  };
+  EthereumInitiateWithdrawFeeEstimation & LayerswapQuoteFields;
 
 export type EthereumCompleteWithdrawFeeEstimation = {
   l1Fee: Amount;
