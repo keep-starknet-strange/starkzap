@@ -3,9 +3,48 @@ import { StarkZap } from "@/sdk";
 import { StarkSigner } from "@/signer";
 import { OpenZeppelinPreset, ArgentPreset, BraavosPreset } from "@/account";
 import { Amount, ChainId, fromAddress, type Token } from "@/types";
+import type { WalletInterface } from "@/wallet";
 import type { SwapProvider } from "@/swap";
 import type { DcaProvider } from "@/dca";
 import { getTestConfig, testPrivateKeys } from "./config.js";
+
+function createStubWallet(deployed = true): {
+  wallet: WalletInterface;
+  ensureReady: ReturnType<typeof vi.fn>;
+  isDeployed: ReturnType<typeof vi.fn>;
+  registerSwapProvider: ReturnType<typeof vi.fn>;
+  setDefaultSwapProvider: ReturnType<typeof vi.fn>;
+  registerDcaProvider: ReturnType<typeof vi.fn>;
+  setDefaultDcaProvider: ReturnType<typeof vi.fn>;
+} {
+  const ensureReady = vi.fn().mockResolvedValue(undefined);
+  const isDeployed = vi.fn().mockResolvedValue(deployed);
+  const registerSwapProvider = vi.fn();
+  const setDefaultSwapProvider = vi.fn();
+  const registerDcaProvider = vi.fn();
+  const setDefaultDcaProvider = vi.fn();
+
+  const wallet = {
+    ensureReady,
+    isDeployed,
+    registerSwapProvider,
+    setDefaultSwapProvider,
+    dca: () => ({
+      registerProvider: registerDcaProvider,
+      setDefaultProvider: setDefaultDcaProvider,
+    }),
+  } as unknown as WalletInterface;
+
+  return {
+    wallet,
+    ensureReady,
+    isDeployed,
+    registerSwapProvider,
+    setDefaultSwapProvider,
+    registerDcaProvider,
+    setDefaultDcaProvider,
+  };
+}
 
 describe("Wallet", () => {
   const { config, privateKey, network } = getTestConfig();
@@ -658,6 +697,121 @@ describe("StarkZap", () => {
       } finally {
         vi.unstubAllGlobals();
       }
+    });
+  });
+
+  describe("onboard", () => {
+    it("should reuse shared connect options and ensureReady flow for signer onboarding", async () => {
+      const sdk = new StarkZap(config);
+      const signer = new StarkSigner(testPrivateKeys.key1);
+      const swapProvider: SwapProvider = {
+        id: "ekubo",
+        supportsChain: () => true,
+        getQuote: vi.fn(),
+        prepareSwap: vi.fn(),
+      };
+      const dcaProvider: DcaProvider = {
+        id: "ekubo",
+        supportsChain: () => true,
+        getOrders: vi.fn(),
+        prepareCreate: vi.fn(),
+        prepareCancel: vi.fn(),
+      };
+      const onProgress = vi.fn();
+      const { wallet, ensureReady } = createStubWallet();
+
+      const connectWalletSpy = vi
+        .spyOn(sdk, "connectWallet")
+        .mockResolvedValue(wallet as never);
+
+      const result = await sdk.onboard({
+        strategy: "signer",
+        account: { signer },
+        feeMode: { type: "paymaster" },
+        timeBounds: { executeBefore: 123456 },
+        swapProviders: [swapProvider],
+        defaultSwapProviderId: "ekubo",
+        dcaProviders: [dcaProvider],
+        defaultDcaProviderId: "ekubo",
+        onProgress,
+      });
+
+      expect(connectWalletSpy).toHaveBeenCalledWith({
+        account: {
+          signer,
+          accountClass: OpenZeppelinPreset,
+        },
+        feeMode: { type: "paymaster" },
+        timeBounds: { executeBefore: 123456 },
+        swapProviders: [swapProvider],
+        defaultSwapProviderId: "ekubo",
+        dcaProviders: [dcaProvider],
+        defaultDcaProviderId: "ekubo",
+      });
+      expect(ensureReady).toHaveBeenCalledWith({
+        deploy: "if_needed",
+        feeMode: { type: "paymaster" },
+        onProgress,
+      });
+      expect(result.wallet).toBe(wallet);
+      expect(result.strategy).toBe("signer");
+      expect(result.deployed).toBe(true);
+    });
+
+    it("should apply providers and skip ensureReady when cartridge onboarding uses deploy never", async () => {
+      const sdk = new StarkZap(config);
+      const swapProvider: SwapProvider = {
+        id: "ekubo",
+        supportsChain: () => true,
+        getQuote: vi.fn(),
+        prepareSwap: vi.fn(),
+      };
+      const dcaProvider: DcaProvider = {
+        id: "ekubo",
+        supportsChain: () => true,
+        getOrders: vi.fn(),
+        prepareCreate: vi.fn(),
+        prepareCancel: vi.fn(),
+      };
+      const {
+        wallet,
+        ensureReady,
+        registerSwapProvider,
+        setDefaultSwapProvider,
+        registerDcaProvider,
+        setDefaultDcaProvider,
+      } = createStubWallet();
+
+      const connectCartridgeSpy = vi
+        .spyOn(sdk, "connectCartridge")
+        .mockResolvedValue(wallet as never);
+
+      const result = await sdk.onboard({
+        strategy: "cartridge",
+        deploy: "never",
+        cartridge: { preset: "social", url: "https://example.com" },
+        feeMode: { type: "paymaster" },
+        timeBounds: { executeBefore: 123456 },
+        swapProviders: [swapProvider],
+        defaultSwapProviderId: "ekubo",
+        dcaProviders: [dcaProvider],
+        defaultDcaProviderId: "ekubo",
+      });
+
+      expect(connectCartridgeSpy).toHaveBeenCalledWith({
+        preset: "social",
+        url: "https://example.com",
+        feeMode: { type: "paymaster" },
+        timeBounds: { executeBefore: 123456 },
+      });
+      expect(registerSwapProvider).toHaveBeenCalledWith(swapProvider);
+      expect(setDefaultSwapProvider).toHaveBeenCalledWith("ekubo");
+      expect(registerDcaProvider).toHaveBeenCalledWith(dcaProvider);
+      expect(setDefaultDcaProvider).toHaveBeenCalledWith("ekubo");
+      expect(ensureReady).not.toHaveBeenCalled();
+      expect(result.wallet).toBe(wallet);
+      expect(result.strategy).toBe("cartridge");
+      expect(result.deployed).toBe(true);
     });
   });
 });

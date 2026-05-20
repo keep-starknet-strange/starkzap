@@ -1,17 +1,17 @@
 {
   "name": "starkzap",
-  "version": "2.0.0",
+  "version": "3.0.0",
   "description": "Helper sdk for easy wallet integration",
   "workspaces": [
     "packages/*"
   ],
-  "homepage": "https://github.com/keep-starknet-strange/x#readme",
+  "homepage": "https://github.com/keep-starknet-strange/starkzap#readme",
   "bugs": {
-    "url": "https://github.com/keep-starknet-strange/x/issues"
+    "url": "https://github.com/keep-starknet-strange/starkzap/issues"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/keep-starknet-strange/x.git"
+    "url": "git+https://github.com/keep-starknet-strange/starkzap.git"
   },
   "license": "MIT",
   "author": "0xLucqs",
