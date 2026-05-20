@@ -282,8 +282,8 @@ const sdk = new StarkZap({
           }),
           ...(SOL_BRIDGING_RPC_URL && { solanaRpcUrl: SOL_BRIDGING_RPC_URL }),
           ...(OFT_PUBLIC_KEY && { layerZeroApiKey: OFT_PUBLIC_KEY }),
-          ...(LAYERSWAP_API_KEY && { layerSwapApiKey: LAYERSWAP_API_KEY }),
-          ...(LAYERSWAP_BASE_URL && { layerSwapBaseUrl: LAYERSWAP_BASE_URL }),
+          ...(LAYERSWAP_API_KEY && { layerswapApiKey: LAYERSWAP_API_KEY }),
+          ...(LAYERSWAP_BASE_URL && { layerswapBaseUrl: LAYERSWAP_BASE_URL }),
         },
       }
     : {}),
@@ -789,7 +789,7 @@ function formatProtocolTag(protocol: Protocol): string {
     case Protocol.HYPERLANE:
       return "[Hyperlane]";
     case Protocol.LAYERSWAP:
-      return "[LayerSwap]";
+      return "[Layerswap]";
     default:
       return `[${String(protocol)}]`;
   }

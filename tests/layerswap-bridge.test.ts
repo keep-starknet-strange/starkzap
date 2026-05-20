@@ -1,18 +1,18 @@
 /**
- * LayerSwap Bridge Integration Test
+ * Layerswap Bridge Integration Test
  *
- * Tests the LayerSwap bridge provider end-to-end:
+ * Tests the Layerswap bridge provider end-to-end:
  * - Token discovery via mocked StarkGate API (including layerswap protocol)
- * - Quote and fee estimation via real LayerSwap API
- * - Swap creation via real LayerSwap API
+ * - Quote and fee estimation via real Layerswap API
+ * - Swap creation via real Layerswap API
  *
  * Run with:
  *   LAYERSWAP_API_KEY="your-key" npx vitest run tests/layerswap-bridge.test.ts
  */
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { BridgeTokenRepository } from "@/bridge/tokens/repository";
-import { LayerSwapApi } from "@/bridge/ethereum/layerswap/LayerSwapApi";
-import { LayerSwapBridge } from "@/bridge/ethereum/layerswap/LayerSwapBridge";
+import { LayerswapApi } from "@/bridge/ethereum/layerswap/LayerswapApi";
+import { LayerswapBridge } from "@/bridge/ethereum/layerswap/LayerswapBridge";
 import {
   EthereumBridgeToken,
   ExternalChain,
@@ -36,7 +36,7 @@ afterEach(() => {
 // Mock StarkGate API response including a layerswap token
 // ============================================================
 
-function mockApiResponseWithLayerSwap() {
+function mockApiResponseWithLayerswap() {
   return [
     {
       id: "eth-canonical",
@@ -56,7 +56,7 @@ function mockApiResponseWithLayerSwap() {
       id: "eth-layerswap",
       chain: "ethereum",
       protocol: "layerswap",
-      name: "Ethereum (LayerSwap)",
+      name: "Ethereum (Layerswap)",
       symbol: "ETH",
       decimals: 18,
       l2_token_address:
@@ -70,7 +70,7 @@ function mockApiResponseWithLayerSwap() {
       id: "usdc-layerswap",
       chain: "ethereum",
       protocol: "layerswap",
-      name: "USDC (LayerSwap)",
+      name: "USDC (Layerswap)",
       symbol: "USDC",
       decimals: 6,
       l2_token_address:
@@ -87,13 +87,13 @@ function mockApiResponseWithLayerSwap() {
 // 1. Token discovery — BridgeTokenRepository parses layerswap
 // ============================================================
 
-describe("LayerSwap token discovery", () => {
+describe("Layerswap token discovery", () => {
   it("should parse layerswap tokens from StarkGate API response", async () => {
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,
       status: 200,
       statusText: "OK",
-      json: async () => mockApiResponseWithLayerSwap(),
+      json: async () => mockApiResponseWithLayerswap(),
     });
 
     const repository = new BridgeTokenRepository({
@@ -101,16 +101,16 @@ describe("LayerSwap token discovery", () => {
     });
     const tokens = await repository.getTokens();
 
-    const layerSwapTokens = tokens.filter(
+    const layerswapTokens = tokens.filter(
       (t) => t.protocol === Protocol.LAYERSWAP
     );
 
-    expect(layerSwapTokens).toHaveLength(2);
-    expect(layerSwapTokens[0]).toBeInstanceOf(EthereumBridgeToken);
-    expect(layerSwapTokens[0]!.chain).toBe(ExternalChain.ETHEREUM);
-    expect(layerSwapTokens[0]!.protocol).toBe(Protocol.LAYERSWAP);
-    expect(layerSwapTokens[0]!.symbol).toBe("ETH");
-    expect(layerSwapTokens[1]!.symbol).toBe("USDC");
+    expect(layerswapTokens).toHaveLength(2);
+    expect(layerswapTokens[0]).toBeInstanceOf(EthereumBridgeToken);
+    expect(layerswapTokens[0]!.chain).toBe(ExternalChain.ETHEREUM);
+    expect(layerswapTokens[0]!.protocol).toBe(Protocol.LAYERSWAP);
+    expect(layerswapTokens[0]!.symbol).toBe("ETH");
+    expect(layerswapTokens[1]!.symbol).toBe("USDC");
 
     // Canonical token should still be present
     const canonicalTokens = tokens.filter(
@@ -121,14 +121,14 @@ describe("LayerSwap token discovery", () => {
 });
 
 // ============================================================
-// 2. LayerSwap API — real API calls (requires API key)
+// 2. Layerswap API — real API calls (requires API key)
 // ============================================================
 
-describe("LayerSwap API (live)", () => {
+describe("Layerswap API (live)", () => {
   it.skipIf(!hasApiKey)(
     "should fetch available source networks for Starknet Sepolia",
     async () => {
-      const api = new LayerSwapApi({ apiKey: API_KEY });
+      const api = new LayerswapApi({ apiKey: API_KEY });
       const sources = await api.getSources({
         destinationNetwork: "STARKNET_SEPOLIA",
       });
@@ -152,7 +152,7 @@ describe("LayerSwap API (live)", () => {
   it.skipIf(!hasApiKey)(
     "should fetch available destination networks from Ethereum Sepolia",
     async () => {
-      const api = new LayerSwapApi({ apiKey: API_KEY });
+      const api = new LayerswapApi({ apiKey: API_KEY });
       const destinations = await api.getDestinations({
         sourceNetwork: "ETHEREUM_SEPOLIA",
       });
@@ -171,7 +171,7 @@ describe("LayerSwap API (live)", () => {
   it.skipIf(!hasApiKey)(
     "should get a quote for ETH from Ethereum Sepolia to Starknet Sepolia",
     async () => {
-      const api = new LayerSwapApi({ apiKey: API_KEY });
+      const api = new LayerswapApi({ apiKey: API_KEY });
 
       const quote = await api.getQuote({
         sourceNetwork: "ETHEREUM_SEPOLIA",
@@ -195,7 +195,7 @@ describe("LayerSwap API (live)", () => {
   );
 
   it.skipIf(!hasApiKey)("should get limits for ETH route", async () => {
-    const api = new LayerSwapApi({ apiKey: API_KEY });
+    const api = new LayerswapApi({ apiKey: API_KEY });
 
     const limits = await api.getLimits({
       sourceNetwork: "ETHEREUM_SEPOLIA",
@@ -213,7 +213,7 @@ describe("LayerSwap API (live)", () => {
 });
 
 // ============================================================
-// 3. LayerSwapBridge — fee estimation via real API
+// 3. LayerswapBridge — fee estimation via real API
 // ============================================================
 
 function mockStarknetWallet(chainId: ChainId): WalletInterface {
@@ -239,10 +239,10 @@ function mockEthereumWalletConfig(): EthereumWalletConfig {
   } as unknown as EthereumWalletConfig;
 }
 
-function layerSwapEthToken(): EthereumBridgeToken {
+function layerswapEthToken(): EthereumBridgeToken {
   return new EthereumBridgeToken({
     id: "eth-layerswap",
-    name: "Ethereum (LayerSwap)",
+    name: "Ethereum (Layerswap)",
     symbol: "ETH",
     decimals: 18,
     protocol: Protocol.LAYERSWAP,
@@ -256,12 +256,12 @@ function layerSwapEthToken(): EthereumBridgeToken {
   });
 }
 
-describe("LayerSwapBridge (live)", () => {
+describe("LayerswapBridge (live)", () => {
   it.skipIf(!hasApiKey)(
-    "should estimate deposit fees via real LayerSwap API",
+    "should estimate deposit fees via real Layerswap API",
     async () => {
-      const bridge = new LayerSwapBridge(
-        layerSwapEthToken(),
+      const bridge = new LayerswapBridge(
+        layerswapEthToken(),
         mockEthereumWalletConfig(),
         mockStarknetWallet(ChainId.SEPOLIA),
         API_KEY,
@@ -282,10 +282,10 @@ describe("LayerSwapBridge (live)", () => {
   );
 
   it.skipIf(!hasApiKey)(
-    "should return null for allowance (LayerSwap handles approvals)",
+    "should return null for allowance (Layerswap handles approvals)",
     async () => {
-      const bridge = new LayerSwapBridge(
-        layerSwapEthToken(),
+      const bridge = new LayerswapBridge(
+        layerswapEthToken(),
         mockEthereumWalletConfig(),
         mockStarknetWallet(ChainId.SEPOLIA),
         API_KEY,
@@ -302,9 +302,9 @@ describe("LayerSwapBridge (live)", () => {
 // 4. Full swap creation (no execution — just API swap creation)
 // ============================================================
 
-describe("LayerSwap swap creation (live)", () => {
-  it.skipIf(!hasApiKey)("should create a swap on LayerSwap API", async () => {
-    const api = new LayerSwapApi({ apiKey: API_KEY });
+describe("Layerswap swap creation (live)", () => {
+  it.skipIf(!hasApiKey)("should create a swap on Layerswap API", async () => {
+    const api = new LayerswapApi({ apiKey: API_KEY });
 
     const response = await api.createSwap({
       sourceNetwork: "ETHEREUM_SEPOLIA",

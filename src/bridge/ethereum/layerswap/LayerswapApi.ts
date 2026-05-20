@@ -1,13 +1,13 @@
 import {
-  LayerSwapApiError,
-  type LayerSwapApiConfig,
-  type LayerSwapCreateRequest,
-  type LayerSwapGetDestinationsRequest,
-  type LayerSwapGetNetworksRequest,
-  type LayerSwapGetSourcesRequest,
-  type LayerSwapGetSwapsRequest,
-  type LayerSwapGetTransactionStatusRequest,
-  type LayerSwapQuoteRequest,
+  LayerswapApiError,
+  type LayerswapApiConfig,
+  type LayerswapCreateRequest,
+  type LayerswapGetDestinationsRequest,
+  type LayerswapGetNetworksRequest,
+  type LayerswapGetSourcesRequest,
+  type LayerswapGetSwapsRequest,
+  type LayerswapGetTransactionStatusRequest,
+  type LayerswapQuoteRequest,
   type LsApiResponse,
   type LsDepositAction,
   type LsDetailedQuote,
@@ -24,16 +24,16 @@ import {
 const DEFAULT_BASE_URL = "https://api.layerswap.io";
 
 /**
- * Low-level HTTP client for the LayerSwap REST API v2.
+ * Low-level HTTP client for the Layerswap REST API v2.
  *
  * Zero dependencies — uses native `fetch` and `URLSearchParams`.
  * Works in Node 18+, Deno, Bun, browsers, and Cloudflare Workers.
  */
-export class LayerSwapApi {
+export class LayerswapApi {
   private readonly baseUrl: string;
   private readonly apiKey: string;
 
-  constructor(config: LayerSwapApiConfig) {
+  constructor(config: LayerswapApiConfig) {
     this.apiKey = config.apiKey;
     this.baseUrl = (config.baseUrl ?? DEFAULT_BASE_URL).replace(/\/+$/, "");
   }
@@ -43,7 +43,7 @@ export class LayerSwapApi {
   // ============================================================
 
   /** Get available source networks and tokens. */
-  async getSources(params?: LayerSwapGetSourcesRequest): Promise<LsRoute[]> {
+  async getSources(params?: LayerswapGetSourcesRequest): Promise<LsRoute[]> {
     const qs = new URLSearchParams();
     if (params?.destinationNetwork)
       qs.set("destination_network", params.destinationNetwork);
@@ -64,7 +64,7 @@ export class LayerSwapApi {
 
   /** Get available destination networks and tokens. */
   async getDestinations(
-    params?: LayerSwapGetDestinationsRequest
+    params?: LayerswapGetDestinationsRequest
   ): Promise<LsRoute[]> {
     const qs = new URLSearchParams();
     if (params?.sourceNetwork) qs.set("source_network", params.sourceNetwork);
@@ -82,7 +82,7 @@ export class LayerSwapApi {
 
   /** Get all available networks with their tokens. */
   async getNetworks(
-    params?: LayerSwapGetNetworksRequest
+    params?: LayerswapGetNetworksRequest
   ): Promise<LsNetwork[]> {
     const qs = new URLSearchParams();
     if (params?.networkTypes?.length)
@@ -95,12 +95,12 @@ export class LayerSwapApi {
   // ============================================================
 
   /** Get min/max transfer limits for a route. */
-  async getLimits(request: LayerSwapQuoteRequest): Promise<LsLimits> {
+  async getLimits(request: LayerswapQuoteRequest): Promise<LsLimits> {
     return this.get<LsLimits>("/api/v2/limits", this.quoteParams(request));
   }
 
   /** Get a swap quote with fee breakdown. */
-  async getQuote(request: LayerSwapQuoteRequest): Promise<LsQuote> {
+  async getQuote(request: LayerswapQuoteRequest): Promise<LsQuote> {
     const response = await this.get<LsQuoteResponse>(
       "/api/v2/quote",
       this.quoteParams(request)
@@ -110,7 +110,7 @@ export class LayerSwapApi {
 
   /** Get detailed quote information with fee breakdown and routing paths. */
   async getDetailedQuote(
-    request: LayerSwapQuoteRequest
+    request: LayerswapQuoteRequest
   ): Promise<LsDetailedQuote[]> {
     return this.get<LsDetailedQuote[]>(
       "/api/v2/detailed_quote",
@@ -123,7 +123,7 @@ export class LayerSwapApi {
   // ============================================================
 
   /** Create a new swap. Returns the full response including swap, deposit actions, and quote. */
-  async createSwap(request: LayerSwapCreateRequest): Promise<LsSwapResponse> {
+  async createSwap(request: LayerswapCreateRequest): Promise<LsSwapResponse> {
     return this.post<LsSwapResponse>("/api/v2/swaps", {
       source_network: request.sourceNetwork,
       source_token: request.sourceToken,
@@ -151,7 +151,7 @@ export class LayerSwapApi {
   }
 
   /** List swaps for a given address. */
-  async getSwaps(params: LayerSwapGetSwapsRequest): Promise<LsSwap[]> {
+  async getSwaps(params: LayerswapGetSwapsRequest): Promise<LsSwap[]> {
     const qs = new URLSearchParams();
     qs.set("address", params.address);
     if (params.page != null) qs.set("page", String(params.page));
@@ -209,17 +209,17 @@ export class LayerSwapApi {
       headers: this.headers(),
     });
     if (!response.ok) {
-      throw new LayerSwapApiError(
+      throw new LayerswapApiError(
         response.status,
         undefined,
-        `LayerSwap API health check failed (HTTP ${response.status})`
+        `Layerswap API health check failed (HTTP ${response.status})`
       );
     }
   }
 
   /** Get transaction status on a network. */
   async getTransactionStatus(
-    params: LayerSwapGetTransactionStatusRequest
+    params: LayerswapGetTransactionStatusRequest
   ): Promise<LsTransactionStatus> {
     const qs = new URLSearchParams();
     qs.set("network", params.network);
@@ -231,7 +231,7 @@ export class LayerSwapApi {
   // Internals
   // ============================================================
 
-  private quoteParams(request: LayerSwapQuoteRequest): URLSearchParams {
+  private quoteParams(request: LayerswapQuoteRequest): URLSearchParams {
     const params = new URLSearchParams();
     params.set("source_network", request.sourceNetwork);
     params.set("source_token", request.sourceToken);
@@ -277,18 +277,18 @@ export class LayerSwapApi {
       json = (await response.json()) as LsApiResponse<T>;
     } catch {
       // CDN/edge errors (e.g. 502 with HTML body) won't be JSON. Surface
-      // them as a structured LayerSwapApiError instead of a raw SyntaxError.
-      throw new LayerSwapApiError(
+      // them as a structured LayerswapApiError instead of a raw SyntaxError.
+      throw new LayerswapApiError(
         response.status,
         undefined,
-        `LayerSwap API returned non-JSON response (HTTP ${response.status})`
+        `Layerswap API returned non-JSON response (HTTP ${response.status})`
       );
     }
     if (!response.ok || json.error) {
-      throw new LayerSwapApiError(
+      throw new LayerswapApiError(
         response.status,
         json.error?.code,
-        json.error?.message ?? `LayerSwap API error (HTTP ${response.status})`,
+        json.error?.message ?? `Layerswap API error (HTTP ${response.status})`,
         json.error?.metadata
       );
     }

@@ -4,9 +4,9 @@ import {
   DepositState,
   WithdrawalState,
 } from "@/bridge/monitor/types";
-import { LayerSwapMonitor } from "@/bridge/monitor/layerswap/LayerSwapMonitor";
+import { LayerswapMonitor } from "@/bridge/monitor/layerswap/LayerswapMonitor";
 import {
-  LayerSwapApiError,
+  LayerswapApiError,
   type LsSwap,
   type LsSwapStatus,
   type LsSwapResponse,
@@ -41,7 +41,7 @@ function fakeResponse(swap: LsSwap): LsSwapResponse {
 }
 
 function makeMonitor(getSwapByTransactionHash: ReturnType<typeof vi.fn>) {
-  const monitor = new LayerSwapMonitor({
+  const monitor = new LayerswapMonitor({
     apiKey: "test",
     logger: NOOP_LOGGER,
   });
@@ -51,7 +51,7 @@ function makeMonitor(getSwapByTransactionHash: ReturnType<typeof vi.fn>) {
   return monitor;
 }
 
-describe("LayerSwapMonitor", () => {
+describe("LayerswapMonitor", () => {
   let originalFetch: typeof globalThis.fetch;
 
   beforeEach(() => {
@@ -106,7 +106,7 @@ describe("LayerSwapMonitor", () => {
     it("maps a 404 to NOT_SUBMITTED_ON_L1", async () => {
       const get = vi
         .fn()
-        .mockRejectedValue(new LayerSwapApiError(404, undefined, "not found"));
+        .mockRejectedValue(new LayerswapApiError(404, undefined, "not found"));
       const monitor = makeMonitor(get);
       const result = await monitor.monitorDeposit(L1_HASH);
       expect(result.status).toBe(BridgeTransferStatus.NOT_SUBMITTED_ON_L1);
@@ -116,7 +116,7 @@ describe("LayerSwapMonitor", () => {
     it("propagates non-404 errors so callers can retry", async () => {
       const get = vi
         .fn()
-        .mockRejectedValue(new LayerSwapApiError(500, undefined, "boom"));
+        .mockRejectedValue(new LayerswapApiError(500, undefined, "boom"));
       const monitor = makeMonitor(get);
       await expect(monitor.monitorDeposit(L1_HASH)).rejects.toThrow(/boom/);
     });

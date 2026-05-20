@@ -1,4 +1,4 @@
-/** Network type as reported by the LayerSwap API. */
+/** Network type as reported by the Layerswap API. */
 export type LsNetworkType =
   | "evm"
   | "starknet"
@@ -12,7 +12,7 @@ export type LsNetworkType =
   | "bitcoin"
   | (string & {});
 
-/** Token descriptor from the LayerSwap API. */
+/** Token descriptor from the Layerswap API. */
 export interface LsToken {
   readonly symbol: string;
   readonly display_asset?: string;
@@ -25,7 +25,7 @@ export interface LsToken {
   readonly group?: string;
 }
 
-/** Network descriptor from the LayerSwap API. */
+/** Network descriptor from the Layerswap API. */
 export interface LsNetwork {
   readonly name: string;
   readonly display_name: string;
@@ -214,7 +214,7 @@ export interface LsTransactionStatus {
   readonly max_confirmations?: number;
 }
 
-/** Wrapper for all LayerSwap API responses. */
+/** Wrapper for all Layerswap API responses. */
 export interface LsApiResponse<T> {
   readonly error: {
     readonly code: string;
@@ -225,7 +225,7 @@ export interface LsApiResponse<T> {
 }
 
 /** Parameters for querying a swap quote or route limits. */
-export interface LayerSwapQuoteRequest {
+export interface LayerswapQuoteRequest {
   readonly sourceNetwork: string;
   readonly sourceToken: string;
   readonly destinationNetwork: string;
@@ -238,7 +238,7 @@ export interface LayerSwapQuoteRequest {
 }
 
 /** Parameters for creating a new swap. */
-export interface LayerSwapCreateRequest {
+export interface LayerswapCreateRequest {
   readonly sourceNetwork: string;
   readonly sourceToken: string;
   readonly destinationNetwork: string;
@@ -258,14 +258,14 @@ export interface LayerSwapCreateRequest {
 }
 
 /** Parameters for listing swaps by address. */
-export interface LayerSwapGetSwapsRequest {
+export interface LayerswapGetSwapsRequest {
   readonly address: string;
   readonly page?: number;
   readonly includeExpired?: boolean;
 }
 
 /** Parameters for GET /api/v2/sources. */
-export interface LayerSwapGetSourcesRequest {
+export interface LayerswapGetSourcesRequest {
   readonly destinationNetwork?: string;
   readonly destinationToken?: string;
   readonly includeSwaps?: boolean;
@@ -276,7 +276,7 @@ export interface LayerSwapGetSourcesRequest {
 }
 
 /** Parameters for GET /api/v2/destinations. */
-export interface LayerSwapGetDestinationsRequest {
+export interface LayerswapGetDestinationsRequest {
   readonly sourceNetwork?: string;
   readonly sourceToken?: string;
   readonly includeSwaps?: boolean;
@@ -286,23 +286,23 @@ export interface LayerSwapGetDestinationsRequest {
 }
 
 /** Parameters for GET /api/v2/networks. */
-export interface LayerSwapGetNetworksRequest {
+export interface LayerswapGetNetworksRequest {
   readonly networkTypes?: string[];
 }
 
 /** Parameters for GET /api/v2/transaction_status. */
-export interface LayerSwapGetTransactionStatusRequest {
+export interface LayerswapGetTransactionStatusRequest {
   readonly network: string;
   readonly transactionId: string;
 }
 
-export interface LayerSwapApiConfig {
+export interface LayerswapApiConfig {
   apiKey: string;
   baseUrl?: string;
 }
 
-/** Error thrown when the LayerSwap API returns an error response. */
-export class LayerSwapApiError extends Error {
+/** Error thrown when the Layerswap API returns an error response. */
+export class LayerswapApiError extends Error {
   readonly statusCode: number;
   readonly errorCode: string | undefined;
   readonly metadata: Record<string, unknown> | undefined;
@@ -317,6 +317,6 @@ export class LayerSwapApiError extends Error {
     this.statusCode = statusCode;
     this.errorCode = errorCode;
     this.metadata = metadata;
-    this.name = "LayerSwapApiError";
+    this.name = "LayerswapApiError";
   }
 }

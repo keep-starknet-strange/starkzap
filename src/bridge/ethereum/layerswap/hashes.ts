@@ -1,7 +1,7 @@
 import { num } from "starknet";
 
 /**
- * LayerSwap's `/api/v2/swaps/by_transaction_hash` does an exact-match lookup,
+ * Layerswap's `/api/v2/swaps/by_transaction_hash` does an exact-match lookup,
  * so the hash must be fully padded to 32 bytes. Starknet RPCs return felt-
  * style hashes like `0x3397f2d…` (63 hex chars) when the leading nibble is
  * zero — those are rejected. Ethereum hashes are always 32 bytes from the

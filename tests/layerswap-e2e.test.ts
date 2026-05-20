@@ -1,11 +1,11 @@
 /**
- * LayerSwap Bridge End-to-End Test (Real Wallet)
+ * Layerswap Bridge End-to-End Test (Real Wallet)
  *
  * Performs a real ETH deposit from Ethereum Sepolia → Starknet Sepolia
- * via LayerSwap using a private key signer.
+ * via Layerswap using a private key signer.
  *
  * Required environment variables:
- *   LAYERSWAP_API_KEY    — LayerSwap API key
+ *   LAYERSWAP_API_KEY    — Layerswap API key
  *   ETH_PRIVATE_KEY      — Ethereum Sepolia private key (with Sepolia ETH)
  *   ETH_RPC_URL          — Ethereum Sepolia RPC URL (e.g. https://rpc.sepolia.org)
  *   STARKNET_ADDRESS     — Starknet recipient address on Sepolia
@@ -15,7 +15,7 @@
  *     npx vitest run tests/layerswap-e2e.test.ts
  */
 import { describe, expect, it } from "vitest";
-import { LayerSwapBridge } from "@/bridge/ethereum/layerswap/LayerSwapBridge";
+import { LayerswapBridge } from "@/bridge/ethereum/layerswap/LayerswapBridge";
 import {
   EthereumBridgeToken,
   Protocol,
@@ -41,10 +41,10 @@ const canRun =
 // Amount to bridge (small — 0.0001 ETH ≈ $0.20)
 const DEPOSIT_AMOUNT = "0.0001";
 
-function layerSwapEthToken(): EthereumBridgeToken {
+function layerswapEthToken(): EthereumBridgeToken {
   return new EthereumBridgeToken({
     id: "eth-layerswap",
-    name: "Ethereum (LayerSwap)",
+    name: "Ethereum (Layerswap)",
     symbol: "ETH",
     decimals: 18,
     protocol: Protocol.LAYERSWAP,
@@ -78,15 +78,15 @@ async function createEthWalletConfig(): Promise<EthereumWalletConfig> {
   return { provider, signer } as unknown as EthereumWalletConfig;
 }
 
-describe("LayerSwap E2E (real wallet)", () => {
+describe("Layerswap E2E (real wallet)", () => {
   it.skipIf(!canRun)(
     "should deposit ETH from Ethereum Sepolia to Starknet Sepolia",
     async () => {
-      const token = layerSwapEthToken();
+      const token = layerswapEthToken();
       const ethConfig = await createEthWalletConfig();
       const starknetWallet = mockStarknetWallet();
 
-      const bridge = new LayerSwapBridge(
+      const bridge = new LayerswapBridge(
         token,
         ethConfig,
         starknetWallet,

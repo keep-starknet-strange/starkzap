@@ -29,42 +29,42 @@ export type HyperlaneFeeEstimate = {
 };
 
 /**
- * Quote is requested at the LayerSwap route minimum (`amount: 0`), so
+ * Quote is requested at the Layerswap route minimum (`amount: 0`), so
  * percentage-scaled components will differ for larger deposits — re-quote
  * at swap-creation time for exact numbers.
  */
-export type SolanaLayerSwapDepositFeeEstimation = {
+export type SolanaLayerswapDepositFeeEstimation = {
   /** User's Solana tx cost in SOL (wallet outflow). */
   localFee: Amount;
   /** Total fee at the route minimum tier (bridge token, deducted from input). */
   totalFee: Amount;
   /** Blockchain fee portion at the route minimum tier (bridge token, deducted from input). */
   blockchainFee: Amount;
-  /** LayerSwap service fee portion at the route minimum tier (bridge token, deducted from input). */
+  /** Layerswap service fee portion at the route minimum tier (bridge token, deducted from input). */
   serviceFee: Amount;
   /** Estimated completion time (e.g. "00:02:00"). */
   avgCompletionTime: string;
-  /** Set when the LayerSwap quote fetch fails; `totalFee` / `blockchainFee` / `serviceFee` / `avgCompletionTime` will be zero/empty. */
+  /** Set when the Layerswap quote fetch fails; `totalFee` / `blockchainFee` / `serviceFee` / `avgCompletionTime` will be zero/empty. */
   quoteError?: FeeErrorCause;
 };
 
 export type SolanaWithdrawFeeEstimation = HyperlaneFeeEstimate;
 
 /**
- * Quote is requested at the LayerSwap route minimum (`amount: 0`), so
+ * Quote is requested at the Layerswap route minimum (`amount: 0`), so
  * percentage-scaled components will differ for larger withdrawals — re-quote
  * at swap-creation time for exact numbers.
  */
-export type SolanaLayerSwapInitiateWithdrawFeeEstimation = {
-  /** Starknet L2 fee to submit the transfer to LayerSwap's deposit address. */
+export type SolanaLayerswapInitiateWithdrawFeeEstimation = {
+  /** Starknet L2 fee to submit the transfer to Layerswap's deposit address. */
   l2Fee: Amount;
   l2FeeError?: FeeErrorCause;
-  /** Destination-chain settlement cost quoted by LayerSwap (bridge token, deducted from input). */
+  /** Destination-chain settlement cost quoted by Layerswap (bridge token, deducted from input). */
   blockchainFee: Amount;
-  /** LayerSwap service fee portion at the route minimum tier (bridge token, deducted from input). */
+  /** Layerswap service fee portion at the route minimum tier (bridge token, deducted from input). */
   serviceFee: Amount;
   /** Estimated completion time (e.g. "00:02:00"). */
   avgCompletionTime: string;
-  /** Set when the LayerSwap quote fetch fails; `blockchainFee` / `serviceFee` / `avgCompletionTime` will be zero/empty. */
+  /** Set when the Layerswap quote fetch fails; `blockchainFee` / `serviceFee` / `avgCompletionTime` will be zero/empty. */
   quoteError?: FeeErrorCause;
 };
