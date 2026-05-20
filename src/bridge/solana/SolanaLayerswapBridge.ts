@@ -3,20 +3,20 @@ import type {
   BridgeInterface,
   InitiateBridgeWithdrawOptions,
 } from "@/bridge/types/BridgeInterface";
-import { LayerSwapApi } from "@/bridge/ethereum/layerswap/LayerSwapApi";
+import { LayerswapApi } from "@/bridge/ethereum/layerswap/LayerswapApi";
 import { normalizeLsTxHash } from "@/bridge/ethereum/layerswap/hashes";
 import {
   buildDummyStarknetTransferCalls,
   estimateStarknetFee,
-  parseLayerSwapStarknetCalls,
+  parseLayerswapStarknetCalls,
 } from "@/bridge/ethereum/layerswap/starknet";
 import type {
-  LayerSwapApiConfig,
+  LayerswapApiConfig,
   LsDepositAction,
 } from "@/bridge/ethereum/layerswap/types";
 import type {
-  SolanaLayerSwapDepositFeeEstimation,
-  SolanaLayerSwapInitiateWithdrawFeeEstimation,
+  SolanaLayerswapDepositFeeEstimation,
+  SolanaLayerswapInitiateWithdrawFeeEstimation,
   SolanaWalletConfig,
 } from "@/bridge/solana/types";
 import {
@@ -34,9 +34,9 @@ import type { Tx } from "@/tx";
 import type { StarkZapLogger } from "@/logger";
 
 // Solana charges 5000 lamports per signature, unchanged since v1.0.
-// LayerSwap deposits are single-signature transfers with no user-side ATA
+// Layerswap deposits are single-signature transfers with no user-side ATA
 // creation (source-token ATA already exists), so this is the exact base fee.
-// Priority fees embedded by LayerSwap in call_data are not captured.
+// Priority fees embedded by Layerswap in call_data are not captured.
 const SOLANA_DEPOSIT_BASE_FEE_LAMPORTS = 5_000n;
 
 // StarkGate's bridge token registry uses the System Program ID as the
@@ -44,19 +44,19 @@ const SOLANA_DEPOSIT_BASE_FEE_LAMPORTS = 5_000n;
 const NATIVE_SOL_MARKER = "11111111111111111111111111111111";
 
 /**
- * LayerSwap bridge provider for Solana → Starknet deposits.
+ * Layerswap bridge provider for Solana → Starknet deposits.
  *
  * The deposit flow:
- * 1. Creates a swap on LayerSwap API
+ * 1. Creates a swap on Layerswap API
  * 2. Retrieves deposit actions (Solana transactions to execute)
  * 3. Builds and signs SOL/SPL transfers via the connected wallet
- * 4. Notifies LayerSwap for faster detection
+ * 4. Notifies Layerswap for faster detection
  *
  * Routed by {@link BridgeOperator} when `token.protocol === Protocol.LAYERSWAP`
  * and `token.chain === ExternalChain.SOLANA`.
  */
-export class SolanaLayerSwapBridge implements BridgeInterface<SolanaAddress> {
-  private readonly api: LayerSwapApi;
+export class SolanaLayerswapBridge implements BridgeInterface<SolanaAddress> {
+  private readonly api: LayerswapApi;
   private readonly starknetToken: Erc20;
   private readonly sourceNetwork: string;
   private readonly destNetwork: string;
@@ -67,9 +67,9 @@ export class SolanaLayerSwapBridge implements BridgeInterface<SolanaAddress> {
     readonly starknetWallet: WalletInterface,
     apiKey: string,
     private readonly logger: StarkZapLogger,
-    apiConfig?: Omit<LayerSwapApiConfig, "apiKey">
+    apiConfig?: Omit<LayerswapApiConfig, "apiKey">
   ) {
-    this.api = new LayerSwapApi({ apiKey, ...apiConfig });
+    this.api = new LayerswapApi({ apiKey, ...apiConfig });
     this.starknetToken = new Erc20(
       bridgeToken.intoStarknetToken(),
       starknetWallet.getProvider()
@@ -113,10 +113,10 @@ export class SolanaLayerSwapBridge implements BridgeInterface<SolanaAddress> {
 
     const signature = await this.executeSolanaDepositAction(action);
 
-    // Nudge LayerSwap to detect the source-chain tx faster. Non-critical —
+    // Nudge Layerswap to detect the source-chain tx faster. Non-critical —
     // their poller picks it up regardless.
     this.api.speedUpDeposit(swap.id, signature).catch((e: unknown) => {
-      this.logger.debug("[SolanaLayerSwapBridge] speedUpDeposit failed:", e);
+      this.logger.debug("[SolanaLayerswapBridge] speedUpDeposit failed:", e);
     });
 
     return { hash: signature };
@@ -124,21 +124,21 @@ export class SolanaLayerSwapBridge implements BridgeInterface<SolanaAddress> {
 
   async getDepositFeeEstimate(
     _options?: BridgeDepositOptions
-  ): Promise<SolanaLayerSwapDepositFeeEstimation> {
+  ): Promise<SolanaLayerswapDepositFeeEstimation> {
     const quote = await this.api
       .getQuote({
         sourceNetwork: this.sourceNetwork,
         sourceToken: this.bridgeToken.symbol,
         destinationNetwork: this.destNetwork,
         destinationToken: this.bridgeToken.symbol,
-        // LayerSwap treats `0` as "quote at the route minimum". Pass the
+        // Layerswap treats `0` as "quote at the route minimum". Pass the
         // user's amount here once `BridgeInterface.getDepositFeeEstimate`
         // grows an `amount` arg, for an exact quote.
         amount: "0",
       })
       .catch((e: unknown) => {
         this.logger.debug(
-          "[SolanaLayerSwapBridge] getDepositFeeEstimate (quote) failed:",
+          "[SolanaLayerswapBridge] getDepositFeeEstimate (quote) failed:",
           e
         );
         return null;
@@ -174,7 +174,7 @@ export class SolanaLayerSwapBridge implements BridgeInterface<SolanaAddress> {
   }
 
   async getAvailableDepositBalance(account: SolanaAddress): Promise<Amount> {
-    const solanaWeb3 = await loadSolanaWeb3("LayerSwap balance query");
+    const solanaWeb3 = await loadSolanaWeb3("Layerswap balance query");
     const connection = this.config.connection as InstanceType<
       typeof solanaWeb3.Connection
     >;
@@ -207,11 +207,11 @@ export class SolanaLayerSwapBridge implements BridgeInterface<SolanaAddress> {
   }
 
   /**
-   * Initiate a withdrawal from Starknet → Solana via LayerSwap.
+   * Initiate a withdrawal from Starknet → Solana via Layerswap.
    *
-   * Creates a LayerSwap swap with source=Starknet, destination=Solana, and
-   * executes the Starknet transfer into LayerSwap's deposit address.
-   * LayerSwap auto-delivers the funds on Solana — no `completeWithdraw` step.
+   * Creates a Layerswap swap with source=Starknet, destination=Solana, and
+   * executes the Starknet transfer into Layerswap's deposit address.
+   * Layerswap auto-delivers the funds on Solana — no `completeWithdraw` step.
    */
   async initiateWithdraw(
     recipient: SolanaAddress,
@@ -246,7 +246,7 @@ export class SolanaLayerSwapBridge implements BridgeInterface<SolanaAddress> {
       );
     }
 
-    const calls = parseLayerSwapStarknetCalls(
+    const calls = parseLayerswapStarknetCalls(
       action,
       this.bridgeToken.starknetAddress.toString()
     );
@@ -255,7 +255,7 @@ export class SolanaLayerSwapBridge implements BridgeInterface<SolanaAddress> {
     this.api
       .speedUpDeposit(swap.id, normalizeLsTxHash(tx.hash, "starknet"))
       .catch((e: unknown) => {
-        this.logger.debug("[SolanaLayerSwapBridge] speedUpDeposit failed:", e);
+        this.logger.debug("[SolanaLayerswapBridge] speedUpDeposit failed:", e);
       });
 
     return tx;
@@ -263,7 +263,7 @@ export class SolanaLayerSwapBridge implements BridgeInterface<SolanaAddress> {
 
   async getInitiateWithdrawFeeEstimate(
     _options?: InitiateBridgeWithdrawOptions
-  ): Promise<SolanaLayerSwapInitiateWithdrawFeeEstimation> {
+  ): Promise<SolanaLayerswapInitiateWithdrawFeeEstimation> {
     const dummyCalls = buildDummyStarknetTransferCalls(
       this.bridgeToken.starknetAddress.toString()
     );
@@ -279,7 +279,7 @@ export class SolanaLayerSwapBridge implements BridgeInterface<SolanaAddress> {
         })
         .catch((e: unknown) => {
           this.logger.debug(
-            "[SolanaLayerSwapBridge] getInitiateWithdrawFeeEstimate (quote) failed:",
+            "[SolanaLayerswapBridge] getInitiateWithdrawFeeEstimate (quote) failed:",
             e
           );
           return null;
@@ -288,7 +288,7 @@ export class SolanaLayerSwapBridge implements BridgeInterface<SolanaAddress> {
         this.starknetWallet,
         dummyCalls,
         this.logger,
-        "SolanaLayerSwapBridge"
+        "SolanaLayerswapBridge"
       ),
     ]);
 
@@ -329,7 +329,7 @@ export class SolanaLayerSwapBridge implements BridgeInterface<SolanaAddress> {
       );
     }
 
-    const solanaWeb3 = await loadSolanaWeb3("LayerSwap deposit");
+    const solanaWeb3 = await loadSolanaWeb3("Layerswap deposit");
     const connection = this.config.connection as InstanceType<
       typeof solanaWeb3.Connection
     >;

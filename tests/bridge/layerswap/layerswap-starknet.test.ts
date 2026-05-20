@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   buildDummyStarknetTransferCalls,
-  parseLayerSwapStarknetCalls,
+  parseLayerswapStarknetCalls,
 } from "@/bridge/ethereum/layerswap/starknet";
 import type { LsDepositAction } from "@/bridge/ethereum/layerswap/types";
 
@@ -30,9 +30,9 @@ function transferCall(contract: string = TOKEN, entrypoint = "transfer") {
   };
 }
 
-describe("parseLayerSwapStarknetCalls", () => {
+describe("parseLayerswapStarknetCalls", () => {
   it("accepts a single Call object", () => {
-    const calls = parseLayerSwapStarknetCalls(
+    const calls = parseLayerswapStarknetCalls(
       action(JSON.stringify(transferCall())),
       TOKEN
     );
@@ -41,7 +41,7 @@ describe("parseLayerSwapStarknetCalls", () => {
   });
 
   it("accepts a Call[] array", () => {
-    const calls = parseLayerSwapStarknetCalls(
+    const calls = parseLayerswapStarknetCalls(
       action(JSON.stringify([transferCall(), transferCall()])),
       TOKEN
     );
@@ -51,7 +51,7 @@ describe("parseLayerSwapStarknetCalls", () => {
   it("normalises Starknet addresses to felt-padded form before comparing", () => {
     const shortToken =
       "0x49d36570d4e46f48e99674bd3fcc84644ddd6b96f7c741b1562b82f9e004dc7"; // missing leading zero
-    const calls = parseLayerSwapStarknetCalls(
+    const calls = parseLayerswapStarknetCalls(
       action(JSON.stringify(transferCall(shortToken))),
       TOKEN
     );
@@ -59,26 +59,26 @@ describe("parseLayerSwapStarknetCalls", () => {
   });
 
   it("rejects missing call_data", () => {
-    expect(() => parseLayerSwapStarknetCalls(action(null), TOKEN)).toThrow(
+    expect(() => parseLayerswapStarknetCalls(action(null), TOKEN)).toThrow(
       /no call_data/
     );
   });
 
   it("rejects malformed JSON", () => {
     expect(() =>
-      parseLayerSwapStarknetCalls(action("{not json"), TOKEN)
+      parseLayerswapStarknetCalls(action("{not json"), TOKEN)
     ).toThrow(/Failed to parse/);
   });
 
   it("rejects empty array", () => {
     expect(() =>
-      parseLayerSwapStarknetCalls(action(JSON.stringify([])), TOKEN)
+      parseLayerswapStarknetCalls(action(JSON.stringify([])), TOKEN)
     ).toThrow(/no Starknet calls/);
   });
 
   it("rejects entries missing required fields", () => {
     expect(() =>
-      parseLayerSwapStarknetCalls(
+      parseLayerswapStarknetCalls(
         action(JSON.stringify({ contractAddress: TOKEN })),
         TOKEN
       )
@@ -87,7 +87,7 @@ describe("parseLayerSwapStarknetCalls", () => {
 
   it("rejects calls targeting an unexpected contract", () => {
     expect(() =>
-      parseLayerSwapStarknetCalls(
+      parseLayerswapStarknetCalls(
         action(JSON.stringify(transferCall(RECIPIENT))),
         TOKEN
       )
@@ -96,7 +96,7 @@ describe("parseLayerSwapStarknetCalls", () => {
 
   it("rejects calls with an unexpected entrypoint", () => {
     expect(() =>
-      parseLayerSwapStarknetCalls(
+      parseLayerswapStarknetCalls(
         action(JSON.stringify(transferCall(TOKEN, "approve"))),
         TOKEN
       )
@@ -105,7 +105,7 @@ describe("parseLayerSwapStarknetCalls", () => {
 
   it("rejects mixed-validity arrays even if the first call is valid", () => {
     expect(() =>
-      parseLayerSwapStarknetCalls(
+      parseLayerswapStarknetCalls(
         action(
           JSON.stringify([transferCall(), transferCall(TOKEN, "approve")])
         ),
