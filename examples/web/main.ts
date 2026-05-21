@@ -4518,4 +4518,8 @@ log(`SDK initialized on ${NETWORK} with RPC: ${RPC_URL}`, "info");
 if (REOWN_PROJECT_ID) {
   log("Bridge enabled (Reown AppKit)", "info");
 }
-autoConnect().then(() => autoConnectEthereum());
+autoConnect()
+  .then(() => autoConnectEthereum())
+  .catch((err) => {
+    log(`Auto-connect failed: ${err}`, "error");
+  });

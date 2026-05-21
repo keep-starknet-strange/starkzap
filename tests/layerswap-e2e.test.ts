@@ -5,13 +5,15 @@
  * via Layerswap using a private key signer.
  *
  * Required environment variables:
- *   LAYERSWAP_API_KEY    — Layerswap API key
- *   ETH_PRIVATE_KEY      — Ethereum Sepolia private key (with Sepolia ETH)
- *   ETH_RPC_URL          — Ethereum Sepolia RPC URL (e.g. https://rpc.sepolia.org)
- *   STARKNET_ADDRESS     — Starknet recipient address on Sepolia
+ *   RUN_LAYERSWAP_E2E=true — Explicit opt-in flag (real on-chain tx will be sent)
+ *   LAYERSWAP_API_KEY      — Layerswap API key
+ *   ETH_PRIVATE_KEY        — Ethereum Sepolia private key (with Sepolia ETH)
+ *   ETH_RPC_URL            — Ethereum Sepolia RPC URL (e.g. https://rpc.sepolia.org)
+ *   STARKNET_ADDRESS       — Starknet recipient address on Sepolia
  *
  * Run with:
- *   LAYERSWAP_API_KEY="..." ETH_PRIVATE_KEY="..." ETH_RPC_URL="..." STARKNET_ADDRESS="..." \
+ *   RUN_LAYERSWAP_E2E=true LAYERSWAP_API_KEY="..." ETH_PRIVATE_KEY="..." \
+ *     ETH_RPC_URL="..." STARKNET_ADDRESS="..." \
  *     npx vitest run tests/layerswap-e2e.test.ts
  */
 import { describe, expect, it } from "vitest";
@@ -32,8 +34,10 @@ const API_KEY = process.env["LAYERSWAP_API_KEY"] ?? "";
 const ETH_PRIVATE_KEY = process.env["ETH_PRIVATE_KEY"] ?? "";
 const ETH_RPC_URL = process.env["ETH_RPC_URL"] ?? "https://rpc.sepolia.org";
 const STARKNET_ADDRESS = process.env["STARKNET_ADDRESS"] ?? "";
+const RUN_LAYERSWAP_E2E = process.env["RUN_LAYERSWAP_E2E"] === "true";
 
 const canRun =
+  RUN_LAYERSWAP_E2E &&
   API_KEY.length > 0 &&
   ETH_PRIVATE_KEY.length > 0 &&
   STARKNET_ADDRESS.length > 0;

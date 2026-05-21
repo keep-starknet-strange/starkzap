@@ -299,6 +299,7 @@ export interface LayerswapGetTransactionStatusRequest {
 export interface LayerswapApiConfig {
   apiKey: string;
   baseUrl?: string;
+  requestTimeoutMs?: number;
 }
 
 /** Error thrown when the Layerswap API returns an error response. */

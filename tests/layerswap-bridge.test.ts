@@ -7,7 +7,8 @@
  * - Swap creation via real Layerswap API
  *
  * Run with:
- *   LAYERSWAP_API_KEY="your-key" npx vitest run tests/layerswap-bridge.test.ts
+ *   LAYERSWAP_API_KEY="your-key" RUN_LAYERSWAP_LIVE_TESTS=true \
+ *     npx vitest run tests/layerswap-bridge.test.ts
  */
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { BridgeTokenRepository } from "@/bridge/tokens/repository";
@@ -27,6 +28,9 @@ import { NOOP_LOGGER } from "@/logger";
 
 const API_KEY = process.env["LAYERSWAP_API_KEY"] ?? "";
 const hasApiKey = API_KEY.length > 0;
+const runLayerswapLiveTests =
+  process.env["RUN_LAYERSWAP_LIVE_TESTS"] === "true";
+const skipLive = !(hasApiKey && runLayerswapLiveTests);
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -125,7 +129,7 @@ describe("Layerswap token discovery", () => {
 // ============================================================
 
 describe("Layerswap API (live)", () => {
-  it.skipIf(!hasApiKey)(
+  it.skipIf(skipLive)(
     "should fetch available source networks for Starknet Sepolia",
     async () => {
       const api = new LayerswapApi({ apiKey: API_KEY });
@@ -149,7 +153,7 @@ describe("Layerswap API (live)", () => {
     }
   );
 
-  it.skipIf(!hasApiKey)(
+  it.skipIf(skipLive)(
     "should fetch available destination networks from Ethereum Sepolia",
     async () => {
       const api = new LayerswapApi({ apiKey: API_KEY });
@@ -168,7 +172,7 @@ describe("Layerswap API (live)", () => {
     }
   );
 
-  it.skipIf(!hasApiKey)(
+  it.skipIf(skipLive)(
     "should get a quote for ETH from Ethereum Sepolia to Starknet Sepolia",
     async () => {
       const api = new LayerswapApi({ apiKey: API_KEY });
@@ -194,7 +198,7 @@ describe("Layerswap API (live)", () => {
     }
   );
 
-  it.skipIf(!hasApiKey)("should get limits for ETH route", async () => {
+  it.skipIf(skipLive)("should get limits for ETH route", async () => {
     const api = new LayerswapApi({ apiKey: API_KEY });
 
     const limits = await api.getLimits({
@@ -257,7 +261,7 @@ function layerswapEthToken(): EthereumBridgeToken {
 }
 
 describe("LayerswapBridge (live)", () => {
-  it.skipIf(!hasApiKey)(
+  it.skipIf(skipLive)(
     "should estimate deposit fees via real Layerswap API",
     async () => {
       const bridge = new LayerswapBridge(
@@ -281,7 +285,7 @@ describe("LayerswapBridge (live)", () => {
     }
   );
 
-  it.skipIf(!hasApiKey)(
+  it.skipIf(skipLive)(
     "should return null for allowance (Layerswap handles approvals)",
     async () => {
       const bridge = new LayerswapBridge(
@@ -303,7 +307,7 @@ describe("LayerswapBridge (live)", () => {
 // ============================================================
 
 describe("Layerswap swap creation (live)", () => {
-  it.skipIf(!hasApiKey)("should create a swap on Layerswap API", async () => {
+  it.skipIf(skipLive)("should create a swap on Layerswap API", async () => {
     const api = new LayerswapApi({ apiKey: API_KEY });
 
     const response = await api.createSwap({
