@@ -1079,6 +1079,9 @@ function getSolanaLayerswapTestTokens(chainId: ChainId): SolanaBridgeToken[] {
   const isMainnet = chainId.isMainnet();
   // Same native-vs-bridged note as for the Ethereum Layerswap USDC token —
   // Layerswap settles in native USDC.
+  const usdcSol = isMainnet
+    ? "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
+    : "4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU";
   const usdcSn = isMainnet
     ? "0x033068f6539f8e6e6b131e6b2b814e6c34a5224bc66947c47dab9dfee93b35fb"
     : "0x0512feac6339ff7889822cb5aa2a86c848e9d392bb0e3e237c008674feed8343";
@@ -1090,7 +1093,7 @@ function getSolanaLayerswapTestTokens(chainId: ChainId): SolanaBridgeToken[] {
       symbol: "USDC",
       decimals: 6,
       protocol: Protocol.LAYERSWAP,
-      address: "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v" as SolanaAddress,
+      address: usdcSol as SolanaAddress,
       l1Bridge: "11111111111111111111111111111111" as SolanaAddress,
       starknetAddress: fromAddress(usdcSn),
       starknetBridge: fromAddress("0x0"),

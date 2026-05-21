@@ -22,6 +22,7 @@ import {
 } from "@/bridge/ethereum/layerswap/types";
 
 const DEFAULT_BASE_URL = "https://api.layerswap.io";
+const DEFAULT_REQUEST_TIMEOUT_MS = 15_000;
 
 /**
  * Low-level HTTP client for the Layerswap REST API v2.
@@ -32,10 +33,13 @@ const DEFAULT_BASE_URL = "https://api.layerswap.io";
 export class LayerswapApi {
   private readonly baseUrl: string;
   private readonly apiKey: string;
+  private readonly requestTimeoutMs: number;
 
   constructor(config: LayerswapApiConfig) {
     this.apiKey = config.apiKey;
     this.baseUrl = (config.baseUrl ?? DEFAULT_BASE_URL).replace(/\/+$/, "");
+    this.requestTimeoutMs =
+      config.requestTimeoutMs ?? DEFAULT_REQUEST_TIMEOUT_MS;
   }
 
   // ============================================================
@@ -204,7 +208,7 @@ export class LayerswapApi {
   /** Check API health. */
   async health(): Promise<void> {
     const url = `${this.baseUrl}/api/v2/health`;
-    const response = await fetch(url, {
+    const response = await this.fetchWithTimeout(url, {
       method: "GET",
       headers: this.headers(),
     });
@@ -250,7 +254,7 @@ export class LayerswapApi {
   private async get<T>(path: string, params?: URLSearchParams): Promise<T> {
     const qs = params?.toString();
     const url = `${this.baseUrl}${path}${qs ? `?${qs}` : ""}`;
-    const response = await fetch(url, {
+    const response = await this.fetchWithTimeout(url, {
       method: "GET",
       headers: this.headers(),
     });
@@ -259,12 +263,34 @@ export class LayerswapApi {
 
   private async post<T>(path: string, body: unknown): Promise<T> {
     const url = `${this.baseUrl}${path}`;
-    const response = await fetch(url, {
+    const response = await this.fetchWithTimeout(url, {
       method: "POST",
       headers: { ...this.headers(), "Content-Type": "application/json" },
       body: JSON.stringify(body),
     });
     return this.unwrap<T>(response);
+  }
+
+  private async fetchWithTimeout(
+    url: string,
+    init: RequestInit
+  ): Promise<Response> {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), this.requestTimeoutMs);
+    try {
+      return await fetch(url, { ...init, signal: controller.signal });
+    } catch (err) {
+      if (controller.signal.aborted) {
+        throw new LayerswapApiError(
+          0,
+          undefined,
+          `Layerswap API request timed out after ${this.requestTimeoutMs}ms`
+        );
+      }
+      throw err;
+    } finally {
+      clearTimeout(timeout);
+    }
   }
 
   private headers(): Record<string, string> {

@@ -399,12 +399,9 @@ export class BridgeOperator implements BridgeOperatorInterface {
     externalWallet: ConnectedSolanaWallet,
     starknetWallet: WalletInterface
   ): Promise<BridgeInterface<SolanaAddress>> {
-    // SolanaHyperlaneBridge and @solana/web3.js are loaded lazily to avoid
+    // Protocol-specific bridges and @solana/web3.js are loaded lazily to avoid
     // pulling Node.js-only transitive dependencies into polyfill-requiring clients.
-    const [{ SolanaHyperlaneBridge }, connection] = await Promise.all([
-      import("@/bridge/solana/SolanaHyperlaneBridge"),
-      this.getSolanaConnection(),
-    ]);
+    const connection = await this.getSolanaConnection();
 
     const walletConfig = {
       address: externalWallet.address,
@@ -413,12 +410,15 @@ export class BridgeOperator implements BridgeOperatorInterface {
     };
 
     switch (token.protocol) {
-      case Protocol.HYPERLANE:
+      case Protocol.HYPERLANE: {
+        const { SolanaHyperlaneBridge } =
+          await import("@/bridge/solana/SolanaHyperlaneBridge");
         return await SolanaHyperlaneBridge.create(
           token,
           walletConfig,
           starknetWallet
         );
+      }
       case Protocol.LAYERSWAP: {
         const apiKey = this.bridgingConfig?.layerswapApiKey;
         if (!apiKey) {

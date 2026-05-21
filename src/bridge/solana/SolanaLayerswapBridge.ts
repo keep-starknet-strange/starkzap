@@ -197,9 +197,12 @@ export class SolanaLayerswapBridge implements BridgeInterface<SolanaAddress> {
       return Amount.fromRaw(0n, decimals, symbol);
     }
 
-    const rawAmount = value[0]!.account.data.parsed.info.tokenAmount
-      .amount as string;
-    return Amount.fromRaw(BigInt(rawAmount), decimals, symbol);
+    const rawAmount = value.reduce((sum, accountInfo) => {
+      const amount = accountInfo.account.data.parsed.info.tokenAmount
+        .amount as string;
+      return sum + BigInt(amount);
+    }, 0n);
+    return Amount.fromRaw(rawAmount, decimals, symbol);
   }
 
   async getAllowance(): Promise<Amount | null> {
