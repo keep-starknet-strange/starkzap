@@ -5,6 +5,7 @@ import {
   fromAddress,
   type Address,
   type ExecuteOptions,
+  type Token,
 } from "@/types";
 import type { Tx } from "@/tx";
 import type { WalletInterface } from "@/wallet/interface";
@@ -28,12 +29,14 @@ import type {
   PaycrestOfframpStatus,
   PaycrestOptions,
   PaycrestOrder,
+  PaycrestOrderList,
   PaycrestOrderStatus,
   PaycrestProviderAccount,
   PaycrestProviderOrderStatus,
   PaycrestRate,
   PaycrestRateSide,
   PaycrestRecipient,
+  PaycrestSenderFeeOverride,
   PaycrestToken,
   PaycrestWaitForOrderOptions,
 } from "@/paycrest/types";
@@ -103,6 +106,15 @@ const DEFAULT_WAIT_TIMEOUT_MS = 10 * 60_000;
  * `156000` represents `1560.00`; `136192` represents `1361.92`).
  */
 const RATE_DECIMALS = 2n;
+
+/**
+ * Like `Omit`, but distributes over union members so each branch keeps
+ * its own keys. Plain `Omit<A | B, K>` collapses to the members' shared
+ * keys, which would drop the path-specific fields of `OfframpResult`.
+ */
+type DistributiveOmit<T, K extends PropertyKey> = T extends unknown
+  ? Omit<T, K>
+  : never;
 
 /**
  * Fiat on/off-ramp module backed by Paycrest. Two paths share the same
@@ -202,10 +214,9 @@ export class Paycrest {
   }
 
   /** List orders attached to your sender profile. Requires an API key. */
-  async listOrders(filter?: Record<string, string | number>): Promise<{
-    orders: PaycrestOrder[];
-    [key: string]: unknown;
-  }> {
+  async listOrders(
+    filter?: Record<string, string | number>
+  ): Promise<PaycrestOrderList> {
     return this.api.listOrders(filter);
   }
 
@@ -386,24 +397,22 @@ export class Paycrest {
     }
     if (result.path === "api") {
       const order = await this.waitForOrder(id, options);
-      const status: PaycrestOfframpStatus = {
+      return {
         path: "api",
         orderId: id,
         status: order.status,
         raw: order,
+        ...pickDefined({ txHash: order.txHash }),
       };
-      if (order.txHash !== undefined) status.txHash = order.txHash;
-      return status;
     }
     const provider = await this.waitForGatewayOrder(id, options);
-    const status: PaycrestOfframpStatus = {
+    return {
       path: "gateway",
       orderId: id,
       status: provider.status,
       raw: provider,
+      ...pickDefined({ txHash: provider.txHash }),
     };
-    if (provider.txHash !== undefined) status.txHash = provider.txHash;
-    return status;
   }
 
   // ##################################################################
@@ -468,11 +477,20 @@ export class Paycrest {
    * Attach a `wait()` method to a partially-built `OfframpResult`. The
    * method delegates to `waitForOfframp`, dispatching to the correct
    * endpoint based on `result.path`.
+   *
+   * `wait()` is memoized: a second call reuses the in-flight (or
+   * settled) polling promise from the first call instead of starting a
+   * second loop against the same order. The tradeoff is that options
+   * passed to a later `wait(opts)` are ignored once the first call has
+   * started.
    */
-  private attachWait(partial: Omit<OfframpResult, "wait">): OfframpResult {
+  private attachWait(
+    partial: DistributiveOmit<OfframpResult, "wait">
+  ): OfframpResult {
     const result = partial as OfframpResult;
+    let pending: Promise<PaycrestOfframpStatus> | undefined;
     result.wait = (waitOptions?: PaycrestWaitForOrderOptions) =>
-      this.waitForOfframp(result, waitOptions ?? {});
+      (pending ??= this.waitForOfframp(result, waitOptions ?? {}));
     return result;
   }
 
@@ -505,6 +523,16 @@ export class Paycrest {
     input: OfframpInput,
     options?: ExecuteOptions
   ): Promise<OfframpResult> {
+    // `senderFee` is a gateway-path concept (an on-chain fee + recipient
+    // set on `create_order`). The Sender API has no per-request fee
+    // recipient — fees are configured on the Paycrest Sender Dashboard
+    // and returned in the order — so reject it here rather than silently
+    // ignore it.
+    if (input.senderFee) {
+      throw new Error(
+        `Paycrest: senderFee is only supported on the gateway path. On the api path, configure fees on your Paycrest Sender Dashboard; the SDK transfers amount + senderFee + transactionFee returned by the API.`
+      );
+    }
     const network = paycrestNetworkFor(wallet.getChainId());
     const body = buildOfframpApiBody({
       input,
@@ -518,9 +546,17 @@ export class Paycrest {
         `Paycrest API order ${order.id ?? "<unknown>"} returned no receiveAddress`
       );
     }
+    // The app must fund the receive address with the full amount the
+    // aggregator expects: order amount plus the senderFee and
+    // transactionFee it computed and returned (both in token units).
+    // Sending only `amount` underfunds the order.
+    const transferAmount = addFees(input.from.amount, input.from.token, [
+      order.senderFee,
+      order.transactionFee,
+    ]);
     const erc20 = wallet.erc20(input.from.token);
     const calls = erc20.populateTransfer([
-      { to: fromAddress(receiveAddress), amount: input.from.amount },
+      { to: fromAddress(receiveAddress), amount: transferAmount },
     ]);
     let tx: Tx;
     try {
@@ -531,27 +567,36 @@ export class Paycrest {
       // without recreating the order. Recreating would charge fees
       // twice and produce two pending orders against the same intent.
       throw new PaycrestOfframpExecuteError(
-        `Paycrest api off-ramp execute failed after order ${order.id ?? "<unknown>"} was created. Resume by sending ${input.from.amount.toUnit()} ${input.from.token.symbol} to receiveAddress.`,
+        `Paycrest api off-ramp execute failed after order ${order.id ?? "<unknown>"} was created. Resume by sending ${transferAmount.toUnit()} ${input.from.token.symbol} to receiveAddress.`,
         { order, receiveAddress, cause }
       );
     }
 
-    const partial: Omit<OfframpResult, "wait"> = {
+    return this.attachWait({
       path: "api",
       orderId: Promise.resolve(order.id ?? null),
       tx,
       calls,
       receiveAddress,
-    };
-    if (order.providerAccount) partial.providerAccount = order.providerAccount;
-    if (input.rate) partial.rate = input.rate;
-    return this.attachWait(partial);
+      ...(order.providerAccount
+        ? { providerAccount: order.providerAccount }
+        : {}),
+      ...(input.rate ? { rate: input.rate } : {}),
+    });
   }
 
   private async buildGatewayOfframpCalls(
     wallet: WalletInterface,
     input: OfframpInput
   ): Promise<{ calls: Call[]; rate: string }> {
+    // `senderFeeOverride` maps to the Sender API `senderFee`/
+    // `senderFeePercent` body fields — there's no order-creation HTTP
+    // call on the gateway path to carry them. Reject rather than ignore.
+    if (input.senderFeeOverride) {
+      throw new Error(
+        `Paycrest: senderFeeOverride only applies to the api path. On the gateway path, set senderFee: { recipient, amount } for the on-chain fee instead.`
+      );
+    }
     const chainId = wallet.getChainId();
     const network = paycrestNetworkFor(chainId);
     const gatewayAddress = this.resolveGatewayAddress(chainId);
@@ -664,18 +709,16 @@ export class Paycrest {
       );
     }
     const providerAccount = order.providerAccount as PaycrestProviderAccount;
-    const result: OnrampResult = {
-      orderId: order.id,
-      status: order.status,
-      providerAccount,
-    };
     // The Sender API surfaces `validUntil` either at the top level of
     // the order or nested under `providerAccount`. Fall back to the
     // nested location so the SDK never drops a real expiry.
     const validUntil = order.validUntil ?? providerAccount.validUntil;
-    if (validUntil !== undefined) result.validUntil = validUntil;
-    if (input.reference !== undefined) result.reference = input.reference;
-    return result;
+    return {
+      orderId: order.id,
+      status: order.status,
+      providerAccount,
+      ...pickDefined({ validUntil, reference: input.reference }),
+    };
   }
 
   // ##################################################################
@@ -689,13 +732,25 @@ export class Paycrest {
    * Run this before trusting webhook payloads. Pass the **raw** request
    * body string (not parsed JSON) — any whitespace difference will fail
    * verification.
+   *
+   * Throws if `apiSecret` is missing/empty — that's a configuration
+   * (programmer) error and must not be confused with a failed
+   * verification. A missing or non-matching `signature` returns `false`
+   * (a legitimate request-level rejection). The signature is compared
+   * case-insensitively so proxies that upcase the hex header still pass.
    */
   static async verifyWebhookSignature(
     rawBody: string,
     signature: string,
     apiSecret: string
   ): Promise<boolean> {
-    if (!signature || !apiSecret) return false;
+    if (!apiSecret || apiSecret.trim() === "") {
+      throw new Error(
+        "Paycrest.verifyWebhookSignature requires apiSecret — pass your Paycrest webhook secret (configuration error, not a verification failure)."
+      );
+    }
+    if (!signature) return false;
+    const expected = signature.trim().toLowerCase();
     const subtle = (globalThis as { crypto?: { subtle?: SubtleCrypto } }).crypto
       ?.subtle;
     if (subtle) {
@@ -709,7 +764,7 @@ export class Paycrest {
       );
       const sigBuf = await subtle.sign("HMAC", key, enc.encode(rawBody));
       const computed = bytesToHex(new Uint8Array(sigBuf));
-      return timingSafeEqualHex(computed, signature.trim());
+      return timingSafeEqualHex(computed, expected);
     }
     const nodeCrypto =
       (await import("node:crypto")) as typeof import("node:crypto");
@@ -717,7 +772,7 @@ export class Paycrest {
       .createHmac("sha256", apiSecret)
       .update(rawBody, "utf8")
       .digest("hex");
-    return timingSafeEqualHex(computed, signature.trim());
+    return timingSafeEqualHex(computed, expected);
   }
 }
 
@@ -725,21 +780,75 @@ export class Paycrest {
 //                            HELPERS
 // ====================================================================
 
+/**
+ * Return a shallow copy of `obj` keeping only keys whose value is not
+ * `undefined`. Lets call sites spread optional fields into object
+ * literals (`{ ...pickDefined({ a, b }) }`) instead of a run of
+ * `if (x !== undefined) obj.x = x` statements, while staying compatible
+ * with `exactOptionalPropertyTypes` (omits keys rather than setting
+ * them to `undefined`).
+ */
+function pickDefined<T extends object>(
+  obj: T
+): {
+  [K in keyof T]?: Exclude<T[K], undefined>;
+} {
+  const out: Record<string, unknown> = {};
+  for (const key in obj) {
+    const value = obj[key];
+    if (value !== undefined) out[key] = value;
+  }
+  return out as { [K in keyof T]?: Exclude<T[K], undefined> };
+}
+
+/**
+ * Map a per-order sender-fee override to the Sender API body fields.
+ * `{ amount }` becomes `senderFee` (token units); `{ percent }` becomes
+ * `senderFeePercent`. The two are mutually exclusive server-side, which
+ * the union type already enforces at the call site.
+ */
+function senderFeeOverrideToBody(
+  override: PaycrestSenderFeeOverride | undefined
+): Record<string, string> {
+  if (!override) return {};
+  if ("amount" in override) return { senderFee: override.amount.toUnit() };
+  return { senderFeePercent: String(override.percent) };
+}
+
+/**
+ * Add decimal-string fees (token units, e.g. `"0.5"`) to a base Amount.
+ * Missing / empty / zero fees are skipped. Used by the api-path off-ramp
+ * to fund the receive address with `amount + senderFee + transactionFee`
+ * as the Sender API requires.
+ */
+function addFees(
+  base: Amount,
+  token: Token,
+  fees: Array<string | undefined>
+): Amount {
+  let total = base;
+  for (const fee of fees) {
+    if (!fee) continue;
+    const parsed = Amount.parse(fee, token);
+    if (parsed.toBase() > 0n) total = total.add(parsed);
+  }
+  return total;
+}
+
 function buildOfframpApiBody(args: {
   input: OfframpInput;
   network: PaycrestNetwork;
   refundAddress: Address;
 }): Record<string, unknown> {
   const { input, network, refundAddress } = args;
-  const recipient: Record<string, unknown> = {
+  const recipient = {
     institution: input.to.recipient.institution,
     accountIdentifier: input.to.recipient.accountIdentifier,
     accountName: input.to.recipient.accountName,
+    ...pickDefined({ memo: input.to.recipient.memo }),
   };
-  if (input.to.recipient.memo !== undefined)
-    recipient["memo"] = input.to.recipient.memo;
 
-  const body: Record<string, unknown> = {
+  return {
     amount: input.from.amount.toUnit(),
     source: {
       type: "crypto",
@@ -752,10 +861,9 @@ function buildOfframpApiBody(args: {
       currency: input.to.currency,
       recipient,
     },
+    ...pickDefined({ reference: input.reference, rate: input.rate }),
+    ...senderFeeOverrideToBody(input.senderFeeOverride),
   };
-  if (input.reference !== undefined) body["reference"] = input.reference;
-  if (input.rate !== undefined) body["rate"] = input.rate;
-  return body;
 }
 
 function buildOnrampApiBody(args: {
@@ -763,7 +871,7 @@ function buildOnrampApiBody(args: {
   network: PaycrestNetwork;
 }): Record<string, unknown> {
   const { input, network } = args;
-  const body: Record<string, unknown> = {
+  return {
     amount: String(input.from.amount),
     amountIn: "fiat",
     source: {
@@ -783,9 +891,9 @@ function buildOnrampApiBody(args: {
         network,
       },
     },
+    ...pickDefined({ reference: input.reference }),
+    ...senderFeeOverrideToBody(input.senderFeeOverride),
   };
-  if (input.reference !== undefined) body["reference"] = input.reference;
-  return body;
 }
 
 /**

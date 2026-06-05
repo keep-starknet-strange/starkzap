@@ -35,6 +35,21 @@ function pemToSpki(pem: string): Uint8Array {
   return base64Decode(body);
 }
 
+/**
+ * Re-emit a PEM in canonical form (standard armor, 64-char base64 lines,
+ * `\n` separators) from whatever the caller passed. `pemToSpki` already
+ * tolerates CRLF / indentation / surrounding whitespace; rebuilding from
+ * its output means the strict OpenSSL-backed Node path accepts the same
+ * lenient inputs the BigInt path does. Doubles as validation — throws on
+ * a malformed PEM.
+ */
+function canonicalizePem(pem: string): string {
+  const der = pemToSpki(pem);
+  const body = base64Encode(der);
+  const lines = body.match(/.{1,64}/g) ?? [body];
+  return `${PEM_BEGIN}\n${lines.join("\n")}\n${PEM_END}\n`;
+}
+
 function base64Decode(value: string): Uint8Array {
   if (typeof globalThis.atob === "function") {
     const binary = globalThis.atob(value);
@@ -230,9 +245,11 @@ export async function encryptRecipient(
   publicKeyPem: string,
   plaintext: string
 ): Promise<string> {
-  // Validate PEM shape up front so the error is consistent across runtimes
-  // (node:crypto delegates to OpenSSL which produces a different message).
-  pemToSpki(publicKeyPem);
+  // Validate and canonicalize the PEM up front so the error is consistent
+  // across runtimes (node:crypto delegates to OpenSSL, which both produces
+  // a different message and rejects non-canonical armor the BigInt path
+  // would accept). Both code paths then receive the same clean PEM.
+  const pem = canonicalizePem(publicKeyPem);
   // Pick the encryptor by runtime feature detection rather than catching
   // bundler-specific import errors (the exact string varies across Vite,
   // Webpack, Rollup, esbuild — matching them is brittle). Any host that
@@ -241,7 +258,7 @@ export async function encryptRecipient(
   const proc = (globalThis as { process?: { versions?: { node?: string } } })
     .process;
   if (typeof proc?.versions?.node === "string") {
-    return encryptViaNode(publicKeyPem, plaintext);
+    return encryptViaNode(pem, plaintext);
   }
-  return encryptViaWebCrypto(publicKeyPem, plaintext);
+  return encryptViaWebCrypto(pem, plaintext);
 }

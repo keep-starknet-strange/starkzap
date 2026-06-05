@@ -135,11 +135,18 @@ export interface PaycrestOrder {
   direction?: "onramp" | "offramp";
   status: PaycrestOrderStatus;
   amount?: string;
+  /**
+   * Sender fee in token units, returned by the Sender API. For an
+   * off-ramp the app must transfer `amount + senderFee + transactionFee`
+   * to `providerAccount.receiveAddress`.
+   */
+  senderFee?: string;
+  /** Network/transaction fee in token units, returned by the Sender API. */
+  transactionFee?: string;
   txHash?: string;
   reference?: string;
   providerAccount?: PaycrestProviderAccount;
   validUntil?: string;
-  [key: string]: unknown;
 }
 
 /**
@@ -171,7 +178,6 @@ export interface PaycrestProviderOrderStatus {
   txHash?: string;
   settlements?: unknown[];
   txReceipts?: unknown[];
-  [key: string]: unknown;
 }
 
 /**
@@ -181,13 +187,36 @@ export interface PaycrestProviderOrderStatus {
  * path). The `raw` field carries the underlying response if you need
  * fields beyond status/txHash.
  */
-export interface PaycrestOfframpStatus {
-  path: PaycrestPath;
+interface PaycrestOfframpStatusBase {
   /** Whichever id was used to look up the order (UUID for api, felt252 for gateway). */
   orderId: string;
   status: PaycrestOrderStatus;
   txHash?: string;
-  raw: PaycrestOrder | PaycrestProviderOrderStatus;
+}
+
+/**
+ * Discriminated on `path`: the api path carries the full `PaycrestOrder`
+ * in `raw`, the gateway path the smaller `PaycrestProviderOrderStatus`.
+ * Narrow on `status.path` to access the correct `raw` shape.
+ */
+export type PaycrestOfframpStatus =
+  | (PaycrestOfframpStatusBase & { path: "api"; raw: PaycrestOrder })
+  | (PaycrestOfframpStatusBase & {
+      path: "gateway";
+      raw: PaycrestProviderOrderStatus;
+    });
+
+/**
+ * Paginated result returned by `GET /v2/sender/orders` (`listOrders`).
+ * Pagination metadata is typed explicitly rather than via an open index
+ * signature so unknown server fields don't silently degrade to `unknown`;
+ * fields the aggregator may add beyond these are still present at runtime.
+ */
+export interface PaycrestOrderList {
+  orders: PaycrestOrder[];
+  total?: number;
+  page?: number;
+  pageSize?: number;
 }
 
 /** Webhook payload posted to the configured endpoint by the Paycrest backend. */
@@ -245,6 +274,32 @@ export interface PaycrestOptions {
 }
 
 /**
+ * Per-order sender-fee override for the Sender API (api-path off-ramp and
+ * on-ramp). Overrides the fee configured on your Paycrest Sender
+ * Dashboard for this single order.
+ *
+ * Provide exactly one of `amount` or `percent` — they are mutually
+ * exclusive (the API rejects both). The fee **recipient** is always your
+ * dashboard-configured fee address and cannot be set per-order.
+ *
+ * Not applicable to the gateway path, which carries its fee on-chain via
+ * `OfframpInput.senderFee` — passing `senderFeeOverride` there throws.
+ */
+export type PaycrestSenderFeeOverride =
+  | {
+      /** Fixed fee in token units. Maps to the API `senderFee` field. */
+      amount: Amount;
+    }
+  | {
+      /**
+       * Fee percentage of the order amount (e.g. `0.5` for 0.5%). Maps to
+       * the API `senderFeePercent` field; capped server-side by your
+       * token's max-fee config.
+       */
+      percent: number | string;
+    };
+
+/**
  * Input to `Paycrest.offramp(wallet, input)`.
  *
  * `path` defaults to `"gateway"`. The two paths surface the same shape
@@ -274,13 +329,28 @@ export interface OfframpInput {
    */
   rate?: string;
   /**
-   * Optional sender fee (gateway path only). Defaults to zero address +
-   * `0n`. When set, the approve amount is `amount + senderFee`.
+   * Optional sender fee — **gateway path only**. Defaults to zero address
+   * + `0n`. When set, the approve amount becomes `amount + senderFee` and
+   * the fee + recipient are passed to the on-chain `create_order`.
+   *
+   * Not supported on the `api` path: the Sender API computes its own
+   * `senderFee` + `transactionFee` (from your Paycrest Sender Dashboard
+   * config, or a `senderFeePercent` override) and returns them in the
+   * order; the SDK then transfers `amount + senderFee + transactionFee`
+   * to the receive address. Passing `senderFee` with `path: "api"`
+   * throws.
    */
   senderFee?: {
     recipient: Address;
     amount: bigint;
   };
+  /**
+   * Per-order sender-fee override (**api path only**). Overrides your
+   * Sender Dashboard fee config for this order. Passing it with the
+   * gateway path throws — use `senderFee` for the on-chain fee instead.
+   * See {@link PaycrestSenderFeeOverride}.
+   */
+  senderFeeOverride?: PaycrestSenderFeeOverride;
 }
 
 /** Input to `Paycrest.onramp(input)`. On-ramp is API-path only. */
@@ -296,11 +366,15 @@ export interface OnrampInput {
     recipient: Address;
   };
   reference?: string;
+  /**
+   * Per-order sender-fee override. Overrides your Sender Dashboard fee
+   * config for this order. See {@link PaycrestSenderFeeOverride}.
+   */
+  senderFeeOverride?: PaycrestSenderFeeOverride;
 }
 
-/** Result returned by `Paycrest.offramp(...)`. */
-export interface OfframpResult {
-  path: PaycrestPath;
+/** Fields shared by both off-ramp paths. */
+interface OfframpResultBase {
   /**
    * Resolves to the order id once it's known.
    *
@@ -317,16 +391,6 @@ export interface OfframpResult {
   tx: Tx;
   /** Underlying calls executed (returned for inspection / re-use). */
   calls: Call[];
-  /** Sender API order metadata (api path only). */
-  providerAccount?: PaycrestProviderAccount;
-  /** ERC20 receive address on the api path. */
-  receiveAddress?: string;
-  /**
-   * Rate used for the on-chain order (gateway path only). Either the
-   * caller-supplied `input.rate` or the rate fetched from `/v2/rates`
-   * when `input.rate` was omitted.
-   */
-  rate?: string;
   /**
    * Wait for fiat settlement. Polls the correct aggregator endpoint
    * based on `path`:
@@ -340,9 +404,37 @@ export interface OfframpResult {
    * reached (`validated` or `settled`); throws `PaycrestOrderError`
    * on `refunded` / `expired`. See `PaycrestWaitForOrderOptions` for
    * tuning.
+   *
+   * Memoized: calling `wait()` more than once reuses the first call's
+   * polling loop (and its options) rather than starting a second.
    */
   wait(options?: PaycrestWaitForOrderOptions): Promise<PaycrestOfframpStatus>;
 }
+
+/**
+ * Result returned by `Paycrest.offramp(...)`. Discriminated on `path`:
+ * the gateway path always carries the on-chain `rate`; the api path
+ * carries the assigned `receiveAddress` (and optional `providerAccount`).
+ * Narrow on `result.path` before reaching for path-specific fields.
+ */
+export type OfframpResult =
+  | (OfframpResultBase & {
+      path: "gateway";
+      /**
+       * Rate used for the on-chain order. Either the caller-supplied
+       * `input.rate` or the rate fetched from `/v2/rates` when omitted.
+       */
+      rate: string;
+    })
+  | (OfframpResultBase & {
+      path: "api";
+      /** ERC20 receive address the tokens were transferred to. */
+      receiveAddress: string;
+      /** Sender API order metadata. */
+      providerAccount?: PaycrestProviderAccount;
+      /** Caller-supplied rate forwarded in the order body, if any. */
+      rate?: string;
+    });
 
 /** Result returned by `Paycrest.onramp(...)`. */
 export interface OnrampResult {

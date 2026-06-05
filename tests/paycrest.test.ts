@@ -15,6 +15,8 @@ import {
   PaycrestApiError,
   PaycrestOfframpExecuteError,
   PaycrestOrderError,
+  ORDER_CREATED_EVENT_SELECTOR,
+  extractOrderIdFromReceipt,
   STARKNET_MAINNET_CHAIN_ID,
   paycrestGatewayFor,
   paycrestGatewaySessionPolicies,
@@ -22,7 +24,7 @@ import {
 } from "@/paycrest";
 import type { WalletInterface } from "@/wallet/interface";
 import { Erc20 } from "@/erc20";
-import type { RpcProvider } from "starknet";
+import { num, type RpcProvider } from "starknet";
 
 const USDC: Token = {
   name: "USDC",
@@ -386,6 +388,28 @@ describe("Paycrest gateway off-ramp", () => {
       })
     ).rejects.toThrow(/mainnet-only/i);
   });
+
+  it("rejects senderFeeOverride on the gateway path (api-path concept)", async () => {
+    const paycrest = new Paycrest({
+      apiKey: "k",
+      fetch: vi.fn() as unknown as typeof fetch,
+    });
+    const { wallet } = makeFakeWallet();
+    await expect(
+      paycrest.offramp(wallet, {
+        from: { token: USDC, amount: Amount.parse("100", USDC) },
+        to: {
+          currency: "NGN",
+          recipient: {
+            institution: "GTBINGLA",
+            accountIdentifier: "1",
+            accountName: "x",
+          },
+        },
+        senderFeeOverride: { percent: 0.5 },
+      })
+    ).rejects.toThrow(/only applies to the api path/i);
+  });
 });
 
 describe("Paycrest API off-ramp", () => {
@@ -443,6 +467,172 @@ describe("Paycrest API off-ramp", () => {
     expect(result.calls).toHaveLength(1);
     expect(result.calls[0]!.entrypoint).toBe("transfer");
     expect(executeMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("transfers amount + senderFee + transactionFee returned by the API", async () => {
+    const receiveAddress =
+      "0x05bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
+    const fetchMock = vi.fn().mockResolvedValue(
+      jsonResponse(
+        201,
+        envelope({
+          id: "ord-fee",
+          status: "initiated",
+          amount: "50",
+          // Aggregator-computed fees (token units), returned top-level
+          // in the v2 create response.
+          senderFee: "0.5",
+          transactionFee: "0.1",
+          providerAccount: { receiveAddress, network: "starknet" },
+        })
+      )
+    );
+
+    const paycrest = new Paycrest({
+      apiKey: "test-key",
+      fetch: fetchMock as unknown as typeof fetch,
+    });
+
+    const { wallet } = makeFakeWallet();
+    const result = await paycrest.offramp(wallet, {
+      path: "api",
+      from: { token: USDC, amount: Amount.parse("50", USDC) },
+      to: {
+        currency: "NGN",
+        recipient: {
+          institution: "GTBINGLA",
+          accountIdentifier: "1234567890",
+          accountName: "Test",
+        },
+      },
+    });
+
+    // No fee fields are sent in the request body (fees are dashboard-
+    // configured server-side); the order amount is the off-ramp amount.
+    const [, init] = fetchMock.mock.calls[0]!;
+    const body = JSON.parse(init.body as string) as {
+      amount: string;
+      senderFee?: string;
+      senderFeeRecipient?: string;
+    };
+    expect(body.amount).toBe("50");
+    expect(body.senderFee).toBeUndefined();
+    expect(body.senderFeeRecipient).toBeUndefined();
+
+    // Transfer = 50 + 0.5 + 0.1 = 50.6 USDC (50_600000 base).
+    // ERC20 transfer calldata: [recipient, amount.low, amount.high].
+    const calldata = result.calls[0]!.calldata as string[];
+    expect(num.toBigInt(calldata[1]!)).toBe(50_600000n);
+    expect(num.toBigInt(calldata[2]!)).toBe(0n);
+  });
+
+  it("rejects input.senderFee on the api path (gateway-only concept)", async () => {
+    const fetchMock = vi.fn();
+    const paycrest = new Paycrest({
+      apiKey: "test-key",
+      fetch: fetchMock as unknown as typeof fetch,
+    });
+    const { wallet } = makeFakeWallet();
+    await expect(
+      paycrest.offramp(wallet, {
+        path: "api",
+        from: { token: USDC, amount: Amount.parse("50", USDC) },
+        to: {
+          currency: "NGN",
+          recipient: {
+            institution: "GTBINGLA",
+            accountIdentifier: "1234567890",
+            accountName: "Test",
+          },
+        },
+        senderFee: {
+          recipient: fromAddress("0x02fee"),
+          amount: 1_000000n,
+        },
+      })
+    ).rejects.toThrow(/only supported on the gateway path/i);
+    // Fails before creating an order.
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("forwards a fixed senderFeeOverride as body.senderFee", async () => {
+    const receiveAddress =
+      "0x05bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
+    const fetchMock = vi.fn().mockResolvedValue(
+      jsonResponse(
+        201,
+        envelope({
+          id: "ord-ovr",
+          status: "initiated",
+          providerAccount: { receiveAddress, network: "starknet" },
+        })
+      )
+    );
+    const paycrest = new Paycrest({
+      apiKey: "k",
+      fetch: fetchMock as unknown as typeof fetch,
+    });
+    const { wallet } = makeFakeWallet();
+    await paycrest.offramp(wallet, {
+      path: "api",
+      from: { token: USDC, amount: Amount.parse("50", USDC) },
+      to: {
+        currency: "NGN",
+        recipient: {
+          institution: "GTBINGLA",
+          accountIdentifier: "1234567890",
+          accountName: "Test",
+        },
+      },
+      senderFeeOverride: { amount: Amount.parse("0.75", USDC) },
+    });
+    const [, init] = fetchMock.mock.calls[0]!;
+    const body = JSON.parse(init.body as string) as {
+      senderFee?: string;
+      senderFeePercent?: string;
+    };
+    expect(body.senderFee).toBe("0.75");
+    expect(body.senderFeePercent).toBeUndefined();
+  });
+
+  it("forwards a percent senderFeeOverride as body.senderFeePercent", async () => {
+    const receiveAddress =
+      "0x05bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
+    const fetchMock = vi.fn().mockResolvedValue(
+      jsonResponse(
+        201,
+        envelope({
+          id: "ord-ovr-pct",
+          status: "initiated",
+          providerAccount: { receiveAddress, network: "starknet" },
+        })
+      )
+    );
+    const paycrest = new Paycrest({
+      apiKey: "k",
+      fetch: fetchMock as unknown as typeof fetch,
+    });
+    const { wallet } = makeFakeWallet();
+    await paycrest.offramp(wallet, {
+      path: "api",
+      from: { token: USDC, amount: Amount.parse("50", USDC) },
+      to: {
+        currency: "NGN",
+        recipient: {
+          institution: "GTBINGLA",
+          accountIdentifier: "1234567890",
+          accountName: "Test",
+        },
+      },
+      senderFeeOverride: { percent: 0.5 },
+    });
+    const [, init] = fetchMock.mock.calls[0]!;
+    const body = JSON.parse(init.body as string) as {
+      senderFee?: string;
+      senderFeePercent?: string;
+    };
+    expect(body.senderFeePercent).toBe("0.5");
+    expect(body.senderFee).toBeUndefined();
   });
 });
 
@@ -540,6 +730,47 @@ describe("Paycrest on-ramp", () => {
       to: { token: USDC, recipient: SENDER },
     });
     expect(result.validUntil).toBe(validUntil);
+  });
+
+  it("forwards a senderFeeOverride into the onramp body", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      jsonResponse(
+        201,
+        envelope({
+          id: "ord-on-ovr",
+          status: "initiated",
+          providerAccount: {
+            institution: "GTB",
+            accountIdentifier: "0123456789",
+            accountName: "Provider A",
+            amountToTransfer: "50000",
+            currency: "NGN",
+          },
+        })
+      )
+    );
+    const paycrest = new Paycrest({
+      apiKey: "k",
+      fetch: fetchMock as unknown as typeof fetch,
+    });
+    await paycrest.onramp({
+      from: {
+        currency: "NGN",
+        amount: 50000,
+        refundAccount: {
+          institution: "GTB",
+          accountIdentifier: "1",
+          accountName: "x",
+        },
+      },
+      to: { token: USDC, recipient: SENDER },
+      senderFeeOverride: { percent: "0.25" },
+    });
+    const [, init] = fetchMock.mock.calls[0]!;
+    const body = JSON.parse(init.body as string) as {
+      senderFeePercent?: string;
+    };
+    expect(body.senderFeePercent).toBe("0.25");
   });
 
   it("accepts 40-hex-digit Starknet recipients (valid felt252 that fits in 160 bits)", async () => {
@@ -970,6 +1201,60 @@ describe("OfframpResult.wait() dispatch", () => {
     expect(senderCalls.length).toBe(0);
   });
 
+  it("memoizes wait(): a second concurrent call reuses the first poll", async () => {
+    const receiveAddress =
+      "0x05bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
+    let posted = false;
+    const fetchMock = vi.fn().mockImplementation(async (url: string | URL) => {
+      const u = String(url);
+      if (u.endsWith("/v2/sender/orders") && !posted) {
+        posted = true;
+        return jsonResponse(
+          201,
+          envelope({
+            id: "uuid-memo",
+            status: "initiated",
+            providerAccount: { receiveAddress, network: "starknet" },
+          })
+        );
+      }
+      if (u.includes("/v2/sender/orders/uuid-memo")) {
+        return jsonResponse(
+          200,
+          envelope({ id: "uuid-memo", status: "settled" })
+        );
+      }
+      throw new Error(`unexpected: ${u}`);
+    });
+    const paycrest = new Paycrest({
+      apiKey: "k",
+      fetch: fetchMock as unknown as typeof fetch,
+    });
+    const { wallet } = makeFakeWallet();
+    const result = await paycrest.offramp(wallet, {
+      path: "api",
+      from: { token: USDC, amount: Amount.parse("1", USDC) },
+      to: {
+        currency: "NGN",
+        recipient: {
+          institution: "GTBINGLA",
+          accountIdentifier: "1",
+          accountName: "x",
+        },
+      },
+    });
+    // Two calls in flight at once must share a single polling loop.
+    const [a, b] = await Promise.all([
+      result.wait({ pollIntervalMs: 1 }),
+      result.wait({ pollIntervalMs: 1 }),
+    ]);
+    expect(a).toBe(b);
+    const lookupCalls = fetchMock.mock.calls.filter((c) =>
+      String(c[0]).includes("/v2/sender/orders/uuid-memo")
+    );
+    expect(lookupCalls.length).toBe(1);
+  });
+
   it("throws when gateway off-ramp tx reverted (no on-chain order id)", async () => {
     const { publicKey } = buildKeyPair();
     const fetchMock = vi.fn().mockImplementation(async (url: string | URL) => {
@@ -1342,10 +1627,99 @@ describe("Paycrest webhook signature", () => {
     );
   });
 
-  it("rejects empty signature or secret", async () => {
+  it("returns false on an empty signature (request-level rejection)", async () => {
     expect(await Paycrest.verifyWebhookSignature("body", "", "k")).toBe(false);
-    expect(await Paycrest.verifyWebhookSignature("body", "sig", "")).toBe(
-      false
-    );
+  });
+
+  it("throws on a missing/empty secret (configuration error, not a rejection)", async () => {
+    await expect(
+      Paycrest.verifyWebhookSignature("body", "sig", "")
+    ).rejects.toThrow(/requires apiSecret/i);
+    await expect(
+      Paycrest.verifyWebhookSignature("body", "sig", "   ")
+    ).rejects.toThrow(/requires apiSecret/i);
+  });
+
+  it("accepts an uppercased signature header (case-insensitive compare)", async () => {
+    const secret = "shh";
+    const body = JSON.stringify({ event: "payment_order.settled" });
+    const sig = nodeCrypto
+      .createHmac("sha256", secret)
+      .update(body, "utf8")
+      .digest("hex");
+    expect(
+      await Paycrest.verifyWebhookSignature(body, sig.toUpperCase(), secret)
+    ).toBe(true);
+  });
+});
+
+describe("extractOrderIdFromReceipt", () => {
+  const GATEWAY = PAYCREST_GATEWAY_MAINNET;
+  const SELECTOR = ORDER_CREATED_EVENT_SELECTOR;
+  // data layout: [protocol_fee.low, protocol_fee.high, order_id, rate, ...message_hash]
+  const ORDER_ID =
+    "0x07f3b1c0000000000000000000000000000000000000000000000000000000ab";
+  const NORMALIZED_ID = num.toHex(num.toBigInt(ORDER_ID));
+
+  function event(overrides: {
+    from_address?: string;
+    keys?: string[];
+    data?: string[];
+  }): { from_address?: string; keys?: string[]; data?: string[] } {
+    return {
+      from_address: GATEWAY,
+      keys: [SELECTOR, SENDER, USDC.address, "0x0", "0x0"],
+      data: ["0x0", "0x0", ORDER_ID, "0x" + 150050n.toString(16)],
+      ...overrides,
+    };
+  }
+
+  it("returns the first matching OrderCreated event's order id", () => {
+    const second =
+      "0x01230000000000000000000000000000000000000000000000000000000000ff";
+    const receipt = {
+      events: [event({}), event({ data: ["0x0", "0x0", second, "0x1"] })],
+    };
+    expect(extractOrderIdFromReceipt(receipt, GATEWAY)).toBe(NORMALIZED_ID);
+  });
+
+  it("ignores events emitted by a different from_address", () => {
+    const receipt = {
+      events: [event({ from_address: USDC.address })],
+    };
+    expect(extractOrderIdFromReceipt(receipt, GATEWAY)).toBeNull();
+  });
+
+  it("ignores events whose keys[0] is not the OrderCreated selector", () => {
+    const otherSelector = num.toHex(num.toBigInt(SELECTOR) + 1n);
+    const receipt = {
+      events: [event({ keys: [otherSelector, SENDER] })],
+    };
+    expect(extractOrderIdFromReceipt(receipt, GATEWAY)).toBeNull();
+  });
+
+  it("returns null for an empty event list", () => {
+    expect(extractOrderIdFromReceipt({ events: [] }, GATEWAY)).toBeNull();
+  });
+
+  it("returns null when events is undefined", () => {
+    expect(extractOrderIdFromReceipt({}, GATEWAY)).toBeNull();
+  });
+
+  it("skips (does not throw on) a malformed event with data.length < 3", () => {
+    const receipt = {
+      events: [event({ data: ["0x0", "0x0"] })],
+    };
+    expect(extractOrderIdFromReceipt(receipt, GATEWAY)).toBeNull();
+  });
+
+  it("matches despite leading-zero address differences (felt normalization)", () => {
+    // The receipt's from_address is the same felt with leading zeros
+    // stripped; both sides are normalized via num.toBigInt before compare.
+    const stripped = num.toHex(num.toBigInt(GATEWAY));
+    const receipt = {
+      events: [event({ from_address: stripped })],
+    };
+    expect(extractOrderIdFromReceipt(receipt, GATEWAY)).toBe(NORMALIZED_ID);
   });
 });

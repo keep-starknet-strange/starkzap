@@ -1,9 +1,11 @@
 import { assertSafeHttpUrl } from "@/utils";
+import { fetchJsonWithTimeout } from "@/utils/http";
 import type {
   PaycrestCurrency,
   PaycrestInstitution,
   PaycrestNetwork,
   PaycrestOrder,
+  PaycrestOrderList,
   PaycrestProviderOrderStatus,
   PaycrestRate,
   PaycrestToken,
@@ -153,10 +155,7 @@ export class PaycrestApi {
   async listOrders(
     filter?: Record<string, string | number>,
     options?: { signal?: AbortSignal }
-  ): Promise<{
-    orders: PaycrestOrder[];
-    [key: string]: unknown;
-  }> {
+  ): Promise<PaycrestOrderList> {
     this.requireApiKey("listOrders");
     let path = "/v2/sender/orders";
     if (filter && Object.keys(filter).length > 0) {
@@ -164,7 +163,7 @@ export class PaycrestApi {
       for (const [k, v] of Object.entries(filter)) params.set(k, String(v));
       path += `?${params.toString()}`;
     }
-    return this.request<{ orders: PaycrestOrder[] }>(
+    return this.request<PaycrestOrderList>(
       path,
       { method: "GET" },
       options?.signal
@@ -226,21 +225,7 @@ export class PaycrestApi {
     init: RequestInit,
     callerSignal?: AbortSignal
   ): Promise<T> {
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), this.timeoutMs);
-    // Forward an external abort onto our internal controller so the
-    // in-flight fetch is cancelled immediately. Without this, callers
-    // who passed `signal` to a higher-level wait method would have to
-    // wait for `timeoutMs` to elapse before the HTTP request gives up.
-    let onCallerAbort: (() => void) | undefined;
-    if (callerSignal) {
-      if (callerSignal.aborted) {
-        controller.abort();
-      } else {
-        onCallerAbort = () => controller.abort();
-        callerSignal.addEventListener("abort", onCallerAbort, { once: true });
-      }
-    }
+    const method = init.method ?? "GET";
     const headers: Record<string, string> = {
       Accept: "application/json",
     };
@@ -249,67 +234,62 @@ export class PaycrestApi {
     if (init.headers)
       Object.assign(headers, init.headers as Record<string, string>);
 
-    try {
-      const res = await this.fetcher(`${this.baseUrl}${path}`, {
-        ...init,
-        headers,
-        signal: controller.signal,
-      });
+    // The timeout + caller-abort plumbing is shared with the Privy signer
+    // via `fetchJsonWithTimeout`; the Paycrest-specific envelope unwrapping
+    // and error extraction stay in the `parse` callback below.
+    return fetchJsonWithTimeout<T>(
+      `${this.baseUrl}${path}`,
+      { ...init, headers },
+      {
+        fetchImpl: this.fetcher,
+        timeoutMs: this.timeoutMs,
+        ...(callerSignal ? { callerSignal } : {}),
+        onTimeout: () =>
+          new Error(
+            `Paycrest API ${method} ${path} timed out after ${this.timeoutMs}ms`
+          ),
+        onCallerAbort: () =>
+          new Error(`Paycrest API ${method} ${path} aborted by caller signal`),
+      },
+      async (res) => {
+        let parsed: unknown;
+        try {
+          parsed = await res.json();
+        } catch {
+          if (!res.ok) {
+            throw new PaycrestApiError({
+              status: res.status,
+              method,
+              path,
+              message: `${res.status} ${res.statusText}`,
+              body: undefined,
+            });
+          }
+          throw new Error(
+            `Paycrest API returned non-JSON response for ${path}`
+          );
+        }
 
-      const method = init.method ?? "GET";
-      let parsed: unknown;
-      try {
-        parsed = await res.json();
-      } catch {
         if (!res.ok) {
+          const message =
+            extractErrorMessage(parsed) ?? `${res.status} ${res.statusText}`;
           throw new PaycrestApiError({
             status: res.status,
             method,
             path,
-            message: `${res.status} ${res.statusText}`,
-            body: undefined,
+            message,
+            body: parsed,
           });
         }
-        throw new Error(`Paycrest API returned non-JSON response for ${path}`);
-      }
 
-      if (!res.ok) {
-        const message =
-          extractErrorMessage(parsed) ?? `${res.status} ${res.statusText}`;
-        throw new PaycrestApiError({
-          status: res.status,
-          method,
-          path,
-          message,
-          body: parsed,
-        });
-      }
-
-      const envelope = parsed as Partial<PaycrestEnvelope<T>>;
-      if (envelope && "data" in envelope) {
-        return envelope.data as T;
-      }
-      // Some endpoints (e.g. raw key) may return a value directly.
-      return parsed as T;
-    } catch (error) {
-      const name = errorName(error);
-      if (name === "AbortError") {
-        if (callerSignal?.aborted) {
-          throw new Error(
-            `Paycrest API ${init.method ?? "GET"} ${path} aborted by caller signal`
-          );
+        const envelope = parsed as Partial<PaycrestEnvelope<T>>;
+        if (envelope && "data" in envelope) {
+          return envelope.data as T;
         }
-        throw new Error(
-          `Paycrest API ${init.method ?? "GET"} ${path} timed out after ${this.timeoutMs}ms`
-        );
+        // Some endpoints (e.g. raw key) may return a value directly.
+        return parsed as T;
       }
-      throw error;
-    } finally {
-      clearTimeout(timer);
-      if (callerSignal && onCallerAbort) {
-        callerSignal.removeEventListener("abort", onCallerAbort);
-      }
-    }
+    );
   }
 }
 
@@ -324,12 +304,4 @@ function extractErrorMessage(value: unknown): string | null {
     return extractErrorMessage(v["data"]);
   }
   return null;
-}
-
-function errorName(error: unknown): string {
-  if (error && typeof error === "object" && "name" in error) {
-    const n = (error as { name?: unknown }).name;
-    return typeof n === "string" ? n : "";
-  }
-  return "";
 }

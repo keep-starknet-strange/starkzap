@@ -41,7 +41,7 @@ export interface PopulateCreateOrderArgs {
   senderFee?: bigint;
   /** Refund address — typically the wallet sending the order. */
   refundAddress: Address;
-  /** Base64-encoded RSA-OAEP ciphertext of the recipient JSON. */
+  /** Base64-encoded RSA PKCS1 v1.5 ciphertext of the recipient JSON. */
   messageHash: string;
 }
 
