@@ -289,6 +289,8 @@ export type PaycrestSenderFeeOverride =
   | {
       /** Fixed fee in token units. Maps to the API `senderFee` field. */
       amount: Amount;
+      /** @internal Discriminator — not a valid field; enforces XOR with `amount`. */
+      percent?: never;
     }
   | {
       /**
@@ -297,6 +299,8 @@ export type PaycrestSenderFeeOverride =
        * token's max-fee config.
        */
       percent: number | string;
+      /** @internal Discriminator — not a valid field; enforces XOR with `percent`. */
+      amount?: never;
     };
 
 /**

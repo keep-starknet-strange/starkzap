@@ -2,7 +2,7 @@ import "dotenv/config";
 import { fromAddress, Paycrest, mainnetTokens, type Token } from "starkzap";
 
 /**
- * On-ramp 50000 NGN -> stablecoin delivered to a Starknet wallet.
+ * On-ramp 1000 NGN -> stablecoin delivered to a Starknet wallet.
  * Token defaults to USDT; set `PAYCREST_TOKEN=USDC` to opt into USDC.
  *
  * On-ramp is Sender-API-only — Paycrest does not support on-ramp via
@@ -20,7 +20,7 @@ async function main() {
   const result = await paycrest.onramp({
     from: {
       currency: "NGN",
-      amount: 50_000,
+      amount: 1_000,
       refundAccount: {
         institution: required("RECIPIENT_INSTITUTION"),
         accountIdentifier: required("RECIPIENT_ACCOUNT_IDENTIFIER"),
@@ -49,12 +49,11 @@ function required(name: string): string {
 }
 
 function resolveToken(): Token {
-  const symbol = (process.env["PAYCREST_TOKEN"] ?? "USDT").toUpperCase();
+  const raw = process.env["PAYCREST_TOKEN"]?.trim();
+  const symbol = (raw && raw.length > 0 ? raw : "USDT").toUpperCase();
   if (symbol === "USDT") return mainnetTokens.USDT;
   if (symbol === "USDC") return mainnetTokens.USDC;
-  throw new Error(
-    `PAYCREST_TOKEN must be USDC or USDT (got: ${process.env["PAYCREST_TOKEN"]})`
-  );
+  throw new Error(`PAYCREST_TOKEN must be USDC or USDT (got: ${raw})`);
 }
 
 main().catch((err) => {

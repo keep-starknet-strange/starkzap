@@ -199,7 +199,9 @@ export class PrivySigner implements SignerInterface {
           let data: unknown;
           try {
             data = await response.json();
-          } catch {
+          } catch (err) {
+            // Propagate abort rather than masking it as a JSON parse failure.
+            if (err instanceof Error && err.name === "AbortError") throw err;
             throw new Error("Privy signing failed: invalid JSON response");
           }
 

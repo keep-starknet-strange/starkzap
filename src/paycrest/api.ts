@@ -76,7 +76,13 @@ export class PaycrestApi {
     this.fetcher =
       options.fetch ??
       ((url: RequestInfo | URL, init?: RequestInit) => fetch(url, init));
-    this.timeoutMs = options.requestTimeoutMs ?? DEFAULT_TIMEOUT_MS;
+    const rawTimeout = options.requestTimeoutMs ?? DEFAULT_TIMEOUT_MS;
+    if (!Number.isFinite(rawTimeout) || rawTimeout <= 0) {
+      throw new Error(
+        `PaycrestApi requestTimeoutMs must be a positive finite number (got: ${String(rawTimeout)})`
+      );
+    }
+    this.timeoutMs = rawTimeout;
   }
 
   /** RSA public key (PEM) used to encrypt recipient details on the gateway path. */
@@ -255,7 +261,11 @@ export class PaycrestApi {
         let parsed: unknown;
         try {
           parsed = await res.json();
-        } catch {
+        } catch (err) {
+          // Body-read was cancelled mid-stream (signal fired after headers
+          // arrived). Propagate the AbortError rather than masking it as a
+          // JSON parse failure so callers see the correct abort semantics.
+          if (err instanceof Error && err.name === "AbortError") throw err;
           if (!res.ok) {
             throw new PaycrestApiError({
               status: res.status,

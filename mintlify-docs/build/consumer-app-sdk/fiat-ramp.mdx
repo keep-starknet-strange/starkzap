@@ -172,7 +172,7 @@ const sdk = new StarkZap({
 });
 ```
 
-The `gasToken` flow (user pays gas in a stablecoin) works against AVNU's public endpoint without an api key.
+The `gasToken` flow is still paymaster mode — configure `x-paymaster-api-key` as shown above when enabling it.
 
 <Note>
   `nodeUrl` is required when you set `paymaster`. starknet.js's `PaymasterRpc` defaults `nodeUrl` to the Sepolia paymaster when omitted, which causes mainnet transactions to fail with `execution error contract not found`.

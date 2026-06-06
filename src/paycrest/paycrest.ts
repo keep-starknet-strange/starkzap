@@ -464,19 +464,30 @@ export class Paycrest {
     const { calls, rate } = await this.buildGatewayOfframpCalls(wallet, input);
     const tx = await wallet.execute(calls, options);
     const gateway = this.resolveGatewayAddress(wallet.getChainId());
-    return this.attachWait({
-      path: "gateway",
-      orderId: this.resolveGatewayOrderId(tx, gateway),
-      tx,
-      calls,
-      rate,
-    });
+    return this.attachWait(
+      {
+        path: "gateway",
+        orderId: this.resolveGatewayOrderId(tx, gateway),
+        tx,
+        calls,
+        rate,
+      },
+      // Capture the originating chain so result.wait() polls the correct
+      // Paycrest index rather than always falling back to the mainnet default.
+      { chainId: paycrestChainIdFor(wallet.getChainId()) }
+    );
   }
 
   /**
    * Attach a `wait()` method to a partially-built `OfframpResult`. The
    * method delegates to `waitForOfframp`, dispatching to the correct
    * endpoint based on `result.path`.
+   *
+   * `defaultWaitOptions` are merged with whatever the caller passes to
+   * `result.wait(opts)` — caller options take precedence. Used by the
+   * gateway path to propagate the originating `chainId` so
+   * `waitForGatewayOrder` polls the correct Paycrest index rather than
+   * always falling back to the mainnet default.
    *
    * `wait()` is memoized: a second call reuses the in-flight (or
    * settled) polling promise from the first call instead of starting a
@@ -485,12 +496,18 @@ export class Paycrest {
    * started.
    */
   private attachWait(
-    partial: DistributiveOmit<OfframpResult, "wait">
+    partial: DistributiveOmit<OfframpResult, "wait">,
+    defaultWaitOptions?: PaycrestWaitForOrderOptions & {
+      chainId?: bigint | number | string;
+    }
   ): OfframpResult {
     const result = partial as OfframpResult;
     let pending: Promise<PaycrestOfframpStatus> | undefined;
     result.wait = (waitOptions?: PaycrestWaitForOrderOptions) =>
-      (pending ??= this.waitForOfframp(result, waitOptions ?? {}));
+      (pending ??= this.waitForOfframp(result, {
+        ...(defaultWaitOptions ?? {}),
+        ...(waitOptions ?? {}),
+      }));
     return result;
   }
 
