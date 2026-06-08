@@ -20,6 +20,7 @@ import {
   type LsSwapResponse,
   type LsTransactionStatus,
 } from "@/bridge/ethereum/layerswap/types";
+import { assertSafeHttpUrl } from "@/utils";
 
 const DEFAULT_BASE_URL = "https://api.layerswap.io";
 const DEFAULT_REQUEST_TIMEOUT_MS = 15_000;
@@ -37,7 +38,10 @@ export class LayerswapApi {
 
   constructor(config: LayerswapApiConfig) {
     this.apiKey = config.apiKey;
-    this.baseUrl = (config.baseUrl ?? DEFAULT_BASE_URL).replace(/\/+$/, "");
+    const baseUrl = config.baseUrl ?? DEFAULT_BASE_URL;
+    this.baseUrl = assertSafeHttpUrl(baseUrl, "bridging.layerswapBaseUrl")
+      .toString()
+      .replace(/\/+$/, "");
     this.requestTimeoutMs =
       config.requestTimeoutMs ?? DEFAULT_REQUEST_TIMEOUT_MS;
   }

@@ -54,8 +54,8 @@ const ERC20_DEPOSIT_FALLBACK_GAS = 65_000n;
  */
 export class LayerswapBridge extends EthereumBridge {
   private readonly api: LayerswapApi;
-  private readonly sourceNetwork: string;
-  private readonly destNetwork: string;
+  private readonly evmNetwork: string;
+  private readonly starknetNetwork: string;
 
   constructor(
     bridgeToken: EthereumBridgeToken,
@@ -68,8 +68,8 @@ export class LayerswapBridge extends EthereumBridge {
     super(bridgeToken, config, starknetWallet, logger);
     this.api = new LayerswapApi({ apiKey, ...apiConfig });
     const mainnet = starknetWallet.getChainId().isMainnet();
-    this.sourceNetwork = mainnet ? "ETHEREUM_MAINNET" : "ETHEREUM_SEPOLIA";
-    this.destNetwork = mainnet ? "STARKNET_MAINNET" : "STARKNET_SEPOLIA";
+    this.evmNetwork = mainnet ? "ETHEREUM_MAINNET" : "ETHEREUM_SEPOLIA";
+    this.starknetNetwork = mainnet ? "STARKNET_MAINNET" : "STARKNET_SEPOLIA";
   }
 
   async deposit(
@@ -80,9 +80,9 @@ export class LayerswapBridge extends EthereumBridge {
     const signerAddress = await this.config.signer.getAddress();
 
     const response = await this.api.createSwap({
-      sourceNetwork: this.sourceNetwork,
+      sourceNetwork: this.evmNetwork,
       sourceToken: this.bridgeToken.symbol,
-      destinationNetwork: this.destNetwork,
+      destinationNetwork: this.starknetNetwork,
       destinationToken: this.bridgeToken.symbol,
       amount: amount.toUnit(),
       destinationAddress: recipient.toString(),
@@ -97,12 +97,12 @@ export class LayerswapBridge extends EthereumBridge {
         ? response.deposit_actions
         : await this.api.getDepositActions(swap.id, signerAddress);
     const action = actions.find(
-      (a) => a.network.name === this.sourceNetwork && a.type === "transfer"
+      (a) => a.network.name === this.evmNetwork && a.type === "transfer"
     );
 
     if (!action) {
       throw new Error(
-        `No transfer deposit action for swap "${swap.id}" on network "${this.sourceNetwork}".`
+        `No transfer deposit action for swap "${swap.id}" on network "${this.evmNetwork}".`
       );
     }
 
@@ -123,9 +123,9 @@ export class LayerswapBridge extends EthereumBridge {
     const [quote, sourceTxFee] = await Promise.all([
       this.api
         .getQuote({
-          sourceNetwork: this.sourceNetwork,
+          sourceNetwork: this.evmNetwork,
           sourceToken: this.bridgeToken.symbol,
-          destinationNetwork: this.destNetwork,
+          destinationNetwork: this.starknetNetwork,
           destinationToken: this.bridgeToken.symbol,
           // Layerswap treats `0` as "quote at the route minimum". Pass the
           // user's amount here once `BridgeInterface.getDepositFeeEstimate`
@@ -185,9 +185,9 @@ export class LayerswapBridge extends EthereumBridge {
     const starknetAddress = this.starknetWallet.address.toString();
 
     const response = await this.api.createSwap({
-      sourceNetwork: this.destNetwork,
+      sourceNetwork: this.starknetNetwork,
       sourceToken: this.bridgeToken.symbol,
-      destinationNetwork: this.sourceNetwork,
+      destinationNetwork: this.evmNetwork,
       destinationToken: this.bridgeToken.symbol,
       amount: amount.toUnit(),
       destinationAddress: recipient.toString(),
@@ -201,12 +201,12 @@ export class LayerswapBridge extends EthereumBridge {
         ? response.deposit_actions
         : await this.api.getDepositActions(swap.id, starknetAddress);
     const action = actions.find(
-      (a) => a.network.name === this.destNetwork && a.type === "transfer"
+      (a) => a.network.name === this.starknetNetwork && a.type === "transfer"
     );
 
     if (!action) {
       throw new Error(
-        `No transfer deposit action for swap "${swap.id}" on network "${this.destNetwork}".`
+        `No transfer deposit action for swap "${swap.id}" on network "${this.starknetNetwork}".`
       );
     }
 
@@ -237,9 +237,9 @@ export class LayerswapBridge extends EthereumBridge {
     const [quote, l2] = await Promise.all([
       this.api
         .getQuote({
-          sourceNetwork: this.destNetwork,
+          sourceNetwork: this.starknetNetwork,
           sourceToken: this.bridgeToken.symbol,
-          destinationNetwork: this.sourceNetwork,
+          destinationNetwork: this.evmNetwork,
           destinationToken: this.bridgeToken.symbol,
           amount: "0",
         })

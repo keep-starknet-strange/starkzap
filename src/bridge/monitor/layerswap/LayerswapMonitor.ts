@@ -173,6 +173,13 @@ export class LayerswapMonitor implements BridgeMonitorInterface {
       case "pending_refund":
       case "refunded":
         return BridgeTransferStatus.ERROR;
+      default:
+        this.logger.warn(
+          `[LayerswapMonitor] Unknown Layerswap deposit status "${String(
+            swap.status
+          )}" for swap "${swap.id}"; reporting ERROR.`
+        );
+        return BridgeTransferStatus.ERROR;
     }
   }
 
@@ -191,6 +198,13 @@ export class LayerswapMonitor implements BridgeMonitorInterface {
       case "cancelled":
       case "pending_refund":
       case "refunded":
+        return BridgeTransferStatus.ERROR;
+      default:
+        this.logger.warn(
+          `[LayerswapMonitor] Unknown Layerswap withdrawal status "${String(
+            swap.status
+          )}" for swap "${swap.id}"; reporting ERROR.`
+        );
         return BridgeTransferStatus.ERROR;
     }
   }
