@@ -6,10 +6,11 @@ import {
 import * as ethersRuntime from "@/connect/ethersRuntime";
 import * as solanaWeb3Runtime from "@/connect/solanaWeb3Runtime";
 import {
+  ContractRoutedEthereumBridgeToken,
+  ContractRoutedSolanaBridgeToken,
   EthereumBridgeToken,
   ExternalChain,
   Protocol,
-  SolanaBridgeToken,
 } from "@/types";
 import { StarkZapLogger } from "@/logger";
 
@@ -156,13 +157,109 @@ describe("BridgeTokenRepository", () => {
 
     expect(tokens).toHaveLength(3);
 
-    expect(tokens[0]).toBeInstanceOf(EthereumBridgeToken);
+    // Contract-routed protocols carry the bridge-contract addresses, so they
+    // parse to the ContractRouted* subclasses.
+    expect(tokens[0]).toBeInstanceOf(ContractRoutedEthereumBridgeToken);
     expect(tokens[0]?.protocol).toBe(Protocol.CANONICAL);
     expect(tokens[0]?.chain).toBe(ExternalChain.ETHEREUM);
 
-    expect(tokens[2]).toBeInstanceOf(SolanaBridgeToken);
+    expect(tokens[2]).toBeInstanceOf(ContractRoutedSolanaBridgeToken);
     expect(tokens[2]?.protocol).toBe(Protocol.HYPERLANE);
     expect(tokens[2]?.chain).toBe(ExternalChain.SOLANA);
+  });
+
+  it("should parse Layerswap tokens to the plain base classes (no bridge addresses)", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      statusText: "OK",
+      json: async () => [
+        {
+          id: "eth-layerswap",
+          chain: "ethereum",
+          protocol: "layerswap",
+          name: "Ethereum",
+          symbol: "ETH",
+          decimals: 18,
+          l1_token_address: "0x0000000000000000000000000000000000000000",
+          l2_token_address:
+            "0x049d36570d4e46f48e99674bd3fcc84644ddd6b96f7c741b1562b82f9e004dc7",
+        },
+      ],
+    });
+
+    const repository = new BridgeTokenRepository({
+      fetchFn: fetchMock as unknown as typeof fetch,
+    });
+    const tokens = await repository.getTokens();
+
+    expect(tokens).toHaveLength(1);
+    expect(tokens[0]?.protocol).toBe(Protocol.LAYERSWAP);
+    expect(tokens[0]).toBeInstanceOf(EthereumBridgeToken);
+    expect(tokens[0]).not.toBeInstanceOf(ContractRoutedEthereumBridgeToken);
+  });
+
+  it("should parse CCTP tokens to the plain base classes (resolves contracts from constants, not the record)", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      statusText: "OK",
+      json: async () => [
+        {
+          id: "usdc-cctp",
+          chain: "ethereum",
+          protocol: "cctp",
+          name: "USD Coin",
+          symbol: "USDC",
+          decimals: 6,
+          l1_token_address: "0x0000000000000000000000000000000000000000",
+          l2_token_address:
+            "0x049d36570d4e46f48e99674bd3fcc84644ddd6b96f7c741b1562b82f9e004dc7",
+        },
+      ],
+    });
+
+    const repository = new BridgeTokenRepository({
+      fetchFn: fetchMock as unknown as typeof fetch,
+    });
+    const tokens = await repository.getTokens();
+
+    expect(tokens).toHaveLength(1);
+    expect(tokens[0]?.protocol).toBe(Protocol.CCTP);
+    expect(tokens[0]).toBeInstanceOf(EthereumBridgeToken);
+    expect(tokens[0]).not.toBeInstanceOf(ContractRoutedEthereumBridgeToken);
+  });
+
+  it("should throw when a contract-routed token is missing a bridge address", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      statusText: "OK",
+      json: async () => [
+        {
+          id: "broken-canonical",
+          chain: "ethereum",
+          protocol: "canonical",
+          name: "Ethereum",
+          symbol: "ETH",
+          decimals: 18,
+          l1_token_address: "0x0000000000000000000000000000000000000000",
+          l2_token_address:
+            "0x049d36570d4e46f48e99674bd3fcc84644ddd6b96f7c741b1562b82f9e004dc7",
+          // l1_bridge_address omitted
+          l2_bridge_address:
+            "0x073314940630fd6dcda0d772d4c972c4e0a9946bef9dabf4ef84eda8ef542b82",
+        },
+      ],
+    });
+
+    const repository = new BridgeTokenRepository({
+      fetchFn: fetchMock as unknown as typeof fetch,
+    });
+
+    await expect(
+      repository.getTokens({ chain: ExternalChain.ETHEREUM })
+    ).rejects.toThrow('Missing required field "l1_bridge_address"');
   });
 
   it("should send optional env and chain query params when provided", async () => {

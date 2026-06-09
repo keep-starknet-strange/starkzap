@@ -1,9 +1,9 @@
 import {
   type Address,
   Amount,
-  BridgeToken,
   type ChainId,
   type ChainIdLiteral,
+  ContractRoutedEthereumBridgeToken,
   fromAddress,
   type Token,
 } from "@/types";
@@ -22,7 +22,7 @@ export interface AutoWithdrawFeesHandlerOptions {
 /** Arguments for {@link AutoWithdrawFeesHandler.getFeeData}. */
 export interface AutoWithdrawFeeInput {
   /** L2 bridge token involved in the withdrawal (used for bridge address and balance rules). */
-  bridgeToken: BridgeToken;
+  bridgeToken: ContractRoutedEthereumBridgeToken;
   /** Withdrawal amount; reserved from balance when the fee token is the bridged token. */
   amount: Amount;
   /** Wallet or account whose balances are checked against quoted gas costs. */

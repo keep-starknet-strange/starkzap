@@ -3,6 +3,8 @@ import { type EthereumBridgeProtocol, Protocol } from "@/types/bridge/protocol";
 import { ExternalChain } from "@/types/bridge/external-chain";
 import {
   type BridgeToken,
+  ContractRoutedEthereumBridgeToken,
+  ContractRoutedSolanaBridgeToken,
   EthereumBridgeToken,
   SolanaBridgeToken,
 } from "@/types/bridge/bridge-token";
@@ -153,6 +155,23 @@ function isOptionalPeerDependencyError(
   );
 }
 
+/**
+ * Whether a token's bridge-contract addresses are actually consumed by its
+ * bridge class. Canonical, Lords, OFT (Ethereum) and Hyperlane (Solana) build a
+ * bridge `Contract` from these addresses, so they become required fields on the
+ * `ContractRouted*` token classes.
+ *
+ * Layerswap and CCTP are excluded: Layerswap derives a per-swap deposit address
+ * from its API, and CCTP resolves its TokenMessenger/MessageTransmitter from
+ * chain-keyed constants rather than the token record. Both ignore any
+ * bridge-contract addresses, so their records parse to the plain base token
+ * classes — the distinction is encoded in the type system instead of asserted at
+ * runtime.
+ */
+function isContractRouted(protocol: Protocol): boolean {
+  return protocol !== Protocol.LAYERSWAP && protocol !== Protocol.CCTP;
+}
+
 function parseToken(
   token: BridgeTokenApiRecord,
   normalizeEthereumAddress?: NormalizeEthereumAddress,
@@ -180,8 +199,7 @@ function parseToken(
       );
     }
     const coingeckoId = optionalString(token, "coingecko_id");
-
-    return new EthereumBridgeToken({
+    const params = {
       id: requiredString(token, "id"),
       name: requiredString(token, "name"),
       symbol: requiredString(token, "symbol"),
@@ -190,14 +208,22 @@ function parseToken(
       address: normalizeEthereumAddress(
         requiredString(token, "l1_token_address")
       ),
-      l1Bridge: normalizeEthereumAddress(
-        requiredString(token, "l1_bridge_address")
-      ),
       starknetAddress: fromAddress(requiredString(token, "l2_token_address")),
-      starknetBridge: fromAddress(requiredString(token, "l2_bridge_address")),
       supportsAutoWithdraw: token.AW_support === true,
       ...(coingeckoId ? { coingeckoId } : {}),
-    });
+    };
+
+    return isContractRouted(protocol)
+      ? new ContractRoutedEthereumBridgeToken({
+          ...params,
+          l1Bridge: normalizeEthereumAddress(
+            requiredString(token, "l1_bridge_address")
+          ),
+          starknetBridge: fromAddress(
+            requiredString(token, "l2_bridge_address")
+          ),
+        })
+      : new EthereumBridgeToken(params);
   }
 
   if (chain === ExternalChain.SOLANA) {
@@ -213,7 +239,7 @@ function parseToken(
       );
     }
 
-    return new SolanaBridgeToken({
+    const params = {
       id: requiredString(token, "id"),
       name: requiredString(token, "name"),
       symbol: requiredString(token, "symbol"),
@@ -222,12 +248,20 @@ function parseToken(
       address: normalizeSolanaAddress(
         requiredString(token, "l1_token_address")
       ),
-      l1Bridge: normalizeSolanaAddress(
-        requiredString(token, "l1_bridge_address")
-      ),
       starknetAddress: fromAddress(requiredString(token, "l2_token_address")),
-      starknetBridge: fromAddress(requiredString(token, "l2_bridge_address")),
-    });
+    };
+
+    return isContractRouted(protocol)
+      ? new ContractRoutedSolanaBridgeToken({
+          ...params,
+          l1Bridge: normalizeSolanaAddress(
+            requiredString(token, "l1_bridge_address")
+          ),
+          starknetBridge: fromAddress(
+            requiredString(token, "l2_bridge_address")
+          ),
+        })
+      : new SolanaBridgeToken(params);
   }
 
   throw new Error(`Chain "${chain} not supported"`);

@@ -22,6 +22,8 @@ import {
   type BridgeDepositFeeEstimation,
   type BridgeInitiateWithdrawFeeEstimation,
   type BridgingConfig,
+  ContractRoutedEthereumBridgeToken,
+  ContractRoutedSolanaBridgeToken,
   type EthereumAddress,
   type ExternalAddress,
   ExternalChain,
@@ -47,6 +49,28 @@ import type {
 } from "@/bridge/monitor/types";
 import type { StarkZapLogger } from "@/logger";
 import { CCTPFees } from "@/bridge/ethereum/cctp/CCTPFees";
+
+/**
+ * Narrow a bridge token to its contract-routed subclass, throwing a clear error
+ * if it is not one. Canonical, Lords, OFT and Hyperlane bridges build a bridge
+ * `Contract` from the token's on-chain addresses, so they require those fields
+ * to be present. The repository only constructs `ContractRouted*` tokens for
+ * those protocols (see `isContractRouted`), so this guard always passes in
+ * practice — it replaces an unchecked `as` cast with an explicit invariant check
+ * so any future drift surfaces as an actionable error instead of a
+ * `new Contract(undefined, ...)` failure.
+ */
+function requireContractRouted<T extends BridgeToken>(
+  token: BridgeToken,
+  TokenClass: new (...args: never[]) => T
+): T {
+  if (token instanceof TokenClass) {
+    return token;
+  }
+  throw new Error(
+    `Bridging ${token.name} via "${token.protocol}" requires a contract-routed token with on-chain bridge addresses, but its token record carries none.`
+  );
+}
 
 export class BridgeOperator implements BridgeOperatorInterface {
   private cache = new BridgeCache();
@@ -314,7 +338,7 @@ export class BridgeOperator implements BridgeOperatorInterface {
       const { LordsBridge } =
         await import("@/bridge/ethereum/lords/LordsBridge");
       return new LordsBridge(
-        token,
+        requireContractRouted(token, ContractRoutedEthereumBridgeToken),
         walletConfig,
         starknetWallet,
         this.autoWithdrawFeesHandler,
@@ -327,7 +351,7 @@ export class BridgeOperator implements BridgeOperatorInterface {
         const { CanonicalEthereumBridge } =
           await import("@/bridge/ethereum/canonical/CanonicalEthereumBridge");
         return new CanonicalEthereumBridge(
-          token,
+          requireContractRouted(token, ContractRoutedEthereumBridgeToken),
           walletConfig,
           starknetWallet,
           this.autoWithdrawFeesHandler,
@@ -360,7 +384,7 @@ export class BridgeOperator implements BridgeOperatorInterface {
         }
         const { OftBridge } = await import("@/bridge/ethereum/oft/OftBridge");
         return new OftBridge(
-          token,
+          requireContractRouted(token, ContractRoutedEthereumBridgeToken),
           walletConfig,
           starknetWallet,
           apiKey,
@@ -414,7 +438,7 @@ export class BridgeOperator implements BridgeOperatorInterface {
         const { SolanaHyperlaneBridge } =
           await import("@/bridge/solana/SolanaHyperlaneBridge");
         return await SolanaHyperlaneBridge.create(
-          token,
+          requireContractRouted(token, ContractRoutedSolanaBridgeToken),
           walletConfig,
           starknetWallet
         );

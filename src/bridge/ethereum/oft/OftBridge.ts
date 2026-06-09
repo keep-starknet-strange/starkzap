@@ -1,4 +1,4 @@
-import { EthereumBridge } from "@/bridge/ethereum/EthereumBridge";
+import { ContractRoutedEthereumBridge } from "@/bridge/ethereum/ContractRoutedEthereumBridge";
 import type {
   BridgeDepositOptions,
   CompleteBridgeWithdrawOptions,
@@ -18,8 +18,8 @@ import type {
 } from "@/types";
 import {
   Amount,
+  ContractRoutedEthereumBridgeToken,
   type EthereumAddress,
-  EthereumBridgeToken,
   ExternalChain,
 } from "@/types";
 import type { WalletInterface } from "@/wallet";
@@ -43,13 +43,13 @@ type DummyDepositTxCache = {
   createdAt: number;
 };
 
-export class OftBridge extends EthereumBridge {
+export class OftBridge extends ContractRoutedEthereumBridge {
   private readonly layerZeroApi: LayerZeroApi;
   private cachedSpender: EthereumAddress | null | undefined;
   private dummyDepositTxCache: DummyDepositTxCache | null = null;
 
   constructor(
-    bridgeToken: EthereumBridgeToken,
+    bridgeToken: ContractRoutedEthereumBridgeToken,
     config: EthereumWalletConfig,
     starknetWallet: WalletInterface,
     apiKey: string,

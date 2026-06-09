@@ -7,7 +7,7 @@ import {
   type Address,
   type Token,
 } from "@/types";
-import { EthereumBridgeToken } from "@/types/bridge/bridge-token";
+import { ContractRoutedEthereumBridgeToken } from "@/types/bridge/bridge-token";
 import { Protocol } from "@/types/bridge/protocol";
 import { AutoWithdrawFeesHandler } from "@/bridge/utils/auto-withdraw-fees-handler";
 import type { RpcProvider } from "starknet";
@@ -41,7 +41,7 @@ const mockEthToken: Token = {
   address: ETH_ADDRESS,
 };
 
-const mockBridgeToken = new EthereumBridgeToken({
+const mockBridgeToken = new ContractRoutedEthereumBridgeToken({
   id: "strk",
   name: "Starknet Token",
   symbol: "STRK",

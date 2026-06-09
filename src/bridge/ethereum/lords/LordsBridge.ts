@@ -2,7 +2,7 @@ import { CanonicalEthereumBridge } from "@/bridge/ethereum/canonical/CanonicalEt
 import { ethereumAddress } from "@/bridge/ethereum/EtherToken";
 import type { EthereumTransactionDetails } from "@/bridge/ethereum/types";
 import type { Address, ExternalAddress } from "@/types";
-import { Amount, EthereumBridgeToken } from "@/types";
+import { Amount, ContractRoutedEthereumBridgeToken } from "@/types";
 import type { EthereumWalletConfig } from "@/bridge/ethereum/types";
 import type { WalletInterface } from "@/wallet";
 import { type Call, CallData, RPC, uint256 } from "starknet";
@@ -13,7 +13,7 @@ import type { StarkZapLogger } from "@/logger";
 
 export class LordsBridge extends CanonicalEthereumBridge {
   constructor(
-    bridgeToken: EthereumBridgeToken,
+    bridgeToken: ContractRoutedEthereumBridgeToken,
     config: EthereumWalletConfig,
     starknetWallet: WalletInterface,
     autoWithdrawFeesHandler: AutoWithdrawFeesHandler,

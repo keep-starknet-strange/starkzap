@@ -163,7 +163,7 @@ export class CCTPBridge extends EthereumBridge {
     }
   }
 
-  override async initiateWithdraw(
+  async initiateWithdraw(
     recipient: EthereumAddress,
     amount: Amount,
     options?: InitiateBridgeWithdrawOptions

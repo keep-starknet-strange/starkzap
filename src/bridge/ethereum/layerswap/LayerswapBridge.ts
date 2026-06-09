@@ -177,7 +177,7 @@ export class LayerswapBridge extends EthereumBridge {
    * executes the Starknet transfer into Layerswap's deposit address.
    * Layerswap auto-delivers the funds on Ethereum — no `completeWithdraw` step.
    */
-  override async initiateWithdraw(
+  async initiateWithdraw(
     recipient: ExternalAddress,
     amount: Amount,
     options?: InitiateBridgeWithdrawOptions
@@ -282,7 +282,7 @@ export class LayerswapBridge extends EthereumBridge {
    * Layerswap delivers funds automatically on the destination chain — the
    * user never calls `completeWithdraw`.
    */
-  override async completeWithdraw(
+  async completeWithdraw(
     _recipient: ExternalAddress,
     _amount: Amount,
     _options?: CompleteBridgeWithdrawOptions
@@ -292,7 +292,7 @@ export class LayerswapBridge extends EthereumBridge {
     );
   }
 
-  override async getCompleteWithdrawFeeEstimate(
+  async getCompleteWithdrawFeeEstimate(
     _amount: Amount,
     _recipient: ExternalAddress,
     _options?: CompleteBridgeWithdrawOptions

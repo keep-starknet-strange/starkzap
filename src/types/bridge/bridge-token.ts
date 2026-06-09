@@ -20,8 +20,21 @@ export interface BridgeTokenParams<A extends ExternalAddress> {
   coingeckoId?: string;
   protocol: Protocol;
   address: A;
-  l1Bridge: A;
   starknetAddress: Address;
+}
+
+/**
+ * On-chain bridge-contract addresses, carried only by tokens whose bridge class
+ * reads them to build a bridge `Contract` (canonical, Lords, OFT, Hyperlane).
+ * Layerswap derives a per-swap deposit address from its API, and CCTP resolves
+ * its contracts from chain-keyed constants; neither reads these, so they live on
+ * the `ContractRouted*` token classes rather than the shared base — the
+ * distinction is encoded in the type system instead of asserted at runtime.
+ */
+export interface BridgeContractAddresses<A extends ExternalAddress> {
+  /** Source-chain (EVM/Solana) bridge contract address. */
+  l1Bridge: A;
+  /** Starknet-side bridge contract address. */
   starknetBridge: Address;
 }
 
@@ -33,9 +46,7 @@ export abstract class BridgeToken<A extends ExternalAddress = ExternalAddress> {
   readonly decimals: number;
 
   readonly address: A;
-  readonly bridgeAddress: A;
   readonly starknetAddress: Address;
-  readonly starknetBridge: Address;
 
   abstract readonly protocol: Protocol;
   abstract readonly chain: ExternalChain;
@@ -50,9 +61,7 @@ export abstract class BridgeToken<A extends ExternalAddress = ExternalAddress> {
     this.decimals = params.decimals;
 
     this.address = params.address;
-    this.bridgeAddress = params.l1Bridge;
     this.starknetAddress = params.starknetAddress;
-    this.starknetBridge = params.starknetBridge;
   }
 
   intoStarknetToken(): Token {
@@ -76,9 +85,29 @@ export class EthereumBridgeToken extends BridgeToken<EthereumAddress> {
   readonly supportsAutoWithdraw: boolean;
 
   constructor(params: EthereumBridgeTokenParams) {
-    super({ ...params });
+    super(params);
     this.protocol = params.protocol;
     this.supportsAutoWithdraw = params.supportsAutoWithdraw;
+  }
+}
+
+export interface ContractRoutedEthereumBridgeTokenParams
+  extends EthereumBridgeTokenParams, BridgeContractAddresses<EthereumAddress> {}
+
+/**
+ * An Ethereum bridge token that routes through fixed bridge contracts
+ * (canonical, Lords, OFT). Carries the L1 and Starknet bridge addresses
+ * as required fields, so consumers read them without optional-chaining or
+ * runtime assertions.
+ */
+export class ContractRoutedEthereumBridgeToken extends EthereumBridgeToken {
+  readonly bridgeAddress: EthereumAddress;
+  readonly starknetBridge: Address;
+
+  constructor(params: ContractRoutedEthereumBridgeTokenParams) {
+    super(params);
+    this.bridgeAddress = params.l1Bridge;
+    this.starknetBridge = params.starknetBridge;
   }
 }
 
@@ -91,7 +120,25 @@ export class SolanaBridgeToken extends BridgeToken<SolanaAddress> {
   readonly protocol: SolanaBridgeProtocol;
 
   constructor(params: SolanaBridgeTokenParams) {
-    super({ ...params });
+    super(params);
     this.protocol = params.protocol;
+  }
+}
+
+export interface ContractRoutedSolanaBridgeTokenParams
+  extends SolanaBridgeTokenParams, BridgeContractAddresses<SolanaAddress> {}
+
+/**
+ * A Solana bridge token that routes through fixed bridge contracts (Hyperlane).
+ * Carries the L1 and Starknet bridge addresses as required fields.
+ */
+export class ContractRoutedSolanaBridgeToken extends SolanaBridgeToken {
+  readonly bridgeAddress: SolanaAddress;
+  readonly starknetBridge: Address;
+
+  constructor(params: ContractRoutedSolanaBridgeTokenParams) {
+    super(params);
+    this.bridgeAddress = params.l1Bridge;
+    this.starknetBridge = params.starknetBridge;
   }
 }
