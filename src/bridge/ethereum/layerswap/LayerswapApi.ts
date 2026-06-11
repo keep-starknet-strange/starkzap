@@ -19,6 +19,7 @@ import {
   type LsSwap,
   type LsSwapResponse,
   type LsTransactionStatus,
+  type LayerswapTokenSource,
 } from "@/bridge/ethereum/layerswap/types";
 import { assertSafeHttpUrl } from "@/utils";
 
@@ -31,9 +32,9 @@ const DEFAULT_REQUEST_TIMEOUT_MS = 15_000;
  * Zero dependencies — uses native `fetch` and `URLSearchParams`.
  * Works in Node 18+, Deno, Bun, browsers, and Cloudflare Workers.
  */
-export class LayerswapApi {
+export class LayerswapApi implements LayerswapTokenSource {
   private readonly baseUrl: string;
-  private readonly apiKey: string;
+  private readonly apiKey: string | undefined;
   private readonly requestTimeoutMs: number;
 
   constructor(config: LayerswapApiConfig) {
@@ -67,7 +68,9 @@ export class LayerswapApi {
       qs.set("has_deposit_address", String(params.hasDepositAddress));
     if (params?.networkTypes?.length)
       qs.set("network_types", params.networkTypes.join(","));
-    return this.get<LsRoute[]>("/api/v2/sources", qs);
+    // A successful response with no routes returns `{ data: null }`; normalize
+    // to an empty list so callers can rely on the array contract.
+    return (await this.get<LsRoute[] | null>("/api/v2/sources", qs)) ?? [];
   }
 
   /** Get available destination networks and tokens. */
@@ -85,7 +88,9 @@ export class LayerswapApi {
       qs.set("include_unmatched", String(params.includeUnmatched));
     if (params?.networkTypes?.length)
       qs.set("network_types", params.networkTypes.join(","));
-    return this.get<LsRoute[]>("/api/v2/destinations", qs);
+    // A successful response with no routes returns `{ data: null }`; normalize
+    // to an empty list so callers can rely on the array contract.
+    return (await this.get<LsRoute[] | null>("/api/v2/destinations", qs)) ?? [];
   }
 
   /** Get all available networks with their tokens. */
@@ -95,7 +100,9 @@ export class LayerswapApi {
     const qs = new URLSearchParams();
     if (params?.networkTypes?.length)
       qs.set("network_types", params.networkTypes.join(","));
-    return this.get<LsNetwork[]>("/api/v2/networks", qs);
+    // A successful response with no networks returns `{ data: null }`; normalize
+    // to an empty list so callers can rely on the array contract.
+    return (await this.get<LsNetwork[] | null>("/api/v2/networks", qs)) ?? [];
   }
 
   // ============================================================
@@ -298,7 +305,7 @@ export class LayerswapApi {
   }
 
   private headers(): Record<string, string> {
-    return { "X-LS-APIKEY": this.apiKey };
+    return this.apiKey ? { "X-LS-APIKEY": this.apiKey } : {};
   }
 
   private async unwrap<T>(response: Response): Promise<T> {

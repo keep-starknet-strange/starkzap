@@ -4,6 +4,11 @@ import type {
   InitiateBridgeWithdrawOptions,
 } from "@/bridge/types/BridgeInterface";
 import { LayerswapApi } from "@/bridge/ethereum/layerswap/LayerswapApi";
+import { resolveLayerswapRoute } from "@/bridge/ethereum/layerswap/networks";
+import {
+  ExternalChain,
+  NATIVE_TOKEN_ADDRESS,
+} from "@/types/bridge/external-chain";
 import { normalizeLsTxHash } from "@/bridge/ethereum/layerswap/hashes";
 import {
   buildDummyStarknetTransferCalls,
@@ -41,7 +46,7 @@ const SOLANA_DEPOSIT_BASE_FEE_LAMPORTS = 5_000n;
 
 // StarkGate's bridge token registry uses the System Program ID as the
 // `address` marker for native SOL (there is no SPL mint for SOL).
-const NATIVE_SOL_MARKER = "11111111111111111111111111111111";
+const NATIVE_SOL_MARKER = NATIVE_TOKEN_ADDRESS[ExternalChain.SOLANA];
 
 /**
  * Layerswap bridge provider for Solana → Starknet deposits.
@@ -74,9 +79,10 @@ export class SolanaLayerswapBridge implements BridgeInterface<SolanaAddress> {
       bridgeToken.intoStarknetToken(),
       starknetWallet.getProvider()
     );
-    const mainnet = starknetWallet.getChainId().isMainnet();
-    this.solanaNetwork = mainnet ? "SOLANA_MAINNET" : "SOLANA_DEVNET";
-    this.starknetNetwork = mainnet ? "STARKNET_MAINNET" : "STARKNET_SEPOLIA";
+    const env = starknetWallet.getChainId().isMainnet() ? "mainnet" : "testnet";
+    const route = resolveLayerswapRoute(ExternalChain.SOLANA, env);
+    this.solanaNetwork = route.externalNetwork;
+    this.starknetNetwork = route.starknetNetwork;
   }
 
   async deposit(

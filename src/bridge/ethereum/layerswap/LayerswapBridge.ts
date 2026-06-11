@@ -5,6 +5,8 @@ import type {
   InitiateBridgeWithdrawOptions,
 } from "@/bridge/types/BridgeInterface";
 import { LayerswapApi } from "@/bridge/ethereum/layerswap/LayerswapApi";
+import { resolveLayerswapRoute } from "@/bridge/ethereum/layerswap/networks";
+import { ExternalChain } from "@/types/bridge/external-chain";
 import { normalizeLsTxHash } from "@/bridge/ethereum/layerswap/hashes";
 import {
   buildDummyStarknetTransferCalls,
@@ -67,9 +69,10 @@ export class LayerswapBridge extends EthereumBridge {
   ) {
     super(bridgeToken, config, starknetWallet, logger);
     this.api = new LayerswapApi({ apiKey, ...apiConfig });
-    const mainnet = starknetWallet.getChainId().isMainnet();
-    this.evmNetwork = mainnet ? "ETHEREUM_MAINNET" : "ETHEREUM_SEPOLIA";
-    this.starknetNetwork = mainnet ? "STARKNET_MAINNET" : "STARKNET_SEPOLIA";
+    const env = starknetWallet.getChainId().isMainnet() ? "mainnet" : "testnet";
+    const route = resolveLayerswapRoute(ExternalChain.ETHEREUM, env);
+    this.evmNetwork = route.externalNetwork;
+    this.starknetNetwork = route.starknetNetwork;
   }
 
   async deposit(

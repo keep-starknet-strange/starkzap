@@ -85,25 +85,40 @@ describe("parseLayerswapStarknetCalls", () => {
     ).toThrow(/missing required Call fields/);
   });
 
-  it("rejects calls targeting an unexpected contract", () => {
+  it("accepts helper calls to other contracts when the token transfer is present", () => {
+    const helperCall = {
+      contractAddress: RECIPIENT,
+      entrypoint: "deposit",
+      calldata: ["0x4", "0x5"],
+    };
+
+    const calls = parseLayerswapStarknetCalls(
+      action(JSON.stringify([transferCall(), helperCall])),
+      TOKEN
+    );
+
+    expect(calls).toEqual([transferCall(), helperCall]);
+  });
+
+  it("rejects payloads without a transfer on the expected token", () => {
     expect(() =>
       parseLayerswapStarknetCalls(
         action(JSON.stringify(transferCall(RECIPIENT))),
         TOKEN
       )
-    ).toThrow(/unexpected contract/);
+    ).toThrow(/does not include a transfer/);
   });
 
-  it("rejects calls with an unexpected entrypoint", () => {
+  it("rejects bridge-token calls with an unexpected entrypoint", () => {
     expect(() =>
       parseLayerswapStarknetCalls(
         action(JSON.stringify(transferCall(TOKEN, "approve"))),
         TOKEN
       )
-    ).toThrow(/unexpected entrypoint/);
+    ).toThrow(/unexpected bridge-token entrypoint/);
   });
 
-  it("rejects mixed-validity arrays even if the first call is valid", () => {
+  it("rejects mixed-validity arrays when a bridge-token call is not a transfer", () => {
     expect(() =>
       parseLayerswapStarknetCalls(
         action(
@@ -111,7 +126,7 @@ describe("parseLayerswapStarknetCalls", () => {
         ),
         TOKEN
       )
-    ).toThrow(/unexpected entrypoint/);
+    ).toThrow(/unexpected bridge-token entrypoint/);
   });
 });
 

@@ -1,5 +1,9 @@
 import { Amount, type EthereumAddress, EthereumBridgeToken } from "@/types";
 import {
+  ExternalChain,
+  NATIVE_TOKEN_ADDRESS,
+} from "@/types/bridge/external-chain";
+import {
   Contract,
   type ContractTransaction,
   getAddress,
@@ -38,8 +42,6 @@ export type EthereumTokenInterface = {
   isNativeEth(): boolean;
 };
 
-const NATIVE_ETH_ADDRESS = "0x0000000000000000000000000000000000000000";
-
 export function intoEthereumToken(
   bridgeToken: EthereumBridgeToken,
   config: EthereumWalletConfig
@@ -48,7 +50,8 @@ export function intoEthereumToken(
   // zero-address token (used by providers like Layerswap that assign their
   // own ids like `"eth-layerswap"` while still referring to native ETH).
   const isNativeEth =
-    bridgeToken.id === "eth" || bridgeToken.address === NATIVE_ETH_ADDRESS;
+    bridgeToken.id === "eth" ||
+    bridgeToken.address === NATIVE_TOKEN_ADDRESS[ExternalChain.ETHEREUM];
   return isNativeEth
     ? EtherToken.create(config.provider)
     : ERC20EthereumToken.create(bridgeToken.address, config.provider);

@@ -20,14 +20,11 @@ import {
   type EthereumInitiateWithdrawFeeEstimation,
   ExternalChain,
   Protocol,
-  type SolanaAddress,
-  SolanaBridgeToken,
   type HyperlaneFeeEstimate,
   type SolanaLayerswapDepositFeeEstimation,
   type SolanaProvider,
   type StarkZap,
   type WalletInterface,
-  fromAddress,
   DepositState,
   WithdrawalState,
   type WithdrawMonitorResult,
@@ -392,28 +389,6 @@ export class BridgeController {
         chains.map((chain) => this.sdk.getBridgingTokens(chain))
       );
       const tokens = results.flat();
-
-      // Inject Layerswap tokens until StarkGate API includes them
-      if (chains.includes(ExternalChain.ETHEREUM)) {
-        const hasEthLayerswap = tokens.some(
-          (t) =>
-            t.protocol === Protocol.LAYERSWAP &&
-            t.chain === ExternalChain.ETHEREUM
-        );
-        if (!hasEthLayerswap) {
-          tokens.push(...getEthereumLayerswapTestTokens(this.chainId));
-        }
-      }
-      if (chains.includes(ExternalChain.SOLANA)) {
-        const hasSolLayerswap = tokens.some(
-          (t) =>
-            t.protocol === Protocol.LAYERSWAP &&
-            t.chain === ExternalChain.SOLANA
-        );
-        if (!hasSolLayerswap) {
-          tokens.push(...getSolanaLayerswapTestTokens(this.chainId));
-        }
-      }
 
       this.state.tokens = tokens;
       this.state.tokensLoading = false;
@@ -1023,80 +998,4 @@ export function formatFeeEstimate(estimate: AnyFeeEstimate): string {
   }
 
   return lines.join("\n");
-}
-
-/**
- * Hardcoded Layerswap tokens for testing until StarkGate API includes them.
- * Remove this once StarkGate serves protocol:"layerswap" tokens.
- *
- * Addresses must match the configured network — picking the wrong USDC
- * makes `balanceOf` revert on a non-existent contract and the UI shows "—".
- */
-function getEthereumLayerswapTestTokens(
-  chainId: ChainId
-): EthereumBridgeToken[] {
-  const isMainnet = chainId.isMainnet();
-  const usdcL1 = isMainnet
-    ? "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48"
-    : "0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238";
-  // Layerswap settles in native USDC, not StarkGate-bridged USDC.e — these
-  // are separate ERC20 contracts on Starknet, and `balanceOf` returns 0 on
-  // the wrong one.
-  const usdcSn = isMainnet
-    ? "0x033068f6539f8e6e6b131e6b2b814e6c34a5224bc66947c47dab9dfee93b35fb"
-    : "0x0512feac6339ff7889822cb5aa2a86c848e9d392bb0e3e237c008674feed8343";
-
-  return [
-    new EthereumBridgeToken({
-      id: "eth-layerswap",
-      name: "Ethereum (Layerswap)",
-      symbol: "ETH",
-      decimals: 18,
-      protocol: Protocol.LAYERSWAP,
-      address: "0x0000000000000000000000000000000000000000" as EthereumAddress,
-      l1Bridge: "0x0000000000000000000000000000000000000000" as EthereumAddress,
-      starknetAddress: fromAddress(
-        // Canonical Starknet ETH ERC20 — same address on mainnet & Sepolia.
-        "0x049d36570d4e46f48e99674bd3fcc84644ddd6b96f7c741b1562b82f9e004dc7"
-      ),
-      starknetBridge: fromAddress("0x0"),
-    }),
-    new EthereumBridgeToken({
-      id: "usdc-layerswap",
-      name: "USDC (Layerswap)",
-      symbol: "USDC",
-      decimals: 6,
-      protocol: Protocol.LAYERSWAP,
-      address: usdcL1 as EthereumAddress,
-      l1Bridge: "0x0000000000000000000000000000000000000000" as EthereumAddress,
-      starknetAddress: fromAddress(usdcSn),
-      starknetBridge: fromAddress("0x0"),
-    }),
-  ];
-}
-
-function getSolanaLayerswapTestTokens(chainId: ChainId): SolanaBridgeToken[] {
-  const isMainnet = chainId.isMainnet();
-  // Same native-vs-bridged note as for the Ethereum Layerswap USDC token —
-  // Layerswap settles in native USDC.
-  const usdcSol = isMainnet
-    ? "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
-    : "4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU";
-  const usdcSn = isMainnet
-    ? "0x033068f6539f8e6e6b131e6b2b814e6c34a5224bc66947c47dab9dfee93b35fb"
-    : "0x0512feac6339ff7889822cb5aa2a86c848e9d392bb0e3e237c008674feed8343";
-
-  return [
-    new SolanaBridgeToken({
-      id: "usdc-solana-layerswap",
-      name: "USDC (Solana Layerswap)",
-      symbol: "USDC",
-      decimals: 6,
-      protocol: Protocol.LAYERSWAP,
-      address: usdcSol as SolanaAddress,
-      l1Bridge: "11111111111111111111111111111111" as SolanaAddress,
-      starknetAddress: fromAddress(usdcSn),
-      starknetBridge: fromAddress("0x0"),
-    }),
-  ];
 }

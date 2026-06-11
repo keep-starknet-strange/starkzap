@@ -290,6 +290,16 @@ export interface LayerswapGetNetworksRequest {
   readonly networkTypes?: string[];
 }
 
+/**
+ * Narrow view of the Layerswap API covering only the route-discovery calls
+ * used to enumerate bridgeable tokens. Lets consumers (e.g. the bridge token
+ * repository) depend on — and tests stub — just the surface they need.
+ */
+export interface LayerswapTokenSource {
+  getSources(params?: LayerswapGetSourcesRequest): Promise<LsRoute[]>;
+  getDestinations(params?: LayerswapGetDestinationsRequest): Promise<LsRoute[]>;
+}
+
 /** Parameters for GET /api/v2/transaction_status. */
 export interface LayerswapGetTransactionStatusRequest {
   readonly network: string;
@@ -297,7 +307,11 @@ export interface LayerswapGetTransactionStatusRequest {
 }
 
 export interface LayerswapApiConfig {
-  apiKey: string;
+  /**
+   * API key sent as `X-LS-APIKEY` when provided. The API also accepts
+   * unauthenticated requests, so the key is optional.
+   */
+  apiKey?: string;
   baseUrl?: string;
   requestTimeoutMs?: number;
 }

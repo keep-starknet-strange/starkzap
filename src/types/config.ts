@@ -181,7 +181,9 @@ export interface BridgingConfig {
   /**
    * Layerswap API key for Layerswap bridge support.
    *
-   * Required only when bridging tokens via Layerswap.
+   * Required only when bridging tokens via Layerswap. Setting it also opts
+   * `getBridgingTokens` into discovering Layerswap-bridgeable tokens from
+   * the Layerswap API.
    */
   layerswapApiKey?: string;
 

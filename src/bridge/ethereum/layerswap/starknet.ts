@@ -10,9 +10,10 @@ import { type Call, CallData, num, uint256 } from "starknet";
  * Parse and validate Layerswap's Starknet deposit-action `call_data`.
  *
  * Layerswap delivers Starknet calls as a JSON-encoded `Call` or `Call[]`.
- * Since these calls are signed by the user's Starknet wallet, we constrain
- * them to a `transfer` on the bridge token contract — anything else is
- * rejected as an unexpected (potentially malicious) call.
+ * Since these calls are signed by the user's Starknet wallet, we require the
+ * payload to contain a `transfer` on the bridge token contract. Layerswap can
+ * include extra helper calls to its own contracts, so those are passed through;
+ * direct calls to the bridge token contract must still be transfers.
  */
 export function parseLayerswapStarknetCalls(
   action: LsDepositAction,
@@ -44,7 +45,8 @@ export function parseLayerswapStarknetCalls(
 
   const expected = num.toHex64(expectedContractAddress);
 
-  return raw.map((entry, i) => {
+  let hasExpectedTransfer = false;
+  const calls = raw.map((entry, i) => {
     if (
       typeof entry !== "object" ||
       entry === null ||
@@ -56,18 +58,24 @@ export function parseLayerswapStarknetCalls(
       );
     }
     const call = entry as Call;
-    if (num.toHex64(call.contractAddress) !== expected) {
-      throw new Error(
-        `Layerswap call_data entry ${i} targets unexpected contract "${call.contractAddress}" (expected bridge token "${expectedContractAddress}").`
-      );
-    }
-    if (call.entrypoint !== "transfer") {
-      throw new Error(
-        `Layerswap call_data entry ${i} uses unexpected entrypoint "${call.entrypoint}" (expected "transfer").`
-      );
+    if (num.toHex64(call.contractAddress) === expected) {
+      if (call.entrypoint !== "transfer") {
+        throw new Error(
+          `Layerswap call_data entry ${i} uses unexpected bridge-token entrypoint "${call.entrypoint}" (expected "transfer").`
+        );
+      }
+      hasExpectedTransfer = true;
     }
     return call;
   });
+
+  if (!hasExpectedTransfer) {
+    throw new Error(
+      `Layerswap Starknet call_data does not include a transfer on expected bridge token "${expectedContractAddress}".`
+    );
+  }
+
+  return calls;
 }
 
 /** Build a dummy Starknet `transfer` call for L2 fee estimation. */

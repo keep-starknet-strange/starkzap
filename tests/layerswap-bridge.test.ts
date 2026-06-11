@@ -22,6 +22,11 @@ import {
   fromAddress,
 } from "@/types";
 import type { EthereumAddress } from "@/types";
+import type {
+  LayerswapTokenSource,
+  LsRoute,
+  LsToken,
+} from "@/bridge/ethereum/layerswap/types";
 import type { WalletInterface } from "@/wallet";
 import type { EthereumWalletConfig } from "@/bridge/ethereum/types";
 import { NOOP_LOGGER } from "@/logger";
@@ -92,7 +97,32 @@ function mockApiResponseWithLayerswap() {
 // ============================================================
 
 describe("Layerswap token discovery", () => {
-  it("should parse layerswap tokens from StarkGate API response", async () => {
+  function lsToken(overrides: Partial<LsToken> & { symbol: string }): LsToken {
+    return {
+      logo: "https://example.com/logo.png",
+      contract: null,
+      decimals: 18,
+      price_in_usd: 0,
+      precision: 6,
+      listing_date: "2024-01-01T00:00:00Z",
+      ...overrides,
+    };
+  }
+
+  function lsRoute(name: string, tokens: LsToken[]): LsRoute {
+    return {
+      name,
+      display_name: name,
+      logo: "https://example.com/network.png",
+      chain_id: "1",
+      type: "evm",
+      transaction_explorer_template: "https://example.com/tx/{0}",
+      account_explorer_template: "https://example.com/account/{0}",
+      tokens,
+    };
+  }
+
+  it("discovers layerswap tokens from the Layerswap API and ignores StarkGate layerswap rows", async () => {
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,
       status: 200,
@@ -100,10 +130,41 @@ describe("Layerswap token discovery", () => {
       json: async () => mockApiResponseWithLayerswap(),
     });
 
+    const layerswapApi: LayerswapTokenSource = {
+      getSources: vi.fn().mockResolvedValue([
+        lsRoute("ETHEREUM_MAINNET", [
+          lsToken({ symbol: "ETH", contract: null, decimals: 18 }),
+          lsToken({
+            symbol: "USDC",
+            contract: "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+            decimals: 6,
+          }),
+        ]),
+      ]),
+      getDestinations: vi.fn().mockResolvedValue([
+        lsRoute("STARKNET_MAINNET", [
+          lsToken({
+            symbol: "ETH",
+            contract:
+              "0x049d36570d4e46f48e99674bd3fcc84644ddd6b96f7c741b1562b82f9e004dc7",
+          }),
+          lsToken({
+            symbol: "USDC",
+            contract:
+              "0x053c91253bc9682c04929ca02ed00b3e423f6710d2ee7e0d5ebb06f3ecf368a8",
+            decimals: 6,
+          }),
+        ]),
+      ]),
+    };
+
     const repository = new BridgeTokenRepository({
       fetchFn: fetchMock as unknown as typeof fetch,
+      layerswapApi,
     });
-    const tokens = await repository.getTokens();
+    const tokens = await repository.getTokens({
+      chain: ExternalChain.ETHEREUM,
+    });
 
     const layerswapTokens = tokens.filter(
       (t) => t.protocol === Protocol.LAYERSWAP
@@ -113,8 +174,18 @@ describe("Layerswap token discovery", () => {
     expect(layerswapTokens[0]).toBeInstanceOf(EthereumBridgeToken);
     expect(layerswapTokens[0]!.chain).toBe(ExternalChain.ETHEREUM);
     expect(layerswapTokens[0]!.protocol).toBe(Protocol.LAYERSWAP);
-    expect(layerswapTokens[0]!.symbol).toBe("ETH");
-    expect(layerswapTokens[1]!.symbol).toBe("USDC");
+    expect(layerswapTokens.map((t) => t.symbol).sort()).toEqual([
+      "ETH",
+      "USDC",
+    ]);
+
+    // The Layerswap API is the sole source of layerswap tokens: the StarkGate
+    // rows (ids "eth-layerswap"/"usdc-layerswap") are ignored in favor of the
+    // discovered, chain-qualified tokens.
+    expect(layerswapTokens.map((t) => t.id).sort()).toEqual([
+      "eth-ethereum-layerswap",
+      "usdc-ethereum-layerswap",
+    ]);
 
     // Canonical token should still be present
     const canonicalTokens = tokens.filter(

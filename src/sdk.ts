@@ -552,8 +552,12 @@ export class StarkZap {
    */
   async getBridgingTokens(chain?: ExternalChain): Promise<BridgeToken[]> {
     if (!this.bridgeTokenRepository) {
+      const layerswapApiKey = this.config.bridging?.layerswapApiKey;
+      const layerswapBaseUrl = this.config.bridging?.layerswapBaseUrl;
       this.bridgeTokenRepository = new BridgeTokenRepository({
         logger: createLogger(this.config.logging),
+        ...(layerswapApiKey ? { layerswapApiKey } : {}),
+        ...(layerswapBaseUrl ? { layerswapBaseUrl } : {}),
       });
     }
 

@@ -1,6 +1,10 @@
 import { assertSafeHttpUrl, resolveFetch } from "@/utils";
 import { type EthereumBridgeProtocol, Protocol } from "@/types/bridge/protocol";
-import { ExternalChain } from "@/types/bridge/external-chain";
+import {
+  type BridgeEnv,
+  ExternalChain,
+  NATIVE_TOKEN_ADDRESS,
+} from "@/types/bridge/external-chain";
 import {
   type BridgeToken,
   ContractRoutedEthereumBridgeToken,
@@ -14,8 +18,14 @@ import { fromEthereumAddress } from "@/connect/ethersRuntime";
 import { loadSolanaWeb3 } from "@/connect/solanaWeb3Runtime";
 import { fromSolanaAddress } from "@/types/solanaAddress";
 import { type StarkZapLogger, NOOP_LOGGER } from "@/logger";
+import { LayerswapApi } from "@/bridge/ethereum/layerswap/LayerswapApi";
+import { resolveLayerswapRoute } from "@/bridge/ethereum/layerswap/networks";
+import type {
+  LayerswapTokenSource,
+  LsToken,
+} from "@/bridge/ethereum/layerswap/types";
 
-export type BridgeTokenApiEnv = "mainnet" | "testnet";
+export type BridgeTokenApiEnv = BridgeEnv;
 
 export interface BridgeTokenQuery {
   env?: BridgeTokenApiEnv;
@@ -28,11 +38,38 @@ export interface BridgeTokenRepositoryOptions {
   fetchFn?: typeof fetch;
   now?: () => number;
   logger?: StarkZapLogger;
+  /**
+   * Layerswap API key. Layerswap tokens are sourced exclusively from the
+   * Layerswap API; providing a key opts `getTokens` into discovering them.
+   * Without a key no Layerswap tokens are returned — they could not be
+   * bridged anyway, since Layerswap bridging requires the key.
+   */
+  layerswapApiKey?: string;
+  /**
+   * Custom Layerswap API base URL. Defaults to the public endpoint. Only
+   * takes effect when discovery is enabled via `layerswapApiKey`.
+   */
+  layerswapBaseUrl?: string;
+  /**
+   * Pre-built Layerswap token source. Overrides `layerswapApiKey`/
+   * `layerswapBaseUrl`; primarily an injection seam for tests.
+   */
+  layerswapApi?: LayerswapTokenSource;
 }
 
 interface CacheEntry {
   tokens: BridgeToken[];
   expiresAt: number;
+}
+
+/**
+ * Layerswap discovery outcome. `degraded` marks a transient failure (network
+ * error, timeout) that emptied the contribution — distinct from a genuinely
+ * empty result — so the cache entry can expire early and retry.
+ */
+interface LayerswapDiscoveryResult {
+  tokens: BridgeToken[];
+  degraded: boolean;
 }
 
 interface BridgeTokenApiRecord {
@@ -59,6 +96,12 @@ const DEFAULT_ENV: BridgeTokenApiEnv = "mainnet";
 export const STARKGATE_TOKENS_API_URL =
   "https://starkgate.starknet.io/tokens/api/tokens";
 export const BRIDGE_TOKEN_CACHE_TTL_MS = 60 * 60 * 1000;
+/**
+ * Cache TTL applied when the Layerswap contribution degraded to empty on a
+ * transient failure. Short, so the missing tokens reappear soon after the
+ * Layerswap API recovers instead of being pinned out for the full TTL.
+ */
+export const LAYERSWAP_DEGRADED_CACHE_TTL_MS = 60 * 1000;
 
 function requiredString(
   token: BridgeTokenApiRecord,
@@ -267,6 +310,105 @@ function parseToken(
   throw new Error(`Chain "${chain} not supported"`);
 }
 
+/** Shared fields for a discovered Layerswap token. */
+function layerswapTokenBase(
+  chain: ExternalChain,
+  externalToken: LsToken,
+  starknetContract: string
+) {
+  return {
+    // Chain-qualified so same-symbol tokens on different chains (e.g. Ethereum
+    // and Solana USDC) get distinct ids — consumers look tokens up by id alone.
+    id: `${externalToken.symbol.toLowerCase()}-${chain}-${Protocol.LAYERSWAP}`,
+    name: externalToken.display_asset ?? externalToken.symbol,
+    symbol: externalToken.symbol,
+    decimals: externalToken.decimals,
+    starknetAddress: fromAddress(starknetContract),
+  };
+}
+
+type LayerswapTokenBuilder = (
+  externalToken: LsToken,
+  starknetContract: string
+) => BridgeToken;
+
+/**
+ * Load the address-normalization runtime for `chain` and return a builder for
+ * discovered Layerswap tokens. Native assets are reported with a `null`
+ * contract and mapped to the chain's native-token marker. Throws the
+ * optional-peer-dependency error when the chain's runtime is not installed.
+ */
+async function loadLayerswapTokenBuilder(
+  chain: ExternalChain
+): Promise<LayerswapTokenBuilder> {
+  if (chain === ExternalChain.ETHEREUM) {
+    const ethers = await loadEthers("Layerswap token discovery");
+    return (externalToken, starknetContract) =>
+      new EthereumBridgeToken({
+        ...layerswapTokenBase(chain, externalToken, starknetContract),
+        protocol: Protocol.LAYERSWAP,
+        address: fromEthereumAddress(
+          externalToken.contract ?? NATIVE_TOKEN_ADDRESS[chain],
+          ethers
+        ),
+        supportsAutoWithdraw: false,
+      });
+  }
+
+  if (chain === ExternalChain.SOLANA) {
+    const solanaWeb3 = await loadSolanaWeb3("Layerswap token discovery");
+    return (externalToken, starknetContract) =>
+      new SolanaBridgeToken({
+        ...layerswapTokenBase(chain, externalToken, starknetContract),
+        protocol: Protocol.LAYERSWAP,
+        address: fromSolanaAddress(
+          externalToken.contract ?? NATIVE_TOKEN_ADDRESS[chain],
+          solanaWeb3
+        ),
+      });
+  }
+
+  throw new Error(`Layerswap discovery does not support chain "${chain}"`);
+}
+
+/** Canonical key for the external↔Starknet symbol join (case-insensitive). */
+function symbolKey(symbol: string): string {
+  return symbol.toUpperCase();
+}
+
+/**
+ * Index route tokens by symbol, dropping symbols that appear more than once.
+ * The external↔Starknet join is symbol-based, so an ambiguous symbol cannot be
+ * safely mapped to a single contract — last-write-wins could silently pick the
+ * wrong token (e.g. native USDC vs bridged USDC.e). Keyed case-insensitively so
+ * casing drift between the two API sides neither drops valid pairs nor sneaks
+ * past the ambiguity check; values keep their original symbol for display/id.
+ */
+function unambiguousBySymbol(
+  tokens: readonly LsToken[],
+  network: string,
+  logger: StarkZapLogger
+): Map<string, LsToken> {
+  const bySymbol = new Map<string, LsToken>();
+  const ambiguous = new Set<string>();
+  for (const token of tokens) {
+    const key = symbolKey(token.symbol);
+    if (bySymbol.has(key)) {
+      ambiguous.add(key);
+    } else {
+      bySymbol.set(key, token);
+    }
+  }
+  for (const key of ambiguous) {
+    const original = bySymbol.get(key)?.symbol ?? key;
+    bySymbol.delete(key);
+    logger.warn(
+      `[starkzap] Skipping Layerswap token ${original}: multiple ${network} tokens share the symbol.`
+    );
+  }
+  return bySymbol;
+}
+
 function buildCacheKey(query: BridgeTokenQuery): string {
   return `${query.env ?? DEFAULT_ENV}:${query.chain ?? "all"}`;
 }
@@ -288,6 +430,7 @@ export class BridgeTokenRepository {
   private readonly fetchFn: typeof fetch;
   private readonly now: () => number;
   private readonly logger: StarkZapLogger;
+  private readonly layerswapApi: LayerswapTokenSource | undefined;
   private readonly cache = new Map<string, CacheEntry>();
   private readonly inflight = new Map<string, Promise<BridgeToken[]>>();
 
@@ -305,6 +448,19 @@ export class BridgeTokenRepository {
     this.fetchFn = resolveFetch(options.fetchFn);
     this.now = options.now ?? Date.now;
     this.logger = options.logger ?? NOOP_LOGGER;
+
+    if (options.layerswapApi) {
+      this.layerswapApi = options.layerswapApi;
+    } else if (options.layerswapApiKey) {
+      // Discovery is gated on the API key so the SDK never advertises Layerswap
+      // tokens it cannot bridge (BridgeOperator refuses keyless bridging). The
+      // discovery calls themselves hit Layerswap's public route endpoints,
+      // which take unauthenticated requests and can reject a scoped key — so
+      // the discovery client is built keyless; the key only acts as the gate.
+      this.layerswapApi = new LayerswapApi(
+        options.layerswapBaseUrl ? { baseUrl: options.layerswapBaseUrl } : {}
+      );
+    }
   }
 
   clearCache(): void {
@@ -341,6 +497,25 @@ export class BridgeTokenRepository {
     key: string
   ): Promise<BridgeToken[]> {
     const isExplicitChainRequest = query.chain !== undefined;
+
+    // Layerswap tokens are sourced exclusively from the Layerswap API, fully
+    // independent of the StarkGate payload — so discovery runs concurrently
+    // with the StarkGate fetch. The promise never rejects: each chain degrades
+    // to an empty contribution on failure, flagged so the result is only
+    // cached briefly.
+    const discovered = this.layerswapApi
+      ? this.discoverLayerswapTokens(
+          this.layerswapApi,
+          query.chain
+            ? [query.chain]
+            : [ExternalChain.ETHEREUM, ExternalChain.SOLANA],
+          query.env ?? DEFAULT_ENV
+        )
+      : Promise.resolve<LayerswapDiscoveryResult>({
+          tokens: [],
+          degraded: false,
+        });
+
     const url = new URL(this.apiUrl);
     url.searchParams.set("env", query.env ?? DEFAULT_ENV);
     if (query.chain) {
@@ -360,18 +535,24 @@ export class BridgeTokenRepository {
 
     const payload = assertArrayPayload(await response.json());
     const visiblePayload = payload.filter((token) => {
-      return !token.hidden && !token.deprecated;
+      return (
+        !token.hidden &&
+        !token.deprecated &&
+        // Layerswap tokens are sourced exclusively from the Layerswap API;
+        // any layerswap-protocol rows StarkGate serves are ignored.
+        token.protocol?.toLowerCase() !== Protocol.LAYERSWAP
+      );
     });
     const scopedPayload = query.chain
       ? visiblePayload.filter((token) => getTokenChain(token) === query.chain)
       : visiblePayload;
 
-    const hasEthereumRows = scopedPayload.some((token) => {
-      return getTokenChain(token) === ExternalChain.ETHEREUM;
-    });
-    const hasSolanaRows = scopedPayload.some((token) => {
-      return getTokenChain(token) === ExternalChain.SOLANA;
-    });
+    const hasEthereumRows = scopedPayload.some(
+      (token) => getTokenChain(token) === ExternalChain.ETHEREUM
+    );
+    const hasSolanaRows = scopedPayload.some(
+      (token) => getTokenChain(token) === ExternalChain.SOLANA
+    );
     const unavailableChains = new Set<ExternalChain>();
     let ethers: Awaited<ReturnType<typeof loadEthers>> | undefined;
     let solanaWeb3: Awaited<ReturnType<typeof loadSolanaWeb3>> | undefined;
@@ -447,11 +628,119 @@ export class BridgeTokenRepository {
       })
       .filter(isNonNull);
 
+    const discovery = await discovered;
+    tokens.push(...discovery.tokens);
+
     this.cache.set(key, {
       tokens,
-      expiresAt: this.now() + this.cacheTtlMs,
+      expiresAt:
+        this.now() +
+        (discovery.degraded
+          ? Math.min(this.cacheTtlMs, LAYERSWAP_DEGRADED_CACHE_TTL_MS)
+          : this.cacheTtlMs),
     });
 
     return tokens;
+  }
+
+  /**
+   * Discover Layerswap-bridgeable tokens for the given chains, in parallel.
+   * Self-contained: loads its own address-normalization runtimes, so it never
+   * affects how the StarkGate payload is handled. Failures (network errors,
+   * missing runtimes, missing routes, malformed tokens) degrade gracefully to
+   * an empty contribution for that chain rather than failing the whole fetch;
+   * `degraded` reports transient failures so callers can cache accordingly.
+   */
+  private async discoverLayerswapTokens(
+    api: LayerswapTokenSource,
+    chains: ExternalChain[],
+    env: BridgeTokenApiEnv
+  ): Promise<LayerswapDiscoveryResult> {
+    const perChain = await Promise.all(
+      chains.map((chain) => this.discoverLayerswapChain(api, chain, env))
+    );
+    return {
+      tokens: perChain.flatMap((result) => result.tokens),
+      degraded: perChain.some((result) => result.degraded),
+    };
+  }
+
+  private async discoverLayerswapChain(
+    api: LayerswapTokenSource,
+    chain: ExternalChain,
+    env: BridgeTokenApiEnv
+  ): Promise<LayerswapDiscoveryResult> {
+    try {
+      const buildToken = await loadLayerswapTokenBuilder(chain);
+      const route = resolveLayerswapRoute(chain, env);
+      const [sources, destinations] = await Promise.all([
+        api.getSources({
+          destinationNetwork: route.starknetNetwork,
+          networkTypes: [route.networkType],
+        }),
+        api.getDestinations({ sourceNetwork: route.externalNetwork }),
+      ]);
+
+      const externalRoute = sources.find(
+        (entry) => entry.name === route.externalNetwork
+      );
+      const starknetRoute = destinations.find(
+        (entry) => entry.name === route.starknetNetwork
+      );
+      if (!externalRoute || !starknetRoute) {
+        return { tokens: [], degraded: false };
+      }
+
+      const externalBySymbol = unambiguousBySymbol(
+        externalRoute.tokens,
+        externalRoute.name,
+        this.logger
+      );
+      const starknetBySymbol = unambiguousBySymbol(
+        starknetRoute.tokens,
+        starknetRoute.name,
+        this.logger
+      );
+
+      const tokens: BridgeToken[] = [];
+      for (const externalToken of externalBySymbol.values()) {
+        const starknetToken = starknetBySymbol.get(
+          symbolKey(externalToken.symbol)
+        );
+        if (!starknetToken?.contract) {
+          // No matching Starknet-side token, so no L2 address to bridge to.
+          continue;
+        }
+        if (starknetToken.decimals !== externalToken.decimals) {
+          // BridgeToken carries a single decimals value for both sides, so a
+          // mismatched pair would mis-scale Starknet amounts by 10^diff.
+          this.logger.warn(
+            `[starkzap] Skipping Layerswap token ${externalToken.symbol}: decimals differ between ${externalRoute.name} (${externalToken.decimals}) and ${starknetRoute.name} (${starknetToken.decimals}).`
+          );
+          continue;
+        }
+        try {
+          tokens.push(buildToken(externalToken, starknetToken.contract));
+        } catch (error) {
+          this.logger.warn(
+            `Ignoring Layerswap token ${externalToken.symbol} due to`,
+            error
+          );
+        }
+      }
+      return { tokens, degraded: false };
+    } catch (error) {
+      this.logger.warn(
+        `[starkzap] Skipping Layerswap ${chain} token discovery due to`,
+        error
+      );
+      // A missing optional runtime is a permanent condition — retrying soon
+      // cannot help — whereas anything else (network error, timeout, bad
+      // payload) is treated as transient and worth a short-TTL retry.
+      const permanent =
+        isOptionalPeerDependencyError(error, "ethers") ||
+        isOptionalPeerDependencyError(error, "@solana/web3.js");
+      return { tokens: [], degraded: !permanent };
+    }
   }
 }
