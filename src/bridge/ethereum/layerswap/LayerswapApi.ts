@@ -34,10 +34,13 @@ const DEFAULT_REQUEST_TIMEOUT_MS = 15_000;
  */
 export class LayerswapApi implements LayerswapTokenSource {
   private readonly baseUrl: string;
-  private readonly apiKey: string | undefined;
+  private readonly apiKey: string;
   private readonly requestTimeoutMs: number;
 
   constructor(config: LayerswapApiConfig) {
+    if (!config.apiKey) {
+      throw new Error("Layerswap API key is required.");
+    }
     this.apiKey = config.apiKey;
     const baseUrl = config.baseUrl ?? DEFAULT_BASE_URL;
     this.baseUrl = assertSafeHttpUrl(baseUrl, "bridging.layerswapBaseUrl")
@@ -305,7 +308,7 @@ export class LayerswapApi implements LayerswapTokenSource {
   }
 
   private headers(): Record<string, string> {
-    return this.apiKey ? { "X-LS-APIKEY": this.apiKey } : {};
+    return { "X-LS-APIKEY": this.apiKey };
   }
 
   private async unwrap<T>(response: Response): Promise<T> {

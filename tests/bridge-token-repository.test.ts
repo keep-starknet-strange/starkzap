@@ -41,6 +41,14 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
+/** Stub Layerswap source for tests focused on the StarkGate payload. */
+function emptyLayerswapApi(): LayerswapTokenSource {
+  return {
+    getSources: vi.fn().mockResolvedValue([]),
+    getDestinations: vi.fn().mockResolvedValue([]),
+  };
+}
+
 function mockApiResponse() {
   return [
     {
@@ -142,6 +150,7 @@ describe("BridgeTokenRepository", () => {
 
     const repository = new BridgeTokenRepository({
       fetchFn: fetchMock as unknown as typeof fetch,
+      layerswapApi: emptyLayerswapApi(),
     });
 
     await expect(repository.getTokens()).rejects.toThrow(
@@ -159,6 +168,7 @@ describe("BridgeTokenRepository", () => {
 
     const repository = new BridgeTokenRepository({
       fetchFn: fetchMock as unknown as typeof fetch,
+      layerswapApi: emptyLayerswapApi(),
     });
     const tokens = await repository.getTokens();
 
@@ -197,6 +207,7 @@ describe("BridgeTokenRepository", () => {
 
     const repository = new BridgeTokenRepository({
       fetchFn: fetchMock as unknown as typeof fetch,
+      layerswapApi: emptyLayerswapApi(),
     });
     const tokens = await repository.getTokens();
 
@@ -225,6 +236,7 @@ describe("BridgeTokenRepository", () => {
 
     const repository = new BridgeTokenRepository({
       fetchFn: fetchMock as unknown as typeof fetch,
+      layerswapApi: emptyLayerswapApi(),
     });
     const tokens = await repository.getTokens();
 
@@ -259,6 +271,7 @@ describe("BridgeTokenRepository", () => {
 
     const repository = new BridgeTokenRepository({
       fetchFn: fetchMock as unknown as typeof fetch,
+      layerswapApi: emptyLayerswapApi(),
     });
 
     await expect(
@@ -276,6 +289,7 @@ describe("BridgeTokenRepository", () => {
 
     const repository = new BridgeTokenRepository({
       fetchFn: fetchMock as unknown as typeof fetch,
+      layerswapApi: emptyLayerswapApi(),
     });
 
     await repository.getTokens({
@@ -304,6 +318,7 @@ describe("BridgeTokenRepository", () => {
 
     const repository = new BridgeTokenRepository({
       fetchFn: fetchMock as unknown as typeof fetch,
+      layerswapApi: emptyLayerswapApi(),
     });
 
     await expect(
@@ -335,6 +350,7 @@ describe("BridgeTokenRepository", () => {
 
     const repository = new BridgeTokenRepository({
       fetchFn: fetchMock as unknown as typeof fetch,
+      layerswapApi: emptyLayerswapApi(),
     });
 
     await expect(
@@ -358,6 +374,7 @@ describe("BridgeTokenRepository", () => {
 
     const repository = new BridgeTokenRepository({
       fetchFn: fetchMock as unknown as typeof fetch,
+      layerswapApi: emptyLayerswapApi(),
       logger: mockLogger.instance,
     });
     const tokens = await repository.getTokens();
@@ -388,6 +405,7 @@ describe("BridgeTokenRepository", () => {
 
     const repository = new BridgeTokenRepository({
       fetchFn: fetchMock as unknown as typeof fetch,
+      layerswapApi: emptyLayerswapApi(),
       logger: mockLogger.instance,
     });
     const tokens = await repository.getTokens();
@@ -411,6 +429,7 @@ describe("BridgeTokenRepository", () => {
 
     const repository = new BridgeTokenRepository({
       fetchFn: fetchMock as unknown as typeof fetch,
+      layerswapApi: emptyLayerswapApi(),
       now: () => now,
     });
 
@@ -441,6 +460,7 @@ describe("BridgeTokenRepository", () => {
 
     const repository = new BridgeTokenRepository({
       fetchFn: fetchMock as unknown as typeof fetch,
+      layerswapApi: emptyLayerswapApi(),
       now: () => now,
     });
 
@@ -466,6 +486,7 @@ describe("BridgeTokenRepository", () => {
 
     const repository = new BridgeTokenRepository({
       fetchFn: fetchMock as unknown as typeof fetch,
+      layerswapApi: emptyLayerswapApi(),
     });
     const tokens = await repository.getTokens();
 
@@ -699,41 +720,24 @@ describe("BridgeTokenRepository Layerswap discovery", () => {
     }
   });
 
-  it("does not discover Layerswap tokens when no source is configured", async () => {
-    const fetchMock = vi.fn().mockResolvedValue({
-      ok: true,
-      status: 200,
-      statusText: "OK",
-      json: async () => mockApiResponse(),
-    });
-
-    const repository = new BridgeTokenRepository({
-      fetchFn: fetchMock as unknown as typeof fetch,
-    });
-    const tokens = await repository.getTokens();
-
-    // Identical to the StarkGate-only result: no Layerswap tokens added.
-    expect(tokens).toHaveLength(3);
-    expect(tokens.some((t) => t.protocol === Protocol.LAYERSWAP)).toBe(false);
+  it("throws when constructed without a Layerswap API key or source", () => {
+    expect(
+      () => new BridgeTokenRepository({ fetchFn: emptyStarkgateFetch() })
+    ).toThrow(
+      'Bridge token discovery requires a Layerswap API key. Set "layerswapApiKey".'
+    );
   });
 
-  it("does not discover Layerswap tokens with only a base URL (bridging needs the API key)", async () => {
-    const fetchMock = vi.fn().mockResolvedValue({
-      ok: true,
-      status: 200,
-      statusText: "OK",
-      json: async () => mockApiResponse(),
-    });
-
-    const repository = new BridgeTokenRepository({
-      fetchFn: fetchMock as unknown as typeof fetch,
-      layerswapBaseUrl: "https://layerswap.example.com",
-    });
-    const tokens = await repository.getTokens();
-
-    // Without a key the SDK cannot bridge via Layerswap, so it must not
-    // advertise Layerswap tokens either.
-    expect(tokens.some((t) => t.protocol === Protocol.LAYERSWAP)).toBe(false);
+  it("throws when constructed with only a base URL (the API key is required)", () => {
+    expect(
+      () =>
+        new BridgeTokenRepository({
+          fetchFn: emptyStarkgateFetch(),
+          layerswapBaseUrl: "https://layerswap.example.com",
+        })
+    ).toThrow(
+      'Bridge token discovery requires a Layerswap API key. Set "layerswapApiKey".'
+    );
   });
 
   it("coexists with StarkGate tokens, and discovered tokens win over any layerswap rows StarkGate serves", async () => {

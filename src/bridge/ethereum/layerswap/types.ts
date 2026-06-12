@@ -308,10 +308,11 @@ export interface LayerswapGetTransactionStatusRequest {
 
 export interface LayerswapApiConfig {
   /**
-   * API key sent as `X-LS-APIKEY` when provided. The API also accepts
-   * unauthenticated requests, so the key is optional.
+   * API key sent as `X-LS-APIKEY` on every request. Required — keys are
+   * environment-scoped (separate mainnet/testnet keys), so unauthenticated
+   * requests could resolve routes for the wrong environment.
    */
-  apiKey?: string;
+  apiKey: string;
   baseUrl?: string;
   requestTimeoutMs?: number;
 }

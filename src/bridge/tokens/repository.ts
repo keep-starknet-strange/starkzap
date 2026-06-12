@@ -40,14 +40,12 @@ export interface BridgeTokenRepositoryOptions {
   logger?: StarkZapLogger;
   /**
    * Layerswap API key. Layerswap tokens are sourced exclusively from the
-   * Layerswap API; providing a key opts `getTokens` into discovering them.
-   * Without a key no Layerswap tokens are returned — they could not be
-   * bridged anyway, since Layerswap bridging requires the key.
+   * Layerswap API, so the key is required — unless a pre-built
+   * `layerswapApi` source is injected instead.
    */
   layerswapApiKey?: string;
   /**
-   * Custom Layerswap API base URL. Defaults to the public endpoint. Only
-   * takes effect when discovery is enabled via `layerswapApiKey`.
+   * Custom Layerswap API base URL. Defaults to the public endpoint.
    */
   layerswapBaseUrl?: string;
   /**
@@ -430,7 +428,7 @@ export class BridgeTokenRepository {
   private readonly fetchFn: typeof fetch;
   private readonly now: () => number;
   private readonly logger: StarkZapLogger;
-  private readonly layerswapApi: LayerswapTokenSource | undefined;
+  private readonly layerswapApi: LayerswapTokenSource;
   private readonly cache = new Map<string, CacheEntry>();
   private readonly inflight = new Map<string, Promise<BridgeToken[]>>();
 
@@ -452,9 +450,7 @@ export class BridgeTokenRepository {
     if (options.layerswapApi) {
       this.layerswapApi = options.layerswapApi;
     } else if (options.layerswapApiKey) {
-      // Discovery is gated on the API key so the SDK never advertises Layerswap
-      // tokens it cannot bridge (BridgeOperator refuses keyless bridging). The
-      // key is also environment-scoped — Layerswap issues separate keys for
+      // The key is environment-scoped — Layerswap issues separate keys for
       // mainnet and testnet — so the discovery client must send it, otherwise
       // route discovery could return a different environment's networks than
       // the one swap creation targets.
@@ -464,6 +460,10 @@ export class BridgeTokenRepository {
           ? { baseUrl: options.layerswapBaseUrl }
           : {}),
       });
+    } else {
+      throw new Error(
+        'Bridge token discovery requires a Layerswap API key. Set "layerswapApiKey".'
+      );
     }
   }
 
@@ -507,18 +507,13 @@ export class BridgeTokenRepository {
     // with the StarkGate fetch. The promise never rejects: each chain degrades
     // to an empty contribution on failure, flagged so the result is only
     // cached briefly.
-    const discovered = this.layerswapApi
-      ? this.discoverLayerswapTokens(
-          this.layerswapApi,
-          query.chain
-            ? [query.chain]
-            : [ExternalChain.ETHEREUM, ExternalChain.SOLANA],
-          query.env ?? DEFAULT_ENV
-        )
-      : Promise.resolve<LayerswapDiscoveryResult>({
-          tokens: [],
-          degraded: false,
-        });
+    const discovered = this.discoverLayerswapTokens(
+      this.layerswapApi,
+      query.chain
+        ? [query.chain]
+        : [ExternalChain.ETHEREUM, ExternalChain.SOLANA],
+      query.env ?? DEFAULT_ENV
+    );
 
     const url = new URL(this.apiUrl);
     url.searchParams.set("env", query.env ?? DEFAULT_ENV);
