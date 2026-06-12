@@ -129,6 +129,27 @@ function isZeroString(value: string): boolean {
   return /^0+(\.0+)?$/.test(value);
 }
 
+function parseScalarToScaledBigInt(
+  value: BigNumberish,
+  label: string,
+  precision: number
+): bigint {
+  const valueStr = normalizeUnitNumberish(value);
+
+  if (!valueStr.match(/^\d+(\.\d+)?$/)) {
+    throw new Error(`Invalid ${label}: "${valueStr}". Must be a positive number.`);
+  }
+
+  const [integer, fraction = ""] = valueStr.split(".");
+  if (fraction.length > precision) {
+    throw new Error(
+      `${label} "${valueStr}" exceeds ${precision} decimal places.`
+    );
+  }
+
+  return BigInt(`${integer}${fraction.padEnd(precision, "0")}`);
+}
+
 function formatIntegerPart(integerPart: string): string {
   try {
     return BigInt(integerPart).toLocaleString("default");
@@ -573,22 +594,14 @@ export class Amount {
    * ```
    */
   public multiply(multiplier: BigNumberish): Amount {
-    const multiplierStr = multiplier.toString();
-
-    if (!multiplierStr.match(/^\d+(\.\d+)?$/)) {
-      throw new Error(
-        `Invalid multiplier: "${multiplierStr}". Must be a positive number.`
-      );
-    }
-
     // Use high precision for scalar operations
     const PRECISION = 18;
     const scaleFactor = 10n ** BigInt(PRECISION);
-
-    // Convert multiplier to scaled bigint
-    const [integer, fraction = ""] = multiplierStr.split(".");
-    const paddedFraction = fraction.padEnd(PRECISION, "0").slice(0, PRECISION);
-    const scaledMultiplier = BigInt(`${integer}${paddedFraction}`);
+    const scaledMultiplier = parseScalarToScaledBigInt(
+      multiplier,
+      "multiplier",
+      PRECISION
+    );
 
     // Multiply and scale back down
     const result = (this.baseValue * scaledMultiplier) / scaleFactor;
@@ -619,22 +632,15 @@ export class Amount {
    * ```
    */
   public divide(divisor: BigNumberish): Amount {
-    const divisorStr = divisor.toString();
-
-    if (!divisorStr.match(/^\d+(\.\d+)?$/)) {
-      throw new Error(
-        `Invalid divisor: "${divisorStr}". Must be a positive number.`
-      );
-    }
-
     // Use high precision for scalar operations
     const PRECISION = 18;
     const scaleFactor = 10n ** BigInt(PRECISION);
-
-    // Convert divisor to scaled bigint
-    const [integer, fraction = ""] = divisorStr.split(".");
-    const paddedFraction = fraction.padEnd(PRECISION, "0").slice(0, PRECISION);
-    const scaledDivisor = BigInt(`${integer}${paddedFraction}`);
+    const divisorStr = normalizeUnitNumberish(divisor);
+    const scaledDivisor = parseScalarToScaledBigInt(
+      divisor,
+      "divisor",
+      PRECISION
+    );
 
     if (scaledDivisor === 0n) {
       if (!isZeroString(divisorStr)) {

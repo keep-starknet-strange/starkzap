@@ -789,6 +789,18 @@ describe("Amount arithmetic operations", () => {
       const amount = Amount.parse("10", 18, "ETH");
       expect(amount.multiply(3n).toUnit()).toBe("30");
     });
+
+    it("should reject multipliers above scalar precision", () => {
+      const amount = Amount.parse("1", 18, "ETH");
+      expect(() => amount.multiply("1.0000000000000000001")).toThrow(
+        "exceeds 18 decimal places"
+      );
+    });
+
+    it("should support scientific notation multipliers", () => {
+      const amount = Amount.parse("10", 18, "ETH");
+      expect(amount.multiply("1e-1").toUnit()).toBe("1");
+    });
   });
 
   describe("divide", () => {
@@ -855,6 +867,18 @@ describe("Amount arithmetic operations", () => {
       const result = amount.divide(3);
       // The result should be close to 3.333...
       expect(result.toUnit()).toBe("3.333333333333333333");
+    });
+
+    it("should reject divisors above scalar precision", () => {
+      const amount = Amount.parse("1", 18, "ETH");
+      expect(() => amount.divide("1.0000000000000000001")).toThrow(
+        "exceeds 18 decimal places"
+      );
+    });
+
+    it("should support scientific notation divisors", () => {
+      const amount = Amount.parse("10", 18, "ETH");
+      expect(amount.divide("1e1").toUnit()).toBe("1");
     });
   });
 
