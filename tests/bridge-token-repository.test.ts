@@ -648,10 +648,10 @@ describe("BridgeTokenRepository Layerswap discovery", () => {
     expect(tokens[0]?.starknetAddress).toBe(STARKNET_ETH_ADDRESS);
   });
 
-  it("builds a keyless discovery client from layerswapApiKey and never sends the API key", async () => {
-    // The real (non-injected) path: discovery hits Layerswap's public route
-    // endpoints via global fetch. The scoped key gates discovery but must not
-    // be sent, since those endpoints can reject it.
+  it("builds a discovery client from layerswapApiKey and sends the API key", async () => {
+    // The real (non-injected) path: discovery hits Layerswap's route endpoints
+    // via global fetch. The key is environment-scoped (separate mainnet/testnet
+    // keys), so discovery must send it to resolve routes for the right network.
     const headersSeen: HeadersInit[] = [];
     const lsFetch = vi.fn(async (url: string, init?: RequestInit) => {
       headersSeen.push(init?.headers ?? {});
@@ -691,7 +691,7 @@ describe("BridgeTokenRepository Layerswap discovery", () => {
       expect(headersSeen.length).toBeGreaterThan(0);
       for (const headers of headersSeen) {
         expect((headers as Record<string, string>)["X-LS-APIKEY"]).toBe(
-          undefined
+          "secret-key"
         );
       }
     } finally {

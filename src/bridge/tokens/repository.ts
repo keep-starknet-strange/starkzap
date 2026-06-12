@@ -454,12 +454,16 @@ export class BridgeTokenRepository {
     } else if (options.layerswapApiKey) {
       // Discovery is gated on the API key so the SDK never advertises Layerswap
       // tokens it cannot bridge (BridgeOperator refuses keyless bridging). The
-      // discovery calls themselves hit Layerswap's public route endpoints,
-      // which take unauthenticated requests and can reject a scoped key — so
-      // the discovery client is built keyless; the key only acts as the gate.
-      this.layerswapApi = new LayerswapApi(
-        options.layerswapBaseUrl ? { baseUrl: options.layerswapBaseUrl } : {}
-      );
+      // key is also environment-scoped — Layerswap issues separate keys for
+      // mainnet and testnet — so the discovery client must send it, otherwise
+      // route discovery could return a different environment's networks than
+      // the one swap creation targets.
+      this.layerswapApi = new LayerswapApi({
+        apiKey: options.layerswapApiKey,
+        ...(options.layerswapBaseUrl
+          ? { baseUrl: options.layerswapBaseUrl }
+          : {}),
+      });
     }
   }
 
