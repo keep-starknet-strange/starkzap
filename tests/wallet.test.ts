@@ -692,6 +692,29 @@ describe("Wallet", () => {
       expect(offramp).toHaveBeenCalledWith(wallet, input, undefined);
     });
 
+    it("offramp() forwards explicit execute options", async () => {
+      const offramp = vi.fn().mockResolvedValue({ path: "api" });
+      const wallet = await walletWithFakePaycrest({ offramp });
+      const input = {
+        path: "api" as const,
+        from: {
+          token: testSwapToken,
+          amount: Amount.parse("1", testSwapToken),
+        },
+        to: {
+          currency: "NGN",
+          recipient: {
+            institution: "GTBINGLA",
+            accountIdentifier: "1",
+            accountName: "x",
+          },
+        },
+      };
+      const options = { feeMode: { type: "paymaster" as const } };
+      await wallet.offramp(input, options);
+      expect(offramp).toHaveBeenCalledWith(wallet, input, options);
+    });
+
     it("onramp() defaults the destination recipient to the wallet address", async () => {
       const onramp = vi.fn().mockResolvedValue({ orderId: "x" });
       const wallet = await walletWithFakePaycrest({ onramp });
