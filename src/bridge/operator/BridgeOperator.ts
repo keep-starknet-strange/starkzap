@@ -12,6 +12,7 @@ import {
   ConnectedEthereumWallet,
   type ConnectedExternalWallet,
   ConnectedSolanaWallet,
+  SolanaNetwork,
 } from "@/connect";
 import type { WalletInterface } from "@/wallet";
 import type { BridgeOperatorInterface } from "@/bridge/operator/BridgeOperatorInterface";
@@ -314,9 +315,30 @@ export class BridgeOperator implements BridgeOperatorInterface {
         starknetWallet
       );
     } else if (token.chain === ExternalChain.SOLANA) {
+      const externalWallet = wallet as ConnectedSolanaWallet;
+      if (
+        token.protocol === Protocol.LAYERSWAP &&
+        starknetWallet.getChainId().isSepolia() &&
+        externalWallet.network !== SolanaNetwork.DEVNET
+      ) {
+        throw new Error(
+          `Attempting to bridge ${token.name} on sepolia using Layerswap protocol but wallet is not connected to Solana Devnet`
+        );
+      }
+
+      if (
+        token.protocol === Protocol.HYPERLANE &&
+        starknetWallet.getChainId().isSepolia() &&
+        externalWallet.network !== SolanaNetwork.TESTNET
+      ) {
+        throw new Error(
+          `Attempting to bridge ${token.name} on sepolia using Hyperlane protocol but wallet is not connected to Solana Testnet`
+        );
+      }
+
       return await this.createSolanaBridge(
         token as SolanaBridgeToken,
-        wallet as ConnectedSolanaWallet,
+        externalWallet,
         starknetWallet
       );
     }
@@ -425,7 +447,7 @@ export class BridgeOperator implements BridgeOperatorInterface {
   ): Promise<BridgeInterface<SolanaAddress>> {
     // Protocol-specific bridges and @solana/web3.js are loaded lazily to avoid
     // pulling Node.js-only transitive dependencies into polyfill-requiring clients.
-    const connection = await this.getSolanaConnection();
+    const connection = await this.getSolanaConnection(token.protocol);
 
     const walletConfig = {
       address: externalWallet.address,
@@ -500,7 +522,7 @@ export class BridgeOperator implements BridgeOperatorInterface {
           await Promise.all([
             import("@/bridge/monitor/hyperlane/SolanaHyperlaneMonitor"),
             Promise.all([
-              this.getSolanaConnection(),
+              this.getSolanaConnection(token.protocol),
               loadHyperlane("Solana bridge monitoring"),
             ]).then(([connection, hyperlane]) => ({ connection, hyperlane })),
           ]);
@@ -611,11 +633,13 @@ export class BridgeOperator implements BridgeOperatorInterface {
     return guarded;
   }
 
-  private async getSolanaConnection() {
+  private async getSolanaConnection(protocol: Protocol) {
     const solanaWeb3 = await loadSolanaWeb3("Solana operations");
     const cluster = this.starknetWallet.getChainId().isMainnet()
       ? "mainnet-beta"
-      : "testnet";
+      : protocol === Protocol.LAYERSWAP
+        ? "devnet" // Layerswap uses devnet
+        : "testnet"; // Hyperlane uses testnet
     const endpoint =
       this.bridgingConfig?.solanaRpcUrl ?? solanaWeb3.clusterApiUrl(cluster);
     return new solanaWeb3.Connection(endpoint);

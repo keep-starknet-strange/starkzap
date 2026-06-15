@@ -183,7 +183,7 @@ export interface BridgingConfig {
    *
    * Required for bridging tokens via Layerswap and for bridge token
    * discovery (`getBridgingTokens`), which sources Layerswap-bridgeable
-   * tokens from the Layerswap API.
+   * tokens from the Layerswap API. If undefined, Layerswap discovery is omitted.
    */
   layerswapApiKey?: string;
 

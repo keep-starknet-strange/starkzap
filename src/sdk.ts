@@ -556,17 +556,17 @@ export class StarkZap {
   async getBridgingTokens(chain?: ExternalChain): Promise<BridgeToken[]> {
     if (!this.bridgeTokenRepository) {
       const layerswapApiKey = this.config.bridging?.layerswapApiKey;
-      if (!layerswapApiKey) {
-        throw new Error(
-          "Bridge token discovery requires a Layerswap API key. " +
-            'Set "bridging.layerswapApiKey" in the SDK configuration.'
-        );
-      }
       const layerswapBaseUrl = this.config.bridging?.layerswapBaseUrl;
       this.bridgeTokenRepository = new BridgeTokenRepository({
         logger: createLogger(this.config.logging),
-        layerswapApiKey,
-        ...(layerswapBaseUrl ? { layerswapBaseUrl } : {}),
+        ...(layerswapApiKey
+          ? {
+              layerswapOptions: {
+                apiKey: layerswapApiKey,
+                ...(layerswapBaseUrl ? { baseUrl: layerswapBaseUrl } : {}),
+              },
+            }
+          : {}),
       });
     }
 

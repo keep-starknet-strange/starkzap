@@ -17,6 +17,7 @@ export interface ConnectSolanaWalletOptions {
 export enum SolanaNetwork {
   MAINNET = "5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp",
   TESTNET = "4uhcVJyU9pJkvQyS88uRDiswHXSCkY3z",
+  DEVNET = "EtWTRABZaYq6iMfeYKouRu166VU2xqa1",
 }
 
 function assertSolanaProvider(signer: unknown): SolanaProvider {
@@ -52,12 +53,10 @@ export class ConnectedSolanaWallet {
     const signer = assertSolanaProvider(options.provider);
     const address = fromSolanaAddress(options.address, solanaWeb3);
 
-    let network: SolanaNetwork;
-    if (chainId === SolanaNetwork.MAINNET) {
-      network = SolanaNetwork.MAINNET;
-    } else if (chainId === SolanaNetwork.TESTNET) {
-      network = SolanaNetwork.TESTNET;
-    } else {
+    const network = Object.values(SolanaNetwork).find(
+      (value) => value === chainId
+    );
+    if (!network) {
       throw new Error(`Unsupported chainId ${chainId} for Solana`);
     }
 
@@ -67,6 +66,10 @@ export class ConnectedSolanaWallet {
 
     if (network === SolanaNetwork.TESTNET && !starknetChain.isSepolia()) {
       throw new Error("Solana Testnet cannot be used with Starknet Mainnet.");
+    }
+
+    if (network === SolanaNetwork.DEVNET && !starknetChain.isSepolia()) {
+      throw new Error("Solana Devnet cannot be used with Starknet Mainnet.");
     }
 
     return new ConnectedSolanaWallet(address, signer, network);

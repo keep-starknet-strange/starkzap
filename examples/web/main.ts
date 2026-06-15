@@ -165,9 +165,19 @@ const SDK_CHAIN_ID =
 const OFT_PUBLIC_KEY = import.meta.env.VITE_OFT_PUBLIC_KEY as
   | string
   | undefined;
-const LAYERSWAP_API_KEY = import.meta.env.VITE_LAYERSWAP_API_KEY as
-  | string
-  | undefined;
+// Layerswap API keys are environment-scoped — Layerswap issues separate keys
+// for mainnet and testnet — so pick the key matching the network this example
+// is configured for. Falls back to the network-agnostic VITE_LAYERSWAP_API_KEY
+// when a network-specific key is not set.
+const LAYERSWAP_API_KEY_MAINNET = import.meta.env
+  .VITE_LAYERSWAP_API_KEY_MAINNET as string | undefined;
+const LAYERSWAP_API_KEY_TESTNET = import.meta.env
+  .VITE_LAYERSWAP_API_KEY_TESTNET as string | undefined;
+const LAYERSWAP_API_KEY =
+  (NETWORK === MAINNET_NETWORK
+    ? LAYERSWAP_API_KEY_MAINNET
+    : LAYERSWAP_API_KEY_TESTNET) ??
+  (import.meta.env.VITE_LAYERSWAP_API_KEY as string | undefined);
 const LAYERSWAP_BASE_URL = import.meta.env.VITE_LAYERSWAP_BASE_URL as
   | string
   | undefined;

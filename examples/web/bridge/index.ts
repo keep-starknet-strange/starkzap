@@ -43,6 +43,7 @@ import {
   mainnet,
   sepolia,
   solana,
+  solanaDevnet,
   solanaTestnet,
 } from "@reown/appkit/networks";
 
@@ -117,7 +118,7 @@ export function initializeAppKit(projectId: string): AppKit {
 
   return createAppKit({
     adapters: [ethersAdapter, solanaAdapter],
-    networks: [mainnet, sepolia, solana, solanaTestnet],
+    networks: [mainnet, sepolia, solana, solanaTestnet, solanaDevnet],
     projectId,
     metadata: {
       name: "StarkZap Web Example",
@@ -250,7 +251,10 @@ export class BridgeController {
 
       this.state.connectedEthWallet = wallet;
       this.log(
-        `Ethereum wallet connected (dev): ${address.slice(0, 6)}...${address.slice(-4)}`,
+        `Ethereum wallet connected (dev): ${address.slice(
+          0,
+          6
+        )}...${address.slice(-4)}`,
         "success"
       );
       this.render();

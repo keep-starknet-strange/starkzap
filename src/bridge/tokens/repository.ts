@@ -12,12 +12,11 @@ import {
   EthereumBridgeToken,
   SolanaBridgeToken,
 } from "@/types/bridge/bridge-token";
-import { type EthereumAddress, type SolanaAddress, fromAddress } from "@/types";
-import { loadEthers } from "@/connect/ethersRuntime";
-import { fromEthereumAddress } from "@/connect/ethersRuntime";
+import { type EthereumAddress, fromAddress, type SolanaAddress } from "@/types";
+import { fromEthereumAddress, loadEthers } from "@/connect/ethersRuntime";
 import { loadSolanaWeb3 } from "@/connect/solanaWeb3Runtime";
 import { fromSolanaAddress } from "@/types/solanaAddress";
-import { type StarkZapLogger, NOOP_LOGGER } from "@/logger";
+import { NOOP_LOGGER, type StarkZapLogger } from "@/logger";
 import { LayerswapApi } from "@/bridge/ethereum/layerswap/LayerswapApi";
 import { resolveLayerswapRoute } from "@/bridge/ethereum/layerswap/networks";
 import type {
@@ -38,22 +37,22 @@ export interface BridgeTokenRepositoryOptions {
   fetchFn?: typeof fetch;
   now?: () => number;
   logger?: StarkZapLogger;
-  /**
-   * Layerswap API key. Layerswap tokens are sourced exclusively from the
-   * Layerswap API, so the key is required — unless a pre-built
-   * `layerswapApi` source is injected instead.
-   */
-  layerswapApiKey?: string;
-  /**
-   * Custom Layerswap API base URL. Defaults to the public endpoint.
-   */
-  layerswapBaseUrl?: string;
-  /**
-   * Pre-built Layerswap token source. Overrides `layerswapApiKey`/
-   * `layerswapBaseUrl`; primarily an injection seam for tests.
-   */
-  layerswapApi?: LayerswapTokenSource;
+  layerswapOptions?: LayerswapOptions;
 }
+
+export type LayerswapOptions =
+  | {
+      /**
+       * Layerswap API key. Layerswap tokens are sourced exclusively from the
+       * Layerswap API, so the key is required.
+       */
+      apiKey: string;
+      /**
+       * Custom Layerswap API base URL. Defaults to the public endpoint.
+       */
+      baseUrl?: string;
+    }
+  | LayerswapTokenSource;
 
 interface CacheEntry {
   tokens: BridgeToken[];
@@ -428,7 +427,7 @@ export class BridgeTokenRepository {
   private readonly fetchFn: typeof fetch;
   private readonly now: () => number;
   private readonly logger: StarkZapLogger;
-  private readonly layerswapApi: LayerswapTokenSource;
+  private readonly layerswapApi: LayerswapTokenSource | undefined;
   private readonly cache = new Map<string, CacheEntry>();
   private readonly inflight = new Map<string, Promise<BridgeToken[]>>();
 
@@ -447,23 +446,23 @@ export class BridgeTokenRepository {
     this.now = options.now ?? Date.now;
     this.logger = options.logger ?? NOOP_LOGGER;
 
-    if (options.layerswapApi) {
-      this.layerswapApi = options.layerswapApi;
-    } else if (options.layerswapApiKey) {
-      // The key is environment-scoped — Layerswap issues separate keys for
-      // mainnet and testnet — so the discovery client must send it, otherwise
-      // route discovery could return a different environment's networks than
-      // the one swap creation targets.
-      this.layerswapApi = new LayerswapApi({
-        apiKey: options.layerswapApiKey,
-        ...(options.layerswapBaseUrl
-          ? { baseUrl: options.layerswapBaseUrl }
-          : {}),
-      });
-    } else {
-      throw new Error(
-        'Bridge token discovery requires a Layerswap API key. Set "layerswapApiKey".'
-      );
+    const layerswapOptions = options.layerswapOptions;
+    if (layerswapOptions) {
+      // A pre-built LayerswapTokenSource (e.g. a test stub or a shared client)
+      // is used as-is; otherwise build a LayerswapApi from the individual
+      // options. The key is environment-scoped — Layerswap issues separate keys
+      // for mainnet and testnet — so the discovery client must send it,
+      // otherwise route discovery could return a different environment's
+      // networks than the one swap creation targets.
+      this.layerswapApi =
+        "apiKey" in layerswapOptions
+          ? new LayerswapApi({
+              apiKey: layerswapOptions.apiKey,
+              ...(layerswapOptions.baseUrl
+                ? { baseUrl: layerswapOptions.baseUrl }
+                : {}),
+            })
+          : layerswapOptions;
     }
   }
 
@@ -507,13 +506,17 @@ export class BridgeTokenRepository {
     // with the StarkGate fetch. The promise never rejects: each chain degrades
     // to an empty contribution on failure, flagged so the result is only
     // cached briefly.
-    const discovered = this.discoverLayerswapTokens(
-      this.layerswapApi,
-      query.chain
-        ? [query.chain]
-        : [ExternalChain.ETHEREUM, ExternalChain.SOLANA],
-      query.env ?? DEFAULT_ENV
-    );
+    let layerSwapTokensDiscovery: Promise<LayerswapDiscoveryResult> | null =
+      null;
+    if (this.layerswapApi) {
+      layerSwapTokensDiscovery = this.discoverLayerswapTokens(
+        this.layerswapApi,
+        query.chain
+          ? [query.chain]
+          : [ExternalChain.ETHEREUM, ExternalChain.SOLANA],
+        query.env ?? DEFAULT_ENV
+      );
+    }
 
     const url = new URL(this.apiUrl);
     url.searchParams.set("env", query.env ?? DEFAULT_ENV);
@@ -627,14 +630,18 @@ export class BridgeTokenRepository {
       })
       .filter(isNonNull);
 
-    const discovery = await discovered;
-    tokens.push(...discovery.tokens);
+    let degradedDiscovery = false;
+    if (layerSwapTokensDiscovery) {
+      const discoveryResult = await layerSwapTokensDiscovery;
+      degradedDiscovery = discoveryResult.degraded;
+      tokens.push(...discoveryResult.tokens);
+    }
 
     this.cache.set(key, {
       tokens,
       expiresAt:
         this.now() +
-        (discovery.degraded
+        (degradedDiscovery
           ? Math.min(this.cacheTtlMs, LAYERSWAP_DEGRADED_CACHE_TTL_MS)
           : this.cacheTtlMs),
     });
