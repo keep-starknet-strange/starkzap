@@ -256,8 +256,6 @@ export interface PaycrestOptions {
    * if omitted.
    */
   apiKey?: string;
-  /** Paycrest API secret. Required only for `Paycrest.verifyWebhookSignature`. */
-  apiSecret?: string;
   /** Override the API base URL. Defaults to `https://api.paycrest.io`. */
   apiBaseUrl?: string;
   /**

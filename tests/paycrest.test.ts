@@ -1255,6 +1255,61 @@ describe("OfframpResult.wait() dispatch", () => {
     expect(lookupCalls.length).toBe(1);
   });
 
+  it("wait() retries cleanly after a failure (memoizes only on success)", async () => {
+    const receiveAddress =
+      "0x05cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc";
+    let posted = false;
+    let lookupCount = 0;
+    const fetchMock = vi.fn().mockImplementation(async (url: string | URL) => {
+      const u = String(url);
+      if (u.endsWith("/v2/sender/orders") && !posted) {
+        posted = true;
+        return jsonResponse(
+          201,
+          envelope({
+            id: "uuid-retry",
+            status: "initiated",
+            providerAccount: { receiveAddress, network: "starknet" },
+          })
+        );
+      }
+      if (u.includes("/v2/sender/orders/uuid-retry")) {
+        lookupCount += 1;
+        // First wait() hits a transient network blip; the second must be
+        // able to retry rather than replay the cached rejection forever.
+        if (lookupCount === 1) throw new Error("transient network blip");
+        return jsonResponse(
+          200,
+          envelope({ id: "uuid-retry", status: "settled" })
+        );
+      }
+      throw new Error(`unexpected: ${u}`);
+    });
+    const paycrest = new Paycrest({
+      apiKey: "k",
+      fetch: fetchMock as unknown as typeof fetch,
+    });
+    const { wallet } = makeFakeWallet();
+    const result = await paycrest.offramp(wallet, {
+      path: "api",
+      from: { token: USDC, amount: Amount.parse("1", USDC) },
+      to: {
+        currency: "NGN",
+        recipient: {
+          institution: "GTBINGLA",
+          accountIdentifier: "1",
+          accountName: "x",
+        },
+      },
+    });
+    await expect(result.wait({ pollIntervalMs: 1 })).rejects.toThrow(
+      /transient network blip/
+    );
+    const status = await result.wait({ pollIntervalMs: 1 });
+    expect(status.status).toBe("settled");
+    expect(lookupCount).toBe(2);
+  });
+
   it("throws when gateway off-ramp tx reverted (no on-chain order id)", async () => {
     const { publicKey } = buildKeyPair();
     const fetchMock = vi.fn().mockImplementation(async (url: string | URL) => {

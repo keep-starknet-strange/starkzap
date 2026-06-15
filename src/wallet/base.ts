@@ -43,7 +43,14 @@ import type {
 import { Erc20 } from "@/erc20";
 import { Staking, EndurStaking, type EndurStakingOptions } from "@/staking";
 import { Troves, type TrovesOptions } from "@/troves";
-import { Paycrest, type PaycrestOptions } from "@/paycrest";
+import {
+  Paycrest,
+  type PaycrestOptions,
+  type OfframpInput,
+  type OfframpResult,
+  type OnrampResult,
+} from "@/paycrest";
+import type { WalletOnrampInput } from "@/wallet/interface";
 import type { PaycrestConfig } from "@/types/config";
 import type { PreparedSwap, SwapInput, SwapProvider, SwapQuote } from "@/swap";
 import { AvnuSwapProvider } from "@/swap";
@@ -850,6 +857,35 @@ export abstract class BaseWallet implements WalletInterface {
       this.paycrestInstance = new Paycrest(merged);
     }
     return this.paycrestInstance;
+  }
+
+  /**
+   * {@inheritDoc WalletInterface.offramp}
+   *
+   * Thin wrapper over `this.paycrest().offramp(this, input, options)` —
+   * the Paycrest client is built from `SDKConfig.paycrest` (so the API key
+   * flows from config). Use `paycrest()` directly for advanced use.
+   */
+  async offramp(
+    input: OfframpInput,
+    options?: ExecuteOptions
+  ): Promise<OfframpResult> {
+    return this.paycrest().offramp(this, input, options);
+  }
+
+  /**
+   * {@inheritDoc WalletInterface.onramp}
+   *
+   * Thin wrapper over `this.paycrest().onramp(input)`. Defaults the
+   * destination `recipient` to this wallet's own address when the caller
+   * omits it.
+   */
+  async onramp(input: WalletOnrampInput): Promise<OnrampResult> {
+    const recipient = input.to.recipient ?? this.address;
+    return this.paycrest().onramp({
+      ...input,
+      to: { ...input.to, recipient },
+    });
   }
 
   /** {@inheritDoc WalletInterface.initiateWithdraw} */

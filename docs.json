@@ -57,7 +57,6 @@
           "mintlify-docs/build/consumer-app-sdk/connecting-wallets",
           "mintlify-docs/build/consumer-app-sdk/erc20",
           "mintlify-docs/build/consumer-app-sdk/staking",
-          "mintlify-docs/build/consumer-app-sdk/fiat-ramp",
           "mintlify-docs/build/consumer-app-sdk/transactions",
           "mintlify-docs/build/consumer-app-sdk/tx-builder"
         ]

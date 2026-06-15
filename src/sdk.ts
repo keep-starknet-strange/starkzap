@@ -4,6 +4,7 @@ import {
   ChainId,
   type ExplorerConfig,
   getChainId,
+  type PaycrestConfig,
   type SDKConfig,
   type StakingConfig,
 } from "@/types/config";
@@ -179,6 +180,7 @@ export class StarkZap {
     chainId: ChainId;
     explorer?: ExplorerConfig;
     logging?: LoggerConfig;
+    paycrest?: PaycrestConfig;
     rpcUrl: string;
     staking?: StakingConfig;
   }> {

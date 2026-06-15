@@ -489,11 +489,13 @@ export class Paycrest {
    * `waitForGatewayOrder` polls the correct Paycrest index rather than
    * always falling back to the mainnet default.
    *
-   * `wait()` is memoized: a second call reuses the in-flight (or
-   * settled) polling promise from the first call instead of starting a
-   * second loop against the same order. The tradeoff is that options
-   * passed to a later `wait(opts)` are ignored once the first call has
-   * started.
+   * `wait()` is memoized **only on success**: a second call reuses the
+   * in-flight (or settled) polling promise from the first call instead of
+   * starting a second loop against the same order. If the wait rejects
+   * (timeout, transient network failure, terminal error state), the cached
+   * promise is cleared so a later `wait()` retries cleanly rather than
+   * replaying the same failure forever. The tradeoff is that options
+   * passed to a later `wait(opts)` are ignored once a call is in flight.
    */
   private attachWait(
     partial: DistributiveOmit<OfframpResult, "wait">,
@@ -503,11 +505,20 @@ export class Paycrest {
   ): OfframpResult {
     const result = partial as OfframpResult;
     let pending: Promise<PaycrestOfframpStatus> | undefined;
-    result.wait = (waitOptions?: PaycrestWaitForOrderOptions) =>
-      (pending ??= this.waitForOfframp(result, {
-        ...(defaultWaitOptions ?? {}),
-        ...(waitOptions ?? {}),
-      }));
+    result.wait = (waitOptions?: PaycrestWaitForOrderOptions) => {
+      if (!pending) {
+        pending = this.waitForOfframp(result, {
+          ...(defaultWaitOptions ?? {}),
+          ...(waitOptions ?? {}),
+        }).catch((err: unknown) => {
+          // Drop the failed promise so the next wait() starts a fresh
+          // poll instead of returning this same rejection forever.
+          pending = undefined;
+          throw err;
+        });
+      }
+      return pending;
+    };
     return result;
   }
 

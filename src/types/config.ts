@@ -199,16 +199,17 @@ export interface BridgingConfig {
  *   network: "mainnet",
  *   paycrest: {
  *     apiKey: process.env.PAYCREST_API_KEY,
- *     apiSecret: process.env.PAYCREST_API_SECRET, // for webhook verification
  *   },
  * });
  * ```
+ *
+ * Webhook signature verification does not read from this config — pass the
+ * secret directly to the static `Paycrest.verifyWebhookSignature(body,
+ * signature, secret)`.
  */
 export interface PaycrestConfig {
   /** Paycrest API key from app.paycrest.io (required for order creation). */
   apiKey?: string;
-  /** Paycrest API secret (required only for webhook signature verification). */
-  apiSecret?: string;
   /** Override the API base URL. Defaults to `https://api.paycrest.io`. */
   apiBaseUrl?: string;
   /** Override the Cairo Gateway address (e.g. for forking). */

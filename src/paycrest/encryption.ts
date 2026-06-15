@@ -5,12 +5,15 @@
  * `crypto/rsa.DecryptPKCS1v15`, so the SDK must encrypt with the matching
  * PKCS1 v1.5 padding (NOT OAEP — those are incompatible at the byte level).
  *
- * Runtime auto-detection:
+ * Runtime auto-detection (see {@link tryLoadNodeCrypto}):
  *   - Node / Bun / SSR / Deno-with-Node-shim: `node:crypto.publicEncrypt`
  *     with `RSA_PKCS1_PADDING`.
- *   - True browsers / RN / Workers: a small BigInt-based PKCS1 v1.5 encoder
- *     plus raw RSA exponentiation. WebCrypto's `subtle.encrypt` only
- *     supports OAEP for RSA, which the aggregator can't decrypt.
+ *   - True browsers / RN / Workers (no `node:crypto`): the optional
+ *     `node-forge` peer dependency, which implements RSAES-PKCS1-V1_5.
+ *     WebCrypto's `subtle.encrypt` only supports OAEP for RSA, which the
+ *     aggregator can't decrypt, so a userland implementation is required
+ *     there. `node-forge` is a vetted library — we no longer hand-roll the
+ *     DER parsing / modular exponentiation / PKCS1 padding.
  *
  * The Cairo Gateway expects the encrypted blob as a UTF-8 ByteArray on
  * `create_order`. Both code paths return a base64-encoded string; pass it
@@ -39,9 +42,9 @@ function pemToSpki(pem: string): Uint8Array {
  * Re-emit a PEM in canonical form (standard armor, 64-char base64 lines,
  * `\n` separators) from whatever the caller passed. `pemToSpki` already
  * tolerates CRLF / indentation / surrounding whitespace; rebuilding from
- * its output means the strict OpenSSL-backed Node path accepts the same
- * lenient inputs the BigInt path does. Doubles as validation — throws on
- * a malformed PEM.
+ * its output means both the strict OpenSSL-backed Node path and the
+ * `node-forge` path receive identical, clean input. Doubles as validation
+ * — throws on a malformed PEM.
  */
 function canonicalizePem(pem: string): string {
   const der = pemToSpki(pem);
@@ -83,9 +86,30 @@ function base64Encode(bytes: Uint8Array): string {
   throw new Error("No base64 encoder available in this environment");
 }
 
-async function encryptViaNode(pem: string, plaintext: string): Promise<string> {
-  const nodeCrypto =
-    (await import("node:crypto")) as typeof import("node:crypto");
+/**
+ * Attempt to load `node:crypto`. Resolves to the module on Node-like
+ * runtimes (Node, Bun, Deno `--node-compat`, SSR) and to `null` in true
+ * browsers / RN / Workers — or wherever a bundler stubs the import.
+ *
+ * This replaces the previous `process.versions.node` sniff: runtimes can
+ * fake `process`, but a working `node:crypto.publicEncrypt` is the actual
+ * capability we depend on, so we probe for it directly.
+ */
+async function tryLoadNodeCrypto(): Promise<
+  typeof import("node:crypto") | null
+> {
+  try {
+    return await import("node:crypto");
+  } catch {
+    return null;
+  }
+}
+
+function encryptViaNode(
+  nodeCrypto: typeof import("node:crypto"),
+  pem: string,
+  plaintext: string
+): string {
   const ciphertext = nodeCrypto.publicEncrypt(
     {
       key: pem,
@@ -96,143 +120,40 @@ async function encryptViaNode(pem: string, plaintext: string): Promise<string> {
   return ciphertext.toString("base64");
 }
 
-// --- Browser / WebCrypto path: manual PKCS1 v1.5 + raw RSA --- //
-
-interface DerField {
-  tag: number;
-  valueStart: number;
-  valueEnd: number;
-}
-
-function readDer(bytes: Uint8Array, offset: number): DerField {
-  const tag = bytes[offset];
-  if (tag === undefined) throw new Error("DER: unexpected end of input");
-  let length = bytes[offset + 1];
-  if (length === undefined) throw new Error("DER: unexpected end of input");
-  let valueStart = offset + 2;
-  if (length & 0x80) {
-    const numLenBytes = length & 0x7f;
-    length = 0;
-    for (let i = 0; i < numLenBytes; i++) {
-      const b = bytes[valueStart + i];
-      if (b === undefined) throw new Error("DER: truncated length");
-      length = (length << 8) | b;
-    }
-    valueStart += numLenBytes;
-  }
-  return { tag, valueStart, valueEnd: valueStart + length };
-}
-
-function bytesToBigint(bytes: Uint8Array): bigint {
-  let n = 0n;
-  for (let i = 0; i < bytes.length; i++) {
-    n = (n << 8n) | BigInt(bytes[i]!);
-  }
-  return n;
-}
-
-function bigintToFixedBytes(n: bigint, length: number): Uint8Array {
-  const out = new Uint8Array(length);
-  let v = n;
-  for (let i = length - 1; i >= 0; i--) {
-    out[i] = Number(v & 0xffn);
-    v >>= 8n;
-  }
-  if (v !== 0n) throw new Error("RSA: integer overflows modulus length");
-  return out;
-}
-
-function modPow(base: bigint, exp: bigint, mod: bigint): bigint {
-  let result = 1n;
-  let b = base % mod;
-  let e = exp;
-  while (e > 0n) {
-    if (e & 1n) result = (result * b) % mod;
-    e >>= 1n;
-    b = (b * b) % mod;
-  }
-  return result;
-}
-
-function parseRsaSpki(pem: string): { n: bigint; e: bigint; k: number } {
-  const spki = pemToSpki(pem);
-  // SubjectPublicKeyInfo ::= SEQUENCE { AlgorithmIdentifier, BIT STRING }
-  const outer = readDer(spki, 0);
-  if (outer.tag !== 0x30)
-    throw new Error("RSA: SPKI outer SEQUENCE tag missing");
-  const algId = readDer(spki, outer.valueStart);
-  if (algId.tag !== 0x30)
-    throw new Error("RSA: AlgorithmIdentifier SEQUENCE tag missing");
-  const bitString = readDer(spki, algId.valueEnd);
-  if (bitString.tag !== 0x03) throw new Error("RSA: BIT STRING tag missing");
-  // First byte of BIT STRING value is the unused-bit count (must be 0).
-  if (spki[bitString.valueStart] !== 0)
-    throw new Error("RSA: unsupported unused bits in BIT STRING");
-  // Inside the BIT STRING: RSAPublicKey ::= SEQUENCE { INTEGER n, INTEGER e }
-  const rsaSeq = readDer(spki, bitString.valueStart + 1);
-  if (rsaSeq.tag !== 0x30)
-    throw new Error("RSA: RSAPublicKey SEQUENCE tag missing");
-  const nInt = readDer(spki, rsaSeq.valueStart);
-  if (nInt.tag !== 0x02) throw new Error("RSA: modulus INTEGER tag missing");
-  const eInt = readDer(spki, nInt.valueEnd);
-  if (eInt.tag !== 0x02) throw new Error("RSA: exponent INTEGER tag missing");
-  const n = bytesToBigint(spki.subarray(nInt.valueStart, nInt.valueEnd));
-  const e = bytesToBigint(spki.subarray(eInt.valueStart, eInt.valueEnd));
-  // PKCS1 ciphertext byte length equals byte length of modulus.
-  const k = Math.ceil(n.toString(2).length / 8);
-  return { n, e, k };
-}
-
-function getRandomBytes(length: number): Uint8Array {
-  const g = (
-    globalThis as {
-      crypto?: { getRandomValues?: (a: Uint8Array) => Uint8Array };
-    }
-  ).crypto;
-  if (g?.getRandomValues) {
-    const out = new Uint8Array(length);
-    g.getRandomValues(out);
-    return out;
-  }
-  throw new Error("RSA: no crypto.getRandomValues available in this runtime");
-}
-
-// PKCS1 v1.5 type-2 encryption padding (RFC 8017 §7.2.1).
-// EM = 0x00 || 0x02 || PS || 0x00 || M
-// where PS is `k - mLen - 3` cryptographically-random non-zero bytes.
-function pkcs1v15PadType2(message: Uint8Array, k: number): Uint8Array {
-  if (message.length > k - 11)
+/**
+ * Browser / React Native / Workers path. Uses the optional `node-forge`
+ * peer dependency to perform RSAES-PKCS1-V1_5 encryption (the same padding
+ * scheme Go's `DecryptPKCS1v15` expects). Exported for direct testing of
+ * the non-Node path without having to defeat the runtime probe.
+ *
+ * @throws if `node-forge` is not installed — with an actionable message.
+ */
+export async function encryptViaForge(
+  pem: string,
+  plaintext: string
+): Promise<string> {
+  type ForgeModule = typeof import("node-forge");
+  let mod: unknown;
+  try {
+    mod = await import("node-forge");
+  } catch {
     throw new Error(
-      `RSA: plaintext too long for modulus (max ${k - 11} bytes, got ${message.length})`
+      "Paycrest recipient encryption requires the optional `node-forge` " +
+        "dependency on this runtime (no node:crypto available). Install it " +
+        "with `npm install node-forge` — it is declared as an optional peer " +
+        "dependency."
     );
-  const psLen = k - message.length - 3;
-  const ps = new Uint8Array(psLen);
-  let filled = 0;
-  // Resample until every byte is non-zero (rejection sampling).
-  while (filled < psLen) {
-    const draw = getRandomBytes(psLen - filled);
-    for (let i = 0; i < draw.length && filled < psLen; i++) {
-      const b = draw[i]!;
-      if (b !== 0) ps[filled++] = b;
-    }
   }
-  const em = new Uint8Array(k);
-  em[0] = 0x00;
-  em[1] = 0x02;
-  em.set(ps, 2);
-  em[2 + psLen] = 0x00;
-  em.set(message, 3 + psLen);
-  return em;
-}
-
-function encryptViaWebCrypto(pem: string, plaintext: string): string {
-  const { n, e, k } = parseRsaSpki(pem);
-  const message = new TextEncoder().encode(plaintext);
-  const em = pkcs1v15PadType2(message, k);
-  const m = bytesToBigint(em);
-  if (m >= n) throw new Error("RSA: padded message >= modulus");
-  const c = modPow(m, e, n);
-  return base64Encode(bigintToFixedBytes(c, k));
+  // node-forge is CommonJS (`export =`); under ESM the namespace may carry
+  // the library on `.default`. Tolerate both interop shapes.
+  const forge = ((mod as { default?: ForgeModule }).default ??
+    mod) as ForgeModule;
+  const publicKey = forge.pki.publicKeyFromPem(pem);
+  const encrypted = publicKey.encrypt(
+    forge.util.encodeUtf8(plaintext),
+    "RSAES-PKCS1-V1_5"
+  );
+  return forge.util.encode64(encrypted);
 }
 
 /**
@@ -247,18 +168,12 @@ export async function encryptRecipient(
 ): Promise<string> {
   // Validate and canonicalize the PEM up front so the error is consistent
   // across runtimes (node:crypto delegates to OpenSSL, which both produces
-  // a different message and rejects non-canonical armor the BigInt path
+  // a different message and rejects non-canonical armor that node-forge
   // would accept). Both code paths then receive the same clean PEM.
   const pem = canonicalizePem(publicKeyPem);
-  // Pick the encryptor by runtime feature detection rather than catching
-  // bundler-specific import errors (the exact string varies across Vite,
-  // Webpack, Rollup, esbuild — matching them is brittle). Any host that
-  // exposes `process.versions.node` is Node, Bun, or a Node-compat layer
-  // (Deno --node-compat, etc.); everything else uses the BigInt path.
-  const proc = (globalThis as { process?: { versions?: { node?: string } } })
-    .process;
-  if (typeof proc?.versions?.node === "string") {
-    return encryptViaNode(pem, plaintext);
+  const nodeCrypto = await tryLoadNodeCrypto();
+  if (nodeCrypto && typeof nodeCrypto.publicEncrypt === "function") {
+    return encryptViaNode(nodeCrypto, pem, plaintext);
   }
-  return encryptViaWebCrypto(pem, plaintext);
+  return encryptViaForge(pem, plaintext);
 }
