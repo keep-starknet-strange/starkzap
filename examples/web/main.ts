@@ -39,6 +39,7 @@ import {
 import { BridgeTransferStatus, DepositState, WithdrawalState } from "starkzap";
 import type { StoredBridgeTx } from "./bridge/tx-storage";
 import { getDcaProviders } from "./dca";
+import { initPaycrestPanel } from "./paycrest";
 import {
   buildFallbackWebVesuMarkets,
   buildWebVesuDebtOptions,
@@ -162,6 +163,9 @@ const SDK_CHAIN_ID =
 const OFT_PUBLIC_KEY = import.meta.env.VITE_OFT_PUBLIC_KEY as
   | string
   | undefined;
+const PAYCREST_API_KEY = import.meta.env.VITE_PAYCREST_API_KEY as
+  | string
+  | undefined;
 const BPS_DENOMINATOR = 10_000n;
 const DEFAULT_SLIPPAGE_BPS = 100n;
 const DEFAULT_DCA_FREQUENCY = "P1D";
@@ -260,6 +264,19 @@ const sdk = new StarkZap({
                 : undefined,
           }),
           ...(OFT_PUBLIC_KEY && { layerZeroApiKey: OFT_PUBLIC_KEY }),
+        },
+      }
+    : {}),
+  // API key for the Paycrest fiat ramp. Flows into wallet.offramp /
+  // wallet.onramp so the panel never handles it directly. `apiBaseUrl`
+  // points at the same-origin Vite proxy (see vite.config.ts) because
+  // Paycrest's API sends no CORS headers — a direct browser call is
+  // blocked.
+  ...(PAYCREST_API_KEY
+    ? {
+        paycrest: {
+          apiKey: PAYCREST_API_KEY,
+          apiBaseUrl: `${window.location.origin}/paycrest-api`,
         },
       }
     : {}),
@@ -529,6 +546,16 @@ if (REOWN_PROJECT_ID) {
 } else {
   log("VITE_REOWN_PROJECT_ID not set - bridge disabled", "info");
 }
+
+// Paycrest fiat-ramp panel. Reads the connected wallet lazily on submit;
+// only needs VITE_PAYCREST_API_KEY (wired into the SDK config above). The
+// apiBaseUrl matches the wallet's Paycrest client so the panel's read-only
+// list calls (tokens/currencies/institutions) go through the same proxy.
+initPaycrestPanel(() => wallet, {
+  apiBaseUrl: `${window.location.origin}/paycrest-api`,
+  enabled: Boolean(PAYCREST_API_KEY),
+  log,
+});
 
 // Lending DOM elements
 const lendingTokenSelect = document.getElementById(
