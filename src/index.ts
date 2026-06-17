@@ -48,6 +48,9 @@ export * from "@/connect";
 // Troves
 export * from "@/troves";
 
+// Paycrest (fiat on/off-ramp)
+export * from "@/paycrest";
+
 // Logger
 export type { Logger, LoggerConfig, LogLevel } from "@/logger";
 

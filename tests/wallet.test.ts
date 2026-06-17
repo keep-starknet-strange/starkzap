@@ -649,6 +649,96 @@ describe("Wallet", () => {
       ).rejects.toThrow("RPC chain mismatch");
     });
   });
+
+  describe("paycrest wrappers", () => {
+    const refundAccount = {
+      institution: "GTBINGLA",
+      accountIdentifier: "1234567890",
+      accountName: "Test User",
+    };
+
+    async function walletWithFakePaycrest(fake: {
+      offramp?: ReturnType<typeof vi.fn>;
+      onramp?: ReturnType<typeof vi.fn>;
+    }): Promise<WalletInterface> {
+      const wallet = await sdk.connectWallet({
+        account: { signer: new StarkSigner(privateKey) },
+      });
+      vi.spyOn(wallet, "paycrest").mockReturnValue(
+        fake as unknown as ReturnType<WalletInterface["paycrest"]>
+      );
+      return wallet;
+    }
+
+    it("offramp() delegates to paycrest().offramp(this, input, options)", async () => {
+      const offramp = vi.fn().mockResolvedValue({ path: "api" });
+      const wallet = await walletWithFakePaycrest({ offramp });
+      const input = {
+        path: "api" as const,
+        from: {
+          token: testSwapToken,
+          amount: Amount.parse("1", testSwapToken),
+        },
+        to: {
+          currency: "NGN",
+          recipient: {
+            institution: "GTBINGLA",
+            accountIdentifier: "1",
+            accountName: "x",
+          },
+        },
+      };
+      await wallet.offramp(input);
+      expect(offramp).toHaveBeenCalledWith(wallet, input, undefined);
+    });
+
+    it("offramp() forwards explicit execute options", async () => {
+      const offramp = vi.fn().mockResolvedValue({ path: "api" });
+      const wallet = await walletWithFakePaycrest({ offramp });
+      const input = {
+        path: "api" as const,
+        from: {
+          token: testSwapToken,
+          amount: Amount.parse("1", testSwapToken),
+        },
+        to: {
+          currency: "NGN",
+          recipient: {
+            institution: "GTBINGLA",
+            accountIdentifier: "1",
+            accountName: "x",
+          },
+        },
+      };
+      const options = { feeMode: { type: "paymaster" as const } };
+      await wallet.offramp(input, options);
+      expect(offramp).toHaveBeenCalledWith(wallet, input, options);
+    });
+
+    it("onramp() defaults the destination recipient to the wallet address", async () => {
+      const onramp = vi.fn().mockResolvedValue({ orderId: "x" });
+      const wallet = await walletWithFakePaycrest({ onramp });
+      await wallet.onramp({
+        from: { currency: "NGN", amount: 1000, refundAccount },
+        to: { token: testSwapToken },
+      });
+      expect(onramp).toHaveBeenCalledTimes(1);
+      const arg = onramp.mock.calls[0]![0];
+      expect(arg.to.recipient).toBe(wallet.address);
+    });
+
+    it("onramp() honors an explicitly supplied recipient", async () => {
+      const onramp = vi.fn().mockResolvedValue({ orderId: "x" });
+      const wallet = await walletWithFakePaycrest({ onramp });
+      const recipient = fromAddress("0xabc");
+      await wallet.onramp({
+        from: { currency: "NGN", amount: 1000, refundAccount },
+        to: { token: testSwapToken, recipient },
+      });
+      const arg = onramp.mock.calls[0]![0];
+      expect(arg.to.recipient).toBe(recipient);
+    });
+  });
 });
 
 describe("StarkZap", () => {

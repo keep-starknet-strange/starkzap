@@ -186,6 +186,39 @@ export interface BridgingConfig {
 }
 
 /**
+ * Configuration for the Paycrest fiat on/off-ramp module.
+ *
+ * Paycrest is mainnet-only — there is no testnet backend or Gateway.
+ * `apiKey` is required for any order-creating call (offramp, onramp,
+ * getOrder); read-only endpoints (currencies, institutions, rates)
+ * work without one.
+ *
+ * @example
+ * ```ts
+ * const sdk = new StarkZap({
+ *   network: "mainnet",
+ *   paycrest: {
+ *     apiKey: process.env.PAYCREST_API_KEY,
+ *   },
+ * });
+ * ```
+ *
+ * Webhook signature verification does not read from this config — pass the
+ * secret directly to the static `Paycrest.verifyWebhookSignature(body,
+ * signature, secret)`.
+ */
+export interface PaycrestConfig {
+  /** Paycrest API key from app.paycrest.io (required for order creation). */
+  apiKey?: string;
+  /** Override the API base URL. Defaults to `https://api.paycrest.io`. */
+  apiBaseUrl?: string;
+  /** Override the Cairo Gateway address (e.g. for forking). */
+  gatewayAddress?: Address;
+  /** Per-request timeout in milliseconds. Defaults to 15000. */
+  requestTimeoutMs?: number;
+}
+
+/**
  * Main configuration for the StarkZap.
  *
  * You can configure using a network preset or custom rpcUrl/chainId.
@@ -245,6 +278,16 @@ export interface SDKConfig {
    * @see {@link BridgingConfig}
    */
   bridging?: BridgingConfig;
+
+  /**
+   * Optional: configuration for the Paycrest fiat on/off-ramp module.
+   *
+   * Threaded through to `wallet.paycrest()` so apps don't need to pass
+   * the API key on every call.
+   *
+   * @see {@link PaycrestConfig}
+   */
+  paycrest?: PaycrestConfig;
 
   /**
    * Optional logging configuration for SDK diagnostics.

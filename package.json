@@ -35,10 +35,14 @@
     "@hyperlane-xyz/sdk": "^14.4.0",
     "@hyperlane-xyz/utils": "^14.4.0",
     "@solana/web3.js": "^1.98.4",
-    "ethers": "^6.16.0"
+    "ethers": "^6.16.0",
+    "node-forge": "^1.3.1"
   },
   "peerDependenciesMeta": {
     "@cartridge/controller": {
+      "optional": true
+    },
+    "node-forge": {
       "optional": true
     },
     "@hyperlane-xyz/registry": {
@@ -116,7 +120,9 @@
     "eslint": "^9.39.2",
     "eslint-config-prettier": "^10.1.8",
     "ethers": "^6.16.0",
+    "@types/node-forge": "^1.3.11",
     "husky": "^9.1.7",
+    "node-forge": "^1.3.1",
     "prettier": "3.8.1",
     "starknet-devnet": "^0.7.2",
     "tsc-alias": "^1.8.16",

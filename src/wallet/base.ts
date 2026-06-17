@@ -43,6 +43,15 @@ import type {
 import { Erc20 } from "@/erc20";
 import { Staking, EndurStaking, type EndurStakingOptions } from "@/staking";
 import { Troves, type TrovesOptions } from "@/troves";
+import {
+  Paycrest,
+  type PaycrestOptions,
+  type OfframpInput,
+  type OfframpResult,
+  type OnrampResult,
+} from "@/paycrest";
+import type { WalletOnrampInput } from "@/wallet/interface";
+import type { PaycrestConfig } from "@/types/config";
 import type { PreparedSwap, SwapInput, SwapProvider, SwapQuote } from "@/swap";
 import { AvnuSwapProvider } from "@/swap";
 import { resolveSwapInput } from "@/swap/utils";
@@ -118,6 +127,8 @@ export abstract class BaseWallet implements WalletInterface {
   private stakingInFlight: Map<Address, Promise<Staking>> = new Map();
   private lstStakingMap: Map<string, EndurStaking> = new Map();
   private trovesInstance: Troves | undefined;
+  private paycrestInstance: Paycrest | undefined;
+  private readonly paycrestConfig: PaycrestConfig | undefined;
 
   private readonly bridging: BridgeOperator;
 
@@ -131,6 +142,7 @@ export abstract class BaseWallet implements WalletInterface {
     address: Address;
     stakingConfig?: StakingConfig | undefined;
     bridgingConfig?: BridgingConfig | undefined;
+    paycrestConfig?: PaycrestConfig | undefined;
     defaultSwapProvider?: SwapProvider | undefined;
     defaultLendingProvider?: LendingProvider | undefined;
     defaultDcaProvider?: DcaProvider | undefined;
@@ -138,6 +150,7 @@ export abstract class BaseWallet implements WalletInterface {
   }) {
     this.address = options.address;
     this.stakingConfig = options.stakingConfig;
+    this.paycrestConfig = options.paycrestConfig;
     this.logger = createLogger(options.logging);
     this.bridging = new BridgeOperator(
       this,
@@ -827,6 +840,52 @@ export abstract class BaseWallet implements WalletInterface {
       this.trovesInstance = new Troves(this, options);
     }
     return this.trovesInstance;
+  }
+
+  /**
+   * Get a Paycrest client for fiat on/off-ramps. Configuration is
+   * pulled from `SDKConfig.paycrest` if not overridden at call time.
+   *
+   * The same instance is returned across calls. `options` only takes
+   * effect on the first call — construct `Paycrest` directly if you
+   * need different settings later.
+   */
+  paycrest(options?: PaycrestOptions): Paycrest {
+    if (!this.paycrestInstance) {
+      const merged: PaycrestOptions = { ...(this.paycrestConfig ?? {}) };
+      if (options) Object.assign(merged, options);
+      this.paycrestInstance = new Paycrest(merged);
+    }
+    return this.paycrestInstance;
+  }
+
+  /**
+   * {@inheritDoc WalletInterface.offramp}
+   *
+   * Thin wrapper over `this.paycrest().offramp(this, input, options)` —
+   * the Paycrest client is built from `SDKConfig.paycrest` (so the API key
+   * flows from config). Use `paycrest()` directly for advanced use.
+   */
+  async offramp(
+    input: OfframpInput,
+    options?: ExecuteOptions
+  ): Promise<OfframpResult> {
+    return this.paycrest().offramp(this, input, options);
+  }
+
+  /**
+   * {@inheritDoc WalletInterface.onramp}
+   *
+   * Thin wrapper over `this.paycrest().onramp(input)`. Defaults the
+   * destination `recipient` to this wallet's own address when the caller
+   * omits it.
+   */
+  async onramp(input: WalletOnrampInput): Promise<OnrampResult> {
+    const recipient = input.to.recipient ?? this.address;
+    return this.paycrest().onramp({
+      ...input,
+      to: { ...input.to, recipient },
+    });
   }
 
   /** {@inheritDoc WalletInterface.initiateWithdraw} */
