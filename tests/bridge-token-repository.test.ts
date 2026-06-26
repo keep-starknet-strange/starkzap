@@ -2,15 +2,23 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   BRIDGE_TOKEN_CACHE_TTL_MS,
   BridgeTokenRepository,
+  LAYERSWAP_DEGRADED_CACHE_TTL_MS,
 } from "@/bridge/tokens/repository";
 import * as ethersRuntime from "@/connect/ethersRuntime";
 import * as solanaWeb3Runtime from "@/connect/solanaWeb3Runtime";
 import {
+  ContractRoutedEthereumBridgeToken,
+  ContractRoutedSolanaBridgeToken,
   EthereumBridgeToken,
   ExternalChain,
   Protocol,
   SolanaBridgeToken,
 } from "@/types";
+import type {
+  LayerswapTokenSource,
+  LsRoute,
+  LsToken,
+} from "@/bridge/ethereum/layerswap/types";
 import { StarkZapLogger } from "@/logger";
 
 function createMockLogger() {
@@ -32,6 +40,14 @@ function createMockLogger() {
 afterEach(() => {
   vi.restoreAllMocks();
 });
+
+/** Stub Layerswap source for tests focused on the StarkGate payload. */
+function emptyLayerswapApi(): LayerswapTokenSource {
+  return {
+    getSources: vi.fn().mockResolvedValue([]),
+    getDestinations: vi.fn().mockResolvedValue([]),
+  };
+}
 
 function mockApiResponse() {
   return [
@@ -134,6 +150,7 @@ describe("BridgeTokenRepository", () => {
 
     const repository = new BridgeTokenRepository({
       fetchFn: fetchMock as unknown as typeof fetch,
+      layerswapOptions: emptyLayerswapApi(),
     });
 
     await expect(repository.getTokens()).rejects.toThrow(
@@ -151,18 +168,115 @@ describe("BridgeTokenRepository", () => {
 
     const repository = new BridgeTokenRepository({
       fetchFn: fetchMock as unknown as typeof fetch,
+      layerswapOptions: emptyLayerswapApi(),
     });
     const tokens = await repository.getTokens();
 
     expect(tokens).toHaveLength(3);
 
-    expect(tokens[0]).toBeInstanceOf(EthereumBridgeToken);
+    // Contract-routed protocols carry the bridge-contract addresses, so they
+    // parse to the ContractRouted* subclasses.
+    expect(tokens[0]).toBeInstanceOf(ContractRoutedEthereumBridgeToken);
     expect(tokens[0]?.protocol).toBe(Protocol.CANONICAL);
     expect(tokens[0]?.chain).toBe(ExternalChain.ETHEREUM);
 
-    expect(tokens[2]).toBeInstanceOf(SolanaBridgeToken);
+    expect(tokens[2]).toBeInstanceOf(ContractRoutedSolanaBridgeToken);
     expect(tokens[2]?.protocol).toBe(Protocol.HYPERLANE);
     expect(tokens[2]?.chain).toBe(ExternalChain.SOLANA);
+  });
+
+  it("should ignore layerswap-protocol rows from StarkGate (the Layerswap API is their sole source)", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      statusText: "OK",
+      json: async () => [
+        {
+          id: "eth-layerswap",
+          chain: "ethereum",
+          protocol: "layerswap",
+          name: "Ethereum",
+          symbol: "ETH",
+          decimals: 18,
+          l1_token_address: "0x0000000000000000000000000000000000000000",
+          l2_token_address:
+            "0x049d36570d4e46f48e99674bd3fcc84644ddd6b96f7c741b1562b82f9e004dc7",
+        },
+      ],
+    });
+
+    const repository = new BridgeTokenRepository({
+      fetchFn: fetchMock as unknown as typeof fetch,
+      layerswapOptions: emptyLayerswapApi(),
+    });
+    const tokens = await repository.getTokens();
+
+    expect(tokens).toHaveLength(0);
+  });
+
+  it("should parse CCTP tokens to the plain base classes (resolves contracts from constants, not the record)", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      statusText: "OK",
+      json: async () => [
+        {
+          id: "usdc-cctp",
+          chain: "ethereum",
+          protocol: "cctp",
+          name: "USD Coin",
+          symbol: "USDC",
+          decimals: 6,
+          l1_token_address: "0x0000000000000000000000000000000000000000",
+          l2_token_address:
+            "0x049d36570d4e46f48e99674bd3fcc84644ddd6b96f7c741b1562b82f9e004dc7",
+        },
+      ],
+    });
+
+    const repository = new BridgeTokenRepository({
+      fetchFn: fetchMock as unknown as typeof fetch,
+      layerswapOptions: emptyLayerswapApi(),
+    });
+    const tokens = await repository.getTokens();
+
+    expect(tokens).toHaveLength(1);
+    expect(tokens[0]?.protocol).toBe(Protocol.CCTP);
+    expect(tokens[0]).toBeInstanceOf(EthereumBridgeToken);
+    expect(tokens[0]).not.toBeInstanceOf(ContractRoutedEthereumBridgeToken);
+  });
+
+  it("should throw when a contract-routed token is missing a bridge address", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      statusText: "OK",
+      json: async () => [
+        {
+          id: "broken-canonical",
+          chain: "ethereum",
+          protocol: "canonical",
+          name: "Ethereum",
+          symbol: "ETH",
+          decimals: 18,
+          l1_token_address: "0x0000000000000000000000000000000000000000",
+          l2_token_address:
+            "0x049d36570d4e46f48e99674bd3fcc84644ddd6b96f7c741b1562b82f9e004dc7",
+          // l1_bridge_address omitted
+          l2_bridge_address:
+            "0x073314940630fd6dcda0d772d4c972c4e0a9946bef9dabf4ef84eda8ef542b82",
+        },
+      ],
+    });
+
+    const repository = new BridgeTokenRepository({
+      fetchFn: fetchMock as unknown as typeof fetch,
+      layerswapOptions: emptyLayerswapApi(),
+    });
+
+    await expect(
+      repository.getTokens({ chain: ExternalChain.ETHEREUM })
+    ).rejects.toThrow('Missing required field "l1_bridge_address"');
   });
 
   it("should send optional env and chain query params when provided", async () => {
@@ -175,6 +289,7 @@ describe("BridgeTokenRepository", () => {
 
     const repository = new BridgeTokenRepository({
       fetchFn: fetchMock as unknown as typeof fetch,
+      layerswapOptions: emptyLayerswapApi(),
     });
 
     await repository.getTokens({
@@ -203,6 +318,7 @@ describe("BridgeTokenRepository", () => {
 
     const repository = new BridgeTokenRepository({
       fetchFn: fetchMock as unknown as typeof fetch,
+      layerswapOptions: emptyLayerswapApi(),
     });
 
     await expect(
@@ -234,6 +350,7 @@ describe("BridgeTokenRepository", () => {
 
     const repository = new BridgeTokenRepository({
       fetchFn: fetchMock as unknown as typeof fetch,
+      layerswapOptions: emptyLayerswapApi(),
     });
 
     await expect(
@@ -257,6 +374,7 @@ describe("BridgeTokenRepository", () => {
 
     const repository = new BridgeTokenRepository({
       fetchFn: fetchMock as unknown as typeof fetch,
+      layerswapOptions: emptyLayerswapApi(),
       logger: mockLogger.instance,
     });
     const tokens = await repository.getTokens();
@@ -287,6 +405,7 @@ describe("BridgeTokenRepository", () => {
 
     const repository = new BridgeTokenRepository({
       fetchFn: fetchMock as unknown as typeof fetch,
+      layerswapOptions: emptyLayerswapApi(),
       logger: mockLogger.instance,
     });
     const tokens = await repository.getTokens();
@@ -310,6 +429,7 @@ describe("BridgeTokenRepository", () => {
 
     const repository = new BridgeTokenRepository({
       fetchFn: fetchMock as unknown as typeof fetch,
+      layerswapOptions: emptyLayerswapApi(),
       now: () => now,
     });
 
@@ -340,6 +460,7 @@ describe("BridgeTokenRepository", () => {
 
     const repository = new BridgeTokenRepository({
       fetchFn: fetchMock as unknown as typeof fetch,
+      layerswapOptions: emptyLayerswapApi(),
       now: () => now,
     });
 
@@ -365,10 +486,555 @@ describe("BridgeTokenRepository", () => {
 
     const repository = new BridgeTokenRepository({
       fetchFn: fetchMock as unknown as typeof fetch,
+      layerswapOptions: emptyLayerswapApi(),
     });
     const tokens = await repository.getTokens();
 
     expect(tokens.some((token) => token.id === "hidden-token")).toBe(false);
     expect(tokens.some((token) => token.id === "deprecated-token")).toBe(false);
+  });
+});
+
+describe("BridgeTokenRepository Layerswap discovery", () => {
+  const STARKNET_ETH_ADDRESS =
+    "0x049d36570d4e46f48e99674bd3fcc84644ddd6b96f7c741b1562b82f9e004dc7";
+  const STARKNET_USDC_ADDRESS =
+    "0x053c91253bc9682c04929ca02ed00b3e423f6710d2ee7e0d5ebb06f3ecf368a8";
+
+  function lsToken(overrides: Partial<LsToken> & { symbol: string }): LsToken {
+    return {
+      logo: "https://example.com/logo.png",
+      contract: null,
+      decimals: 18,
+      price_in_usd: 0,
+      precision: 6,
+      listing_date: "2024-01-01T00:00:00Z",
+      ...overrides,
+    };
+  }
+
+  function lsRoute(name: string, tokens: LsToken[]): LsRoute {
+    return {
+      name,
+      display_name: name,
+      logo: "https://example.com/network.png",
+      chain_id: "1",
+      type: name.startsWith("SOLANA") ? "solana" : "evm",
+      transaction_explorer_template: "https://example.com/tx/{0}",
+      account_explorer_template: "https://example.com/account/{0}",
+      tokens,
+    };
+  }
+
+  function emptyStarkgateFetch() {
+    return vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      statusText: "OK",
+      json: async () => [],
+    }) as unknown as typeof fetch;
+  }
+
+  it("discovers and merges Layerswap tokens, joining external and Starknet sides by symbol", async () => {
+    const layerswapApi: LayerswapTokenSource = {
+      getSources: vi.fn().mockResolvedValue([
+        lsRoute("ETHEREUM_SEPOLIA", [
+          lsToken({ symbol: "ETH", contract: null, decimals: 18 }),
+          lsToken({
+            symbol: "USDC",
+            contract: "0x2222222222222222222222222222222222222222",
+            decimals: 6,
+          }),
+        ]),
+      ]),
+      getDestinations: vi.fn().mockResolvedValue([
+        lsRoute("STARKNET_SEPOLIA", [
+          lsToken({ symbol: "ETH", contract: STARKNET_ETH_ADDRESS }),
+          lsToken({
+            symbol: "USDC",
+            contract: STARKNET_USDC_ADDRESS,
+            decimals: 6,
+          }),
+        ]),
+      ]),
+    };
+
+    const repository = new BridgeTokenRepository({
+      fetchFn: emptyStarkgateFetch(),
+      layerswapOptions: layerswapApi,
+    });
+
+    const tokens = await repository.getTokens({
+      env: "testnet",
+      chain: ExternalChain.ETHEREUM,
+    });
+
+    expect(layerswapApi.getSources).toHaveBeenCalledWith({
+      destinationNetwork: "STARKNET_SEPOLIA",
+      networkTypes: ["evm"],
+    });
+    expect(layerswapApi.getDestinations).toHaveBeenCalledWith({
+      sourceNetwork: "ETHEREUM_SEPOLIA",
+    });
+
+    expect(tokens).toHaveLength(2);
+    const eth = tokens.find((t) => t.symbol === "ETH");
+    expect(eth).toBeInstanceOf(EthereumBridgeToken);
+    expect(eth).not.toBeInstanceOf(ContractRoutedEthereumBridgeToken);
+    expect(eth?.protocol).toBe(Protocol.LAYERSWAP);
+    expect(eth?.id).toBe("eth-ethereum-layerswap");
+    // Native ETH (null contract) maps to the zero-address marker.
+    expect(eth?.address).toBe("0x0000000000000000000000000000000000000000");
+    expect(eth?.starknetAddress).toBe(STARKNET_ETH_ADDRESS);
+
+    const usdc = tokens.find((t) => t.symbol === "USDC");
+    expect(usdc?.address).toBe("0x2222222222222222222222222222222222222222");
+    expect(usdc?.starknetAddress).toBe(STARKNET_USDC_ADDRESS);
+  });
+
+  it("discovers Solana Layerswap tokens with the native SOL marker", async () => {
+    const layerswapApi: LayerswapTokenSource = {
+      getSources: vi
+        .fn()
+        .mockResolvedValue([
+          lsRoute("SOLANA_MAINNET", [
+            lsToken({ symbol: "SOL", contract: null, decimals: 9 }),
+          ]),
+        ]),
+      getDestinations: vi.fn().mockResolvedValue([
+        lsRoute("STARKNET_MAINNET", [
+          lsToken({
+            symbol: "SOL",
+            contract: STARKNET_ETH_ADDRESS,
+            decimals: 9,
+          }),
+        ]),
+      ]),
+    };
+
+    const repository = new BridgeTokenRepository({
+      fetchFn: emptyStarkgateFetch(),
+      layerswapOptions: layerswapApi,
+    });
+
+    const tokens = await repository.getTokens({
+      env: "mainnet",
+      chain: ExternalChain.SOLANA,
+    });
+
+    expect(layerswapApi.getSources).toHaveBeenCalledWith({
+      destinationNetwork: "STARKNET_MAINNET",
+      networkTypes: ["solana"],
+    });
+    expect(tokens).toHaveLength(1);
+    const sol = tokens[0];
+    expect(sol).toBeInstanceOf(SolanaBridgeToken);
+    expect(sol?.protocol).toBe(Protocol.LAYERSWAP);
+    expect(sol?.address).toBe("11111111111111111111111111111111");
+  });
+
+  it("joins external and Starknet sides case-insensitively by symbol", async () => {
+    // The two API sides report the same asset with different casing.
+    const layerswapApi: LayerswapTokenSource = {
+      getSources: vi
+        .fn()
+        .mockResolvedValue([
+          lsRoute("ETHEREUM_MAINNET", [
+            lsToken({ symbol: "ETH", contract: null, decimals: 18 }),
+          ]),
+        ]),
+      getDestinations: vi
+        .fn()
+        .mockResolvedValue([
+          lsRoute("STARKNET_MAINNET", [
+            lsToken({ symbol: "eth", contract: STARKNET_ETH_ADDRESS }),
+          ]),
+        ]),
+    };
+
+    const repository = new BridgeTokenRepository({
+      fetchFn: emptyStarkgateFetch(),
+      layerswapOptions: layerswapApi,
+    });
+
+    const tokens = await repository.getTokens({
+      env: "mainnet",
+      chain: ExternalChain.ETHEREUM,
+    });
+
+    // The casing mismatch must not drop the pair; the external symbol/id wins.
+    expect(tokens).toHaveLength(1);
+    expect(tokens[0]?.symbol).toBe("ETH");
+    expect(tokens[0]?.id).toBe("eth-ethereum-layerswap");
+    expect(tokens[0]?.starknetAddress).toBe(STARKNET_ETH_ADDRESS);
+  });
+
+  it("builds a discovery client from layerswapApiKey and sends the API key", async () => {
+    // The real (non-injected) path: discovery hits Layerswap's route endpoints
+    // via global fetch. The key is environment-scoped (separate mainnet/testnet
+    // keys), so discovery must send it to resolve routes for the right network.
+    const headersSeen: HeadersInit[] = [];
+    const lsFetch = vi.fn(async (url: string, init?: RequestInit) => {
+      headersSeen.push(init?.headers ?? {});
+      const data = url.includes("/sources")
+        ? [
+            lsRoute("ETHEREUM_MAINNET", [
+              lsToken({ symbol: "ETH", contract: null, decimals: 18 }),
+            ]),
+          ]
+        : [
+            lsRoute("STARKNET_MAINNET", [
+              lsToken({ symbol: "ETH", contract: STARKNET_ETH_ADDRESS }),
+            ]),
+          ];
+      return {
+        ok: true,
+        status: 200,
+        statusText: "OK",
+        json: async () => ({ data, error: null }),
+      };
+    });
+    vi.stubGlobal("fetch", lsFetch);
+
+    try {
+      const repository = new BridgeTokenRepository({
+        fetchFn: emptyStarkgateFetch(),
+        layerswapOptions: {
+          apiKey: "secret-key",
+        },
+      });
+
+      const tokens = await repository.getTokens({
+        env: "mainnet",
+        chain: ExternalChain.ETHEREUM,
+      });
+
+      expect(tokens).toHaveLength(1);
+      expect(tokens[0]?.symbol).toBe("ETH");
+      expect(headersSeen.length).toBeGreaterThan(0);
+      for (const headers of headersSeen) {
+        expect((headers as Record<string, string>)["X-LS-APIKEY"]).toBe(
+          "secret-key"
+        );
+      }
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it("omits Layerswap discovery and returns only StarkGate tokens when no key or source is given", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      statusText: "OK",
+      json: async () => mockApiResponse(),
+    });
+
+    // No `layerswapOptions`: construction must not throw, and discovery is
+    // skipped entirely — only the StarkGate payload is returned.
+    const repository = new BridgeTokenRepository({
+      fetchFn: fetchMock as unknown as typeof fetch,
+    });
+
+    const tokens = await repository.getTokens();
+
+    expect(tokens).toHaveLength(3);
+    expect(tokens.some((token) => token.protocol === Protocol.LAYERSWAP)).toBe(
+      false
+    );
+  });
+
+  it("coexists with StarkGate tokens, and discovered tokens win over any layerswap rows StarkGate serves", async () => {
+    // StarkGate serves canonical ETH (a distinct route that must survive) and
+    // a layerswap USDC row — which is ignored, since the Layerswap API is the
+    // sole source of layerswap tokens.
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      statusText: "OK",
+      json: async () => [
+        {
+          id: "eth",
+          chain: "ethereum",
+          protocol: "canonical",
+          name: "Ethereum",
+          symbol: "ETH",
+          decimals: 18,
+          l1_token_address: "0x0000000000000000000000000000000000000000",
+          l2_token_address: STARKNET_ETH_ADDRESS,
+          l1_bridge_address: "0x1111111111111111111111111111111111111111",
+          l2_bridge_address:
+            "0x073314940630fd6dcda0d772d4c972c4e0a9946bef9dabf4ef84eda8ef542b82",
+        },
+        {
+          id: "usdc-layerswap-starkgate",
+          chain: "ethereum",
+          protocol: "layerswap",
+          name: "USD Coin",
+          symbol: "USDC",
+          decimals: 6,
+          l1_token_address: "0x4444444444444444444444444444444444444444",
+          l2_token_address: STARKNET_USDC_ADDRESS,
+        },
+      ],
+    });
+
+    const layerswapApi: LayerswapTokenSource = {
+      getSources: vi.fn().mockResolvedValue([
+        lsRoute("ETHEREUM_MAINNET", [
+          lsToken({ symbol: "ETH", contract: null }),
+          lsToken({
+            symbol: "USDC",
+            contract: "0x2222222222222222222222222222222222222222",
+            decimals: 6,
+          }),
+        ]),
+      ]),
+      getDestinations: vi.fn().mockResolvedValue([
+        lsRoute("STARKNET_MAINNET", [
+          lsToken({ symbol: "ETH", contract: STARKNET_ETH_ADDRESS }),
+          lsToken({
+            symbol: "USDC",
+            contract: STARKNET_USDC_ADDRESS,
+            decimals: 6,
+          }),
+        ]),
+      ]),
+    };
+
+    const repository = new BridgeTokenRepository({
+      fetchFn: fetchMock as unknown as typeof fetch,
+      layerswapOptions: layerswapApi,
+    });
+
+    const tokens = await repository.getTokens({
+      env: "mainnet",
+      chain: ExternalChain.ETHEREUM,
+    });
+
+    // Different protocols are distinct routes: canonical ETH AND Layerswap ETH
+    // both survive.
+    const ethTokens = tokens.filter((t) => t.symbol === "ETH");
+    expect(ethTokens.map((t) => t.protocol).sort()).toEqual([
+      Protocol.CANONICAL,
+      Protocol.LAYERSWAP,
+    ]);
+
+    // StarkGate's layerswap USDC row is ignored; the discovered token is the
+    // only layerswap USDC and carries the Layerswap-reported address.
+    const usdcTokens = tokens.filter((t) => t.symbol === "USDC");
+    expect(usdcTokens).toHaveLength(1);
+    expect(usdcTokens[0]?.protocol).toBe(Protocol.LAYERSWAP);
+    expect(usdcTokens[0]?.address).toBe(
+      "0x2222222222222222222222222222222222222222"
+    );
+  });
+
+  it("gives same-symbol tokens on different chains distinct, chain-qualified ids", async () => {
+    const layerswapApi: LayerswapTokenSource = {
+      getSources: vi.fn().mockResolvedValue([
+        lsRoute("ETHEREUM_MAINNET", [
+          lsToken({
+            symbol: "USDC",
+            contract: "0x2222222222222222222222222222222222222222",
+            decimals: 6,
+          }),
+        ]),
+        lsRoute("SOLANA_MAINNET", [
+          lsToken({
+            symbol: "USDC",
+            contract: "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+            decimals: 6,
+          }),
+        ]),
+      ]),
+      getDestinations: vi.fn().mockResolvedValue([
+        lsRoute("STARKNET_MAINNET", [
+          lsToken({
+            symbol: "USDC",
+            contract: STARKNET_USDC_ADDRESS,
+            decimals: 6,
+          }),
+        ]),
+      ]),
+    };
+
+    const repository = new BridgeTokenRepository({
+      fetchFn: emptyStarkgateFetch(),
+      layerswapOptions: layerswapApi,
+    });
+
+    const tokens = await repository.getTokens({ env: "mainnet" });
+
+    expect(tokens.map((t) => t.id).sort()).toEqual([
+      "usdc-ethereum-layerswap",
+      "usdc-solana-layerswap",
+    ]);
+  });
+
+  it("skips tokens whose symbol is ambiguous on the Starknet side instead of guessing a contract", async () => {
+    const layerswapApi: LayerswapTokenSource = {
+      getSources: vi.fn().mockResolvedValue([
+        lsRoute("ETHEREUM_MAINNET", [
+          lsToken({ symbol: "ETH", contract: null }),
+          lsToken({
+            symbol: "USDC",
+            contract: "0x2222222222222222222222222222222222222222",
+            decimals: 6,
+          }),
+        ]),
+      ]),
+      getDestinations: vi.fn().mockResolvedValue([
+        lsRoute("STARKNET_MAINNET", [
+          lsToken({ symbol: "ETH", contract: STARKNET_ETH_ADDRESS }),
+          // Two Starknet-side tokens share the USDC symbol (e.g. native USDC
+          // and bridged USDC.e) — the symbol join cannot pick one safely.
+          lsToken({ symbol: "USDC", contract: STARKNET_USDC_ADDRESS }),
+          lsToken({
+            symbol: "USDC",
+            contract:
+              "0x0512feac6339ff7889822cb5aa2a86c848e9d392bb0e3e237c008674feed8343",
+          }),
+        ]),
+      ]),
+    };
+    const mockLogger = createMockLogger().install();
+
+    const repository = new BridgeTokenRepository({
+      fetchFn: emptyStarkgateFetch(),
+      layerswapOptions: layerswapApi,
+      logger: mockLogger.instance,
+    });
+
+    const tokens = await repository.getTokens({
+      env: "mainnet",
+      chain: ExternalChain.ETHEREUM,
+    });
+
+    expect(tokens.map((t) => t.symbol)).toEqual(["ETH"]);
+    expect(mockLogger.spies.warn).toHaveBeenCalledWith(
+      "[starkzap] Skipping Layerswap token USDC: multiple STARKNET_MAINNET tokens share the symbol."
+    );
+  });
+
+  it("degrades gracefully when Layerswap discovery fails", async () => {
+    const layerswapApi: LayerswapTokenSource = {
+      getSources: vi.fn().mockRejectedValue(new Error("network down")),
+      getDestinations: vi.fn().mockResolvedValue([]),
+    };
+    const mockLogger = createMockLogger().install();
+
+    const repository = new BridgeTokenRepository({
+      fetchFn: emptyStarkgateFetch(),
+      layerswapOptions: layerswapApi,
+      logger: mockLogger.instance,
+    });
+
+    const tokens = await repository.getTokens({
+      env: "testnet",
+      chain: ExternalChain.ETHEREUM,
+    });
+
+    // StarkGate result (empty here) is preserved; failure is logged, not thrown.
+    expect(tokens).toHaveLength(0);
+    expect(mockLogger.spies.warn).toHaveBeenCalledWith(
+      "[starkzap] Skipping Layerswap ethereum token discovery due to",
+      expect.any(Error)
+    );
+  });
+
+  it("skips tokens whose decimals differ between the external and Starknet sides", async () => {
+    const layerswapApi: LayerswapTokenSource = {
+      getSources: vi.fn().mockResolvedValue([
+        lsRoute("ETHEREUM_MAINNET", [
+          lsToken({ symbol: "ETH", contract: null, decimals: 18 }),
+          lsToken({
+            symbol: "USDC",
+            contract: "0x2222222222222222222222222222222222222222",
+            decimals: 6,
+          }),
+        ]),
+      ]),
+      getDestinations: vi.fn().mockResolvedValue([
+        lsRoute("STARKNET_MAINNET", [
+          lsToken({
+            symbol: "ETH",
+            contract: STARKNET_ETH_ADDRESS,
+            decimals: 18,
+          }),
+          // A single decimals value drives Starknet-side amount math, so a
+          // mismatched pair would mis-scale amounts by 10^diff.
+          lsToken({
+            symbol: "USDC",
+            contract: STARKNET_USDC_ADDRESS,
+            decimals: 8,
+          }),
+        ]),
+      ]),
+    };
+    const mockLogger = createMockLogger().install();
+
+    const repository = new BridgeTokenRepository({
+      fetchFn: emptyStarkgateFetch(),
+      layerswapOptions: layerswapApi,
+      logger: mockLogger.instance,
+    });
+
+    const tokens = await repository.getTokens({
+      env: "mainnet",
+      chain: ExternalChain.ETHEREUM,
+    });
+
+    expect(tokens.map((t) => t.symbol)).toEqual(["ETH"]);
+    expect(mockLogger.spies.warn).toHaveBeenCalledWith(
+      "[starkzap] Skipping Layerswap token USDC: decimals differ between ETHEREUM_MAINNET (6) and STARKNET_MAINNET (8)."
+    );
+  });
+
+  it("caches a transiently degraded discovery only briefly, then retries", async () => {
+    let now = 0;
+    const layerswapApi: LayerswapTokenSource = {
+      getSources: vi
+        .fn()
+        .mockRejectedValueOnce(new Error("network down"))
+        .mockResolvedValue([
+          lsRoute("ETHEREUM_MAINNET", [
+            lsToken({ symbol: "ETH", contract: null, decimals: 18 }),
+          ]),
+        ]),
+      getDestinations: vi
+        .fn()
+        .mockResolvedValue([
+          lsRoute("STARKNET_MAINNET", [
+            lsToken({ symbol: "ETH", contract: STARKNET_ETH_ADDRESS }),
+          ]),
+        ]),
+    };
+
+    const repository = new BridgeTokenRepository({
+      fetchFn: emptyStarkgateFetch(),
+      layerswapOptions: layerswapApi,
+      now: () => now,
+    });
+    const query = { env: "mainnet", chain: ExternalChain.ETHEREUM } as const;
+
+    expect(await repository.getTokens(query)).toHaveLength(0);
+
+    // Still within the degraded TTL: the empty result is served from cache.
+    now = LAYERSWAP_DEGRADED_CACHE_TTL_MS - 1;
+    expect(await repository.getTokens(query)).toHaveLength(0);
+    expect(layerswapApi.getSources).toHaveBeenCalledTimes(1);
+
+    // Degraded TTL elapsed (well before the full TTL): discovery retries and
+    // the recovered Layerswap tokens reappear.
+    now = LAYERSWAP_DEGRADED_CACHE_TTL_MS;
+    const recovered = await repository.getTokens(query);
+    expect(recovered.map((t) => t.symbol)).toEqual(["ETH"]);
+    expect(layerswapApi.getSources).toHaveBeenCalledTimes(2);
+
+    // The successful result is cached at the full TTL again.
+    now += BRIDGE_TOKEN_CACHE_TTL_MS - 1;
+    await repository.getTokens(query);
+    expect(layerswapApi.getSources).toHaveBeenCalledTimes(2);
   });
 });

@@ -1,4 +1,4 @@
-import { EthereumBridge } from "@/bridge/ethereum/EthereumBridge";
+import { ContractRoutedEthereumBridge } from "@/bridge/ethereum/ContractRoutedEthereumBridge";
 import type {
   BridgeDepositOptions,
   EthereumDepositFeeEstimation,
@@ -11,8 +11,8 @@ import { DUMMY_L1_ADDRESS, DUMMY_SN_ADDRESS } from "@/bridge/ethereum/types";
 import {
   type Address,
   Amount,
+  ContractRoutedEthereumBridgeToken,
   type EthereumAddress,
-  EthereumBridgeToken,
   type ExternalAddress,
   type ExternalTransactionResponse,
 } from "@/types";
@@ -29,11 +29,11 @@ import CANONICAL_BRIDGE_ABI from "@/abi/ethereum/canonicalBridge.json";
 import type { Tx } from "@/tx";
 import type { StarkZapLogger } from "@/logger";
 
-export class CanonicalEthereumBridge extends EthereumBridge {
+export class CanonicalEthereumBridge extends ContractRoutedEthereumBridge {
   private static readonly DEFAULT_ESTIMATED_DEPOSIT_GAS_REQUIREMENT = 154744n;
 
   constructor(
-    bridgeToken: EthereumBridgeToken,
+    bridgeToken: ContractRoutedEthereumBridgeToken,
     config: EthereumWalletConfig,
     starknetWallet: WalletInterface,
     private readonly autoWithdrawFeesHandler: AutoWithdrawFeesHandler,

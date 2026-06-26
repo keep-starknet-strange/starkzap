@@ -707,6 +707,18 @@
         border-color: var(--accent-primary);
       }
 
+      select.bridge-direction-btn {
+        display: inline-block;
+        appearance: none;
+        flex: 0 0 auto;
+        width: auto;
+      }
+
+      select.bridge-direction-btn:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+
       .bridge-row {
         display: flex;
         justify-content: space-between;
@@ -1589,20 +1601,30 @@
             margin-bottom: 1rem;
           "
         >
-          <button id="bridge-direction-btn" class="bridge-direction-btn">
-            Ethereum &rarr; Starknet
-          </button>
+          <select id="bridge-direction-select" class="bridge-direction-btn">
+            <option value="external:to-starknet">
+              External &rarr; Starknet
+            </option>
+          </select>
           <button
             id="btn-appkit-connect"
             class="btn btn-secondary"
-            style="padding: 0.6rem 1.2rem; font-size: 0.85rem"
+            style="padding: 0.6rem 1.2rem; font-size: 0.85rem; flex: 0 0 auto"
           >
             Connect Wallet
           </button>
           <span
             id="bridge-eth-address"
             class="info-value"
-            style="font-size: 0.8rem; color: var(--text-muted)"
+            style="
+              font-size: 0.8rem;
+              color: var(--text-muted);
+              flex: 1 1 auto;
+              min-width: 0;
+              overflow: hidden;
+              text-overflow: ellipsis;
+              white-space: nowrap;
+            "
           ></span>
         </div>
 

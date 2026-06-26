@@ -532,6 +532,9 @@ export class StarkZap {
    * Get bridgeable tokens for the SDK's configured Starknet network.
    *
    * @remarks
+   * Requires `bridging.layerswapApiKey` in the SDK configuration — Layerswap
+   * tokens are discovered from the Layerswap API, which needs the key.
+   *
    * The bridge token API environment is inferred from the configured chain:
    * - `SN_MAIN` -> `mainnet`
    * - `SN_SEPOLIA` -> `testnet`
@@ -552,8 +555,18 @@ export class StarkZap {
    */
   async getBridgingTokens(chain?: ExternalChain): Promise<BridgeToken[]> {
     if (!this.bridgeTokenRepository) {
+      const layerswapApiKey = this.config.bridging?.layerswapApiKey;
+      const layerswapBaseUrl = this.config.bridging?.layerswapBaseUrl;
       this.bridgeTokenRepository = new BridgeTokenRepository({
         logger: createLogger(this.config.logging),
+        ...(layerswapApiKey
+          ? {
+              layerswapOptions: {
+                apiKey: layerswapApiKey,
+                ...(layerswapBaseUrl ? { baseUrl: layerswapBaseUrl } : {}),
+              },
+            }
+          : {}),
       });
     }
 

@@ -48,12 +48,25 @@ export type OftDepositFeeEstimation = EthereumDepositFeeEstimation & {
   interchainFee: Amount;
 };
 
+export type LayerswapQuoteFields = {
+  blockchainFee: Amount;
+  serviceFee: Amount;
+  avgCompletionTime: string;
+  quoteError?: FeeErrorCause;
+};
+
+export type LayerswapDepositFeeEstimation = EthereumDepositFeeEstimation &
+  LayerswapQuoteFields;
+
 export type EthereumInitiateWithdrawFeeEstimation = {
   l2Fee: Amount;
   l2FeeError?: FeeErrorCause | undefined;
   autoWithdrawFee?: Amount | undefined;
   autoWithdrawFeeError?: FeeErrorCause | undefined;
 };
+
+export type LayerswapInitiateWithdrawFeeEstimation =
+  EthereumInitiateWithdrawFeeEstimation & LayerswapQuoteFields;
 
 export type EthereumCompleteWithdrawFeeEstimation = {
   l1Fee: Amount;

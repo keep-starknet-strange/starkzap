@@ -1,8 +1,6 @@
 import type {
   BridgeDepositOptions,
   BridgeInterface,
-  CompleteBridgeWithdrawOptions,
-  InitiateBridgeWithdrawOptions,
 } from "@/bridge/types/BridgeInterface";
 import {
   type Address,
@@ -10,7 +8,6 @@ import {
   type BridgeDepositFeeEstimation,
   type EthereumAddress,
   EthereumBridgeToken,
-  type ExternalAddress,
   type ExternalTransactionResponse,
 } from "@/types";
 import {
@@ -19,13 +16,9 @@ import {
 } from "@/bridge/ethereum/EtherToken";
 import {
   type ApprovalFeeEstimation,
-  type EthereumCompleteWithdrawFeeEstimation,
-  type EthereumTransactionDetails,
   type EthereumWalletConfig,
 } from "@/bridge/ethereum/types";
-import type { InterfaceAbi } from "ethers";
 import {
-  Contract,
   type ContractTransaction,
   type ContractTransactionReceipt,
   type ContractTransactionResponse,
@@ -36,10 +29,7 @@ import {
 } from "ethers";
 import { FeeErrorCause, TransactionErrorCause } from "@/types/errors";
 import type { WalletInterface } from "@/wallet";
-import type { Tx } from "@/tx";
-import CANONICAL_BRIDGE_ABI from "@/abi/ethereum/canonicalBridge.json";
 import { fromEthereumAddress } from "@/connect/ethersRuntime";
-import { type Call, CallData, uint256 } from "starknet";
 import { Erc20 } from "@/erc20";
 import { type StarkZapLogger } from "@/logger";
 
@@ -53,25 +43,18 @@ export abstract class EthereumBridge implements BridgeInterface<EthereumAddress>
   };
   protected readonly token: EthereumTokenInterface;
   protected readonly starknetToken: Erc20;
-  protected readonly bridge: Contract;
 
   constructor(
     protected readonly bridgeToken: EthereumBridgeToken,
     protected readonly config: EthereumWalletConfig,
     readonly starknetWallet: WalletInterface,
-    protected readonly logger: StarkZapLogger,
-    bridgeAbi: InterfaceAbi = CANONICAL_BRIDGE_ABI
+    protected readonly logger: StarkZapLogger
   ) {
     this.allowanceCache = {
       current: null,
       timestamp: 0,
     };
     this.token = intoEthereumToken(bridgeToken, config);
-    this.bridge = new Contract(
-      bridgeToken.bridgeAddress,
-      bridgeAbi,
-      config.signer
-    );
     this.starknetToken = new Erc20(
       bridgeToken.intoStarknetToken(),
       starknetWallet.getProvider()
@@ -113,59 +96,8 @@ export abstract class EthereumBridge implements BridgeInterface<EthereumAddress>
     return this.allowanceCache.current;
   }
 
-  /**
-   * Initiate a withdrawal from Starknet to Ethereum by calling
-   * `initiate_token_withdraw` on the L2 bridge contract.
-   *
-   * The `ExecuteOptions` portion of `options` is forwarded to
-   * `starknetWallet.execute` unchanged; the bridge-internal `fastTransfer`
-   * flag is consumed by protocol-specific overrides (e.g. CCTP fee tier)
-   * and does not affect the Starknet transaction itself.
-   */
-  async initiateWithdraw(
-    recipient: ExternalAddress,
-    amount: Amount,
-    options?: InitiateBridgeWithdrawOptions
-  ): Promise<Tx> {
-    const call = this.buildInitiateWithdrawCall(recipient.toString(), amount);
-    return this.starknetWallet.execute([call], options);
-  }
-
   async getAvailableWithdrawBalance(account: Address): Promise<Amount> {
     return await this.starknetToken.balanceOf(account);
-  }
-
-  async completeWithdraw(
-    recipient: ExternalAddress,
-    amount: Amount,
-    _options?: CompleteBridgeWithdrawOptions
-  ): Promise<ExternalTransactionResponse> {
-    const details = await this.buildCompleteWithdrawCall(recipient, amount);
-    const tx = await this.populateTransaction(details);
-    const gasLimit = await this.estimateEthereumSafeGasLimitForTx(tx);
-    const response = await this.execute({ ...tx, gasLimit });
-    return { hash: response.hash };
-  }
-
-  async getCompleteWithdrawFeeEstimate(
-    amount: Amount,
-    recipient: ExternalAddress,
-    _options?: CompleteBridgeWithdrawOptions
-  ): Promise<EthereumCompleteWithdrawFeeEstimation> {
-    try {
-      const details = await this.buildCompleteWithdrawCall(recipient, amount);
-      const tx = await this.populateTransaction(details);
-      const [gasUnits, gasPrice] = await Promise.all([
-        this.config.provider.estimateGas(tx),
-        this.getEthereumGasPrice(),
-      ]);
-      return { l1Fee: this.ethAmount(gasUnits * gasPrice) };
-    } catch {
-      return {
-        l1Fee: this.ethAmount(0n),
-        l1FeeError: FeeErrorCause.GENERIC_L1_FEE_ERROR,
-      };
-    }
   }
 
   protected abstract getAllowanceSpender(): Promise<EthereumAddress | null>;
@@ -226,14 +158,6 @@ export abstract class EthereumBridge implements BridgeInterface<EthereumAddress>
       // TODO be more specific with other ethers errors
       throw e;
     }
-  }
-
-  protected async populateTransaction(
-    details: EthereumTransactionDetails
-  ): Promise<ContractTransaction> {
-    return await this.bridge
-      .getFunction(details.method)
-      .populateTransaction(...details.args, details.transaction);
   }
 
   protected ethAmount(value: bigint): Amount {
@@ -300,35 +224,6 @@ export abstract class EthereumBridge implements BridgeInterface<EthereumAddress>
 
   protected clearCachedAllowance() {
     this.allowanceCache.timestamp = -1;
-  }
-
-  protected buildInitiateWithdrawCall(recipient: string, amount: Amount): Call {
-    return {
-      contractAddress: this.bridgeToken.starknetBridge.toString(),
-      entrypoint: "initiate_token_withdraw",
-      calldata: CallData.compile({
-        l1Token: this.bridgeToken.address.toString(),
-        l1Recipient: recipient,
-        amount: uint256.bnToUint256(amount.toBase()),
-      }),
-    };
-  }
-
-  protected async buildCompleteWithdrawCall(
-    recipient: ExternalAddress,
-    amount: Amount
-  ): Promise<EthereumTransactionDetails> {
-    return {
-      method: "withdraw(address,uint256,address)",
-      args: [
-        this.bridgeToken.address.toString(),
-        amount.toBase().toString(),
-        recipient.toString(),
-      ],
-      transaction: {
-        from: await this.config.signer.getAddress(),
-      },
-    };
   }
 
   private setCachedAllowance(newValue: Amount | null) {

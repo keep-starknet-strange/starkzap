@@ -5,6 +5,9 @@ import {
   type BridgeToken,
   type CCTPDepositFeeEstimation,
   type CCTPInitiateWithdrawFeeEstimation,
+  type LayerswapDepositFeeEstimation,
+  type LayerswapInitiateWithdrawFeeEstimation,
+  type SolanaLayerswapInitiateWithdrawFeeEstimation,
   type ChainId,
   ConnectedEthereumWallet,
   ConnectedSolanaWallet,
@@ -17,7 +20,8 @@ import {
   type EthereumInitiateWithdrawFeeEstimation,
   ExternalChain,
   Protocol,
-  type SolanaDepositFeeEstimation,
+  type HyperlaneFeeEstimate,
+  type SolanaLayerswapDepositFeeEstimation,
   type SolanaProvider,
   type StarkZap,
   type WalletInterface,
@@ -39,6 +43,7 @@ import {
   mainnet,
   sepolia,
   solana,
+  solanaDevnet,
   solanaTestnet,
 } from "@reown/appkit/networks";
 
@@ -48,8 +53,24 @@ type LogFn = (
 ) => void;
 type RenderFn = () => void;
 
+export type BridgeDirection = "to-starknet" | "from-starknet";
+
+/**
+ * Which external chain(s) the bridge UI is scoped to.
+ * - `external`: both Ethereum and Solana (only offered when both wallets are
+ *   connected); the token list shows tokens from both chains.
+ * - `ethereum` / `solana`: scope the token list to a single external chain.
+ */
+export type BridgeChainFilter = "external" | "ethereum" | "solana";
+
+export interface BridgeRoute {
+  chainFilter: BridgeChainFilter;
+  direction: BridgeDirection;
+}
+
 export interface BridgeState {
-  direction: "to-starknet" | "from-starknet";
+  direction: BridgeDirection;
+  chainFilter: BridgeChainFilter;
   tokens: BridgeToken[];
   selectedToken: BridgeToken | null;
   connectedEthWallet: ConnectedEthereumWallet | undefined;
@@ -63,7 +84,8 @@ export interface BridgeState {
   allowanceLoading: boolean;
   feeEstimate:
     | EthereumDepositFeeEstimation
-    | SolanaDepositFeeEstimation
+    | HyperlaneFeeEstimate
+    | SolanaLayerswapDepositFeeEstimation
     | BridgeInitiateWithdrawFeeEstimation
     | null;
   feeLoading: boolean;
@@ -77,6 +99,7 @@ export interface BridgeState {
 function initialState(): BridgeState {
   return {
     direction: "to-starknet",
+    chainFilter: "external",
     tokens: [],
     selectedToken: null,
     connectedEthWallet: undefined,
@@ -112,7 +135,7 @@ export function initializeAppKit(projectId: string): AppKit {
 
   return createAppKit({
     adapters: [ethersAdapter, solanaAdapter],
-    networks: [mainnet, sepolia, solana, solanaTestnet],
+    networks: [mainnet, sepolia, solana, solanaTestnet, solanaDevnet],
     projectId,
     metadata: {
       name: "StarkZap Web Example",
@@ -180,6 +203,7 @@ export class BridgeController {
         this.chainId
       );
       this.state.connectedEthWallet = wallet;
+      this.revalidateRoute();
       this.log(
         `Ethereum wallet connected: ${address.slice(0, 6)}...${address.slice(
           -4
@@ -193,12 +217,79 @@ export class BridgeController {
     }
   }
 
+  /**
+   * Connect an Ethereum wallet directly from a private key (dev mode).
+   * Bypasses Reown/WalletConnect — useful for local testing.
+   */
+  async connectEthereumWalletFromKey(
+    privateKey: string,
+    rpcUrl: string,
+    chainId: number
+  ): Promise<void> {
+    try {
+      const { JsonRpcProvider, Wallet } = await import("ethers");
+      const provider = new JsonRpcProvider(rpcUrl, chainId);
+      const signer = new Wallet(privateKey, provider);
+      const address = await signer.getAddress();
+
+      // Create a minimal EIP-1193 provider wrapper for ConnectedEthereumWallet
+      const eip1193Provider = {
+        request: async (args: { method: string; params?: unknown[] }) => {
+          if (args.method === "eth_chainId") {
+            return `0x${chainId.toString(16)}`;
+          }
+          if (
+            args.method === "eth_accounts" ||
+            args.method === "eth_requestAccounts"
+          ) {
+            return [address];
+          }
+          return provider.send(args.method, args.params ?? []);
+        },
+      };
+
+      const wallet = await ConnectedEthereumWallet.from(
+        {
+          chain: ExternalChain.ETHEREUM,
+          provider: eip1193Provider,
+          address,
+          chainId: `0x${chainId.toString(16)}`,
+        },
+        this.chainId
+      );
+
+      // Patch the wallet config to use the private key signer directly
+      // (BrowserProvider from EIP-1193 won't have signing capability for raw keys)
+      const originalToConfig = wallet.toEthWalletConfig.bind(wallet);
+      wallet.toEthWalletConfig = async (ethereumRpcUrl?: string) => {
+        const config = await originalToConfig(ethereumRpcUrl);
+        // Replace the BrowserProvider signer with our direct Wallet signer
+        return { ...config, signer: signer as unknown as typeof config.signer };
+      };
+
+      this.state.connectedEthWallet = wallet;
+      this.revalidateRoute();
+      this.log(
+        `Ethereum wallet connected (dev): ${address.slice(
+          0,
+          6
+        )}...${address.slice(-4)}`,
+        "success"
+      );
+      this.render();
+      this.fetchTokens();
+    } catch (err) {
+      this.log(`Failed to connect Ethereum wallet from key: ${err}`, "error");
+    }
+  }
+
   disconnectEthWallet(): void {
     this.state.connectedEthWallet = undefined;
     this.state.externalBalance = null;
     this.state.externalBalanceUnit = null;
     this.state.allowance = null;
     this.state.feeEstimate = null;
+    this.revalidateRoute();
     this.log("Ethereum wallet disconnected", "info");
     this.render();
   }
@@ -219,6 +310,7 @@ export class BridgeController {
         this.chainId
       );
       this.state.connectedSolWallet = wallet;
+      this.revalidateRoute();
       this.log(
         `Solana wallet connected: ${address.slice(0, 4)}...${address.slice(
           -4
@@ -237,12 +329,13 @@ export class BridgeController {
     this.state.externalBalance = null;
     this.state.externalBalanceUnit = null;
     this.state.feeEstimate = null;
+    this.revalidateRoute();
     this.log("Solana wallet disconnected", "info");
     this.render();
   }
 
-  setDirection(dir: "to-starknet" | "from-starknet"): void {
-    this.state.direction = dir;
+  /** Reset the per-token/per-direction transient fields (balances, fees, toggles). */
+  private resetTransientState(): void {
     this.state.starknetBalance = null;
     this.state.externalBalance = null;
     this.state.externalBalanceUnit = null;
@@ -250,6 +343,81 @@ export class BridgeController {
     this.state.feeEstimate = null;
     this.state.fastTransfer = false;
     this.state.autoWithdraw = false;
+  }
+
+  /** External chain filters available given the currently connected wallets. */
+  private availableChainFilters(): BridgeChainFilter[] {
+    const eth = this.state.connectedEthWallet != null;
+    const sol = this.state.connectedSolWallet != null;
+    if (eth && sol) return ["external", "ethereum", "solana"];
+    if (eth) return ["ethereum"];
+    if (sol) return ["solana"];
+    return [];
+  }
+
+  /**
+   * Routes the user can pick from, ordered as:
+   * External↔Starknet, Eth↔Starknet, Sol↔Starknet (each chain filter offering
+   * both directions). Only chain filters whose wallet is connected appear.
+   */
+  getAvailableRoutes(): BridgeRoute[] {
+    const routes: BridgeRoute[] = [];
+    for (const chainFilter of this.availableChainFilters()) {
+      routes.push({ chainFilter, direction: "to-starknet" });
+      routes.push({ chainFilter, direction: "from-starknet" });
+    }
+    return routes;
+  }
+
+  private tokenMatchesFilter(token: BridgeToken): boolean {
+    switch (this.state.chainFilter) {
+      case "ethereum":
+        return token.chain === ExternalChain.ETHEREUM;
+      case "solana":
+        return token.chain === ExternalChain.SOLANA;
+      case "external":
+        return true;
+    }
+  }
+
+  /** Tokens visible for the active chain filter. */
+  getVisibleTokens(): BridgeToken[] {
+    return this.state.tokens.filter((t) => this.tokenMatchesFilter(t));
+  }
+
+  /**
+   * Keep the route valid after wallets connect/disconnect: snap the chain
+   * filter to an available one and drop a selected token that no longer
+   * matches the filter.
+   */
+  private revalidateRoute(): void {
+    const available = this.availableChainFilters();
+    if (available.length > 0 && !available.includes(this.state.chainFilter)) {
+      this.state.chainFilter = available[0]!;
+    }
+    if (
+      this.state.selectedToken &&
+      !this.tokenMatchesFilter(this.state.selectedToken)
+    ) {
+      this.state.selectedToken = null;
+      this.resetTransientState();
+    }
+  }
+
+  setRoute(chainFilter: BridgeChainFilter, direction: BridgeDirection): void {
+    this.state.chainFilter = chainFilter;
+    if (
+      this.state.selectedToken &&
+      !this.tokenMatchesFilter(this.state.selectedToken)
+    ) {
+      this.state.selectedToken = null;
+    }
+    this.setDirection(direction);
+  }
+
+  setDirection(dir: BridgeDirection): void {
+    this.state.direction = dir;
+    this.resetTransientState();
     this.render();
     this.fetchStarknetBalance();
     this.fetchExternalBalance();
@@ -259,24 +427,12 @@ export class BridgeController {
     this.fetchFeeEstimate();
   }
 
-  toggleDirection(): void {
-    this.setDirection(
-      this.state.direction === "to-starknet" ? "from-starknet" : "to-starknet"
-    );
-  }
-
   selectToken(tokenId: string | null): void {
     const token = tokenId
       ? (this.state.tokens.find((t) => t.id === tokenId) ?? null)
       : null;
     this.state.selectedToken = token;
-    this.state.starknetBalance = null;
-    this.state.externalBalance = null;
-    this.state.externalBalanceUnit = null;
-    this.state.allowance = null;
-    this.state.feeEstimate = null;
-    this.state.fastTransfer = false;
-    this.state.autoWithdraw = false;
+    this.resetTransientState();
     this.render();
     if (token) {
       this.fetchStarknetBalance();
@@ -322,6 +478,7 @@ export class BridgeController {
         chains.map((chain) => this.sdk.getBridgingTokens(chain))
       );
       const tokens = results.flat();
+
       this.state.tokens = tokens;
       this.state.tokensLoading = false;
       this.log(`Loaded ${tokens.length} bridge tokens`, "success");
@@ -822,7 +979,8 @@ export class BridgeController {
 
 type AnyFeeEstimate =
   | EthereumDepositFeeEstimation
-  | SolanaDepositFeeEstimation
+  | HyperlaneFeeEstimate
+  | SolanaLayerswapDepositFeeEstimation
   | BridgeInitiateWithdrawFeeEstimation;
 
 function isEthereumDepositFee(
@@ -831,10 +989,23 @@ function isEthereumDepositFee(
   return "l1Fee" in estimate && "approvalFee" in estimate;
 }
 
-function isSolanaFee(
+function isSolanaLayerswapFee(
   estimate: AnyFeeEstimate
-): estimate is SolanaDepositFeeEstimation {
-  return "localFee" in estimate;
+): estimate is SolanaLayerswapDepositFeeEstimation {
+  // `localFee` is the Solana-deposit discriminator. Without it, the Layerswap
+  // withdrawal shapes (Ethereum & Solana) — which also carry serviceFee +
+  // avgCompletionTime — fall into this branch and crash on `localFee.toFormatted`.
+  return (
+    "localFee" in estimate &&
+    "serviceFee" in estimate &&
+    "avgCompletionTime" in estimate
+  );
+}
+
+function isHyperlaneFee(
+  estimate: AnyFeeEstimate
+): estimate is HyperlaneFeeEstimate {
+  return "localFee" in estimate && "interchainFee" in estimate;
 }
 
 export function formatFeeEstimate(estimate: AnyFeeEstimate): string {
@@ -862,7 +1033,18 @@ export function formatFeeEstimate(estimate: AnyFeeEstimate): string {
         `Fast Transfer Fee: ${(cctp.fastTransferBpFee / 100).toFixed(2)}%`
       );
     }
-  } else if (isSolanaFee(estimate)) {
+    const ls = estimate as LayerswapDepositFeeEstimation;
+    if (ls.avgCompletionTime !== undefined) {
+      lines.push(`Blockchain Fee: ${ls.blockchainFee.toFormatted(false)}`);
+      lines.push(`Service Fee: ${ls.serviceFee.toFormatted(false)}`);
+      lines.push(`Est. Time: ${ls.avgCompletionTime}`);
+    }
+  } else if (isSolanaLayerswapFee(estimate)) {
+    lines.push(`Local Fee: ${estimate.localFee.toFormatted(false)}`);
+    lines.push(`Blockchain Fee: ${estimate.blockchainFee.toFormatted(false)}`);
+    lines.push(`Service Fee: ${estimate.serviceFee.toFormatted(false)}`);
+    lines.push(`Est. Time: ${estimate.avgCompletionTime}`);
+  } else if (isHyperlaneFee(estimate)) {
     lines.push(
       `Local Fee: ${estimate.localFee.toFormatted(false)}${
         estimate.localFeeError ? " (est.)" : ""
@@ -893,6 +1075,14 @@ export function formatFeeEstimate(estimate: AnyFeeEstimate): string {
       lines.push(
         `Fast Transfer Fee: ${(cctp.fastTransferBpFee / 100).toFixed(2)}%`
       );
+    }
+    const ls = estimate as
+      | LayerswapInitiateWithdrawFeeEstimation
+      | SolanaLayerswapInitiateWithdrawFeeEstimation;
+    if (ls.avgCompletionTime !== undefined) {
+      lines.push(`Blockchain Fee: ${ls.blockchainFee.toFormatted(false)}`);
+      lines.push(`Service Fee: ${ls.serviceFee.toFormatted(false)}`);
+      lines.push(`Est. Time: ${ls.avgCompletionTime}`);
     }
   }
 

@@ -35,6 +35,9 @@ import {
   BridgeController,
   initializeAppKit,
   formatFeeEstimate,
+  type BridgeChainFilter,
+  type BridgeDirection,
+  type BridgeRoute,
 } from "./bridge";
 import { BridgeTransferStatus, DepositState, WithdrawalState } from "starkzap";
 import type { StoredBridgeTx } from "./bridge/tx-storage";
@@ -66,6 +69,9 @@ const SEPOLIA_NETWORK: AppNetwork = "sepolia";
 const NETWORK_QUERY_PARAM = "network";
 const NETWORK_STORAGE_KEY = "starkzap:web:network";
 const ALCHEMY_API_KEY = import.meta.env.VITE_ALCHEMY_API_KEY as
+  | string
+  | undefined;
+const SOLANA_RPC_URL = import.meta.env.VITE_SOLANA_RPC_URL as
   | string
   | undefined;
 const DEFAULT_RPC_URLS: Record<AppNetwork, string> = {
@@ -162,6 +168,22 @@ const SDK_CHAIN_ID =
 const OFT_PUBLIC_KEY = import.meta.env.VITE_OFT_PUBLIC_KEY as
   | string
   | undefined;
+// Layerswap API keys are environment-scoped — Layerswap issues separate keys
+// for mainnet and testnet — so pick the key matching the network this example
+// is configured for. Falls back to the network-agnostic VITE_LAYERSWAP_API_KEY
+// when a network-specific key is not set.
+const LAYERSWAP_API_KEY_MAINNET = import.meta.env
+  .VITE_LAYERSWAP_API_KEY_MAINNET as string | undefined;
+const LAYERSWAP_API_KEY_TESTNET = import.meta.env
+  .VITE_LAYERSWAP_API_KEY_TESTNET as string | undefined;
+const LAYERSWAP_API_KEY =
+  (NETWORK === MAINNET_NETWORK
+    ? LAYERSWAP_API_KEY_MAINNET
+    : LAYERSWAP_API_KEY_TESTNET) ??
+  (import.meta.env.VITE_LAYERSWAP_API_KEY as string | undefined);
+const LAYERSWAP_BASE_URL = import.meta.env.VITE_LAYERSWAP_BASE_URL as
+  | string
+  | undefined;
 const BPS_DENOMINATOR = 10_000n;
 const DEFAULT_SLIPPAGE_BPS = 100n;
 const DEFAULT_DCA_FREQUENCY = "P1D";
@@ -241,25 +263,40 @@ function appendSdkLog(level: string, message: string, args: unknown[]): void {
   }
 }
 
+const ETH_BRIDGING_RPC_URL = ALCHEMY_API_KEY
+  ? NETWORK === "mainnet"
+    ? `https://eth-mainnet.g.alchemy.com/v2/${ALCHEMY_API_KEY}`
+    : `https://eth-sepolia.g.alchemy.com/v2/${ALCHEMY_API_KEY}`
+  : undefined;
+
+// VITE_SOLANA_RPC_URL takes precedence over the Alchemy default — handy when
+// pointing at non-mainnet Solana clusters (Alchemy only serves
+// solana-mainnet) or any third-party RPC. Without this override the SDK
+// falls back to clusterApiUrl(...) which gets 403'd from browsers.
+const SOL_BRIDGING_RPC_URL =
+  SOLANA_RPC_URL ??
+  (NETWORK === "mainnet" && ALCHEMY_API_KEY
+    ? `https://solana-mainnet.g.alchemy.com/v2/${ALCHEMY_API_KEY}`
+    : undefined);
+
 // SDK instance
 const sdk = new StarkZap({
   rpcUrl: RPC_URL,
   chainId: SDK_CHAIN_ID,
   logging: { logger: sdkLogger },
-  ...(ALCHEMY_API_KEY || OFT_PUBLIC_KEY
+  ...(ETH_BRIDGING_RPC_URL ||
+  SOL_BRIDGING_RPC_URL ||
+  OFT_PUBLIC_KEY ||
+  LAYERSWAP_API_KEY
     ? {
         bridging: {
-          ...(ALCHEMY_API_KEY && {
-            ethereumRpcUrl:
-              NETWORK === "mainnet"
-                ? `https://eth-mainnet.g.alchemy.com/v2/${ALCHEMY_API_KEY}`
-                : `https://eth-sepolia.g.alchemy.com/v2/${ALCHEMY_API_KEY}`,
-            solanaRpcUrl:
-              NETWORK === "mainnet"
-                ? `https://solana-mainnet.g.alchemy.com/v2/${ALCHEMY_API_KEY}`
-                : undefined,
+          ...(ETH_BRIDGING_RPC_URL && {
+            ethereumRpcUrl: ETH_BRIDGING_RPC_URL,
           }),
+          ...(SOL_BRIDGING_RPC_URL && { solanaRpcUrl: SOL_BRIDGING_RPC_URL }),
           ...(OFT_PUBLIC_KEY && { layerZeroApiKey: OFT_PUBLIC_KEY }),
+          ...(LAYERSWAP_API_KEY && { layerswapApiKey: LAYERSWAP_API_KEY }),
+          ...(LAYERSWAP_BASE_URL && { layerswapBaseUrl: LAYERSWAP_BASE_URL }),
         },
       }
     : {}),
@@ -462,9 +499,9 @@ const btnTongoRefresh = document.getElementById(
 
 // Bridge DOM elements
 const bridgeSection = document.getElementById("bridge-section")!;
-const bridgeDirectionBtn = document.getElementById(
-  "bridge-direction-btn"
-) as HTMLButtonElement;
+const bridgeDirectionSelect = document.getElementById(
+  "bridge-direction-select"
+) as HTMLSelectElement;
 const btnAppkitConnect = document.getElementById(
   "btn-appkit-connect"
 ) as HTMLButtonElement;
@@ -520,14 +557,22 @@ const AUTO_PRIVATE_KEY = import.meta.env.VITE_PRIVATE_KEY as string | undefined;
 const AUTO_ACCOUNT_PRESET = import.meta.env.VITE_ACCOUNT_PRESET as
   | string
   | undefined;
+const AUTO_ETH_PRIVATE_KEY = import.meta.env.VITE_ETH_PRIVATE_KEY as
+  | string
+  | undefined;
 let appKit: ReturnType<typeof initializeAppKit> | null = null;
 let bridgeController: BridgeController | null = null;
 
-if (REOWN_PROJECT_ID) {
-  appKit = initializeAppKit(REOWN_PROJECT_ID);
+if (REOWN_PROJECT_ID || AUTO_ETH_PRIVATE_KEY) {
+  if (REOWN_PROJECT_ID) {
+    appKit = initializeAppKit(REOWN_PROJECT_ID);
+  }
   bridgeController = new BridgeController(sdk, SDK_CHAIN_ID, log, renderBridge);
 } else {
-  log("VITE_REOWN_PROJECT_ID not set - bridge disabled", "info");
+  log(
+    "VITE_REOWN_PROJECT_ID or VITE_ETH_PRIVATE_KEY not set - bridge disabled",
+    "info"
+  );
 }
 
 // Lending DOM elements
@@ -756,6 +801,8 @@ function formatProtocolTag(protocol: Protocol): string {
       return "[OFT Migrated]";
     case Protocol.HYPERLANE:
       return "[Hyperlane]";
+    case Protocol.LAYERSWAP:
+      return "[Layerswap]";
     default:
       return `[${String(protocol)}]`;
   }
@@ -1819,17 +1866,42 @@ function formatRawAmount(
   }
 }
 
+const CHAIN_FILTER_LABEL: Record<BridgeChainFilter, string> = {
+  external: "External",
+  ethereum: "Eth",
+  solana: "Sol",
+};
+
+function routeValue(route: BridgeRoute): string {
+  return `${route.chainFilter}:${route.direction}`;
+}
+
+function routeLabel(route: BridgeRoute): string {
+  const chain = CHAIN_FILTER_LABEL[route.chainFilter];
+  return route.direction === "to-starknet"
+    ? `${chain} → Starknet`
+    : `Starknet → ${chain}`;
+}
+
 // Bridge rendering
 function renderBridge(): void {
   if (!bridgeController) return;
   const s = bridgeController.getState();
 
-  // Direction button
-  const selectedChain = s.selectedToken?.chain ?? "External";
-  bridgeDirectionBtn.innerHTML =
-    s.direction === "to-starknet"
-      ? `${selectedChain} &rarr; Starknet`
-      : `Starknet &rarr; ${selectedChain}`;
+  // Direction / route selector — options depend on which wallets are connected.
+  const routes = bridgeController.getAvailableRoutes();
+  bridgeDirectionSelect.innerHTML = "";
+  for (const route of routes) {
+    const opt = document.createElement("option");
+    opt.value = routeValue(route);
+    opt.textContent = routeLabel(route);
+    bridgeDirectionSelect.appendChild(opt);
+  }
+  bridgeDirectionSelect.value = routeValue({
+    chainFilter: s.chainFilter,
+    direction: s.direction,
+  });
+  bridgeDirectionSelect.disabled = routes.length === 0;
 
   // External wallet addresses
   const ethAddr = s.connectedEthWallet?.address;
@@ -1848,10 +1920,10 @@ function renderBridge(): void {
     btnAppkitConnect.textContent = "Connect Wallet";
   }
 
-  // Populate token select
+  // Populate token select (scoped to the active chain filter)
   const currentValue = bridgeTokenSelect.value;
   bridgeTokenSelect.innerHTML = '<option value="">Select a token...</option>';
-  for (const token of s.tokens) {
+  for (const token of bridgeController.getVisibleTokens()) {
     const opt = document.createElement("option");
     opt.value = token.id;
     const protocolTag = formatProtocolTag(token.protocol);
@@ -3059,8 +3131,12 @@ btnAppkitConnect.addEventListener("click", () => {
   }
 });
 
-bridgeDirectionBtn.addEventListener("click", () => {
-  bridgeController?.toggleDirection();
+bridgeDirectionSelect.addEventListener("change", () => {
+  const [chainFilter, direction] = bridgeDirectionSelect.value.split(":") as [
+    BridgeChainFilter,
+    BridgeDirection,
+  ];
+  bridgeController?.setRoute(chainFilter, direction);
 });
 
 bridgeTokenSelect.addEventListener("change", () => {
@@ -3190,6 +3266,23 @@ async function autoConnect(): Promise<void> {
   } catch (err) {
     log(`Auto-connect failed: ${err}`, "error");
   }
+}
+
+async function autoConnectEthereum(): Promise<void> {
+  if (!AUTO_ETH_PRIVATE_KEY || !bridgeController) return;
+
+  const ethRpcUrl =
+    NETWORK === "mainnet"
+      ? "https://eth.llamarpc.com"
+      : "https://rpc.sepolia.org";
+  const ethChainId = NETWORK === "mainnet" ? 1 : 11155111;
+
+  log(`Auto-connecting Ethereum wallet on ${NETWORK}...`, "info");
+  await bridgeController.connectEthereumWalletFromKey(
+    AUTO_ETH_PRIVATE_KEY,
+    ethRpcUrl,
+    ethChainId
+  );
 }
 
 // Tongo event listeners
@@ -4467,4 +4560,8 @@ log(`SDK initialized on ${NETWORK} with RPC: ${RPC_URL}`, "info");
 if (REOWN_PROJECT_ID) {
   log("Bridge enabled (Reown AppKit)", "info");
 }
-autoConnect();
+autoConnect()
+  .then(() => autoConnectEthereum())
+  .catch((err) => {
+    log(`Auto-connect failed: ${err}`, "error");
+  });
