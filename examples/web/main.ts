@@ -35,6 +35,9 @@ import {
   BridgeController,
   initializeAppKit,
   formatFeeEstimate,
+  type BridgeChainFilter,
+  type BridgeDirection,
+  type BridgeRoute,
 } from "./bridge";
 import { BridgeTransferStatus, DepositState, WithdrawalState } from "starkzap";
 import type { StoredBridgeTx } from "./bridge/tx-storage";
@@ -496,9 +499,9 @@ const btnTongoRefresh = document.getElementById(
 
 // Bridge DOM elements
 const bridgeSection = document.getElementById("bridge-section")!;
-const bridgeDirectionBtn = document.getElementById(
-  "bridge-direction-btn"
-) as HTMLButtonElement;
+const bridgeDirectionSelect = document.getElementById(
+  "bridge-direction-select"
+) as HTMLSelectElement;
 const btnAppkitConnect = document.getElementById(
   "btn-appkit-connect"
 ) as HTMLButtonElement;
@@ -1863,17 +1866,42 @@ function formatRawAmount(
   }
 }
 
+const CHAIN_FILTER_LABEL: Record<BridgeChainFilter, string> = {
+  external: "External",
+  ethereum: "Eth",
+  solana: "Sol",
+};
+
+function routeValue(route: BridgeRoute): string {
+  return `${route.chainFilter}:${route.direction}`;
+}
+
+function routeLabel(route: BridgeRoute): string {
+  const chain = CHAIN_FILTER_LABEL[route.chainFilter];
+  return route.direction === "to-starknet"
+    ? `${chain} → Starknet`
+    : `Starknet → ${chain}`;
+}
+
 // Bridge rendering
 function renderBridge(): void {
   if (!bridgeController) return;
   const s = bridgeController.getState();
 
-  // Direction button
-  const selectedChain = s.selectedToken?.chain ?? "External";
-  bridgeDirectionBtn.innerHTML =
-    s.direction === "to-starknet"
-      ? `${selectedChain} &rarr; Starknet`
-      : `Starknet &rarr; ${selectedChain}`;
+  // Direction / route selector — options depend on which wallets are connected.
+  const routes = bridgeController.getAvailableRoutes();
+  bridgeDirectionSelect.innerHTML = "";
+  for (const route of routes) {
+    const opt = document.createElement("option");
+    opt.value = routeValue(route);
+    opt.textContent = routeLabel(route);
+    bridgeDirectionSelect.appendChild(opt);
+  }
+  bridgeDirectionSelect.value = routeValue({
+    chainFilter: s.chainFilter,
+    direction: s.direction,
+  });
+  bridgeDirectionSelect.disabled = routes.length === 0;
 
   // External wallet addresses
   const ethAddr = s.connectedEthWallet?.address;
@@ -1892,10 +1920,10 @@ function renderBridge(): void {
     btnAppkitConnect.textContent = "Connect Wallet";
   }
 
-  // Populate token select
+  // Populate token select (scoped to the active chain filter)
   const currentValue = bridgeTokenSelect.value;
   bridgeTokenSelect.innerHTML = '<option value="">Select a token...</option>';
-  for (const token of s.tokens) {
+  for (const token of bridgeController.getVisibleTokens()) {
     const opt = document.createElement("option");
     opt.value = token.id;
     const protocolTag = formatProtocolTag(token.protocol);
@@ -3103,8 +3131,12 @@ btnAppkitConnect.addEventListener("click", () => {
   }
 });
 
-bridgeDirectionBtn.addEventListener("click", () => {
-  bridgeController?.toggleDirection();
+bridgeDirectionSelect.addEventListener("change", () => {
+  const [chainFilter, direction] = bridgeDirectionSelect.value.split(":") as [
+    BridgeChainFilter,
+    BridgeDirection,
+  ];
+  bridgeController?.setRoute(chainFilter, direction);
 });
 
 bridgeTokenSelect.addEventListener("change", () => {

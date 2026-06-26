@@ -53,8 +53,24 @@ type LogFn = (
 ) => void;
 type RenderFn = () => void;
 
+export type BridgeDirection = "to-starknet" | "from-starknet";
+
+/**
+ * Which external chain(s) the bridge UI is scoped to.
+ * - `external`: both Ethereum and Solana (only offered when both wallets are
+ *   connected); the token list shows tokens from both chains.
+ * - `ethereum` / `solana`: scope the token list to a single external chain.
+ */
+export type BridgeChainFilter = "external" | "ethereum" | "solana";
+
+export interface BridgeRoute {
+  chainFilter: BridgeChainFilter;
+  direction: BridgeDirection;
+}
+
 export interface BridgeState {
-  direction: "to-starknet" | "from-starknet";
+  direction: BridgeDirection;
+  chainFilter: BridgeChainFilter;
   tokens: BridgeToken[];
   selectedToken: BridgeToken | null;
   connectedEthWallet: ConnectedEthereumWallet | undefined;
@@ -83,6 +99,7 @@ export interface BridgeState {
 function initialState(): BridgeState {
   return {
     direction: "to-starknet",
+    chainFilter: "external",
     tokens: [],
     selectedToken: null,
     connectedEthWallet: undefined,
@@ -186,6 +203,7 @@ export class BridgeController {
         this.chainId
       );
       this.state.connectedEthWallet = wallet;
+      this.revalidateRoute();
       this.log(
         `Ethereum wallet connected: ${address.slice(0, 6)}...${address.slice(
           -4
@@ -250,6 +268,7 @@ export class BridgeController {
       };
 
       this.state.connectedEthWallet = wallet;
+      this.revalidateRoute();
       this.log(
         `Ethereum wallet connected (dev): ${address.slice(
           0,
@@ -270,6 +289,7 @@ export class BridgeController {
     this.state.externalBalanceUnit = null;
     this.state.allowance = null;
     this.state.feeEstimate = null;
+    this.revalidateRoute();
     this.log("Ethereum wallet disconnected", "info");
     this.render();
   }
@@ -290,6 +310,7 @@ export class BridgeController {
         this.chainId
       );
       this.state.connectedSolWallet = wallet;
+      this.revalidateRoute();
       this.log(
         `Solana wallet connected: ${address.slice(0, 4)}...${address.slice(
           -4
@@ -308,12 +329,13 @@ export class BridgeController {
     this.state.externalBalance = null;
     this.state.externalBalanceUnit = null;
     this.state.feeEstimate = null;
+    this.revalidateRoute();
     this.log("Solana wallet disconnected", "info");
     this.render();
   }
 
-  setDirection(dir: "to-starknet" | "from-starknet"): void {
-    this.state.direction = dir;
+  /** Reset the per-token/per-direction transient fields (balances, fees, toggles). */
+  private resetTransientState(): void {
     this.state.starknetBalance = null;
     this.state.externalBalance = null;
     this.state.externalBalanceUnit = null;
@@ -321,6 +343,81 @@ export class BridgeController {
     this.state.feeEstimate = null;
     this.state.fastTransfer = false;
     this.state.autoWithdraw = false;
+  }
+
+  /** External chain filters available given the currently connected wallets. */
+  private availableChainFilters(): BridgeChainFilter[] {
+    const eth = this.state.connectedEthWallet != null;
+    const sol = this.state.connectedSolWallet != null;
+    if (eth && sol) return ["external", "ethereum", "solana"];
+    if (eth) return ["ethereum"];
+    if (sol) return ["solana"];
+    return [];
+  }
+
+  /**
+   * Routes the user can pick from, ordered as:
+   * External↔Starknet, Eth↔Starknet, Sol↔Starknet (each chain filter offering
+   * both directions). Only chain filters whose wallet is connected appear.
+   */
+  getAvailableRoutes(): BridgeRoute[] {
+    const routes: BridgeRoute[] = [];
+    for (const chainFilter of this.availableChainFilters()) {
+      routes.push({ chainFilter, direction: "to-starknet" });
+      routes.push({ chainFilter, direction: "from-starknet" });
+    }
+    return routes;
+  }
+
+  private tokenMatchesFilter(token: BridgeToken): boolean {
+    switch (this.state.chainFilter) {
+      case "ethereum":
+        return token.chain === ExternalChain.ETHEREUM;
+      case "solana":
+        return token.chain === ExternalChain.SOLANA;
+      case "external":
+        return true;
+    }
+  }
+
+  /** Tokens visible for the active chain filter. */
+  getVisibleTokens(): BridgeToken[] {
+    return this.state.tokens.filter((t) => this.tokenMatchesFilter(t));
+  }
+
+  /**
+   * Keep the route valid after wallets connect/disconnect: snap the chain
+   * filter to an available one and drop a selected token that no longer
+   * matches the filter.
+   */
+  private revalidateRoute(): void {
+    const available = this.availableChainFilters();
+    if (available.length > 0 && !available.includes(this.state.chainFilter)) {
+      this.state.chainFilter = available[0]!;
+    }
+    if (
+      this.state.selectedToken &&
+      !this.tokenMatchesFilter(this.state.selectedToken)
+    ) {
+      this.state.selectedToken = null;
+      this.resetTransientState();
+    }
+  }
+
+  setRoute(chainFilter: BridgeChainFilter, direction: BridgeDirection): void {
+    this.state.chainFilter = chainFilter;
+    if (
+      this.state.selectedToken &&
+      !this.tokenMatchesFilter(this.state.selectedToken)
+    ) {
+      this.state.selectedToken = null;
+    }
+    this.setDirection(direction);
+  }
+
+  setDirection(dir: BridgeDirection): void {
+    this.state.direction = dir;
+    this.resetTransientState();
     this.render();
     this.fetchStarknetBalance();
     this.fetchExternalBalance();
@@ -330,24 +427,12 @@ export class BridgeController {
     this.fetchFeeEstimate();
   }
 
-  toggleDirection(): void {
-    this.setDirection(
-      this.state.direction === "to-starknet" ? "from-starknet" : "to-starknet"
-    );
-  }
-
   selectToken(tokenId: string | null): void {
     const token = tokenId
       ? (this.state.tokens.find((t) => t.id === tokenId) ?? null)
       : null;
     this.state.selectedToken = token;
-    this.state.starknetBalance = null;
-    this.state.externalBalance = null;
-    this.state.externalBalanceUnit = null;
-    this.state.allowance = null;
-    this.state.feeEstimate = null;
-    this.state.fastTransfer = false;
-    this.state.autoWithdraw = false;
+    this.resetTransientState();
     this.render();
     if (token) {
       this.fetchStarknetBalance();
