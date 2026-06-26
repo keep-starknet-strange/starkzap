@@ -809,6 +809,23 @@ describe("Amount arithmetic operations", () => {
       const amount = Amount.parse("10", 18, "ETH");
       expect(amount.multiply("1e-1").toUnit()).toBe("1");
     });
+
+    it("should floor low-decimal tokens when result is sub-unit", () => {
+      // For USDC (6 decimals), 1 USDC × 1e-18 = 0.000000000000001 base units
+      // Since we can't represent fractional base units, this floors to 0
+      const usdc = Amount.parse("1", 6, "USDC");
+      const result = usdc.multiply("0.000000000000000001");
+      expect(result.toBase()).toBe(0n);
+      expect(result.toUnit()).toBe("0");
+    });
+
+    it("should preserve sub-unit fractional multiplication for 18-decimal tokens", () => {
+      // For ETH (18 decimals), the same scalar preserves the fraction
+      const eth = Amount.parse("1", 18, "ETH");
+      const result = eth.multiply("0.000000000000000001");
+      expect(result.toBase()).toBe(1n);
+      expect(result.toUnit()).toBe("0.000000000000000001");
+    });
   });
 
   describe("divide", () => {
@@ -898,6 +915,24 @@ describe("Amount arithmetic operations", () => {
     it("should support scientific notation divisors", () => {
       const amount = Amount.parse("10", 18, "ETH");
       expect(amount.divide("1e1").toUnit()).toBe("1");
+    });
+
+    it("should floor low-decimal tokens when result is sub-unit", () => {
+      // For USDC (6 decimals), dividing by a small number can produce sub-unit fractions.
+      // 1 USDC ÷ 1e18 = 1e-12 base units (fractional), floors to 0.
+      const usdc = Amount.parse("1", 6, "USDC");
+      const result = usdc.divide("1000000000000000000");
+      expect(result.toBase()).toBe(0n);
+      expect(result.toUnit()).toBe("0");
+    });
+
+    it("should preserve sub-unit fractional division for 18-decimal tokens", () => {
+      // For ETH (18 decimals), the same divisor preserves the fraction.
+      // 1 ETH ÷ 1e18 = 1e-18 ETH (one wei).
+      const eth = Amount.parse("1", 18, "ETH");
+      const result = eth.divide("1000000000000000000");
+      expect(result.toBase()).toBe(1n);
+      expect(result.toUnit()).toBe("0.000000000000000001");
     });
   });
 
