@@ -160,7 +160,7 @@ describe("Layerswap token discovery", () => {
 
     const repository = new BridgeTokenRepository({
       fetchFn: fetchMock as unknown as typeof fetch,
-      layerswapApi,
+      layerswapOptions: layerswapApi,
     });
     const tokens = await repository.getTokens({
       chain: ExternalChain.ETHEREUM,
