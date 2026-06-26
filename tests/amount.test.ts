@@ -797,6 +797,14 @@ describe("Amount arithmetic operations", () => {
       );
     });
 
+    it("should honor a multiplier at the 18-decimal precision boundary", () => {
+      // 1 ETH × 1e-18 must keep the 18th fraction digit (no silent truncation)
+      const amount = Amount.parse("1", 18, "ETH");
+      const result = amount.multiply("0.000000000000000001");
+      expect(result.toBase()).toBe(1n);
+      expect(result.toUnit()).toBe("0.000000000000000001");
+    });
+
     it("should support scientific notation multipliers", () => {
       const amount = Amount.parse("10", 18, "ETH");
       expect(amount.multiply("1e-1").toUnit()).toBe("1");
@@ -836,7 +844,9 @@ describe("Amount arithmetic operations", () => {
 
     it("should throw a precision error on tiny non-zero divisors", () => {
       const amount = Amount.parse("10", 18, "ETH");
-      expect(() => amount.divide("0.0000000000000000001")).toThrow("too small");
+      expect(() => amount.divide("0.0000000000000000001")).toThrow(
+        "exceeds 18 decimal places"
+      );
     });
 
     it("should preserve decimals and symbol", () => {
@@ -873,6 +883,15 @@ describe("Amount arithmetic operations", () => {
       const amount = Amount.parse("1", 18, "ETH");
       expect(() => amount.divide("1.0000000000000000001")).toThrow(
         "exceeds 18 decimal places"
+      );
+    });
+
+    it("should honor a divisor at the 18-decimal precision boundary", () => {
+      // dividing by 1e-18 (smallest representable divisor) must use the full
+      // 18-digit fraction, not a truncated one: 1 / 1e-18 = 1e18
+      const amount = Amount.parse("1", 18, "ETH");
+      expect(amount.divide("0.000000000000000001").toUnit()).toBe(
+        "1000000000000000000"
       );
     });
 

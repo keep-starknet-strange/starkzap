@@ -74,17 +74,20 @@ function expandScientificNotation(value: string): string {
   return `${integerPart.slice(0, splitIndex)}.${integerPart.slice(splitIndex)}${fractionPart}`;
 }
 
-function normalizeUnitNumberish(amount: BigNumberish): string {
+function normalizeUnitNumberish(
+  amount: BigNumberish,
+  label = "unit amount"
+): string {
   if (typeof amount === "number") {
     if (!Number.isFinite(amount) || amount < 0) {
       throw new Error(
-        `Invalid unit amount: "${amount}". Must be a positive number.`
+        `Invalid ${label}: "${amount}". Must be a positive number.`
       );
     }
 
     if (Number.isInteger(amount) && !Number.isSafeInteger(amount)) {
       throw new Error(
-        "Amount.parse(number) only accepts safe integers. Pass a string or bigint for exact large values."
+        `Invalid ${label}: "${amount}". Number values must be safe integers; pass a string or bigint for exact large values.`
       );
     }
 
@@ -94,7 +97,7 @@ function normalizeUnitNumberish(amount: BigNumberish): string {
       );
       if (significantDigits > MAX_SIGNIFICANT_NUMBER_DIGITS) {
         throw new Error(
-          "Amount.parse(number) cannot safely represent this decimal. Pass a string for exact values."
+          `Invalid ${label}: "${amount}". A number cannot safely represent this decimal; pass a string for exact values.`
         );
       }
     }
@@ -125,19 +128,17 @@ function normalizeRawNumberish(amount: BigNumberish): string {
   return expandScientificNotation(amount.toString());
 }
 
-function isZeroString(value: string): boolean {
-  return /^0+(\.0+)?$/.test(value);
-}
-
 function parseScalarToScaledBigInt(
   value: BigNumberish,
   label: string,
   precision: number
 ): bigint {
-  const valueStr = normalizeUnitNumberish(value);
+  const valueStr = normalizeUnitNumberish(value, label);
 
   if (!valueStr.match(/^\d+(\.\d+)?$/)) {
-    throw new Error(`Invalid ${label}: "${valueStr}". Must be a positive number.`);
+    throw new Error(
+      `Invalid ${label}: "${valueStr}". Must be a positive number.`
+    );
   }
 
   const [integer, fraction = ""] = valueStr.split(".");
@@ -635,19 +636,15 @@ export class Amount {
     // Use high precision for scalar operations
     const PRECISION = 18;
     const scaleFactor = 10n ** BigInt(PRECISION);
-    const divisorStr = normalizeUnitNumberish(divisor);
     const scaledDivisor = parseScalarToScaledBigInt(
       divisor,
       "divisor",
       PRECISION
     );
 
+    // Over-precise divisors are already rejected by parseScalarToScaledBigInt,
+    // so a zero scaled divisor can only come from an actual zero input.
     if (scaledDivisor === 0n) {
-      if (!isZeroString(divisorStr)) {
-        throw new Error(
-          `Divisor "${divisorStr}" is too small: precision is limited to ${PRECISION} decimal places.`
-        );
-      }
       throw new Error("Division by zero");
     }
 
