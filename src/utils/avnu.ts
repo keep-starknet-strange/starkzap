@@ -1,13 +1,68 @@
 import type { Address, ChainId } from "@/types";
 import { CallData, type Call } from "starknet";
-import { BASE_URL, SEPOLIA_BASE_URL } from "@avnu/avnu-sdk";
 
-export const DEFAULT_AVNU_API_BASES = {
-  SN_MAIN: [BASE_URL],
-  SN_SEPOLIA: [SEPOLIA_BASE_URL, BASE_URL],
-} as const;
+export type AvnuSdkModule = typeof import("@avnu/avnu-sdk");
+
+let cachedAvnuSdk: AvnuSdkModule | undefined;
+let loadingAvnuSdk: Promise<AvnuSdkModule> | undefined;
+
+/**
+ * Lazily loads @avnu/avnu-sdk and caches the module namespace object.
+ *
+ * The dependency is an optional peer dependency: it is only required when AVNU
+ * swap or DCA features are actually used. This is the single place where the
+ * SDK's presence is checked at runtime.
+ */
+export async function loadAvnuSdk(feature: string): Promise<AvnuSdkModule> {
+  if (cachedAvnuSdk) {
+    return cachedAvnuSdk;
+  }
+
+  loadingAvnuSdk ??= import("@avnu/avnu-sdk")
+    .then((module) => {
+      cachedAvnuSdk = module as unknown as AvnuSdkModule;
+      return cachedAvnuSdk;
+    })
+    .catch((error) => {
+      const detail =
+        error instanceof Error && error.message
+          ? ` Original error: ${error.message}`
+          : "";
+      throw new Error(
+        `[starkzap] ${feature} requires optional peer dependency "@avnu/avnu-sdk". Install it with: npm i @avnu/avnu-sdk.${detail}`
+      );
+    })
+    .finally(() => {
+      loadingAvnuSdk = undefined;
+    });
+
+  return await loadingAvnuSdk;
+}
 
 export type AvnuApiBases = Record<"SN_MAIN" | "SN_SEPOLIA", string[]>;
+
+/** Subset of the avnu SDK namespace exposing its API base URL constants. */
+export interface AvnuApiBaseUrls {
+  BASE_URL: string;
+  SEPOLIA_BASE_URL: string;
+}
+
+/**
+ * Resolve per-chain AVNU API bases from the loaded avnu SDK's URL constants,
+ * applying any caller-provided overrides.
+ *
+ * The URLs are read from the SDK at runtime (rather than inlined) so they stay
+ * in sync with the dependency's published values.
+ */
+export function resolveAvnuApiBases(
+  sdk: AvnuApiBaseUrls,
+  overrides?: Partial<AvnuApiBases>
+): AvnuApiBases {
+  return {
+    SN_MAIN: overrides?.SN_MAIN ?? [sdk.BASE_URL],
+    SN_SEPOLIA: overrides?.SN_SEPOLIA ?? [sdk.SEPOLIA_BASE_URL, sdk.BASE_URL],
+  };
+}
 
 export function supportsAvnuChain(chainId: ChainId): boolean {
   const literal = chainId.toLiteral();

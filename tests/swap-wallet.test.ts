@@ -91,6 +91,20 @@ class TestWallet extends BaseWallet {
 }
 
 describe("BaseWallet swap abstraction", () => {
+  it("throws an actionable error when no swap provider is registered", async () => {
+    const wallet = new TestWallet();
+
+    await expect(
+      wallet.getQuote({
+        tokenIn: mockToken,
+        tokenOut: mockToken,
+        amountIn: Amount.parse("1", mockToken),
+      })
+    ).rejects.toThrow(
+      /No default swap provider configured.*registerSwapProvider/s
+    );
+  });
+
   it("returns provider quotes via getQuote", async () => {
     const wallet = new TestWallet();
     const amountIn = Amount.parse("50", mockToken);

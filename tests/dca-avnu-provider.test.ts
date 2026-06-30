@@ -11,11 +11,6 @@ const avnuMocks = vi.hoisted(() => ({
 vi.mock("@avnu/avnu-sdk", () => ({
   BASE_URL: "https://starknet.api.avnu.fi",
   SEPOLIA_BASE_URL: "https://sepolia.api.avnu.fi",
-  DcaOrderStatus: {
-    INDEXING: "INDEXING",
-    ACTIVE: "ACTIVE",
-    CLOSED: "CLOSED",
-  },
   getDcaOrders: avnuMocks.getDcaOrders,
   createDcaToCalls: avnuMocks.createDcaToCalls,
   cancelDcaToCalls: avnuMocks.cancelDcaToCalls,

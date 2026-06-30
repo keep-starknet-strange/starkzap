@@ -51,6 +51,7 @@ All peer dependencies are **optional** to keep the package lean. Install only wh
 | **Ethereum bridging** (deposit / withdraw to Ethereum)           | `starkzap`,<br/>`starkzap-native` | `ethers@^6`                                                                                               |
 | **Solana bridging** (deposit / withdraw to Solana via Hyperlane) | `starkzap`,<br/>`starkzap-native` | `@solana/web3.js@^1`, `@hyperlane-xyz/sdk@^14`, `@hyperlane-xyz/registry@^19`, `@hyperlane-xyz/utils@^14` |
 | **Cartridge Controller wallet**                                  | `starkzap`,<br/>`starkzap-native` | `@cartridge/controller@^0.13`                                                                             |
+| **AVNU swaps & DCA** (`AvnuSwapProvider`, `AvnuDcaProvider`)     | `starkzap`,<br/>`starkzap-native` | `@avnu/avnu-sdk@^4`                                                                                       |
 | **Confidential transfers** (Tongo)                               | `starkzap`,<br/>`starkzap-native` | `@fatsolutions/tongo-sdk@^1`                                                                              |
 | **React Native / Expo**                                          | `starkzap-native`                 | `react-native-get-random-values@^1`, `fast-text-encoding@^1`, `@ethersproject/shims@^5`, `buffer@^6`      |
 
@@ -63,6 +64,9 @@ npm install @solana/web3.js @hyperlane-xyz/sdk @hyperlane-xyz/registry @hyperlan
 
 # Cartridge Controller (only for Web)
 npm install @cartridge/controller
+
+# AVNU swaps & DCA (only for AvnuSwapProvider / AvnuDcaProvider; Ekubo needs nothing extra)
+npm install @avnu/avnu-sdk
 
 # Confidential transfers
 npm install @fatsolutions/tongo-sdk
