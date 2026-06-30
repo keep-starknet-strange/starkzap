@@ -1,3 +1,4 @@
+import "@avnu/avnu-sdk";
 import {
   AvnuSwapProvider,
   EkuboSwapProvider,
