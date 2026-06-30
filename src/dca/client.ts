@@ -32,7 +32,7 @@ export class DcaClient implements DcaClientInterface {
     this.context = context;
     this.registry = new ProviderRegistry(
       "DCA",
-      'Register a DCA provider before using DCA, e.g. `wallet.dca().registerProvider(new AvnuDcaProvider())` (AVNU requires the optional peer dependency "@avnu/avnu-sdk": npm i @avnu/avnu-sdk).'
+      'Register a DCA provider before using DCA, e.g. `registerProvider(new AvnuDcaProvider())` (via `wallet.dca()` or directly on a `DcaClient`). AVNU requires the optional peer dependency "@avnu/avnu-sdk": npm i @avnu/avnu-sdk.'
     );
     if (defaultProvider) {
       this.registry.register(defaultProvider, true);
