@@ -1071,14 +1071,6 @@ function buildSwapInput() {
   };
 }
 
-function registerWalletSwapProviders(connectedWallet: WalletInterface): void {
-  let makeDefault = true;
-  for (const provider of swapProviders) {
-    connectedWallet.registerSwapProvider(provider, makeDefault);
-    makeDefault = false;
-  }
-}
-
 function initializeSwapForm(): void {
   populateSwapProviders();
   populateSwapTokens();
@@ -2157,7 +2149,6 @@ async function connectCartridge() {
     });
     wallet = onboard.wallet;
     walletType = "cartridge";
-    registerWalletSwapProviders(wallet);
 
     walletAddressEl.textContent = truncateAddress(wallet.address);
     walletAddressEl.title = wallet.address;
@@ -2205,7 +2196,6 @@ async function connectPrivateKey() {
     });
     wallet = onboard.wallet;
     walletType = "privatekey";
-    registerWalletSwapProviders(wallet);
 
     walletAddressEl.textContent = truncateAddress(wallet.address);
     walletAddressEl.title = wallet.address;
@@ -2298,7 +2288,6 @@ async function connectPrivy() {
     });
     wallet = onboard.wallet;
     walletType = "privy";
-    registerWalletSwapProviders(wallet);
 
     log(`Wallet address: ${wallet.address}`, "info");
 
@@ -3252,16 +3241,20 @@ async function autoConnect(): Promise<void> {
       deploy: "never",
       account: { signer },
       accountPreset: preset,
+      swapProviders,
+      defaultSwapProviderId: swapProviders[0]?.id,
+      dcaProviders,
+      defaultDcaProviderId: dcaProviders[0]?.id,
     });
     wallet = onboard.wallet;
     walletType = "privatekey";
-    registerWalletSwapProviders(wallet);
 
     walletAddressEl.textContent = truncateAddress(wallet.address);
     walletAddressEl.title = wallet.address;
 
     log(`Auto-connected: ${truncateAddress(wallet.address)}`, "success");
     showConnected();
+    await refreshDcaOrders(true);
     await checkDeploymentStatus();
   } catch (err) {
     log(`Auto-connect failed: ${err}`, "error");

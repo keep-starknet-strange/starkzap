@@ -12,6 +12,7 @@
     "lint": "expo lint"
   },
   "dependencies": {
+    "@avnu/avnu-sdk": "^4.1.0-rc.0",
     "@ethersproject/shims": "^5.7.0",
     "@expo/vector-icons": "^15.0.3",
     "@hyperlane-xyz/registry": "^19.4.0",
