@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { Pressable, Linking } from "react-native";
+import { Pressable } from "react-native";
 import { Amount } from "starkzap-native";
 import { Card, Text, Button, TextField, Select, IconSymbol } from "@/ui";
 import { useTheme } from "@/theme";
@@ -21,7 +21,6 @@ export function DcaPanel() {
     previewing,
     submitting,
     error,
-    lastTx,
     orders,
     cancellingId,
     init,
@@ -148,16 +147,6 @@ export function DcaPanel() {
       </Card>
 
       {error ? <Text style={{ color: colors.danger }}>{error}</Text> : null}
-      {lastTx ? (
-        <Card>
-          <Text style={{ color: colors.success, fontWeight: "600" }}>
-            Order created
-          </Text>
-          <Pressable onPress={() => void Linking.openURL(lastTx.explorerUrl)}>
-            <Text variant="muted">View on explorer ↗</Text>
-          </Pressable>
-        </Card>
-      ) : null}
 
       {orders.length > 0 ? <Text variant="title">Active orders</Text> : null}
       {orders.map((order) => (

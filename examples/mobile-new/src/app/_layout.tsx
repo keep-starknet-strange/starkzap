@@ -7,6 +7,7 @@ import { SafeAreaProvider } from "react-native-safe-area-context";
 import { useTheme } from "@/theme";
 import { getDevLogin } from "@/core/dev-login";
 import { useWalletStore } from "@/core/wallet/store";
+import { TxBanner } from "@/core/tx-banner/TxBanner";
 
 // If .env supplies a dev private key, connect automatically on startup.
 function useDevAutoLogin() {
@@ -58,6 +59,7 @@ export default function RootLayout() {
           }}
         />
       </Stack>
+      <TxBanner />
       <StatusBar style="auto" />
     </SafeAreaProvider>
   );

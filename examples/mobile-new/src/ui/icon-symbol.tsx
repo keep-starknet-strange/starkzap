@@ -38,6 +38,8 @@ const MAPPING = {
   checkmark: { family: "material", name: "check" },
   trash: { family: "material", name: "delete-outline" },
   repeat: { family: "material", name: "repeat" },
+  xmark: { family: "material", name: "close" },
+  exclamationmark: { family: "material", name: "error-outline" },
   "wallet.bifold.fill": { family: "material", name: "account-balance-wallet" },
   "chart.line.uptrend.xyaxis": { family: "material", name: "trending-up" },
   "arrow.left.arrow.right": { family: "material", name: "swap-horiz" },

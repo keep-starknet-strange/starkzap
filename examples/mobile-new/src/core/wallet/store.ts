@@ -19,6 +19,7 @@ import { PRIVY_SERVER_URL, PAYMASTER_PROXY_URL } from "@/core/config";
 import { resolveExamplePaymasterNodeUrl } from "@/core/paymaster";
 import { ensureCartridgeAdapter } from "@/core/cartridge";
 import { useTokensStore } from "@/core/tokens/store";
+import { useTxBannerStore } from "@/core/tx-banner/store";
 
 export type WalletType = "cartridge" | "privatekey" | "privy";
 
@@ -228,15 +229,11 @@ export const useWalletStore = create<WalletStore>((set, get) => ({
     const { wallet } = get();
     if (!wallet) return;
     set({ connecting: true, error: null });
-    try {
-      const tx = await wallet.deploy();
-      await tx.wait();
-      await get().checkDeployment();
-    } catch (err) {
-      set({ error: String(err) });
-    } finally {
-      set({ connecting: false });
-    }
+    const tx = await useTxBannerStore
+      .getState()
+      .notify("Deploy account", () => wallet.deploy());
+    if (tx) await get().checkDeployment();
+    set({ connecting: false });
   },
 
   disconnect: () =>

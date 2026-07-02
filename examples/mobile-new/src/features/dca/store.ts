@@ -7,6 +7,7 @@ import {
 } from "starkzap-native";
 import { useWalletStore } from "@/core/wallet/store";
 import { useTokensStore } from "@/core/tokens/store";
+import { useTxBannerStore } from "@/core/tx-banner/store";
 
 // ISO 8601 durations understood by the DCA providers.
 export const DCA_FREQUENCIES = [
@@ -26,7 +27,6 @@ interface DcaStore {
   previewing: boolean;
   submitting: boolean;
   error: string | null;
-  lastTx: { hash: string; explorerUrl: string } | null;
   orders: DcaOrder[];
   loadingOrders: boolean;
   cancellingId: string | null;
@@ -62,7 +62,6 @@ export const useDcaStore = create<DcaStore>((set, get) => ({
   previewing: false,
   submitting: false,
   error: null,
-  lastTx: null,
   orders: [],
   loadingOrders: false,
   cancellingId: null,
@@ -110,25 +109,19 @@ export const useDcaStore = create<DcaStore>((set, get) => ({
     const { total, cycle, frequency } = get();
     if (!wallet || !sellTok || !buyTok || !total.trim() || !cycle.trim())
       return false;
-    set({ submitting: true, error: null, lastTx: null });
-    try {
-      const tx = await wallet.dca().create({
+    set({ submitting: true });
+    const tx = await useTxBannerStore.getState().notify("DCA order", () =>
+      wallet.dca().create({
         sellToken: sellTok,
         buyToken: buyTok,
         sellAmount: Amount.parse(total, sellTok),
         sellAmountPerCycle: Amount.parse(cycle, sellTok),
         frequency,
-      });
-      await tx.wait();
-      set({ lastTx: { hash: tx.hash, explorerUrl: tx.explorerUrl } });
-      await get().loadOrders();
-      return true;
-    } catch (err) {
-      set({ error: String(err) });
-      return false;
-    } finally {
-      set({ submitting: false });
-    }
+      })
+    );
+    set({ submitting: false });
+    if (tx) await get().loadOrders();
+    return !!tx;
   },
   loadOrders: async () => {
     const { wallet } = useWalletStore.getState();
@@ -146,21 +139,19 @@ export const useDcaStore = create<DcaStore>((set, get) => ({
   cancel: async (order) => {
     const { wallet } = useWalletStore.getState();
     if (!wallet) return;
-    set({ cancellingId: order.id, error: null });
-    try {
-      const tx = await wallet
-        .dca()
-        .cancel(
-          order.providerId === "ekubo"
-            ? { orderId: order.id }
-            : { orderAddress: order.orderAddress }
-        );
-      await tx.wait();
-      await get().loadOrders();
-    } catch (err) {
-      set({ error: String(err) });
-    } finally {
-      set({ cancellingId: null });
-    }
+    set({ cancellingId: order.id });
+    const tx = await useTxBannerStore
+      .getState()
+      .notify("Cancel DCA", () =>
+        wallet
+          .dca()
+          .cancel(
+            order.providerId === "ekubo"
+              ? { orderId: order.id }
+              : { orderAddress: order.orderAddress }
+          )
+      );
+    if (tx) await get().loadOrders();
+    set({ cancellingId: null });
   },
 }));

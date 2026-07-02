@@ -2,6 +2,7 @@ import { create } from "zustand";
 import { Amount, type SwapQuote, type Token } from "starkzap-native";
 import { useWalletStore } from "@/core/wallet/store";
 import { useTokensStore } from "@/core/tokens/store";
+import { useTxBannerStore } from "@/core/tx-banner/store";
 
 const SLIPPAGE_BPS = 100n; // 1%
 
@@ -13,7 +14,6 @@ interface SwapStore {
   quoting: boolean;
   submitting: boolean;
   error: string | null;
-  lastTx: { hash: string; explorerUrl: string } | null;
   init: (tokenIn: string, tokenOut: string) => void;
   setTokenIn: (address: string) => void;
   setTokenOut: (address: string) => void;
@@ -40,7 +40,6 @@ export const useSwapStore = create<SwapStore>((set, get) => ({
   quoting: false,
   submitting: false,
   error: null,
-  lastTx: null,
   init: (tokenIn, tokenOut) =>
     set((s) => ({
       tokenIn: s.tokenIn || tokenIn,
@@ -83,22 +82,16 @@ export const useSwapStore = create<SwapStore>((set, get) => ({
     const { inTok, outTok } = pair();
     const { amountIn } = get();
     if (!wallet || !inTok || !outTok || !amountIn.trim()) return false;
-    set({ submitting: true, error: null, lastTx: null });
-    try {
-      const tx = await wallet.swap({
+    set({ submitting: true });
+    const tx = await useTxBannerStore.getState().notify("Swap", () =>
+      wallet.swap({
         tokenIn: inTok,
         tokenOut: outTok,
         amountIn: Amount.parse(amountIn, inTok),
         slippageBps: SLIPPAGE_BPS,
-      });
-      await tx.wait();
-      set({ lastTx: { hash: tx.hash, explorerUrl: tx.explorerUrl } });
-      return true;
-    } catch (err) {
-      set({ error: String(err) });
-      return false;
-    } finally {
-      set({ submitting: false });
-    }
+      })
+    );
+    set({ submitting: false });
+    return !!tx;
   },
 }));

@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { View, Pressable, Linking } from "react-native";
+import { View, Pressable } from "react-native";
 import { Redirect } from "expo-router";
 import {
   Screen,
@@ -21,17 +21,8 @@ export default function TransfersTab() {
   const wallet = useWalletStore((s) => s.wallet);
   const tokens = useTokensStore((s) => s.tokens);
   const { balances, loading, refresh } = useBalancesStore();
-  const {
-    items,
-    submitting,
-    error,
-    lastTx,
-    addItem,
-    updateItem,
-    removeItem,
-    reset,
-    send,
-  } = useTransfersStore();
+  const { items, submitting, addItem, updateItem, removeItem, reset, send } =
+    useTransfersStore();
 
   const firstToken = tokens[0]?.address ?? "";
 
@@ -131,16 +122,6 @@ export default function TransfersTab() {
         disabled={!hasValid}
         onPress={onSend}
       />
-
-      {error ? <Text style={{ color: colors.danger }}>{error}</Text> : null}
-      {lastTx ? (
-        <Card>
-          <Text style={{ color: colors.success, fontWeight: "600" }}>Sent</Text>
-          <Pressable onPress={() => void Linking.openURL(lastTx.explorerUrl)}>
-            <Text variant="muted">View on explorer ↗</Text>
-          </Pressable>
-        </Card>
-      ) : null}
     </Screen>
   );
 }
