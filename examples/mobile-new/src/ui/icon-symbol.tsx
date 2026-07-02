@@ -37,6 +37,7 @@ const MAPPING = {
   "chevron.down": { family: "material", name: "keyboard-arrow-down" },
   checkmark: { family: "material", name: "check" },
   trash: { family: "material", name: "delete-outline" },
+  repeat: { family: "material", name: "repeat" },
   "wallet.bifold.fill": { family: "material", name: "account-balance-wallet" },
   "chart.line.uptrend.xyaxis": { family: "material", name: "trending-up" },
   "arrow.left.arrow.right": { family: "material", name: "swap-horiz" },

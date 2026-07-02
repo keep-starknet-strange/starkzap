@@ -51,6 +51,19 @@ export default function TabsLayout() {
           ),
         }}
       />
+      <Tabs.Screen
+        name="swap"
+        options={{
+          tabBarLabel: "Swap",
+          tabBarIcon: ({ color, size }) => (
+            <IconSymbol
+              name="arrow.left.arrow.right"
+              size={size}
+              color={color}
+            />
+          ),
+        }}
+      />
     </Tabs>
   );
 }

@@ -8,6 +8,8 @@ import {
   OnboardStrategy,
   StarkSigner,
   StarkZap,
+  EkuboSwapProvider,
+  EkuboDcaProvider,
   type AccountClassConfig,
   type CartridgePolicies,
   type WalletInterface,
@@ -19,6 +21,15 @@ import { ensureCartridgeAdapter } from "@/core/cartridge";
 import { useTokensStore } from "@/core/tokens/store";
 
 export type WalletType = "cartridge" | "privatekey" | "privy";
+
+// Ekubo powers swap and DCA: fetch-based, no extra dependency, supports both
+// Mainnet and Sepolia. (Avnu is an alternative but needs @avnu/avnu-sdk.)
+const PROVIDER_OPTIONS = {
+  swapProviders: [new EkuboSwapProvider()],
+  defaultSwapProviderId: "ekubo",
+  dcaProviders: [new EkuboDcaProvider()],
+  defaultDcaProviderId: "ekubo",
+};
 
 export const LOGIN_LABEL: Record<WalletType, string> = {
   cartridge: "Cartridge",
@@ -112,6 +123,7 @@ export const useWalletStore = create<WalletStore>((set, get) => ({
       const { wallet } = await sdk.onboard({
         strategy: OnboardStrategy.Cartridge,
         deploy: "never",
+        ...PROVIDER_OPTIONS,
         cartridge: {
           policies: CARTRIDGE_POLICIES,
           // Redirect to the app root: Cartridge sends the browser back to this
@@ -144,6 +156,7 @@ export const useWalletStore = create<WalletStore>((set, get) => ({
       const { wallet } = await sdk.onboard({
         strategy: OnboardStrategy.Signer,
         deploy: "never",
+        ...PROVIDER_OPTIONS,
         account: { signer },
         accountPreset: ACCOUNT_PRESETS[presetName],
         ...(sponsored && paymasterNodeUrl
@@ -172,6 +185,7 @@ export const useWalletStore = create<WalletStore>((set, get) => ({
       const { wallet } = await sdk.onboard({
         strategy: OnboardStrategy.Privy,
         deploy: "never",
+        ...PROVIDER_OPTIONS,
         accountPreset: ACCOUNT_PRESETS.Ready,
         // The wallet signs remotely through the example server's Privy route,
         // authenticated with the access token from the Privy login.
