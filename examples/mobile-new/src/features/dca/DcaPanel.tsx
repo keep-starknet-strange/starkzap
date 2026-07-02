@@ -1,9 +1,18 @@
 import { useEffect } from "react";
 import { Pressable } from "react-native";
 import { Amount } from "starkzap-native";
-import { Card, Text, Button, TextField, Select, IconSymbol } from "@/ui";
+import {
+  Card,
+  Text,
+  Button,
+  TextField,
+  Select,
+  Segmented,
+  IconSymbol,
+} from "@/ui";
 import { useTheme } from "@/theme";
 import { useTokensStore } from "@/core/tokens/store";
+import { PROVIDER_OPTIONS_LIST } from "@/core/wallet/store";
 import { useBalancesStore } from "@/features/balances/store";
 import { DCA_FREQUENCIES, useDcaStore } from "@/features/dca/store";
 
@@ -21,16 +30,21 @@ export function DcaPanel() {
     previewing,
     submitting,
     error,
+    dryRunning,
+    dryRunResult,
     orders,
     cancellingId,
+    providerId,
     init,
     setSellToken,
     setBuyToken,
     setTotal,
     setCycle,
     setFrequency,
+    setProvider,
     flip,
     fetchPreview,
+    dryRun,
     createOrder,
     loadOrders,
     cancel,
@@ -38,7 +52,7 @@ export function DcaPanel() {
 
   useEffect(() => {
     void loadOrders();
-  }, [loadOrders]);
+  }, [loadOrders, providerId]);
 
   useEffect(() => {
     if (tokens[0] && tokens[1]) init(tokens[0].address, tokens[1].address);
@@ -80,6 +94,11 @@ export function DcaPanel() {
 
   return (
     <>
+      <Segmented
+        options={PROVIDER_OPTIONS_LIST}
+        value={providerId}
+        onChange={setProvider}
+      />
       <Card>
         <Text variant="label">You pay</Text>
         <Select
@@ -144,6 +163,22 @@ export function DcaPanel() {
           disabled={!total.trim() || !cycle.trim()}
           onPress={onCreate}
         />
+        <Button
+          title="Dry run"
+          variant="secondary"
+          loading={dryRunning}
+          disabled={!total.trim() || !cycle.trim()}
+          onPress={() => void dryRun()}
+        />
+        {dryRunResult ? (
+          <Text
+            style={{
+              color: dryRunResult.ok ? colors.success : colors.danger,
+            }}
+          >
+            {dryRunResult.message}
+          </Text>
+        ) : null}
       </Card>
 
       {error ? <Text style={{ color: colors.danger }}>{error}</Text> : null}

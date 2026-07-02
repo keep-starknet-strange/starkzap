@@ -1,9 +1,18 @@
 import { useEffect } from "react";
 import { Pressable } from "react-native";
 import { Amount } from "starkzap-native";
-import { Card, Text, Button, TextField, Select, IconSymbol } from "@/ui";
+import {
+  Card,
+  Text,
+  Button,
+  TextField,
+  Select,
+  Segmented,
+  IconSymbol,
+} from "@/ui";
 import { useTheme } from "@/theme";
 import { useTokensStore } from "@/core/tokens/store";
+import { PROVIDER_OPTIONS_LIST } from "@/core/wallet/store";
 import { useBalancesStore } from "@/features/balances/store";
 import { useSwapStore } from "@/features/swap/store";
 
@@ -19,12 +28,17 @@ export function SwapPanel() {
     quoting,
     submitting,
     error,
+    providerId,
+    dryRunning,
+    dryRunResult,
     init,
     setTokenIn,
     setTokenOut,
     setAmountIn,
+    setProvider,
     flip,
     fetchQuote,
+    dryRun,
     swap,
   } = useSwapStore();
 
@@ -55,6 +69,11 @@ export function SwapPanel() {
 
   return (
     <>
+      <Segmented
+        options={PROVIDER_OPTIONS_LIST}
+        value={providerId}
+        onChange={setProvider}
+      />
       <Card>
         <Text variant="label">You pay</Text>
         <Select
@@ -108,6 +127,22 @@ export function SwapPanel() {
         disabled={!quote || quoting}
         onPress={onSwap}
       />
+      <Button
+        title="Dry run"
+        variant="secondary"
+        loading={dryRunning}
+        disabled={!amountIn.trim()}
+        onPress={() => void dryRun()}
+      />
+      {dryRunResult ? (
+        <Text
+          style={{
+            color: dryRunResult.ok ? colors.success : colors.danger,
+          }}
+        >
+          {dryRunResult.message}
+        </Text>
+      ) : null}
 
       {error ? <Text style={{ color: colors.danger }}>{error}</Text> : null}
     </>

@@ -28,8 +28,22 @@ config.resolver.blockList = [].concat(
 // ...and resolve `starkzap` straight to its built entry instead, so Metro never
 // walks node_modules for it (which also trips the 0.84 path-collapse bug).
 const coreDist = path.join(workspaceRoot, "dist", "src");
+
+// Pin @avnu/avnu-sdk to this example's single copy. starkzap lazily
+// `import("@avnu/avnu-sdk")` from the workspace-root install, which would
+// otherwise resolve a different physical copy than the eager import below,
+// giving Metro two module ids and an unresolved lazy import at runtime.
+const avnuSdkDir = path.resolve(__dirname, "node_modules/@avnu/avnu-sdk");
 const priorResolveRequest = config.resolver.resolveRequest;
 config.resolver.resolveRequest = (context, moduleName, platform) => {
+  if (
+    moduleName === "@avnu/avnu-sdk" ||
+    moduleName.startsWith("@avnu/avnu-sdk/")
+  ) {
+    const target = avnuSdkDir + moduleName.slice("@avnu/avnu-sdk".length);
+    const resolver = priorResolveRequest ?? context.resolveRequest;
+    return resolver(context, target, platform);
+  }
   if (moduleName === "starkzap") {
     return { type: "sourceFile", filePath: path.join(coreDist, "index.js") };
   }

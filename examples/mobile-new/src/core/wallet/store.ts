@@ -1,3 +1,6 @@
+// Eagerly bundle the Avnu SDK so starkzap's lazy import("@avnu/avnu-sdk")
+// resolves to the same copy at runtime (see the pin in metro.config.js).
+import "@avnu/avnu-sdk";
 import { create } from "zustand";
 import * as Linking from "expo-linking";
 import {
@@ -10,6 +13,8 @@ import {
   StarkZap,
   EkuboSwapProvider,
   EkuboDcaProvider,
+  AvnuSwapProvider,
+  AvnuDcaProvider,
   type AccountClassConfig,
   type CartridgePolicies,
   type WalletInterface,
@@ -23,14 +28,21 @@ import { useTxBannerStore } from "@/core/tx-banner/store";
 
 export type WalletType = "cartridge" | "privatekey" | "privy";
 
-// Ekubo powers swap and DCA: fetch-based, no extra dependency, supports both
-// Mainnet and Sepolia. (Avnu is an alternative but needs @avnu/avnu-sdk.)
+// Swap + DCA providers. Ekubo is fetch-only; Avnu needs @avnu/avnu-sdk (added
+// as a dep). Both are registered so the user can pick per swap/order; Ekubo is
+// the default.
 const PROVIDER_OPTIONS = {
-  swapProviders: [new EkuboSwapProvider()],
+  swapProviders: [new EkuboSwapProvider(), new AvnuSwapProvider()],
   defaultSwapProviderId: "ekubo",
-  dcaProviders: [new EkuboDcaProvider()],
+  dcaProviders: [new EkuboDcaProvider(), new AvnuDcaProvider()],
   defaultDcaProviderId: "ekubo",
 };
+
+// Provider ids for the swap/DCA selectors.
+export const PROVIDER_OPTIONS_LIST = [
+  { label: "Ekubo", value: "ekubo" },
+  { label: "Avnu", value: "avnu" },
+];
 
 export const LOGIN_LABEL: Record<WalletType, string> = {
   cartridge: "Cartridge",
