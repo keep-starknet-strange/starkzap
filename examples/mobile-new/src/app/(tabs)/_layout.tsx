@@ -64,6 +64,19 @@ export default function TabsLayout() {
           ),
         }}
       />
+      <Tabs.Screen
+        name="staking"
+        options={{
+          tabBarLabel: "Staking",
+          tabBarIcon: ({ color, size }) => (
+            <IconSymbol
+              name="chart.line.uptrend.xyaxis"
+              size={size}
+              color={color}
+            />
+          ),
+        }}
+      />
     </Tabs>
   );
 }

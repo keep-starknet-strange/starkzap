@@ -1,8 +1,15 @@
 import { create } from "zustand";
 
+export interface PickerOption {
+  label: string;
+  value: string;
+  // Optional leading logo (e.g. token/validator icon).
+  image?: string;
+}
+
 export interface PickerConfig {
   title?: string;
-  options: { label: string; value: string }[];
+  options: PickerOption[];
   selected?: string;
   onSelect: (value: string) => void;
 }

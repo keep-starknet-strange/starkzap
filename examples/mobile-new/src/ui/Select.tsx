@@ -1,4 +1,4 @@
-import { Pressable } from "react-native";
+import { View, Image, Pressable } from "react-native";
 import { router } from "expo-router";
 import { useTheme } from "@/theme";
 import { Text } from "./Text";
@@ -8,6 +8,8 @@ import { usePickerStore } from "@/core/picker/store";
 export interface SelectOption<T extends string> {
   label: string;
   value: T;
+  // Optional leading logo shown in the button and picker row.
+  image?: string;
 }
 
 // A button showing the current selection; tapping opens the picker sheet route.
@@ -49,7 +51,22 @@ export function Select<T extends string>({
         minHeight: 48,
       }}
     >
-      <Text variant="body">{selected?.label ?? "Select"}</Text>
+      <View
+        style={{
+          flexDirection: "row",
+          alignItems: "center",
+          gap: spacing.sm,
+          flexShrink: 1,
+        }}
+      >
+        {selected?.image ? (
+          <Image
+            source={{ uri: selected.image }}
+            style={{ width: 24, height: 24, borderRadius: 12 }}
+          />
+        ) : null}
+        <Text variant="body">{selected?.label ?? "Select"}</Text>
+      </View>
       <IconSymbol name="chevron.down" size={20} color={colors.textMuted} />
     </Pressable>
   );

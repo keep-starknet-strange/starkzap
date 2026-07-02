@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { Pressable, ScrollView } from "react-native";
+import { View, Pressable, ScrollView, Image } from "react-native";
 import { Stack, router } from "expo-router";
 import { Text, IconSymbol } from "@/ui";
 import { useTheme } from "@/theme";
@@ -36,14 +36,29 @@ export default function PickerScreen() {
                 paddingHorizontal: spacing.lg,
               }}
             >
-              <Text
+              <View
                 style={{
-                  color: active ? colors.primary : colors.text,
-                  fontWeight: active ? "700" : "400",
+                  flexDirection: "row",
+                  alignItems: "center",
+                  gap: spacing.md,
+                  flexShrink: 1,
                 }}
               >
-                {o.label}
-              </Text>
+                {o.image ? (
+                  <Image
+                    source={{ uri: o.image }}
+                    style={{ width: 28, height: 28, borderRadius: 14 }}
+                  />
+                ) : null}
+                <Text
+                  style={{
+                    color: active ? colors.primary : colors.text,
+                    fontWeight: active ? "700" : "400",
+                  }}
+                >
+                  {o.label}
+                </Text>
+              </View>
               {active ? (
                 <IconSymbol name="checkmark" size={20} color={colors.primary} />
               ) : null}
