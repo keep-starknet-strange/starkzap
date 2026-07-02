@@ -5,6 +5,7 @@
   "dependencies": {
     "@ethersproject/shims": "^5.8.0",
     "@expo/ui": "~57.0.2",
+    "@expo/vector-icons": "^15.0.2",
     "@privy-io/expo": "^0.69.4",
     "@privy-io/expo-native-extensions": "^0.0.11",
     "buffer": "^6.0.3",

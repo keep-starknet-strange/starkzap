@@ -1,6 +1,6 @@
 import { type ReactNode } from "react";
-import { ScrollView, View, type ViewStyle } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { RefreshControl, ScrollView, View, type ViewStyle } from "react-native";
+import { SafeAreaView, type Edge } from "react-native-safe-area-context";
 import { useTheme } from "@/theme";
 
 export function Screen({
@@ -8,11 +8,21 @@ export function Screen({
   scroll = false,
   center = false,
   contentStyle,
+  edges,
+  onRefresh,
+  refreshing = false,
 }: {
   children: ReactNode;
   scroll?: boolean;
   center?: boolean;
   contentStyle?: ViewStyle;
+  // Defaults to all edges. Drop "top" on screens that show a native header,
+  // which already offsets content below the status bar.
+  edges?: readonly Edge[];
+  // Pull-to-refresh; only applies when scroll is true. Themed here so the
+  // spinner uses the primary color on both iOS (tintColor) and Android (colors).
+  onRefresh?: () => void;
+  refreshing?: boolean;
 }) {
   const { colors, spacing } = useTheme();
   const padding: ViewStyle = {
@@ -22,9 +32,21 @@ export function Screen({
   };
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }}>
+    <SafeAreaView edges={edges} style={{ flex: 1, backgroundColor: colors.bg }}>
       {scroll ? (
-        <ScrollView contentContainerStyle={[padding, contentStyle]}>
+        <ScrollView
+          contentContainerStyle={[padding, contentStyle]}
+          refreshControl={
+            onRefresh ? (
+              <RefreshControl
+                refreshing={refreshing}
+                onRefresh={onRefresh}
+                tintColor={colors.primary}
+                colors={[colors.primary]}
+              />
+            ) : undefined
+          }
+        >
           {children}
         </ScrollView>
       ) : (

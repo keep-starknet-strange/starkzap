@@ -69,21 +69,19 @@ function PrivyLogin() {
       publicKey: data.wallet.publicKey,
       accessToken: token,
     });
-    router.replace("/home");
+    router.replace("/balances");
   }, [getAccessToken, connectPrivy]);
 
   if (!isReady) {
     return (
-      <Screen center>
+      <Screen center edges={["left", "right", "bottom"]}>
         <ActivityIndicator color={colors.accent} />
       </Screen>
     );
   }
 
   return (
-    <Screen scroll>
-      <Text variant="title">Privy</Text>
-
+    <Screen edges={["left", "right", "bottom"]}>
       <Card>
         {user ? (
           <>
@@ -126,7 +124,9 @@ function PrivyLogin() {
                 })
               }
             />
-            <Text variant="muted">or</Text>
+            <Text variant="muted" style={{ alignContent: "center" }}>
+              or
+            </Text>
             <Button
               title="Continue with Google"
               variant="secondary"
@@ -167,8 +167,6 @@ function PrivyLogin() {
           </>
         )}
       </Card>
-
-      <Button title="← Back" variant="ghost" onPress={() => router.back()} />
     </Screen>
   );
 }

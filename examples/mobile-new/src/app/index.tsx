@@ -38,7 +38,7 @@ export default function Login() {
   const [presetName, setPresetName] = useState("Ready");
   const [sponsored, setSponsored] = useState(false);
 
-  if (wallet) return <Redirect href="/home" />;
+  if (wallet) return <Redirect href="/balances" />;
 
   const openPrivy = () => {
     if (isExpoGo) {

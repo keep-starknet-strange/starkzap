@@ -26,7 +26,24 @@ export default function RootLayout() {
 
   return (
     <SafeAreaProvider>
-      <Stack screenOptions={{ headerShown: false }} />
+      <Stack screenOptions={{ headerShown: false }}>
+        <Stack.Screen
+          name="account"
+          options={{
+            headerShown: true,
+            headerBackButtonDisplayMode: "minimal",
+            title: "Account",
+          }}
+        />
+        <Stack.Screen
+          name="privy"
+          options={{
+            headerShown: true,
+            headerBackButtonDisplayMode: "minimal",
+            title: "Sign in with Privy",
+          }}
+        />
+      </Stack>
       <StatusBar style="auto" />
     </SafeAreaProvider>
   );

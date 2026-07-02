@@ -19,6 +19,12 @@ import { ensureCartridgeAdapter } from "@/core/cartridge";
 
 export type WalletType = "cartridge" | "privatekey" | "privy";
 
+export const LOGIN_LABEL: Record<WalletType, string> = {
+  cartridge: "Cartridge",
+  privatekey: "Private key",
+  privy: "Privy",
+};
+
 // Labels shown in the UI mapped to their account class implementations.
 export const ACCOUNT_PRESETS: Record<string, AccountClassConfig> = {
   Ready: ArgentPreset,

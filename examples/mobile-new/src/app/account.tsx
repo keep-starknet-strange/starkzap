@@ -1,16 +1,11 @@
+import { useState } from "react";
 import { View, Pressable } from "react-native";
 import { Redirect } from "expo-router";
 import * as Clipboard from "expo-clipboard";
 import { Screen, Text, Button, Card } from "@/ui";
 import { useTheme } from "@/theme";
 import { NETWORKS } from "@/core/network";
-import { useWalletStore, type WalletType } from "@/core/wallet/store";
-
-const LOGIN_LABEL: Record<WalletType, string> = {
-  cartridge: "Cartridge",
-  privatekey: "Private key",
-  privy: "Privy",
-};
+import { LOGIN_LABEL, useWalletStore } from "@/core/wallet/store";
 
 function truncate(address: string) {
   return `${address.slice(0, 6)}…${address.slice(-4)}`;
@@ -25,7 +20,7 @@ function Row({ label, value }: { label: string; value: string }) {
   );
 }
 
-export default function Home() {
+export default function Account() {
   const { colors, spacing } = useTheme();
   const {
     wallet,
@@ -40,6 +35,16 @@ export default function Home() {
     disconnect,
   } = useWalletStore();
 
+  const [refreshing, setRefreshing] = useState(false);
+  const onRefresh = async () => {
+    setRefreshing(true);
+    try {
+      await checkDeployment();
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
   if (!wallet || !address) return <Redirect href="/" />;
 
   const status =
@@ -52,9 +57,12 @@ export default function Home() {
         : colors.textMuted;
 
   return (
-    <Screen scroll>
-      <Text variant="title">Account</Text>
-
+    <Screen
+      scroll
+      edges={["left", "right", "bottom"]}
+      onRefresh={onRefresh}
+      refreshing={refreshing}
+    >
       <Card>
         <View style={{ gap: spacing.xs }}>
           <Text variant="label">Address</Text>
@@ -80,11 +88,6 @@ export default function Home() {
       {isDeployed === false && (
         <Button title="Deploy account" onPress={deploy} loading={connecting} />
       )}
-      <Button
-        title="Refresh status"
-        variant="secondary"
-        onPress={checkDeployment}
-      />
       <Button title="Disconnect" variant="ghost" onPress={disconnect} />
     </Screen>
   );

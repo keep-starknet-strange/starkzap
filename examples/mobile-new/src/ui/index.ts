@@ -4,3 +4,4 @@ export { Card } from "./Card";
 export { TextField } from "./TextField";
 export { Segmented, type SegmentedOption } from "./Segmented";
 export { Screen } from "./Screen";
+export { IconSymbol } from "./icon-symbol";

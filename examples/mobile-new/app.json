@@ -9,7 +9,7 @@
     "userInterfaceStyle": "automatic",
     "ios": {
       "icon": "./assets/expo.icon",
-      "bundleIdentifier": "com.micbakos.starkzap",
+      "bundleIdentifier": "com.kss.starkzap",
       "appleTeamId": "4M48KC5QKH"
     },
     "android": {
