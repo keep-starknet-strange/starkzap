@@ -77,6 +77,19 @@ export default function TabsLayout() {
           ),
         }}
       />
+      <Tabs.Screen
+        name="lending"
+        options={{
+          tabBarLabel: "Lending",
+          tabBarIcon: ({ color, size }) => (
+            <IconSymbol
+              name="building.columns.fill"
+              size={size}
+              color={color}
+            />
+          ),
+        }}
+      />
     </Tabs>
   );
 }

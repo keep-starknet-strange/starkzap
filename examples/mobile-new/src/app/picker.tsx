@@ -1,12 +1,14 @@
 import { useEffect } from "react";
 import { View, Pressable, ScrollView, Image } from "react-native";
 import { Stack, router } from "expo-router";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Text, IconSymbol } from "@/ui";
 import { useTheme } from "@/theme";
 import { usePickerStore } from "@/core/picker/store";
 
 export default function PickerScreen() {
   const { colors, spacing } = useTheme();
+  const insets = useSafeAreaInsets();
   const config = usePickerStore((s) => s.config);
   const close = usePickerStore((s) => s.close);
 
@@ -18,7 +20,10 @@ export default function PickerScreen() {
   return (
     <>
       <Stack.Screen options={{ title: config.title ?? "Select" }} />
-      <ScrollView contentInsetAdjustmentBehavior="automatic">
+      <ScrollView
+        contentInsetAdjustmentBehavior="automatic"
+        contentContainerStyle={{ paddingBottom: insets.bottom + spacing.md }}
+      >
         {config.options.map((o) => {
           const active = o.value === config.selected;
           return (
