@@ -4,6 +4,7 @@ import { useEffect, useRef } from "react";
 import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { SafeAreaProvider } from "react-native-safe-area-context";
+import { useTheme } from "@/theme";
 import { getDevLogin } from "@/core/dev-login";
 import { useWalletStore } from "@/core/wallet/store";
 
@@ -22,6 +23,7 @@ function useDevAutoLogin() {
 }
 
 export default function RootLayout() {
+  const { colors } = useTheme();
   useDevAutoLogin();
 
   return (
@@ -33,6 +35,18 @@ export default function RootLayout() {
             headerShown: true,
             headerBackButtonDisplayMode: "minimal",
             title: "Account",
+          }}
+        />
+        <Stack.Screen
+          name="picker"
+          options={{
+            presentation: "formSheet",
+            sheetAllowedDetents: "fitToContents",
+            sheetGrabberVisible: true,
+            headerShown: true,
+            headerStyle: { backgroundColor: colors.card },
+            headerTintColor: colors.text,
+            contentStyle: { backgroundColor: colors.card },
           }}
         />
         <Stack.Screen

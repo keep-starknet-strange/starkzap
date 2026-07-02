@@ -1,10 +1,7 @@
 import { create } from "zustand";
-import { getPresets, type Amount, type Token } from "starkzap-native";
-import { NETWORKS } from "@/core/network";
+import { type Amount, type Token } from "starkzap-native";
 import { useWalletStore } from "@/core/wallet/store";
-
-// Common tokens to show; any absent from the network's presets are skipped.
-const SYMBOLS = ["STRK", "ETH", "USDC", "USDT", "WBTC"];
+import { useTokensStore } from "@/core/tokens/store";
 
 export interface TokenBalance {
   token: Token;
@@ -23,14 +20,11 @@ export const useBalancesStore = create<BalancesStore>((set) => ({
   loading: false,
   error: null,
   refresh: async () => {
-    const { wallet, networkIndex } = useWalletStore.getState();
+    const { wallet } = useWalletStore.getState();
     if (!wallet) return;
     set({ loading: true, error: null });
     try {
-      const presets = getPresets(NETWORKS[networkIndex].chainId);
-      const tokens = SYMBOLS.map((s) => presets[s]).filter(
-        (t): t is Token => !!t
-      );
+      const { tokens } = useTokensStore.getState();
       const balances = await Promise.all(
         tokens.map(async (token) => ({
           token,

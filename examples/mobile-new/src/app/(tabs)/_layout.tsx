@@ -36,8 +36,18 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="balances"
         options={{
+          tabBarLabel: "Balances",
           tabBarIcon: ({ color, size }) => (
             <IconSymbol name="wallet.bifold.fill" size={size} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="transfers"
+        options={{
+          tabBarLabel: "Transfers",
+          tabBarIcon: ({ color, size }) => (
+            <IconSymbol name="paperplane.fill" size={size} color={color} />
           ),
         }}
       />

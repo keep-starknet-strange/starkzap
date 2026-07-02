@@ -14,6 +14,7 @@ export interface ThemeColors {
   accent: string;
   danger: string;
   success: string;
+  scrim: string;
 }
 
 const palette: { light: ThemeColors; dark: ThemeColors } = {
@@ -28,6 +29,7 @@ const palette: { light: ThemeColors; dark: ThemeColors } = {
     accent: "#3b5bff",
     danger: "#dc2626",
     success: "#16a34a",
+    scrim: "rgba(0,0,0,0.4)",
   },
   dark: {
     bg: "#0b0d12",
@@ -40,6 +42,7 @@ const palette: { light: ThemeColors; dark: ThemeColors } = {
     accent: "#6f86ff",
     danger: "#f87171",
     success: "#4ade80",
+    scrim: "rgba(0,0,0,0.5)",
   },
 };
 

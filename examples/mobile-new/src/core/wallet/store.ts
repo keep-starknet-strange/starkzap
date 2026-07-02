@@ -16,6 +16,7 @@ import { NETWORKS } from "@/core/network";
 import { PRIVY_SERVER_URL, PAYMASTER_PROXY_URL } from "@/core/config";
 import { resolveExamplePaymasterNodeUrl } from "@/core/paymaster";
 import { ensureCartridgeAdapter } from "@/core/cartridge";
+import { useTokensStore } from "@/core/tokens/store";
 
 export type WalletType = "cartridge" | "privatekey" | "privy";
 
@@ -98,7 +99,10 @@ export const useWalletStore = create<WalletStore>((set, get) => ({
   connecting: false,
   error: null,
 
-  setNetworkIndex: (index) => set({ networkIndex: index }),
+  setNetworkIndex: (index) => {
+    useTokensStore.getState().load(index);
+    set({ networkIndex: index });
+  },
 
   connectCartridge: async () => {
     ensureCartridgeAdapter();
