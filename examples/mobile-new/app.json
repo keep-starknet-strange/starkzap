@@ -10,7 +10,10 @@
     "ios": {
       "icon": "./assets/expo.icon",
       "bundleIdentifier": "com.kss.starkzap",
-      "appleTeamId": "4M48KC5QKH"
+      "appleTeamId": "4M48KC5QKH",
+      "infoPlist": {
+        "LSApplicationQueriesSchemes": ["phantom", "solflare"]
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -19,7 +22,8 @@
         "backgroundImage": "./assets/images/android-icon-background.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "package": "com.kss.starkzap"
     },
     "web": {
       "output": "static",
@@ -28,6 +32,7 @@
     "plugins": [
       "expo-router",
       "expo-secure-store",
+      "./plugins/android-wallet-queries",
       [
         "expo-splash-screen",
         {

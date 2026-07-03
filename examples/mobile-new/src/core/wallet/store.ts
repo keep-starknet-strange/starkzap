@@ -20,7 +20,16 @@ import {
   type WalletInterface,
 } from "starkzap-native";
 import { NETWORKS } from "@/core/network";
-import { PRIVY_SERVER_URL, PAYMASTER_PROXY_URL } from "@/core/config";
+import {
+  PRIVY_SERVER_URL,
+  PAYMASTER_PROXY_URL,
+  LAYERSWAP_API_KEY_MAINNET,
+  LAYERSWAP_API_KEY_TESTNET,
+  SOLANA_RPC_URL,
+  OFT_PUBLIC_KEY,
+  alchemyEthRpc,
+  alchemySolanaMainnetRpc,
+} from "@/core/config";
 import { resolveExamplePaymasterNodeUrl } from "@/core/paymaster";
 import { ensureCartridgeAdapter } from "@/core/cartridge";
 import { useTokensStore } from "@/core/tokens/store";
@@ -105,10 +114,25 @@ function buildSdk(networkIndex: number) {
     privyServerUrl: PRIVY_SERVER_URL,
     chainId: net.chainId.toLiteral(),
   });
+  const isMain = net.chainId.isMainnet();
+  const ethRpc = alchemyEthRpc(isMain ? "mainnet" : "sepolia");
+  // Solana override wins; else Alchemy (mainnet only).
+  const solanaRpc = SOLANA_RPC_URL || (isMain ? alchemySolanaMainnetRpc() : "");
+  const layerswapApiKey = isMain
+    ? LAYERSWAP_API_KEY_MAINNET
+    : LAYERSWAP_API_KEY_TESTNET;
+  const bridging = {
+    ...(ethRpc ? { ethereumRpcUrl: ethRpc } : {}),
+    ...(solanaRpc ? { solanaRpcUrl: solanaRpc } : {}),
+    ...(layerswapApiKey ? { layerswapApiKey } : {}),
+    // OFT is mainnet-only.
+    ...(isMain && OFT_PUBLIC_KEY ? { layerZeroApiKey: OFT_PUBLIC_KEY } : {}),
+  };
   const sdk = new StarkZap({
     rpcUrl: net.rpcUrl,
     chainId: net.chainId,
     ...(paymasterNodeUrl ? { paymaster: { nodeUrl: paymasterNodeUrl } } : {}),
+    ...(Object.keys(bridging).length ? { bridging } : {}),
   });
   return { sdk, paymasterNodeUrl };
 }

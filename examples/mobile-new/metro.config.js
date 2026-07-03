@@ -29,20 +29,29 @@ config.resolver.blockList = [].concat(
 // walks node_modules for it (which also trips the 0.84 path-collapse bug).
 const coreDist = path.join(workspaceRoot, "dist", "src");
 
-// Pin @avnu/avnu-sdk to this example's single copy. starkzap lazily
-// `import("@avnu/avnu-sdk")` from the workspace-root install, which would
-// otherwise resolve a different physical copy than the eager import below,
-// giving Metro two module ids and an unresolved lazy import at runtime.
-const avnuSdkDir = path.resolve(__dirname, "node_modules/@avnu/avnu-sdk");
+// Packages installed in THIS example but lazily `import()`-ed by the prebuilt
+// starkzap core (resolved from dist/). Without pinning, those dynamic imports
+// resolve from the workspace root (where the packages are absent) and fail at
+// runtime. Pin each to the example's own copy.
+// Only the BARE specifiers here — those are what starkzap core lazily
+// `import()`s. Pinning subpaths (e.g. `ethers/lib/...`) would hijack other
+// packages that bring their own version (e.g. @hyperlane-xyz uses ethers v5).
+const appNodeModules = path.resolve(__dirname, "node_modules");
+const APP_PINNED = ["@avnu/avnu-sdk", "ethers", "@solana/web3.js"];
 const priorResolveRequest = config.resolver.resolveRequest;
 config.resolver.resolveRequest = (context, moduleName, platform) => {
-  if (
-    moduleName === "@avnu/avnu-sdk" ||
-    moduleName.startsWith("@avnu/avnu-sdk/")
-  ) {
-    const target = avnuSdkDir + moduleName.slice("@avnu/avnu-sdk".length);
+  if (APP_PINNED.includes(moduleName)) {
     const resolver = priorResolveRequest ?? context.resolveRequest;
-    return resolver(context, target, platform);
+    return resolver(context, path.join(appNodeModules, moduleName), platform);
+  }
+  // starkzap core is resolved from the repo-root dist/, which lives OUTSIDE this
+  // app. Its lazy `import()`s of bridge/monitor modules leak to the Metro dev
+  // server as package-root paths ("./dist/src/bridge/...") anchored at the app
+  // root and fail. Redirect any such specifier to the real repo-root dist.
+  const distMatch = moduleName.match(/(?:^|\/)(dist\/src\/.+)$/);
+  if (distMatch && moduleName.includes("dist/src/")) {
+    const resolver = priorResolveRequest ?? context.resolveRequest;
+    return resolver(context, path.join(workspaceRoot, distMatch[1]), platform);
   }
   if (moduleName === "starkzap") {
     return { type: "sourceFile", filePath: path.join(coreDist, "index.js") };

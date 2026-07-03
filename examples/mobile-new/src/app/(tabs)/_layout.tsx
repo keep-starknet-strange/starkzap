@@ -108,6 +108,19 @@ export default function TabsLayout() {
           ),
         }}
       />
+      <Tabs.Screen
+        name="bridge"
+        options={{
+          tabBarLabel: "Bridge",
+          tabBarIcon: ({ color, size }) => (
+            <IconSymbol
+              name="point.3.connected.trianglepath.dotted"
+              size={size}
+              color={color}
+            />
+          ),
+        }}
+      />
     </Tabs>
   );
 }
