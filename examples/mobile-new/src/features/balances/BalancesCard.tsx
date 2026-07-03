@@ -1,5 +1,5 @@
-import { View, Image } from "react-native";
-import { Card, Text } from "@/ui";
+import { View } from "react-native";
+import { Card, Text, RemoteImage } from "@/ui";
 import { useTheme } from "@/theme";
 import { useBalancesStore } from "./store";
 
@@ -35,14 +35,7 @@ export function BalancesCard() {
                 }}
               >
                 {logo ? (
-                  <Image
-                    source={{ uri: logo }}
-                    style={{
-                      width: ICON,
-                      height: ICON,
-                      borderRadius: ICON / 2,
-                    }}
-                  />
+                  <RemoteImage uri={logo} size={ICON} />
                 ) : (
                   <View
                     style={{

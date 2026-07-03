@@ -90,6 +90,15 @@ export default function TabsLayout() {
           ),
         }}
       />
+      <Tabs.Screen
+        name="yield"
+        options={{
+          tabBarLabel: "Yield",
+          tabBarIcon: ({ color, size }) => (
+            <IconSymbol name="cube.box.fill" size={size} color={color} />
+          ),
+        }}
+      />
     </Tabs>
   );
 }

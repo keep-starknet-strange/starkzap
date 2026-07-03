@@ -1,8 +1,8 @@
 import { useEffect } from "react";
-import { View, Pressable, ScrollView, Image } from "react-native";
+import { View, Pressable, ScrollView } from "react-native";
 import { Stack, router } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Text, IconSymbol } from "@/ui";
+import { Text, IconSymbol, RemoteImage } from "@/ui";
 import { useTheme } from "@/theme";
 import { usePickerStore } from "@/core/picker/store";
 
@@ -49,12 +49,7 @@ export default function PickerScreen() {
                   flexShrink: 1,
                 }}
               >
-                {o.image ? (
-                  <Image
-                    source={{ uri: o.image }}
-                    style={{ width: 28, height: 28, borderRadius: 14 }}
-                  />
-                ) : null}
+                {o.image ? <RemoteImage uri={o.image} size={28} /> : null}
                 <Text
                   style={{
                     color: active ? colors.primary : colors.text,

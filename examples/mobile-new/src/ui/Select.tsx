@@ -1,8 +1,9 @@
-import { View, Image, Pressable } from "react-native";
+import { View, Pressable } from "react-native";
 import { router } from "expo-router";
 import { useTheme } from "@/theme";
 import { Text } from "./Text";
 import { IconSymbol } from "./icon-symbol";
+import { RemoteImage } from "./RemoteImage";
 import { usePickerStore } from "@/core/picker/store";
 
 export interface SelectOption<T extends string> {
@@ -60,10 +61,7 @@ export function Select<T extends string>({
         }}
       >
         {selected?.image ? (
-          <Image
-            source={{ uri: selected.image }}
-            style={{ width: 24, height: 24, borderRadius: 12 }}
-          />
+          <RemoteImage uri={selected.image} size={24} />
         ) : null}
         <Text variant="body">{selected?.label ?? "Select"}</Text>
       </View>
