@@ -25,6 +25,7 @@ import { resolveExamplePaymasterNodeUrl } from "@/core/paymaster";
 import { ensureCartridgeAdapter } from "@/core/cartridge";
 import { useTokensStore } from "@/core/tokens/store";
 import { useTxBannerStore } from "@/core/tx-banner/store";
+import { usePrivacyStore } from "@/features/privacy/store";
 
 export type WalletType = "cartridge" | "privatekey" | "privy";
 
@@ -153,6 +154,7 @@ export const useWalletStore = create<WalletStore>((set, get) => ({
         walletType: "cartridge",
         address: wallet.address,
       });
+      usePrivacyStore.getState().clear();
       await get().checkDeployment();
     } catch (err) {
       set({ error: String(err) });
@@ -183,6 +185,8 @@ export const useWalletStore = create<WalletStore>((set, get) => ({
         walletType: "privatekey",
         address: wallet.address,
       });
+      // Establish the confidential capability now, while the key is in scope.
+      usePrivacyStore.getState().init(privateKey.trim());
       await get().checkDeployment();
     } catch (err) {
       set({ error: String(err) });
@@ -218,6 +222,7 @@ export const useWalletStore = create<WalletStore>((set, get) => ({
         walletType: "privy",
         address: wallet.address,
       });
+      usePrivacyStore.getState().clear();
       await get().checkDeployment();
     } catch (err) {
       set({ error: String(err) });
@@ -248,7 +253,8 @@ export const useWalletStore = create<WalletStore>((set, get) => ({
     set({ connecting: false });
   },
 
-  disconnect: () =>
+  disconnect: () => {
+    usePrivacyStore.getState().clear();
     set({
       sdk: null,
       paymasterNodeUrl: null,
@@ -257,5 +263,6 @@ export const useWalletStore = create<WalletStore>((set, get) => ({
       address: null,
       isDeployed: null,
       error: null,
-    }),
+    });
+  },
 }));

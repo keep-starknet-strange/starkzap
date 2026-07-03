@@ -26,7 +26,7 @@ export default function SwapTab() {
   return (
     <Screen
       scroll
-      edges={["left", "right", "bottom"]}
+      edges={["left", "right"]}
       onRefresh={() => {
         void refresh();
         if (mode === "dca") void loadOrders();

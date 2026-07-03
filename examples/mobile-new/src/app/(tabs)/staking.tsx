@@ -26,7 +26,7 @@ export default function StakingTab() {
   return (
     <Screen
       scroll
-      edges={["left", "right", "bottom"]}
+      edges={["left", "right"]}
       onRefresh={() => {
         void refresh();
         if (mode === "delegate") void delegateRefresh();

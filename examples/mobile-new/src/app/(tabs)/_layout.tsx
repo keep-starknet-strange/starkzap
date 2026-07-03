@@ -99,6 +99,15 @@ export default function TabsLayout() {
           ),
         }}
       />
+      <Tabs.Screen
+        name="privacy"
+        options={{
+          tabBarLabel: "Privacy",
+          tabBarIcon: ({ color, size }) => (
+            <IconSymbol name="lock.shield.fill" size={size} color={color} />
+          ),
+        }}
+      />
     </Tabs>
   );
 }
