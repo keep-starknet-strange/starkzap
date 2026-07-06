@@ -172,8 +172,10 @@ describe("TongoConfidential", () => {
       };
       const calls = await c.fund(details);
       expect(calls).toEqual([approveCall, fundCall]);
+      // Amount is converted from ERC20 base units to confidential (tongo) units.
+      expect(mockTongoAccount.erc20ToTongo).toHaveBeenCalledWith(100n);
       expect(mockTongoAccount.fund).toHaveBeenCalledWith({
-        amount: 100n,
+        amount: 200n,
         sender: "0xSENDER",
       });
     });
@@ -201,7 +203,7 @@ describe("TongoConfidential", () => {
       };
       await c.fund(details);
       expect(mockTongoAccount.fund).toHaveBeenCalledWith({
-        amount: 100n,
+        amount: 200n,
         sender: "0xSENDER",
         fee_to_sender: 5n,
       });
@@ -230,8 +232,10 @@ describe("TongoConfidential", () => {
       };
       const calls = await c.transfer(details);
       expect(calls).toEqual([transferCall]);
+      // Amount is converted from ERC20 base units to confidential (tongo) units.
+      expect(mockTongoAccount.erc20ToTongo).toHaveBeenCalledWith(50n);
       expect(mockTongoAccount.transfer).toHaveBeenCalledWith({
-        amount: 50n,
+        amount: 200n,
         to: { x: 1n, y: 2n },
         sender: "0xSENDER",
       });
@@ -247,7 +251,7 @@ describe("TongoConfidential", () => {
         feeTo: 3n,
       });
       expect(mockTongoAccount.transfer).toHaveBeenCalledWith({
-        amount: 50n,
+        amount: 200n,
         to: { x: 1n, y: 2n },
         sender: "0xSENDER",
         fee_to_sender: 3n,
@@ -266,8 +270,10 @@ describe("TongoConfidential", () => {
       };
       const calls = await c.withdraw(details);
       expect(calls).toEqual([withdrawCall]);
+      // Amount is converted from ERC20 base units to confidential (tongo) units.
+      expect(mockTongoAccount.erc20ToTongo).toHaveBeenCalledWith(25n);
       expect(mockTongoAccount.withdraw).toHaveBeenCalledWith({
-        amount: 25n,
+        amount: 200n,
         to: "0xRECIPIENT",
         sender: "0xSENDER",
       });
@@ -283,7 +289,7 @@ describe("TongoConfidential", () => {
         feeTo: 2n,
       });
       expect(mockTongoAccount.withdraw).toHaveBeenCalledWith({
-        amount: 25n,
+        amount: 200n,
         to: "0xRECIPIENT",
         sender: "0xSENDER",
         fee_to_sender: 2n,
