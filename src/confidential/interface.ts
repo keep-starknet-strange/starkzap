@@ -31,6 +31,14 @@ export interface ConfidentialProvider {
   readonly recipientId: ConfidentialRecipient;
 
   /**
+   * Resolve a shareable account address (the single public key returned by
+   * {@link address}) into the recipient identity used by {@link transfer}.
+   *
+   * Lets a sender paste one public key instead of raw coordinates.
+   */
+  recipientFromAddress(address: string): ConfidentialRecipient;
+
+  /**
    * Get the decrypted confidential account state.
    *
    * Reads the on-chain encrypted balance and decrypts it locally.

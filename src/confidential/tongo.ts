@@ -1,5 +1,8 @@
 import type { Call } from "starknet";
-import { Account as TongoAccount } from "@fatsolutions/tongo-sdk";
+import {
+  Account as TongoAccount,
+  pubKeyBase58ToAffine,
+} from "@fatsolutions/tongo-sdk";
 import type { ConfidentialProvider } from "@/confidential/interface";
 import type { Amount } from "@/types/amount";
 import type {
@@ -68,6 +71,14 @@ export class TongoConfidential implements ConfidentialProvider {
   /** The public key used to receive confidential transfers to this account. */
   get recipientId(): ConfidentialRecipient {
     return this.account.publicKey;
+  }
+
+  /**
+   * Decode a Tongo address (base58-encoded public key, as returned by
+   * {@link address}) into the `{ x, y }` recipient used by {@link transfer}.
+   */
+  recipientFromAddress(address: string): ConfidentialRecipient {
+    return pubKeyBase58ToAffine(address.trim());
   }
 
   /**
