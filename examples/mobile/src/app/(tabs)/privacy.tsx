@@ -33,7 +33,6 @@ export default function PrivacyTab() {
 
   const [fundAmount, setFundAmount] = useState("");
   const [wAmount, setWAmount] = useState("");
-  const [wTo, setWTo] = useState("");
   const [tAmount, setTAmount] = useState("");
   const [tx, setTx] = useState("");
   const [ty, setTy] = useState("");
@@ -140,19 +139,12 @@ export default function PrivacyTab() {
               onChangeText={setWAmount}
               keyboardType="decimal-pad"
             />
-            <TextField
-              label="To address"
-              placeholder="0x…"
-              value={wTo}
-              onChangeText={setWTo}
-              autoCapitalize="none"
-              autoCorrect={false}
-            />
+            <Text variant="muted">Unshields to your wallet address.</Text>
             <Button
               title="Unshield"
               loading={busy}
-              disabled={!wAmount.trim() || !wTo.trim()}
-              onPress={() => void withdraw(wAmount, wTo)}
+              disabled={!wAmount.trim()}
+              onPress={() => void withdraw(wAmount)}
             />
           </Card>
 

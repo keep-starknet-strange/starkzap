@@ -2,6 +2,7 @@ import { defineConfig, type Plugin } from "vite";
 import path from "path";
 import { createRequire } from "module";
 import { nodePolyfills } from "vite-plugin-node-polyfills";
+import { svelte } from "@sveltejs/vite-plugin-svelte";
 
 const require = createRequire(import.meta.url);
 
@@ -17,7 +18,7 @@ function resolvePolyfillShims(): Plugin {
 }
 
 export default defineConfig({
-  plugins: [nodePolyfills(), resolvePolyfillShims()],
+  plugins: [svelte(), nodePolyfills(), resolvePolyfillShims()],
   server: {
     allowedHosts: ["localhost", ".trycloudflare.com"],
   },
@@ -25,6 +26,7 @@ export default defineConfig({
     alias: {
       starkzap: path.resolve(__dirname, "../../src/index.ts"),
       "@": path.resolve(__dirname, "../../src"),
+      "~": path.resolve(__dirname, "src"),
     },
   },
   optimizeDeps: {

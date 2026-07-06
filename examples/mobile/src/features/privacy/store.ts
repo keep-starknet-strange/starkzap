@@ -50,7 +50,7 @@ interface PrivacyStore {
   connect: () => Promise<void>;
   refresh: () => Promise<void>;
   fund: (amount: string) => Promise<void>;
-  withdraw: (amount: string, to: string) => Promise<void>;
+  withdraw: (amount: string) => Promise<void>;
   transfer: (amount: string, x: string, y: string) => Promise<void>;
   rollover: () => Promise<void>;
 }
@@ -137,17 +137,18 @@ export const usePrivacyStore = create<PrivacyStore>((set, get) => ({
     set({ busy: false });
     if (tx) await get().refresh();
   },
-  withdraw: async (amount, to) => {
+  // Unshield always returns funds to our own wallet address.
+  withdraw: async (amount) => {
     const { wallet } = useWalletStore.getState();
     const { instance, token } = get();
-    if (!wallet || !instance || !token || !amount.trim() || !to.trim()) return;
+    if (!wallet || !instance || !token || !amount.trim()) return;
     set({ busy: true });
     const tx = await useTxBannerStore
       .getState()
       .notify(`Unshield ${token.symbol}`, async () => {
         const calls = await instance.withdraw({
           amount: Amount.parse(amount, token.decimals, token.symbol),
-          to: fromAddress(to),
+          to: fromAddress(wallet.address),
           sender: wallet.address,
         });
         return wallet.execute(calls);
