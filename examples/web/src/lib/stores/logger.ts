@@ -14,6 +14,10 @@ export interface LogEntry {
 
 export const logs = writable<LogEntry[]>([]);
 
+export function clearLogs(): void {
+  logs.set([]);
+}
+
 function push(source: LogEntry["source"], level: LogLevel, message: string) {
   const time = new Date().toLocaleTimeString("en-US", { hour12: false });
   logs.update((prev) => [...prev, { time, source, level, message }]);
