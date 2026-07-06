@@ -101,6 +101,7 @@ interface WalletStore {
     walletId: string;
     publicKey: string;
     accessToken: string;
+    presetName: string;
   }) => Promise<void>;
   checkDeployment: () => Promise<void>;
   deploy: () => Promise<void>;
@@ -219,7 +220,7 @@ export const useWalletStore = create<WalletStore>((set, get) => ({
     }
   },
 
-  connectPrivy: async ({ walletId, publicKey, accessToken }) => {
+  connectPrivy: async ({ walletId, publicKey, accessToken, presetName }) => {
     set({ connecting: true, error: null });
     try {
       const { sdk, paymasterNodeUrl } = buildSdk(get().networkIndex);
@@ -227,7 +228,7 @@ export const useWalletStore = create<WalletStore>((set, get) => ({
         strategy: OnboardStrategy.Privy,
         deploy: "never",
         ...PROVIDER_OPTIONS,
-        accountPreset: ACCOUNT_PRESETS.Ready,
+        accountPreset: ACCOUNT_PRESETS[presetName] ?? ACCOUNT_PRESETS.Ready,
         // The wallet signs remotely through the example server's Privy route,
         // authenticated with the access token from the Privy login.
         privy: {

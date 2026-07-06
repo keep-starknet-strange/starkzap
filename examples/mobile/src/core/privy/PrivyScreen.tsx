@@ -7,10 +7,17 @@ import {
   useLoginWithEmail,
   useLoginWithOAuth,
 } from "@privy-io/expo";
-import { Screen, Card, Text, Button, TextField } from "@/ui";
+import { Screen, Card, Text, Button, TextField, Segmented } from "@/ui";
 import { useTheme } from "@/theme";
 import { PRIVY_APP_ID, PRIVY_CLIENT_ID, PRIVY_SERVER_URL } from "@/core/config";
-import { useWalletStore } from "@/core/wallet/store";
+import { ACCOUNT_PRESETS, useWalletStore } from "@/core/wallet/store";
+
+const PRESET_OPTIONS = [
+  { label: "Ready", value: "Ready" },
+  { label: "OZ", value: "OpenZeppelin" },
+  { label: "Braavos", value: "Braavos" },
+  { label: "Devnet", value: "Devnet" },
+] satisfies { label: string; value: keyof typeof ACCOUNT_PRESETS }[];
 
 // NOTE: this module is the ONLY place that statically imports @privy-io/expo.
 // It is loaded lazily (see app/privy.tsx) so Expo Go never evaluates the native
@@ -39,6 +46,7 @@ function PrivyLogin() {
   const [otp, setOtp] = useState("");
   const [codeSent, setCodeSent] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [presetName, setPresetName] = useState("Ready");
 
   const run = useCallback(async (fn: () => Promise<unknown>) => {
     setBusy(true);
@@ -68,9 +76,10 @@ function PrivyLogin() {
       walletId: data.wallet.id,
       publicKey: data.wallet.publicKey,
       accessToken: token,
+      presetName,
     });
     router.replace("/balances");
-  }, [getAccessToken, connectPrivy]);
+  }, [getAccessToken, connectPrivy, presetName]);
 
   if (!isReady) {
     return (
@@ -86,6 +95,12 @@ function PrivyLogin() {
         {user ? (
           <>
             <Text>Signed in with Privy.</Text>
+            <Text variant="label">Account type</Text>
+            <Segmented
+              options={PRESET_OPTIONS}
+              value={presetName}
+              onChange={setPresetName}
+            />
             <Button
               title="Connect Starknet"
               loading={busy || connecting}
