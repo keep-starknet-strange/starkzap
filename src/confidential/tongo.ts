@@ -122,7 +122,8 @@ export class TongoConfidential implements ConfidentialProvider {
    */
   async fund(details: ConfidentialFundDetails): Promise<Call[]> {
     const op = await this.account.fund({
-      amount: details.amount.toBase(),
+      // Tongo works in confidential units (32-bit), not ERC20 base units.
+      amount: await this.toConfidentialUnits(details.amount),
       sender: details.sender,
       ...(details.feeTo !== undefined && { fee_to_sender: details.feeTo }),
     });
@@ -136,7 +137,7 @@ export class TongoConfidential implements ConfidentialProvider {
    */
   async transfer(details: ConfidentialTransferDetails): Promise<Call[]> {
     const op = await this.account.transfer({
-      amount: details.amount.toBase(),
+      amount: await this.toConfidentialUnits(details.amount),
       to: details.to,
       sender: details.sender,
       ...(details.feeTo !== undefined && { fee_to_sender: details.feeTo }),
@@ -151,7 +152,7 @@ export class TongoConfidential implements ConfidentialProvider {
    */
   async withdraw(details: ConfidentialWithdrawDetails): Promise<Call[]> {
     const op = await this.account.withdraw({
-      amount: details.amount.toBase(),
+      amount: await this.toConfidentialUnits(details.amount),
       to: details.to,
       sender: details.sender,
       ...(details.feeTo !== undefined && { fee_to_sender: details.feeTo }),
