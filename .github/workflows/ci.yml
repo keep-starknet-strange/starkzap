@@ -76,7 +76,6 @@ jobs:
           cache-dependency-path: |
             package-lock.json
             examples/web/package-lock.json
-            examples/flappy-bird/package-lock.json
             examples/mobile/package-lock.json
           cache: npm
 
@@ -102,9 +101,3 @@ jobs:
 
       - name: Build Web Example
         run: npm run -s build --prefix examples/web
-
-      - name: Install Flappy-Bird Example
-        run: npm ci --prefix examples/flappy-bird
-
-      - name: Build Flappy-Bird Example
-        run: npm run -s build --prefix examples/flappy-bird
