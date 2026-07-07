@@ -5,7 +5,7 @@
   "scripts": {
     "postinstall": "cd ../.. && npm run build",
     "dev": "vite",
-    "dev:server": "tsx server.ts",
+    "dev:server": "npm --prefix ../server start",
     "dev:all": "concurrently \"npm run dev\" \"npm run dev:server\"",
     "build": "vite build",
     "preview": "vite preview",
@@ -13,6 +13,7 @@
   },
   "dependencies": {
     "@avnu/avnu-sdk": "^4.1.0-rc.0",
+    "@privy-io/js-sdk-core": "^0.68.0",
     "@cartridge/controller": "^0.13.9",
     "@hyperlane-xyz/registry": "^19.4.0",
     "@hyperlane-xyz/sdk": "^14.4.0",

@@ -4,6 +4,10 @@ import {
   StarkSigner,
   OnboardStrategy,
   type WalletInterface,
+  AvnuSwapProvider,
+  EkuboSwapProvider,
+  AvnuDcaProvider,
+  EkuboDcaProvider,
 } from "starkzap";
 import {
   RPC_URL,
@@ -15,9 +19,8 @@ import {
   AUTO_ACCOUNT_PRESET,
 } from "./config";
 import { sdkLogger, log } from "./logger";
-import { getSwapProviders } from "../../../swaps";
-import { getDcaProviders } from "../../../dca";
 import * as privacy from "~/features/privacy/store";
+import { getAccessToken as getPrivyAccessToken } from "./privy";
 
 export type WalletType = "cartridge" | "privatekey" | "privy";
 
@@ -26,8 +29,8 @@ const STRK_ADDRESS =
   "0x04718f5a0fc34cc1af16a1cdee98ffb20c31f5cd61d6ab07201858f4287c938d";
 const CARTRIDGE_POLICY = { target: STRK_ADDRESS, method: "transfer" };
 
-const swapProviders = getSwapProviders();
-const dcaProviders = getDcaProviders();
+const swapProviders = [new AvnuSwapProvider(), new EkuboSwapProvider()];
+const dcaProviders = [new AvnuDcaProvider(), new EkuboDcaProvider()];
 
 // Swap/DCA provider options for the selectors. Ekubo is fetch-only (no key);
 // Avnu uses @avnu/avnu-sdk. Both registered; Ekubo is the default.
@@ -128,21 +131,26 @@ export function connectPrivateKey(
   });
 }
 
-// Privy: register/fetch the user's wallet via the example server, then onboard
-// with the remote signer. Requires `npm run dev:server` running.
-export function connectPrivy(email: string, presetName: string): Promise<void> {
+// Privy: the user logs in with Privy in-browser first (see privy store) to get
+// an access token; the example server verifies it, returns/creates the Starknet
+// wallet, then the SDK signs remotely via the server. Requires `npm run dev:server`.
+export function connectPrivy(presetName: string): Promise<void> {
   return connect("privy", async () => {
     const preset = ACCOUNT_PRESETS[presetName];
     if (!preset) throw new Error(`Unknown account preset: ${presetName}`);
+    const token = await getPrivyAccessToken();
+    if (!token) throw new Error("Log in with Privy first.");
     const res = await fetch(`${PRIVY_SERVER_URL}/api/wallet/starknet`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email }),
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
     });
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
       throw new Error(
-        err.details || err.error || "Failed to register Privy user"
+        err.details || err.error || "Failed to fetch Privy wallet"
       );
     }
     const { wallet: walletData } = await res.json();

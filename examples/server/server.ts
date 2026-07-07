@@ -80,7 +80,12 @@ app.post("/api/wallet/starknet", auth, async (req, res) => {
   }
 
   try {
-    const wallet = await privy.wallets().create({ chain_type: "starknet" });
+    // owner_id expects a cuid2 key-quorum id; to own by a Privy user pass
+    // `owner: { user_id }` with the user's DID (from the verified token).
+    const wallet = await privy.wallets().create({
+      chain_type: "starknet",
+      owner: { user_id: userId },
+    });
     const privyWallet = {
       id: wallet.id,
       address: wallet.address,

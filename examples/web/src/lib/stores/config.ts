@@ -100,6 +100,12 @@ export const PRIVY_SERVER_URL =
 // Reown/WalletConnect project id — enables the bridge's external wallet connect.
 export const REOWN_PROJECT_ID = env.VITE_REOWN_PROJECT_ID as string | undefined;
 
+// Privy client credentials — enable in-browser Privy login (email OTP). The
+// browser authenticates with Privy to get an access token, which the example
+// server verifies. Both are required for the web Privy flow.
+export const PRIVY_APP_ID = env.VITE_PRIVY_APP_ID as string | undefined;
+export const PRIVY_CLIENT_ID = env.VITE_PRIVY_CLIENT_ID as string | undefined;
+
 // Auto-connect: when VITE_PRIVATE_KEY is set the app signs in on load with this
 // key + preset (VITE_ACCOUNT_PRESET, default openzeppelin). VITE_NETWORK above
 // selects the network.

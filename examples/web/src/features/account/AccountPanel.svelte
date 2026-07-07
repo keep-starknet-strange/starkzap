@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { onMount } from "svelte";
   import { ec } from "starknet";
   import Card from "~/lib/ui/Card.svelte";
   import Text from "~/lib/ui/Text.svelte";
@@ -16,6 +17,20 @@
     deploy,
     disconnect,
   } from "~/lib/stores/wallet";
+  import {
+    privyEnabled,
+    serverUrl as privyServerUrl,
+    serverHealthy,
+    loggedIn as privyLoggedIn,
+    codeSent as privyCodeSent,
+    busy as privyBusy,
+    error as privyError,
+    init as privyInit,
+    checkServerHealth,
+    sendCode as privySendCode,
+    loginWithCode as privyLoginWithCode,
+    logout as privyLogout,
+  } from "~/lib/stores/privy";
 
   const presetOptions = Object.keys(ACCOUNT_PRESETS).map((k) => ({
     label: k,
@@ -25,8 +40,16 @@
   let method = $state<"cartridge" | "privatekey" | "privy">("cartridge");
   let privateKey = $state("");
   let email = $state("");
+  let otp = $state("");
   let presetName = $state(presetOptions[0]?.value ?? "argent");
   let copied = $state(false);
+
+  onMount(privyInit); // restores any existing Privy session
+
+  // Ping the example server whenever the Privy tab is active.
+  $effect(() => {
+    if (method === "privy" && privyEnabled) void checkServerHealth();
+  });
 
   function generateKey() {
     const bytes = ec.starkCurve.utils.randomPrivateKey();
@@ -114,18 +137,60 @@
         onclick={() => connectPrivateKey(privateKey, presetName)}
       />
     </Card>
-  {:else}
+  {:else if !privyEnabled}
+    <Text variant="muted">
+      Set VITE_PRIVY_APP_ID and VITE_PRIVY_CLIENT_ID to enable Privy login.
+    </Text>
+  {:else if $privyLoggedIn}
     <Card>
-      <TextField label="Email" placeholder="you@example.com" bind:value={email} />
+      <Text variant="muted">Signed in with Privy.</Text>
       <Select label="Account preset" options={presetOptions} bind:value={presetName} />
       <Button
-        title="Connect"
+        title="Connect Starknet"
         loading={$walletState.connecting}
-        onclick={() => connectPrivy(email, presetName)}
+        onclick={() => connectPrivy(presetName)}
       />
-      <Text variant="muted">Requires the example server (npm run dev:server).</Text>
+      <Button variant="ghost" title="Log out" onclick={privyLogout} />
+    </Card>
+  {:else if !$privyCodeSent}
+    <Card>
+      <TextField label="Email" placeholder="you@example.com" bind:value={email} />
+      <Button
+        title="Send code"
+        loading={$privyBusy}
+        disabled={!email.includes("@")}
+        onclick={() => privySendCode(email)}
+      />
+    </Card>
+  {:else}
+    <Card>
+      <Text variant="muted">Enter the code sent to {email}</Text>
+      <TextField label="Code" placeholder="6-digit code" bind:value={otp} />
+      <Button
+        title="Verify"
+        loading={$privyBusy}
+        disabled={otp.trim().length < 4}
+        onclick={() => privyLoginWithCode(email, otp)}
+      />
+      <Button
+        variant="ghost"
+        title="Use a different email"
+        onclick={() => {
+          privyCodeSent.set(false);
+          otp = "";
+        }}
+      />
     </Card>
   {/if}
+
+  {#if method === "privy" && privyEnabled}
+    {#if $serverHealthy}
+      <Text variant="muted">🟢 Server running at {privyServerUrl}</Text>
+    {:else}
+      <Text variant="muted">Requires the example server (npm run dev:server).</Text>
+    {/if}
+  {/if}
+  {#if $privyError}<Text variant="muted">{$privyError}</Text>{/if}
 {/if}
 
 <style>
