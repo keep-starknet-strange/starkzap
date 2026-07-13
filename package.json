@@ -29,8 +29,8 @@
     }
   },
   "peerDependencies": {
-    "@avnu/avnu-sdk": "^4.1.0-rc.0",
-    "@cartridge/controller": "^0.13.9",
+    "@avnu/avnu-sdk": "^4.2.0-next.2",
+    "@cartridge/controller": "^0.13.13",
     "@fatsolutions/tongo-sdk": "^1.3.2",
     "@hyperlane-xyz/registry": "^19.4.0",
     "@hyperlane-xyz/sdk": "^14.4.0",
@@ -107,8 +107,8 @@
   },
   "devDependencies": {
     "@0no-co/graphql.web": "^1.2.0",
-    "@avnu/avnu-sdk": "^4.1.0-rc.0",
-    "@cartridge/controller": "^0.13.9",
+    "@avnu/avnu-sdk": "4.2.0-next.2",
+    "@cartridge/controller": "^0.13.13",
     "@eslint/js": "^9.39.2",
     "@fatsolutions/tongo-sdk": "^1.3.2",
     "@hyperlane-xyz/registry": "^19.4.0",
