@@ -1,4 +1,5 @@
 import { fromAddress, type Address, type ChainId } from "@/types";
+import { resolveFetch } from "@/utils";
 import type {
   PreparedSwap,
   SwapProvider,
@@ -67,7 +68,7 @@ export class EkuboSwapProvider implements SwapProvider {
 
   constructor(options: EkuboSwapProviderOptions = {}) {
     this.apiBase = options.apiBase ?? DEFAULT_EKUBO_API_BASE;
-    this.fetcher = options.fetcher ?? fetch;
+    this.fetcher = resolveFetch(options.fetcher);
   }
 
   supportsChain(chainId: ChainId): boolean {

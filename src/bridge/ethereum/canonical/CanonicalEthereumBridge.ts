@@ -18,7 +18,8 @@ import {
 } from "@/types";
 import { ethereumAddress } from "@/bridge/ethereum/EtherToken";
 import { type ContractTransaction, type InterfaceAbi } from "ethers";
-import { type Call, CallData, RPC, uint256 } from "starknet";
+import { type Call, CallData, uint256 } from "starknet";
+import type { L1Message } from "@starknet-io/starknet-types-0103";
 import { FeeErrorCause } from "@/types/errors";
 import type { WalletInterface } from "@/wallet";
 import {
@@ -243,7 +244,7 @@ export class CanonicalEthereumBridge extends ContractRoutedEthereumBridge {
   ): Promise<{ fee: Amount; l2FeeError?: FeeErrorCause }> {
     try {
       const { low, high } = uint256.bnToUint256(amount.toBase());
-      const l1Message: RPC.RPCSPEC010.L1Message = {
+      const l1Message: L1Message = {
         from_address: await ethereumAddress(this.bridge),
         to_address: this.bridgeToken.starknetBridge.toString(),
         entry_point_selector: "handle_token_deposit",

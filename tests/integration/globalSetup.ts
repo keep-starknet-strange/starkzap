@@ -2,14 +2,13 @@ import type { TestProject } from "vitest/node";
 import { Devnet } from "starknet-devnet";
 import "dotenv/config";
 import { getChainId } from "../../src/types/config.js";
-import { forkRPC, type TestConfig } from "./shared";
+import { type TestConfig } from "./shared";
 import { RpcProvider } from "starknet";
 
 let devnet: Devnet | null = null;
 
 // Compatibility constants
-const DEVNET_VERSION = "v0.7.2";
-const RPC_VERSION = "v0_10";
+const DEVNET_VERSION = "v0.9.1";
 
 /**
  * Global setup for integration tests.
@@ -24,8 +23,7 @@ const RPC_VERSION = "v0_10";
  * @see https://0xspaceshard.github.io/starknet-devnet/docs/forking
  */
 export default async function setup(project: TestProject) {
-  const forkNetwork = forkRPC(RPC_VERSION);
-
+  const forkNetwork = process.env.FORK_NETWORK;
   const args = ["--seed", "0"];
   if (forkNetwork) {
     args.push("--fork-network", forkNetwork);
@@ -36,8 +34,8 @@ export default async function setup(project: TestProject) {
 
   devnet = await Devnet.spawnVersion(DEVNET_VERSION, {
     args,
-    stdout: "ignore",
-    stderr: "ignore",
+    stdout: "inherit",
+    stderr: "inherit",
     maxStartupMillis: 15000,
   });
 

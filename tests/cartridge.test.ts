@@ -56,13 +56,15 @@ vi.mock("@cartridge/controller", () => {
       type: "invoke",
       invoke: { signature: ["0xsig"] },
     }),
-    simulateTransaction: vi.fn().mockResolvedValue([
-      {
-        transaction_trace: {
-          execute_invocation: {},
+    simulateTransaction: vi.fn().mockResolvedValue({
+      simulated_transactions: [
+        {
+          transaction_trace: {
+            execute_invocation: {},
+          },
         },
-      },
-    ]),
+      ],
+    }),
     estimateInvokeFee: vi.fn().mockResolvedValue({}),
   };
   MockController.prototype.connect = vi

@@ -123,7 +123,7 @@
     "ethers": "^6.16.0",
     "husky": "^9.1.7",
     "prettier": "3.8.1",
-    "starknet-devnet": "^0.7.2",
+    "starknet-devnet": "^0.8.2",
     "tsc-alias": "^1.8.16",
     "tsx": "^4.21.0",
     "typedoc": "^0.28.16",
@@ -135,6 +135,6 @@
     "vitest": "^4.0.17"
   },
   "dependencies": {
-    "starknet": "^9.2.1"
+    "starknet": "^10.5.0"
   }
 }

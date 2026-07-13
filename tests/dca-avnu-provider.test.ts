@@ -264,37 +264,30 @@ describe("AvnuDcaProvider", () => {
     expect(request?.frequency.toISOString()).toBe("PT1H");
   });
 
-  it("falls back to the second sepolia endpoint when the first create attempt fails", async () => {
-    avnuMocks.createDcaToCalls
-      .mockRejectedValueOnce(new Error("temporary failure"))
-      .mockResolvedValueOnce({
-        chainId: "SN_SEPOLIA",
-        calls: [
-          {
-            contractAddress: "0x777",
-            entrypoint: "open_dca",
-            calldata: [],
-          },
-        ],
-      });
+  it("does not fall back to the mainnet API for Sepolia when the create attempt fails", async () => {
+    // A mainnet fallback would build DCA calls against mainnet-only contracts
+    // that are not deployed on Sepolia. The Sepolia failure must propagate
+    // without ever reaching the mainnet base.
+    avnuMocks.createDcaToCalls.mockRejectedValue(
+      new Error("temporary failure")
+    );
 
     const provider = new AvnuDcaProvider();
 
-    await provider.prepareCreate(context, {
-      sellToken,
-      buyToken,
-      sellAmount: Amount.parse("2", sellToken),
-      sellAmountPerCycle: Amount.parse("1", sellToken),
-      frequency: "P1D",
-      traderAddress,
-    });
+    await expect(
+      provider.prepareCreate(context, {
+        sellToken,
+        buyToken,
+        sellAmount: Amount.parse("2", sellToken),
+        sellAmountPerCycle: Amount.parse("1", sellToken),
+        frequency: "P1D",
+        traderAddress,
+      })
+    ).rejects.toThrow();
 
-    expect(avnuMocks.createDcaToCalls).toHaveBeenCalledTimes(2);
+    expect(avnuMocks.createDcaToCalls).toHaveBeenCalledTimes(1);
     expect(avnuMocks.createDcaToCalls.mock.calls[0]![1]).toEqual({
       baseUrl: "https://sepolia.api.avnu.fi",
-    });
-    expect(avnuMocks.createDcaToCalls.mock.calls[1]![1]).toEqual({
-      baseUrl: "https://starknet.api.avnu.fi",
     });
   });
 

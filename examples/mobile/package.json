@@ -50,7 +50,7 @@
     "react-native-svg": "15.15.4",
     "react-native-web": "~0.21.0",
     "react-native-worklets": "0.10.0",
-    "starknet": "^9.2.1",
+    "starknet": "^10.5.0",
     "starkzap-native": "file:../../packages/native",
     "zustand": "^5.0.14"
   },

@@ -246,9 +246,11 @@ class NativeCartridgeAccount extends Account {
     if (!this.session.account.simulateTransaction) {
       throw unsupportedSessionFeature("simulateTransaction");
     }
-    return this.session.account.simulateTransaction(
-      invocations
-    ) as Promise<SimulateTransactionOverheadResponse>;
+    const res = await this.session.account.simulateTransaction(invocations);
+    // Normalize the legacy bare-array shape to v10's object shape.
+    return (
+      Array.isArray(res) ? { simulated_transactions: res } : res
+    ) as SimulateTransactionOverheadResponse;
   }
 
   override async signMessage(typedData: TypedData): Promise<Signature> {
@@ -420,7 +422,10 @@ export class NativeCartridgeWallet extends BaseWallet {
       const simulation = await simulate([
         { type: "INVOKE", payload: options.calls },
       ]);
-      const first = simulation[0] as
+      const results = Array.isArray(simulation)
+        ? simulation
+        : (simulation?.simulated_transactions ?? []);
+      const first = results[0] as
         | {
             transaction_trace?: {
               execute_invocation?: { revert_reason?: string };

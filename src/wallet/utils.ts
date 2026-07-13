@@ -5,7 +5,7 @@ import {
   type Call,
   type PaymasterTimeBounds,
 } from "starknet";
-import type { PAYMASTER_API } from "@starknet-io/starknet-types-010";
+import type { PAYMASTER_API } from "@starknet-io/starknet-types-0103";
 import { Tx } from "@/tx";
 import { isRecord } from "@/utils/ekubo";
 import type { Address } from "@/types";
@@ -143,7 +143,7 @@ export async function preflightTransaction(
   account: {
     simulateTransaction: (
       invocations: Array<{ type: "INVOKE"; payload: Call[] }>
-    ) => Promise<unknown[]>;
+    ) => Promise<{ simulated_transactions: unknown[] } | unknown[]>;
   },
   options: PreflightOptions
 ): Promise<PreflightResult> {
@@ -162,7 +162,12 @@ export async function preflightTransaction(
       { type: "INVOKE", payload: calls },
     ]);
 
-    const revertReason = extractRevertReason(simulation[0]);
+    // Response shape depends on the resolved starknet version: v10 returns
+    // `{ simulated_transactions }`, while v8/v9 returns a bare array.
+    const results = Array.isArray(simulation)
+      ? simulation
+      : (simulation?.simulated_transactions ?? []);
+    const revertReason = extractRevertReason(results[0]);
     if (revertReason !== null) {
       return { ok: false, reason: revertReason };
     }
