@@ -5,6 +5,7 @@
   "dependencies": {
     "@avnu/avnu-sdk": "4.2.0-next.2",
     "@ethersproject/shims": "^5.8.0",
+    "@fatsolutions/tongo-sdk": "^1.5.0",
     "@expo/ui": "~57.0.2",
     "@expo/vector-icons": "^15.0.2",
     "@privy-io/expo": "^0.69.4",

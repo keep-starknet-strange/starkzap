@@ -54,7 +54,7 @@ export class TongoConfidential implements ConfidentialProvider {
   private readonly account: TongoAccount;
 
   constructor(config: ConfidentialConfig) {
-    // Cast needed: starkzap uses starknet v10 while tongo-sdk uses v8.
+    // Cast needed: starkzap uses starknet v10 while tongo-sdk (1.5.0) uses v9.
     // The Provider types are runtime-compatible but differ in private fields.
     this.account = new TongoAccount(
       config.privateKey,
