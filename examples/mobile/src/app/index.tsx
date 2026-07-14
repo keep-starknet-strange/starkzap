@@ -76,7 +76,7 @@ export default function Login() {
   if (wallet) return <Redirect href="/balances" />;
   if (resumePrivy) return <Redirect href="/privy" />;
 
-  const openPrivy = () => {
+  const openPrivy = async () => {
     if (isExpoGo) {
       Alert.alert(
         "Native build required",
@@ -88,6 +88,19 @@ export default function Login() {
       Alert.alert(
         "Privy not configured",
         "Set EXPO_PUBLIC_PRIVY_APP_ID (and EXPO_PUBLIC_PRIVY_SERVER_URL) in .env."
+      );
+      return;
+    }
+    // Privy login needs the example server (wallet creation + signing). Ping its
+    // Privy health endpoint first so a down or Privy-disabled server fails here
+    // with a clear message rather than mid-login. 200 only when Privy is enabled.
+    try {
+      const res = await fetch(`${PRIVY_SERVER_URL}/api/health/privy`);
+      if (!res.ok) throw new Error(String(res.status));
+    } catch {
+      Alert.alert(
+        "Privy server unavailable",
+        `Can't reach the Privy example server at ${PRIVY_SERVER_URL || "(EXPO_PUBLIC_PRIVY_SERVER_URL unset)"}.\n\nStart it with ENABLE_PRIVY=true and set EXPO_PUBLIC_PRIVY_SERVER_URL.`
       );
       return;
     }

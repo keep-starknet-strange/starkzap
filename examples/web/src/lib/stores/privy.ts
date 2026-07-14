@@ -39,10 +39,11 @@ async function ensureClient(): Promise<PrivyClient> {
   return client;
 }
 
-// Ping the example server's /api/health endpoint.
+// Ping the example server's Privy health endpoint (200 only when the server has
+// Privy enabled; 404 → serverHealthy=false, which is the right signal here).
 export async function checkServerHealth(): Promise<void> {
   try {
-    const res = await fetch(`${PRIVY_SERVER_URL}/api/health`);
+    const res = await fetch(`${PRIVY_SERVER_URL}/api/health/privy`);
     serverHealthy.set(res.ok);
   } catch {
     serverHealthy.set(false);
