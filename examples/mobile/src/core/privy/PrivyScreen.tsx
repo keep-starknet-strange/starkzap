@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { ActivityIndicator, Alert } from "react-native";
 import { router } from "expo-router";
 import {
@@ -10,7 +10,11 @@ import {
 import { Screen, Card, Text, Button, TextField, Segmented } from "@/ui";
 import { useTheme } from "@/theme";
 import { PRIVY_APP_ID, PRIVY_CLIENT_ID, PRIVY_SERVER_URL } from "@/core/config";
-import { ACCOUNT_PRESETS, useWalletStore } from "@/core/wallet/store";
+import {
+  ACCOUNT_PRESETS,
+  getSessionHint,
+  useWalletStore,
+} from "@/core/wallet/store";
 
 const PRESET_OPTIONS = [
   { label: "Ready", value: "Ready" },
@@ -61,25 +65,41 @@ function PrivyLogin() {
 
   // After Privy auth: exchange the access token for a server-managed Starknet
   // wallet, then hand it to the SDK (which signs via the server).
-  const connectStarknet = useCallback(async () => {
-    const token = await getAccessToken();
-    if (!token) throw new Error("No Privy access token");
-    const res = await fetch(`${PRIVY_SERVER_URL}/api/wallet/starknet`, {
-      method: "POST",
-      headers: { Authorization: `Bearer ${token}` },
+  const connectStarknet = useCallback(
+    async (preset = presetName) => {
+      const token = await getAccessToken();
+      if (!token) throw new Error("No Privy access token");
+      const res = await fetch(`${PRIVY_SERVER_URL}/api/privy-wallet/starknet`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) throw new Error(`Server ${res.status}: ${await res.text()}`);
+      const data = (await res.json()) as {
+        wallet: { id: string; publicKey: string };
+      };
+      await connectPrivy({
+        walletId: data.wallet.id,
+        publicKey: data.wallet.publicKey,
+        accessToken: token,
+        presetName: preset,
+      });
+      router.replace("/balances");
+    },
+    [getAccessToken, connectPrivy, presetName]
+  );
+
+  // Resume: if we got here from a remembered Privy login and the session is
+  // still valid, reconnect automatically with the remembered preset.
+  const resumed = useRef(false);
+  useEffect(() => {
+    if (resumed.current || !isReady || !user) return;
+    resumed.current = true;
+    void getSessionHint().then((hint) => {
+      if (hint?.walletType !== "privy") return;
+      if (hint.presetName) setPresetName(hint.presetName);
+      void run(() => connectStarknet(hint.presetName));
     });
-    if (!res.ok) throw new Error(`Server ${res.status}: ${await res.text()}`);
-    const data = (await res.json()) as {
-      wallet: { id: string; publicKey: string };
-    };
-    await connectPrivy({
-      walletId: data.wallet.id,
-      publicKey: data.wallet.publicKey,
-      accessToken: token,
-      presetName,
-    });
-    router.replace("/balances");
-  }, [getAccessToken, connectPrivy, presetName]);
+  }, [isReady, user, run, connectStarknet]);
 
   if (!isReady) {
     return (

@@ -2,6 +2,7 @@
 // resolves to the same copy at runtime (see the pin in metro.config.js).
 import "@avnu/avnu-sdk";
 import { create } from "zustand";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as Linking from "expo-linking";
 import {
   ArgentPreset,
@@ -37,6 +38,36 @@ import { useTxBannerStore } from "@/core/tx-banner/store";
 import { usePrivacyStore } from "@/features/privacy/store";
 
 export type WalletType = "cartridge" | "privatekey" | "privy";
+
+// Remembers the last login so the app can resume on next launch. Only the
+// method and preset are stored — never a private key.
+const LOGIN_STORAGE_KEY = "starkzap:example:login";
+export type LoginHint = {
+  walletType: WalletType;
+  presetName?: string;
+  networkIndex?: number;
+  // Account resumed into — used to reject an env key that resolves elsewhere.
+  address?: string;
+};
+
+function saveHint(hint: LoginHint): void {
+  void AsyncStorage.setItem(LOGIN_STORAGE_KEY, JSON.stringify(hint)).catch(
+    () => {}
+  );
+}
+
+export async function getSessionHint(): Promise<LoginHint | null> {
+  try {
+    const raw = await AsyncStorage.getItem(LOGIN_STORAGE_KEY);
+    return raw ? (JSON.parse(raw) as LoginHint) : null;
+  } catch {
+    return null;
+  }
+}
+
+function clearHint(): void {
+  void AsyncStorage.removeItem(LOGIN_STORAGE_KEY).catch(() => {});
+}
 
 // Swap + DCA providers. Ekubo is fetch-only; Avnu needs @avnu/avnu-sdk (added
 // as a dep). Both are registered so the user can pick per swap/order; Ekubo is
@@ -91,11 +122,13 @@ interface WalletStore {
   error: string | null;
 
   setNetworkIndex: (index: number) => void;
+  switchNetwork: () => void;
   connectCartridge: () => Promise<void>;
   connectPrivateKey: (
     privateKey: string,
     presetName: string,
-    sponsored: boolean
+    sponsored: boolean,
+    expectedAddress?: string
   ) => Promise<void>;
   connectPrivy: (params: {
     walletId: string;
@@ -154,6 +187,14 @@ export const useWalletStore = create<WalletStore>((set, get) => ({
     set({ networkIndex: index });
   },
 
+  // Toggle to the other network. The SDK/wallet are built for a single network
+  // at connect time and RN can't reload, so switching drops the session and
+  // returns to login (disconnect clears the hint, so no resume reverts it).
+  switchNetwork: () => {
+    get().setNetworkIndex((get().networkIndex + 1) % NETWORKS.length);
+    get().disconnect();
+  },
+
   connectCartridge: async () => {
     ensureCartridgeAdapter();
     set({ connecting: true, error: null });
@@ -179,6 +220,14 @@ export const useWalletStore = create<WalletStore>((set, get) => ({
         walletType: "cartridge",
         address: wallet.address,
       });
+      // ponytail: recorded for the account screen + network restore; NOT
+      // auto-resumed on launch — the RN Cartridge adapter has no persisted
+      // session, so a resume would reopen the in-app browser every cold start.
+      saveHint({
+        walletType: "cartridge",
+        networkIndex: get().networkIndex,
+        address: wallet.address,
+      });
       usePrivacyStore.getState().clear();
       await get().checkDeployment();
     } catch (err) {
@@ -188,7 +237,12 @@ export const useWalletStore = create<WalletStore>((set, get) => ({
     }
   },
 
-  connectPrivateKey: async (privateKey, presetName, sponsored) => {
+  connectPrivateKey: async (
+    privateKey,
+    presetName,
+    sponsored,
+    expectedAddress
+  ) => {
     set({ connecting: true, error: null });
     try {
       const { sdk, paymasterNodeUrl } = buildSdk(get().networkIndex);
@@ -203,11 +257,24 @@ export const useWalletStore = create<WalletStore>((set, get) => ({
           ? { feeMode: "sponsored" as const }
           : {}),
       });
+      // Guard the resume path: refuse if this key/preset resolves to a
+      // different account than the one we saved (e.g. env key changed).
+      if (expectedAddress && wallet.address !== expectedAddress) {
+        throw new Error(
+          "Configured key resolves to a different account than your last login."
+        );
+      }
       set({
         sdk,
         paymasterNodeUrl,
         wallet,
         walletType: "privatekey",
+        address: wallet.address,
+      });
+      saveHint({
+        walletType: "privatekey",
+        presetName,
+        networkIndex: get().networkIndex,
         address: wallet.address,
       });
       // Establish the confidential capability now, while the key is in scope.
@@ -235,7 +302,7 @@ export const useWalletStore = create<WalletStore>((set, get) => ({
           resolve: async () => ({
             walletId,
             publicKey,
-            serverUrl: `${PRIVY_SERVER_URL}/api/wallet/sign`,
+            serverUrl: `${PRIVY_SERVER_URL}/api/privy-wallet/sign`,
             headers: { Authorization: `Bearer ${accessToken}` },
           }),
         },
@@ -245,6 +312,12 @@ export const useWalletStore = create<WalletStore>((set, get) => ({
         paymasterNodeUrl,
         wallet,
         walletType: "privy",
+        address: wallet.address,
+      });
+      saveHint({
+        walletType: "privy",
+        presetName,
+        networkIndex: get().networkIndex,
         address: wallet.address,
       });
       usePrivacyStore.getState().clear();
@@ -280,6 +353,7 @@ export const useWalletStore = create<WalletStore>((set, get) => ({
 
   disconnect: () => {
     usePrivacyStore.getState().clear();
+    clearHint();
     set({
       sdk: null,
       paymasterNodeUrl: null,

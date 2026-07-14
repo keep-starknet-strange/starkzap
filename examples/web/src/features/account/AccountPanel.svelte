@@ -16,6 +16,7 @@
     connectPrivy,
     deploy,
     disconnect,
+    getSessionHint,
   } from "~/lib/stores/wallet";
   import {
     privyEnabled,
@@ -37,11 +38,17 @@
     value: k,
   }));
 
-  let method = $state<"cartridge" | "privatekey" | "privy">("cartridge");
+  // Preselect the last-used login method/preset (see wallet store resumeSession).
+  const hint = getSessionHint();
+  let method = $state<"cartridge" | "privatekey" | "privy">(
+    hint?.walletType ?? "cartridge"
+  );
   let privateKey = $state("");
   let email = $state("");
   let otp = $state("");
-  let presetName = $state(presetOptions[0]?.value ?? "argent");
+  let presetName = $state(
+    hint?.presetName ?? presetOptions[0]?.value ?? "argent"
+  );
   let copied = $state(false);
 
   onMount(privyInit); // restores any existing Privy session

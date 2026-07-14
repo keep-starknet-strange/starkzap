@@ -1,7 +1,9 @@
-import { Pressable } from "react-native";
+import { Pressable, View } from "react-native";
 import { Tabs, router } from "expo-router";
-import { IconSymbol } from "@/ui";
+import { IconSymbol, Text } from "@/ui";
 import { useTheme } from "@/theme";
+import { NETWORKS } from "@/core/network";
+import { useWalletStore } from "@/core/wallet/store";
 
 // Account icon in the header; tapping opens the account page.
 function AccountButton() {
@@ -17,14 +19,51 @@ function AccountButton() {
   );
 }
 
+// Current network pill; tapping switches to the other network (and re-logs in).
+function NetworkBadge() {
+  const { colors } = useTheme();
+  const networkIndex = useWalletStore((s) => s.networkIndex);
+  const switchNetwork = useWalletStore((s) => s.switchNetwork);
+  const net = NETWORKS[networkIndex];
+  return (
+    <Pressable onPress={switchNetwork} hitSlop={8}>
+      <View
+        style={{
+          flexDirection: "row",
+          alignItems: "center",
+          gap: 6,
+          paddingHorizontal: 10,
+          paddingVertical: 4,
+          borderRadius: 999,
+          borderWidth: 1,
+          borderColor: colors.border,
+          backgroundColor: colors.card,
+        }}
+      >
+        <View
+          style={{
+            width: 8,
+            height: 8,
+            borderRadius: 4,
+            backgroundColor: net.chainId.isMainnet()
+              ? colors.success
+              : colors.textMuted,
+          }}
+        />
+        <Text style={{ fontSize: 13, fontWeight: "600" }}>{net.name}</Text>
+      </View>
+    </Pressable>
+  );
+}
+
 export default function TabsLayout() {
   const { colors } = useTheme();
   return (
     <Tabs
       screenOptions={{
+        headerTitle: () => <NetworkBadge />,
         headerRight: () => <AccountButton />,
         headerStyle: { backgroundColor: colors.bg },
-        title: "Starkzap",
         headerTintColor: colors.text,
         tabBarActiveTintColor: colors.primary,
         tabBarStyle: {

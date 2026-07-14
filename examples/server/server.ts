@@ -66,7 +66,7 @@ async function auth(
 }
 
 // Get or create Starknet wallet (Privy key pair)
-app.post("/api/wallet/starknet", auth, async (req, res) => {
+app.post("/api/privy-wallet/starknet", auth, async (req, res) => {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const userId = (req as any).userId;
 
@@ -101,7 +101,7 @@ app.post("/api/wallet/starknet", auth, async (req, res) => {
 });
 
 // Register a computed account address for a preset
-app.post("/api/wallet/register-account", auth, async (req, res) => {
+app.post("/api/privy-wallet/register-account", auth, async (req, res) => {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const userId = (req as any).userId;
   const { preset, address, deployed } = req.body;
@@ -123,7 +123,7 @@ app.post("/api/wallet/register-account", auth, async (req, res) => {
 });
 
 // Update deployment status for an account
-app.post("/api/wallet/set-deployed", auth, async (req, res) => {
+app.post("/api/privy-wallet/set-deployed", auth, async (req, res) => {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const userId = (req as any).userId;
   const { preset, deployed } = req.body;
@@ -143,7 +143,7 @@ app.post("/api/wallet/set-deployed", auth, async (req, res) => {
 });
 
 // Sign a hash
-app.post("/api/wallet/sign", async (req, res) => {
+app.post("/api/privy-wallet/sign", async (req, res) => {
   const { walletId, hash } = req.body;
   if (!walletId || !hash)
     return res.status(400).json({ error: "walletId and hash required" });

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { View, Pressable, Alert } from "react-native";
 import { Redirect, router } from "expo-router";
 import { stark } from "starknet";
@@ -12,7 +12,12 @@ import {
   isExpoGo,
 } from "@/core/config";
 import { resolveExamplePaymasterNodeUrl } from "@/core/paymaster";
-import { ACCOUNT_PRESETS, useWalletStore } from "@/core/wallet/store";
+import { getDevLogin } from "@/core/dev-login";
+import {
+  ACCOUNT_PRESETS,
+  getSessionHint,
+  useWalletStore,
+} from "@/core/wallet/store";
 
 const PRESET_OPTIONS = [
   { label: "Ready", value: "Ready" },
@@ -37,8 +42,39 @@ export default function Login() {
   const [privateKey, setPrivateKey] = useState("");
   const [presetName, setPresetName] = useState("Ready");
   const [sponsored, setSponsored] = useState(false);
+  const [resumePrivy, setResumePrivy] = useState(false);
+
+  // Resume the last login: Privy has a persisted session (route in to reconnect),
+  // private key auto-logins only from the env dev key, otherwise re-opens its
+  // form with the remembered preset. Cartridge isn't resumed here — its RN
+  // adapter has no persisted session (see store).
+  useEffect(() => {
+    void getSessionHint().then((hint) => {
+      if (!hint || useWalletStore.getState().wallet) return;
+      // Return the user to the network they last used.
+      if (hint.networkIndex != null) setNetworkIndex(hint.networkIndex);
+      if (hint.walletType === "privatekey") {
+        // Preselect the form so a missing/mismatched env key lands the user here.
+        setShowKeyForm(true);
+        if (hint.presetName) setPresetName(hint.presetName);
+        const dev = getDevLogin();
+        if (dev) {
+          setNetworkIndex(dev.networkIndex); // env network wins for the dev key
+          void connectPrivateKey(
+            dev.privateKey,
+            hint.presetName ?? dev.presetName,
+            false,
+            hint.address
+          );
+        }
+      } else if (hint.walletType === "privy" && !isExpoGo && PRIVY_APP_ID) {
+        setResumePrivy(true);
+      }
+    });
+  }, [connectPrivateKey, setNetworkIndex]);
 
   if (wallet) return <Redirect href="/balances" />;
+  if (resumePrivy) return <Redirect href="/privy" />;
 
   const openPrivy = () => {
     if (isExpoGo) {

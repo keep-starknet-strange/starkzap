@@ -2,6 +2,7 @@
   import type { Component } from "svelte";
   import Screen from "~/lib/ui/Screen.svelte";
   import { walletState } from "~/lib/stores/wallet";
+  import { NETWORK, switchNetwork } from "~/lib/stores/config";
   import { logs, clearLogs } from "~/lib/stores/logger";
   import AccountPanel from "~/features/account/AccountPanel.svelte";
   import BalancesPanel from "~/features/balances/BalancesPanel.svelte";
@@ -48,6 +49,15 @@
     <header>
       <span class="brand">Starkzap</span>
       <div class="header-actions">
+        <button
+          class="net-badge"
+          title="Switch network"
+          onclick={() =>
+            switchNetwork(NETWORK === "sepolia" ? "mainnet" : "sepolia")}
+        >
+          <span class="net-dot" class:mainnet={NETWORK === "mainnet"}></span>
+          {NETWORK}
+        </button>
         <button
           class="icon-btn"
           class:active={showLogs}
@@ -153,6 +163,29 @@
     display: flex;
     align-items: center;
     gap: var(--sp-sm);
+  }
+  .net-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    border-radius: 999px;
+    border: 1px solid var(--border);
+    background: var(--card);
+    color: var(--text);
+    font-size: 13px;
+    font-weight: 600;
+    text-transform: capitalize;
+    cursor: pointer;
+  }
+  .net-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--text-muted);
+  }
+  .net-dot.mainnet {
+    background: var(--success);
   }
   .icon-btn {
     display: grid;
