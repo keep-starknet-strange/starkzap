@@ -12,7 +12,7 @@ import type { WalletInterface } from "@/wallet/interface";
 import type { Call } from "starknet";
 import type { Staking } from "@/staking";
 import type { SwapProvider } from "@/swap";
-import type { ConfidentialProvider } from "@/confidential";
+import type { TongoConfidential } from "@/confidential";
 import {
   testLendingCollateralToken as mockSTRK,
   testLendingDebtToken as mockUSDC,
@@ -949,7 +949,7 @@ describe("TxBuilder", () => {
       const builder = new TxBuilder(wallet);
       const mockConfidential = {
         fund: vi.fn().mockResolvedValue([rawCall]),
-      } as unknown as ConfidentialProvider;
+      } as unknown as TongoConfidential;
 
       expect(
         builder.confidentialFund(mockConfidential, {
@@ -967,7 +967,7 @@ describe("TxBuilder", () => {
       };
       const mockConfidential = {
         fund: vi.fn().mockResolvedValue([fundCall]),
-      } as unknown as ConfidentialProvider;
+      } as unknown as TongoConfidential;
 
       const wallet = createMockWallet();
       const calls = await new TxBuilder(wallet)
@@ -994,7 +994,7 @@ describe("TxBuilder", () => {
       };
       const mockConfidential = {
         transfer: vi.fn().mockResolvedValue([transferCall]),
-      } as unknown as ConfidentialProvider;
+      } as unknown as TongoConfidential;
 
       const wallet = createMockWallet();
       const calls = await new TxBuilder(wallet)
@@ -1023,7 +1023,7 @@ describe("TxBuilder", () => {
       };
       const mockConfidential = {
         withdraw: vi.fn().mockResolvedValue([withdrawCall]),
-      } as unknown as ConfidentialProvider;
+      } as unknown as TongoConfidential;
 
       const wallet = createMockWallet();
       const calls = await new TxBuilder(wallet)
@@ -1042,7 +1042,7 @@ describe("TxBuilder", () => {
     it("should propagate populate errors through send", async () => {
       const mockConfidential = {
         fund: vi.fn().mockRejectedValue(new Error("proof generation failed")),
-      } as unknown as ConfidentialProvider;
+      } as unknown as TongoConfidential;
 
       const wallet = createMockWallet();
       const builder = new TxBuilder(wallet).confidentialFund(mockConfidential, {
@@ -1063,7 +1063,7 @@ describe("TxBuilder", () => {
       };
       const mockConfidential = {
         fund: vi.fn().mockResolvedValue([confidentialCall]),
-      } as unknown as ConfidentialProvider;
+      } as unknown as TongoConfidential;
 
       const wallet = createMockWallet();
       const amount = Amount.parse("100", mockUSDC);

@@ -5,9 +5,8 @@
   import Button from "~/lib/ui/Button.svelte";
   import Select from "~/lib/ui/Select.svelte";
   import TextField from "~/lib/ui/TextField.svelte";
-  import { PRIVACY_PROVIDERS } from "./providers";
+  import { privacyTokens } from "./tokens";
   import {
-    providerId,
     tokenSymbol,
     instance,
     token,
@@ -18,7 +17,6 @@
     pending,
     error,
     enabled,
-    setProvider,
     setToken,
     connect,
     refresh,
@@ -40,15 +38,10 @@
     setTimeout(() => (copied = false), 1200);
   }
 
-  const providerOptions = PRIVACY_PROVIDERS.map((p) => ({
-    label: p.label,
-    value: p.id,
-  }));
-  const def = $derived(PRIVACY_PROVIDERS.find((p) => p.id === $providerId));
-  const tokenOptions = $derived([
+  const tokenOptions = [
     { label: "Select a token", value: "" },
-    ...(def?.tokens().map((t) => ({ label: t.symbol, value: t.symbol })) ?? []),
-  ]);
+    ...privacyTokens().map((t) => ({ label: t.symbol, value: t.symbol })),
+  ];
   const fmt = (base: bigint) =>
     $token ? Amount.fromRaw(base, $token.decimals, $token.symbol).toFormatted(true) : "—";
 
@@ -75,13 +68,6 @@
   </Text>
 {:else}
   <Card>
-    <Select
-      label="Provider"
-      options={providerOptions}
-      value={$providerId}
-      oninput={(e: Event) =>
-        setProvider((e.currentTarget as HTMLSelectElement).value)}
-    />
     <Select
       label="Token"
       options={tokenOptions}

@@ -1,28 +1,9 @@
-import {
-  TongoConfidential,
-  fromAddress,
-  type ConfidentialProvider,
-} from "starkzap-native";
-import type { RpcProvider } from "starknet";
 import { NETWORKS } from "@/core/network";
 
 export interface PrivacyToken {
   symbol: string;
   contractAddress: string;
   decimals: number;
-}
-
-// A privacy provider definition. Add a new entry (e.g. native "STRK20" when
-// the SDK ships it) — the rest of the feature is provider-agnostic.
-export interface PrivacyProviderDef {
-  id: string;
-  label: string;
-  tokensForNetwork: (networkIndex: number) => PrivacyToken[];
-  create: (params: {
-    token: PrivacyToken;
-    privateKey: string;
-    provider: RpcProvider;
-  }) => ConfidentialProvider;
 }
 
 // Tongo contract addresses per token — https://docs.tongo.cash/protocol/contracts.html
@@ -51,7 +32,8 @@ const TONGO_MAINNET: Record<string, string> = {
   DAI: "0x511741b1ad1777b4ad59fbff49d64b8eb188e2aeb4fc72438278a589d8a10d8",
 };
 
-function tongoTokens(networkIndex: number): PrivacyToken[] {
+/** Tokens with a Tongo confidential contract on the selected network. */
+export function privacyTokens(networkIndex: number): PrivacyToken[] {
   const map = NETWORKS[networkIndex].chainId.isSepolia()
     ? TONGO_SEPOLIA
     : TONGO_MAINNET;
@@ -61,18 +43,3 @@ function tongoTokens(networkIndex: number): PrivacyToken[] {
     decimals: TOKEN_DECIMALS[symbol] ?? 18,
   }));
 }
-
-export const PRIVACY_PROVIDERS: PrivacyProviderDef[] = [
-  {
-    id: "tongo",
-    label: "Tongo",
-    tokensForNetwork: tongoTokens,
-    create: ({ token, privateKey, provider }) =>
-      new TongoConfidential({
-        privateKey,
-        contractAddress: fromAddress(token.contractAddress),
-        provider,
-      }),
-  },
-  // Future: { id: "strk20", label: "STRK20", ... } once the SDK exposes it.
-];

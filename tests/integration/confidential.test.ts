@@ -108,7 +108,7 @@ describe("Confidential (Integration)", () => {
     const relayer = await getRelayer(0);
     const privateKey = kg.from(1);
 
-    const confidential = new TongoConfidential({
+    const confidential = await TongoConfidential.create({
       privateKey,
       contractAddress: TONGO_CONTRACT as never,
       provider,
@@ -150,7 +150,7 @@ describe("Confidential (Integration)", () => {
     const relayer = await getRelayer(1);
     const privateKey = kg.from(1);
 
-    const confidential = new TongoConfidential({
+    const confidential = await TongoConfidential.create({
       privateKey,
       contractAddress: TONGO_CONTRACT as never,
       provider,
@@ -182,12 +182,12 @@ describe("Confidential (Integration)", () => {
     const kg = new KeyGen("starkzap-transfer");
     const relayer = await getRelayer(2);
 
-    const sender = new TongoConfidential({
+    const sender = await TongoConfidential.create({
       privateKey: kg.from(1),
       contractAddress: TONGO_CONTRACT as never,
       provider,
     });
-    const receiver = new TongoConfidential({
+    const receiver = await TongoConfidential.create({
       privateKey: kg.from(2),
       contractAddress: TONGO_CONTRACT as never,
       provider,
@@ -237,12 +237,12 @@ describe("Confidential (Integration)", () => {
     const kg = new KeyGen("starkzap-rollover");
     const relayer = await getRelayer(3);
 
-    const sender = new TongoConfidential({
+    const sender = await TongoConfidential.create({
       privateKey: kg.from(1),
       contractAddress: TONGO_CONTRACT as never,
       provider,
     });
-    const receiver = new TongoConfidential({
+    const receiver = await TongoConfidential.create({
       privateKey: kg.from(2),
       contractAddress: TONGO_CONTRACT as never,
       provider,
