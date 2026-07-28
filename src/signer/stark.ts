@@ -10,6 +10,12 @@ import type { SignerInterface } from "@/signer/interface";
  * ```
  */
 export class StarkSigner implements SignerInterface {
+  /**
+   * `ec.starkCurve.sign` uses RFC-6979, so the same hash always produces the
+   * same signature. Signature-derived secrets are safe with this signer.
+   */
+  readonly deterministic = true;
+
   private readonly publicKey: string;
   private readonly privateKey: string;
 

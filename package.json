@@ -36,6 +36,7 @@
     "@hyperlane-xyz/sdk": "^14.4.0",
     "@hyperlane-xyz/utils": "^14.4.0",
     "@solana/web3.js": "^1.98.4",
+    "@starkware-libs/starknet-privacy-sdk": "^0.14.3-rc.4",
     "ethers": "^6.16.0"
   },
   "peerDependenciesMeta": {
@@ -43,6 +44,12 @@
       "optional": true
     },
     "@cartridge/controller": {
+      "optional": true
+    },
+    "@ethersproject/shims": {
+      "optional": true
+    },
+    "@fatsolutions/tongo-sdk": {
       "optional": true
     },
     "@hyperlane-xyz/registry": {
@@ -54,22 +61,19 @@
     "@hyperlane-xyz/utils": {
       "optional": true
     },
-    "@fatsolutions/tongo-sdk": {
+    "@solana/web3.js": {
       "optional": true
     },
-    "react-native-get-random-values": {
-      "optional": true
-    },
-    "fast-text-encoding": {
+    "@starkware-libs/starknet-privacy-sdk": {
       "optional": true
     },
     "ethers": {
       "optional": true
     },
-    "@solana/web3.js": {
+    "fast-text-encoding": {
       "optional": true
     },
-    "@ethersproject/shims": {
+    "react-native-get-random-values": {
       "optional": true
     }
   },
@@ -113,6 +117,7 @@
     "@hyperlane-xyz/sdk": "^14.4.0",
     "@hyperlane-xyz/utils": "^14.4.0",
     "@solana/web3.js": "^1.98.4",
+    "@starkware-libs/starknet-privacy-sdk": "^0.14.3-rc.4",
     "@vitest/coverage-v8": "^4.0.17",
     "bestzip": "^2.2.1",
     "dotenv": "^17.2.3",

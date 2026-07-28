@@ -15,6 +15,7 @@ import type {
   FeeMode,
   PreflightOptions,
   PreflightResult,
+  TransactionProof,
 } from "@/types";
 
 /** Canonical (non-deprecated) fee mode variants. */
@@ -41,6 +42,35 @@ export function isPaymasterMode(
       feeMode !== null &&
       feeMode.type === "paymaster")
   );
+}
+
+/**
+ * Reject a proof-carrying transaction the caller's wallet or fee mode cannot
+ * actually send, instead of silently dropping the proof and letting the pool
+ * contract revert with an unhelpful on-chain error.
+ *
+ * @param proof - The proof from `wallet.execute()` options, if any
+ * @param feeMode - The resolved fee mode for this execution
+ * @param wallet - Wallet description used in the error message
+ */
+export function assertProofSendable(
+  proof: TransactionProof | undefined,
+  feeMode: FeeMode,
+  wallet: string
+): void {
+  if (!proof) return;
+
+  if (wallet !== "Wallet") {
+    throw new Error(
+      `[starkzap] ${wallet} cannot send proof-carrying transactions. Privacy operations require a Wallet backed by a StarkSigner.`
+    );
+  }
+
+  if (isPaymasterMode(feeMode)) {
+    throw new Error(
+      '[starkzap] Proof-carrying transactions require feeMode "user_pays". The paymaster API has no field for a transaction proof, so the proof would be dropped and the transaction would revert.'
+    );
+  }
 }
 
 /**
