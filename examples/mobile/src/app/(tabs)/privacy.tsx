@@ -1,185 +1,47 @@
 import { useState } from "react";
-import { Pressable } from "react-native";
 import { Redirect } from "expo-router";
-import * as Clipboard from "expo-clipboard";
-import { Amount } from "starkzap-native";
-import { Screen, Card, Text, Button, TextField, Select } from "@/ui";
+import { Screen, Card, Text, Segmented } from "@/ui";
 import { useWalletStore } from "@/core/wallet/store";
 import { usePrivacyStore } from "@/features/privacy/store";
-import { privacyTokens } from "@/features/privacy/tokens";
+import TongoPanel from "@/features/privacy/TongoPanel";
+import Strk20Panel from "@/features/privacy/strk20/Strk20Panel";
+import { useStrk20Store } from "@/features/privacy/strk20/store";
+
+type Protocol = "strk20" | "tongo";
 
 export default function PrivacyTab() {
   const wallet = useWalletStore((s) => s.wallet);
-  const networkIndex = useWalletStore((s) => s.networkIndex);
-  const {
-    make,
-    tokenSymbol,
-    instance,
-    token,
-    connecting,
-    busy,
-    address,
-    balance,
-    pending,
-    setToken,
-    connect,
-    refresh,
-    fund,
-    withdraw,
-    transfer,
-    rollover,
-  } = usePrivacyStore();
+  const [protocol, setProtocol] = useState<Protocol>("strk20");
 
-  const [fundAmount, setFundAmount] = useState("");
-  const [wAmount, setWAmount] = useState("");
-  const [tAmount, setTAmount] = useState("");
-  const [tx, setTx] = useState("");
-  const [ty, setTy] = useState("");
+  // Each protocol keeps its own client and refresh, so pull-to-refresh has to
+  // follow the visible tab.
+  const refreshStrk20 = useStrk20Store((s) => s.refresh);
+  const refreshTongo = usePrivacyStore((s) => s.refresh);
 
   if (!wallet) return <Redirect href="/" />;
-
-  const tokenOptions = privacyTokens(networkIndex).map((t) => ({
-    label: t.symbol,
-    value: t.symbol,
-  }));
-  const fmt = (v: bigint) =>
-    token
-      ? Amount.fromRaw(v, token.decimals, token.symbol).toFormatted(true)
-      : "—";
-
-  if (!make) {
-    return (
-      <Screen edges={["left", "right"]}>
-        <Card>
-          <Text variant="subtitle">Private-key login required</Text>
-          <Text variant="muted">
-            Confidential balances are derived from your key, so this feature is
-            available only when you sign in with a private key.
-          </Text>
-        </Card>
-      </Screen>
-    );
-  }
 
   return (
     <Screen
       scroll
       edges={["left", "right"]}
-      onRefresh={() => void refresh()}
+      onRefresh={() =>
+        void (protocol === "strk20" ? refreshStrk20() : refreshTongo())
+      }
       refreshing={false}
     >
       <Card>
-        <Text variant="label">Provider · Tongo</Text>
-        <Text variant="label">Token</Text>
-        <Select
-          title="Select a token"
-          options={tokenOptions}
-          value={tokenSymbol}
-          onChange={setToken}
-        />
-        <Button
-          title={instance ? "Reconnect" : "Connect"}
-          loading={connecting}
-          disabled={!tokenSymbol}
-          onPress={() => void connect()}
+        <Text variant="label">Protocol</Text>
+        <Segmented
+          options={[
+            { label: "STRK20", value: "strk20" },
+            { label: "Tongo", value: "tongo" },
+          ]}
+          value={protocol}
+          onChange={setProtocol}
         />
       </Card>
 
-      {instance ? (
-        <>
-          <Card>
-            <Text variant="label">Confidential balance</Text>
-            <Text variant="subtitle">{fmt(balance)}</Text>
-            {pending > 0n ? (
-              <>
-                <Text variant="muted">Pending: {fmt(pending)}</Text>
-                <Button
-                  title="Rollover pending"
-                  variant="secondary"
-                  loading={busy}
-                  onPress={() => void rollover()}
-                />
-              </>
-            ) : null}
-            <Pressable onPress={() => Clipboard.setStringAsync(address)}>
-              <Text variant="muted">Your address (tap to copy)</Text>
-              <Text variant="body">
-                {address.slice(0, 10)}…{address.slice(-6)}
-              </Text>
-            </Pressable>
-          </Card>
-
-          <Card>
-            <Text variant="label">Shield (deposit)</Text>
-            <TextField
-              label="Amount"
-              placeholder="0.0"
-              value={fundAmount}
-              onChangeText={setFundAmount}
-              keyboardType="decimal-pad"
-            />
-            <Button
-              title="Shield"
-              loading={busy}
-              disabled={!fundAmount.trim()}
-              onPress={() =>
-                void fund(fundAmount).then(() => setFundAmount(""))
-              }
-            />
-          </Card>
-
-          <Card>
-            <Text variant="label">Unshield (withdraw)</Text>
-            <TextField
-              label="Amount"
-              placeholder="0.0"
-              value={wAmount}
-              onChangeText={setWAmount}
-              keyboardType="decimal-pad"
-            />
-            <Text variant="muted">Unshields to your wallet address.</Text>
-            <Button
-              title="Unshield"
-              loading={busy}
-              disabled={!wAmount.trim()}
-              onPress={() => void withdraw(wAmount)}
-            />
-          </Card>
-
-          <Card>
-            <Text variant="label">Private transfer</Text>
-            <TextField
-              label="Amount"
-              placeholder="0.0"
-              value={tAmount}
-              onChangeText={setTAmount}
-              keyboardType="decimal-pad"
-            />
-            <TextField
-              label="Recipient x"
-              placeholder="0x…"
-              value={tx}
-              onChangeText={setTx}
-              autoCapitalize="none"
-              autoCorrect={false}
-            />
-            <TextField
-              label="Recipient y"
-              placeholder="0x…"
-              value={ty}
-              onChangeText={setTy}
-              autoCapitalize="none"
-              autoCorrect={false}
-            />
-            <Button
-              title="Send privately"
-              loading={busy}
-              disabled={!tAmount.trim() || !tx.trim() || !ty.trim()}
-              onPress={() => void transfer(tAmount, tx, ty)}
-            />
-          </Card>
-        </>
-      ) : null}
+      {protocol === "strk20" ? <Strk20Panel /> : <TongoPanel />}
     </Screen>
   );
 }

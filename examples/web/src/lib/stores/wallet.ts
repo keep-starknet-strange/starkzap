@@ -17,6 +17,7 @@ import {
   PRIVY_SERVER_URL,
   AUTO_PRIVATE_KEY,
   AUTO_ACCOUNT_PRESET,
+  PRIVACY_CONFIG,
 } from "./config";
 import { sdkLogger, log } from "./logger";
 import * as privacy from "~/features/privacy/store";
@@ -93,6 +94,9 @@ export const sdk = new StarkZap({
   chainId: CHAIN_ID,
   logging: { logger: sdkLogger },
   ...(bridging ? { bridging } : {}),
+  // Enables wallet.privacy() on locally-signed wallets. Absent when this
+  // network has no VITE_PRIVACY_* endpoints configured.
+  ...(PRIVACY_CONFIG ? { privacy: PRIVACY_CONFIG } : {}),
 });
 
 interface WalletState {

@@ -1,4 +1,5 @@
 import Constants, { ExecutionEnvironment } from "expo-constants";
+import type { PrivacyConfig } from "starkzap-native";
 
 // Public env vars (Expo inlines EXPO_PUBLIC_* at build time).
 export const PRIVY_SERVER_URL = process.env.EXPO_PUBLIC_PRIVY_SERVER_URL ?? "";
@@ -46,3 +47,54 @@ export function alchemySolanaMainnetRpc(): string {
 // works in a dev/custom build. Use this to gate the Privy path.
 export const isExpoGo =
   Constants.executionEnvironment === ExecutionEnvironment.StoreClient;
+
+// ─── STRK20 privacy pool ────────────────────────────────────────────────────
+//
+// One pool serves every token, so unlike Tongo there is no per-token contract —
+// just the pool plus the two services. All of it is per-network because the app
+// switches chains at runtime.
+//
+// Expo inlines EXPO_PUBLIC_* at build time and cannot read process.env
+// dynamically, so every variable is spelled out as a literal here rather than
+// looked up by a computed key.
+const PRIVACY_POOL_MAINNET = process.env.EXPO_PUBLIC_PRIVACY_POOL_MAINNET ?? "";
+const PRIVACY_POOL_SEPOLIA = process.env.EXPO_PUBLIC_PRIVACY_POOL_SEPOLIA ?? "";
+const PRIVACY_PROVER_MAINNET =
+  process.env.EXPO_PUBLIC_PRIVACY_PROVER_MAINNET ?? "";
+const PRIVACY_PROVER_SEPOLIA =
+  process.env.EXPO_PUBLIC_PRIVACY_PROVER_SEPOLIA ?? "";
+const PRIVACY_DISCOVERY_MAINNET =
+  process.env.EXPO_PUBLIC_PRIVACY_DISCOVERY_MAINNET ?? "";
+const PRIVACY_DISCOVERY_SEPOLIA =
+  process.env.EXPO_PUBLIC_PRIVACY_DISCOVERY_SEPOLIA ?? "";
+const PRIVACY_OHTTP_RELAY = process.env.EXPO_PUBLIC_PRIVACY_OHTTP_RELAY ?? "";
+// OHTTP defaults to on: without it the viewing key reaches the prover and
+// discovery service in plaintext (inside TLS, but readable by the operator).
+const PRIVACY_OHTTP = process.env.EXPO_PUBLIC_PRIVACY_OHTTP !== "false";
+
+/**
+ * Config for `createPrivacy` / `wallet.privacy()` on the given network, or
+ * `undefined` when its endpoints are unset — the STRK20 tab then explains
+ * what is missing instead of failing at call time.
+ */
+export function privacyConfig(
+  network: "mainnet" | "sepolia"
+): PrivacyConfig | undefined {
+  const isMain = network === "mainnet";
+  const pool = (isMain ? PRIVACY_POOL_MAINNET : PRIVACY_POOL_SEPOLIA).trim();
+  const prover = (
+    isMain ? PRIVACY_PROVER_MAINNET : PRIVACY_PROVER_SEPOLIA
+  ).trim();
+  const discovery = (
+    isMain ? PRIVACY_DISCOVERY_MAINNET : PRIVACY_DISCOVERY_SEPOLIA
+  ).trim();
+  if (!pool || !prover || !discovery) return undefined;
+
+  const relay = PRIVACY_OHTTP_RELAY.trim();
+  return {
+    poolContractAddress: pool,
+    prover,
+    discovery,
+    ohttp: PRIVACY_OHTTP ? (relay ? { relayUrl: relay } : true) : false,
+  };
+}

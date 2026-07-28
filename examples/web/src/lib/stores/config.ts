@@ -6,6 +6,7 @@ import {
   BraavosPreset,
   DevnetPreset,
   type AccountClassConfig,
+  type PrivacyConfig,
 } from "starkzap";
 
 // App-level configuration: network resolution + env-derived endpoints.
@@ -183,6 +184,71 @@ const TONGO_CONTRACTS_MAINNET: Record<string, string> = {
 export const TONGO_CONTRACTS = CHAIN_ID.isSepolia()
   ? TONGO_CONTRACTS_SEPOLIA
   : TONGO_CONTRACTS_MAINNET;
+
+// ─── STRK20 privacy pool ────────────────────────────────────────────────────
+//
+// One pool serves every token, so unlike Tongo there is no per-token contract —
+// just the pool plus the two services. All of it is per-network because the app
+// switches chains at runtime. See .env.example.
+
+function pick(mainnet: string | undefined, sepolia: string | undefined) {
+  return (CHAIN_ID.isSepolia() ? sepolia : mainnet)?.trim() || undefined;
+}
+
+const PRIVACY_POOL = pick(
+  env.VITE_PRIVACY_POOL_MAINNET as string | undefined,
+  env.VITE_PRIVACY_POOL_SEPOLIA as string | undefined
+);
+const PRIVACY_PROVER = pick(
+  env.VITE_PRIVACY_PROVER_MAINNET as string | undefined,
+  env.VITE_PRIVACY_PROVER_SEPOLIA as string | undefined
+);
+const PRIVACY_DISCOVERY = pick(
+  env.VITE_PRIVACY_DISCOVERY_MAINNET as string | undefined,
+  env.VITE_PRIVACY_DISCOVERY_SEPOLIA as string | undefined
+);
+const PRIVACY_OHTTP_RELAY = (
+  env.VITE_PRIVACY_OHTTP_RELAY as string | undefined
+)?.trim();
+
+// OHTTP defaults to on: without it the viewing key reaches the prover and
+// discovery service in plaintext (inside TLS, but readable by the operator).
+const PRIVACY_OHTTP =
+  (env.VITE_PRIVACY_OHTTP as string | undefined)?.trim() !== "false";
+
+/**
+ * Config for `createPrivacy` / `wallet.privacy()`, or `undefined` when this
+ * network has no privacy endpoints set — the STRK20 tab then explains what is
+ * missing instead of failing at call time.
+ */
+export const PRIVACY_CONFIG: PrivacyConfig | undefined =
+  PRIVACY_POOL && PRIVACY_PROVER && PRIVACY_DISCOVERY
+    ? {
+        poolContractAddress: PRIVACY_POOL,
+        prover: PRIVACY_PROVER,
+        discovery: PRIVACY_DISCOVERY,
+        ohttp: PRIVACY_OHTTP
+          ? PRIVACY_OHTTP_RELAY
+            ? { relayUrl: PRIVACY_OHTTP_RELAY }
+            : true
+          : false,
+      }
+    : undefined;
+
+/**
+ * Executor contracts for the anonymous swap and lending flows. Absent entries
+ * hide the corresponding operation; the core flows do not need them.
+ */
+export const PRIVACY_ANONYMIZERS = {
+  swap: pick(
+    env.VITE_PRIVACY_SWAP_ANONYMIZER_MAINNET as string | undefined,
+    env.VITE_PRIVACY_SWAP_ANONYMIZER_SEPOLIA as string | undefined
+  ),
+  lending: pick(
+    env.VITE_PRIVACY_LENDING_ANONYMIZER_MAINNET as string | undefined,
+    env.VITE_PRIVACY_LENDING_ANONYMIZER_SEPOLIA as string | undefined
+  ),
+};
 
 // Switch network by reloading with the query param — mirrors the old behavior
 // (a fresh SDK + wallet per network is simpler than live-rebuilding).

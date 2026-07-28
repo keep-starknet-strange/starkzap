@@ -8,7 +8,7 @@ import {
 import type { Call, RpcProvider } from "starknet";
 import { walletState } from "~/lib/stores/wallet";
 import { log } from "~/lib/stores/logger";
-import { privacyTokens, type PrivacyToken } from "./tokens";
+import { tongoTokens, type PrivacyToken } from "./tokens";
 
 // Mints a confidential account for a token; set at login so it closes over the
 // private key without the store ever holding it as plain state.
@@ -67,7 +67,7 @@ export function setToken(symbol: string) {
 
 export async function connect(): Promise<void> {
   const { wallet } = get(walletState);
-  const tok = privacyTokens().find((t) => t.symbol === get(tokenSymbol));
+  const tok = get(tongoTokens).find((t) => t.symbol === get(tokenSymbol));
   if (!wallet || !make || !tok) return;
   connecting.set(true);
   error.set(null);
