@@ -58,6 +58,7 @@ export default defineConfig({
       "@hyperlane-xyz/sdk",
       "@hyperlane-xyz/utils",
       "@solana/web3.js",
+      "@starkware-libs/starknet-privacy-sdk",
       "ethers",
     ],
   },

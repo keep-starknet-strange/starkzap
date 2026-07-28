@@ -1,3 +1,4 @@
+import { useTokensStore } from "@/core/tokens/store";
 import { NETWORKS } from "@/core/network";
 
 export interface PrivacyToken {
@@ -7,15 +8,6 @@ export interface PrivacyToken {
 }
 
 // Tongo contract addresses per token — https://docs.tongo.cash/protocol/contracts.html
-const TOKEN_DECIMALS: Record<string, number> = {
-  STRK: 18,
-  ETH: 18,
-  DAI: 18,
-  USDC: 6,
-  "USDC.e": 6,
-  USDT: 6,
-  WBTC: 8,
-};
 const TONGO_SEPOLIA: Record<string, string> = {
   STRK: "0x408163bfcfc2d76f34b444cb55e09dace5905cf84c0884e4637c2c0f06ab6ed",
   ETH: "0x2cf0dc1d9e8c7731353dd15e6f2f22140120ef2d27116b982fa4fed87f6fef5",
@@ -32,14 +24,25 @@ const TONGO_MAINNET: Record<string, string> = {
   DAI: "0x511741b1ad1777b4ad59fbff49d64b8eb188e2aeb4fc72438278a589d8a10d8",
 };
 
-/** Tokens with a Tongo confidential contract on the selected network. */
-export function privacyTokens(networkIndex: number): PrivacyToken[] {
-  const map = NETWORKS[networkIndex].chainId.isSepolia()
+/**
+ * Tokens usable with Tongo: the shared token list intersected with the tokens
+ * that have a Tongo contract on this network.
+ *
+ * Tongo deploys one contract per token, so — unlike the STRK20 pool, which
+ * serves every token — a token the app tracks is not automatically available
+ * here.
+ */
+export function tongoTokens(networkIndex: number): PrivacyToken[] {
+  const contracts = NETWORKS[networkIndex].chainId.isSepolia()
     ? TONGO_SEPOLIA
     : TONGO_MAINNET;
-  return Object.entries(map).map(([symbol, contractAddress]) => ({
-    symbol,
-    contractAddress,
-    decimals: TOKEN_DECIMALS[symbol] ?? 18,
-  }));
+
+  return useTokensStore
+    .getState()
+    .tokens.filter((t) => contracts[t.symbol])
+    .map((t) => ({
+      symbol: t.symbol,
+      contractAddress: contracts[t.symbol]!,
+      decimals: t.decimals,
+    }));
 }

@@ -30,12 +30,14 @@ import {
   OFT_PUBLIC_KEY,
   alchemyEthRpc,
   alchemySolanaMainnetRpc,
+  privacyConfig,
 } from "@/core/config";
 import { resolveExamplePaymasterNodeUrl } from "@/core/paymaster";
 import { ensureCartridgeAdapter } from "@/core/cartridge";
 import { useTokensStore } from "@/core/tokens/store";
 import { useTxBannerStore } from "@/core/tx-banner/store";
 import { usePrivacyStore } from "@/features/privacy/store";
+import { useStrk20Store } from "@/features/privacy/strk20/store";
 
 export type WalletType = "cartridge" | "privatekey" | "privy";
 
@@ -162,11 +164,14 @@ function buildSdk(networkIndex: number) {
     // OFT is mainnet-only.
     ...(isMain && OFT_PUBLIC_KEY ? { layerZeroApiKey: OFT_PUBLIC_KEY } : {}),
   };
+  // Enables wallet.privacy(); absent when this network has no endpoints set.
+  const privacy = privacyConfig(isMain ? "mainnet" : "sepolia");
   const sdk = new StarkZap({
     rpcUrl: net.rpcUrl,
     chainId: net.chainId,
     ...(paymasterNodeUrl ? { paymaster: { nodeUrl: paymasterNodeUrl } } : {}),
     ...(Object.keys(bridging).length ? { bridging } : {}),
+    ...(privacy ? { privacy } : {}),
   });
   return { sdk, paymasterNodeUrl };
 }
@@ -229,6 +234,7 @@ export const useWalletStore = create<WalletStore>((set, get) => ({
         address: wallet.address,
       });
       usePrivacyStore.getState().clear();
+      useStrk20Store.getState().clear();
       await get().checkDeployment();
     } catch (err) {
       set({ error: String(err) });
@@ -321,6 +327,7 @@ export const useWalletStore = create<WalletStore>((set, get) => ({
         address: wallet.address,
       });
       usePrivacyStore.getState().clear();
+      useStrk20Store.getState().clear();
       await get().checkDeployment();
     } catch (err) {
       set({ error: String(err) });
@@ -353,6 +360,7 @@ export const useWalletStore = create<WalletStore>((set, get) => ({
 
   disconnect: () => {
     usePrivacyStore.getState().clear();
+    useStrk20Store.getState().clear();
     clearHint();
     set({
       sdk: null,
