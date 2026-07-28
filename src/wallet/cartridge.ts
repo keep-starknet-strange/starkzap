@@ -22,6 +22,7 @@ import {
   type StakingConfig,
 } from "@/types";
 import {
+  assertProofSendable,
   checkDeployed,
   ensureWalletReady,
   normalizeFeeMode,
@@ -313,6 +314,8 @@ export class CartridgeWallet extends BaseWallet {
   async execute(calls: Call[], options: ExecuteOptions = {}): Promise<Tx> {
     const feeMode = normalizeFeeMode(options.feeMode ?? this.defaultFeeMode);
     const timeBounds = options.timeBounds ?? this.defaultTimeBounds;
+
+    assertProofSendable(options.proof, feeMode, "CartridgeWallet");
 
     let transaction_hash: string;
 

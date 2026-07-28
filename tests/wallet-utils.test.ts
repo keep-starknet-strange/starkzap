@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
 import type { RpcProvider } from "starknet";
 import {
+  assertProofSendable,
   checkDeployed,
   ensureWalletReady,
   isPaymasterMode,
@@ -176,6 +177,40 @@ describe("wallet utils", () => {
 
       expect(result).not.toHaveProperty("timeBounds");
       expect(result).not.toHaveProperty("deploymentData");
+    });
+  });
+
+  describe("assertProofSendable", () => {
+    const proof = { data: "0xdeadbeef", proofFacts: ["0x1", "0x2"] };
+
+    it("allows a proof on the user_pays path of a Wallet", () => {
+      expect(() =>
+        assertProofSendable(proof, "user_pays", "Wallet")
+      ).not.toThrow();
+    });
+
+    it("is a no-op when there is no proof", () => {
+      expect(() =>
+        assertProofSendable(undefined, { type: "paymaster" }, "CartridgeWallet")
+      ).not.toThrow();
+    });
+
+    it("rejects a proof on the paymaster path", () => {
+      expect(() =>
+        assertProofSendable(proof, { type: "paymaster" }, "Wallet")
+      ).toThrow('require feeMode "user_pays"');
+    });
+
+    it("rejects a proof on the deprecated sponsored alias", () => {
+      expect(() => assertProofSendable(proof, "sponsored", "Wallet")).toThrow(
+        'require feeMode "user_pays"'
+      );
+    });
+
+    it("rejects a proof on a non-Wallet implementation", () => {
+      expect(() =>
+        assertProofSendable(proof, "user_pays", "CartridgeWallet")
+      ).toThrow("CartridgeWallet cannot send proof-carrying transactions");
     });
   });
 

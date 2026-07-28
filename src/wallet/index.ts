@@ -27,14 +27,18 @@ import type {
   ProviderOptions,
   SDKConfig,
   StakingConfig,
+  TransactionProof,
 } from "@/types";
 import {
+  assertProofSendable,
   checkDeployed,
   ensureWalletReady,
   normalizeFeeMode,
   paymasterDetails,
   preflightTransaction,
 } from "@/wallet/utils";
+import { createPrivacy } from "@/privacy/create";
+import type { PrivacyConfig } from "@/privacy/create";
 import type { WalletInterface } from "@/wallet/interface";
 import { BaseWallet } from "@/wallet/base";
 import {
@@ -51,7 +55,10 @@ const NEGATIVE_DEPLOYMENT_CACHE_TTL_MS = 3_000;
 
 export { type WalletInterface } from "@/wallet/interface";
 export { BaseWallet } from "@/wallet/base";
-export { AccountProvider } from "@/wallet/accounts/provider";
+export {
+  AccountProvider,
+  type ViewingKeyScope,
+} from "@/wallet/accounts/provider";
 
 /**
  * Options for creating a Wallet.
@@ -125,6 +132,8 @@ export class Wallet extends BaseWallet {
   private readonly explorerConfig: ExplorerConfig | undefined;
   private readonly defaultFeeMode: FeeMode;
   private readonly defaultTimeBounds: PaymasterTimeBounds | undefined;
+  private readonly privacyConfig: PrivacyConfig | undefined;
+  private privacyClient: ReturnType<typeof createPrivacy> | null = null;
   private deployedCache: boolean | null = null;
   private deployedCacheExpiresAt = 0;
   private sponsoredDeployLock: Promise<void> | null = null;
@@ -138,6 +147,7 @@ export class Wallet extends BaseWallet {
     explorerConfig?: ExplorerConfig;
     defaultFeeMode: FeeMode;
     defaultTimeBounds?: PaymasterTimeBounds;
+    privacyConfig?: PrivacyConfig | undefined;
     stakingConfig: StakingConfig | undefined;
     bridgingConfig?: BridgingConfig | undefined;
     logging?: LoggerConfig;
@@ -155,6 +165,7 @@ export class Wallet extends BaseWallet {
     this.explorerConfig = options.explorerConfig;
     this.defaultFeeMode = options.defaultFeeMode;
     this.defaultTimeBounds = options.defaultTimeBounds;
+    this.privacyConfig = options.privacyConfig;
   }
 
   /**
@@ -229,6 +240,7 @@ export class Wallet extends BaseWallet {
       ...(config.explorer && { explorerConfig: config.explorer }),
       defaultFeeMode: feeMode,
       ...(timeBounds && { defaultTimeBounds: timeBounds }),
+      ...(config.privacy && { privacyConfig: config.privacy }),
       stakingConfig: options.config.staking,
       bridgingConfig: options.config.bridging,
       ...(config.logging && { logging: config.logging }),
@@ -498,10 +510,12 @@ export class Wallet extends BaseWallet {
     const feeMode = normalizeFeeMode(options.feeMode ?? this.defaultFeeMode);
     const timeBounds = options.timeBounds ?? this.defaultTimeBounds;
 
+    assertProofSendable(options.proof, feeMode, "Wallet");
+
     const transactionHash =
       feeMode !== "user_pays"
         ? await this.executeSponsored(calls, timeBounds, feeMode.gasToken)
-        : await this.executeUserPays(calls);
+        : await this.executeUserPays(calls, options.proof);
 
     return new Tx(
       transactionHash,
@@ -511,14 +525,21 @@ export class Wallet extends BaseWallet {
     );
   }
 
-  private async executeUserPays(calls: Call[]): Promise<string> {
+  private async executeUserPays(
+    calls: Call[],
+    proof?: TransactionProof
+  ): Promise<string> {
     const deployed = await this.isDeployed();
     if (!deployed) {
       throw new Error(
         'Account is not deployed. Call wallet.ensureReady({ deploy: "if_needed" }) before execute() in user_pays mode.'
       );
     }
-    return (await this.account.execute(calls)).transaction_hash;
+
+    const details = proof
+      ? { proof: proof.data, proofFacts: proof.proofFacts }
+      : undefined;
+    return (await this.account.execute(calls, details)).transaction_hash;
   }
 
   private executePaymaster(
@@ -603,6 +624,60 @@ export class Wallet extends BaseWallet {
   }
 
   /**
+   * Get the {@link AccountProvider} backing this wallet.
+   *
+   * Exposes the signer and key-derived capabilities (such as
+   * {@link AccountProvider.getViewingKey}) that only a locally-signed wallet
+   * has. `CartridgeWallet` has no equivalent, which is what keeps
+   * signer-dependent features off the Cartridge path at the type level.
+   */
+  getAccountProvider(): AccountProvider {
+    return this.accountProvider;
+  }
+
+  /**
+   * Privacy pool client for this wallet, configured from `privacy` in the
+   * SDK config.
+   *
+   * @returns The privacy SDK client
+   * @throws If `privacy` is missing from the SDK config
+   *
+   * @example
+   * ```ts
+   * const sdk = new StarkZap({
+   *   network: "mainnet",
+   *   privacy: { poolContractAddress: POOL, prover: PROVER, discovery: DISCOVERY },
+   * });
+   * const wallet = await sdk.connectWallet({ account: { signer } });
+   *
+   * const privateTransfers = await wallet.privacy();
+   * const { callAndProof } = await privateTransfers.build().register().execute();
+   * await wallet.execute([callAndProof.call], { proof: callAndProof.proof });
+   * ```
+   */
+  async privacy(): ReturnType<typeof createPrivacy> {
+    const config = this.privacyConfig;
+    if (!config) {
+      throw new Error(
+        "[starkzap] wallet.privacy() requires 'privacy' in the SDK config. " +
+          "Add it to StarkZap({ privacy: { poolContractAddress, prover, discovery } }), " +
+          "or call createPrivacy(wallet, config) directly."
+      );
+    }
+
+    this.privacyClient ??= createPrivacy(this, config).catch(
+      (error: unknown) => {
+        // Don't cache a failure — a missing dependency or an unreachable
+        // service should be retryable once fixed.
+        this.privacyClient = null;
+        throw error;
+      }
+    );
+
+    return this.privacyClient;
+  }
+
+  /**
    * Estimate the fee for executing calls.
    *
    * @example
@@ -620,6 +695,9 @@ export class Wallet extends BaseWallet {
   override async disconnect(): Promise<void> {
     await super.disconnect();
     this.clearDeploymentCache();
+    // The privacy client holds a derived viewing key; it must not outlive the
+    // session that authorised it.
+    this.privacyClient = null;
   }
 }
 

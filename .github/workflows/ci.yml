@@ -16,6 +16,9 @@ on:
 
 permissions:
   contents: read
+  # The privacy SDK is on GitHub Packages, which requires auth even for public
+  # packages. The built-in GITHUB_TOKEN covers it — no PAT in repo secrets.
+  packages: read
 
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
@@ -42,6 +45,10 @@ jobs:
 
       - name: Install
         run: npm ci
+        env:
+          # Authenticates the @starkware-libs scope against GitHub Packages;
+          # the scope->registry mapping lives in the committed .npmrc.
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Format check
         run: npm run -s prettier:check
@@ -86,6 +93,8 @@ jobs:
 
       - name: Install (workspaces)
         run: npm ci
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build SDK + Native Package
         run: npm run -s build:all

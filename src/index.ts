@@ -35,6 +35,9 @@ export * from "@/swap";
 // Confidential
 export * from "@/confidential";
 
+// Privacy (STRK20 privacy pool)
+export * from "@/privacy";
+
 // Lending
 export * from "@/lending";
 
