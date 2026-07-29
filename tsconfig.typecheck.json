@@ -1,0 +1,11 @@
+{
+  // Typecheck-only config: the build config deliberately includes `src` alone so
+  // `tsc` emits nothing but the library. Tests and scripts still need checking —
+  // vitest transpiles without typechecking, so a green test run proves nothing
+  // about types, and `scripts/` is never compiled at all.
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": true
+  },
+  "include": ["src/**/*", "tests/**/*", "scripts/**/*"]
+}

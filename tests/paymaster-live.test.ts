@@ -20,7 +20,7 @@ maybeDescribe("Live Paymaster Smoke (opt-in)", () => {
     }
 
     const sdkUserPays = new StarkZap({
-      rpcUrl: testnetConfig.rpcUrl,
+      ...testnetConfig,
       chainId: ChainId.SEPOLIA,
     });
     const userPaysWallet = await sdkUserPays.connectWallet({
@@ -36,7 +36,7 @@ maybeDescribe("Live Paymaster Smoke (opt-in)", () => {
     }
 
     const sdkSponsored = new StarkZap({
-      rpcUrl: testnetConfig.rpcUrl,
+      ...testnetConfig,
       chainId: ChainId.SEPOLIA,
       paymaster: testnetPaymasterConfig,
     });

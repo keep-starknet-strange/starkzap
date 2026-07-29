@@ -8,12 +8,14 @@ import {
   WithdrawalState,
 } from "@/bridge/monitor/types";
 import { CanonicalMonitor } from "@/bridge/monitor/canonical/CanonicalMonitor";
+import { NOOP_LOGGER } from "@/logger";
 
 function makeMonitor(): CanonicalMonitor {
   return new CanonicalMonitor({
     chainId: ChainId.SEPOLIA,
     starknetProvider: {} as RpcProvider,
     ethereumProvider: {} as Provider,
+    logger: NOOP_LOGGER,
   });
 }
 

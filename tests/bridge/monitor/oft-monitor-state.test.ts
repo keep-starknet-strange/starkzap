@@ -9,12 +9,14 @@ import {
   WithdrawalState,
 } from "@/bridge/monitor/types";
 import { OftMonitor } from "@/bridge/monitor/oft/OftMonitor";
+import { NOOP_LOGGER } from "@/logger";
 
 function makeMonitor(): OftMonitor {
   return new OftMonitor({
     chainId: ChainId.SEPOLIA,
     starknetProvider: {} as RpcProvider,
     ethereumProvider: {} as Provider,
+    logger: NOOP_LOGGER,
     protocol: Protocol.OFT,
   });
 }

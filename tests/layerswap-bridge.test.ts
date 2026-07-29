@@ -28,7 +28,7 @@ import type {
   LsToken,
 } from "@/bridge/ethereum/layerswap/types";
 import type { WalletInterface } from "@/wallet";
-import type { EthereumWalletConfig } from "@/bridge/ethereum/types";
+import type { EthereumWalletConfig } from "@/bridge/ethereum/ethers-interop";
 import { NOOP_LOGGER } from "@/logger";
 
 const API_KEY = process.env["LAYERSWAP_API_KEY"] ?? "";

@@ -38,7 +38,7 @@ async function createWallet() {
   }
 
   const sdk = new StarkZap({
-    rpcUrl: testnetConfig.rpcUrl,
+    ...testnetConfig,
     chainId: ChainId.SEPOLIA,
   });
 

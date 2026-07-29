@@ -82,7 +82,7 @@
   "scripts": {
     "build": "tsc; tsc-alias",
     "build:all": "npm run build --workspace starkzap-native",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc -p tsconfig.typecheck.json",
     "typecheck:all": "npm run typecheck --workspace starkzap-native",
     "lint": "eslint .",
     "fix": "eslint . --fix",

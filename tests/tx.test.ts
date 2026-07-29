@@ -93,7 +93,9 @@ describe("Tx", () => {
     });
 
     it("should store hash correctly", () => {
-      const provider = new RpcProvider({ nodeUrl: config.rpcUrl });
+      const provider = new RpcProvider({
+        ...(config.rpcUrl && { nodeUrl: config.rpcUrl }),
+      });
       const hash = "0xdeadbeef";
 
       const tx = new Tx(hash, provider, SEPOLIA);
