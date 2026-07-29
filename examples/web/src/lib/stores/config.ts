@@ -5,8 +5,10 @@ import {
   ArgentXV050Preset,
   BraavosPreset,
   DevnetPreset,
+  fromAddress,
   type AccountClassConfig,
   type PrivacyConfig,
+  type PrivacyFeeMode,
 } from "starkzap";
 
 // App-level configuration: network resolution + env-derived endpoints.
@@ -229,12 +231,40 @@ const PRIVACY_OHTTP =
  * network has no privacy endpoints set — the STRK20 tab then explains what is
  * missing instead of failing at call time.
  */
+// How the pool fee is paid. `sponsored` is the sane default: the relayer covers
+// gas and the pool fee is ~1 STRK, whereas `default` needs no API key but the
+// forwarder keeps the entire suggested-max gas withdrawal — measured at ~16x
+// more. `default` needs a gas token, `sponsored_private` a pool-fee token.
+const PRIVACY_FEE_MODE =
+  (env.VITE_PRIVACY_FEE_MODE as string | undefined) ?? "sponsored";
+const PRIVACY_FEE_TOKEN = env.VITE_PRIVACY_FEE_TOKEN as string | undefined;
+
+function privacyFee(): PrivacyFeeMode | undefined {
+  if (PRIVACY_FEE_MODE === "sponsored") return { mode: "sponsored" };
+  if (!PRIVACY_FEE_TOKEN) return undefined;
+  const token = fromAddress(PRIVACY_FEE_TOKEN);
+  return PRIVACY_FEE_MODE === "default"
+    ? { mode: "default", gasToken: token }
+    : { mode: "sponsored_private", poolFeeToken: token };
+}
+
+const PRIVACY_FEE = privacyFee();
+
 export const PRIVACY_CONFIG: PrivacyConfig | undefined =
-  PRIVACY_POOL && PRIVACY_PROVER && PRIVACY_DISCOVERY
+  PRIVACY_POOL &&
+  PRIVACY_PROVER &&
+  PRIVACY_DISCOVERY &&
+  PAYMASTER_NODE_URL &&
+  PRIVACY_FEE
     ? {
         poolContractAddress: PRIVACY_POOL,
         prover: PRIVACY_PROVER,
         discovery: PRIVACY_DISCOVERY,
+        // Privacy transactions are submitted by the paymaster's relayer, so the
+        // account never appears on-chain. Same proxy as the sponsored toggle:
+        // it forwards any method with the API key attached.
+        paymasterUrl: PAYMASTER_NODE_URL,
+        fee: PRIVACY_FEE,
         ohttp: PRIVACY_OHTTP
           ? PRIVACY_OHTTP_RELAY
             ? { relayUrl: PRIVACY_OHTTP_RELAY }

@@ -15,6 +15,16 @@ const ENABLE_PRIVACY_STACK = process.env.ENABLE_PRIVACY_STACK === "true";
 
 const app = express();
 app.use(cors());
+
+// Privacy proofs are megabytes of base64, far past express.json()'s 100kb
+// default — which rejects them with an HTML 413 before any route runs, so the
+// caller sees "non-JSON response" rather than a size problem. Scoped to the
+// paymaster path and mounted first: body-parser skips a body already parsed, so
+// every other route keeps the safe default. An integrator's own proxy needs the
+// same allowance.
+const PROOF_BODY_LIMIT = "32mb";
+app.use("/api/paymaster", express.json({ limit: PROOF_BODY_LIMIT }));
+
 app.use(express.json());
 
 // --- Privacy proving stack (opt-in) ---
@@ -246,7 +256,10 @@ if (ENABLE_PAYMASTER) {
 
   app.post("/api/paymaster", async (req, res) => {
     try {
-      console.log(`[Paymaster] ${req.body?.method || "unknown"}`);
+      const size = Buffer.byteLength(JSON.stringify(req.body ?? {}));
+      console.log(
+        `[Paymaster] ${req.body?.method || "unknown"} (${(size / 1024).toFixed(0)}kb)`
+      );
 
       const response = await fetch(AVNU_PAYMASTER_URL, {
         method: "POST",

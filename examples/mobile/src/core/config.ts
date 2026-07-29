@@ -1,5 +1,9 @@
 import Constants, { ExecutionEnvironment } from "expo-constants";
-import type { PrivacyConfig } from "starkzap-native";
+import {
+  fromAddress,
+  type PrivacyConfig,
+  type PrivacyFeeMode,
+} from "starkzap-native";
 
 // Public env vars (Expo inlines EXPO_PUBLIC_* at build time).
 export const PRIVY_SERVER_URL = process.env.EXPO_PUBLIC_PRIVY_SERVER_URL ?? "";
@@ -77,8 +81,26 @@ const PRIVACY_OHTTP = process.env.EXPO_PUBLIC_PRIVACY_OHTTP !== "false";
  * `undefined` when its endpoints are unset — the STRK20 tab then explains
  * what is missing instead of failing at call time.
  */
+// How the pool fee is paid. `sponsored` is the sane default: the relayer covers
+// gas and the pool fee is ~1 STRK, whereas `default` needs no API key but the
+// forwarder keeps the whole suggested-max gas withdrawal — ~16x more.
+const PRIVACY_FEE_MODE =
+  process.env.EXPO_PUBLIC_PRIVACY_FEE_MODE ?? "sponsored";
+const PRIVACY_FEE_TOKEN = process.env.EXPO_PUBLIC_PRIVACY_FEE_TOKEN ?? "";
+
+function privacyFee(): PrivacyFeeMode | undefined {
+  if (PRIVACY_FEE_MODE === "sponsored") return { mode: "sponsored" };
+  const raw = PRIVACY_FEE_TOKEN.trim();
+  if (!raw) return undefined;
+  const token = fromAddress(raw);
+  return PRIVACY_FEE_MODE === "default"
+    ? { mode: "default", gasToken: token }
+    : { mode: "sponsored_private", poolFeeToken: token };
+}
+
 export function privacyConfig(
-  network: "mainnet" | "sepolia"
+  network: "mainnet" | "sepolia",
+  paymasterUrl?: string | null
 ): PrivacyConfig | undefined {
   const isMain = network === "mainnet";
   const pool = (isMain ? PRIVACY_POOL_MAINNET : PRIVACY_POOL_SEPOLIA).trim();
@@ -88,13 +110,18 @@ export function privacyConfig(
   const discovery = (
     isMain ? PRIVACY_DISCOVERY_MAINNET : PRIVACY_DISCOVERY_SEPOLIA
   ).trim();
-  if (!pool || !prover || !discovery) return undefined;
+  const fee = privacyFee();
+  if (!pool || !prover || !discovery || !paymasterUrl || !fee) return undefined;
 
   const relay = PRIVACY_OHTTP_RELAY.trim();
   return {
     poolContractAddress: pool,
     prover,
     discovery,
+    // Privacy transactions are submitted by the paymaster's relayer, so the
+    // account never appears on-chain. Same proxy the sponsored flow uses.
+    paymasterUrl,
+    fee,
     ohttp: PRIVACY_OHTTP ? (relay ? { relayUrl: relay } : true) : false,
   };
 }

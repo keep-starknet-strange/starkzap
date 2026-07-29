@@ -8,21 +8,20 @@
   import { walletState } from "~/lib/stores/wallet";
   import {
     balances,
-    blocksUntilProvable,
     busy,
     client,
     connect,
     connecting,
     deposit,
     error,
+    fee,
     recipientReady,
     refresh,
-    register,
     registered,
     step,
     transfer,
     unavailableReason,
-    waiting,
+    waitingBlocks,
     withdraw,
   } from "./store";
 
@@ -35,6 +34,8 @@
   let sendAmount = $state("");
   let sendTo = $state("");
   let withdrawAmount = $state("");
+  // Deliberately empty: self-withdrawing undoes the pool, so it has to be chosen.
+  let withdrawTo = $state("");
 
   // Whether the recipient has registered a viewing key. The SDK cannot build a
   // transfer to an account without one, so this is checked before offering it.
@@ -48,9 +49,10 @@
     ...$tokens.map((t) => ({ label: t.symbol, value: t.symbol })),
   ]);
 
-  // Actions are blocked while the chain catches up: a proof must read state that
+  // Only one operation at a time. The block wait now happens *inside* send(),
+  // reported through `waitingBlocks`, rather than gating the buttons up front.
   // is already ~10 blocks old.
-  const blocked = $derived($busy || $waiting);
+  const blocked = $derived($busy);
 </script>
 
 {#if reason}
@@ -82,35 +84,32 @@
         ? "Checking registration…"
         : $registered
           ? "Registered — ready to transact."
-          : "Not registered yet. Depositing registers you automatically."}
+          : "Not registered yet — your first deposit registers you. Registering on its own is not possible: the pool fee comes from your private balance, and you have none yet."}
     </Text>
 
-    {#if $waiting}
+    {#if $waitingBlocks !== null}
       <div class="wait">
         <Text variant="label">
-          Waiting {$blocksUntilProvable} block{$blocksUntilProvable === 1
-            ? ""
-            : "s"}
+          Waiting {$waitingBlocks} block{$waitingBlocks === 1 ? "" : "s"}
         </Text>
         <Text variant="muted">
-          A proof must read state that is already ~10 blocks old, so the next
-          private transaction cannot be built yet.
+          A proof must read state that is already ~10 blocks old, so this
+          transaction cannot be proven yet.
         </Text>
       </div>
+    {/if}
+
+    {#if $fee}
+      <Text variant="muted">
+        Pool fee: {$fee.feeAction.amount === 0n
+          ? "none on this deployment"
+          : `${$fee.feeAction.amount} (base units) — withdrawn from your private balance, not paid from your account`}
+      </Text>
     {/if}
 
     {#if $step}<Text variant="muted">{$step}</Text>{/if}
     {#if $error}<Text variant="muted">{$error}</Text>{/if}
 
-    {#if $registered === false}
-      <Button
-        variant="secondary"
-        title="Register now"
-        loading={$busy}
-        disabled={blocked}
-        onclick={register}
-      />
-    {/if}
   </Card>
 
   <!-- Balances: one discovery call covers every token. -->
@@ -196,12 +195,27 @@
         inputmode="decimal"
         bind:value={withdrawAmount}
       />
-      <Text variant="muted">Withdraws to your own wallet address.</Text>
+      <TextField
+        label="Recipient address"
+        placeholder="0x…"
+        bind:value={withdrawTo}
+      />
+      <Text variant="muted">
+        Deposits and withdrawals are public; only what happens between them is
+        private. Withdrawing to the address you deposited from puts both ends on
+        the same address, which is enough to link them — so a fresh address is
+        what preserves the gap.
+      </Text>
+      <Button
+        variant="secondary"
+        title="Use my own address (links the two ends)"
+        onclick={() => (withdrawTo = $walletState.address ?? "")}
+      />
       <Button
         title="Withdraw"
         loading={$busy}
-        disabled={blocked || !withdrawAmount.trim()}
-        onclick={() => token && withdraw(token, withdrawAmount)}
+        disabled={blocked || !withdrawAmount.trim() || !withdrawTo.trim()}
+        onclick={() => token && withdraw(token, withdrawTo, withdrawAmount)}
       />
     </Card>
   {/if}
