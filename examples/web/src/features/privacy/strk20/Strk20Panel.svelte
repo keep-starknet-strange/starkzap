@@ -15,8 +15,6 @@
     connecting,
     deposit,
     error,
-    finishDeposit,
-    pendingDeposit,
     recipientReady,
     refresh,
     register,
@@ -141,40 +139,25 @@
   </Card>
 
   {#if token}
-    <!-- Deposit is two transactions: a transparent approve, then the proof. -->
+    <!-- Two transactions: a transparent approve, then the proof. The approve
+         does not have to age, so both go through on one press. -->
     <Card>
       <Text variant="subtitle">Deposit</Text>
-      {#if $pendingDeposit}
-        <Text variant="muted">
-          Approved {$pendingDeposit.input}
-          {$pendingDeposit.token.symbol}.
-          {$waiting
-            ? "Waiting for it to become provable…"
-            : "Ready — press Deposit to prove and submit."}
-        </Text>
-        <Button
-          title="Deposit"
-          loading={$busy}
-          disabled={blocked}
-          onclick={finishDeposit}
-        />
-      {:else}
-        <TextField
-          label="Amount"
-          placeholder="0.0"
-          inputmode="decimal"
-          bind:value={depositAmount}
-        />
-        <Text variant="muted">
-          Sends an ERC20 approve first; the pool cannot pull funds without it.
-        </Text>
-        <Button
-          title="Approve"
-          loading={$busy}
-          disabled={blocked || !depositAmount.trim()}
-          onclick={() => token && deposit(token, depositAmount)}
-        />
-      {/if}
+      <TextField
+        label="Amount"
+        placeholder="0.0"
+        inputmode="decimal"
+        bind:value={depositAmount}
+      />
+      <Text variant="muted">
+        Sends an ERC20 approve first; the pool cannot pull funds without it.
+      </Text>
+      <Button
+        title="Deposit"
+        loading={$busy}
+        disabled={blocked || !depositAmount.trim()}
+        onclick={() => token && deposit(token, depositAmount).then(() => (depositAmount = ""))}
+      />
     </Card>
 
     <Card>

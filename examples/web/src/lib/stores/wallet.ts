@@ -21,6 +21,7 @@ import {
   PAYMASTER_NODE_URL,
 } from "./config";
 import { sdkLogger, log } from "./logger";
+import { feeOptions } from "./settings";
 import * as privacy from "~/features/privacy/store";
 import {
   getAccessToken as getPrivyAccessToken,
@@ -286,7 +287,9 @@ export async function deploy(): Promise<void> {
   walletState.update((s) => ({ ...s, connecting: true, error: null }));
   try {
     log("Deploying account…", "info");
-    const tx = await wallet.deploy();
+    // Honours the same sponsored preference as every other transaction, so a
+    // brand-new account can be deployed without holding STRK first.
+    const tx = await wallet.deploy(feeOptions());
     await tx.wait();
     log("Account deployed", "success");
     await checkDeployment();

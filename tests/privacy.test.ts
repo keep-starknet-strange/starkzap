@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { ec, type RpcProvider, type Signature } from "starknet";
+import { RpcError, ec, type RpcProvider, type Signature } from "starknet";
 import {
   Mocknet,
   MockProofInvocationFactory,
@@ -9,6 +9,9 @@ import {
 import {
   PROOF_BASE_BLOCK_DEPTH,
   waitForProvableBlock,
+  waitForProvableState,
+  waitForDeployedAccount,
+  waitForFundedBalance,
 } from "@/privacy/sequencing";
 import { screeningVerdict } from "@/privacy/errors";
 import { createPrivacy } from "@/privacy/create";
@@ -80,6 +83,21 @@ describe("privacy", () => {
       ).resolves.toBe(101);
     });
 
+    it("reports every poll, including the one that succeeds", async () => {
+      const provider = providerWithHeads(105, 111);
+      const onAttempt = vi.fn();
+
+      await waitForProvableBlock(provider, 100, {
+        pollIntervalMs: 1,
+        onAttempt,
+      });
+
+      expect(onAttempt.mock.calls.map(([a]) => a)).toEqual([
+        { attempt: 1, head: 105, provingBlock: 95, ready: false },
+        { attempt: 2, head: 111, provingBlock: 101, ready: true },
+      ]);
+    });
+
     it("throws when the head never advances far enough", async () => {
       const provider = providerWithHeads(101);
 
@@ -89,6 +107,194 @@ describe("privacy", () => {
           timeoutMs: 20,
         })
       ).rejects.toThrow(/Timed out after 20ms waiting for block 100/);
+    });
+  });
+
+  /**
+   * The state-based waits exist because counting blocks from a receipt only
+   * works for transactions this process saw. An account funded from a faucet,
+   * a bridge or another wallet has no receipt here, so the precondition has to
+   * be read off-chain state instead.
+   */
+  describe("waitForProvableState", () => {
+    function providerWithHeads(...heads: number[]): RpcProvider {
+      const getBlockNumber = vi.fn();
+      for (const head of heads) getBlockNumber.mockResolvedValueOnce(head);
+      getBlockNumber.mockResolvedValue(heads[heads.length - 1]);
+      return { getBlockNumber } as unknown as RpcProvider;
+    }
+
+    it("returns the proving block once the state is visible there", async () => {
+      const provider = providerWithHeads(120);
+      const isVisible = vi.fn().mockResolvedValue(true);
+
+      await expect(waitForProvableState(provider, isVisible)).resolves.toBe(
+        110
+      );
+      expect(isVisible).toHaveBeenCalledWith(110);
+    });
+
+    it("keeps polling while the state is not visible yet", async () => {
+      const provider = providerWithHeads(120, 121, 122);
+      const isVisible = vi
+        .fn()
+        .mockResolvedValueOnce(false)
+        .mockResolvedValueOnce(false)
+        .mockResolvedValue(true);
+
+      await expect(
+        waitForProvableState(provider, isVisible, { pollIntervalMs: 1 })
+      ).resolves.toBe(112);
+      expect(isVisible).toHaveBeenCalledTimes(3);
+    });
+
+    it("does not probe a negative block on a fresh chain", async () => {
+      const provider = providerWithHeads(3, 15);
+      const isVisible = vi.fn().mockResolvedValue(true);
+
+      await expect(
+        waitForProvableState(provider, isVisible, { pollIntervalMs: 1 })
+      ).resolves.toBe(5);
+      expect(isVisible).toHaveBeenCalledTimes(1);
+      expect(isVisible).toHaveBeenCalledWith(5);
+    });
+
+    it("reports every poll, including the one that succeeds", async () => {
+      const provider = providerWithHeads(120, 121);
+      const onAttempt = vi.fn();
+
+      await waitForProvableState(
+        provider,
+        vi.fn().mockResolvedValueOnce(false).mockResolvedValue(true),
+        { pollIntervalMs: 1, onAttempt }
+      );
+
+      expect(onAttempt.mock.calls.map(([a]) => a)).toEqual([
+        { attempt: 1, head: 120, provingBlock: 110, ready: false },
+        { attempt: 2, head: 121, provingBlock: 111, ready: true },
+      ]);
+    });
+
+    it("throws when the state never becomes visible", async () => {
+      const provider = providerWithHeads(120);
+
+      await expect(
+        waitForProvableState(provider, async () => false, {
+          pollIntervalMs: 1,
+          timeoutMs: 20,
+        })
+      ).rejects.toThrow(/Timed out waiting for the state a proof depends on/);
+    });
+  });
+
+  describe("waitForDeployedAccount", () => {
+    /** RpcError shape: what `isType` checks is the `baseError.code`. */
+    function notFound(): RpcError {
+      return new RpcError(
+        { code: 20, message: "Contract not found" },
+        "starknet_getClassHashAt",
+        []
+      );
+    }
+
+    it("resolves once the class hash is readable at the proving block", async () => {
+      const provider = {
+        getBlockNumber: vi.fn().mockResolvedValue(120),
+        getClassHashAt: vi.fn().mockResolvedValue("0x1"),
+      } as unknown as RpcProvider;
+
+      await expect(
+        waitForDeployedAccount(provider, fromAddress("0xabc"))
+      ).resolves.toBe(110);
+      expect(provider.getClassHashAt).toHaveBeenCalledWith(
+        fromAddress("0xabc"),
+        110
+      );
+    });
+
+    it("waits while the account is not deployed at that block yet", async () => {
+      const provider = {
+        getBlockNumber: vi.fn().mockResolvedValue(120),
+        getClassHashAt: vi
+          .fn()
+          .mockRejectedValueOnce(notFound())
+          .mockResolvedValue("0x1"),
+      } as unknown as RpcProvider;
+
+      await expect(
+        waitForDeployedAccount(provider, fromAddress("0xabc"), {
+          pollIntervalMs: 1,
+        })
+      ).resolves.toBe(110);
+      expect(provider.getClassHashAt).toHaveBeenCalledTimes(2);
+    });
+
+    it("propagates unrelated RPC failures instead of polling forever", async () => {
+      const provider = {
+        getBlockNumber: vi.fn().mockResolvedValue(120),
+        getClassHashAt: vi.fn().mockRejectedValue(new Error("network down")),
+      } as unknown as RpcProvider;
+
+      await expect(
+        waitForDeployedAccount(provider, fromAddress("0xabc"), {
+          pollIntervalMs: 1,
+          timeoutMs: 50,
+        })
+      ).rejects.toThrow("network down");
+    });
+  });
+
+  describe("waitForFundedBalance", () => {
+    const token = {
+      address: fromAddress(
+        "0x49d36570d4e46f48e99674bd3fcc84644ddd6b96f7c741b1562b82f9e004dc7"
+      ),
+      symbol: "TKN",
+      decimals: 18,
+      name: "Token",
+    } as never;
+
+    function providerReturning(...results: string[][]): RpcProvider {
+      const callContract = vi.fn();
+      for (const result of results) callContract.mockResolvedValueOnce(result);
+      callContract.mockResolvedValue(results[results.length - 1]);
+      return {
+        getBlockNumber: vi.fn().mockResolvedValue(120),
+        callContract,
+      } as unknown as RpcProvider;
+    }
+
+    it("resolves when the balance at the proving block covers the amount", async () => {
+      const provider = providerReturning(["0x64", "0x0"]);
+
+      await expect(
+        waitForFundedBalance(provider, token, fromAddress("0xabc"), 100n)
+      ).resolves.toBe(110);
+      expect(provider.callContract).toHaveBeenCalledWith(
+        expect.objectContaining({ entrypoint: "balance_of" }),
+        110
+      );
+    });
+
+    it("waits while the funding transfer has not propagated back that far", async () => {
+      // Balance is still 0 at the proving block, then appears.
+      const provider = providerReturning(["0x0", "0x0"], ["0x64", "0x0"]);
+
+      await expect(
+        waitForFundedBalance(provider, token, fromAddress("0xabc"), 100n, {
+          pollIntervalMs: 1,
+        })
+      ).resolves.toBe(110);
+      expect(provider.callContract).toHaveBeenCalledTimes(2);
+    });
+
+    it("reads a u256 balance, not just the low felt", async () => {
+      // low = 0, high = 1 → 2**128, which a low-only read would see as zero.
+      const provider = providerReturning(["0x0", "0x1"]);
+
+      await expect(
+        waitForFundedBalance(provider, token, fromAddress("0xabc"), 1n << 127n)
+      ).resolves.toBe(110);
     });
   });
 

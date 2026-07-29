@@ -4,10 +4,13 @@ import {
   PROOF_BASE_BLOCK_DEPTH,
   fromAddress,
   screeningVerdict,
+  waitForDeployedAccount,
+  waitForFundedBalance,
   type Token,
   type Wallet,
   type WalletInterface,
 } from "starkzap-native";
+import type { RpcProvider } from "starknet";
 import type { PrivateTransfersInterface } from "@starkware-libs/starknet-privacy-sdk";
 import { privacyConfig } from "@/core/config";
 import { NETWORKS } from "@/core/network";
@@ -21,12 +24,6 @@ export interface PrivacyBalance {
   notes: number;
 }
 
-/** A deposit whose approve has landed and is waiting to become provable. */
-interface PendingDeposit {
-  token: Token;
-  input: string;
-}
-
 interface Strk20Store {
   client: PrivateTransfersInterface | null;
   connecting: boolean;
@@ -36,7 +33,6 @@ interface Strk20Store {
   error: string | null;
   registered: boolean | null;
   balances: PrivacyBalance[];
-  pendingDeposit: PendingDeposit | null;
 
   // Visible block wait: any on-chain state a proof reads must trail the chain
   // head by PROOF_BASE_BLOCK_DEPTH blocks. Rather than hide that inside a
@@ -49,8 +45,7 @@ interface Strk20Store {
   clear: () => void;
   refresh: () => Promise<void>;
   register: () => Promise<void>;
-  approveDeposit: (token: Token, input: string) => Promise<void>;
-  finishDeposit: () => Promise<void>;
+  deposit: (token: Token, input: string) => Promise<void>;
   transfer: (token: Token, recipient: string, input: string) => Promise<void>;
   withdraw: (token: Token, input: string) => Promise<void>;
   recipientReady: (recipient: string, token: Token) => Promise<boolean>;
@@ -139,13 +134,18 @@ export const useStrk20Store = create<Strk20Store>((set, get) => {
   /**
    * Prove and submit one privacy transaction. The proof travels as
    * transaction-level fields, so it can never be batched with other calls.
+   *
+   * `provable` lets an operation demand more than the default depth: some
+   * proofs read state this app never saw a receipt for (an account funded
+   * elsewhere), so they check the state itself rather than counting blocks.
    */
   async function submit(
     label: string,
     compile: (
       transfers: PrivateTransfersInterface,
       provingBlockId: number
-    ) => Promise<{ callAndProof: { call: never; proof: never } }>
+    ) => Promise<{ callAndProof: { call: never; proof: never } }>,
+    provable?: (provider: RpcProvider) => Promise<number>
   ) {
     const transfers = get().client;
     const wallet = localWallet(useWalletStore.getState().wallet);
@@ -153,8 +153,11 @@ export const useStrk20Store = create<Strk20Store>((set, get) => {
 
     set({ busy: true, error: null });
     try {
-      const provingBlockId =
-        (await wallet.getProvider().getBlockNumber()) - PROOF_BASE_BLOCK_DEPTH;
+      const provider = wallet.getProvider();
+      set({ step: `${label}: checking state…` });
+      const provingBlockId = provable
+        ? await provable(provider)
+        : (await provider.getBlockNumber()) - PROOF_BASE_BLOCK_DEPTH;
 
       set({ step: `${label}: proving…` });
       const { callAndProof } = await compile(transfers, provingBlockId);
@@ -183,7 +186,6 @@ export const useStrk20Store = create<Strk20Store>((set, get) => {
     error: null,
     registered: null,
     balances: [],
-    pendingDeposit: null,
     lastTxBlock: null,
     head: null,
 
@@ -193,7 +195,6 @@ export const useStrk20Store = create<Strk20Store>((set, get) => {
         client: null,
         registered: null,
         balances: [],
-        pendingDeposit: null,
         lastTxBlock: null,
         head: null,
         error: null,
@@ -254,20 +255,33 @@ export const useStrk20Store = create<Strk20Store>((set, get) => {
       }
     },
 
-    register: () =>
-      submit(
+    register: () => {
+      const wallet = useWalletStore.getState().wallet;
+      if (!wallet) return Promise.resolve();
+
+      return submit(
         "Register",
         (transfers, provingBlockId) =>
-          transfers.build({ provingBlockId }).register().execute() as never
-      ),
+          transfers.build({ provingBlockId }).register().execute() as never,
+        // The proof reads the account's viewing-key slot, which only exists
+        // once the deploy is finalized — registering right after deploying
+        // would prove over a slot that isn't there yet.
+        (provider) =>
+          waitForDeployedAccount(provider, fromAddress(wallet.address))
+      );
+    },
 
     /**
-     * First half of a deposit: the ERC20 approve is transparent and cannot
-     * share the privacy transaction, because the proof owns that one. The
-     * approve must also age before the proof reads the balance, which is why
-     * the wait is visible and the user presses Deposit again afterwards.
+     * Deposit into the pool.
+     *
+     * Two transactions: the ERC20 approve is transparent and cannot share the
+     * privacy transaction, because the proof owns that one. The approve does
+     * not have to age — it is checked when the deposit executes, not when it is
+     * proven — so the deposit follows straight after it. What must be visible
+     * at the proving block is the *balance*, which `waitForFundedBalance`
+     * checks directly, covering accounts funded outside this app.
      */
-    approveDeposit: async (token, input) => {
+    deposit: async (token, input) => {
       const wallet = useWalletStore.getState().wallet;
       const network = NETWORKS[
         useWalletStore.getState().networkIndex
@@ -278,31 +292,19 @@ export const useStrk20Store = create<Strk20Store>((set, get) => {
       if (!wallet || !config || !input.trim() || blocksUntilProvable(get()) > 0)
         return;
 
+      const amount = Amount.parse(input, token);
       set({ busy: true, error: null, step: "Deposit: approving…" });
       try {
         const tx = await wallet
           .tx()
-          .approve(
-            token,
-            fromAddress(config.poolContractAddress),
-            Amount.parse(input, token)
-          )
+          .approve(token, fromAddress(config.poolContractAddress), amount)
           .send();
         await tx.wait();
-        await markSubmitted();
-        set({ pendingDeposit: { token, input } });
       } catch (err) {
-        set({ error: describe(err) });
-      } finally {
-        set({ step: null, busy: false });
+        set({ error: describe(err), step: null, busy: false });
+        return;
       }
-    },
-
-    finishDeposit: async () => {
-      const pending = get().pendingDeposit;
-      const wallet = useWalletStore.getState().wallet;
-      if (!pending || !wallet) return;
-      const { token, input } = pending;
+      set({ busy: false });
 
       await submit(
         "Deposit",
@@ -315,11 +317,17 @@ export const useStrk20Store = create<Strk20Store>((set, get) => {
               provingBlockId,
             })
             .with(token.address)
-            .deposit({ amount: Amount.parse(input, token).toBase() })
+            .deposit({ amount: amount.toBase() })
             .surplusTo(wallet.address)
-            .execute() as never
+            .execute() as never,
+        (provider) =>
+          waitForFundedBalance(
+            provider,
+            token,
+            fromAddress(wallet.address),
+            amount.toBase()
+          )
       );
-      set({ pendingDeposit: null });
     },
 
     transfer: (token, recipient, input) => {
