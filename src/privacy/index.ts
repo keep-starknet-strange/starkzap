@@ -4,5 +4,9 @@ export { loadPrivacySdk, type PrivacySdkModule } from "@/privacy/runtime";
 export {
   PROOF_BASE_BLOCK_DEPTH,
   waitForProvableBlock,
+  waitForProvableState,
+  waitForDeployedAccount,
+  waitForFundedBalance,
   type ProvableBlockOptions,
+  type ProvableAttempt,
 } from "@/privacy/sequencing";

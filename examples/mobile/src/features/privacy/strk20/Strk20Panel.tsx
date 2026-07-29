@@ -21,13 +21,11 @@ export default function Strk20Panel() {
     error,
     registered,
     balances,
-    pendingDeposit,
     lastTxBlock,
     head,
     connect,
     register,
-    approveDeposit,
-    finishDeposit,
+    deposit,
     transfer,
     withdraw,
     recipientReady,
@@ -143,46 +141,27 @@ export default function Strk20Panel() {
         <>
           <Card>
             <Text variant="label">Deposit</Text>
-            {pendingDeposit ? (
-              <>
-                <Text variant="muted">
-                  Approved {pendingDeposit.input} {pendingDeposit.token.symbol}.
-                  {waiting > 0
-                    ? " Waiting for it to become provable…"
-                    : " Ready — press Deposit to prove and submit."}
-                </Text>
-                <Button
-                  title="Deposit"
-                  loading={busy}
-                  disabled={blocked}
-                  onPress={() => void finishDeposit()}
-                />
-              </>
-            ) : (
-              <>
-                <TextField
-                  label="Amount"
-                  placeholder="0.0"
-                  value={depositAmount}
-                  onChangeText={setDepositAmount}
-                  keyboardType="decimal-pad"
-                />
-                <Text variant="muted">
-                  Sends an ERC20 approve first; the pool cannot pull funds
-                  without it.
-                </Text>
-                <Button
-                  title="Approve"
-                  loading={busy}
-                  disabled={blocked || !depositAmount.trim()}
-                  onPress={() =>
-                    void approveDeposit(token, depositAmount).then(() =>
-                      setDepositAmount("")
-                    )
-                  }
-                />
-              </>
-            )}
+            <TextField
+              label="Amount"
+              placeholder="0.0"
+              value={depositAmount}
+              onChangeText={setDepositAmount}
+              keyboardType="decimal-pad"
+            />
+            <Text variant="muted">
+              Sends an ERC20 approve first; the pool cannot pull funds without
+              it.
+            </Text>
+            <Button
+              title="Deposit"
+              loading={busy}
+              disabled={blocked || !depositAmount.trim()}
+              onPress={() =>
+                void deposit(token, depositAmount).then(() =>
+                  setDepositAmount("")
+                )
+              }
+            />
           </Card>
 
           <Card>

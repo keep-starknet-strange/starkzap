@@ -4,10 +4,14 @@ import {
   PROOF_BASE_BLOCK_DEPTH,
   fromAddress,
   screeningVerdict,
+  waitForDeployedAccount,
+  waitForFundedBalance,
+  type ProvableAttempt,
   type Token,
   type Wallet,
   type WalletInterface,
 } from "starkzap";
+import type { RpcProvider } from "starknet";
 import type { PrivateTransfersInterface } from "@starkware-libs/starknet-privacy-sdk";
 import { PRIVACY_CONFIG } from "~/lib/stores/config";
 import { tokens } from "~/lib/stores/tokens";
@@ -180,28 +184,74 @@ export async function refresh(): Promise<void> {
 // ─── Writes ──────────────────────────────────────────────────────────────────
 
 /**
+ * Log every poll of a provable-state wait.
+ *
+ * These waits are otherwise invisible: a deposit that blocks for eight blocks
+ * looks identical to one that hung. Logging each attempt also makes it
+ * checkable which proving block a proof actually used.
+ */
+function logAttempts(what: string): (attempt: ProvableAttempt) => void {
+  return ({ attempt, head, provingBlock, ready }) =>
+    log(
+      `wait[${what}] #${attempt}: head ${head}, proving block ${provingBlock} — ${
+        ready ? "ready" : "not visible yet, polling"
+      }`,
+      ready ? "success" : "info"
+    );
+}
+
+/**
  * Prove and submit one privacy transaction.
  *
  * `compile` receives the proving block and returns the SDK's execute result.
  * The proof travels as transaction-level fields, so it can never be batched
  * with other calls.
+ *
+ * `provable` lets an operation demand more than the default depth: some proofs
+ * read state this app never saw a receipt for (an account funded elsewhere), so
+ * they check the state itself rather than counting blocks from a transaction.
  */
 async function submit(
   label: string,
   compile: (
     transfers: PrivateTransfersInterface,
     provingBlockId: number
-  ) => Promise<{ callAndProof: { call: never; proof: never } }>
+  ) => Promise<{ callAndProof: { call: never; proof: never } }>,
+  provable?: (provider: RpcProvider) => Promise<number>
 ): Promise<void> {
   const transfers = get(client);
   const { wallet } = get(walletState);
-  if (!transfers || !wallet || get(waiting)) return;
+  if (!transfers || !wallet) return;
+  if (get(waiting)) {
+    // The button is disabled while the countdown runs, so reaching this is a
+    // bug — but returning silently would look like a dead click.
+    log(
+      `${label} blocked: ${get(
+        blocksUntilProvable
+      )} block(s) until our last private tx is provable`,
+      "warn"
+    );
+    return;
+  }
 
   busy.set(true);
   error.set(null);
   try {
-    const provingBlockId =
-      (await wallet.getProvider().getBlockNumber()) - PROOF_BASE_BLOCK_DEPTH;
+    const provider = wallet.getProvider();
+    step.set(`${label}: checking state…`);
+    let provingBlockId: number;
+    if (provable) {
+      provingBlockId = await provable(provider);
+    } else {
+      // No extra state precondition. The only state this proof reads is our own
+      // last private tx, which the countdown above already gated on.
+      provingBlockId =
+        (await provider.getBlockNumber()) - PROOF_BASE_BLOCK_DEPTH;
+      log(
+        `${label}: no state precondition, proving at ${provingBlockId} (head - ${PROOF_BASE_BLOCK_DEPTH}); countdown already clear`,
+        "info"
+      );
+    }
 
     step.set(`${label}: proving…`);
     const { callAndProof } = await compile(transfers, provingBlockId);
@@ -224,10 +274,20 @@ async function submit(
 }
 
 export function register(): Promise<void> {
+  const { wallet } = get(walletState);
+  if (!wallet) return Promise.resolve();
+
   return submit(
     "Register",
     (transfers, provingBlockId) =>
-      transfers.build({ provingBlockId }).register().execute() as never
+      transfers.build({ provingBlockId }).register().execute() as never,
+    // The proof reads the account's viewing-key slot, which only exists once
+    // the deploy is finalized — registering right after deploying would prove
+    // over a slot that isn't there yet.
+    (provider) =>
+      waitForDeployedAccount(provider, fromAddress(wallet.address), {
+        onAttempt: logAttempts("Register · account deployed"),
+      })
   );
 }
 
@@ -235,14 +295,17 @@ export function register(): Promise<void> {
  * Deposit into the pool.
  *
  * Two transactions: the ERC20 approve is transparent and cannot share the
- * privacy transaction, because the proof owns that one. The approve must also
- * age before the proof reads the balance, which is why the wait is visible.
+ * privacy transaction, because the proof owns that one. The approve does not
+ * have to age — it is checked when the deposit executes, not when it is proven
+ * — so the deposit follows straight after it. What must be visible at the
+ * proving block is the *balance*, which is what `waitForFundedBalance` checks.
  */
 export async function deposit(token: Token, input: string): Promise<void> {
   const { wallet } = get(walletState);
   if (!wallet || !PRIVACY_CONFIG || !input.trim() || get(waiting)) return;
 
   const amount = Amount.parse(input, token);
+  let approveBlock: number | null = null;
   busy.set(true);
   error.set(null);
   try {
@@ -252,35 +315,23 @@ export async function deposit(token: Token, input: string): Promise<void> {
       .approve(token, fromAddress(PRIVACY_CONFIG.poolContractAddress), amount)
       .send();
     await approve.wait();
-    await markSubmitted(approve.hash);
+    // Logged so the approve's block can be compared with the proving block the
+    // deposit then uses: if proving is *earlier*, the allowance did not age.
+    const receipt = await wallet
+      .getProvider()
+      .getTransactionReceipt(approve.hash);
+    approveBlock =
+      "block_number" in receipt ? (receipt.block_number as number) : null;
+    log(`approve ${approve.hash} landed in block ${approveBlock}`, "info");
   } catch (err) {
     error.set(describe(err));
     step.set(null);
     busy.set(false);
     return;
   }
-  step.set(null);
   busy.set(false);
 
-  // The approve now has to age. The UI shows the countdown; the caller presses
-  // "Deposit" again once it clears.
-  pendingDeposit.set({ token, input });
-}
-
-/** A deposit whose approve has landed and is waiting to become provable. */
-export const pendingDeposit = writable<{
-  token: Token;
-  input: string;
-} | null>(null);
-
-export function finishDeposit(): Promise<void> {
-  const pending = get(pendingDeposit);
-  if (!pending) return Promise.resolve();
-  const { token, input } = pending;
-  const amount = Amount.parse(input, token);
-  const { wallet } = get(walletState);
-
-  return submit(
+  await submit(
     "Deposit",
     (transfers, provingBlockId) =>
       transfers
@@ -292,9 +343,30 @@ export function finishDeposit(): Promise<void> {
         })
         .with(token.address)
         .deposit({ amount: amount.toBase() })
-        .surplusTo(wallet!.address)
-        .execute() as never
-  ).then(() => pendingDeposit.set(null));
+        .surplusTo(wallet.address)
+        .execute() as never,
+    (provider) =>
+      waitForFundedBalance(
+        provider,
+        token,
+        fromAddress(wallet.address),
+        amount.toBase(),
+        {
+          onAttempt: (attempt) => {
+            logAttempts("Deposit · balance visible")(attempt);
+            if (attempt.ready && approveBlock !== null) {
+              log(
+                `proving at ${attempt.provingBlock}, approve was block ${approveBlock} — ` +
+                  (attempt.provingBlock < approveBlock
+                    ? "proving block predates the approve, so the allowance did not have to age"
+                    : "proving block is at or after the approve, so this run does not test the allowance claim"),
+                "info"
+              );
+            }
+          },
+        }
+      )
+  );
 }
 
 export function transfer(
