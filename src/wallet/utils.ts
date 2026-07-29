@@ -1,6 +1,8 @@
 import {
   RpcProvider,
   RpcError,
+  num,
+  shortString,
   TransactionFinalityStatus,
   type Call,
   type PaymasterTimeBounds,
@@ -45,18 +47,30 @@ export function isPaymasterMode(
 }
 
 /**
- * Reject a proof-carrying transaction the caller's wallet or fee mode cannot
- * actually send, instead of silently dropping the proof and letting the pool
- * contract revert with an unhelpful on-chain error.
+ * Reject a proof-carrying transaction the caller cannot actually send, or should
+ * not send unknowingly.
+ *
+ * Three separate refusals:
+ *
+ * - **Wrong wallet.** Only a locally-signed `Wallet` can produce the viewing key
+ *   the pool needs, so a Cartridge or Privy wallet cannot carry a proof at all.
+ * - **Paymaster mode.** starknet.js's SNIP-29 paymaster has no field for a
+ *   proof, so the proof would be silently dropped and the pool would revert.
+ *   A *privacy* paymaster can carry one, but it is not this code path. See
+ *   `PrivacyPaymaster`.
+ * - **Unacknowledged self-submission.** Sending a proof from the user's own
+ *   account works, but records who sent it. That has to be opted into.
  *
  * @param proof - The proof from `wallet.execute()` options, if any
  * @param feeMode - The resolved fee mode for this execution
  * @param wallet - Wallet description used in the error message
+ * @param unsafeUserPays - Whether the caller accepted revealing the sender
  */
 export function assertProofSendable(
   proof: TransactionProof | undefined,
   feeMode: FeeMode,
-  wallet: string
+  wallet: string,
+  unsafeUserPays?: boolean
 ): void {
   if (!proof) return;
 
@@ -68,9 +82,100 @@ export function assertProofSendable(
 
   if (isPaymasterMode(feeMode)) {
     throw new Error(
-      '[starkzap] Proof-carrying transactions require feeMode "user_pays". The paymaster API has no field for a transaction proof, so the proof would be dropped and the transaction would revert.'
+      "[starkzap] A SNIP-29 paymaster cannot carry a transaction proof: its " +
+        "executable-transaction shape has no field for one, so the proof would be " +
+        "dropped and the pool would revert. Submit through a privacy paymaster " +
+        "instead (configure `privacy.paymasterUrl`), or self-submit with " +
+        '`feeMode: "user_pays"` and `unsafeUserPays: true`.'
     );
   }
+
+  if (!unsafeUserPays) {
+    throw new Error(
+      "[starkzap] Refusing to self-submit a proof-carrying transaction: it would " +
+        "be sent from this account, incrementing its nonce and paying gas from its " +
+        "public balance, so the chain would record who performed the private " +
+        "operation. Submit through a privacy paymaster (configure " +
+        "`privacy.paymasterUrl` and use `wallet.privacy()`), or pass " +
+        "`unsafeUserPays: true` to accept revealing the sender."
+    );
+  }
+}
+
+/**
+ * The block number a proof was generated from, taken from its proof facts.
+ *
+ * The facts are a tag-then-payload list; the felt after the `VIRTUAL_SNOS0` tag
+ * is the base block. Returns `undefined` when the tag is absent — the layout is
+ * the proving service's, not ours, so an unrecognised shape must not turn a
+ * valid proof away.
+ */
+export function proofBaseBlock(proof: TransactionProof): number | undefined {
+  const tag = shortString.encodeShortString("VIRTUAL_SNOS0");
+  const facts = proof.proofFacts.map((f) => num.toHex(f));
+  const block_index = facts.indexOf(num.toHex(tag)) + 1;
+  if (block_index === 0 || block_index >= facts.length) return undefined;
+
+  const block = Number(num.toBigInt(facts[block_index]!));
+  return Number.isSafeInteger(block) && block > 0 ? block : undefined;
+}
+
+/**
+ * Reject a proof whose base block is too recent for the sequencer to accept.
+ *
+ * Pure: takes the head rather than reading it, so the comparison is testable
+ * without a provider. See {@link assertProofFresh} for the IO wrapper.
+ *
+ * @param proof - The proof about to be submitted
+ * @param head - Current chain head
+ * @param depth - Blocks the base block must trail the head by
+ */
+export function assertProofBaseBlockAged(
+  proof: TransactionProof,
+  head: number,
+  depth: number
+): void {
+  const base = proofBaseBlock(proof);
+  if (base === undefined) return;
+
+  if (head - base < depth) {
+    throw new Error(
+      `[starkzap] This proof was generated against block ${base}, only ${
+        head - base
+      } block(s) behind the head (${head}). The sequencer requires at least ${depth}. ` +
+        "Wait for the chain to advance and prove again — see `waitForProvableBlock`."
+    );
+  }
+}
+
+/**
+ * Fail fast on a proof the sequencer will refuse, before paying to submit it.
+ *
+ * Deliberately best-effort. The base block is read from the proof first, so a
+ * proof shape we do not recognise costs no RPC call at all, and a failed head
+ * read is swallowed: this exists to turn one opaque on-chain revert into a clear
+ * local error, and a check that can itself break a working transaction would be
+ * worse than the problem it solves.
+ *
+ * @param proof - The proof about to be submitted
+ * @param provider - Provider used to read the chain head
+ * @param depth - Blocks the base block must trail the head by
+ */
+export async function assertProofFresh(
+  proof: TransactionProof,
+  provider: RpcProvider,
+  depth: number
+): Promise<void> {
+  if (proofBaseBlock(proof) === undefined) return;
+
+  let head: number;
+  try {
+    head = await provider.getBlockNumber();
+  } catch {
+    return;
+  }
+
+  assertProofBaseBlockAged(proof, head, depth);
 }
 
 /**

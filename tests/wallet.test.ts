@@ -433,7 +433,7 @@ describe("Wallet", () => {
       const calls = [
         { contractAddress: "0x123", entrypoint: "apply_actions", calldata: [] },
       ];
-      const tx = await wallet.execute(calls, { proof });
+      const tx = await wallet.execute(calls, { proof, unsafeUserPays: true });
 
       expect(tx.hash).toBe("0xproof");
       expect(executeSpy).toHaveBeenCalledWith(calls, {
@@ -462,8 +462,8 @@ describe("Wallet", () => {
     });
 
     it("should refuse to send a proof through the paymaster", async () => {
-      // The paymaster API has no field for a proof, so sending would silently
-      // drop it and revert on-chain.
+      // The SNIP-29 paymaster's executable-transaction shape has no field for a
+      // proof, so sending would silently drop it and revert on-chain.
       const signer = new StarkSigner(testPrivateKeys.key1);
       const wallet = await sdk.connectWallet({ account: { signer } });
 
@@ -482,7 +482,7 @@ describe("Wallet", () => {
           ],
           { proof, feeMode: { type: "paymaster" } }
         )
-      ).rejects.toThrow('require feeMode "user_pays"');
+      ).rejects.toThrow("SNIP-29 paymaster cannot carry a transaction proof");
 
       expect(paymasterSpy).not.toHaveBeenCalled();
     });
@@ -568,6 +568,8 @@ describe("Wallet", () => {
       poolContractAddress: "0x123",
       prover: "https://prover.example.com",
       discovery: "https://discovery.example.com",
+      paymasterUrl: "https://paymaster.example.com",
+      fee: { mode: "sponsored" } as const,
     };
 
     it("should explain itself when the SDK config omits privacy", async () => {
@@ -576,6 +578,23 @@ describe("Wallet", () => {
 
       await expect(wallet.privacy()).rejects.toThrow(
         "requires 'privacy' in the SDK config"
+      );
+    });
+
+    it("should require a paymaster and an explicit fee mode", async () => {
+      // Not defaulted on purpose: `default` mode needs no API key but the
+      // forwarder keeps the whole suggested-max gas withdrawal, so choosing it
+      // silently would overcharge. See the forwarder's execute_private.
+      const { paymasterUrl: _url, fee: _fee, ...incomplete } = privacyConfig;
+      const partialSdk = new StarkZap({ ...config, privacy: incomplete });
+      vi.spyOn(partialSdk.getProvider(), "getChainId").mockResolvedValue(
+        config.chainId!.toFelt252() as constants.StarknetChainId
+      );
+      const signer = new StarkSigner(testPrivateKeys.key1);
+      const wallet = await partialSdk.connectWallet({ account: { signer } });
+
+      await expect(wallet.privacy()).rejects.toThrow(
+        "`privacy.paymasterUrl` and `privacy.fee` are both required"
       );
     });
 
