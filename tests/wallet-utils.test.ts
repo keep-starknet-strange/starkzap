@@ -1,7 +1,10 @@
 import { describe, it, expect, vi } from "vitest";
-import type { RpcProvider } from "starknet";
+import { num, shortString, type RpcProvider } from "starknet";
 import {
+  assertProofBaseBlockAged,
+  assertProofFresh,
   assertProofSendable,
+  proofBaseBlock,
   checkDeployed,
   ensureWalletReady,
   isPaymasterMode,
@@ -183,10 +186,18 @@ describe("wallet utils", () => {
   describe("assertProofSendable", () => {
     const proof = { data: "0xdeadbeef", proofFacts: ["0x1", "0x2"] };
 
-    it("allows a proof on the user_pays path of a Wallet", () => {
+    it("allows a self-submitted proof once the caller acknowledges the cost", () => {
       expect(() =>
-        assertProofSendable(proof, "user_pays", "Wallet")
+        assertProofSendable(proof, "user_pays", "Wallet", true)
       ).not.toThrow();
+    });
+
+    it("refuses to self-submit a proof by default", () => {
+      // Self-submission works on-chain, which is exactly why it needs a gate:
+      // nothing would tell the caller their address is now on the transaction.
+      expect(() => assertProofSendable(proof, "user_pays", "Wallet")).toThrow(
+        "Refusing to self-submit"
+      );
     });
 
     it("is a no-op when there is no proof", () => {
@@ -195,22 +206,137 @@ describe("wallet utils", () => {
       ).not.toThrow();
     });
 
-    it("rejects a proof on the paymaster path", () => {
+    it("rejects a proof on the SNIP-29 paymaster path", () => {
       expect(() =>
-        assertProofSendable(proof, { type: "paymaster" }, "Wallet")
-      ).toThrow('require feeMode "user_pays"');
+        assertProofSendable(proof, { type: "paymaster" }, "Wallet", true)
+      ).toThrow("SNIP-29 paymaster cannot carry a transaction proof");
     });
 
     it("rejects a proof on the deprecated sponsored alias", () => {
-      expect(() => assertProofSendable(proof, "sponsored", "Wallet")).toThrow(
-        'require feeMode "user_pays"'
-      );
+      expect(() =>
+        assertProofSendable(proof, "sponsored", "Wallet", true)
+      ).toThrow("SNIP-29 paymaster cannot carry a transaction proof");
+    });
+
+    it("checks the wallet before the fee mode", () => {
+      // A Cartridge wallet cannot derive a viewing key at all, so that refusal
+      // is the more useful one to surface even on the paymaster path.
+      expect(() =>
+        assertProofSendable(proof, { type: "paymaster" }, "CartridgeWallet")
+      ).toThrow("CartridgeWallet cannot send proof-carrying transactions");
     });
 
     it("rejects a proof on a non-Wallet implementation", () => {
       expect(() =>
-        assertProofSendable(proof, "user_pays", "CartridgeWallet")
+        assertProofSendable(proof, "user_pays", "CartridgeWallet", true)
       ).toThrow("CartridgeWallet cannot send proof-carrying transactions");
+    });
+  });
+
+  describe("proofBaseBlock / assertProofBaseBlockAged", () => {
+    /** Facts in the shape the proving service emits: tag, then payload. */
+    function factsWithBase(block: number): string[] {
+      return [
+        num.toHex(shortString.encodeShortString("PROOF1")),
+        num.toHex(shortString.encodeShortString("VIRTUAL_SNOS")),
+        "0x53f6c9",
+        num.toHex(shortString.encodeShortString("VIRTUAL_SNOS0")),
+        num.toHex(block),
+        "0x7b0a26",
+      ];
+    }
+
+    it("reads the base block from the felt after the VIRTUAL_SNOS0 tag", () => {
+      expect(
+        proofBaseBlock({ data: "0x1", proofFacts: factsWithBase(12621393) })
+      ).toBe(12621393);
+    });
+
+    it("returns undefined when the tag is absent", () => {
+      // The layout belongs to the proving service. An unrecognised shape must
+      // read as "cannot tell", never as "block zero".
+      expect(
+        proofBaseBlock({ data: "0x1", proofFacts: ["0x1", "0x2"] })
+      ).toBeUndefined();
+    });
+
+    it("returns undefined when the tag is the last fact", () => {
+      expect(
+        proofBaseBlock({
+          data: "0x1",
+          proofFacts: [
+            num.toHex(shortString.encodeShortString("VIRTUAL_SNOS0")),
+          ],
+        })
+      ).toBeUndefined();
+    });
+
+    it("accepts a base block at exactly the required depth", () => {
+      expect(() =>
+        assertProofBaseBlockAged(
+          { data: "0x1", proofFacts: factsWithBase(100) },
+          110,
+          10
+        )
+      ).not.toThrow();
+    });
+
+    it("rejects a base block that is too recent", () => {
+      expect(() =>
+        assertProofBaseBlockAged(
+          { data: "0x1", proofFacts: factsWithBase(105) },
+          110,
+          10
+        )
+      ).toThrow("generated against block 105, only 5 block(s) behind");
+    });
+
+    it("skips the RPC entirely when there is no base block to check", async () => {
+      // An unrecognised proof shape must not cost a round-trip.
+      const provider = {
+        getBlockNumber: vi.fn(),
+      } as unknown as RpcProvider;
+
+      await expect(
+        assertProofFresh({ data: "0x1", proofFacts: ["0x1"] }, provider, 10)
+      ).resolves.toBeUndefined();
+      expect(provider.getBlockNumber).not.toHaveBeenCalled();
+    });
+
+    it("rejects a too-recent proof once the head is known", async () => {
+      const provider = {
+        getBlockNumber: vi.fn().mockResolvedValue(110),
+      } as unknown as RpcProvider;
+
+      await expect(
+        assertProofFresh(
+          { data: "0x1", proofFacts: factsWithBase(105) },
+          provider,
+          10
+        )
+      ).rejects.toThrow("only 5 block(s) behind");
+    });
+
+    it("does not block a transaction when the head cannot be read", async () => {
+      // The check is advisory. A provider hiccup must not be the reason an
+      // otherwise-valid privacy transaction fails.
+      const provider = {
+        getBlockNumber: vi.fn().mockRejectedValue(new Error("rpc down")),
+      } as unknown as RpcProvider;
+
+      await expect(
+        assertProofFresh(
+          { data: "0x1", proofFacts: factsWithBase(105) },
+          provider,
+          10
+        )
+      ).resolves.toBeUndefined();
+    });
+
+    it("lets a proof through when the base block cannot be read", () => {
+      expect(() =>
+        assertProofBaseBlockAged({ data: "0x1", proofFacts: ["0x1"] }, 110, 10)
+      ).not.toThrow();
     });
   });
 

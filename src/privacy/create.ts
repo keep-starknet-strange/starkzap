@@ -7,6 +7,7 @@ import type {
 } from "@starkware-libs/starknet-privacy-sdk";
 
 import { SignerAdapter } from "@/signer";
+import type { PrivacyFeeMode, PrivacyTip } from "@/privacy/paymaster";
 import type { Wallet } from "@/wallet";
 import { assertSafeHttpUrl } from "@/utils";
 import { loadPrivacySdk, type PrivacySdkModule } from "@/privacy/runtime";
@@ -60,6 +61,29 @@ export interface PrivacyConfig {
    * real serialized calldata.
    */
   proofInvocationFactory?: CreatePrivateTransfersParams["proofInvocationFactory"];
+  /**
+   * Paymaster endpoint used to submit private transactions.
+   *
+   * Point this at a proxy that holds the API key rather than at the paymaster
+   * itself. `sponsored` and `sponsored_private` need one. `default` mode
+   * needs no key.
+   *
+   * Without it, privacy transactions can only be self-submitted via
+   * `wallet.execute(calls, { proof, unsafeUserPays: true })`, which puts the
+   * sender's address, nonce and gas payment on-chain and so undoes the privacy
+   * the pool provides.
+   */
+  paymasterUrl?: string;
+  /**
+   * How the fee is paid. Defaults to `default` mode with STRK as the gas token,
+   * which is the only mode that needs no paymaster API key.
+   *
+   * All modes withdraw the fee from the shielded balance and are submitted by
+   * the relayer, so the choice is about cost, not about privacy.
+   */
+  fee?: PrivacyFeeMode;
+  /** Optional transaction priority passed through to the paymaster. */
+  tip?: PrivacyTip;
 }
 
 /**

@@ -1,5 +1,11 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { RpcError, ec, type RpcProvider, type Signature } from "starknet";
+import {
+  RpcError,
+  ec,
+  hash as starknetHash,
+  type RpcProvider,
+  type Signature,
+} from "starknet";
 import {
   Mocknet,
   MockProofInvocationFactory,
@@ -8,13 +14,16 @@ import {
 } from "@starkware-libs/starknet-privacy-sdk/testing";
 import {
   PROOF_BASE_BLOCK_DEPTH,
+  type ProvableAttempt,
   waitForProvableBlock,
   waitForProvableState,
   waitForDeployedAccount,
   waitForFundedBalance,
 } from "@/privacy/sequencing";
 import { screeningVerdict } from "@/privacy/errors";
+import { PrivacyPaymaster, PrivacyPaymasterError } from "@/privacy/paymaster";
 import { createPrivacy } from "@/privacy/create";
+import { withPaymaster } from "@/privacy/client";
 import { PrivySigner, StarkSigner } from "@/signer";
 import type { SignerInterface } from "@/signer";
 import { AccountProvider } from "@/wallet/accounts/provider";
@@ -298,6 +307,227 @@ describe("privacy", () => {
     });
   });
 
+  /**
+   * The privacy transaction types are not in SNIP-29, so starknet.js's
+   * PaymasterRpc cannot express them. These cover the payload shaping and error
+   * translation of the client that talks to the paymaster directly.
+   */
+  describe("PrivacyPaymaster", () => {
+    const POOL = fromAddress("0x123");
+    const STRK = fromAddress(
+      "0x04718f5a0fc34cc1af16a1cdee98ffb20c31f5cd61d6ab07201858f4287c938d"
+    );
+    const URL = "https://paymaster.example.com";
+
+    /** Stub fetch, returning each body in turn, and record the requests. */
+    function stubFetch(...bodies: unknown[]) {
+      const calls: unknown[] = [];
+      const fetchMock = vi.fn((_url: string, init?: RequestInit) => {
+        calls.push(JSON.parse(String(init?.body)));
+        const body = bodies.shift();
+        return Promise.resolve({
+          status: 200,
+          json: () => Promise.resolve(body),
+        } as Response);
+      });
+      vi.stubGlobal("fetch", fetchMock);
+      return calls as { method: string; params: Record<string, never> }[];
+    }
+
+    afterEach(() => {
+      vi.unstubAllGlobals();
+    });
+
+    it("rejects a paymaster URL that is not http(s)", () => {
+      expect(() => new PrivacyPaymaster("ftp://paymaster.example.com")).toThrow(
+        "Privacy paymaster URL"
+      );
+    });
+
+    it("quotes a default-mode fee and returns it in base units", async () => {
+      const sent = stubFetch({
+        result: {
+          fee_action: {
+            type: "withdraw",
+            recipient: "0x75a1",
+            token: STRK,
+            amount: "0xe06f18c4533e7800",
+          },
+          parameters: { version: "0x1", echoed: true },
+        },
+      });
+
+      const quote = await new PrivacyPaymaster(URL).quote(POOL, {
+        mode: "default",
+        gasToken: STRK,
+      });
+
+      expect(quote.feeAction).toEqual({
+        recipient: "0x75a1",
+        token: STRK,
+        amount: 0xe06f18c4533e7800n,
+      });
+      // Echoed back rather than rebuilt, so a field the service adds survives.
+      expect(quote.parameters).toEqual({ version: "0x1", echoed: true });
+      expect(sent[0]!.method).toBe("paymaster_buildTransaction");
+      expect(sent[0]!.params).toMatchObject({
+        transaction: {
+          type: "apply_action",
+          apply_action: { pool_address: POOL },
+        },
+        parameters: {
+          version: "0x1",
+          fee_mode: { mode: "default", gas_token: STRK },
+        },
+      });
+    });
+
+    it("falls back to locally built parameters when the service omits them", async () => {
+      stubFetch({
+        result: {
+          fee_action: { recipient: "0x1", token: STRK, amount: "0x0" },
+        },
+      });
+
+      const quote = await new PrivacyPaymaster(URL).quote(POOL, {
+        mode: "sponsored",
+      });
+
+      expect(quote.parameters).toEqual({
+        version: "0x1",
+        fee_mode: { mode: "sponsored" },
+      });
+      expect(quote.feeAction.amount).toBe(0n);
+    });
+
+    it("names the pool-fee token for sponsored_private and omits tip by default", async () => {
+      const sent = stubFetch({
+        result: {
+          fee_action: { recipient: "0x1", token: STRK, amount: "0x2" },
+        },
+      });
+
+      await new PrivacyPaymaster(URL).quote(POOL, {
+        mode: "sponsored_private",
+        poolFeeToken: STRK,
+      });
+
+      expect(sent[0]!.params).toMatchObject({
+        parameters: {
+          fee_mode: { mode: "sponsored_private", pool_fee_token: STRK },
+        },
+      });
+      expect(JSON.stringify(sent[0]!.params).includes("tip")).toBe(false);
+    });
+
+    it("submits the call as to/selector/calldata with the proof alongside", async () => {
+      const sent = stubFetch({ result: { transaction_hash: "0xabc" } });
+
+      const hash = await new PrivacyPaymaster(URL).execute(
+        {
+          contractAddress: POOL,
+          entrypoint: "apply_actions",
+          calldata: ["0x1"],
+        },
+        { data: "0xproof", proofFacts: ["0xf1", "0xf2"] },
+        { version: "0x1", fee_mode: { mode: "sponsored" } }
+      );
+
+      expect(hash).toBe("0xabc");
+      expect(sent[0]!.method).toBe("paymaster_executeTransaction");
+      expect(sent[0]!.params).toMatchObject({
+        transaction: {
+          type: "apply_action",
+          apply_action: {
+            apply_actions_call: {
+              to: POOL,
+              selector: starknetHash.getSelectorFromName("apply_actions"),
+              calldata: ["0x1"],
+            },
+            proof: "0xproof",
+            proof_facts: ["0xf1", "0xf2"],
+          },
+        },
+      });
+    });
+
+    it("translates privacy error codes into actionable messages", async () => {
+      stubFetch({
+        error: { code: 167, message: "POOL_FEE_TOO_LOW", data: "need more" },
+      });
+
+      const error = await new PrivacyPaymaster(URL)
+        .execute(
+          { contractAddress: POOL, entrypoint: "apply_actions" },
+          { data: "0x1", proofFacts: [] },
+          {}
+        )
+        .then(
+          () => {
+            throw new Error("expected the paymaster call to reject");
+          },
+          (e: unknown) => e as PrivacyPaymasterError
+        );
+
+      expect(error).toBeInstanceOf(PrivacyPaymasterError);
+      expect(error.code).toBe(167);
+      expect(error.message).toContain("less than the quoted pool fee");
+      expect(error.message).toContain("need more");
+    });
+
+    it("keeps the raw message for codes it does not know", async () => {
+      stubFetch({ error: { code: -32601, message: "Method not found" } });
+
+      await expect(
+        new PrivacyPaymaster(URL).quote(POOL, { mode: "sponsored" })
+      ).rejects.toThrow("Method not found");
+    });
+
+    it("names the proxy body limit on a 413, since proofs are megabytes", async () => {
+      // The rejection comes from whatever sits in front of the paymaster, whose
+      // error page is not JSON — so the code alone reads as a paymaster fault.
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(() =>
+          Promise.resolve({
+            status: 413,
+            json: () => Promise.reject(new Error("not json")),
+          } as unknown as Response)
+        )
+      );
+
+      await expect(
+        new PrivacyPaymaster(URL).quote(POOL, { mode: "sponsored" })
+      ).rejects.toThrow("raise the request body limit");
+    });
+
+    it("reports a non-JSON response rather than an opaque parse error", async () => {
+      // What a proxy in front of the paymaster returns when it fails first.
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(() =>
+          Promise.resolve({
+            status: 502,
+            json: () => Promise.reject(new Error("not json")),
+          } as unknown as Response)
+        )
+      );
+
+      await expect(
+        new PrivacyPaymaster(URL).quote(POOL, { mode: "sponsored" })
+      ).rejects.toThrow("non-JSON response (HTTP 502)");
+    });
+
+    it("refuses to build a proof it knows the paymaster will reject", async () => {
+      // No fee action means there is no way to satisfy the forwarder.
+      stubFetch({ result: { parameters: {} } });
+
+      await expect(
+        new PrivacyPaymaster(URL).quote(POOL, { mode: "sponsored" })
+      ).rejects.toThrow("returned no fee action");
+    });
+  });
+
   describe("screeningVerdict", () => {
     /** Shape of the proving service's JSON-RPC error. */
     function provingError(code: number, data?: string) {
@@ -504,6 +734,283 @@ describe("privacy", () => {
       const total = owned.reduce((sum, note) => sum + note.amount, 0n);
 
       expect(total).toBe(100n);
+    });
+  });
+
+  /**
+   * The wrapper's whole job is bracketing: quote the fee, resolve the proving
+   * block, append the fee withdrawal, prove, submit. These drive it against the
+   * SDK's mocknet so the composition is real rather than stubbed, with only the
+   * paymaster's HTTP faked.
+   */
+  describe("withPaymaster", () => {
+    const POOL_ADDRESS = 0x123n;
+    const POOL_HEX = `0x${POOL_ADDRESS.toString(16)}`;
+    const FORWARDER = fromAddress("0x75a1");
+
+    /** Paymaster whose quote names `amount`, and whose execute always succeeds. */
+    function paymasterStub(amount: string, token: string) {
+      const submitted: Record<string, never>[] = [];
+      vi.stubGlobal(
+        "fetch",
+        vi.fn((_url: string, init?: RequestInit) => {
+          const body = JSON.parse(String(init?.body)) as {
+            method: string;
+            params: Record<string, never>;
+          };
+          if (body.method === "paymaster_buildTransaction") {
+            return Promise.resolve({
+              status: 200,
+              json: () =>
+                Promise.resolve({
+                  result: {
+                    fee_action: { recipient: FORWARDER, token, amount },
+                    parameters: { version: "0x1", tip: "normal" },
+                  },
+                }),
+            } as Response);
+          }
+          submitted.push(body.params);
+          return Promise.resolve({
+            status: 200,
+            json: () =>
+              Promise.resolve({ result: { transaction_hash: "0xsent" } }),
+          } as Response);
+        })
+      );
+      return submitted;
+    }
+
+    function env(head = 500) {
+      const mocknet = new Mocknet({ poolAddress: POOL_ADDRESS });
+      const sdkEnv = mocknet.initialize();
+      const wallet = walletWith(
+        new StarkSigner(testPrivateKeys.key1),
+        `0x${sdkEnv.alice.address.toString(16)}`
+      );
+      const provider = {
+        getBlockNumber: vi.fn().mockResolvedValue(head),
+      } as unknown as RpcProvider;
+
+      const bind = async (fee = { mode: "sponsored" } as const) =>
+        withPaymaster(
+          await createPrivacy(wallet, {
+            poolContractAddress: POOL_HEX,
+            prover: new MockProofProvider(mocknet.pool),
+            discovery: new ContractDiscoveryProvider(mocknet.pool),
+            proofInvocationFactory: new MockProofInvocationFactory(),
+          }),
+          {
+            poolContractAddress: POOL_HEX,
+            paymasterUrl: "https://paymaster.example.com",
+            fee,
+            provider,
+          }
+        );
+
+      return { mocknet, env: sdkEnv, provider, bind };
+    }
+
+    afterEach(() => {
+      vi.unstubAllGlobals();
+    });
+
+    it("submits a funded transaction through the paymaster", async () => {
+      const { mocknet, env: sdkEnv, bind } = env();
+      const submitted = paymasterStub(
+        "0xa",
+        `0x${BigInt(sdkEnv.ace).toString(16)}`
+      );
+      const privacy = await bind();
+      mocknet.executeOutside(
+        await privacy.transfers.build().register().execute()
+      );
+
+      const hash = await privacy.send(
+        (b) =>
+          b
+            .with(sdkEnv.ace, (t) => t.deposit({ amount: 100n }))
+            .surplusTo(`0x${sdkEnv.alice.address.toString(16)}`),
+        { autoSetup: true, autoDiscover: { notes: "refresh" } }
+      );
+
+      expect(hash).toBe("0xsent");
+      // The proof authorises this on-chain; no user signature is involved.
+      expect(submitted[0]!).toMatchObject({
+        transaction: { type: "apply_action" },
+      });
+    });
+
+    it("really adds the fee withdrawal, not just the caller's actions", async () => {
+      // The discriminating case: a fee larger than the deposit can only fail if
+      // the withdrawal genuinely joined the action list. Drop the append and
+      // this passes, which is the point.
+      const { mocknet, env: sdkEnv, bind } = env();
+      paymasterStub("0x3e8", `0x${BigInt(sdkEnv.ace).toString(16)}`);
+      const privacy = await bind();
+      mocknet.executeOutside(
+        await privacy.transfers.build().register().execute()
+      );
+
+      await expect(
+        privacy.send(
+          (b) =>
+            b
+              .with(sdkEnv.ace, (t) => t.deposit({ amount: 100n }))
+              .surplusTo(`0x${sdkEnv.alice.address.toString(16)}`),
+          { autoSetup: true, autoDiscover: { notes: "refresh" } }
+        )
+      ).rejects.toThrow(/Insufficient balance/);
+    });
+
+    it("cannot pay a pool fee from an account with no private balance", async () => {
+      // Why registration only ever happens bundled into a deposit: register
+      // moves no funds, so there is nothing for the fee withdrawal to draw on,
+      // and AVNU's Sepolia deployment charges 1 STRK per transaction.
+      const { env: sdkEnv, bind } = env();
+      paymasterStub("0x64", `0x${BigInt(sdkEnv.ace).toString(16)}`);
+      const privacy = await bind();
+
+      await expect(privacy.send((b) => b.register())).rejects.toThrow(
+        /Insufficient balance/
+      );
+    });
+
+    it("registers with no fee when the deployment charges nothing", async () => {
+      // A zero amount must omit the withdrawal rather than add a zero-value
+      // output, or this same empty-balance failure would apply to every send.
+      const { env: sdkEnv, bind } = env();
+      paymasterStub("0x0", `0x${BigInt(sdkEnv.ace).toString(16)}`);
+      const privacy = await bind();
+
+      await expect(privacy.send((b) => b.register())).resolves.toBe("0xsent");
+    });
+
+    it("echoes the parameters the quote returned rather than rebuilding them", async () => {
+      const { env: sdkEnv, bind } = env();
+      const submitted = paymasterStub(
+        "0x0",
+        `0x${BigInt(sdkEnv.ace).toString(16)}`
+      );
+      const privacy = await bind();
+
+      await privacy.send((b) => b.register());
+
+      // `tip` was chosen by the server, never sent by us — rebuilding would
+      // drop it, along with time bounds.
+      expect(submitted[0]!.parameters).toEqual({
+        version: "0x1",
+        tip: "normal",
+      });
+    });
+
+    it("proves against head - depth on the first send", async () => {
+      const { provider, env: sdkEnv, bind } = env(500);
+      paymasterStub("0x0", `0x${BigInt(sdkEnv.ace).toString(16)}`);
+      const privacy = await bind();
+
+      await privacy.send((b) => b.register());
+
+      expect(provider.getBlockNumber).toHaveBeenCalled();
+    });
+
+    it("waits for the previous send to age before proving the next", async () => {
+      const { provider, env: sdkEnv, bind } = env(500);
+      paymasterStub("0x0", `0x${BigInt(sdkEnv.ace).toString(16)}`);
+      const privacy = await bind();
+      const onWait = vi.fn();
+
+      await privacy.send((b) => b.register());
+      // First send recorded head 500; a proof for the next one may not read a
+      // block before that, so the wait runs until the head passes 500 + depth.
+      vi.mocked(provider.getBlockNumber)
+        .mockResolvedValueOnce(505)
+        .mockResolvedValue(515);
+
+      await privacy.send((b) => b.register(), { onWait });
+
+      expect(onWait).toHaveBeenCalled();
+      const attempts = onWait.mock.calls.map(
+        (call) => (call[0] as ProvableAttempt).ready
+      );
+      expect(attempts).toEqual([false, true]);
+    });
+
+    it("honours an explicit proving block without touching the chain head", async () => {
+      const { provider, env: sdkEnv, bind } = env();
+      paymasterStub("0x0", `0x${BigInt(sdkEnv.ace).toString(16)}`);
+      const privacy = await bind();
+      vi.mocked(provider.getBlockNumber).mockClear();
+
+      await privacy.send((b) => b.register(), { provingBlockId: 42 });
+
+      // Still read once after submitting, to seed the next wait — but never to
+      // choose the proving block.
+      expect(provider.getBlockNumber).toHaveBeenCalledTimes(1);
+    });
+
+    it("clears the stale pool nonce when submission fails", async () => {
+      const { env: sdkEnv, bind } = env();
+      paymasterStub("0x0", `0x${BigInt(sdkEnv.ace).toString(16)}`);
+      const privacy = await bind();
+      const invalidate = vi.spyOn(
+        privacy.transfers,
+        "invalidateProofNonceCache"
+      );
+      vi.stubGlobal(
+        "fetch",
+        vi.fn((_url: string, init?: RequestInit) => {
+          const body = JSON.parse(String(init?.body)) as { method: string };
+          return Promise.resolve({
+            status: 200,
+            json: () =>
+              Promise.resolve(
+                body.method === "paymaster_buildTransaction"
+                  ? {
+                      result: {
+                        fee_action: {
+                          recipient: FORWARDER,
+                          token: "0x1",
+                          amount: "0x0",
+                        },
+                      },
+                    }
+                  : { error: { code: 167, message: "POOL_FEE_TOO_LOW" } }
+              ),
+          } as Response);
+        })
+      );
+
+      await expect(privacy.send((b) => b.register())).rejects.toThrow(
+        "less than the quoted pool fee"
+      );
+      // A failed invocation leaves a cached nonce that would poison the retry.
+      expect(invalidate).toHaveBeenCalled();
+    });
+
+    it("delegates reads to the SDK client untouched", async () => {
+      const { bind } = env();
+      paymasterStub("0x0", "0x1");
+      const privacy = await bind();
+      const spy = vi.spyOn(privacy.transfers, "discoverNotes");
+
+      await privacy.discoverNotes();
+
+      expect(spy).toHaveBeenCalledTimes(1);
+      expect(privacy.user).toBe(privacy.transfers.user);
+    });
+
+    it("does not expose the proof paths that would skip the fee", async () => {
+      const { bind } = env();
+      paymasterStub("0x0", "0x1");
+      const privacy = await bind();
+
+      // `build`/`execute`/`createProofInvocation` stay on `.transfers`, so a
+      // caller cannot accidentally produce a proof the paymaster will reject.
+      expect("build" in privacy).toBe(false);
+      expect("execute" in privacy).toBe(false);
+      expect("createProofInvocation" in privacy).toBe(false);
+      expect(typeof privacy.transfers.build).toBe("function");
     });
   });
 

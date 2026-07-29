@@ -223,11 +223,25 @@ export type ExecuteOptions = TransactionFeeOptions & {
   /**
    * Validity proof to attach to the transaction.
    *
-   * Requires `feeMode: "user_pays"`. The paymaster API has no field to carry
-   * a proof, so a sponsored privacy transaction is rejected rather than sent
-   * without it.
+   * Self-submitting a proof is legal at the protocol level but defeats the
+   * point: the transaction carries your address as sender, increments your
+   * nonce, and pays gas from your public balance, so the chain records exactly
+   * who performed the "private" operation. Requires `unsafeUserPays`.
+   *
+   * Submit through a privacy paymaster instead as `wallet.privacy()` does, and
+   * the relayer's account appears on-chain in place of yours.
    */
   proof?: TransactionProof;
+  /**
+   * Acknowledge that self-submitting {@link ExecuteOptions.proof} reveals the
+   * sender, and send it anyway.
+   *
+   * Exists because devnet and the integration tests have no paymaster, so
+   * removing self-submission entirely would remove the ability to test privacy
+   * locally. It is deliberately awkward to type: whoever passes it should know
+   * what it costs.
+   */
+  unsafeUserPays?: boolean;
 };
 
 // ─── Preflight ───────────────────────────────────────────────────────────────

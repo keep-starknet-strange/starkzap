@@ -30,6 +30,7 @@ import type {
   TransactionProof,
 } from "@/types";
 import {
+  assertProofFresh,
   assertProofSendable,
   checkDeployed,
   ensureWalletReady,
@@ -38,6 +39,8 @@ import {
   preflightTransaction,
 } from "@/wallet/utils";
 import { createPrivacy } from "@/privacy/create";
+import { withPaymaster, type PrivacyClient } from "@/privacy/client";
+import { PROOF_BASE_BLOCK_DEPTH } from "@/privacy/sequencing";
 import type { PrivacyConfig } from "@/privacy/create";
 import type { WalletInterface } from "@/wallet/interface";
 import { BaseWallet } from "@/wallet/base";
@@ -133,7 +136,7 @@ export class Wallet extends BaseWallet {
   private readonly defaultFeeMode: FeeMode;
   private readonly defaultTimeBounds: PaymasterTimeBounds | undefined;
   private readonly privacyConfig: PrivacyConfig | undefined;
-  private privacyClient: ReturnType<typeof createPrivacy> | null = null;
+  private privacyClient: Promise<PrivacyClient> | null = null;
   private deployedCache: boolean | null = null;
   private deployedCacheExpiresAt = 0;
   private sponsoredDeployLock: Promise<void> | null = null;
@@ -510,7 +513,19 @@ export class Wallet extends BaseWallet {
     const feeMode = normalizeFeeMode(options.feeMode ?? this.defaultFeeMode);
     const timeBounds = options.timeBounds ?? this.defaultTimeBounds;
 
-    assertProofSendable(options.proof, feeMode, "Wallet");
+    assertProofSendable(
+      options.proof,
+      feeMode,
+      "Wallet",
+      options.unsafeUserPays
+    );
+    if (options.proof) {
+      await assertProofFresh(
+        options.proof,
+        this.provider,
+        PROOF_BASE_BLOCK_DEPTH
+      );
+    }
 
     const transactionHash =
       feeMode !== "user_pays"
@@ -639,33 +654,47 @@ export class Wallet extends BaseWallet {
    * Privacy pool client for this wallet, configured from `privacy` in the
    * SDK config.
    *
-   * @returns The privacy SDK client
-   * @throws If `privacy` is missing from the SDK config
+   * Returns a client that owns the pool fee, the proving block and submission —
+   * see {@link PrivacyClient}. Submission goes through the paymaster's relayer,
+   * so the account never appears on-chain; self-submitting would defeat the
+   * point. For the privacy SDK's own client, use `createPrivacy` directly, or
+   * read {@link PrivacyClient.transfers}.
+   *
+   * @returns A paymaster-bound privacy client
+   * @throws If `privacy` is missing from the SDK config, or omits
+   *   `paymasterUrl` / `fee`
    *
    * @example
    * ```ts
    * const sdk = new StarkZap({
    *   network: "mainnet",
-   *   privacy: { poolContractAddress: POOL, prover: PROVER, discovery: DISCOVERY },
+   *   privacy: {
+   *     poolContractAddress: POOL,
+   *     prover: PROVER,
+   *     discovery: DISCOVERY,
+   *     paymasterUrl: "https://my-app.example.com/api/paymaster",
+   *     fee: { mode: "sponsored" },
+   *   },
    * });
    * const wallet = await sdk.connectWallet({ account: { signer } });
    *
-   * const privateTransfers = await wallet.privacy();
-   * const { callAndProof } = await privateTransfers.build().register().execute();
-   * await wallet.execute([callAndProof.call], { proof: callAndProof.proof });
+   * const privacy = await wallet.privacy();
+   * const hash = await privacy.send((b) =>
+   *   b.with(STRK, (t) => t.deposit({ amount })).surplusTo(wallet.address)
+   * );
    * ```
    */
-  async privacy(): ReturnType<typeof createPrivacy> {
+  async privacy(): Promise<PrivacyClient> {
     const config = this.privacyConfig;
     if (!config) {
       throw new Error(
         "[starkzap] wallet.privacy() requires 'privacy' in the SDK config. " +
-          "Add it to StarkZap({ privacy: { poolContractAddress, prover, discovery } }), " +
-          "or call createPrivacy(wallet, config) directly."
+          "Add it to StarkZap({ privacy: { poolContractAddress, prover, discovery, " +
+          "paymasterUrl, fee } }), or call createPrivacy(wallet, config) directly."
       );
     }
 
-    this.privacyClient ??= createPrivacy(this, config).catch(
+    this.privacyClient ??= this.createPrivacyClient(config).catch(
       (error: unknown) => {
         // Don't cache a failure — a missing dependency or an unreachable
         // service should be retryable once fixed.
@@ -675,6 +704,36 @@ export class Wallet extends BaseWallet {
     );
 
     return this.privacyClient;
+  }
+
+  /** Bind a privacy SDK client to the configured paymaster. */
+  private async createPrivacyClient(
+    config: PrivacyConfig
+  ): Promise<PrivacyClient> {
+    // Deliberately not defaulted. `default` fee mode needs no API key but the
+    // forwarder keeps the whole suggested-max gas withdrawal — measured at ~16x
+    // the sponsored pool fee — so picking one silently would overcharge on the
+    // user's behalf. Sponsored modes need a key, which needs a proxy.
+    if (!config.paymasterUrl || !config.fee) {
+      throw new Error(
+        "[starkzap] Privacy transactions are submitted by a paymaster's relayer, " +
+          "so `privacy.paymasterUrl` and `privacy.fee` are both required. Use " +
+          '`fee: { mode: "sponsored" }` (relayer pays gas, pool fee in STRK — needs ' +
+          "an API key, so point paymasterUrl at a proxy holding it), or `fee: { mode: " +
+          '"default", gasToken }` (no key, but the forwarder keeps the full ' +
+          "suggested-max gas amount rather than refunding the unused part)."
+      );
+    }
+
+    const transfers = await createPrivacy(this, config);
+
+    return withPaymaster(transfers, {
+      poolContractAddress: config.poolContractAddress,
+      paymasterUrl: config.paymasterUrl,
+      fee: config.fee,
+      ...(config.tip && { tip: config.tip }),
+      provider: this.provider,
+    });
   }
 
   /**

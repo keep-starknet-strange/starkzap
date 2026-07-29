@@ -1,0 +1,270 @@
+import { hash } from "starknet";
+import type { Call } from "starknet";
+import type { Address } from "@/types";
+import { assertSafeHttpUrl } from "@/utils";
+
+/**
+ * How the fee for a private transaction is paid.
+ *
+ * Every mode is submitted by the paymaster's relayer through the forwarder, so
+ * the user's account never appears on-chain. What differs is who fronts the gas
+ * and which token the fee comes out of. In all three the fee is withdrawn
+ * from the *shielded* balance, never from a public account.
+ *
+ * - `default` — the user pays gas and the pool fee from their private balance,
+ *   in `gasToken`. Needs no paymaster API key, which makes it the only mode that
+ *   works without an integrator account.
+ * - `sponsored` — the relayer pays gas. The user pays the pool fee in STRK.
+ *   Requires an API key.
+ * - `sponsored_private` — as `sponsored`, but the user chooses the pool-fee
+ *   token. Requires an API key. Only valid for private transactions.
+ */
+export type PrivacyFeeMode =
+  | { mode: "default"; gasToken: Address }
+  | { mode: "sponsored" }
+  | { mode: "sponsored_private"; poolFeeToken: Address };
+
+/**
+ * Transaction priority. The paymaster's own schema and its published SDK
+ * disagree on the accepted values, so this stays optional and unset by default.
+ */
+export type PrivacyTip = "slow" | "normal" | "fast";
+
+/** The withdrawal a proof must include so the forwarder is reimbursed. */
+export interface PrivacyFeeAction {
+  /** Forwarder address that must receive the fee. */
+  recipient: Address;
+  /** Token the fee is paid in. */
+  token: Address;
+  /** Amount to withdraw, in base units. Zero means no withdrawal is needed. */
+  amount: bigint;
+}
+
+/** What the build step returns. */
+export interface PrivacyFeeQuote {
+  /** The withdrawal to append to the proof's action list. */
+  feeAction: PrivacyFeeAction;
+  /**
+   * Execution parameters to hand back to {@link PrivacyPaymaster.execute}
+   * verbatim. The spec says to echo these rather than rebuild them, so a
+   * tracking or nonce field the service adds is not silently dropped.
+   */
+  parameters: unknown;
+}
+
+/** Errors the paymaster returns for privacy-specific failures. */
+const PRIVACY_ERRORS: Record<number, string> = {
+  161: "the privacy pool is not whitelisted by this paymaster",
+  162: "the call's selector is not `apply_actions`",
+  163: "the paymaster rejected the request (usually a missing or invalid API key)",
+  164: "this paymaster does not allow user calls alongside a pool action",
+  165: "the proof is missing the fee withdrawal the paymaster asked for",
+  166: "the paymaster could not parse the call's calldata",
+  167: "the fee withdrawn in the proof is less than the quoted pool fee",
+  168: "`sponsored_private` is only valid for private transactions",
+};
+
+/** JSON-RPC error body, as returned by the paymaster. */
+interface RpcErrorBody {
+  code: number;
+  message: string;
+  data?: unknown;
+}
+
+function isRpcErrorBody(value: unknown): value is RpcErrorBody {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    typeof (value as { code?: unknown }).code === "number"
+  );
+}
+
+/**
+ * Error thrown when the paymaster rejects a request.
+ *
+ * Carries the JSON-RPC code so callers can branch — 167 and 165 mean the proof
+ * and the quote disagreed and a retry may help, while 161 and 168 are
+ * configuration mistakes that will fail identically forever.
+ */
+export class PrivacyPaymasterError extends Error {
+  constructor(
+    readonly code: number,
+    message: string,
+    readonly data?: unknown
+  ) {
+    super(message);
+    this.name = "PrivacyPaymasterError";
+  }
+}
+
+/**
+ * Minimal client for a privacy-capable paymaster.
+ *
+ * The privacy transaction types (`apply_action`) are not part of SNIP-29, so
+ * starknet.js's `PaymasterRpc` cannot express them. Its executable transaction
+ * union has no field for a proof. This talks to the paymaster's JSON-RPC
+ * endpoint directly instead.
+ *
+ * Point `url` at a proxy that holds the API key, never at the paymaster with the
+ * key in the browser. `default` mode needs no key at all.
+ */
+export class PrivacyPaymaster {
+  private readonly url: string;
+
+  constructor(url: string) {
+    assertSafeHttpUrl(url, "Privacy paymaster URL");
+    this.url = url;
+  }
+
+  /**
+   * Ask what the transaction will cost, before proving.
+   *
+   * The returned {@link PrivacyFeeAction} must be appended to the proof's
+   * action list as the final withdrawal. The forwarder collects it from the
+   * proof, so a proof built without it is rejected with code 165.
+   *
+   * @param poolAddress - Privacy pool the transaction targets
+   * @param feeMode - How the fee is paid
+   * @param tip - Optional priority
+   * @returns The fee to include, and the parameters to echo back on execute
+   */
+  async quote(
+    poolAddress: Address,
+    feeMode: PrivacyFeeMode,
+    tip?: PrivacyTip
+  ): Promise<PrivacyFeeQuote> {
+    const result = await this.send<{
+      fee_action?: { recipient: string; token: string; amount: string };
+      parameters?: unknown;
+    }>("paymaster_buildTransaction", {
+      transaction: {
+        type: "apply_action",
+        apply_action: { pool_address: poolAddress },
+      },
+      parameters: this.parameters(feeMode, tip),
+    });
+
+    const action = result.fee_action;
+    if (!action) {
+      throw new PrivacyPaymasterError(
+        -1,
+        "[starkzap] The paymaster returned no fee action for this pool, so " +
+          "there is no way to build a proof it will accept."
+      );
+    }
+
+    return {
+      feeAction: {
+        recipient: action.recipient as Address,
+        token: action.token as Address,
+        amount: BigInt(action.amount),
+      },
+      // Echoed back verbatim; falls back to a locally built copy if the service
+      // omits them, which older deployments do.
+      parameters: result.parameters ?? this.parameters(feeMode, tip),
+    };
+  }
+
+  /**
+   * Submit a proven private transaction.
+   *
+   * No user signature is involved: the relayer sends it and the pool authorises
+   * it from the proof alone, which is what keeps the user's account off-chain.
+   *
+   * @param call - The pool's `apply_actions` call
+   * @param proof - Proof data and facts from the proving service
+   * @param parameters - The `parameters` from {@link quote}
+   * @returns The submitted transaction hash
+   */
+  async execute(
+    call: Call,
+    proof: { data: string; proofFacts: string[] },
+    parameters: unknown
+  ): Promise<string> {
+    const result = await this.send<{ transaction_hash: string }>(
+      "paymaster_executeTransaction",
+      {
+        transaction: {
+          type: "apply_action",
+          apply_action: {
+            apply_actions_call: {
+              to: call.contractAddress,
+              selector: hash.getSelectorFromName(call.entrypoint),
+              calldata: call.calldata ?? [],
+            },
+            proof: proof.data,
+            proof_facts: proof.proofFacts,
+          },
+        },
+        parameters,
+      }
+    );
+    return result.transaction_hash;
+  }
+
+  /** Execution parameters in the shape the paymaster expects. */
+  private parameters(feeMode: PrivacyFeeMode, tip?: PrivacyTip) {
+    const mode =
+      feeMode.mode === "default"
+        ? { mode: "default" as const, gas_token: feeMode.gasToken }
+        : feeMode.mode === "sponsored_private"
+          ? {
+              mode: "sponsored_private" as const,
+              pool_fee_token: feeMode.poolFeeToken,
+            }
+          : { mode: "sponsored" as const };
+
+    return {
+      version: "0x1",
+      fee_mode: { ...mode, ...(tip && { tip }) },
+    };
+  }
+
+  private async send<T>(method: string, params: unknown): Promise<T> {
+    const response = await fetch(this.url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json",
+      },
+      body: JSON.stringify({ jsonrpc: "2.0", id: 1, method, params }),
+    });
+
+    // A proxy that fails before reaching the paymaster returns HTML or an empty
+    // body, which would otherwise surface as an opaque JSON parse error.
+    const body: unknown = await response.json().catch(() => undefined);
+    if (body === undefined) {
+      // 413 is worth naming: a proof is megabytes of base64, and most HTTP
+      // stacks cap request bodies far below that by default (express.json is
+      // 100kb, nginx 1MB). The rejection comes from the proxy, not the
+      // paymaster, and its error page is not JSON.
+      const hint =
+        response.status === 413
+          ? " A proof is several megabytes; raise the request body limit on the" +
+            " proxy in front of the paymaster."
+          : "";
+      throw new PrivacyPaymasterError(
+        response.status,
+        `[starkzap] The privacy paymaster returned a non-JSON response (HTTP ${response.status}) for ${method}.${hint}`
+      );
+    }
+
+    const error = (body as { error?: unknown }).error;
+    if (error !== undefined) {
+      const rpc = isRpcErrorBody(error)
+        ? error
+        : { code: -1, message: String(error) };
+      const known = PRIVACY_ERRORS[rpc.code];
+      const detail = typeof rpc.data === "string" ? ` (${rpc.data})` : "";
+      throw new PrivacyPaymasterError(
+        rpc.code,
+        `[starkzap] Privacy paymaster rejected ${method} with code ${rpc.code}: ${
+          known ?? rpc.message
+        }${detail}`,
+        rpc.data
+      );
+    }
+
+    return (body as { result: T }).result;
+  }
+}
