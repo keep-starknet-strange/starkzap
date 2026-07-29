@@ -9,14 +9,18 @@ import {
   Select,
   Segmented,
   IconSymbol,
+  Toggle,
 } from "@/ui";
 import { useTheme } from "@/theme";
 import { useTokensStore } from "@/core/tokens/store";
 import { PROVIDER_OPTIONS_LIST } from "@/core/wallet/store";
+import { useSettingsStore, useSponsoredAvailable } from "@/core/settings";
 import { useBalancesStore } from "@/features/balances/store";
 import { useSwapStore } from "@/features/swap/store";
 
 export function SwapPanel() {
+  const sponsoredAvailable = useSponsoredAvailable();
+  const { sponsored, setSponsored } = useSettingsStore();
   const { colors, spacing } = useTheme();
   const tokens = useTokensStore((s) => s.tokens);
   const { balances, refresh } = useBalancesStore();
@@ -121,6 +125,13 @@ export function SwapPanel() {
         ) : null}
       </Card>
 
+      {sponsoredAvailable ? (
+        <Toggle
+          label="Sponsored"
+          value={sponsored}
+          onValueChange={setSponsored}
+        />
+      ) : null}
       <Button
         title="Swap"
         loading={submitting}

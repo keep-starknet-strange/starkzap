@@ -18,6 +18,7 @@ import {
   AUTO_PRIVATE_KEY,
   AUTO_ACCOUNT_PRESET,
   PRIVACY_CONFIG,
+  PAYMASTER_NODE_URL,
 } from "./config";
 import { sdkLogger, log } from "./logger";
 import * as privacy from "~/features/privacy/store";
@@ -94,6 +95,8 @@ export const sdk = new StarkZap({
   chainId: CHAIN_ID,
   logging: { logger: sdkLogger },
   ...(bridging ? { bridging } : {}),
+  // Enables the "Sponsored" toggles. Absent when no proxy is set.
+  ...(PAYMASTER_NODE_URL ? { paymaster: { nodeUrl: PAYMASTER_NODE_URL } } : {}),
   // Enables wallet.privacy() on locally-signed wallets. Absent when this
   // network has no VITE_PRIVACY_* endpoints configured.
   ...(PRIVACY_CONFIG ? { privacy: PRIVACY_CONFIG } : {}),

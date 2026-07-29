@@ -13,6 +13,7 @@ import {
 } from "@/core/config";
 import { resolveExamplePaymasterNodeUrl } from "@/core/paymaster";
 import { getDevLogin } from "@/core/dev-login";
+import { useSettingsStore } from "@/core/settings";
 import {
   ACCOUNT_PRESETS,
   getSessionHint,
@@ -41,7 +42,9 @@ export default function Login() {
   const [showKeyForm, setShowKeyForm] = useState(false);
   const [privateKey, setPrivateKey] = useState("");
   const [presetName, setPresetName] = useState("Ready");
-  const [sponsored, setSponsored] = useState(false);
+  // Same preference the per-transaction toggles read, so the choice made at
+  // login carries into every transaction instead of silently resetting.
+  const { sponsored, setSponsored } = useSettingsStore();
   const [resumePrivy, setResumePrivy] = useState(false);
 
   // Resume the last login: Privy has a persisted session (route in to reconnect),

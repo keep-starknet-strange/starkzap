@@ -1,7 +1,8 @@
-import { Card, Text, Button, TextField, Select } from "@/ui";
+import { Card, Text, Button, TextField, Select, Toggle } from "@/ui";
 import { useTheme } from "@/theme";
 import { useBalancesStore } from "@/features/balances/store";
 import { Amount } from "starkzap-native";
+import { useSettingsStore, useSponsoredAvailable } from "@/core/settings";
 import {
   useLendingStore,
   marketId,
@@ -9,6 +10,8 @@ import {
 } from "@/features/lending/store";
 
 export function EarnPanel() {
+  const sponsoredAvailable = useSponsoredAvailable();
+  const { sponsored, setSponsored } = useSettingsStore();
   const { colors } = useTheme();
   const balances = useBalancesStore((s) => s.balances);
   const {
@@ -77,6 +80,13 @@ export function EarnPanel() {
         <Text variant="muted">
           Balance: {balance ? balance.toFormatted(true) : "—"}
         </Text>
+        {sponsoredAvailable ? (
+          <Toggle
+            label="Sponsored"
+            value={sponsored}
+            onValueChange={setSponsored}
+          />
+        ) : null}
         <Button
           title="Deposit"
           loading={earnSubmitting}

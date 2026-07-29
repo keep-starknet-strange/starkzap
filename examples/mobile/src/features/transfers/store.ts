@@ -3,6 +3,7 @@ import { Amount, fromAddress } from "starkzap-native";
 import { useWalletStore } from "@/core/wallet/store";
 import { useTokensStore } from "@/core/tokens/store";
 import { useTxBannerStore } from "@/core/tx-banner/store";
+import { feeOptions } from "@/core/settings";
 
 export interface TransferItem {
   id: number;
@@ -65,7 +66,7 @@ export const useTransfersStore = create<TransfersStore>((set, get) => ({
           amount: Amount.parse(item.amount, token),
         });
       }
-      return builder.send();
+      return builder.send(feeOptions());
     });
     set({ submitting: false });
     return !!tx;
