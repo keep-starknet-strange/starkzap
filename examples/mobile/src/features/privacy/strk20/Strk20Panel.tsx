@@ -2,15 +2,12 @@ import { useState } from "react";
 import { Card, Text, Button, TextField, Select } from "@/ui";
 import { useWalletStore } from "@/core/wallet/store";
 import { useTokensStore } from "@/core/tokens/store";
-import {
-  blocksUntilProvable,
-  unavailableReason,
-  useStrk20Store,
-} from "./store";
+import { unavailableReason, useStrk20Store } from "./store";
 
 export default function Strk20Panel() {
   const networkIndex = useWalletStore((s) => s.networkIndex);
   const walletType = useWalletStore((s) => s.walletType);
+  const address = useWalletStore((s) => s.address);
   const tokens = useTokensStore((s) => s.tokens);
 
   const {
@@ -21,10 +18,9 @@ export default function Strk20Panel() {
     error,
     registered,
     balances,
-    lastTxBlock,
-    head,
+    waitingBlocks,
+    fee,
     connect,
-    register,
     deposit,
     transfer,
     withdraw,
@@ -36,14 +32,15 @@ export default function Strk20Panel() {
   const [sendAmount, setSendAmount] = useState("");
   const [sendTo, setSendTo] = useState("");
   const [withdrawAmount, setWithdrawAmount] = useState("");
+  // Deliberately empty: self-withdrawing undoes the pool, so it has to be chosen.
+  const [withdrawTo, setWithdrawTo] = useState("");
   const [toReady, setToReady] = useState<boolean | null>(null);
 
   const reason = unavailableReason(networkIndex, walletType);
   const token = tokens.find((t) => t.symbol === symbol);
-  const waiting = blocksUntilProvable({ lastTxBlock, head });
-  // Actions are blocked while the chain catches up: a proof must read state
-  // that is already ~10 blocks old.
-  const blocked = busy || waiting > 0;
+  // Only one operation at a time. The block wait now happens *inside* send(),
+  // reported through `waitingBlocks`, rather than gating the buttons up front.
+  const blocked = busy;
 
   if (reason) return <Text variant="muted">{reason}</Text>;
 
@@ -81,33 +78,31 @@ export default function Strk20Panel() {
             ? "Checking registration…"
             : registered
               ? "Registered — ready to transact."
-              : "Not registered yet. Depositing registers you automatically."}
+              : "Not registered yet — your first deposit registers you. Registering alone is not possible: the pool fee comes from your private balance."}
         </Text>
 
-        {waiting > 0 ? (
+        {waitingBlocks !== null ? (
           <>
             <Text variant="label">
-              Waiting {waiting} block{waiting === 1 ? "" : "s"}
+              Waiting {waitingBlocks} block{waitingBlocks === 1 ? "" : "s"}
             </Text>
             <Text variant="muted">
-              A proof must read state that is already ~10 blocks old, so the
-              next private transaction cannot be built yet.
+              A proof must read state that is already ~10 blocks old, so this
+              transaction cannot be proven yet.
             </Text>
           </>
         ) : null}
 
+        {fee ? (
+          <Text variant="muted">
+            {fee.feeAction.amount === 0n
+              ? "No pool fee on this deployment."
+              : `Pool fee ${fee.feeAction.amount} (base units), withdrawn from your private balance — not paid from your account.`}
+          </Text>
+        ) : null}
+
         {step ? <Text variant="muted">{step}</Text> : null}
         {error ? <Text variant="muted">{error}</Text> : null}
-
-        {registered === false ? (
-          <Button
-            title="Register now"
-            variant="secondary"
-            loading={busy}
-            disabled={blocked}
-            onPress={() => void register()}
-          />
-        ) : null}
       </Card>
 
       <Card>
@@ -204,12 +199,30 @@ export default function Strk20Panel() {
               onChangeText={setWithdrawAmount}
               keyboardType="decimal-pad"
             />
-            <Text variant="muted">Withdraws to your own wallet address.</Text>
+            <TextField
+              label="Recipient address"
+              placeholder="0x…"
+              value={withdrawTo}
+              onChangeText={setWithdrawTo}
+              autoCapitalize="none"
+              autoCorrect={false}
+            />
+            <Text variant="muted">
+              Deposits and withdrawals are public; only what happens between
+              them is private. Withdrawing to the address you deposited from
+              puts both ends on the same address, which is enough to link them —
+              so a fresh address is what preserves the gap.
+            </Text>
+            <Button
+              title="Use my own address (links the two ends)"
+              variant="secondary"
+              onPress={() => setWithdrawTo(address ?? "")}
+            />
             <Button
               title="Withdraw"
               loading={busy}
-              disabled={blocked || !withdrawAmount.trim()}
-              onPress={() => void withdraw(token, withdrawAmount)}
+              disabled={blocked || !withdrawAmount.trim() || !withdrawTo.trim()}
+              onPress={() => void withdraw(token, withdrawTo, withdrawAmount)}
             />
           </Card>
         </>

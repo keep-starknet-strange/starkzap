@@ -165,7 +165,10 @@ function buildSdk(networkIndex: number) {
     ...(isMain && OFT_PUBLIC_KEY ? { layerZeroApiKey: OFT_PUBLIC_KEY } : {}),
   };
   // Enables wallet.privacy(); absent when this network has no endpoints set.
-  const privacy = privacyConfig(isMain ? "mainnet" : "sepolia");
+  const privacy = privacyConfig(
+    isMain ? "mainnet" : "sepolia",
+    paymasterNodeUrl
+  );
   const sdk = new StarkZap({
     rpcUrl: net.rpcUrl,
     chainId: net.chainId,
