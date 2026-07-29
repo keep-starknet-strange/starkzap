@@ -8,7 +8,7 @@
   import TextField from "~/lib/ui/TextField.svelte";
   import Toggle from "~/lib/ui/Toggle.svelte";
   import { balances } from "~/features/balances/store";
-  import { sponsored } from "~/lib/stores/settings";
+  import { sponsored, sponsoredAvailable } from "~/lib/stores/settings";
   import {
     marketId,
     formatUsd18,
@@ -71,7 +71,9 @@
         setEarnAmount((e.currentTarget as HTMLInputElement).value)}
     />
     <Text variant="muted">Balance: {balance ? balance.toFormatted(true) : "—"}</Text>
-    <Toggle label="Sponsored (gasless)" bind:checked={$sponsored} />
+    {#if sponsoredAvailable}
+      <Toggle label="Sponsored" bind:checked={$sponsored} />
+    {/if}
     <Button title="Deposit" loading={$earnSubmitting} disabled={!$earnAmount.trim()} onclick={deposit} />
     <Button
       variant="secondary"

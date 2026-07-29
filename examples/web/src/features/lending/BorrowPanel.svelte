@@ -7,7 +7,7 @@
   import Select from "~/lib/ui/Select.svelte";
   import TextField from "~/lib/ui/TextField.svelte";
   import Toggle from "~/lib/ui/Toggle.svelte";
-  import { sponsored } from "~/lib/stores/settings";
+  import { sponsored, sponsoredAvailable } from "~/lib/stores/settings";
   import {
     marketId,
     formatUsd18,
@@ -107,7 +107,9 @@
       </Text>
     {/if}
 
-    <Toggle label="Sponsored (gasless)" bind:checked={$sponsored} />
+    {#if sponsoredAvailable}
+      <Toggle label="Sponsored" bind:checked={$sponsored} />
+    {/if}
     <Button
       title="Borrow"
       loading={$borrowSubmitting}

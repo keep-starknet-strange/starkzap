@@ -98,6 +98,14 @@ export const RPC_URL = resolveRpcUrl(NETWORK);
 export const PRIVY_SERVER_URL =
   (env.VITE_PRIVY_SERVER_URL as string | undefined) ?? "http://localhost:3001";
 
+// Paymaster (gas sponsorship) endpoint — point it at a proxy that holds the AVNU
+// API key, never at AVNU directly, or the key ships in the bundle. Unset means no
+// paymaster: starknet.js then falls back to AVNU's public endpoint, muted, and
+// always the *Sepolia* one whatever the chain — so sponsored mode is unusable.
+export const PAYMASTER_NODE_URL = (
+  env.VITE_PAYMASTER_PROXY_URL as string | undefined
+)?.trim();
+
 // Reown/WalletConnect project id — enables the bridge's external wallet connect.
 export const REOWN_PROJECT_ID = env.VITE_REOWN_PROJECT_ID as string | undefined;
 

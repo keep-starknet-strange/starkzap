@@ -5,6 +5,7 @@ import { useWalletStore } from "@/core/wallet/store";
 import { useTokensStore } from "@/core/tokens/store";
 import { useTxBannerStore } from "@/core/tx-banner/store";
 import { friendlyPairError, type DryRunResult } from "@/core/errors";
+import { feeOptions } from "@/core/settings";
 
 const SLIPPAGE_BPS = 100n; // 1%
 
@@ -136,13 +137,16 @@ export const useSwapStore = create<SwapStore>((set, get) => ({
     if (!wallet || !inTok || !outTok || !amountIn.trim()) return false;
     set({ submitting: true });
     const tx = await useTxBannerStore.getState().notify("Swap", () =>
-      wallet.swap({
-        tokenIn: inTok,
-        tokenOut: outTok,
-        amountIn: Amount.parse(amountIn, inTok),
-        slippageBps: SLIPPAGE_BPS,
-        provider: get().providerId,
-      })
+      wallet.swap(
+        {
+          tokenIn: inTok,
+          tokenOut: outTok,
+          amountIn: Amount.parse(amountIn, inTok),
+          slippageBps: SLIPPAGE_BPS,
+          provider: get().providerId,
+        },
+        feeOptions()
+      )
     );
     set({ submitting: false });
     return !!tx;

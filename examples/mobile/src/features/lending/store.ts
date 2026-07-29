@@ -8,6 +8,7 @@ import {
 import { useWalletStore } from "@/core/wallet/store";
 import { useTxBannerStore } from "@/core/tx-banner/store";
 import type { DryRunResult } from "@/core/errors";
+import { feeOptions } from "@/core/settings";
 
 const USD_SCALE = 10n ** 18n;
 // USD values come as integers on a 1e18 scale.
@@ -125,11 +126,14 @@ export const useLendingStore = create<LendingStore>((set, get) => ({
     const tx = await useTxBannerStore
       .getState()
       .notify(`Deposit ${m.asset.symbol}`, () =>
-        wallet.lending().deposit({
-          token: m.asset,
-          amount: Amount.parse(earnAmount, m.asset),
-          poolAddress: m.poolAddress,
-        })
+        wallet.lending().deposit(
+          {
+            token: m.asset,
+            amount: Amount.parse(earnAmount, m.asset),
+            poolAddress: m.poolAddress,
+          },
+          feeOptions()
+        )
       );
     set({ earnSubmitting: false });
     if (tx) {
@@ -171,10 +175,13 @@ export const useLendingStore = create<LendingStore>((set, get) => ({
     const tx = await useTxBannerStore
       .getState()
       .notify(`Withdraw ${p.collateral.token.symbol}`, () =>
-        wallet.lending().withdrawMax({
-          token: p.collateral.token,
-          poolAddress: p.pool.id,
-        })
+        wallet.lending().withdrawMax(
+          {
+            token: p.collateral.token,
+            poolAddress: p.pool.id,
+          },
+          feeOptions()
+        )
       );
     if (tx) await get().refresh();
     set({ busyPosition: null });
@@ -217,13 +224,16 @@ export const useLendingStore = create<LendingStore>((set, get) => ({
     const tx = await useTxBannerStore
       .getState()
       .notify(`Borrow ${d.asset.symbol}`, () =>
-        wallet.lending().borrow({
-          collateralToken: c.asset,
-          debtToken: d.asset,
-          collateralAmount: Amount.parse(collateralAmount, c.asset),
-          amount: Amount.parse(borrowAmount, d.asset),
-          poolAddress: c.poolAddress,
-        })
+        wallet.lending().borrow(
+          {
+            collateralToken: c.asset,
+            debtToken: d.asset,
+            collateralAmount: Amount.parse(collateralAmount, c.asset),
+            amount: Amount.parse(borrowAmount, d.asset),
+            poolAddress: c.poolAddress,
+          },
+          feeOptions()
+        )
       );
     set({ borrowSubmitting: false });
     if (tx) {
@@ -269,13 +279,16 @@ export const useLendingStore = create<LendingStore>((set, get) => ({
     const tx = await useTxBannerStore
       .getState()
       .notify(`Repay ${p.debt.token.symbol}`, () =>
-        wallet.lending().repay({
-          collateralToken: p.collateral.token,
-          debtToken: p.debt!.token,
-          amount: Amount.fromRaw(p.debt!.amount, p.debt!.token),
-          poolAddress: p.pool.id,
-          withdrawCollateral: true,
-        })
+        wallet.lending().repay(
+          {
+            collateralToken: p.collateral.token,
+            debtToken: p.debt!.token,
+            amount: Amount.fromRaw(p.debt!.amount, p.debt!.token),
+            poolAddress: p.pool.id,
+            withdrawCollateral: true,
+          },
+          feeOptions()
+        )
       );
     if (tx) await get().refresh();
     set({ busyPosition: null });
