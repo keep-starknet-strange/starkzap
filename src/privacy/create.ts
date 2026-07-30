@@ -11,6 +11,13 @@ import type { PrivacyFeeMode, PrivacyTip } from "@/privacy/paymaster";
 import type { Wallet } from "@/wallet";
 import { assertSafeHttpUrl } from "@/utils";
 import { loadPrivacySdk, type PrivacySdkModule } from "@/privacy/runtime";
+import {
+  assertCanonicalViewingKey,
+  assertDeterministicSigner,
+  signatureDerivation,
+  type ViewingKeyContext,
+  type ViewingKeyDerivation,
+} from "@/privacy/viewing-key";
 
 /** Parameters accepted by the SDK's own factory. */
 type CreatePrivateTransfersParams = Parameters<
@@ -22,9 +29,7 @@ export interface PrivacyConfig {
   /**
    * Privacy pool contract address.
    *
-   * Used verbatim when deriving the viewing key, so it must byte-match the
-   * form other wallets use for the same pool — `0x040...` and `0x40...`
-   * derive different keys and make existing notes undiscoverable.
+   * Bound into the viewing key.
    */
   poolContractAddress: string;
   /**
@@ -84,6 +89,18 @@ export interface PrivacyConfig {
   fee?: PrivacyFeeMode;
   /** Optional transaction priority passed through to the paymaster. */
   tip?: PrivacyTip;
+  /**
+   * How the viewing key is derived for this account.
+   *
+   * Defaults to {@link signatureDerivation}, which needs nothing but
+   * `signRaw`. Replace it to follow a different scheme like a wallet-native KDF,
+   * a hardware device command, or an externally held key.
+   *
+   * The pool stores the first key an account registers and it cannot be
+   * replaced, so changing this for an account that already registered orphans
+   * its notes. The discovery service rejects a mismatched key outright.
+   */
+  viewingKeyDerivation?: ViewingKeyDerivation;
 }
 
 /**
@@ -127,8 +144,9 @@ export interface PrivacyConfig {
  *   it has no {@link AccountProvider}, so it cannot produce the viewing key.
  * @param config - Pool address and service endpoints
  * @returns The privacy SDK client
- * @throws If the wallet's signer does not declare `deterministic: true`, or the
- *   optional peer dependency is not installed
+ * @throws If the optional peer dependency is not installed. Deriving the
+ *   viewing key throws separately, on first use — see
+ *   {@link ViewingKeyDerivation}
  *
  * @example
  * ```ts
@@ -147,21 +165,13 @@ export async function createPrivacy(
   wallet: Wallet,
   config: PrivacyConfig
 ): Promise<PrivateTransfersInterface> {
-  const accountProvider = wallet.getAccountProvider();
-  const signer = accountProvider.getSigner();
+  const signer = wallet.getAccountProvider().getSigner();
 
-  // The viewing key is a fold of an ECDSA signature over a fixed message, so
-  // it is only reproducible when the signer's nonce is deterministic
-  // (RFC-6979). A signer that draws a fresh nonce per signature would derive a
-  // different key on every call, leaving every existing note undecryptable.
-  if (signer.deterministic !== true) {
-    throw new Error(
-      "[starkzap] Privacy pool operations require a signer that declares " +
-        "`deterministic: true` — the viewing key is derived from a signature, so a " +
-        "signer with a random ECDSA nonce would derive a different key each call and " +
-        "lose access to previously encrypted notes. StarkSigner declares it; Privy " +
-        "and Cartridge signers do not, because their nonce policy is not ours to verify."
-    );
+  // The default derivation's precondition is checkable without signing, so
+  // check it here rather than letting the first private operation fail. A
+  // custom derivation owns its own preconditions.
+  if (config.viewingKeyDerivation === undefined) {
+    assertDeterministicSigner(signer);
   }
 
   if (typeof config.prover === "string") {
@@ -175,6 +185,27 @@ export async function createPrivacy(
 
   const chainId = wallet.getChainId().toFelt252() as constants.StarknetChainId;
 
+  const derive = config.viewingKeyDerivation ?? signatureDerivation;
+  const context: ViewingKeyContext = {
+    chainId,
+    accountAddress: wallet.address,
+    poolAddress: config.poolContractAddress,
+  };
+
+  // Derived once per client and held in the closure rather than persisted, so
+  // it lives exactly as long as the session that authorised it. Whether the key
+  // matches the one the pool registered is left to the discovery service, which
+  // rejects a mismatch outright.
+  let viewingKey: string | undefined;
+  const getViewingKey = async (): Promise<string> => {
+    if (viewingKey === undefined) {
+      const derived = await derive(context, signer);
+      assertCanonicalViewingKey(derived);
+      viewingKey = derived;
+    }
+    return viewingKey;
+  };
+
   return sdk.createPrivateTransfers({
     account: {
       address: wallet.address,
@@ -182,14 +213,7 @@ export async function createPrivacy(
       // needs the full starknet.js signer surface, not starkzap's minimal one.
       signer: new SignerAdapter(signer),
     },
-    viewingKeyProvider: {
-      getViewingKey: async () => {
-        return await accountProvider.getViewingKey({
-          chainId,
-          poolAddress: config.poolContractAddress,
-        });
-      },
-    },
+    viewingKeyProvider: { getViewingKey },
     provingProvider:
       typeof config.prover === "string"
         ? {
