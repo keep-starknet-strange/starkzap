@@ -3,9 +3,7 @@
   "private": true,
   "scripts": {
     "start": "node --import tsx server.ts",
-    "postinstall": "cd ../.. && npm run build",
-    "prepare:privacy-stack": "bash scripts/prepare-privacy-stack.sh",
-    "clean:privacy-stack": "rm -rf .privacy-stack && echo '✓ removed .privacy-stack'"
+    "postinstall": "cd ../.. && npm run build"
   },
   "dependencies": {
     "@privy-io/node": "^0.8.0",
