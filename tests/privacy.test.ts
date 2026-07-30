@@ -23,6 +23,7 @@ import {
 import { screeningVerdict } from "@/privacy/errors";
 import { PrivacyPaymaster, PrivacyPaymasterError } from "@/privacy/paymaster";
 import { createPrivacy } from "@/privacy/create";
+import { signatureDerivation } from "@/privacy/viewing-key";
 import { withPaymaster } from "@/privacy/client";
 import { PrivySigner, StarkSigner } from "@/signer";
 import type { SignerInterface } from "@/signer";
@@ -596,7 +597,7 @@ describe("privacy", () => {
     it("rejects a wallet whose signer is not a StarkSigner", async () => {
       await expect(
         createPrivacy(walletWith(new ForeignSigner()), config)
-      ).rejects.toThrow("require a signer that declares");
+      ).rejects.toThrow("requires a signer that declares");
     });
 
     it("rejects a Privy signer, which makes no determinism claim", async () => {
@@ -612,7 +613,7 @@ describe("privacy", () => {
       });
 
       await expect(createPrivacy(walletWith(privy), config)).rejects.toThrow(
-        "require a signer that declares"
+        "requires a signer that declares"
       );
     });
 
@@ -706,10 +707,14 @@ describe("privacy", () => {
 
       // The key the pool stores must be the one starkzap derives from the
       // signer, not one the SDK generated on its own.
-      const derived = await wallet.getAccountProvider().getViewingKey({
-        chainId: ChainId.MAINNET.toFelt252(),
-        poolAddress: POOL_HEX,
-      });
+      const derived = await signatureDerivation(
+        {
+          chainId: ChainId.MAINNET.toFelt252(),
+          accountAddress: wallet.address,
+          poolAddress: POOL_HEX,
+        },
+        wallet.getAccountProvider().getSigner()
+      );
       const expected = BigInt(ec.starkCurve.getStarkKey(derived));
 
       expect(mocknet.pool.get_public_key(env.alice.address)).toBe(expected);

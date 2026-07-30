@@ -1,5 +1,12 @@
 export { createPrivacy, type PrivacyConfig } from "@/privacy/create";
 export {
+  assertCanonicalViewingKey,
+  assertDeterministicSigner,
+  signatureDerivation,
+  type ViewingKeyContext,
+  type ViewingKeyDerivation,
+} from "@/privacy/viewing-key";
+export {
   withPaymaster,
   type PaymasterBinding,
   type PrivacyClient,

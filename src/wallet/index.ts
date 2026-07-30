@@ -58,10 +58,7 @@ const NEGATIVE_DEPLOYMENT_CACHE_TTL_MS = 3_000;
 
 export { type WalletInterface } from "@/wallet/interface";
 export { BaseWallet } from "@/wallet/base";
-export {
-  AccountProvider,
-  type ViewingKeyScope,
-} from "@/wallet/accounts/provider";
+export { AccountProvider } from "@/wallet/accounts/provider";
 
 /**
  * Options for creating a Wallet.

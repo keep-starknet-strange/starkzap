@@ -1,4 +1,4 @@
-import { ec, hash, num, type Calldata } from "starknet";
+import { hash, num, type Calldata } from "starknet";
 import type { PAYMASTER_API } from "@starknet-io/starknet-types-0103";
 import { OpenZeppelinPreset } from "@/account";
 import type { SignerInterface } from "@/signer";
@@ -11,14 +11,6 @@ function toHex(value: string | number | bigint): string {
     return value;
   }
   return num.toHex(value);
-}
-
-/** Privacy pool a viewing key is derived for. */
-export interface ViewingKeyScope {
-  /** Chain id as a felt hex string, e.g. `0x534e5f4d41494e` for `SN_MAIN`. */
-  chainId: string;
-  /** Privacy pool contract address, exactly as the pool is published. */
-  poolAddress: string;
 }
 
 /**
@@ -96,57 +88,6 @@ export class AccountProvider {
     const pubKey = await this.signer.getPubKey();
     this.cachedPublicKey = pubKey;
     return pubKey;
-  }
-
-  /**
-   * Derive the privacy-pool viewing key for this account.
-   *
-   * The viewing key is the secret that encrypts and decrypts private notes.
-   * It is derived on demand rather than stored: signing a canonical message
-   * with the account's signing key and folding the resulting `(r, s)` pair
-   * through Poseidon reproduces the same key on every device, so notes stay
-   * discoverable after a wallet reinstall.
-   *
-   * The signed message is `` `${chainId}:${poolAddress}` ``. The canonical
-   * form used by the reference privacy wallet, so a key derived here matches
-   * one derived elsewhere from the same signing key. Binding it to chain and
-   * pool keeps mainnet and sepolia keys distinct and stops a pool
-   * redeployment from inheriting the previous key.
-   *
-   * Both fields are interpolated verbatim: `0x040...` and `0x40...` are
-   * different messages and derive different keys, which makes already
-   * encrypted notes undiscoverable. Pass the exact strings the pool is
-   * published under.
-   *
-   * @remarks
-   * The signer's ECDSA must be deterministic (RFC-6979), as {@link StarkSigner}
-   * is. A signer that draws a fresh nonce per signature yields a different key
-   * on every call and permanently loses access to existing notes.
-   *
-   * @param scope - The chain and privacy pool the key is scoped to
-   * @returns The viewing key as a 0x-hex string, reduced into the canonical
-   *   range `[1, n/2]` that the pool contract accepts
-   */
-  async getViewingKey(scope: ViewingKeyScope): Promise<string> {
-    const msgHash = num.toHex(
-      hash.starknetKeccak(`${scope.chainId}:${scope.poolAddress}`)
-    );
-
-    const signature = await this.signer.signRaw(msgHash);
-    const sigArray = Array.isArray(signature)
-      ? signature
-      : [signature.r, signature.s];
-
-    // The pool only accepts keys in [1, n/2] (is_canonical_key). Poseidon
-    // outputs over [0, p) with p > n, so reduce mod n, then negate an
-    // upper-half value that folds it down while preserving the public
-    // key's x coordinate.
-    const order = ec.starkCurve.CURVE.n;
-    const reduced =
-      BigInt(hash.computePoseidonHashOnElements(sigArray)) % order;
-    const canonical = reduced < order / 2n ? reduced : order - reduced;
-
-    return num.toHex(canonical === 0n ? 1n : canonical);
   }
 
   /** Get the underlying signer instance. */
