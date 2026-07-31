@@ -41,6 +41,20 @@ if (ENABLE_PRIVY) {
     appSecret: PRIVY_APP_SECRET,
   });
 
+  // The key this server authorizes wallet requests with. See setup-signer.ts for
+  // why a user-owned wallet is not signable without it.
+  const SIGNER_PUBLIC_KEY = process.env.PRIVY_SIGNER_PUBLIC_KEY;
+  const SIGNER_PRIVATE_KEY = process.env.PRIVY_SIGNER_PRIVATE_KEY;
+  if (!SIGNER_PUBLIC_KEY || !SIGNER_PRIVATE_KEY) {
+    console.error(
+      "ENABLE_PRIVY is set but PRIVY_SIGNER_PUBLIC_KEY / PRIVY_SIGNER_PRIVATE_KEY " +
+        "are missing. Run `npm run setup:signer` and add its output to .env — " +
+        "without them Privy rejects every signature with 401 'No valid " +
+        "authorization keys or user signing keys available'."
+    );
+    process.exit(1);
+  }
+
   app.get("/api/health/privy", (_, res) => res.json({ status: "ok" }));
 
   // Simple file-based wallet storage (use a real database in production)
@@ -49,6 +63,9 @@ if (ENABLE_PRIVY) {
   type UserData = {
     privyWallet: { id: string; address: string; publicKey: string };
     accounts: Record<string, { address: string; deployed: boolean }>;
+    // Owner quorum for this user's wallet. Recorded for debugging and for a
+    // future migration; not needed to sign.
+    keyQuorumId?: string;
   };
   const users = new Map<string, UserData>(
     fs.existsSync(WALLETS_FILE)
@@ -95,18 +112,47 @@ if (ENABLE_PRIVY) {
     }
 
     try {
-      // owner_id expects a cuid2 key-quorum id; to own by a Privy user pass
-      // `owner: { user_id }` with the user's DID (from the verified token).
+      // The wallet is owned by a quorum holding BOTH the user and this server's
+      // key, at threshold 1, so the user is a real owner and either party can
+      // authorize on its own.
+      //
+      // Passing `owner: { user_id: userId }` instead looks equivalent and is not:
+      // Privy then builds a quorum with `authorization_keys: []`, leaving nothing
+      // that can authorize a signature except a user signing key, which a
+      // wallet created through the API does not have. Every rawSign then fails
+      // with 401. See setup-signer.ts.
+      //
+      // Threshold 1 means this server can sign without the user's involvement,
+      // which is what makes it work today. Real user-only control needs the
+      // user's own signing key — provisioned by Privy's React/native SDKs, not
+      // available to a plain browser SDK. If that changes, the user is already a
+      // member and only the threshold has to move.
+      const quorum = await privy.keyQuorums().create({
+        // Privy caps display_name at 50 characters and a Privy DID is 34 of
+        // them, so drop the `did:privy:` prefix and clamp.
+        display_name: `starkzap ${userId.replace("did:privy:", "")}`.slice(
+          0,
+          50
+        ),
+        public_keys: [SIGNER_PUBLIC_KEY],
+        user_ids: [userId],
+        authorization_threshold: 1,
+      });
+
       const wallet = await privy.wallets().create({
         chain_type: "starknet",
-        owner: { user_id: userId },
+        owner_id: quorum.id,
       });
       const privyWallet = {
         id: wallet.id,
         address: wallet.address,
         publicKey: wallet.public_key as string,
       };
-      users.set(userId, { privyWallet, accounts: {} });
+      users.set(userId, {
+        privyWallet,
+        accounts: {},
+        keyQuorumId: quorum.id,
+      });
       saveData();
       res.json({ wallet: privyWallet, accounts: {}, isNew: true });
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -184,9 +230,15 @@ if (ENABLE_PRIVY) {
     }
 
     try {
-      const result = await privy
-        .wallets()
-        .rawSign(user.privyWallet.id, { params: { hash } });
+      const result = await privy.wallets().rawSign(user.privyWallet.id, {
+        params: { hash },
+        // Authorized by this server's key, a member of the wallet's owner
+        // quorum. The SDK signs the canonicalized request with it and sends the
+        // result as the privy-authorization-signature header.
+        authorization_context: {
+          authorization_private_keys: [SIGNER_PRIVATE_KEY],
+        },
+      });
       res.json({ signature: result.signature });
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (error: any) {
