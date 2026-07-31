@@ -77,10 +77,11 @@ function PrivyLogin() {
       const data = (await res.json()) as {
         wallet: { id: string; publicKey: string };
       };
+
       await connectPrivy({
         walletId: data.wallet.id,
         publicKey: data.wallet.publicKey,
-        accessToken: token,
+        getAccessToken,
         presetName: preset,
       });
       router.replace("/balances");

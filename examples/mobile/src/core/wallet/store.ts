@@ -135,7 +135,7 @@ interface WalletStore {
   connectPrivy: (params: {
     walletId: string;
     publicKey: string;
-    accessToken: string;
+    getAccessToken: () => Promise<string | null>;
     presetName: string;
   }) => Promise<void>;
   checkDeployment: () => Promise<void>;
@@ -296,7 +296,7 @@ export const useWalletStore = create<WalletStore>((set, get) => ({
     }
   },
 
-  connectPrivy: async ({ walletId, publicKey, accessToken, presetName }) => {
+  connectPrivy: async ({ walletId, publicKey, getAccessToken, presetName }) => {
     set({ connecting: true, error: null });
     try {
       const { sdk, paymasterNodeUrl } = buildSdk(get().networkIndex);
@@ -312,7 +312,13 @@ export const useWalletStore = create<WalletStore>((set, get) => ({
             walletId,
             publicKey,
             serverUrl: `${PRIVY_SERVER_URL}/api/privy-wallet/sign`,
-            headers: { Authorization: `Bearer ${accessToken}` },
+            headers: async () => {
+              const token = await getAccessToken();
+              if (!token) {
+                throw new Error("Privy session expired, sign in again");
+              }
+              return { Authorization: `Bearer ${token}` };
+            },
           }),
         },
       });

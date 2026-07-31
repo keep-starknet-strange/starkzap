@@ -221,6 +221,7 @@ export function connectPrivy(presetName: string): Promise<void> {
         );
       }
       const { wallet: walletData } = await res.json();
+
       const { wallet } = await sdk.onboard({
         strategy: OnboardStrategy.Privy,
         deploy: "never",
@@ -231,6 +232,13 @@ export function connectPrivy(presetName: string): Promise<void> {
             walletId: walletData.id,
             publicKey: walletData.publicKey,
             serverUrl: `${PRIVY_SERVER_URL}/api/privy-wallet/sign`,
+            headers: async () => {
+              const accessToken = await getPrivyAccessToken();
+              if (!accessToken) {
+                throw new Error("Privy session expired, sign in again");
+              }
+              return { Authorization: `Bearer ${accessToken}` };
+            },
           }),
         },
       });

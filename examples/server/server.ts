@@ -2,8 +2,6 @@ import "dotenv/config";
 import express from "express";
 import cors from "cors";
 import fs from "fs";
-import path from "path";
-import { spawn } from "child_process";
 import { PrivyClient } from "@privy-io/node";
 
 // Each feature is opt-in via an ENABLE_* flag. A flag that's off means its
@@ -11,7 +9,6 @@ import { PrivyClient } from "@privy-io/node";
 // `npm start` with no flags serves only /api/health.
 const ENABLE_PRIVY = process.env.ENABLE_PRIVY === "true";
 const ENABLE_PAYMASTER = process.env.ENABLE_PAYMASTER === "true";
-const ENABLE_PRIVACY_STACK = process.env.ENABLE_PRIVACY_STACK === "true";
 
 const app = express();
 app.use(cors());
@@ -26,66 +23,6 @@ const PROOF_BODY_LIMIT = "32mb";
 app.use("/api/paymaster", express.json({ limit: PROOF_BODY_LIMIT }));
 
 app.use(express.json());
-
-// --- Privacy proving stack (opt-in) ---
-// Set ENABLE_PRIVACY_STACK=true and PROVER_RPC_URL=<real Starknet RPC> to spawn
-// the local SNIP-36 prover (install it first with `npm run prepare:privacy-stack`).
-// PROVER_RPC_URL is renamed to STARKNET_RPC_URL for the child. PROVER_CHAIN_ID
-// (default SN_SEPOLIA) must match that RPC's network — SN_MAIN for a mainnet RPC.
-// Account/key are unused by proving, so we default them.
-if (ENABLE_PRIVACY_STACK) {
-  const STACK_DIR = path.resolve(".privacy-stack");
-  const proverBin = path.join(STACK_DIR, "bin/snip36-playground");
-  const wrapper = path.join(STACK_DIR, "scripts/run-virtual-os.sh");
-  const proverRpc = process.env.PROVER_RPC_URL;
-
-  if (!fs.existsSync(proverBin) || !fs.existsSync(wrapper)) {
-    console.error(
-      "ENABLE_PRIVACY_STACK is set but the stack is not installed. Run: npm run prepare:privacy-stack"
-    );
-    process.exit(1);
-  }
-  if (!proverRpc) {
-    console.error(
-      "ENABLE_PRIVACY_STACK is set but PROVER_RPC_URL is missing (needs a real Sepolia RPC, spec v0.8+)."
-    );
-    process.exit(1);
-  }
-
-  const proverPort = process.env.PROVER_PORT ?? "8090";
-  const proverChainId = process.env.PROVER_CHAIN_ID ?? "SN_SEPOLIA";
-  const prover = spawn(proverBin, [], {
-    env: {
-      ...process.env,
-      SNIP36_PROJECT_DIR: STACK_DIR,
-      STARKNET_RPC_URL: proverRpc, // prover expects STARKNET_RPC_URL
-      STARKNET_CHAIN_ID: proverChainId, // playground config; must match the RPC's network
-      PROVER_CHAIN_ID: proverChainId, // read by the patched run-virtual-os.sh
-      STARKNET_ACCOUNT_ADDRESS: "0x1", // required by config loader, unused by proving
-      STARKNET_PRIVATE_KEY: "0x1", // required by config loader, unused by proving
-      PORT: proverPort,
-    },
-    stdio: "inherit",
-  });
-  prover.on("error", (err) =>
-    console.error("Failed to spawn privacy prover:", err)
-  );
-  process.on("exit", () => prover.kill());
-  console.log(`Privacy proving stack spawned on :${proverPort}`);
-
-  // Forward to the locally spawned prover's own /api/health. We deliberately do
-  // NOT forward the prover's rpc_url — it echoes it and it contains the RPC key.
-  app.get("/api/health/prover", async (_, res) => {
-    try {
-      const upstream = await fetch(`http://127.0.0.1:${proverPort}/api/health`);
-      const data = (await upstream.json()) as { status?: string };
-      res.status(upstream.status).json({ status: data.status ?? "ok" });
-    } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : String(error);
-      res.status(503).json({ status: "unreachable", error: message });
-    }
-  });
-}
 
 // --- Privy embedded wallets (opt-in) ---
 // Set ENABLE_PRIVY=true with PRIVY_APP_ID + PRIVY_APP_SECRET.
@@ -220,16 +157,36 @@ if (ENABLE_PRIVY) {
     res.json({ success: true, accounts: user.accounts });
   });
 
-  // Sign a hash
-  app.post("/api/privy-wallet/sign", async (req, res) => {
+  // Sign a hash with the caller's own wallet.
+  //
+  // Authenticated, and the wallet is looked up from the verified user rather
+  // than taken from the request. A `walletId` in the body is only honoured if
+  // it matches — otherwise any caller who learned another user's wallet id
+  // could have this endpoint sign arbitrary hashes with it, which for a
+  // Starknet account means signing arbitrary transactions.
+  app.post("/api/privy-wallet/sign", auth, async (req, res) => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const userId = (req as any).userId;
     const { walletId, hash } = req.body;
-    if (!walletId || !hash)
-      return res.status(400).json({ error: "walletId and hash required" });
+
+    if (!hash) return res.status(400).json({ error: "hash required" });
+
+    const user = users.get(userId);
+    if (!user) {
+      return res
+        .status(404)
+        .json({ error: "User not found, create wallet first" });
+    }
+    if (walletId && walletId !== user.privyWallet.id) {
+      return res
+        .status(403)
+        .json({ error: "walletId does not belong to the authenticated user" });
+    }
 
     try {
       const result = await privy
         .wallets()
-        .rawSign(walletId, { params: { hash } });
+        .rawSign(user.privyWallet.id, { params: { hash } });
       res.json({ signature: result.signature });
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (error: any) {
@@ -298,7 +255,6 @@ const server = app.listen(3001, () => {
   console.log(
     `  Paymaster: ${ENABLE_PAYMASTER ? `on (${process.env.AVNU_API_KEY ? "sponsored" : "gasless"} mode)` : "off"}`
   );
-  console.log(`  Privacy:   ${ENABLE_PRIVACY_STACK ? "on" : "off"}`);
 });
 
 // Handle errors
