@@ -22,6 +22,7 @@ import {
 } from "starkzap-native";
 import { NETWORKS } from "@/core/network";
 import {
+  PRIVY_APP_ID,
   PRIVY_SERVER_URL,
   PAYMASTER_PROXY_URL,
   LAYERSWAP_API_KEY_MAINNET,
@@ -135,7 +136,15 @@ interface WalletStore {
   connectPrivy: (params: {
     walletId: string;
     publicKey: string;
+    privyApiUrl: string;
     getAccessToken: () => Promise<string | null>;
+    generateAuthorizationSignature: (input: {
+      version: 1;
+      method: "POST";
+      url: string;
+      headers: { "privy-app-id": string };
+      body: { params: { hash: string } };
+    }) => Promise<{ signature: string }>;
     presetName: string;
   }) => Promise<void>;
   checkDeployment: () => Promise<void>;
@@ -296,7 +305,14 @@ export const useWalletStore = create<WalletStore>((set, get) => ({
     }
   },
 
-  connectPrivy: async ({ walletId, publicKey, getAccessToken, presetName }) => {
+  connectPrivy: async ({
+    walletId,
+    publicKey,
+    privyApiUrl,
+    getAccessToken,
+    generateAuthorizationSignature,
+    presetName,
+  }) => {
     set({ connecting: true, error: null });
     try {
       const { sdk, paymasterNodeUrl } = buildSdk(get().networkIndex);
@@ -318,6 +334,20 @@ export const useWalletStore = create<WalletStore>((set, get) => ({
                 throw new Error("Privy session expired, sign in again");
               }
               return { Authorization: `Bearer ${token}` };
+            },
+            buildBody: async ({ walletId: signingWalletId, hash }) => {
+              const { signature } = await generateAuthorizationSignature({
+                version: 1,
+                method: "POST",
+                url: `${privyApiUrl.replace(/\/+$/, "")}/v1/wallets/${signingWalletId}/raw_sign`,
+                headers: { "privy-app-id": PRIVY_APP_ID },
+                body: { params: { hash } },
+              });
+              return {
+                walletId: signingWalletId,
+                hash,
+                authorizationSignature: signature,
+              };
             },
           }),
         },

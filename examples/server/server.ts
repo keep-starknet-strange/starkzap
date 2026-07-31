@@ -3,12 +3,19 @@ import express from "express";
 import cors from "cors";
 import fs from "fs";
 import { PrivyClient } from "@privy-io/node";
+import {
+  PrivySigningRequestError,
+  resolvePrivySigningRequest,
+} from "./privy-signing";
 
 // Each feature is opt-in via an ENABLE_* flag. A flag that's off means its
 // routes are never registered and its env vars are not required — so a plain
 // `npm start` with no flags serves only /api/health.
 const ENABLE_PRIVY = process.env.ENABLE_PRIVY === "true";
 const ENABLE_PAYMASTER = process.env.ENABLE_PAYMASTER === "true";
+const PRIVY_API_URL = (
+  process.env.PRIVY_API_BASE_URL || "https://api.privy.io"
+).replace(/\/+$/, "");
 
 const app = express();
 app.use(cors());
@@ -39,21 +46,8 @@ if (ENABLE_PRIVY) {
   const privy = new PrivyClient({
     appId: PRIVY_APP_ID,
     appSecret: PRIVY_APP_SECRET,
+    apiUrl: PRIVY_API_URL,
   });
-
-  // The key this server authorizes wallet requests with. See setup-signer.ts for
-  // why a user-owned wallet is not signable without it.
-  const SIGNER_PUBLIC_KEY = process.env.PRIVY_SIGNER_PUBLIC_KEY;
-  const SIGNER_PRIVATE_KEY = process.env.PRIVY_SIGNER_PRIVATE_KEY;
-  if (!SIGNER_PUBLIC_KEY || !SIGNER_PRIVATE_KEY) {
-    console.error(
-      "ENABLE_PRIVY is set but PRIVY_SIGNER_PUBLIC_KEY / PRIVY_SIGNER_PRIVATE_KEY " +
-        "are missing. Run `npm run setup:signer` and add its output to .env — " +
-        "without them Privy rejects every signature with 401 'No valid " +
-        "authorization keys or user signing keys available'."
-    );
-    process.exit(1);
-  }
 
   app.get("/api/health/privy", (_, res) => res.json({ status: "ok" }));
 
@@ -63,10 +57,15 @@ if (ENABLE_PRIVY) {
   type UserData = {
     privyWallet: { id: string; address: string; publicKey: string };
     accounts: Record<string, { address: string; deployed: boolean }>;
-    // Owner quorum for this user's wallet. Recorded for debugging and for a
-    // future migration; not needed to sign.
-    keyQuorumId?: string;
   };
+  interface AuthenticatedRequest extends express.Request {
+    userId: string;
+    privyAccessToken: string;
+  }
+
+  const getAuthenticatedRequest = (
+    req: express.Request
+  ): AuthenticatedRequest => req as AuthenticatedRequest;
   const users = new Map<string, UserData>(
     fs.existsSync(WALLETS_FILE)
       ? Object.entries(JSON.parse(fs.readFileSync(WALLETS_FILE, "utf-8")))
@@ -89,8 +88,9 @@ if (ENABLE_PRIVY) {
 
     try {
       const claims = await privy.utils().auth().verifyAccessToken(token);
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (req as any).userId = claims.user_id;
+      const authenticatedReq = getAuthenticatedRequest(req);
+      authenticatedReq.userId = claims.user_id;
+      authenticatedReq.privyAccessToken = token;
       next();
     } catch {
       res.status(401).json({ error: "Invalid token" });
@@ -99,8 +99,7 @@ if (ENABLE_PRIVY) {
 
   // Get or create Starknet wallet (Privy key pair)
   app.post("/api/privy-wallet/starknet", auth, async (req, res) => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const userId = (req as any).userId;
+    const { userId } = getAuthenticatedRequest(req);
 
     const existing = users.get(userId);
     if (existing) {
@@ -108,40 +107,14 @@ if (ENABLE_PRIVY) {
         wallet: existing.privyWallet,
         accounts: existing.accounts,
         isNew: false,
+        privyApiUrl: PRIVY_API_URL,
       });
     }
 
     try {
-      // The wallet is owned by a quorum holding BOTH the user and this server's
-      // key, at threshold 1, so the user is a real owner and either party can
-      // authorize on its own.
-      //
-      // Passing `owner: { user_id: userId }` instead looks equivalent and is not:
-      // Privy then builds a quorum with `authorization_keys: []`, leaving nothing
-      // that can authorize a signature except a user signing key, which a
-      // wallet created through the API does not have. Every rawSign then fails
-      // with 401. See setup-signer.ts.
-      //
-      // Threshold 1 means this server can sign without the user's involvement,
-      // which is what makes it work today. Real user-only control needs the
-      // user's own signing key — provisioned by Privy's React/native SDKs, not
-      // available to a plain browser SDK. If that changes, the user is already a
-      // member and only the threshold has to move.
-      const quorum = await privy.keyQuorums().create({
-        // Privy caps display_name at 50 characters and a Privy DID is 34 of
-        // them, so drop the `did:privy:` prefix and clamp.
-        display_name: `starkzap ${userId.replace("did:privy:", "")}`.slice(
-          0,
-          50
-        ),
-        public_keys: [SIGNER_PUBLIC_KEY],
-        user_ids: [userId],
-        authorization_threshold: 1,
-      });
-
       const wallet = await privy.wallets().create({
         chain_type: "starknet",
-        owner_id: quorum.id,
+        owner: { user_id: userId },
       });
       const privyWallet = {
         id: wallet.id,
@@ -151,20 +124,24 @@ if (ENABLE_PRIVY) {
       users.set(userId, {
         privyWallet,
         accounts: {},
-        keyQuorumId: quorum.id,
       });
       saveData();
-      res.json({ wallet: privyWallet, accounts: {}, isNew: true });
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    } catch (error: any) {
-      res.status(500).json({ error: error.message });
+      res.json({
+        wallet: privyWallet,
+        accounts: {},
+        isNew: true,
+        privyApiUrl: PRIVY_API_URL,
+      });
+    } catch (error: unknown) {
+      res.status(500).json({
+        error: error instanceof Error ? error.message : String(error),
+      });
     }
   });
 
   // Register a computed account address for a preset
   app.post("/api/privy-wallet/register-account", auth, async (req, res) => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const userId = (req as any).userId;
+    const { userId } = getAuthenticatedRequest(req);
     const { preset, address, deployed } = req.body;
 
     if (!preset || !address) {
@@ -185,8 +162,7 @@ if (ENABLE_PRIVY) {
 
   // Update deployment status for an account
   app.post("/api/privy-wallet/set-deployed", auth, async (req, res) => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const userId = (req as any).userId;
+    const { userId } = getAuthenticatedRequest(req);
     const { preset, deployed } = req.body;
 
     if (!preset) {
@@ -211,11 +187,7 @@ if (ENABLE_PRIVY) {
   // could have this endpoint sign arbitrary hashes with it, which for a
   // Starknet account means signing arbitrary transactions.
   app.post("/api/privy-wallet/sign", auth, async (req, res) => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const userId = (req as any).userId;
-    const { walletId, hash } = req.body;
-
-    if (!hash) return res.status(400).json({ error: "hash required" });
+    const { userId, privyAccessToken } = getAuthenticatedRequest(req);
 
     const user = users.get(userId);
     if (!user) {
@@ -223,26 +195,24 @@ if (ENABLE_PRIVY) {
         .status(404)
         .json({ error: "User not found, create wallet first" });
     }
-    if (walletId && walletId !== user.privyWallet.id) {
-      return res
-        .status(403)
-        .json({ error: "walletId does not belong to the authenticated user" });
-    }
 
     try {
+      const { hash, authorizationContext } = resolvePrivySigningRequest(
+        req.body,
+        user.privyWallet.id,
+        privyAccessToken
+      );
       const result = await privy.wallets().rawSign(user.privyWallet.id, {
         params: { hash },
-        // Authorized by this server's key, a member of the wallet's owner
-        // quorum. The SDK signs the canonicalized request with it and sends the
-        // result as the privy-authorization-signature header.
-        authorization_context: {
-          authorization_private_keys: [SIGNER_PRIVATE_KEY],
-        },
+        authorization_context: authorizationContext,
       });
       res.json({ signature: result.signature });
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    } catch (error: any) {
-      res.status(500).json({ error: error.message });
+    } catch (error: unknown) {
+      res
+        .status(error instanceof PrivySigningRequestError ? error.status : 500)
+        .json({
+          error: error instanceof Error ? error.message : String(error),
+        });
     }
   });
 }

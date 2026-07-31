@@ -1,11 +1,11 @@
 import "@/polyfills";
 
-import { type ReactNode } from "react";
+import { lazy, Suspense, type ReactNode } from "react";
 import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { useTheme } from "@/theme";
-import { isExpoGo } from "@/core/config";
+import { isExpoGo, PRIVY_APP_ID, PRIVY_CLIENT_ID } from "@/core/config";
 import { TxBanner } from "@/core/tx-banner/TxBanner";
 
 // AppKit (Reown) pulls native modules missing from Expo Go, so it is loaded
@@ -15,6 +15,14 @@ const AppKitHost: ((props: { children: ReactNode }) => ReactNode) | null =
     ? null
     : // eslint-disable-next-line @typescript-eslint/no-require-imports
       (require("../core/appkit") as typeof import("@/core/appkit")).AppKitHost;
+
+const PrivyProvider = isExpoGo
+  ? null
+  : lazy(() =>
+      import("@privy-io/expo").then(({ PrivyProvider }) => ({
+        default: PrivyProvider,
+      }))
+    );
 
 export default function RootLayout() {
   const { colors } = useTheme();
@@ -55,10 +63,22 @@ export default function RootLayout() {
       <StatusBar style="auto" />
     </>
   );
+  const appContent = AppKitHost ? <AppKitHost>{content}</AppKitHost> : content;
 
   return (
     <SafeAreaProvider>
-      {AppKitHost ? <AppKitHost>{content}</AppKitHost> : content}
+      {PrivyProvider && PRIVY_APP_ID ? (
+        <Suspense fallback={null}>
+          <PrivyProvider
+            appId={PRIVY_APP_ID}
+            {...(PRIVY_CLIENT_ID ? { clientId: PRIVY_CLIENT_ID } : {})}
+          >
+            {appContent}
+          </PrivyProvider>
+        </Suspense>
+      ) : (
+        appContent
+      )}
     </SafeAreaProvider>
   );
 }
