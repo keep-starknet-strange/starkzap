@@ -3,8 +3,7 @@
   "private": true,
   "scripts": {
     "start": "node --import tsx server.ts",
-    "postinstall": "cd ../.. && npm run build",
-    "setup:signer": "node --import tsx setup-signer.ts"
+    "postinstall": "cd ../.. && npm run build"
   },
   "dependencies": {
     "@privy-io/node": "^0.8.0",

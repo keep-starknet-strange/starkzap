@@ -2,14 +2,14 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { ActivityIndicator, Alert } from "react-native";
 import { router } from "expo-router";
 import {
-  PrivyProvider,
+  useAuthorizationSignature,
   usePrivy,
   useLoginWithEmail,
   useLoginWithOAuth,
 } from "@privy-io/expo";
 import { Screen, Card, Text, Button, TextField, Segmented } from "@/ui";
 import { useTheme } from "@/theme";
-import { PRIVY_APP_ID, PRIVY_CLIENT_ID, PRIVY_SERVER_URL } from "@/core/config";
+import { PRIVY_SERVER_URL } from "@/core/config";
 import {
   ACCOUNT_PRESETS,
   getSessionHint,
@@ -28,19 +28,13 @@ const PRESET_OPTIONS = [
 // modules it pulls in. Reached only from a dev/custom build.
 
 export default function PrivyScreen() {
-  return (
-    <PrivyProvider
-      appId={PRIVY_APP_ID}
-      {...(PRIVY_CLIENT_ID ? { clientId: PRIVY_CLIENT_ID } : {})}
-    >
-      <PrivyLogin />
-    </PrivyProvider>
-  );
+  return <PrivyLogin />;
 }
 
 function PrivyLogin() {
   const { colors } = useTheme();
   const { isReady, user, getAccessToken, logout } = usePrivy();
+  const { generateAuthorizationSignature } = useAuthorizationSignature();
   const { sendCode, loginWithCode } = useLoginWithEmail();
   const { login: oauthLogin } = useLoginWithOAuth();
   const connectPrivy = useWalletStore((s) => s.connectPrivy);
@@ -76,17 +70,20 @@ function PrivyLogin() {
       if (!res.ok) throw new Error(`Server ${res.status}: ${await res.text()}`);
       const data = (await res.json()) as {
         wallet: { id: string; publicKey: string };
+        privyApiUrl: string;
       };
 
       await connectPrivy({
         walletId: data.wallet.id,
         publicKey: data.wallet.publicKey,
+        privyApiUrl: data.privyApiUrl,
         getAccessToken,
+        generateAuthorizationSignature,
         presetName: preset,
       });
       router.replace("/balances");
     },
-    [getAccessToken, connectPrivy, presetName]
+    [getAccessToken, generateAuthorizationSignature, connectPrivy, presetName]
   );
 
   // Resume: if we got here from a remembered Privy login and the session is
