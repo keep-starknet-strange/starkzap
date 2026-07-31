@@ -14,6 +14,7 @@ import {
   CHAIN_ID,
   buildBridgingConfig,
   ACCOUNT_PRESETS,
+  PRIVY_APP_ID,
   PRIVY_SERVER_URL,
   AUTO_PRIVATE_KEY,
   AUTO_ACCOUNT_PRESET,
@@ -24,6 +25,7 @@ import { sdkLogger, log } from "./logger";
 import { feeOptions } from "./settings";
 import * as privacy from "~/features/privacy/store";
 import {
+  generateAuthorizationSignature,
   getAccessToken as getPrivyAccessToken,
   init as privyInit,
   loggedIn as privyLoggedIn,
@@ -220,7 +222,10 @@ export function connectPrivy(presetName: string): Promise<void> {
           err.details || err.error || "Failed to fetch Privy wallet"
         );
       }
-      const { wallet: walletData } = await res.json();
+      // `privyApiUrl` comes from the server rather than a constant here: the
+      // authorization signature covers the request URL, so both sides have to
+      // agree on it byte for byte, and the server is the one that decides it.
+      const { wallet: walletData, privyApiUrl } = await res.json();
 
       const { wallet } = await sdk.onboard({
         strategy: OnboardStrategy.Privy,
@@ -238,6 +243,26 @@ export function connectPrivy(presetName: string): Promise<void> {
                 throw new Error("Privy session expired, sign in again");
               }
               return { Authorization: `Bearer ${accessToken}` };
+            },
+            // The wallet is owned by the Privy user, so only their signature
+            // authorizes a request — the server holds no key of its own. Signing
+            // happens in the embedded-wallet iframe; the server just relays.
+            buildBody: async ({ walletId: signingWalletId, hash }) => {
+              const { signature } = await generateAuthorizationSignature({
+                version: 1,
+                method: "POST",
+                url: `${privyApiUrl.replace(
+                  /\/+$/,
+                  ""
+                )}/v1/wallets/${signingWalletId}/raw_sign`,
+                headers: { "privy-app-id": PRIVY_APP_ID! },
+                body: { params: { hash } },
+              });
+              return {
+                walletId: signingWalletId,
+                hash,
+                authorizationSignature: signature,
+              };
             },
           }),
         },
