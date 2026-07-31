@@ -33,10 +33,54 @@ async function ensureClient(): Promise<PrivyClient> {
     storage: new LocalStorage(),
   });
   await client.initialize();
+  mountEmbeddedWallet(client);
   const { user } = await client.user.get();
   loggedIn.set(!!user);
   ready.set(true);
   return client;
+}
+
+/**
+ * Mount the embedded-wallet iframe and relay messages to and from it.
+ *
+ * The user's signing key lives inside a Privy-hosted iframe, never in page
+ * scope, and that key is what authorizes wallet-API requests. React's SDK mounts
+ * the iframe for you and the Expo SDK signs natively; the vanilla browser SDK
+ * does neither, so without this any attempt to use the user's key throws
+ * "Embedded wallet proxy not initialized".
+ *
+ * Bidirectional by necessity: `setMessagePoster` gives the SDK a way to post
+ * into the iframe, and the listener feeds replies back through `onMessage`. The
+ * `event.source` check matters — without it any frame on the page could inject
+ * responses the SDK would treat as coming from Privy.
+ */
+function mountEmbeddedWallet(privy: PrivyClient): void {
+  const iframe = document.createElement("iframe");
+  iframe.src = privy.embeddedWallet.getURL();
+  iframe.style.display = "none";
+  document.body.appendChild(iframe);
+
+  // Privy's docs pass `iframe.contentWindow` straight in, but this SDK version's
+  // `EmbeddedWalletMessagePoster` also requires `reload`, and its `transfer`
+  // parameter is one Transferable where `Window.postMessage` takes an array.
+  privy.setMessagePoster({
+    postMessage: (message, targetOrigin, transfer) =>
+      iframe.contentWindow?.postMessage(
+        message,
+        targetOrigin,
+        transfer ? [transfer] : undefined
+      ),
+    reload: () => {
+      iframe.src = privy.embeddedWallet.getURL();
+    },
+  });
+
+  window.addEventListener("message", (event) => {
+    if (event.source !== iframe.contentWindow) return;
+    const data =
+      typeof event.data === "string" ? JSON.parse(event.data) : event.data;
+    privy.embeddedWallet.onMessage(data);
+  });
 }
 
 // Ping the example server's Privy health endpoint (200 only when the server has
@@ -92,6 +136,40 @@ export async function loginWithCode(email: string, otp: string): Promise<void> {
 export async function getAccessToken(): Promise<string | null> {
   const c = await ensureClient();
   return c.getAccessToken();
+}
+
+/** The wallet-API request an authorization signature covers. */
+export interface AuthorizationSignatureInput {
+  version: 1;
+  method: "POST";
+  url: string;
+  headers: { "privy-app-id": string };
+  body: { params: { hash: string } };
+}
+
+/**
+ * Sign a wallet-API request with the user's own key.
+ *
+ * The wallet is owned by the Privy user, so only their signature authorizes it —
+ * the example server holds no signing key of its own. This is the browser
+ * equivalent of `useAuthorizationSignature()` in `@privy-io/expo`, which signs
+ * natively; here the signing happens inside the embedded-wallet iframe.
+ *
+ * The signature covers the exact request the server will forward, so the caller
+ * builds the payload from the `privyApiUrl` the server reported rather than a
+ * constant — see the `buildBody` in the wallet store.
+ *
+ * @param input - The request to authorize
+ * @returns Base64 authorization signature for the server to relay
+ */
+export async function generateAuthorizationSignature(
+  input: AuthorizationSignatureInput
+): Promise<{ signature: string }> {
+  const c = await ensureClient();
+  const { generateAuthorizationSignature: sign } =
+    await import("@privy-io/js-sdk-core");
+  // The key never reaches page scope; signing happens in the iframe.
+  return sign((payload) => c.embeddedWallet.signWithUserSigner(payload), input);
 }
 
 export async function logout(): Promise<void> {
