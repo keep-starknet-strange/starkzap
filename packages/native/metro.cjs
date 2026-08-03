@@ -21,6 +21,19 @@ const NEEDS_EXPORTS = (name) =>
 const DISABLE_EXPORTS = (name) =>
   name === "isows" || name.startsWith("zustand");
 
+// Browser-only packages that starkzap core reaches through a lazy `import()`.
+// The call never runs on React Native, but Metro still walks it into the graph,
+// so the package has to at least *bundle*. @cartridge/controller cannot: it
+// drives a browser keychain (iframe/popup) and its dist carries a
+// module-federation loader that calls `import(variable)`, which Metro rejects
+// outright ("Invalid call at line 4: import(t)"). Native apps use
+// `registerCartridgeTsAdapter` instead. Stubbing keeps the graph buildable, and
+// core's own module-shape check turns the empty module into its existing
+// "Cartridge integration requires '@cartridge/controller'" error if the web
+// flow is ever called from RN.
+const WEB_ONLY = (name) =>
+  name === "@cartridge/controller" || name.startsWith("@cartridge/controller/");
+
 // Polyfills hoisted to run before the app entry (when present in the graph).
 // REQUIRED: needed by every StarkZap flow — starknet hashes an entrypoint
 //   selector via TextEncoder on every contract read/write. Warned about when
@@ -166,6 +179,10 @@ function withStarkzap(config) {
       ? moduleName.slice(5)
       : moduleName;
     if (ALL_NODE_BUILTINS.has(bare) && !hasNpmPackage.has(bare)) {
+      return { type: "empty" };
+    }
+
+    if (WEB_ONLY(moduleName)) {
       return { type: "empty" };
     }
 
