@@ -135,6 +135,7 @@
     "vitest": "^4.0.17"
   },
   "dependencies": {
+    "@starknet-io/starknet-types-0103": "npm:@starknet-io/types-js@0.10.3",
     "starknet": "^10.5.0"
   }
 }

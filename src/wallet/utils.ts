@@ -162,17 +162,7 @@ export async function preflightTransaction(
       { type: "INVOKE", payload: calls },
     ]);
 
-    // Response shape depends on the resolved starknet version: v10 returns
-    // `{ simulated_transactions }`, while v8/v9 returns a bare array.
-    const results = Array.isArray(simulation)
-      ? simulation
-      : (simulation?.simulated_transactions ?? []);
-    const revertReason = extractRevertReason(results[0]);
-    if (revertReason !== null) {
-      return { ok: false, reason: revertReason };
-    }
-
-    return { ok: true };
+    return preflightFromSimulation(simulation);
   } catch (error) {
     return {
       ok: false,
@@ -196,6 +186,29 @@ export function paymasterDetails(options: {
     ...(options.timeBounds && { timeBounds: options.timeBounds }),
     ...(options.deploymentData && { deploymentData: options.deploymentData }),
   };
+}
+
+/**
+ * Derive a preflight verdict from a raw `simulateTransaction` response.
+ *
+ * Response shape depends on the resolved starknet version: v10 returns
+ * `{ simulated_transactions }`, while v8/v9 returns a bare array. An
+ * unrecognized or empty response is treated as a pass — preflight is a
+ * best-effort revert check, so an unreadable simulation must not block a
+ * transaction that would otherwise succeed.
+ */
+export function preflightFromSimulation(simulation: unknown): PreflightResult {
+  const results = Array.isArray(simulation)
+    ? simulation
+    : isRecord(simulation)
+      ? simulation.simulated_transactions
+      : undefined;
+  const revertReason = extractRevertReason(
+    Array.isArray(results) ? results[0] : undefined
+  );
+  return revertReason !== null
+    ? { ok: false, reason: revertReason }
+    : { ok: true };
 }
 
 /**

@@ -1,4 +1,4 @@
-import { BaseWallet, Tx, fromAddress } from "starkzap";
+import { BaseWallet, Tx, fromAddress, preflightFromSimulation } from "starkzap";
 import type {
   BridgingConfig,
   ChainId,
@@ -422,22 +422,7 @@ export class NativeCartridgeWallet extends BaseWallet {
       const simulation = await simulate([
         { type: "INVOKE", payload: options.calls },
       ]);
-      const results = Array.isArray(simulation)
-        ? simulation
-        : (simulation?.simulated_transactions ?? []);
-      const first = results[0] as
-        | {
-            transaction_trace?: {
-              execute_invocation?: { revert_reason?: string };
-            };
-          }
-        | undefined;
-      const reason =
-        first?.transaction_trace?.execute_invocation?.revert_reason;
-      if (reason) {
-        return { ok: false, reason };
-      }
-      return { ok: true };
+      return preflightFromSimulation(simulation);
     } catch (error) {
       return {
         ok: false,
