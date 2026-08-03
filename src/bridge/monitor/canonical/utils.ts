@@ -1,4 +1,5 @@
-import { AbiCoder, dataSlice, type TransactionReceipt } from "ethers";
+import type { TransactionReceipt } from "ethers";
+import { requireEthers } from "@/connect/ethersRuntime";
 import { constants, hash } from "starknet";
 
 const ZERO = "0x0";
@@ -33,6 +34,9 @@ export function deriveStarknetDepositTxHash(
     return null;
   }
 
+  // Sync accessor is safe: the caller holds an ethers `TransactionReceipt`,
+  // which cannot exist unless ethers has already been loaded.
+  const { AbiCoder, dataSlice } = requireEthers("Canonical deposit monitoring");
   const decoded = AbiCoder.defaultAbiCoder().decode(
     ["uint256[]", "uint256", "uint256"],
     dataSlice(log.data)

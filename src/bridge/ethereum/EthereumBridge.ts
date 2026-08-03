@@ -18,18 +18,15 @@ import {
   type ApprovalFeeEstimation,
   type EthereumWalletConfig,
 } from "@/bridge/ethereum/types";
-import {
-  type ContractTransaction,
-  type ContractTransactionReceipt,
-  type ContractTransactionResponse,
-  getAddress,
-  isError,
-  toBigInt,
-  type TransactionRequest,
+import type {
+  ContractTransaction,
+  ContractTransactionReceipt,
+  ContractTransactionResponse,
+  TransactionRequest,
 } from "ethers";
 import { FeeErrorCause, TransactionErrorCause } from "@/types/errors";
 import type { WalletInterface } from "@/wallet";
-import { fromEthereumAddress } from "@/connect/ethersRuntime";
+import { fromEthereumAddress, loadEthers } from "@/connect/ethersRuntime";
 import { Erc20 } from "@/erc20";
 import { type StarkZapLogger } from "@/logger";
 
@@ -85,6 +82,7 @@ export abstract class EthereumBridge implements BridgeInterface<EthereumAddress>
       Date.now() - this.allowanceCache.timestamp >
       EthereumBridge.ALLOWANCE_CACHE_TTL
     ) {
+      const { getAddress } = await loadEthers("Ethereum bridge operations");
       const signerAddress = await this.config.signer.getAddress();
       const allowance = await this.token.allowance(
         fromEthereumAddress(signerAddress, { getAddress }),
@@ -147,6 +145,7 @@ export abstract class EthereumBridge implements BridgeInterface<EthereumAddress>
         tx
       )) as ContractTransactionResponse;
     } catch (e) {
+      const { isError } = await loadEthers("Ethereum bridge operations");
       if (isError(e, "ACTION_REJECTED")) {
         throw new Error(TransactionErrorCause.USER_REJECTED);
       }
@@ -214,6 +213,7 @@ export abstract class EthereumBridge implements BridgeInterface<EthereumAddress>
   protected async estimateEthereumSafeGasLimitForTx(
     tx: ContractTransaction
   ): Promise<bigint> {
+    const { toBigInt } = await loadEthers("Ethereum bridge operations");
     const estimated = await this.config.provider.estimateGas(tx);
     return (
       (estimated *

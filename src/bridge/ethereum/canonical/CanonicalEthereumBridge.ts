@@ -17,7 +17,7 @@ import {
   type ExternalTransactionResponse,
 } from "@/types";
 import { ethereumAddress } from "@/bridge/ethereum/EtherToken";
-import { type ContractTransaction, type InterfaceAbi } from "ethers";
+import type { ContractTransaction, InterfaceAbi } from "ethers";
 import { type Call, CallData, uint256 } from "starknet";
 import type { L1Message } from "@starknet-io/starknet-types-0103";
 import { FeeErrorCause } from "@/types/errors";
