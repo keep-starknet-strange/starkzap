@@ -21,13 +21,23 @@ const NEEDS_EXPORTS = (name) =>
 const DISABLE_EXPORTS = (name) =>
   name === "isows" || name.startsWith("zustand");
 
-// Polyfills that starkzap needs at runtime, injected before the app entry.
-const POLYFILLS = [
+// Polyfills hoisted to run before the app entry (when present in the graph).
+// REQUIRED: needed by every StarkZap flow — starknet hashes an entrypoint
+//   selector via TextEncoder on every contract read/write. Warned about when
+//   absent.
+// OPTIONAL: needed only by specific features, so hoisted when present but NOT
+//   warned about (avoids nagging apps that don't use them):
+//     react-native-get-random-values → Cartridge sessions, paymaster/outside-
+//       execution (SNIP-9) nonces, random key generation. Deterministic signing
+//       and reads do NOT need it, and noble already throws a clear error.
+//     buffer / @ethersproject/shims → the Ethereum/Solana bridge (ethers).
+const REQUIRED_POLYFILLS = ["fast-text-encoding"];
+const OPTIONAL_POLYFILLS = [
   "react-native-get-random-values",
-  "fast-text-encoding",
   "buffer/",
   "@ethersproject/shims",
 ];
+const POLYFILLS = [...REQUIRED_POLYFILLS, ...OPTIONAL_POLYFILLS];
 
 function resolvePolyfills(projectRoot) {
   const resolved = [];
@@ -38,11 +48,11 @@ function resolvePolyfills(projectRoot) {
       // Ignore Node built-in identifiers (e.g. "buffer") that aren't real file paths.
       if (path.isAbsolute(resolved_path)) {
         resolved.push(resolved_path);
-      } else {
+      } else if (REQUIRED_POLYFILLS.includes(mod)) {
         missing.push(mod);
       }
     } catch {
-      missing.push(mod);
+      if (REQUIRED_POLYFILLS.includes(mod)) missing.push(mod);
     }
   }
   if (missing.length > 0) {
@@ -59,10 +69,28 @@ function resolvePolyfills(projectRoot) {
 /**
  * Apply Starkzap Metro configuration.
  *
- * - Injects React Native polyfills (TextEncoder, crypto.getRandomValues, etc.)
- *   before the app entry point — no custom entrypoint file needed.
- * - Handles ESM/CJS interop for starkzap's transitive dependencies so
- *   consumers don't have to maintain package-specific resolver rules.
+ * - Handles ESM/CJS interop for starkzap's transitive dependencies (starknet,
+ *   jose, Node built-in stubbing, package `exports` quirks) so consumers don't
+ *   have to maintain package-specific resolver rules. This is the main job.
+ * - Hoists the required React Native polyfills (TextEncoder,
+ *   crypto.getRandomValues, Buffer, …) to run before the app entry.
+ *
+ * IMPORTANT: hoisting only *reorders* modules already in Metro's graph — it
+ * cannot inject them. Your app MUST still import the polyfill packages once at
+ * its entry so they enter the graph; withStarkzap then guarantees they run
+ * first. Skipping the import means starknet crashes at runtime.
+ *
+ * ```ts
+ * // app entry (e.g. index.js / root layout), before any StarkZap usage.
+ * // Required by every StarkZap flow (starknet selector encoding):
+ * import "fast-text-encoding";
+ * // Cartridge sessions / paymaster (SNIP-9) / random key generation:
+ * import "react-native-get-random-values";
+ * // Ethereum/Solana bridge only:
+ * import { Buffer } from "buffer";
+ * import "@ethersproject/shims";
+ * if (!globalThis.Buffer) globalThis.Buffer = Buffer;
+ * ```
  *
  * @example
  * ```js

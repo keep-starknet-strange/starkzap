@@ -1,5 +1,8 @@
 import type { Call } from "starknet";
-import { Account as TongoAccount } from "@fatsolutions/tongo-sdk";
+import {
+  Account as TongoAccount,
+  pubKeyBase58ToAffine,
+} from "@fatsolutions/tongo-sdk";
 import type { ConfidentialProvider } from "@/confidential/interface";
 import type { Amount } from "@/types/amount";
 import type {
@@ -71,6 +74,14 @@ export class TongoConfidential implements ConfidentialProvider {
   }
 
   /**
+   * Decode a Tongo address (base58-encoded public key, as returned by
+   * {@link address}) into the `{ x, y }` recipient used by {@link transfer}.
+   */
+  recipientFromAddress(address: string): ConfidentialRecipient {
+    return pubKeyBase58ToAffine(address.trim());
+  }
+
+  /**
    * Get the decrypted confidential account state.
    *
    * Reads the on-chain encrypted balance and decrypts it locally
@@ -111,7 +122,8 @@ export class TongoConfidential implements ConfidentialProvider {
    */
   async fund(details: ConfidentialFundDetails): Promise<Call[]> {
     const op = await this.account.fund({
-      amount: details.amount.toBase(),
+      // Tongo works in confidential units (32-bit), not ERC20 base units.
+      amount: await this.toConfidentialUnits(details.amount),
       sender: details.sender,
       ...(details.feeTo !== undefined && { fee_to_sender: details.feeTo }),
     });
@@ -125,7 +137,7 @@ export class TongoConfidential implements ConfidentialProvider {
    */
   async transfer(details: ConfidentialTransferDetails): Promise<Call[]> {
     const op = await this.account.transfer({
-      amount: details.amount.toBase(),
+      amount: await this.toConfidentialUnits(details.amount),
       to: details.to,
       sender: details.sender,
       ...(details.feeTo !== undefined && { fee_to_sender: details.feeTo }),
@@ -140,7 +152,7 @@ export class TongoConfidential implements ConfidentialProvider {
    */
   async withdraw(details: ConfidentialWithdrawDetails): Promise<Call[]> {
     const op = await this.account.withdraw({
-      amount: details.amount.toBase(),
+      amount: await this.toConfidentialUnits(details.amount),
       to: details.to,
       sender: details.sender,
       ...(details.feeTo !== undefined && { fee_to_sender: details.feeTo }),

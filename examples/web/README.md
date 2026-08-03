@@ -100,7 +100,7 @@ This grants the session permission to call `transfer` on the STRK contract. Tran
 2. A POST to `/api/user/register` creates or retrieves a Privy Starknet wallet for the given email.
 3. The server returns the wallet ID, public key, and address.
 4. The SDK calls `sdk.onboard()` with `OnboardStrategy.Privy`, passing a `resolve` callback that returns the wallet ID, public key, and signing server URL.
-5. A `PrivySigner` is created internally. All subsequent signing requests are sent to the server's `/api/wallet/sign` endpoint, which calls the Privy Node SDK to sign the hash remotely.
+5. A `PrivySigner` is created internally. All subsequent signing requests are sent to the server's `/api/privy-wallet/sign` endpoint, which calls the Privy Node SDK to sign the hash remotely.
 6. The account address is computed the same way as private key mode (public key + preset class hash).
 
 This strategy keeps the private key entirely on Privy's infrastructure. The web app never has access to it. The same new-account workflow applies: fund the address, then deploy.
@@ -161,14 +161,14 @@ npx tsx server.ts
 
 The Express server (port 3001) exposes these routes:
 
-| Endpoint                       | Method | Auth         | Description                                                                                                                                                        |
-| ------------------------------ | ------ | ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `/api/health`                  | GET    | No           | Returns `{ status: "ok" }`. Used by the web app to check if the server is reachable before attempting Privy operations.                                            |
-| `/api/wallet/starknet`         | POST   | Bearer token | Creates a new Starknet wallet via Privy or returns the existing one for the authenticated user. Returns `{ wallet: { id, address, publicKey }, accounts, isNew }`. |
-| `/api/wallet/register-account` | POST   | Bearer token | Associates a computed account address with a preset for the user. Body: `{ preset, address, deployed? }`.                                                          |
-| `/api/wallet/set-deployed`     | POST   | Bearer token | Updates the deployment status of a registered account. Body: `{ preset, deployed }`.                                                                               |
-| `/api/wallet/sign`             | POST   | No           | Signs a transaction hash using a Privy wallet. Body: `{ walletId, hash }`. Returns `{ signature }`.                                                                |
-| `/api/paymaster`               | POST   | No           | Proxies the request body to the AVNU paymaster URL, attaching the `x-paymaster-api-key` header. Returns the paymaster response as-is.                              |
+| Endpoint                             | Method | Auth         | Description                                                                                                                                                        |
+| ------------------------------------ | ------ | ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `/api/health`                        | GET    | No           | Returns `{ status: "ok" }`. Used by the web app to check if the server is reachable before attempting Privy operations.                                            |
+| `/api/privy-wallet/starknet`         | POST   | Bearer token | Creates a new Starknet wallet via Privy or returns the existing one for the authenticated user. Returns `{ wallet: { id, address, publicKey }, accounts, isNew }`. |
+| `/api/privy-wallet/register-account` | POST   | Bearer token | Associates a computed account address with a preset for the user. Body: `{ preset, address, deployed? }`.                                                          |
+| `/api/privy-wallet/set-deployed`     | POST   | Bearer token | Updates the deployment status of a registered account. Body: `{ preset, deployed }`.                                                                               |
+| `/api/privy-wallet/sign`             | POST   | No           | Signs a transaction hash using a Privy wallet. Body: `{ walletId, hash }`. Returns `{ signature }`.                                                                |
+| `/api/paymaster`                     | POST   | No           | Proxies the request body to the AVNU paymaster URL, attaching the `x-paymaster-api-key` header. Returns the paymaster response as-is.                              |
 
 Wallet data is persisted in `wallets.json` (auto-created). This is a simple file store for development -- use a real database in production.
 
