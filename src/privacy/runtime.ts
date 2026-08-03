@@ -23,12 +23,12 @@ export async function loadPrivacySdk(
     return cachedPrivacySdk;
   }
 
-  loadingPrivacySdk ??= import("@starkware-libs/starknet-privacy-sdk")
-    .then((module) => {
+  loadingPrivacySdk ??= (async () => {
+    try {
+      const module = await import("@starkware-libs/starknet-privacy-sdk");
       cachedPrivacySdk = module as unknown as PrivacySdkModule;
       return cachedPrivacySdk;
-    })
-    .catch((error) => {
+    } catch (error) {
       const detail =
         error instanceof Error && error.message
           ? ` Original error: ${error.message}`
@@ -39,10 +39,10 @@ export async function loadPrivacySdk(
           "and requires authentication `read:packages`." +
           `Requires Node >= 24.${detail}`
       );
-    })
-    .finally(() => {
+    } finally {
       loadingPrivacySdk = undefined;
-    });
+    }
+  })();
 
   return await loadingPrivacySdk;
 }
