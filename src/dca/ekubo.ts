@@ -1,5 +1,6 @@
 import { CallData, cairo, type Call } from "starknet";
 import { fromAddress, type Address, type ChainId } from "@/types";
+import { resolveFetch } from "@/utils";
 import type {
   DcaCancelRequest,
   DcaCreateRequest,
@@ -115,7 +116,7 @@ export class EkuboDcaProvider implements DcaProvider {
   constructor(options: EkuboDcaProviderOptions = {}) {
     this.apiBase = options.apiBase ?? DEFAULT_EKUBO_DCA_API_BASE;
     this.quoteApiBase = options.quoteApiBase ?? DEFAULT_EKUBO_API_BASE;
-    this.fetcher = options.fetcher ?? fetch;
+    this.fetcher = resolveFetch(options.fetcher);
     this.minTvlUsd = options.minTvlUsd ?? 0;
     this.presets = {
       SN_MAIN: {

@@ -195,14 +195,41 @@ describe("AvnuSwapProvider", () => {
     );
   });
 
-  it("falls back to second Sepolia endpoint when first has no routes", async () => {
+  it("does not fall back to the mainnet API for Sepolia (no cross-network calls)", async () => {
+    // Sepolia has no route; a mainnet fallback would build calls against the
+    // mainnet router, which is not deployed on Sepolia. Must fail on Sepolia
+    // only, never reaching the mainnet base.
+    avnuMocks.getQuotes.mockResolvedValue([]);
+
+    const provider = new AvnuSwapProvider();
+
+    await expect(
+      provider.getQuote({
+        chainId: ChainId.SEPOLIA,
+        tokenIn,
+        tokenOut,
+        amountIn: Amount.parse("1", tokenIn),
+      })
+    ).rejects.toThrow();
+
+    expect(avnuMocks.getQuotes).toHaveBeenCalledTimes(1);
+    expect(avnuMocks.getQuotes.mock.calls[0]![1]).toEqual({
+      baseUrl: "https://sepolia.api.avnu.fi",
+    });
+  });
+
+  it("still honors multiple explicit Sepolia endpoints via override", async () => {
     avnuMocks.getQuotes
       .mockResolvedValueOnce([])
       .mockResolvedValueOnce([
         makeQuote({ quoteId: "q-2", buyAmount: 1900000n }),
       ]);
 
-    const provider = new AvnuSwapProvider();
+    const provider = new AvnuSwapProvider({
+      apiBases: {
+        SN_SEPOLIA: ["https://sepolia-a.avnu.fi", "https://sepolia-b.avnu.fi"],
+      },
+    });
 
     const quote = await provider.getQuote({
       chainId: ChainId.SEPOLIA,
@@ -214,10 +241,10 @@ describe("AvnuSwapProvider", () => {
     expect(quote.amountOutBase).toBe(1900000n);
     expect(avnuMocks.getQuotes).toHaveBeenCalledTimes(2);
     expect(avnuMocks.getQuotes.mock.calls[0]![1]).toEqual({
-      baseUrl: "https://sepolia.api.avnu.fi",
+      baseUrl: "https://sepolia-a.avnu.fi",
     });
     expect(avnuMocks.getQuotes.mock.calls[1]![1]).toEqual({
-      baseUrl: "https://starknet.api.avnu.fi",
+      baseUrl: "https://sepolia-b.avnu.fi",
     });
   });
 

@@ -3,6 +3,7 @@ import type {
   EstimateFeeResponseOverhead,
   PaymasterTimeBounds,
   Signature,
+  SimulateTransactionOverheadResponse,
   TypedData,
 } from "starknet";
 
@@ -115,9 +116,11 @@ export interface CartridgeNativeAccountLike {
     }
   ) => Promise<CartridgeExecutionResult>;
   signMessage?: (typedData: TypedData) => Promise<Signature>;
+  // starknet v10 returns `{ simulated_transactions }`
+  // If older starknet is resolved, accept a bare array.
   simulateTransaction?: (
     invocations: Array<{ type: "INVOKE"; payload: Call[] }>
-  ) => Promise<unknown[]>;
+  ) => Promise<SimulateTransactionOverheadResponse | unknown[]>;
   estimateInvokeFee?: (calls: Call[]) => Promise<EstimateFeeResponseOverhead>;
 }
 

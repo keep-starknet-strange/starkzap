@@ -60,7 +60,7 @@ export function resolveAvnuApiBases(
 ): AvnuApiBases {
   return {
     SN_MAIN: overrides?.SN_MAIN ?? [sdk.BASE_URL],
-    SN_SEPOLIA: overrides?.SN_SEPOLIA ?? [sdk.SEPOLIA_BASE_URL, sdk.BASE_URL],
+    SN_SEPOLIA: overrides?.SN_SEPOLIA ?? [sdk.SEPOLIA_BASE_URL],
   };
 }
 

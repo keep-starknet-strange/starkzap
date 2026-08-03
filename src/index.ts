@@ -8,6 +8,8 @@ export type {
 // Wallet
 export { Wallet, AccountProvider, BaseWallet } from "@/wallet";
 export type { WalletInterface, WalletOptions } from "@/wallet";
+// Exported for wallet implementations outside this package (e.g. @starkzap/native).
+export { preflightFromSimulation } from "@/wallet/utils";
 
 // Transaction
 export { Tx, TxBuilder } from "@/tx";

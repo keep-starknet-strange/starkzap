@@ -56,13 +56,15 @@ vi.mock("@cartridge/controller", () => {
       type: "invoke",
       invoke: { signature: ["0xsig"] },
     }),
-    simulateTransaction: vi.fn().mockResolvedValue([
-      {
-        transaction_trace: {
-          execute_invocation: {},
+    simulateTransaction: vi.fn().mockResolvedValue({
+      simulated_transactions: [
+        {
+          transaction_trace: {
+            execute_invocation: {},
+          },
         },
-      },
-    ]),
+      ],
+    }),
     estimateInvokeFee: vi.fn().mockResolvedValue({}),
   };
   MockController.prototype.connect = vi
@@ -347,6 +349,36 @@ describe("CartridgeWallet", () => {
       });
 
       expect(result.ok).toBe(true);
+    });
+
+    it("returns the same verdict whichever response shape simulation uses", async () => {
+      const calls = [
+        { contractAddress: "0x123", entrypoint: "transfer", calldata: [] },
+      ];
+      const reverted = [
+        {
+          transaction_trace: {
+            execute_invocation: { revert_reason: "insufficient balance" },
+          },
+        },
+      ];
+
+      // The mock above returns v10's `{ simulated_transactions }`; a session
+      // account resolved against starknet v8/v9 hands back a bare array.
+      for (const simulation of [
+        { simulated_transactions: reverted },
+        reverted,
+      ]) {
+        const wallet = await CartridgeWallet.create();
+        vi.spyOn(wallet.getAccount(), "simulateTransaction").mockResolvedValue(
+          simulation as never
+        );
+
+        await expect(wallet.preflight({ calls })).resolves.toEqual({
+          ok: false,
+          reason: "insufficient balance",
+        });
+      }
     });
   });
 

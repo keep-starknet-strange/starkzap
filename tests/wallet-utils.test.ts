@@ -6,6 +6,7 @@ import {
   isPaymasterMode,
   normalizeFeeMode,
   paymasterDetails,
+  preflightFromSimulation,
 } from "@/wallet/utils";
 import { fromAddress } from "@/types";
 
@@ -237,6 +238,58 @@ describe("wallet utils", () => {
           feeMode: "sponsored",
         })
       );
+    });
+  });
+
+  describe("preflightFromSimulation", () => {
+    const reverted = (reason: unknown) => [
+      { transaction_trace: { execute_invocation: { revert_reason: reason } } },
+    ];
+    const succeeded = [{ transaction_trace: { execute_invocation: {} } }];
+
+    it("reads a revert reason from both response shapes identically", () => {
+      // v10 returns `{ simulated_transactions }`, v8/v9 a bare array.
+      expect(
+        preflightFromSimulation({ simulated_transactions: reverted("boom") })
+      ).toEqual({ ok: false, reason: "boom" });
+      expect(preflightFromSimulation(reverted("boom"))).toEqual({
+        ok: false,
+        reason: "boom",
+      });
+    });
+
+    it("passes a successful simulation in both response shapes", () => {
+      expect(
+        preflightFromSimulation({ simulated_transactions: succeeded })
+      ).toEqual({ ok: true });
+      expect(preflightFromSimulation(succeeded)).toEqual({ ok: true });
+    });
+
+    it("reports a failure when revert_reason is present but not a string", () => {
+      // An empty string is still a revert; only absence means success.
+      expect(preflightFromSimulation(reverted(""))).toEqual({
+        ok: false,
+        reason: "",
+      });
+      expect(preflightFromSimulation(reverted({ nested: true }))).toEqual({
+        ok: false,
+        reason: "Simulation failed",
+      });
+    });
+
+    it("passes unreadable responses rather than blocking the transaction", () => {
+      for (const simulation of [
+        undefined,
+        null,
+        {},
+        [],
+        { simulated_transactions: [] },
+        { simulated_transactions: "not-an-array" },
+        [{ no_trace: true }],
+        [{ transaction_trace: { execute_invocation: "nope" } }],
+      ]) {
+        expect(preflightFromSimulation(simulation)).toEqual({ ok: true });
+      }
     });
   });
 });

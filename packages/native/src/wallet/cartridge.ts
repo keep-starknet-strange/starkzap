@@ -1,4 +1,4 @@
-import { BaseWallet, Tx, fromAddress } from "starkzap";
+import { BaseWallet, Tx, fromAddress, preflightFromSimulation } from "starkzap";
 import type {
   BridgingConfig,
   ChainId,
@@ -246,9 +246,11 @@ class NativeCartridgeAccount extends Account {
     if (!this.session.account.simulateTransaction) {
       throw unsupportedSessionFeature("simulateTransaction");
     }
-    return this.session.account.simulateTransaction(
-      invocations
-    ) as Promise<SimulateTransactionOverheadResponse>;
+    const res = await this.session.account.simulateTransaction(invocations);
+    // Normalize the legacy bare-array shape to v10's object shape.
+    return (
+      Array.isArray(res) ? { simulated_transactions: res } : res
+    ) as SimulateTransactionOverheadResponse;
   }
 
   override async signMessage(typedData: TypedData): Promise<Signature> {
@@ -420,19 +422,7 @@ export class NativeCartridgeWallet extends BaseWallet {
       const simulation = await simulate([
         { type: "INVOKE", payload: options.calls },
       ]);
-      const first = simulation[0] as
-        | {
-            transaction_trace?: {
-              execute_invocation?: { revert_reason?: string };
-            };
-          }
-        | undefined;
-      const reason =
-        first?.transaction_trace?.execute_invocation?.revert_reason;
-      if (reason) {
-        return { ok: false, reason };
-      }
-      return { ok: true };
+      return preflightFromSimulation(simulation);
     } catch (error) {
       return {
         ok: false,

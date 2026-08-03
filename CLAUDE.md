@@ -143,4 +143,5 @@ DO NOT modify manually:
 - `skills/integration-testing.md`
 - `skills/presets-regeneration.md`
 - `skills/docs-export.md`
+- `skills/starknet-upgrade.md`
 </skills>
