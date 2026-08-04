@@ -452,9 +452,69 @@ describe("privacy", () => {
       });
     });
 
-    it("translates privacy error codes into actionable messages", async () => {
+    /** Reject with a payload captured verbatim from AVNU's live paymaster. */
+    function rejectWith(error: unknown) {
+      stubFetch({ error });
+      return new PrivacyPaymaster(URL).quote(POOL, { mode: "sponsored" }).then(
+        () => {
+          throw new Error("expected the paymaster call to reject");
+        },
+        (e: unknown) => e as PrivacyPaymasterError
+      );
+    }
+
+    it("surfaces the reason from an object-shaped `data`", async () => {
+      // Captured from a build against a non-whitelisted pool. The sentence that
+      // names the mistake is inside `data.execution_error`, not `message` —
+      // reading only the string form of `data` loses it entirely.
+      const error = await rejectWith({
+        code: 156,
+        message: "An error occurred (TRANSACTION_EXECUTION_ERROR)",
+        data: { execution_error: "privacy pool address is not whitelisted" },
+      });
+
+      expect(error).toBeInstanceOf(PrivacyPaymasterError);
+      expect(error.code).toBe(156);
+      expect(error.message).toContain(
+        "privacy pool address is not whitelisted"
+      );
+      // The paymaster's own wording is kept alongside, never replaced by ours.
+      expect(error.message).toContain("TRANSACTION_EXECUTION_ERROR");
+    });
+
+    it("surfaces the reason from a string `data`", async () => {
+      // Captured from a sponsored build with no API key. `163` is SNIP-29's
+      // catch-all: it also covers an unavailable service and a blacklisted
+      // call, so only `data` can say which happened.
+      const error = await rejectWith({
+        code: 163,
+        message: "An error occurred (UNKNOWN_ERROR)",
+        data: "x-paymaster-api-key is invalid",
+      });
+
+      expect(error.message).toContain("x-paymaster-api-key is invalid");
+      expect(error.message).toContain("UNKNOWN_ERROR");
+    });
+
+    it("reports a rejection that carries no `data` at all", async () => {
+      // Captured from an execute with unparseable calldata. `message` is all
+      // there is, so it has to come through untouched.
+      const error = await rejectWith({
+        code: 166,
+        message: "An error occurred (CALLDATA_PARSING)",
+      });
+
+      expect(error.message).toContain("CALLDATA_PARSING");
+      // No empty separator left behind by the missing reason.
+      expect(error.message).not.toContain("—");
+    });
+
+    it("adds advice only where the fix is on starkzap's side", async () => {
       stubFetch({
-        error: { code: 167, message: "POOL_FEE_TOO_LOW", data: "need more" },
+        error: {
+          code: 165,
+          message: "An error occurred (MISSING_FEE_TRANSFER_TO)",
+        },
       });
 
       const error = await new PrivacyPaymaster(URL)
@@ -470,18 +530,29 @@ describe("privacy", () => {
           (e: unknown) => e as PrivacyPaymasterError
         );
 
-      expect(error).toBeInstanceOf(PrivacyPaymasterError);
-      expect(error.code).toBe(167);
-      expect(error.message).toContain("less than the quoted pool fee");
-      expect(error.message).toContain("need more");
+      expect(error.message).toContain("MISSING_FEE_TRANSFER_TO");
+      expect(error.message).toContain("`quote()`");
     });
 
-    it("keeps the raw message for codes it does not know", async () => {
-      stubFetch({ error: { code: -32601, message: "Method not found" } });
+    it("does not attach an execute remedy to a build rejection", async () => {
+      // `165` is an execute-only code, and the same number does not mean the
+      // same thing on both calls — so advice is keyed by method, not by number.
+      const error = await rejectWith({
+        code: 165,
+        message: "An error occurred (SOMETHING_ELSE)",
+      });
 
-      await expect(
-        new PrivacyPaymaster(URL).quote(POOL, { mode: "sponsored" })
-      ).rejects.toThrow("Method not found");
+      expect(error.message).toContain("SOMETHING_ELSE");
+      expect(error.message).not.toContain("quote()");
+    });
+
+    it("passes an unrecognised rejection straight through", async () => {
+      const error = await rejectWith({
+        code: -32601,
+        message: "Method not found",
+      });
+
+      expect(error.message).toContain("Method not found");
     });
 
     it("names the proxy body limit on a 413, since proofs are megabytes", async () => {
@@ -1017,14 +1088,19 @@ describe("privacy", () => {
                         },
                       },
                     }
-                  : { error: { code: 167, message: "POOL_FEE_TOO_LOW" } }
+                  : {
+                      error: {
+                        code: 167,
+                        message: "An error occurred (POOL_FEE_TOO_LOW)",
+                      },
+                    }
               ),
           } as Response);
         })
       );
 
       await expect(privacy.send((b) => b.register())).rejects.toThrow(
-        "less than the quoted pool fee"
+        "POOL_FEE_TOO_LOW"
       );
       // A failed invocation leaves a cached nonce that would poison the retry.
       expect(invalidate).toHaveBeenCalled();
