@@ -795,6 +795,11 @@ describe("privacy", () => {
       );
       const provider = {
         getBlockNumber: vi.fn().mockResolvedValue(head),
+        // Defaults to landing in the block that was the head at submit time.
+        // Tests that care about the gap between the two override it.
+        waitForTransaction: vi
+          .fn()
+          .mockResolvedValue({ block_number: head, isError: () => false }),
       } as unknown as RpcProvider;
 
       const bind = async (fee = { mode: "sponsored" } as const) =>
@@ -941,6 +946,38 @@ describe("privacy", () => {
       expect(attempts).toEqual([false, true]);
     });
 
+    it("proves against a block that includes the previous send, not the head it was submitted at", async () => {
+      // The head read at submit time precedes the block the transaction lands
+      // in, so counting from it can pick a proving block *before* the previous
+      // send — a proof that still believes those notes are unspent, which the
+      // pool rejects. The SDK's own recipe counts from `receipt.block_number`.
+      const { provider, env: sdkEnv, bind } = env(500);
+      paymasterStub("0x0", `0x${BigInt(sdkEnv.ace).toString(16)}`);
+      const privacy = await bind();
+
+      await privacy.send((b) => b.register());
+
+      // Submitted while the head was 500; the relayer landed it at 504.
+      const LANDED_AT = 504;
+      vi.mocked(provider.waitForTransaction).mockResolvedValue({
+        block_number: LANDED_AT,
+        isError: () => false,
+      } as never);
+      // At head 511, counting from 500 yields 501 — before the transaction
+      // landed. Counting from 504 has to keep waiting, and lands on 505.
+      vi.mocked(provider.getBlockNumber)
+        .mockResolvedValueOnce(511)
+        .mockResolvedValue(515);
+
+      const build = vi.spyOn(privacy.transfers, "build");
+      await privacy.send((b) => b.register());
+
+      const { provingBlockId } = build.mock.calls[0]![0] as {
+        provingBlockId: number;
+      };
+      expect(provingBlockId).toBeGreaterThan(LANDED_AT);
+    });
+
     it("honours an explicit proving block without touching the chain head", async () => {
       const { provider, env: sdkEnv, bind } = env();
       paymasterStub("0x0", `0x${BigInt(sdkEnv.ace).toString(16)}`);
@@ -949,9 +986,9 @@ describe("privacy", () => {
 
       await privacy.send((b) => b.register(), { provingBlockId: 42 });
 
-      // Still read once after submitting, to seed the next wait — but never to
-      // choose the proving block.
-      expect(provider.getBlockNumber).toHaveBeenCalledTimes(1);
+      // Not read at all: the caller chose the block, and the next send seeds
+      // its wait from this transaction's receipt rather than from the head.
+      expect(provider.getBlockNumber).toHaveBeenCalledTimes(0);
     });
 
     it("clears the stale pool nonce when submission fails", async () => {
