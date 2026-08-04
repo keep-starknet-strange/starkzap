@@ -52,16 +52,26 @@ export interface PrivacyFeeQuote {
   parameters: unknown;
 }
 
-/** Errors the paymaster returns for privacy-specific failures. */
-const PRIVACY_ERRORS: Record<number, string> = {
-  161: "the privacy pool is not whitelisted by this paymaster",
-  162: "the call's selector is not `apply_actions`",
-  163: "the paymaster rejected the request (usually a missing or invalid API key)",
-  164: "this paymaster does not allow user calls alongside a pool action",
-  165: "the proof is missing the fee withdrawal the paymaster asked for",
-  166: "the paymaster could not parse the call's calldata",
-  167: "the fee withdrawn in the proof is less than the quoted pool fee",
-  168: "`sponsored_private` is only valid for private transactions",
+/**
+ * Advice to append to a rejection, for the codes whose fix lies on *this* side
+ * of the boundary — the paymaster cannot know about `quote()`.
+ *
+ * Keyed by method, because the same number means different things on the two
+ * calls: AVNU's `168` is a fee-mode error when building and a missing proof
+ * when executing. Nothing here restates or replaces what the paymaster said;
+ * its own wording is always reported verbatim.
+ *
+ * Deliberately tiny. Writing a sentence for a code whose meaning was assumed
+ * rather than checked is how this map previously came to describe rejections
+ * that AVNU does not emit at all.
+ */
+const REMEDIES: Record<string, Record<number, string>> = {
+  paymaster_executeTransaction: {
+    // MISSING_FEE_TRANSFER_TO
+    165: "Append the `feeAction` from `quote()` as a withdrawal before proving.",
+    // POOL_FEE_TOO_LOW
+    167: "The pool fee moved after this proof was built — quote and prove again.",
+  },
 };
 
 /** JSON-RPC error body, as returned by the paymaster. */
@@ -80,11 +90,33 @@ function isRpcErrorBody(value: unknown): value is RpcErrorBody {
 }
 
 /**
+ * The human-readable reason out of a JSON-RPC error's `data`.
+ *
+ * The paymaster's `message` is only ever the error's name, e.g. `An error
+ * occurred (TRANSACTION_EXECUTION_ERROR)`. What actually went wrong is in
+ * `data`, either as a bare string (`"x-paymaster-api-key is invalid"`) or
+ * wrapped for SNIP-29's execution errors (`{ execution_error: "privacy pool
+ * address is not whitelisted" }`). Reading only the string form drops the
+ * sentence that names the most common misconfiguration.
+ */
+function reasonFrom(data: unknown): string | undefined {
+  if (typeof data === "string") return data || undefined;
+  if (typeof data !== "object" || data === null) return undefined;
+
+  const { execution_error: reason } = data as { execution_error?: unknown };
+  return typeof reason === "string" && reason ? reason : undefined;
+}
+
+/**
  * Error thrown when the paymaster rejects a request.
  *
- * Carries the JSON-RPC code so callers can branch — 167 and 165 mean the proof
- * and the quote disagreed and a retry may help, while 161 and 168 are
- * configuration mistakes that will fail identically forever.
+ * `message` is the paymaster's own, with the reason from its `data` appended.
+ * `code` and `data` are passed through untouched so callers can branch.
+ *
+ * Branch on the *method and code together*, not the number alone: the
+ * privacy-specific codes are AVNU's rather than SNIP-29's, and the same number
+ * carries different meanings across `paymaster_buildTransaction` and
+ * `paymaster_executeTransaction`.
  */
 export class PrivacyPaymasterError extends Error {
   constructor(
@@ -254,13 +286,16 @@ export class PrivacyPaymaster {
       const rpc = isRpcErrorBody(error)
         ? error
         : { code: -1, message: String(error) };
-      const known = PRIVACY_ERRORS[rpc.code];
-      const detail = typeof rpc.data === "string" ? ` (${rpc.data})` : "";
+      // The paymaster's own words first, and never replaced: it knows why it
+      // rejected the request and we do not. Ours is only ever appended.
+      const reported = [rpc.message, reasonFrom(rpc.data)]
+        .filter(Boolean)
+        .join(" — ");
+      const remedy = REMEDIES[method]?.[rpc.code];
       throw new PrivacyPaymasterError(
         rpc.code,
-        `[starkzap] Privacy paymaster rejected ${method} with code ${rpc.code}: ${
-          known ?? rpc.message
-        }${detail}`,
+        `[starkzap] Privacy paymaster rejected ${method} (code ${rpc.code}): ` +
+          `${reported}${remedy ? ` ${remedy}` : ""}`,
         rpc.data
       );
     }
