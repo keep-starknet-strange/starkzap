@@ -15,7 +15,6 @@ import {
   type PrivacyTip,
 } from "@/privacy/paymaster";
 import {
-  PROOF_BASE_BLOCK_DEPTH,
   waitForProvableBlock,
   type ProvableAttempt,
 } from "@/privacy/sequencing";
@@ -147,29 +146,38 @@ export function withPaymaster(
   const paymaster = new PrivacyPaymaster(binding.paymasterUrl);
   const pool = fromAddress(binding.poolContractAddress);
 
-  // Block of this client's most recent submission. A proof must read pool state
+  // Hash of this client's most recent submission. A proof must read pool state
   // that already includes it, otherwise the next transaction spends notes the
   // proof still believes are unspent, and the pool rejects it. Tracked here so
-  // callers do not have to. The head is a conservative stand-in for the block
-  // the transaction actually landed in, which saves waiting on a receipt.
-  let submittedAt: number | undefined;
+  // callers do not have to.
+  let lastSubmittedTxHash: string | undefined;
 
   const quote = (): Promise<PrivacyFeeQuote> =>
     paymaster.quote(pool, binding.fee, binding.tip);
+
+  /** Block the previous send landed in, or -1 when there is nothing to age. */
+  async function previousBlock(): Promise<number> {
+    if (lastSubmittedTxHash === undefined) return -1;
+
+    // `errorStates: []` so a reverted previous transaction does not fail *this*
+    // send: it still occupies a block, and ageing that block is harmless.
+    const receipt = await binding.provider.waitForTransaction(
+      lastSubmittedTxHash,
+      {
+        errorStates: [],
+      }
+    );
+    return receipt.isError() ? -1 : receipt.block_number;
+  }
 
   async function resolveProvingBlock(
     options?: PrivacySendOptions
   ): Promise<number> {
     if (options?.provingBlockId !== undefined) return options.provingBlockId;
 
-    if (submittedAt !== undefined) {
-      return waitForProvableBlock(binding.provider, submittedAt, {
-        ...(options?.onWait && { onAttempt: options.onWait }),
-      });
-    }
-
-    const head = await binding.provider.getBlockNumber();
-    return head - PROOF_BASE_BLOCK_DEPTH;
+    return waitForProvableBlock(binding.provider, await previousBlock(), {
+      ...(options?.onWait && { onAttempt: options.onWait }),
+    });
   }
 
   async function submit(callAndProof: CallAndProof): Promise<string> {
@@ -181,7 +189,7 @@ export function withPaymaster(
         // server-chosen fields (tip, time bounds) that must be echoed back.
         (await quote()).parameters
       );
-      submittedAt = await binding.provider.getBlockNumber();
+      lastSubmittedTxHash = hash;
       return hash;
     } catch (error) {
       // The pool nonce baked into a failed invocation is now stale. Clearing it
