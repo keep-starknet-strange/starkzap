@@ -47,11 +47,16 @@ export interface PrivacyConfig {
   /**
    * Enable OHTTP envelope encryption for the discovery and proving services.
    *
-   * Without it the viewing key travels to those services in plaintext (inside
-   * TLS, but readable by the service operator). Pass `true` for defaults, or
-   * an object to pin a key config or route through a relay.
+   * Without it the viewing key travels to both services in plaintext (inside
+   * TLS, but readable by the service operator). Pass `true` for defaults, or an
+   * object to pin a key config or route through a relay.
    *
-   * Ignored when `prover` is an instance — the instance owns its transport.
+   * Ignored for whichever of `prover` / `discovery` is given as an instance —
+   * an instance owns its own transport.
+   *
+   * Both services have to support OHTTP. Against one that does not, the SDK's
+   * `GET /ohttp-keys` fetch fails and calls throw, so leave this unset rather
+   * than aim it at a plaintext deployment.
    */
   ohttp?: OhttpOption;
   /**
@@ -224,7 +229,11 @@ export async function createPrivacy(
         : config.prover,
     discoveryProvider:
       typeof config.discovery === "string"
-        ? { url: config.discovery }
+        ? new sdk.IndexerDiscoveryProvider(
+            config.discovery,
+            config.poolContractAddress,
+            { ...(config.ohttp !== undefined && { ohttp: config.ohttp }) }
+          )
         : config.discovery,
     ...(config.proofInvocationFactory !== undefined && {
       proofInvocationFactory: config.proofInvocationFactory,

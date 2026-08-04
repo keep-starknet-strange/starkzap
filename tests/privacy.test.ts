@@ -726,6 +726,66 @@ describe("privacy", () => {
         createPrivacy(wallet, { ...config, discovery: "not a url" })
       ).rejects.toThrow("Privacy discovery service URL must be a valid URL");
     });
+
+    /**
+     * Discovery is the only service the viewing key is ever sent to, so it is
+     * the one that most needs the OHTTP envelope. An OHTTP-enabled provider
+     * fetches the server's HPKE key config from `GET /ohttp-keys` before it
+     * will send anything, which makes the envelope observable from outside.
+     */
+    describe("ohttp", () => {
+      /** Records every URL fetched, and fails the key-config fetch. */
+      function recordFetches(): string[] {
+        const urls: string[] = [];
+        vi.stubGlobal(
+          "fetch",
+          vi.fn((input: unknown) => {
+            urls.push(String(input));
+            return Promise.resolve({
+              ok: false,
+              status: 503,
+              json: () => Promise.reject(new Error("not json")),
+              arrayBuffer: () => Promise.reject(new Error("no body")),
+            } as unknown as Response);
+          })
+        );
+        return urls;
+      }
+
+      afterEach(() => {
+        vi.unstubAllGlobals();
+      });
+
+      async function discoverWith(ohttp: boolean | undefined) {
+        const urls = recordFetches();
+        const transfers = await createPrivacy(
+          walletWith(new StarkSigner(testPrivateKeys.key1)),
+          {
+            ...config,
+            discovery: "https://discovery.example.com",
+            ...(ohttp !== undefined && { ohttp }),
+          }
+        );
+        // The stubbed transport fails; only the attempted URLs matter.
+        await transfers.discoverNotes().catch(() => undefined);
+        return urls;
+      }
+
+      it("wraps the discovery service when enabled", async () => {
+        const urls = await discoverWith(true);
+
+        expect(urls.some((u) => u.includes("/ohttp-keys"))).toBe(true);
+      });
+
+      it("talks to the discovery service directly when not enabled", async () => {
+        const urls = await discoverWith(undefined);
+
+        expect(urls.some((u) => u.includes("/ohttp-keys"))).toBe(false);
+        expect(urls.some((u) => u.includes("discovery.example.com"))).toBe(
+          true
+        );
+      });
+    });
   });
 
   describe("against the SDK's mocks", () => {
