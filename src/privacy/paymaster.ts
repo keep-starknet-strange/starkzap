@@ -33,8 +33,8 @@ export type PrivacyFeeMode =
   | { mode: "sponsored_private"; poolFeeToken: Address };
 
 /**
- * Transaction priority. The paymaster's own schema and its published SDK
- * disagree on the accepted values, so this stays optional and unset by default.
+ * Transaction priority. AVNU's build API documents `slow | normal | fast`, and
+ * fills in `normal` when it is omitted.
  */
 export type PrivacyTip = "slow" | "normal" | "fast";
 
@@ -102,10 +102,42 @@ export interface PrivacyFeeAction {
   amount: bigint;
 }
 
+/**
+ * What the paymaster reckons the *gas* will cost, alongside the fee.
+ *
+ * Gas, not your fee — the two coincide only in `default` mode, where the
+ * withdrawal is sized at `suggestedMaxInGasToken`. Under the sponsored modes the
+ * relayer pays the gas and the withdrawal is a separate flat pool fee, so these
+ * figures are informational there.
+ *
+ * The pair worth showing a user is the estimate against the suggested maximum:
+ * the gap is headroom they pay for and may not use, and it is wide.
+ */
+export interface PrivacyGasQuote {
+  /** What the paymaster expects the transaction to cost, in STRK. */
+  estimatedInStrk: bigint;
+  /** The upper bound it charges against instead of the estimate, in STRK. */
+  suggestedMaxInStrk: bigint;
+  /** The same estimate, in the gas token chosen for `default` mode. */
+  estimatedInGasToken: bigint;
+  /** The same upper bound, in that gas token. This is what `default` withdraws. */
+  suggestedMaxInGasToken: bigint;
+  /** What the paymaster valued one gas token at, in STRK. */
+  gasTokenPriceInStrk: bigint;
+}
+
 /** What the build step returns. */
 export interface PrivacyFeeQuote {
   /** The withdrawal to append to the proof's action list. */
   feeAction: PrivacyFeeAction;
+  /**
+   * Gas figures from the same response, or `undefined` when the deployment
+   * omits them or reports them in a shape this cannot read.
+   *
+   * Never fatal: these are for display, so a malformed figure loses the display
+   * rather than the transaction.
+   */
+  gas?: PrivacyGasQuote;
   /**
    * Execution parameters to hand back to {@link PrivacyPaymaster.execute}
    * verbatim. The spec says to echo these rather than rebuild them, so a
@@ -192,17 +224,6 @@ export class PrivacyPaymasterError extends Error {
 }
 
 /**
- * Minimal client for a privacy-capable paymaster.
- *
- * The privacy transaction types (`apply_action`) are not part of SNIP-29, so
- * starknet.js's `PaymasterRpc` cannot express them. Its executable transaction
- * union has no field for a proof. This talks to the paymaster's JSON-RPC
- * endpoint directly instead.
- *
- * Point `url` at a proxy that holds the API key, never at the paymaster with the
- * key in the browser. `default` mode needs no key at all.
- */
-/**
  * Read the paymaster's fee action, validating rather than trusting it.
  *
  * This is a trust boundary. The response decides which address receives how much
@@ -246,12 +267,68 @@ function parseFeeAction(
 }
 
 /**
+ * Read the gas block, or give up on it quietly.
+ *
+ * Display-only, so a deployment that omits it or words it differently costs the
+ * figures and nothing else. Throwing here would fail a transaction over a number
+ * that was never going to be spent.
+ */
+function parseGasQuote(fee: unknown): PrivacyGasQuote | undefined {
+  if (typeof fee !== "object" || fee === null) return undefined;
+
+  const raw = fee as Record<string, unknown>;
+  const felt = (key: string): bigint | undefined => {
+    const value = raw[key];
+    if (typeof value !== "string" && typeof value !== "number")
+      return undefined;
+    try {
+      return BigInt(value);
+    } catch {
+      return undefined;
+    }
+  };
+
+  const estimatedInStrk = felt("estimated_fee_in_strk");
+  const suggestedMaxInStrk = felt("suggested_max_fee_in_strk");
+  const estimatedInGasToken = felt("estimated_fee_in_gas_token");
+  const suggestedMaxInGasToken = felt("suggested_max_fee_in_gas_token");
+  const gasTokenPriceInStrk = felt("gas_token_price_in_strk");
+
+  if (
+    estimatedInStrk === undefined ||
+    suggestedMaxInStrk === undefined ||
+    estimatedInGasToken === undefined ||
+    suggestedMaxInGasToken === undefined ||
+    gasTokenPriceInStrk === undefined
+  ) {
+    return undefined;
+  }
+
+  return {
+    estimatedInStrk,
+    suggestedMaxInStrk,
+    estimatedInGasToken,
+    suggestedMaxInGasToken,
+    gasTokenPriceInStrk,
+  };
+}
+
+/**
  * Minimal client for a privacy-capable paymaster.
  *
  * The privacy transaction types (`apply_action`) are not part of SNIP-29, so
  * starknet.js's `PaymasterRpc` cannot express them. Its executable transaction
  * union has no field for a proof. This talks to the paymaster's JSON-RPC
  * endpoint directly instead.
+ *
+ * `@avnu/avnu-sdk` covers some of the same ground, and the shapes here —
+ * {@link PrivacyTip}, {@link PrivacyFeeAction} — deliberately mirror it rather
+ * than import from it. It is an optional peer so the swap SDK stays out of the
+ * dependency graph of anyone who only wants privacy, and importing even its
+ * *types* would make it required in order to typecheck against starkzap's own.
+ * Its privacy surface is swap-shaped and models `sponsored_private` alone, so it
+ * cannot express the no-API-key mode either. A dozen duplicated declarations is
+ * the cheaper side of that trade — do not "fix" it by adding the import.
  *
  * Point `url` at a proxy that holds the API key, never at the paymaster with the
  * key in the browser. `default` mode needs no key at all.
@@ -281,7 +358,8 @@ export class PrivacyPaymaster {
    * @param poolAddress - Privacy pool the transaction targets
    * @param feeMode - How the fee is paid
    * @param tip - Optional priority
-   * @returns The fee to include, and the parameters to echo back on execute
+   * @returns The fee to include, the gas figures behind it, and the parameters
+   *   to echo back on execute
    */
   async quote(
     poolAddress: Address,
@@ -290,6 +368,7 @@ export class PrivacyPaymaster {
   ): Promise<PrivacyFeeQuote> {
     const result = await this.send<{
       fee_action?: { recipient: string; token: string; amount: string };
+      fee?: unknown;
       parameters?: unknown;
     }>("paymaster_buildTransaction", {
       transaction: {
@@ -308,8 +387,10 @@ export class PrivacyPaymaster {
       );
     }
 
+    const gas = parseGasQuote(result.fee);
     return {
       feeAction: parseFeeAction(action, this.maxFee),
+      ...(gas && { gas }),
       // Echoed back verbatim; falls back to a locally built copy if the service
       // omits them, which older deployments do.
       parameters: result.parameters ?? this.parameters(feeMode, tip),
