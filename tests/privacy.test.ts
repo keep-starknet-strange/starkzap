@@ -363,9 +363,13 @@ describe("privacy", () => {
         gasToken: STRK,
       });
 
+      // Validated on the way in, which also normalises: `fromAddress` pads to
+      // the canonical 64 hex digits, the same form every other address in
+      // starkzap carries. Numerically identical, since the SDK compares
+      // addresses as felts.
       expect(quote.feeAction).toEqual({
-        recipient: "0x75a1",
-        token: STRK,
+        recipient: fromAddress("0x75a1"),
+        token: fromAddress(STRK),
         amount: 0xe06f18c4533e7800n,
       });
       // Echoed back rather than rebuilt, so a field the service adds survives.
@@ -597,6 +601,74 @@ describe("privacy", () => {
       await expect(
         new PrivacyPaymaster(URL).quote(POOL, { mode: "sponsored" })
       ).rejects.toThrow("returned no fee action");
+    });
+
+    /**
+     * The response decides which address receives how much of the caller's
+     * shielded balance, and the proof then commits to it — so it is validated
+     * on the way in rather than cast and trusted.
+     */
+    describe("fee action validation", () => {
+      const feeAction = (over: Record<string, string>) => ({
+        result: {
+          fee_action: {
+            recipient: "0x75a1",
+            token: "0x1",
+            amount: "0xa",
+            ...over,
+          },
+          parameters: {},
+        },
+      });
+
+      it("rejects a recipient that is not an address", async () => {
+        stubFetch(feeAction({ recipient: "not-an-address" }));
+
+        await expect(
+          new PrivacyPaymaster(URL).quote(POOL, { mode: "sponsored" })
+        ).rejects.toThrow("fee action starkzap cannot use");
+      });
+
+      it("rejects an amount that is not a number", async () => {
+        // Would otherwise surface as a bare BigInt SyntaxError from inside a
+        // quote, naming neither the paymaster nor the field.
+        stubFetch(feeAction({ amount: "twelve" }));
+
+        await expect(
+          new PrivacyPaymaster(URL).quote(POOL, { mode: "sponsored" })
+        ).rejects.toThrow("fee action starkzap cannot use");
+      });
+
+      it("rejects a fee above the configured ceiling", async () => {
+        stubFetch(feeAction({ amount: "0xb" }));
+
+        await expect(
+          new PrivacyPaymaster(URL, { maxFee: 10n }).quote(POOL, {
+            mode: "sponsored",
+          })
+        ).rejects.toThrow(
+          /quoted a fee of 11 base units .*above the 10 ceiling/
+        );
+      });
+
+      it("allows a fee exactly at the ceiling", async () => {
+        stubFetch(feeAction({ amount: "0xa" }));
+
+        const { feeAction: action } = await new PrivacyPaymaster(URL, {
+          maxFee: 10n,
+        }).quote(POOL, { mode: "sponsored" });
+        expect(action.amount).toBe(10n);
+      });
+
+      it("has no ceiling unless one is configured", async () => {
+        stubFetch(feeAction({ amount: "0xde0b6b3a7640000" }));
+
+        const { feeAction: action } = await new PrivacyPaymaster(URL).quote(
+          POOL,
+          { mode: "sponsored" }
+        );
+        expect(action.amount).toBe(1_000_000_000_000_000_000n);
+      });
     });
   });
 

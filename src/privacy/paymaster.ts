@@ -1,6 +1,6 @@
 import { hash } from "starknet";
 import type { Call } from "starknet";
-import type { Address } from "@/types";
+import { fromAddress, type Address } from "@/types";
 import { assertSafeHttpUrl } from "@/utils";
 
 /**
@@ -73,6 +73,23 @@ export interface PrivacyPaymasterConfig {
   fee: PrivacyFeeMode;
   /** Transaction priority. Omit to let the paymaster choose. */
   tip?: PrivacyTip;
+  /**
+   * Refuse a quote whose fee exceeds this, in base units of the fee token.
+   *
+   * The paymaster's response decides how much of the shielded balance leaves the
+   * pool: {@link PrivacyClient.send} appends the withdrawal it names, and the
+   * proof then commits to it. A ceiling is the only thing standing between a
+   * misconfigured or compromised endpoint and the caller's balance.
+   *
+   * Which token the amount is denominated in depends on the mode — `default` and
+   * `sponsored_private` take the token you chose, `sponsored` takes whichever the
+   * deployment picked — so the rejection names the token alongside the amount.
+   *
+   * Left unset by default: the right ceiling depends on what an integrator
+   * considers a reasonable fee, and guessing one would break every deployment
+   * whose fee happens to sit above the guess.
+   */
+  maxFee?: bigint;
 }
 
 /** The withdrawal a proof must include so the forwarder is reimbursed. */
@@ -185,12 +202,73 @@ export class PrivacyPaymasterError extends Error {
  * Point `url` at a proxy that holds the API key, never at the paymaster with the
  * key in the browser. `default` mode needs no key at all.
  */
+/**
+ * Read the paymaster's fee action, validating rather than trusting it.
+ *
+ * This is a trust boundary. The response decides which address receives how much
+ * of the caller's shielded balance, and the proof then commits to it — so the
+ * addresses go through `fromAddress` like every other address in starkzap, and a
+ * malformed amount is named here instead of surfacing as a bare BigInt
+ * `SyntaxError` from inside a quote.
+ */
+function parseFeeAction(
+  action: { recipient: string; token: string; amount: string },
+  maxFee: bigint | undefined
+): PrivacyFeeAction {
+  let feeAction: PrivacyFeeAction;
+  try {
+    feeAction = {
+      recipient: fromAddress(action.recipient),
+      token: fromAddress(action.token),
+      amount: BigInt(action.amount),
+    };
+  } catch (error) {
+    throw new PrivacyPaymasterError(
+      -1,
+      "[starkzap] The privacy paymaster returned a fee action starkzap cannot " +
+        `use: ${error instanceof Error ? error.message : String(error)}`,
+      action
+    );
+  }
+
+  if (maxFee !== undefined && feeAction.amount > maxFee) {
+    throw new PrivacyPaymasterError(
+      -1,
+      `[starkzap] The privacy paymaster quoted a fee of ${feeAction.amount} ` +
+        `base units of ${feeAction.token}, above the ${maxFee} ceiling set by ` +
+        "`privacy.paymaster.maxFee`. Nothing was withdrawn. Raise the ceiling if " +
+        "this is the going rate, or check that the endpoint is the one you meant.",
+      action
+    );
+  }
+
+  return feeAction;
+}
+
+/**
+ * Minimal client for a privacy-capable paymaster.
+ *
+ * The privacy transaction types (`apply_action`) are not part of SNIP-29, so
+ * starknet.js's `PaymasterRpc` cannot express them. Its executable transaction
+ * union has no field for a proof. This talks to the paymaster's JSON-RPC
+ * endpoint directly instead.
+ *
+ * Point `url` at a proxy that holds the API key, never at the paymaster with the
+ * key in the browser. `default` mode needs no key at all.
+ */
 export class PrivacyPaymaster {
   private readonly url: string;
+  private readonly maxFee: bigint | undefined;
 
-  constructor(url: string) {
+  /**
+   * @param url - Paymaster endpoint, or a proxy in front of it
+   * @param options.maxFee - Ceiling on the quoted fee, in base units of the fee
+   *   token. See {@link PrivacyPaymasterConfig.maxFee}
+   */
+  constructor(url: string, options?: { maxFee?: bigint }) {
     assertSafeHttpUrl(url, "Privacy paymaster URL");
     this.url = url;
+    this.maxFee = options?.maxFee;
   }
 
   /**
@@ -231,11 +309,7 @@ export class PrivacyPaymaster {
     }
 
     return {
-      feeAction: {
-        recipient: action.recipient as Address,
-        token: action.token as Address,
-        amount: BigInt(action.amount),
-      },
+      feeAction: parseFeeAction(action, this.maxFee),
       // Echoed back verbatim; falls back to a locally built copy if the service
       // omits them, which older deployments do.
       parameters: result.parameters ?? this.parameters(feeMode, tip),
