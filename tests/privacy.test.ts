@@ -785,6 +785,34 @@ describe("privacy", () => {
           true
         );
       });
+
+      it("tolerates a trailing slash on the service URL", async () => {
+        const urls = recordFetches();
+        const transfers = await createPrivacy(
+          walletWith(new StarkSigner(testPrivateKeys.key1)),
+          {
+            ...config,
+            discovery: "https://discovery.example.com/",
+            ohttp: true,
+          }
+        );
+        await transfers.discoverNotes().catch(() => undefined);
+
+        expect(urls).toContain("https://discovery.example.com/ohttp-keys");
+        expect(urls.some((u) => u.includes("//ohttp-keys"))).toBe(false);
+      });
+
+      it("rejects a relay URL that is not http or https", async () => {
+        await expect(
+          createPrivacy(walletWith(new StarkSigner(testPrivateKeys.key1)), {
+            ...config,
+            discovery: "https://discovery.example.com",
+            ohttp: { relayUrl: "ftp://relay.example.com" },
+          })
+        ).rejects.toThrow(
+          "Privacy OHTTP relay URL must use http:// or https://"
+        );
+      });
     });
   });
 

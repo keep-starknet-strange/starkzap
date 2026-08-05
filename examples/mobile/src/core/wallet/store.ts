@@ -24,7 +24,7 @@ import { NETWORKS } from "@/core/network";
 import {
   PRIVY_APP_ID,
   PRIVY_SERVER_URL,
-  PAYMASTER_PROXY_URL,
+  paymasterProxyUrl,
   LAYERSWAP_API_KEY_MAINNET,
   LAYERSWAP_API_KEY_TESTNET,
   SOLANA_RPC_URL,
@@ -155,7 +155,9 @@ interface WalletStore {
 function buildSdk(networkIndex: number) {
   const net = NETWORKS[networkIndex];
   const paymasterNodeUrl = resolveExamplePaymasterNodeUrl({
-    explicitProxyUrl: PAYMASTER_PROXY_URL,
+    explicitProxyUrl: paymasterProxyUrl(
+      net.chainId.isMainnet() ? "mainnet" : "sepolia"
+    ),
     privyServerUrl: PRIVY_SERVER_URL,
     chainId: net.chainId.toLiteral(),
   });

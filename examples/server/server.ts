@@ -222,25 +222,53 @@ if (ENABLE_PRIVY) {
 // Without it: gasless mode (user pays in tokens) still works.
 if (ENABLE_PAYMASTER) {
   const AVNU_API_KEY = process.env.AVNU_API_KEY;
-  const AVNU_PAYMASTER_URL =
-    process.env.AVNU_PAYMASTER_URL || "https://sepolia.paymaster.avnu.fi";
+
+  // One upstream per network, because the clients ship a single build that
+  // switches networks at runtime. A shared URL cannot express that: point it at
+  // Sepolia and a mainnet pool comes back "not whitelisted" (code 156) from two
+  // layers away. One API key covers both networks.
+  const UPSTREAMS: Record<string, string> = {
+    mainnet:
+      process.env.AVNU_PAYMASTER_URL_MAINNET ||
+      "https://starknet.paymaster.avnu.fi",
+    sepolia:
+      process.env.AVNU_PAYMASTER_URL_SEPOLIA ||
+      "https://sepolia.paymaster.avnu.fi",
+  };
 
   app.get("/api/health/paymaster", (_, res) =>
     res.json({
       status: "ok",
-      url: AVNU_PAYMASTER_URL,
+      upstreams: UPSTREAMS,
       mode: AVNU_API_KEY ? "sponsored" : "gasless",
     })
   );
 
-  app.post("/api/paymaster", async (req, res) => {
+  // The bare path used to forward to a single upstream, which silently mixed
+  // networks. Failing here names the problem instead of letting the paymaster
+  // reject a pool it was never asked about.
+  app.post("/api/paymaster", (_, res) =>
+    res.status(400).json({
+      error:
+        "Name the network: POST /api/paymaster/mainnet or /api/paymaster/sepolia.",
+    })
+  );
+
+  app.post("/api/paymaster/:network", async (req, res) => {
+    const upstream = UPSTREAMS[req.params.network];
+    if (!upstream) {
+      return res.status(400).json({
+        error: `Unknown network "${req.params.network}". Use mainnet or sepolia.`,
+      });
+    }
+
     try {
       const size = Buffer.byteLength(JSON.stringify(req.body ?? {}));
       console.log(
-        `[Paymaster] ${req.body?.method || "unknown"} (${(size / 1024).toFixed(0)}kb)`
+        `[Paymaster/${req.params.network}] ${req.body?.method || "unknown"} (${(size / 1024).toFixed(0)}kb)`
       );
 
-      const response = await fetch(AVNU_PAYMASTER_URL, {
+      const response = await fetch(upstream, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

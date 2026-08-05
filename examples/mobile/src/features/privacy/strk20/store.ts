@@ -12,7 +12,7 @@ import {
   type Wallet,
   type WalletInterface,
 } from "starkzap-native";
-import { PAYMASTER_PROXY_URL, privacyConfig } from "@/core/config";
+import { paymasterProxyUrl, privacyConfig } from "@/core/config";
 import { NETWORKS } from "@/core/network";
 import { useTokensStore } from "@/core/tokens/store";
 import { useWalletStore } from "@/core/wallet/store";
@@ -48,7 +48,6 @@ interface Strk20Store {
   recipientReady: (recipient: string, token: Token) => Promise<boolean>;
 }
 
-/** Why the STRK20 tab cannot be used on this network, or null when it can. */
 /**
  * The quoted fee as something a person can read.
  *
@@ -73,6 +72,7 @@ export function feeLabel(
     : `${amount} base units of ${address}`;
 }
 
+/** Why the STRK20 tab cannot be used on this network, or null when it can. */
 export function unavailableReason(
   networkIndex: number,
   walletType: string | null
@@ -80,11 +80,11 @@ export function unavailableReason(
   const network = NETWORKS[networkIndex].chainId.isSepolia()
     ? "sepolia"
     : "mainnet";
-  if (!privacyConfig(network, PAYMASTER_PROXY_URL || null)) {
+  if (!privacyConfig(network, paymasterProxyUrl(network) || null)) {
     return (
       `Set EXPO_PUBLIC_PRIVACY_POOL_*, EXPO_PUBLIC_PRIVACY_PROVER_* and ` +
       `EXPO_PUBLIC_PRIVACY_DISCOVERY_* for ${network}, plus ` +
-      `EXPO_PUBLIC_PAYMASTER_PROXY_URL — privacy transactions are submitted by a ` +
+      `EXPO_PUBLIC_PAYMASTER_PROXY_URL_${network.toUpperCase()} — privacy transactions are submitted by a ` +
       `paymaster's relayer, which is what keeps your account off-chain.`
     );
   }
@@ -253,7 +253,7 @@ export const useStrk20Store = create<Strk20Store>((set, get) => {
       ].chainId.isSepolia()
         ? "sepolia"
         : "mainnet";
-      const config = privacyConfig(network, PAYMASTER_PROXY_URL || null);
+      const config = privacyConfig(network, paymasterProxyUrl(network) || null);
       if (!wallet || !config || !input.trim()) return;
 
       const amount = Amount.parse(input, token);

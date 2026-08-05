@@ -24,6 +24,36 @@ type CreatePrivateTransfersParams = Parameters<
   PrivacySdkModule["createPrivateTransfers"]
 >[0];
 
+/**
+ * Validate a service URL and strip trailing slashes.
+ *
+ * The slash matters: the privacy SDK builds sub-paths by plain concatenation
+ * (`${url}/ohttp-keys`), so `https://host/` becomes `https://host//ohttp-keys`
+ * and 404s from a fetch two layers below this call, naming neither the service
+ * nor the cause. A path prefix is kept — the SDK supports a gateway mounted
+ * under one.
+ */
+function asBaseUrl(value: string, label: string): string {
+  assertSafeHttpUrl(value, label);
+  return value.trim().replace(/\/+$/, "");
+}
+
+/**
+ * Validate the OHTTP relay URL, which nothing else checks.
+ * Every other field of `OhttpOption` passes through untouched.
+ */
+function normalizeOhttp(
+  option: OhttpOption | undefined
+): OhttpOption | undefined {
+  if (option === undefined || typeof option === "boolean") return option;
+  if (option.relayUrl === undefined) return option;
+
+  return {
+    ...option,
+    relayUrl: asBaseUrl(option.relayUrl, "Privacy OHTTP relay URL"),
+  };
+}
+
 /** Configuration for {@link createPrivacy}. */
 export interface PrivacyConfig {
   /**
@@ -172,12 +202,17 @@ export async function createPrivacy(
     assertDeterministicSigner(signer);
   }
 
-  if (typeof config.prover === "string") {
-    assertSafeHttpUrl(config.prover, "Privacy proving service URL");
-  }
-  if (typeof config.discovery === "string") {
-    assertSafeHttpUrl(config.discovery, "Privacy discovery service URL");
-  }
+  // Validated before the SDK is loaded, so a bad URL fails without touching the
+  // network or the optional dependency.
+  const prover =
+    typeof config.prover === "string"
+      ? asBaseUrl(config.prover, "Privacy proving service URL")
+      : config.prover;
+  const discovery =
+    typeof config.discovery === "string"
+      ? asBaseUrl(config.discovery, "Privacy discovery service URL")
+      : config.discovery;
+  const ohttp = normalizeOhttp(config.ohttp);
 
   const sdk = await loadPrivacySdk();
 
@@ -213,21 +248,21 @@ export async function createPrivacy(
     },
     viewingKeyProvider: { getViewingKey },
     provingProvider:
-      typeof config.prover === "string"
+      typeof prover === "string"
         ? {
-            url: config.prover,
+            url: prover,
             chainId,
-            ...(config.ohttp !== undefined && { ohttp: config.ohttp }),
+            ...(ohttp !== undefined && { ohttp }),
           }
-        : config.prover,
+        : prover,
     discoveryProvider:
-      typeof config.discovery === "string"
+      typeof discovery === "string"
         ? new sdk.IndexerDiscoveryProvider(
-            config.discovery,
+            discovery,
             config.poolContractAddress,
-            { ...(config.ohttp !== undefined && { ohttp: config.ohttp }) }
+            { ...(ohttp !== undefined && { ohttp }) }
           )
-        : config.discovery,
+        : discovery,
     ...(config.proofInvocationFactory !== undefined && {
       proofInvocationFactory: config.proofInvocationFactory,
     }),

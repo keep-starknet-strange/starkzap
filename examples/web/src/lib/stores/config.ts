@@ -104,9 +104,19 @@ export const PRIVY_SERVER_URL =
 // API key, never at AVNU directly, or the key ships in the bundle. Unset means no
 // paymaster: starknet.js then falls back to AVNU's public endpoint, muted, and
 // always the *Sepolia* one whatever the chain — so sponsored mode is unusable.
-export const PAYMASTER_NODE_URL = (
-  env.VITE_PAYMASTER_PROXY_URL as string | undefined
-)?.trim();
+//
+// Per network, because each AVNU deployment only whitelists its own privacy
+// pool: send a mainnet pool to the Sepolia paymaster and it answers "privacy
+// pool address is not whitelisted". Same precedence as the RPC URLs above — the
+// network-specific key wins, and the shared one only applies to VITE_NETWORK.
+export const PAYMASTER_NODE_URL =
+  (NETWORK === "mainnet"
+    ? (env.VITE_PAYMASTER_PROXY_URL_MAINNET as string | undefined)
+    : (env.VITE_PAYMASTER_PROXY_URL_SEPOLIA as string | undefined)
+  )?.trim() ||
+  (ENV_NETWORK === NETWORK
+    ? (env.VITE_PAYMASTER_PROXY_URL as string | undefined)?.trim()
+    : undefined);
 
 // Reown/WalletConnect project id — enables the bridge's external wallet connect.
 export const REOWN_PROJECT_ID = env.VITE_REOWN_PROJECT_ID as string | undefined;
