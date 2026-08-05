@@ -141,6 +141,7 @@ export function withPaymaster(
 ): PrivacyClient {
   const paymaster = new PrivacyPaymaster(binding.url, {
     ...(binding.maxFee !== undefined && { maxFee: binding.maxFee }),
+    ...(binding.fetch && { fetch: binding.fetch }),
   });
   const pool = fromAddress(binding.poolContractAddress);
 

@@ -74,6 +74,36 @@ export interface PrivacyPaymasterConfig {
   /** Transaction priority. Omit to let the paymaster choose. */
   tip?: PrivacyTip;
   /**
+   * Transport for paymaster requests. Defaults to the global `fetch`.
+   *
+   * The reason to point {@link PrivacyPaymasterConfig.url} at a proxy is that the
+   * proxy holds the API key instead of the browser — which makes the proxy itself
+   * something worth gating, and gating it needs a credential this client would
+   * otherwise have no way to send.
+   *
+   * Wrap `fetch` and the whole question moves to where it belongs: the caller.
+   * Auth headers, a bearer token refreshed per call, `credentials: "include"` for
+   * a cross-origin session, retries and backoff, a timeout via `AbortSignal`,
+   * tracing headers, a custom agent or proxy — all of it composes here, and none
+   * of it needs a field of its own.
+   *
+   * ```ts
+   * paymaster: {
+   *   url: PROXY_URL,
+   *   fee: { mode: "sponsored" },
+   *   fetch: (input, init) =>
+   *     globalThis.fetch(input, {
+   *       ...init,
+   *       headers: { ...init?.headers, Authorization: `Bearer ${await token()}` },
+   *     }),
+   * }
+   * ```
+   *
+   * Called as `fetch(url, init)` and must resolve to a `Response`. So a wrapper
+   * adds transport behaviour without taking over error handling.
+   */
+  fetch?: typeof fetch;
+  /**
    * Refuse a quote whose fee exceeds this, in base units of the fee token.
    *
    * The paymaster's response decides how much of the shielded balance leaves the
@@ -336,16 +366,23 @@ function parseGasQuote(fee: unknown): PrivacyGasQuote | undefined {
 export class PrivacyPaymaster {
   private readonly url: string;
   private readonly maxFee: bigint | undefined;
+  private readonly fetchImpl: typeof fetch | undefined;
 
   /**
    * @param url - Paymaster endpoint, or a proxy in front of it
    * @param options.maxFee - Ceiling on the quoted fee, in base units of the fee
    *   token. See {@link PrivacyPaymasterConfig.maxFee}
+   * @param options.fetch - Transport override. See
+   *   {@link PrivacyPaymasterConfig.fetch}
    */
-  constructor(url: string, options?: { maxFee?: bigint }) {
+  constructor(
+    url: string,
+    options?: { maxFee?: bigint; fetch?: typeof fetch }
+  ) {
     assertSafeHttpUrl(url, "Privacy paymaster URL");
     this.url = url;
     this.maxFee = options?.maxFee;
+    this.fetchImpl = options?.fetch;
   }
 
   /**
@@ -453,7 +490,10 @@ export class PrivacyPaymaster {
   }
 
   private async send<T>(method: string, params: unknown): Promise<T> {
-    const response = await fetch(this.url, {
+    // Resolved per call rather than captured in the constructor, so replacing
+    // the global (as tests do) still takes effect.
+    const send = this.fetchImpl ?? globalThis.fetch;
+    const response = await send(this.url, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",

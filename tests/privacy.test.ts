@@ -662,6 +662,87 @@ describe("privacy", () => {
     });
 
     /**
+     * A proxy that holds the API key is itself worth gating, and gating it needs
+     * a credential. Rather than growing a field per concern, the transport is
+     * replaceable — so auth, retries, timeouts and tracing all compose in the
+     * caller, while reading the response stays here.
+     */
+    describe("transport override", () => {
+      it("uses the supplied fetch, and keeps interpreting the response", async () => {
+        const seen: RequestInit[] = [];
+        const mine: typeof fetch = (_input, init) => {
+          seen.push(init as RequestInit);
+          return Promise.resolve({
+            status: 200,
+            ok: true,
+            json: () =>
+              Promise.resolve({
+                error: {
+                  code: 163,
+                  message: "An error occurred (UNKNOWN_ERROR)",
+                },
+              }),
+          } as Response);
+        };
+        // The global stays stubbed to prove the override is what ran.
+        stubFetch({ result: {} });
+
+        const error = await rejectedBy(() =>
+          new PrivacyPaymaster(URL, { fetch: mine }).quote(POOL, {
+            mode: "sponsored",
+          })
+        );
+
+        expect(seen).toHaveLength(1);
+        // Our own guards still ran on the wrapper's response.
+        expect(error.code).toBe(163);
+      });
+
+      it("lets a wrapper add headers the client has no field for", async () => {
+        let authorization: string | undefined;
+        const mine: typeof fetch = (_input, init) => {
+          authorization = (init?.headers as Record<string, string>)[
+            "Authorization"
+          ];
+          return Promise.resolve({
+            status: 200,
+            ok: true,
+            json: () =>
+              Promise.resolve({ result: { transaction_hash: "0x1" } }),
+          } as Response);
+        };
+
+        const paymaster = new PrivacyPaymaster(URL, {
+          fetch: (input, init) =>
+            mine(input, {
+              ...init,
+              headers: { ...init?.headers, Authorization: "Bearer secret" },
+            }),
+        });
+        await paymaster.execute(
+          { contractAddress: POOL, entrypoint: "apply_actions" },
+          { data: "0x1", proofFacts: [] },
+          {}
+        );
+
+        expect(authorization).toBe("Bearer secret");
+      });
+
+      it("falls back to the global fetch when none is supplied", async () => {
+        const sent = stubFetch({
+          result: {
+            fee_action: { recipient: "0x75a1", token: STRK, amount: "0x0" },
+            parameters: {},
+          },
+        });
+
+        await new PrivacyPaymaster(URL).quote(POOL, { mode: "sponsored" });
+
+        expect(sent[0]!.method).toBe("paymaster_buildTransaction");
+      });
+    });
+
+    /**
      * The gas figures are what make the cost explicable: `default` mode charges
      * the suggested maximum, not the estimate, and the gap is what a user pays
      * for without using. They used to be dropped on the floor.
