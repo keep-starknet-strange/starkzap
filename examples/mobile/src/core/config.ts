@@ -7,10 +7,25 @@ import {
 
 // Public env vars (Expo inlines EXPO_PUBLIC_* at build time).
 export const PRIVY_SERVER_URL = process.env.EXPO_PUBLIC_PRIVY_SERVER_URL ?? "";
-export const PAYMASTER_PROXY_URL =
-  process.env.EXPO_PUBLIC_PAYMASTER_PROXY_URL ?? "";
 export const PRIVY_APP_ID = process.env.EXPO_PUBLIC_PRIVY_APP_ID ?? "";
 export const PRIVY_CLIENT_ID = process.env.EXPO_PUBLIC_PRIVY_CLIENT_ID ?? "";
+
+// Paymaster proxy, per network: each AVNU deployment whitelists only its own
+// privacy pool, so sending a mainnet pool to the Sepolia paymaster answers
+// "privacy pool address is not whitelisted". One build switches networks at
+// runtime, so there is no single correct URL — hence no shared fallback here.
+const PAYMASTER_PROXY_URL_MAINNET =
+  process.env.EXPO_PUBLIC_PAYMASTER_PROXY_URL_MAINNET ?? "";
+const PAYMASTER_PROXY_URL_SEPOLIA =
+  process.env.EXPO_PUBLIC_PAYMASTER_PROXY_URL_SEPOLIA ?? "";
+
+export function paymasterProxyUrl(network: "mainnet" | "sepolia"): string {
+  return (
+    network === "mainnet"
+      ? PAYMASTER_PROXY_URL_MAINNET
+      : PAYMASTER_PROXY_URL_SEPOLIA
+  ).trim();
+}
 
 // One Alchemy key powers Starknet + Ethereum + Solana RPCs (see network.ts and
 // the bridging config). Without it, Starknet falls back to Cartridge RPCs and

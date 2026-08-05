@@ -7,7 +7,7 @@ import { useTheme } from "@/theme";
 import { NETWORKS } from "@/core/network";
 import {
   PRIVY_SERVER_URL,
-  PAYMASTER_PROXY_URL,
+  paymasterProxyUrl,
   PRIVY_APP_ID,
   isExpoGo,
 } from "@/core/config";
@@ -112,7 +112,9 @@ export default function Login() {
 
   const net = NETWORKS[networkIndex];
   const paymasterAvailable = !!resolveExamplePaymasterNodeUrl({
-    explicitProxyUrl: PAYMASTER_PROXY_URL,
+    explicitProxyUrl: paymasterProxyUrl(
+      net.chainId.isMainnet() ? "mainnet" : "sepolia"
+    ),
     privyServerUrl: PRIVY_SERVER_URL,
     chainId: net.chainId.toLiteral(),
   });
