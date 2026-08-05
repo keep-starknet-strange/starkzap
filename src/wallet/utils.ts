@@ -138,10 +138,10 @@ export function assertProofSendable(
 export function proofBaseBlock(proof: TransactionProof): number | undefined {
   const tag = shortString.encodeShortString("VIRTUAL_SNOS0");
   const facts = proof.proofFacts.map((f) => num.toHex(f));
-  const block_index = facts.indexOf(num.toHex(tag)) + 1;
-  if (block_index === 0 || block_index >= facts.length) return undefined;
+  const blockIndex = facts.indexOf(num.toHex(tag)) + 1;
+  if (blockIndex === 0 || blockIndex >= facts.length) return undefined;
 
-  const block = Number(num.toBigInt(facts[block_index]!));
+  const block = Number(num.toBigInt(facts[blockIndex]!));
   return Number.isSafeInteger(block) && block > 0 ? block : undefined;
 }
 

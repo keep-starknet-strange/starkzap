@@ -148,7 +148,7 @@ export const useStrk20Store = create<Strk20Store>((set, get) => {
 
     set({ busy: true, error: null, step: `${label}: proving and submitting…` });
     try {
-      await privacy.send(compose, { onWait, ...options });
+      await privacy.send(compose, { wait: { onAttempt: onWait }, ...options });
       set({ step: `${label}: refreshing…`, fee: await privacy.quote() });
       await get().refresh();
     } catch (err) {

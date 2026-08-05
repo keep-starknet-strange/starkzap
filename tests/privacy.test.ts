@@ -879,6 +879,40 @@ describe("privacy", () => {
       return Object.assign(new Error(`rpc ${code}`), { code, data });
     }
 
+    /**
+     * `screeningVerdict` reimplements the SDK's own mapper so a catch block never
+     * has to load an optional dependency. The SDK calls those reason strings "a
+     * wire contract… keep both sides in sync", and there are now two copies — so
+     * this compares them instead of trusting that they still agree.
+     */
+    it("agrees with the SDK's own mapper on every verdict", async () => {
+      const { screeningErrorFromProvingError, ScreeningRejected } =
+        await import("@starkware-libs/starknet-privacy-sdk");
+
+      const cases = [
+        ["address_blocked", "rejected"],
+        ["screening_unavailable", "unavailable"],
+        ["something_else", undefined],
+      ] as const;
+
+      for (const [data, expected] of cases) {
+        const error = provingError(10000, data);
+        const theirs = screeningErrorFromProvingError(
+          error as unknown as Parameters<
+            typeof screeningErrorFromProvingError
+          >[0]
+        );
+        const ours = screeningVerdict(error);
+
+        expect(ours).toBe(expected);
+        // Same call, same conclusion: both classify, or both decline to.
+        expect(theirs === undefined).toBe(ours === undefined);
+        if (ours === "rejected") {
+          expect(theirs).toBeInstanceOf(ScreeningRejected);
+        }
+      }
+    });
+
     it("classifies a sanctions block as terminal", () => {
       expect(screeningVerdict(provingError(10000, "address_blocked"))).toBe(
         "rejected"
@@ -1484,7 +1518,9 @@ describe("privacy", () => {
         .mockResolvedValueOnce(505)
         .mockResolvedValue(515);
 
-      await privacy.send((b) => b.register(), { onWait });
+      await privacy.send((b) => b.register(), {
+        wait: { onAttempt: onWait, pollIntervalMs: 1 },
+      });
 
       expect(onWait).toHaveBeenCalled();
       const attempts = onWait.mock.calls.map(
@@ -1517,7 +1553,7 @@ describe("privacy", () => {
         .mockResolvedValue(515);
 
       const build = vi.spyOn(privacy.transfers, "build");
-      await privacy.send((b) => b.register());
+      await privacy.send((b) => b.register(), { wait: { pollIntervalMs: 1 } });
 
       const { provingBlockId } = build.mock.calls[0]![0] as {
         provingBlockId: number;

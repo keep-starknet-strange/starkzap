@@ -73,7 +73,7 @@ const sleep = (ms: number): Promise<void> =>
  * const provingBlock = await waitForProvableBlock(provider, receipt.block_number);
  *
  * const { callAndProof } = await transfers
- *   .build({ provingBlockId: { block_number: provingBlock } })
+ *   .build({ provingBlockId: provingBlock })
  *   .with(STRK, (t) => t.transfer({ recipient: bob, amount: 50n }))
  *   .execute();
  * ```

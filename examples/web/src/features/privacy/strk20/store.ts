@@ -230,7 +230,7 @@ async function run(
   try {
     step.set(`${label}: proving and submitting…`);
     const hash = await privacy.send(compose, {
-      onWait: logAttempts(label),
+      wait: { onAttempt: logAttempts(label) },
       ...options,
     });
     log(`${label} submitted by the paymaster's relayer: ${hash}`, "success");

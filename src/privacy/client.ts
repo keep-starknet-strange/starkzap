@@ -15,7 +15,7 @@ import {
 } from "@/privacy/paymaster";
 import {
   waitForProvableBlock,
-  type ProvableAttempt,
+  type ProvableBlockOptions,
 } from "@/privacy/sequencing";
 
 /** Options for a single {@link PrivacyClient.send}. */
@@ -31,12 +31,16 @@ export interface PrivacySendOptions extends Omit<
    */
   provingBlockId?: number;
   /**
-   * Called on each poll while waiting for a block old enough to prove against.
+   * Depth, poll interval, timeout and per-poll callback for the wait before
+   * proving.
    *
-   * The wait is silent otherwise, and on a slow chain it is minutes long: ten
-   * blocks is seconds on Sepolia but far longer on mainnet.
+   * Forwarded whole to {@link waitForProvableBlock}. `onAttempt` is the one most
+   * callers want — the wait is silent otherwise, and on a slow chain it is
+   * minutes long, so "it hung" and "it is waiting for a block" look identical.
+   * The rest matter for anything that cannot sit on the default two-second poll:
+   * a devnet where blocks arrive instantly, or a test.
    */
-  onWait?: (attempt: ProvableAttempt) => void;
+  wait?: ProvableBlockOptions;
 }
 
 /**
@@ -174,9 +178,11 @@ export function withPaymaster(
   ): Promise<number> {
     if (options?.provingBlockId !== undefined) return options.provingBlockId;
 
-    return waitForProvableBlock(binding.provider, await previousBlock(), {
-      ...(options?.onWait && { onAttempt: options.onWait }),
-    });
+    return waitForProvableBlock(
+      binding.provider,
+      await previousBlock(),
+      options?.wait ?? {}
+    );
   }
 
   /**
@@ -204,9 +210,13 @@ export function withPaymaster(
       return hash;
     } catch (error) {
       // The pool nonce baked into a failed invocation is now stale. Clearing it
-      // makes the *next* attempt clean. Not retried here: retrying means
-      // re-proving, which is slow and costs prover budget, so that is the
-      // caller's decision to make.
+      // makes the *next* attempt clean.
+      //
+      // Not retried here, and a retry has to mean *re-proving*: the paymaster
+      // remembers the calls it has seen, so re-submitting this same proof answers
+      // `156 :: execution error Tx already sent` rather than trying again.
+      // Proving is slow and spends prover budget, so whether to pay for it twice
+      // is the caller's decision.
       transfers.invalidateProofNonceCache();
       throw error;
     }
@@ -229,7 +239,7 @@ export function withPaymaster(
       const { feeAction, parameters } = await quote();
       const provingBlockId = await resolveProvingBlock(options);
 
-      const { onWait: _onWait, ...sdkOptions } = options ?? {};
+      const { wait: _wait, ...sdkOptions } = options ?? {};
       // ProvingBlockId is starknet.js's BlockIdentifier, so a plain number is
       // the block-number form; `{ block_number: n }` is not accepted.
       const builder = transfers.build({
