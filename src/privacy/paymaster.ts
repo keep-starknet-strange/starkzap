@@ -12,12 +12,20 @@ import { assertSafeHttpUrl } from "@/utils";
  * from the *shielded* balance, never from a public account.
  *
  * - `default` — the user pays gas and the pool fee from their private balance,
- *   in `gasToken`. Needs no paymaster API key, which makes it the only mode that
- *   works without an integrator account.
- * - `sponsored` — the relayer pays gas. The user pays the pool fee in STRK.
- *   Requires an API key.
- * - `sponsored_private` — as `sponsored`, but the user chooses the pool-fee
- *   token. Requires an API key. Only valid for private transactions.
+ *   in `gasToken`. The withdrawal is sized at the paymaster's *suggested
+ *   maximum* rather than its estimate, so it covers headroom that may go
+ *   unused. Needs no paymaster API key, which makes it the only mode that works
+ *   without an integrator account.
+ * - `sponsored` — the relayer fronts the gas. The user pays a pool fee the
+ *   paymaster deployment sets, in the token that deployment chooses. Requires
+ *   an API key.
+ * - `sponsored_private` — as `sponsored`, but the user chooses the token the
+ *   pool fee is denominated in. Requires an API key. Only valid for private
+ *   transactions.
+ *
+ * Which mode costs less depends on the deployment, the network and current gas,
+ * none of which are fixed. {@link PrivacyPaymaster.quote} is the only
+ * authority: its `feeAction` names the amount and the token actually required.
  */
 export type PrivacyFeeMode =
   | { mode: "default"; gasToken: Address }

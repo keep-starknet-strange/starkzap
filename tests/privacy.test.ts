@@ -1007,7 +1007,7 @@ describe("privacy", () => {
     it("cannot pay a pool fee from an account with no private balance", async () => {
       // Why registration only ever happens bundled into a deposit: register
       // moves no funds, so there is nothing for the fee withdrawal to draw on,
-      // and AVNU's Sepolia deployment charges 1 STRK per transaction.
+      // and the paymaster charges for every transaction, register included.
       const { env: sdkEnv, bind } = env();
       paymasterStub("0x64", `0x${BigInt(sdkEnv.ace).toString(16)}`);
       const privacy = await bind();

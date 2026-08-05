@@ -231,21 +231,52 @@ const PRIVACY_OHTTP =
  * network has no privacy endpoints set — the STRK20 tab then explains what is
  * missing instead of failing at call time.
  */
-// How the pool fee is paid. `sponsored` is the sane default: the relayer covers
-// gas and the pool fee is ~1 STRK, whereas `default` needs no API key but the
-// forwarder keeps the entire suggested-max gas withdrawal — measured at ~16x
-// more. `default` needs a gas token, `sponsored_private` a pool-fee token.
+// How the pool fee is paid. `sponsored` is the sane default: the relayer fronts
+// the gas and the user pays only the pool fee the deployment sets. `default`
+// needs no API key, but its withdrawal is sized at the paymaster's suggested
+// maximum rather than its estimate, so it covers headroom that may go unused.
+// The amounts, and the gap between the modes, move with the network and with
+// gas — quote the paymaster rather than trust a figure written here. `default`
+// needs a gas token, `sponsored_private` a pool-fee token.
+// `||` rather than `??`, and trimmed first: .env.example ships the key with an
+// empty value, which `??` treats as set and passes straight through.
 const PRIVACY_FEE_MODE =
-  (env.VITE_PRIVACY_FEE_MODE as string | undefined) ?? "sponsored";
-const PRIVACY_FEE_TOKEN = env.VITE_PRIVACY_FEE_TOKEN as string | undefined;
+  (env.VITE_PRIVACY_FEE_MODE as string | undefined)?.trim() || "sponsored";
+const PRIVACY_FEE_TOKEN = (
+  env.VITE_PRIVACY_FEE_TOKEN as string | undefined
+)?.trim();
 
 function privacyFee(): PrivacyFeeMode | undefined {
-  if (PRIVACY_FEE_MODE === "sponsored") return { mode: "sponsored" };
-  if (!PRIVACY_FEE_TOKEN) return undefined;
-  const token = fromAddress(PRIVACY_FEE_TOKEN);
-  return PRIVACY_FEE_MODE === "default"
-    ? { mode: "default", gasToken: token }
-    : { mode: "sponsored_private", poolFeeToken: token };
+  const disabled = (why: string) => {
+    console.warn(`[example] STRK20 disabled: ${why}`);
+    return undefined;
+  };
+  const token = () =>
+    PRIVACY_FEE_TOKEN ? fromAddress(PRIVACY_FEE_TOKEN) : undefined;
+
+  // Matched exhaustively. An unrecognised value used to fall through to
+  // `sponsored_private`, so a typo silently selected the one mode that needs an
+  // API key and lets the user choose the fee token.
+  switch (PRIVACY_FEE_MODE) {
+    case "sponsored":
+      return { mode: "sponsored" };
+    case "default": {
+      const gasToken = token();
+      return gasToken
+        ? { mode: "default", gasToken }
+        : disabled("`default` fee mode needs VITE_PRIVACY_FEE_TOKEN");
+    }
+    case "sponsored_private": {
+      const poolFeeToken = token();
+      return poolFeeToken
+        ? { mode: "sponsored_private", poolFeeToken }
+        : disabled("`sponsored_private` fee mode needs VITE_PRIVACY_FEE_TOKEN");
+    }
+    default:
+      return disabled(
+        `VITE_PRIVACY_FEE_MODE="${PRIVACY_FEE_MODE}" is not one of sponsored, sponsored_private, default`
+      );
+  }
 }
 
 const PRIVACY_FEE = privacyFee();

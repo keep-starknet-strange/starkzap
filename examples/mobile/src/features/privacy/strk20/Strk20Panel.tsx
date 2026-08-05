@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Card, Text, Button, TextField, Select } from "@/ui";
 import { useWalletStore } from "@/core/wallet/store";
 import { useTokensStore } from "@/core/tokens/store";
-import { unavailableReason, useStrk20Store } from "./store";
+import { feeLabel, unavailableReason, useStrk20Store } from "./store";
 
 export default function Strk20Panel() {
   const networkIndex = useWalletStore((s) => s.networkIndex);
@@ -93,11 +93,11 @@ export default function Strk20Panel() {
           </>
         ) : null}
 
-        {fee ? (
+        {feeLabel(fee, tokens) ? (
           <Text variant="muted">
-            {fee.feeAction.amount === 0n
-              ? "No pool fee on this deployment."
-              : `Pool fee ${fee.feeAction.amount} (base units), withdrawn from your private balance — not paid from your account.`}
+            {`Pool fee: ${feeLabel(fee, tokens)} — withdrawn from your private ` +
+              `balance on every send, not paid from your account. Quoted per ` +
+              `pool, so it does not vary with what the transaction does.`}
           </Text>
         ) : null}
 
