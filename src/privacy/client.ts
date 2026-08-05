@@ -139,7 +139,9 @@ export function withPaymaster(
   transfers: PrivateTransfersInterface,
   binding: PaymasterBinding
 ): PrivacyClient {
-  const paymaster = new PrivacyPaymaster(binding.url);
+  const paymaster = new PrivacyPaymaster(binding.url, {
+    ...(binding.maxFee !== undefined && { maxFee: binding.maxFee }),
+  });
   const pool = fromAddress(binding.poolContractAddress);
 
   // Hash of this client's most recent submission. A proof must read pool state
