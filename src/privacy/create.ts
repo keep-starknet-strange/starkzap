@@ -7,7 +7,7 @@ import type {
 } from "@starkware-libs/starknet-privacy-sdk";
 
 import { SignerAdapter } from "@/signer";
-import type { PrivacyFeeMode, PrivacyTip } from "@/privacy/paymaster";
+import type { PrivacyPaymasterConfig } from "@/privacy/paymaster";
 import type { Wallet } from "@/wallet";
 import { assertSafeHttpUrl } from "@/utils";
 import { loadPrivacySdk, type PrivacySdkModule } from "@/privacy/runtime";
@@ -72,28 +72,21 @@ export interface PrivacyConfig {
    */
   proofInvocationFactory?: CreatePrivateTransfersParams["proofInvocationFactory"];
   /**
-   * Paymaster endpoint used to submit private transactions.
+   * Submission through a paymaster's relayer, which is what keeps the account
+   * off-chain. Endpoint and fee mode travel together — see
+   * {@link PrivacyPaymasterConfig}.
    *
-   * Point this at a proxy that holds the API key rather than at the paymaster
-   * itself. `sponsored` and `sponsored_private` need one. `default` mode
-   * needs no key.
+   * Ignored by {@link createPrivacy} itself, which composes and proves but never
+   * submits. It is read when the config reaches {@link Wallet.privacy()} or
+   * `withPaymaster`, both of which require it.
    *
-   * Without it, privacy transactions can only be self-submitted via
+   * Omit it to submit through your own infrastructure. The only route left
+   * inside the SDK is then
    * `wallet.execute(calls, { proof, unsafeUserPays: true })`, which puts the
    * sender's address, nonce and gas payment on-chain and so undoes the privacy
    * the pool provides.
    */
-  paymasterUrl?: string;
-  /**
-   * How the fee is paid. Defaults to `default` mode with STRK as the gas token,
-   * which is the only mode that needs no paymaster API key.
-   *
-   * All modes withdraw the fee from the shielded balance and are submitted by
-   * the relayer, so the choice is about cost, not about privacy.
-   */
-  fee?: PrivacyFeeMode;
-  /** Optional transaction priority passed through to the paymaster. */
-  tip?: PrivacyTip;
+  paymaster?: PrivacyPaymasterConfig;
   /**
    * How the viewing key is derived for this account.
    *

@@ -263,8 +263,7 @@ export const PRIVACY_CONFIG: PrivacyConfig | undefined =
         // Privacy transactions are submitted by the paymaster's relayer, so the
         // account never appears on-chain. Same proxy as the sponsored toggle:
         // it forwards any method with the API key attached.
-        paymasterUrl: PAYMASTER_NODE_URL,
-        fee: PRIVACY_FEE,
+        paymaster: { url: PAYMASTER_NODE_URL, fee: PRIVACY_FEE },
         ohttp: PRIVACY_OHTTP
           ? PRIVACY_OHTTP_RELAY
             ? { relayUrl: PRIVACY_OHTTP_RELAY }

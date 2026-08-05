@@ -19,6 +19,7 @@ export {
   type PrivacyFeeAction,
   type PrivacyFeeMode,
   type PrivacyFeeQuote,
+  type PrivacyPaymasterConfig,
   type PrivacyTip,
 } from "@/privacy/paymaster";
 export { loadPrivacySdk, type PrivacySdkModule } from "@/privacy/runtime";

@@ -120,8 +120,7 @@ export function privacyConfig(
     discovery,
     // Privacy transactions are submitted by the paymaster's relayer, so the
     // account never appears on-chain. Same proxy the sponsored flow uses.
-    paymasterUrl,
-    fee,
+    paymaster: { url: paymasterUrl, fee },
     ohttp: PRIVACY_OHTTP ? (relay ? { relayUrl: relay } : true) : false,
   };
 }
