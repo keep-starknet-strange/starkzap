@@ -67,6 +67,34 @@ export const feeLabel = derived([fee, tokens], ([$fee, $tokens]) => {
     : `${amount} base units of ${address}`;
 });
 
+/**
+ * What the transaction was estimated at, when that differs from what is charged.
+ *
+ * Only for `default` mode. There the withdrawal is the paymaster's suggested
+ * *maximum* gas, so the gap against its own estimate is headroom the user pays
+ * for and may not use — worth seeing before committing. Under the sponsored
+ * modes the relayer pays the gas and these are its costs, not the user's, so
+ * showing them would misattribute the money.
+ */
+export const gasNote = derived([fee, tokens], ([$fee, $tokens]) => {
+  if (PRIVACY_CONFIG?.paymaster?.fee.mode !== "default") return null;
+
+  const gas = $fee?.gas;
+  if (!gas || !$fee) return null;
+
+  const token = $tokens.find(
+    (t) => BigInt(t.address) === BigInt($fee.feeAction.token)
+  );
+  if (!token) return null;
+
+  const estimated = Amount.fromRaw(gas.estimatedInGasToken, token);
+  return (
+    `Estimated at ${estimated.toFormatted(true)} — the figure above is the ` +
+    "paymaster's suggested maximum, and the difference is headroom you may not " +
+    "use. A sponsored fee mode charges a flat pool fee instead."
+  );
+});
+
 // ─── Lifecycle ───────────────────────────────────────────────────────────────
 
 /**

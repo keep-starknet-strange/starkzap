@@ -19,6 +19,7 @@ export {
   type PrivacyFeeAction,
   type PrivacyFeeMode,
   type PrivacyFeeQuote,
+  type PrivacyGasQuote,
   type PrivacyPaymasterConfig,
   type PrivacyTip,
 } from "@/privacy/paymaster";

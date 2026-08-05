@@ -662,6 +662,68 @@ describe("privacy", () => {
     });
 
     /**
+     * The gas figures are what make the cost explicable: `default` mode charges
+     * the suggested maximum, not the estimate, and the gap is what a user pays
+     * for without using. They used to be dropped on the floor.
+     */
+    describe("gas figures", () => {
+      /** The `fee` block as mainnet returned it, hex and all. */
+      const FEE_BLOCK = {
+        gas_token_price_in_strk: "0xde0b6b3a7640000",
+        estimated_fee_in_strk: "0x43b905c161c88000",
+        estimated_fee_in_gas_token: "0x27f7985a13008000",
+        suggested_max_fee_in_strk: "0x10b8eff83c0cb0000",
+        suggested_max_fee_in_gas_token: "0x10b8eff83c0cb0000",
+      };
+      const withFee = (fee?: unknown) => ({
+        result: {
+          fee_action: { recipient: "0x75a1", token: STRK, amount: "0xa" },
+          ...(fee !== undefined && { fee }),
+          parameters: {},
+        },
+      });
+
+      it("reports the estimate alongside what will actually be withdrawn", async () => {
+        stubFetch(withFee(FEE_BLOCK));
+
+        const { gas } = await new PrivacyPaymaster(URL).quote(POOL, {
+          mode: "sponsored",
+        });
+
+        // ~4.88 STRK expected, ~19.28 charged: the spread a caller should show.
+        expect(gas?.estimatedInStrk).toBe(0x43b905c161c88000n);
+        expect(gas?.suggestedMaxInStrk).toBe(0x10b8eff83c0cb0000n);
+        expect(gas?.suggestedMaxInGasToken).toBe(0x10b8eff83c0cb0000n);
+        expect(gas?.gasTokenPriceInStrk).toBe(0xde0b6b3a7640000n);
+      });
+
+      it("omits them when the deployment sends none", async () => {
+        stubFetch(withFee(undefined));
+
+        const quote = await new PrivacyPaymaster(URL).quote(POOL, {
+          mode: "sponsored",
+        });
+
+        expect(quote.gas).toBeUndefined();
+        // The fee itself is unaffected — these are for display only.
+        expect(quote.feeAction.amount).toBe(10n);
+      });
+
+      it("does not fail a quote over an unreadable figure", async () => {
+        stubFetch(
+          withFee({ ...FEE_BLOCK, suggested_max_fee_in_strk: "not-a-number" })
+        );
+
+        const quote = await new PrivacyPaymaster(URL).quote(POOL, {
+          mode: "sponsored",
+        });
+
+        expect(quote.gas).toBeUndefined();
+        expect(quote.feeAction.amount).toBe(10n);
+      });
+    });
+
+    /**
      * The response decides which address receives how much of the caller's
      * shielded balance, and the proof then commits to it — so it is validated
      * on the way in rather than cast and trusted.

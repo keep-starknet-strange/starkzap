@@ -15,6 +15,7 @@
     deposit,
     error,
     feeLabel,
+    gasNote,
     recipientReady,
     refresh,
     registered,
@@ -105,6 +106,9 @@
         send, not paid from your account. Quoted per pool, so it does not vary
         with what the transaction does.
       </Text>
+      {#if $gasNote}
+        <Text variant="muted">{$gasNote}</Text>
+      {/if}
     {/if}
 
     {#if $step}<Text variant="muted">{$step}</Text>{/if}
