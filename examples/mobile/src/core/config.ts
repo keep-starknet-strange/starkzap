@@ -81,21 +81,49 @@ const PRIVACY_OHTTP = process.env.EXPO_PUBLIC_PRIVACY_OHTTP !== "false";
  * `undefined` when its endpoints are unset — the STRK20 tab then explains
  * what is missing instead of failing at call time.
  */
-// How the pool fee is paid. `sponsored` is the sane default: the relayer covers
-// gas and the pool fee is ~1 STRK, whereas `default` needs no API key but the
-// forwarder keeps the whole suggested-max gas withdrawal — ~16x more.
+// How the pool fee is paid. `sponsored` is the sane default: the relayer fronts
+// the gas and the user pays only the pool fee the deployment sets. `default`
+// needs no API key, but its withdrawal is sized at the paymaster's suggested
+// maximum rather than its estimate, so it covers headroom that may go unused.
+// The amounts move with the network and with gas — quote the paymaster rather
+// than trust a figure written here.
 const PRIVACY_FEE_MODE =
-  process.env.EXPO_PUBLIC_PRIVACY_FEE_MODE ?? "sponsored";
-const PRIVACY_FEE_TOKEN = process.env.EXPO_PUBLIC_PRIVACY_FEE_TOKEN ?? "";
+  process.env.EXPO_PUBLIC_PRIVACY_FEE_MODE?.trim() || "sponsored";
+const PRIVACY_FEE_TOKEN = process.env.EXPO_PUBLIC_PRIVACY_FEE_TOKEN?.trim();
 
 function privacyFee(): PrivacyFeeMode | undefined {
-  if (PRIVACY_FEE_MODE === "sponsored") return { mode: "sponsored" };
-  const raw = PRIVACY_FEE_TOKEN.trim();
-  if (!raw) return undefined;
-  const token = fromAddress(raw);
-  return PRIVACY_FEE_MODE === "default"
-    ? { mode: "default", gasToken: token }
-    : { mode: "sponsored_private", poolFeeToken: token };
+  const disabled = (why: string) => {
+    console.warn(`[example] STRK20 disabled: ${why}`);
+    return undefined;
+  };
+  const token = () =>
+    PRIVACY_FEE_TOKEN ? fromAddress(PRIVACY_FEE_TOKEN) : undefined;
+
+  // Matched exhaustively. An unrecognised value used to fall through to
+  // `sponsored_private`, so a typo silently selected the one mode that needs an
+  // API key and lets the user choose the fee token.
+  switch (PRIVACY_FEE_MODE) {
+    case "sponsored":
+      return { mode: "sponsored" };
+    case "default": {
+      const gasToken = token();
+      return gasToken
+        ? { mode: "default", gasToken }
+        : disabled("`default` fee mode needs EXPO_PUBLIC_PRIVACY_FEE_TOKEN");
+    }
+    case "sponsored_private": {
+      const poolFeeToken = token();
+      return poolFeeToken
+        ? { mode: "sponsored_private", poolFeeToken }
+        : disabled(
+            "`sponsored_private` fee mode needs EXPO_PUBLIC_PRIVACY_FEE_TOKEN"
+          );
+    }
+    default:
+      return disabled(
+        `EXPO_PUBLIC_PRIVACY_FEE_MODE="${PRIVACY_FEE_MODE}" is not one of sponsored, sponsored_private, default`
+      );
+  }
 }
 
 export function privacyConfig(

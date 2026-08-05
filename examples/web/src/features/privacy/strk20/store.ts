@@ -1,4 +1,4 @@
-import { writable, get } from "svelte/store";
+import { writable, derived, get } from "svelte/store";
 import {
   Amount,
   fromAddress,
@@ -45,6 +45,27 @@ export const waitingBlocks = writable<number | null>(null);
 
 /** Pool fee the paymaster last quoted, shown before the user commits. */
 export const fee = writable<PrivacyFeeQuote | null>(null);
+
+/**
+ * The quoted fee as something a person can read.
+ *
+ * `feeAction` gives base units and a token address, which is the whole cost to
+ * the user but unreadable as-is. The pool fee does not depend on what the
+ * transaction does — the paymaster quotes it per pool, not per action — so this
+ * one figure covers every send.
+ */
+export const feeLabel = derived([fee, tokens], ([$fee, $tokens]) => {
+  if (!$fee) return null;
+  const { amount, token: address } = $fee.feeAction;
+  if (amount === 0n) return "No pool fee on this deployment.";
+
+  const token = $tokens.find((t) => BigInt(t.address) === BigInt(address));
+  // A fee token that is not in the list still has to render: base units name
+  // the cost badly, but silence names it not at all.
+  return token
+    ? Amount.fromRaw(amount, token).toFormatted(true)
+    : `${amount} base units of ${address}`;
+});
 
 // ─── Lifecycle ───────────────────────────────────────────────────────────────
 

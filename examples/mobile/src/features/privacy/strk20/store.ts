@@ -49,6 +49,30 @@ interface Strk20Store {
 }
 
 /** Why the STRK20 tab cannot be used on this network, or null when it can. */
+/**
+ * The quoted fee as something a person can read.
+ *
+ * `feeAction` gives base units and a token address, which is the whole cost to
+ * the user but unreadable as-is. The pool fee does not depend on what the
+ * transaction does — the paymaster quotes it per pool, not per action — so this
+ * one figure covers every send.
+ */
+export function feeLabel(
+  quote: PrivacyFeeQuote | null,
+  tokens: Token[]
+): string | null {
+  if (!quote) return null;
+  const { amount, token: address } = quote.feeAction;
+  if (amount === 0n) return "No pool fee on this deployment.";
+
+  const token = tokens.find((t) => BigInt(t.address) === BigInt(address));
+  // A fee token that is not in the list still has to render: base units name
+  // the cost badly, but silence names it not at all.
+  return token
+    ? Amount.fromRaw(amount, token).toFormatted(true)
+    : `${amount} base units of ${address}`;
+}
+
 export function unavailableReason(
   networkIndex: number,
   walletType: string | null

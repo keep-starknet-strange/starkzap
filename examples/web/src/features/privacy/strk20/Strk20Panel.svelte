@@ -14,7 +14,7 @@
     connecting,
     deposit,
     error,
-    fee,
+    feeLabel,
     recipientReady,
     refresh,
     registered,
@@ -99,11 +99,11 @@
       </div>
     {/if}
 
-    {#if $fee}
+    {#if $feeLabel}
       <Text variant="muted">
-        Pool fee: {$fee.feeAction.amount === 0n
-          ? "none on this deployment"
-          : `${$fee.feeAction.amount} (base units) — withdrawn from your private balance, not paid from your account`}
+        Pool fee: {$feeLabel} — withdrawn from your private balance on every
+        send, not paid from your account. Quoted per pool, so it does not vary
+        with what the transaction does.
       </Text>
     {/if}
 
