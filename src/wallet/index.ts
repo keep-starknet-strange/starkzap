@@ -633,10 +633,10 @@ export class Wallet extends BaseWallet {
   /**
    * Get the {@link AccountProvider} backing this wallet.
    *
-   * Exposes the signer and key-derived capabilities (such as
-   * {@link AccountProvider.getViewingKey}) that only a locally-signed wallet
-   * has. `CartridgeWallet` has no equivalent, which is what keeps
-   * signer-dependent features off the Cartridge path at the type level.
+   * Exposes the signer, which is what key-derived features need — the privacy
+   * pool's viewing key is derived from it. `CartridgeWallet` has no equivalent,
+   * which is what keeps signer-dependent features off the Cartridge path at the
+   * type level.
    */
   getAccountProvider(): AccountProvider {
     return this.accountProvider;

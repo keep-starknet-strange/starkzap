@@ -5,7 +5,6 @@ node_modules/
 .env
 .env.*
 !.env.example
-!.env.privacy.example
 
 # Build output
 dist/

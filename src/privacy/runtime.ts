@@ -15,6 +15,14 @@ let loadingPrivacySdk: Promise<PrivacySdkModule> | undefined;
  * The SDK is published to GitHub Packages rather than npmjs and needs Node 24
  * for the WebCrypto APIs its OHTTP layer relies on, so both are called out in
  * the failure message.
+ *
+ * Near-identical to the Tongo loader in `@/confidential/tongo`, and deliberately
+ * not shared with it. The specifier has to be a literal in both places: `typeof
+ * import("…")` needs one to produce the module type, and bundlers — Metro in
+ * particular — resolve `import()` statically, so a specifier passed in as an
+ * argument defeats the optional-peer resolution this indirection exists for. What
+ * is left to share is the message formatting, which is not worth splitting a
+ * loader across two files for.
  */
 export async function loadPrivacySdk(
   feature = "Privacy pool transfers"
@@ -34,9 +42,10 @@ export async function loadPrivacySdk(
           ? ` Original error: ${error.message}`
           : "";
       throw new Error(
-        `[starkzap] ${feature} requires optional peer dependency "@starkware-libs/starknet-privacy-sdk". ` +
-          "It is published to GitHub Packages, `https://github.com/starkware-libs/starknet-privacy/pkgs/npm/starknet-privacy-sdk`" +
-          "and requires authentication `read:packages`." +
+        `[starkzap] ${feature} requires optional peer dependency ` +
+          '"@starkware-libs/starknet-privacy-sdk". It is published to GitHub ' +
+          "Packages rather than npmjs, so installing it needs the scope pointed " +
+          "at `https://npm.pkg.github.com` and a token with `read:packages`. " +
           `Requires Node >= 24.${detail}`
       );
     } finally {

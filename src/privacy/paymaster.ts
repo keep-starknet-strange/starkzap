@@ -440,6 +440,13 @@ export class PrivacyPaymaster {
    * No user signature is involved: the relayer sends it and the pool authorises
    * it from the proof alone, which is what keeps the user's account off-chain.
    *
+   * The response also carries a `tracking_id` — the relayer's own identifier, and
+   * the one AVNU support asks for when a submitted transaction misbehaves. It is
+   * deliberately not returned: surfacing it means changing the return type of
+   * this, of {@link PrivacyClient.send} and of {@link PrivacyClient.submit} from
+   * a hash to an object, which is more than a support identifier is worth. Read
+   * it off the paymaster's own logs, or say so and it can be threaded through.
+   *
    * @param call - The pool's `apply_actions` call
    * @param proof - Proof data and facts from the proving service
    * @param parameters - The `parameters` from {@link quote}

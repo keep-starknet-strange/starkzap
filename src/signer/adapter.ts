@@ -104,8 +104,8 @@ export class SignerAdapter implements StarknetSignerInterface {
       resourceBounds: det.resourceBounds,
       tip: det.tip ?? 0,
       paymasterData: det.paymasterData || [],
-      ...(det.proofFacts?.length && { proofFacts: det.proofFacts }),
-    } as Parameters<typeof hash.calculateInvokeTransactionHash>[0]);
+      ...(det.proofFacts?.length ? { proofFacts: det.proofFacts } : {}),
+    });
 
     return this.signer.signRaw(msgHash as string);
   }
