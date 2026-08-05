@@ -4,6 +4,7 @@ import {
   assertProofBaseBlockAged,
   assertProofFresh,
   assertProofSendable,
+  assertProofUnsupported,
   proofBaseBlock,
   checkDeployed,
   ensureWalletReady,
@@ -187,49 +188,51 @@ describe("wallet utils", () => {
     const proof = { data: "0xdeadbeef", proofFacts: ["0x1", "0x2"] };
 
     it("allows a self-submitted proof once the caller acknowledges the cost", () => {
-      expect(() =>
-        assertProofSendable(proof, "user_pays", "Wallet", true)
-      ).not.toThrow();
+      expect(() => assertProofSendable(proof, "user_pays", true)).not.toThrow();
     });
 
     it("refuses to self-submit a proof by default", () => {
       // Self-submission works on-chain, which is exactly why it needs a gate:
       // nothing would tell the caller their address is now on the transaction.
-      expect(() => assertProofSendable(proof, "user_pays", "Wallet")).toThrow(
+      expect(() => assertProofSendable(proof, "user_pays")).toThrow(
         "Refusing to self-submit"
       );
     });
 
     it("is a no-op when there is no proof", () => {
       expect(() =>
-        assertProofSendable(undefined, { type: "paymaster" }, "CartridgeWallet")
+        assertProofSendable(undefined, { type: "paymaster" })
       ).not.toThrow();
     });
 
     it("rejects a proof on the SNIP-29 paymaster path", () => {
       expect(() =>
-        assertProofSendable(proof, { type: "paymaster" }, "Wallet", true)
+        assertProofSendable(proof, { type: "paymaster" }, true)
       ).toThrow("SNIP-29 paymaster cannot carry a transaction proof");
     });
 
     it("rejects a proof on the deprecated sponsored alias", () => {
-      expect(() =>
-        assertProofSendable(proof, "sponsored", "Wallet", true)
-      ).toThrow("SNIP-29 paymaster cannot carry a transaction proof");
+      expect(() => assertProofSendable(proof, "sponsored", true)).toThrow(
+        "SNIP-29 paymaster cannot carry a transaction proof"
+      );
+    });
+  });
+
+  describe("assertProofUnsupported", () => {
+    const proof = { data: "0xdeadbeef", proofFacts: ["0x1", "0x2"] };
+
+    it("refuses a proof outright", () => {
+      // Each wallet knows statically whether it can carry one, so this is a
+      // separate function rather than a branch on the wallet's name.
+      expect(() => assertProofUnsupported(proof, "CartridgeWallet")).toThrow(
+        "CartridgeWallet cannot carry a transaction proof"
+      );
     });
 
-    it("checks the wallet before the fee mode", () => {
-      // A Cartridge wallet cannot derive a viewing key at all, so that refusal
-      // is the more useful one to surface even on the paymaster path.
+    it("is a no-op when there is no proof", () => {
       expect(() =>
-        assertProofSendable(proof, { type: "paymaster" }, "CartridgeWallet")
-      ).toThrow("CartridgeWallet cannot send proof-carrying transactions");
-    });
-
-    it("rejects a proof on a non-Wallet implementation", () => {
-      expect(() =>
-        assertProofSendable(proof, "user_pays", "CartridgeWallet", true)
-      ).toThrow("CartridgeWallet cannot send proof-carrying transactions");
+        assertProofUnsupported(undefined, "CartridgeWallet")
+      ).not.toThrow();
     });
   });
 

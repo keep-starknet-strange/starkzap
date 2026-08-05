@@ -39,6 +39,40 @@ function asBaseUrl(value: string, label: string): string {
 }
 
 /**
+ * Warn when a service URL is plain `http://`.
+ *
+ * Both the prover and the discovery service receive the viewing key, so over
+ * cleartext it is readable by anyone on the path. With OHTTP enabled it is worse
+ * rather than better: the key config is fetched over that same channel and
+ * trusted on first use, so an attacker can serve their own encryption key and
+ * read every envelope sealed to it.
+ *
+ * Warned rather than thrown. {@link assertSafeHttpUrl} allows `http://` on
+ * purpose so local development works, and plain HTTP inside a trusted network is
+ * a judgement an integrator is entitled to make. Emitted with `console.warn`
+ * rather than the SDK logger because that logger defaults to silent, and a
+ * security downgrade nobody sees is not a warning.
+ *
+ * Silence here does not mean the viewing key is protected. It says nothing about
+ * who operates the service: over `https://` with no `ohttp`, the operator still
+ * reads the key in the clear — a deployment decision {@link PrivacyConfig.ohttp}
+ * describes rather than one to adjudicate here. And it sees nothing at all when
+ * `prover` or `discovery` is given as an instance, there being no URL to look at.
+ *
+ * The privacy SDK's README claims it warns about this itself. It does not; there
+ * is no such check in the shipped build.
+ */
+function warnIfPlaintext(url: string, label: string): void {
+  if (new URL(url).protocol !== "http:") return;
+
+  console.warn(
+    `[starkzap] ${label} is plain http://, so the viewing key it receives is ` +
+      "readable in transit. Use https:// unless this is localhost or an " +
+      "otherwise trusted network."
+  );
+}
+
+/**
  * Validate the OHTTP relay URL, which nothing else checks.
  * Every other field of `OhttpOption` passes through untouched.
  */
@@ -254,6 +288,13 @@ export async function createPrivacy(
       ? asBaseUrl(config.discovery, "Privacy discovery service URL")
       : config.discovery;
   const ohttp = normalizeOhttp(config.ohttp);
+
+  if (typeof prover === "string") {
+    warnIfPlaintext(prover, "Privacy proving service URL");
+  }
+  if (typeof discovery === "string") {
+    warnIfPlaintext(discovery, "Privacy discovery service URL");
+  }
 
   const sdk = await loadPrivacySdk();
 

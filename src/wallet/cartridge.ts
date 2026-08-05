@@ -22,7 +22,7 @@ import {
   type StakingConfig,
 } from "@/types";
 import {
-  assertProofSendable,
+  assertProofUnsupported,
   checkDeployed,
   ensureWalletReady,
   normalizeFeeMode,
@@ -315,12 +315,7 @@ export class CartridgeWallet extends BaseWallet {
     const feeMode = normalizeFeeMode(options.feeMode ?? this.defaultFeeMode);
     const timeBounds = options.timeBounds ?? this.defaultTimeBounds;
 
-    assertProofSendable(
-      options.proof,
-      feeMode,
-      "CartridgeWallet",
-      options.unsafeUserPays
-    );
+    assertProofUnsupported(options.proof, "CartridgeWallet");
 
     let transaction_hash: string;
 

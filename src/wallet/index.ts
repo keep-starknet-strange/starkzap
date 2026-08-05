@@ -510,12 +510,7 @@ export class Wallet extends BaseWallet {
     const feeMode = normalizeFeeMode(options.feeMode ?? this.defaultFeeMode);
     const timeBounds = options.timeBounds ?? this.defaultTimeBounds;
 
-    assertProofSendable(
-      options.proof,
-      feeMode,
-      "Wallet",
-      options.unsafeUserPays
-    );
+    assertProofSendable(options.proof, feeMode, options.unsafeUserPays);
     if (options.proof) {
       await assertProofFresh(
         options.proof,
