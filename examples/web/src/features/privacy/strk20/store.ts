@@ -116,7 +116,7 @@ export async function connect(): Promise<void> {
     fee.set(await privacy.quote());
     await refresh();
   } catch (err) {
-    error.set(describe(err));
+    fail("Connect", err);
     client.set(null);
   } finally {
     connecting.set(false);
@@ -158,7 +158,7 @@ export async function refresh(): Promise<void> {
       registered.set(requirement !== 0); // SetupRequirement.Register === 0
     }
   } catch (err) {
-    error.set(describe(err));
+    fail("Refresh", err);
   }
 }
 
@@ -211,7 +211,7 @@ async function run(
     fee.set(await privacy.quote());
     await refresh();
   } catch (err) {
-    error.set(describe(err));
+    fail(label, err);
   } finally {
     waitingBlocks.set(null);
     step.set(null);
@@ -248,7 +248,7 @@ export async function deposit(token: Token, input: string): Promise<void> {
     await approve.wait();
     log(`approve ${approve.hash} landed`, "info");
   } catch (err) {
-    error.set(describe(err));
+    fail("Deposit approve", err);
     step.set(null);
     busy.set(false);
     return;
@@ -358,6 +358,12 @@ export async function recipientReady(
   } catch {
     return false;
   }
+}
+
+function fail(what: string, err: unknown): void {
+  const reason = describe(err);
+  error.set(reason);
+  log(`${what} failed: ${reason}`, "error");
 }
 
 /** Turn screening and paymaster rejections into something a user can act on. */

@@ -1073,6 +1073,55 @@ describe("privacy", () => {
       });
     });
 
+    it("quotes once per send, so the proof and the echo agree", async () => {
+      // Two quotes could disagree: the fee is baked into the proof from the
+      // first, while the paymaster is told to expect the second. It rejects that
+      // as POOL_FEE_TOO_LOW *after* proving, the one step worth not repeating.
+      const { env: sdkEnv, bind } = env();
+      paymasterStub("0x0", `0x${BigInt(sdkEnv.ace).toString(16)}`);
+      const privacy = await bind();
+
+      await privacy.send((b) => b.register());
+
+      const methods = vi.mocked(fetch).mock.calls.map(
+        ([, init]) =>
+          (
+            JSON.parse(String((init as RequestInit).body)) as {
+              method: string;
+            }
+          ).method
+      );
+      expect(
+        methods.filter((m) => m === "paymaster_buildTransaction")
+      ).toHaveLength(1);
+      expect(methods).toContain("paymaster_executeTransaction");
+    });
+
+    it("quotes for a standalone submit, which has none of its own", async () => {
+      // `submit()` is the escape hatch for a proof composed against
+      // `.transfers`, so there is no earlier quote to echo.
+      const { env: sdkEnv, bind } = env();
+      paymasterStub("0x0", `0x${BigInt(sdkEnv.ace).toString(16)}`);
+      const privacy = await bind();
+
+      const { callAndProof } = await privacy.transfers
+        .build()
+        .register()
+        .execute();
+      await expect(privacy.submit(callAndProof)).resolves.toBe("0xsent");
+
+      // No caller-supplied parameters, so this path still has to fetch them.
+      const methods = vi.mocked(fetch).mock.calls.map(
+        ([, init]) =>
+          (
+            JSON.parse(String((init as RequestInit).body)) as {
+              method: string;
+            }
+          ).method
+      );
+      expect(methods).toContain("paymaster_buildTransaction");
+    });
+
     it("proves against head - depth on the first send", async () => {
       const { provider, env: sdkEnv, bind } = env(500);
       paymasterStub("0x0", `0x${BigInt(sdkEnv.ace).toString(16)}`);
