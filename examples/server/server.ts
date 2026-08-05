@@ -20,13 +20,16 @@ const PRIVY_API_URL = (
 const app = express();
 app.use(cors());
 
-// Privacy proofs are megabytes of base64, far past express.json()'s 100kb
-// default — which rejects them with an HTML 413 before any route runs, so the
-// caller sees "non-JSON response" rather than a size problem. Scoped to the
-// paymaster path and mounted first: body-parser skips a body already parsed, so
-// every other route keeps the safe default. An integrator's own proxy needs the
-// same allowance.
-const PROOF_BODY_LIMIT = "32mb";
+// A privacy proof is bigger than `express.json()`'s 100kb default, so submitting
+// one needs a raised limit — measured at 300-320kb for a simple transfer, and
+// larger for transactions carrying more actions. 4mb leaves an order of
+// magnitude of headroom without turning the route into a sink; the real figure
+// for your own transactions is in the `[Paymaster/*]` log line below.
+//
+// Scoped to the paymaster path and mounted first: body-parser skips a body that
+// is already parsed, so every other route keeps the safe default. An integrator's
+// own proxy needs the same allowance.
+const PROOF_BODY_LIMIT = "4mb";
 app.use("/api/paymaster", express.json({ limit: PROOF_BODY_LIMIT }));
 
 app.use(express.json());
@@ -220,6 +223,18 @@ if (ENABLE_PRIVY) {
 // --- AVNU Paymaster proxy (opt-in) ---
 // Set ENABLE_PAYMASTER=true. With AVNU_API_KEY: sponsored (gasfree) mode.
 // Without it: gasless mode (user pays in tokens) still works.
+//
+// !! UNAUTHENTICATED, ON PURPOSE, AND ONLY SAFE ON LOCALHOST. !!
+//
+// The whole point of a proxy is that it holds the API key so the key does not
+// ship in a browser bundle. That makes this route a way to spend the key: anyone
+// who can reach it can submit sponsored transactions against your AVNU account
+// and your gas budget, without ever seeing the key itself. Reachable from the
+// internet, it is an open relay for your sponsorship.
+//
+// Before deploying anything shaped like this, gate it — a session check, a shared
+// secret, an allowlist, a rate limit — and gate it on the *paymaster* route
+// specifically, not just on the routes that happen to have login attached.
 if (ENABLE_PAYMASTER) {
   const AVNU_API_KEY = process.env.AVNU_API_KEY;
 
@@ -263,7 +278,10 @@ if (ENABLE_PAYMASTER) {
     }
 
     try {
-      const size = Buffer.byteLength(JSON.stringify(req.body ?? {}));
+      // Content-Length rather than re-serialising the body: express already read
+      // the figure off the wire, and stringifying a proof to measure it doubles
+      // the memory the request costs.
+      const size = Number(req.get("content-length") ?? 0);
       console.log(
         `[Paymaster/${req.params.network}] ${req.body?.method || "unknown"} (${(size / 1024).toFixed(0)}kb)`
       );
