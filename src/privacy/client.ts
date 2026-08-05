@@ -176,14 +176,26 @@ export function withPaymaster(
     });
   }
 
-  async function submit(callAndProof: CallAndProof): Promise<string> {
+  /**
+   * @param callAndProof - The pool's `apply_actions` call and its proof, as
+   *   returned by the builder's `execute()`. The fee withdrawal has to be among
+   *   the actions already: the proof commits to them, so it cannot be amended
+   *   here, and the paymaster rejects a proof without one (code 165).
+   * @param parameters - The `parameters` of the quote whose fee this proof
+   *   already commits to. Omitted only by the public {@link PrivacyClient.submit}
+   *   entry point, which has no quote of its own and so fetches one.
+   */
+  async function submit(
+    callAndProof: CallAndProof,
+    parameters?: unknown
+  ): Promise<string> {
     try {
       const hash = await paymaster.execute(
         callAndProof.call,
         callAndProof.proof,
-        // A quote is cheap next to a proof, and its `parameters` carry
-        // server-chosen fields (tip, time bounds) that must be echoed back.
-        (await quote()).parameters
+        // Echoed rather than rebuilt: `parameters` carry server-chosen fields
+        // (tip, time bounds) that the paymaster expects back verbatim.
+        parameters ?? (await quote()).parameters
       );
       lastSubmittedTxHash = hash;
       return hash;
@@ -211,7 +223,7 @@ export function withPaymaster(
     submit,
 
     async send(compose, options) {
-      const { feeAction } = await quote();
+      const { feeAction, parameters } = await quote();
       const provingBlockId = await resolveProvingBlock(options);
 
       const { onWait: _onWait, ...sdkOptions } = options ?? {};
@@ -238,7 +250,7 @@ export function withPaymaster(
       }
 
       const { callAndProof } = await builder.execute();
-      return submit(callAndProof);
+      return submit(callAndProof, parameters);
     },
   };
 }
