@@ -22,7 +22,7 @@ import {
 } from "@/privacy/sequencing";
 import { screeningVerdict } from "@/privacy/errors";
 import { PrivacyPaymaster, PrivacyPaymasterError } from "@/privacy/paymaster";
-import { createPrivacy } from "@/privacy/create";
+import { createPrivacy, revokePrivacy } from "@/privacy/create";
 import { signatureDerivation } from "@/privacy/viewing-key";
 import { withPaymaster } from "@/privacy/client";
 import { PrivySigner, StarkSigner } from "@/signer";
@@ -1038,6 +1038,49 @@ describe("privacy", () => {
 
       return { mocknet, env, wallet, create };
     }
+
+    /**
+     * The viewing key lives in a closure inside the client, so dropping a cached
+     * reference elsewhere does not end it. Revocation cuts it off at the source —
+     * and because the SDK asks for the key on every operation rather than
+     * caching it, that ends every call which needs to decrypt.
+     */
+    describe("revokePrivacy", () => {
+      it("refuses to decrypt after being revoked", async () => {
+        const { create } = mockEnv();
+        const transfers = await create();
+
+        // Works beforehand, so the failure afterwards is the revocation and not
+        // a broken fixture.
+        await expect(transfers.discoverNotes()).resolves.toBeDefined();
+
+        revokePrivacy(transfers);
+
+        await expect(transfers.discoverNotes()).rejects.toThrow(
+          "privacy client was revoked"
+        );
+      });
+
+      it("leaves other clients alone", async () => {
+        const { create } = mockEnv();
+        const [first, second] = await Promise.all([create(), create()]);
+
+        revokePrivacy(first);
+
+        await expect(first.discoverNotes()).rejects.toThrow("was revoked");
+        await expect(second.discoverNotes()).resolves.toBeDefined();
+      });
+
+      it("is safe to call twice, and on an unused client", () => {
+        const { create } = mockEnv();
+        return create().then((transfers) => {
+          expect(() => {
+            revokePrivacy(transfers);
+            revokePrivacy(transfers);
+          }).not.toThrow();
+        });
+      });
+    });
 
     it("registers, then reports the account as ready to transact", async () => {
       const { mocknet, env, create } = mockEnv();

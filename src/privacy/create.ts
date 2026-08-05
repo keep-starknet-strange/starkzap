@@ -132,6 +132,39 @@ export interface PrivacyConfig {
 }
 
 /**
+ * Revocation handles for the clients this module built.
+ *
+ * A `WeakMap` rather than a method on the return value, because the return type
+ * is the privacy SDK's own interface and has to stay exactly that — the fluent
+ * builder, discovery and history APIs are meant to be used as the SDK documents
+ * them, not through a starkzap wrapper.
+ */
+const revocations = new WeakMap<PrivateTransfersInterface, () => void>();
+
+/**
+ * Stop a privacy client from using its viewing key again.
+ *
+ * The SDK asks for the key on every operation rather than holding a copy, so
+ * cutting it off here ends the client: any call that needs to decrypt now
+ * throws. {@link Wallet.disconnect} does this for the client it handed out.
+ *
+ * What this can and cannot do, stated exactly. It drops the only reference
+ * starkzap holds, so the key becomes collectable, and it refuses every later
+ * use. It does not scrub memory — JavaScript strings are immutable, so nothing
+ * can overwrite them in place. And it does not unread what was already read:
+ * notes and channels already discovered stay decrypted in whatever registry the
+ * caller is holding.
+ *
+ * Safe to call more than once, and on a client that was never used.
+ *
+ * @param transfers - A client from {@link createPrivacy}, or the `transfers` of
+ *   one from `wallet.privacy()`
+ */
+export function revokePrivacy(transfers: PrivateTransfersInterface): void {
+  revocations.get(transfers)?.();
+}
+
+/**
  * Create a privacy pool client bound to a starkzap wallet.
  *
  * Returns the privacy SDK's own {@link PrivateTransfersInterface} rather than
@@ -238,7 +271,15 @@ export async function createPrivacy(
   // matches the one the pool registered is left to the discovery service, which
   // rejects a mismatch outright.
   let viewingKey: string | undefined;
+  let revoked = false;
   const getViewingKey = async (): Promise<string> => {
+    if (revoked) {
+      throw new Error(
+        "[starkzap] This privacy client was revoked, so its viewing key is no " +
+          "longer available. Build a new one with `wallet.privacy()` or " +
+          "`createPrivacy()` after reconnecting."
+      );
+    }
     if (viewingKey === undefined) {
       const derived = await derive(context, signer);
       assertCanonicalViewingKey(derived);
@@ -247,7 +288,7 @@ export async function createPrivacy(
     return viewingKey;
   };
 
-  return sdk.createPrivateTransfers({
+  const transfers = sdk.createPrivateTransfers({
     account: {
       address: wallet.address,
       // The SDK signs a synthetic invocation whose sender is the pool, so it
@@ -279,4 +320,11 @@ export async function createPrivacy(
       subAccountAnonymizerAddress: config.subAccountAnonymizerAddress,
     }),
   });
+
+  revocations.set(transfers, () => {
+    revoked = true;
+    viewingKey = undefined;
+  });
+
+  return transfers;
 }

@@ -1,4 +1,8 @@
-export { createPrivacy, type PrivacyConfig } from "@/privacy/create";
+export {
+  createPrivacy,
+  revokePrivacy,
+  type PrivacyConfig,
+} from "@/privacy/create";
 export {
   assertCanonicalViewingKey,
   assertDeterministicSigner,
