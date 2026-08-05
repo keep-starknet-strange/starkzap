@@ -638,6 +638,25 @@ describe("Wallet", () => {
       await wallet.disconnect();
       expect(await wallet.privacy()).not.toBe(first);
     });
+
+    it("should revoke the viewing key on disconnect, not just forget it", async () => {
+      // Clearing the cache alone would leave the key alive inside the client the
+      // caller is still holding — which is the thing that must not outlive the
+      // session. So the old client has to refuse, not merely be replaced.
+      const privacySdk = new StarkZap({ ...config, privacy: privacyConfig });
+      vi.spyOn(privacySdk.getProvider(), "getChainId").mockResolvedValue(
+        config.chainId!.toFelt252() as constants.StarknetChainId
+      );
+      const signer = new StarkSigner(testPrivateKeys.key1);
+      const wallet = await privacySdk.connectWallet({ account: { signer } });
+
+      const stale = await wallet.privacy();
+      await wallet.disconnect();
+
+      await expect(stale.discoverNotes()).rejects.toThrow(
+        "privacy client was revoked"
+      );
+    });
   });
 
   describe("preflight", () => {

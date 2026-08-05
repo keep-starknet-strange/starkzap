@@ -38,7 +38,7 @@ import {
   paymasterDetails,
   preflightTransaction,
 } from "@/wallet/utils";
-import { createPrivacy } from "@/privacy/create";
+import { createPrivacy, revokePrivacy } from "@/privacy/create";
 import { withPaymaster, type PrivacyClient } from "@/privacy/client";
 import { PROOF_BASE_BLOCK_DEPTH } from "@/privacy/sequencing";
 import type { PrivacyConfig } from "@/privacy/create";
@@ -752,9 +752,20 @@ export class Wallet extends BaseWallet {
   override async disconnect(): Promise<void> {
     await super.disconnect();
     this.clearDeploymentCache();
-    // The privacy client holds a derived viewing key; it must not outlive the
-    // session that authorised it.
+
+    // Revoked, not merely forgotten. Dropping the cache would leave the viewing
+    // key alive inside any client the caller still holds — and the key outliving
+    // the session that authorised it is the thing to prevent. Revoking cuts the
+    // key off at its source, and since the SDK asks for it on every operation
+    // rather than caching it, that ends every client built from this one.
+    const client = this.privacyClient;
     this.privacyClient = null;
+    await client?.then(
+      (privacy) => revokePrivacy(privacy.transfers),
+      // Creation failed, so there is no key to revoke. Swallowed rather than
+      // rethrown: a failed client must not make disconnecting fail.
+      () => undefined
+    );
   }
 }
 
