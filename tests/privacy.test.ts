@@ -328,11 +328,22 @@ describe("privacy", () => {
         const body = bodies.shift();
         return Promise.resolve({
           status: 200,
+          ok: true,
           json: () => Promise.resolve(body),
         } as Response);
       });
       vi.stubGlobal("fetch", fetchMock);
       return calls as { method: string; params: Record<string, never> }[];
+    }
+
+    /** Await a rejection and hand back the error, typed. */
+    function rejectedBy(call: () => Promise<unknown>) {
+      return call().then(
+        () => {
+          throw new Error("expected the paymaster call to reject");
+        },
+        (e: unknown) => e as PrivacyPaymasterError
+      );
     }
 
     afterEach(() => {
@@ -559,22 +570,69 @@ describe("privacy", () => {
       expect(error.message).toContain("Method not found");
     });
 
-    it("names the proxy body limit on a 413, since proofs are megabytes", async () => {
-      // The rejection comes from whatever sits in front of the paymaster, whose
-      // error page is not JSON — so the code alone reads as a paymaster fault.
+    it("carries the HTTP status as the error code", async () => {
+      // The status is the diagnosis when the failure is below the paymaster —
+      // 413 from a proxy that caps request bodies, say. It used to be dropped in
+      // favour of a synthetic -1, leaving nothing to branch on.
       vi.stubGlobal(
         "fetch",
         vi.fn(() =>
           Promise.resolve({
             status: 413,
-            json: () => Promise.reject(new Error("not json")),
+            ok: false,
+            json: () => Promise.resolve({ error: "Payload Too Large" }),
+          } as unknown as Response)
+        )
+      );
+
+      const error = await rejectedBy(() =>
+        new PrivacyPaymaster(URL).quote(POOL, { mode: "sponsored" })
+      );
+
+      expect(error.code).toBe(413);
+      expect(error.message).toContain("HTTP 413");
+    });
+
+    it("reports a non-2xx whose body is the proxy's own JSON shape", async () => {
+      // No JSON-RPC `error` member, so this reached neither guard and returned
+      // an undefined result — the caller then failed on `result.fee_action`,
+      // pointing at the wrong thing entirely.
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(() =>
+          Promise.resolve({
+            status: 500,
+            ok: false,
+            json: () => Promise.resolve({ detail: "upstream unavailable" }),
+          } as unknown as Response)
+        )
+      );
+
+      const error = await rejectedBy(() =>
+        new PrivacyPaymaster(URL).quote(POOL, { mode: "sponsored" })
+      );
+
+      expect(error).toBeInstanceOf(PrivacyPaymasterError);
+      expect(error.code).toBe(500);
+      // The body is kept so a caller can see what the proxy actually said.
+      expect(error.data).toEqual({ detail: "upstream unavailable" });
+    });
+
+    it("reports a 2xx carrying neither result nor error", async () => {
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(() =>
+          Promise.resolve({
+            status: 200,
+            ok: true,
+            json: () => Promise.resolve({}),
           } as unknown as Response)
         )
       );
 
       await expect(
         new PrivacyPaymaster(URL).quote(POOL, { mode: "sponsored" })
-      ).rejects.toThrow("raise the request body limit");
+      ).rejects.toThrow("returned no result");
     });
 
     it("reports a non-JSON response rather than an opaque parse error", async () => {
@@ -997,6 +1055,7 @@ describe("privacy", () => {
           if (body.method === "paymaster_buildTransaction") {
             return Promise.resolve({
               status: 200,
+              ok: true,
               json: () =>
                 Promise.resolve({
                   result: {
@@ -1009,6 +1068,7 @@ describe("privacy", () => {
           submitted.push(body.params);
           return Promise.resolve({
             status: 200,
+            ok: true,
             json: () =>
               Promise.resolve({ result: { transaction_hash: "0xsent" } }),
           } as Response);
@@ -1285,6 +1345,7 @@ describe("privacy", () => {
           const body = JSON.parse(String(init?.body)) as { method: string };
           return Promise.resolve({
             status: 200,
+            ok: true,
             json: () =>
               Promise.resolve(
                 body.method === "paymaster_buildTransaction"

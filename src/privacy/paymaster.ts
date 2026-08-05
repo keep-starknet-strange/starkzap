@@ -381,30 +381,16 @@ export class PrivacyPaymaster {
       body: JSON.stringify({ jsonrpc: "2.0", id: 1, method, params }),
     });
 
-    // A proxy that fails before reaching the paymaster returns HTML or an empty
-    // body, which would otherwise surface as an opaque JSON parse error.
+    // Undefined when the body is not JSON at all — typically an error page from
+    // a proxy that failed before reaching the paymaster.
     const body: unknown = await response.json().catch(() => undefined);
-    if (body === undefined) {
-      // 413 is worth naming: a proof is megabytes of base64, and most HTTP
-      // stacks cap request bodies far below that by default (express.json is
-      // 100kb, nginx 1MB). The rejection comes from the proxy, not the
-      // paymaster, and its error page is not JSON.
-      const hint =
-        response.status === 413
-          ? " A proof is several megabytes; raise the request body limit on the" +
-            " proxy in front of the paymaster."
-          : "";
-      throw new PrivacyPaymasterError(
-        response.status,
-        `[starkzap] The privacy paymaster returned a non-JSON response (HTTP ${response.status}) for ${method}.${hint}`
-      );
-    }
 
-    const error = (body as { error?: unknown }).error;
-    if (error !== undefined) {
-      const rpc = isRpcErrorBody(error)
-        ? error
-        : { code: -1, message: String(error) };
+    // A JSON-RPC error is checked first, and whatever the status: this is the
+    // paymaster itself answering, and its code carries more than the HTTP one.
+    const error =
+      body === undefined ? undefined : (body as { error?: unknown }).error;
+    if (isRpcErrorBody(error)) {
+      const rpc = error;
       // The paymaster's own words first, and never replaced: it knows why it
       // rejected the request and we do not. Ours is only ever appended.
       const reported = [rpc.message, reasonFrom(rpc.data)]
@@ -419,6 +405,31 @@ export class PrivacyPaymaster {
       );
     }
 
-    return (body as { result: T }).result;
+    // Anything the HTTP layer failed, whether or not the body parsed. The status
+    // is the whole diagnosis here and used to be discarded: a proxy answering
+    // 500 with its own JSON shape reached neither branch above, and the caller
+    // dereferenced an undefined result instead.
+    if (!response.ok || body === undefined) {
+      const what =
+        body === undefined
+          ? `returned a non-JSON response (HTTP ${response.status})`
+          : `rejected the request with HTTP ${response.status}`;
+      throw new PrivacyPaymasterError(
+        response.status,
+        `[starkzap] The privacy paymaster ${what} for ${method}.`,
+        body
+      );
+    }
+
+    const result = (body as { result?: T }).result;
+    if (result === undefined) {
+      throw new PrivacyPaymasterError(
+        response.status,
+        `[starkzap] The privacy paymaster returned no result for ${method} ` +
+          `(HTTP ${response.status}).`,
+        body
+      );
+    }
+    return result;
   }
 }
