@@ -47,13 +47,40 @@ export function isPaymasterMode(
 }
 
 /**
- * Reject a proof-carrying transaction the caller cannot actually send, or should
- * not send unknowingly.
+/**
+ * Refuse a proof on a wallet that could never have produced one.
  *
- * Three separate refusals:
+ * `CartridgeWallet` has no {@link AccountProvider}, so there is no signer to
+ * derive a viewing key from — which means no privacy client can be built for it
+ * and no proof can belong to it.
  *
- * - **Wrong wallet.** Only a locally-signed `Wallet` can produce the viewing key
- *   the pool needs, so a Cartridge or Privy wallet cannot carry a proof at all.
+ * Separate from {@link assertProofSendable} on purpose. Each wallet knows
+ * statically whether it can carry a proof, so it calls the one that applies to
+ * it. This used to be a single function branching on the wallet's *name*, which
+ * read as a dispatch and pushed a compile-time fact into a runtime string.
+ *
+ * @param proof - The proof from `execute()` options, if any
+ * @param wallet - Wallet name, for the message only
+ */
+export function assertProofUnsupported(
+  proof: TransactionProof | undefined,
+  wallet: string
+): void {
+  if (!proof) return;
+
+  throw new Error(
+    `[starkzap] ${wallet} cannot carry a transaction proof: privacy needs a ` +
+      "locally-signed `Wallet`, whose own signer derives the viewing key. Build " +
+      "and submit the proof through one of those instead."
+  );
+}
+
+/**
+ * Reject a proof-carrying transaction that cannot be sent, or should not be sent
+ * unknowingly.
+ *
+ * Two refusals:
+ *
  * - **Paymaster mode.** starknet.js's SNIP-29 paymaster has no field for a
  *   proof, so the proof would be silently dropped and the pool would revert.
  *   A *privacy* paymaster can carry one, but it is not this code path. See
@@ -61,24 +88,22 @@ export function isPaymasterMode(
  * - **Unacknowledged self-submission.** Sending a proof from the user's own
  *   account works, but records who sent it. That has to be opted into.
  *
+ * Which signer the wallet uses is deliberately *not* checked. A Privy-backed
+ * `Wallet` signs and sends a proof perfectly well; what a remote signer may not
+ * be able to do is derive the viewing key, and `createPrivacy` checks that
+ * separately. Refusing here would turn away a wallet that had already built a
+ * valid proof through a custom `viewingKeyDerivation`.
+ *
  * @param proof - The proof from `wallet.execute()` options, if any
  * @param feeMode - The resolved fee mode for this execution
- * @param wallet - Wallet description used in the error message
  * @param unsafeUserPays - Whether the caller accepted revealing the sender
  */
 export function assertProofSendable(
   proof: TransactionProof | undefined,
   feeMode: FeeMode,
-  wallet: string,
   unsafeUserPays?: boolean
 ): void {
   if (!proof) return;
-
-  if (wallet !== "Wallet") {
-    throw new Error(
-      `[starkzap] ${wallet} cannot send proof-carrying transactions. Privacy operations require a Wallet backed by a StarkSigner.`
-    );
-  }
 
   if (isPaymasterMode(feeMode)) {
     throw new Error(

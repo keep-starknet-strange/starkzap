@@ -986,6 +986,27 @@ describe("privacy", () => {
       ).rejects.toThrow("Privacy proving service URL must use");
     });
 
+    it("warns when a service URL is plain http, and not when it is https", async () => {
+      // Both services receive the viewing key, so cleartext exposes it. Warned
+      // rather than thrown: http is allowed on purpose for local development.
+      const warn = vi
+        .spyOn(console, "warn")
+        .mockImplementation(() => undefined);
+      try {
+        await createPrivacy(walletWith(new StarkSigner(testPrivateKeys.key1)), {
+          ...config,
+          prover: "https://prover.example.com",
+          discovery: "http://discovery.example.com",
+        });
+
+        expect(warn).toHaveBeenCalledTimes(1);
+        expect(warn.mock.calls[0]![0]).toContain("discovery service URL");
+        expect(warn.mock.calls[0]![0]).toContain("readable in transit");
+      } finally {
+        warn.mockRestore();
+      }
+    });
+
     it("rejects unsafe service URLs", async () => {
       const wallet = walletWith(new StarkSigner(testPrivateKeys.key1));
 
