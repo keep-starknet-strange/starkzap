@@ -158,15 +158,23 @@ export interface PrivacyConfig {
  * pass-through rather than sequencing transactions on your behalf:
  *
  * - **Depositing needs a prior ERC20 approve to the pool.** Neither this
- *   function nor the privacy SDK builds one, and the approve cannot share the
- *   privacy transaction — the proof owns it. Send it separately
+ *   function nor the privacy SDK builds one, so send it separately
  *   (`wallet.tx().approve(token, pool, amount).send()`) or the deposit reverts
- *   on-chain. Note this differs from {@link TongoConfidential.fund}, which does
- *   bundle its own approve.
- * - **Any on-chain state a proof reads must be ~10 blocks old.** That covers a
- *   preceding approve or top-up, the account's own deployment before
- *   `register()`, and the previous privacy transaction. Use
- *   {@link waitForProvableBlock} and pass the result as `provingBlockId`.
+ *   on-chain. It does *not* have to age: the allowance is spent when the
+ *   transaction executes rather than when it is proven. Note this differs from
+ *   {@link TongoConfidential.fund}, which bundles its own approve.
+ *
+ *   Needing a *separate* transaction is this layer's limitation, not the
+ *   protocol's. AVNU's paymaster has a second transaction type,
+ *   `invoke_and_apply_action`, which wraps a user call in an outside-execution
+ *   and relays it alongside the pool action — so the approve and the deposit
+ *   land together, without the extra transaction or the wait between them.
+ *   {@link PrivacyPaymaster} implements `apply_action` only.
+ * - **On-chain state a proof *reads* must be ~10 blocks old.** That covers a
+ *   top-up before a deposit, the account's own deployment before `register()`,
+ *   and the previous privacy transaction — but not the approve above. Use
+ *   {@link waitForFundedBalance} or {@link waitForProvableBlock} and pass the
+ *   result as `provingBlockId`.
  *
  * @param wallet - A locally-signed wallet. `CartridgeWallet` is not accepted:
  *   it has no {@link AccountProvider}, so it cannot produce the viewing key.
