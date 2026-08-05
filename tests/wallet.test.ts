@@ -7,6 +7,7 @@ import { Amount, ChainId, fromAddress, type Token } from "@/types";
 import type { WalletInterface } from "@/wallet";
 import type { SwapProvider } from "@/swap";
 import type { DcaProvider } from "@/dca";
+import type { PrivacyConfig } from "@/privacy";
 import { getTestConfig, testPrivateKeys } from "./config.js";
 
 function createStubWallet(deployed = true): {
@@ -568,8 +569,10 @@ describe("Wallet", () => {
       poolContractAddress: "0x123",
       prover: "https://prover.example.com",
       discovery: "https://discovery.example.com",
-      paymasterUrl: "https://paymaster.example.com",
-      fee: { mode: "sponsored" } as const,
+      paymaster: {
+        url: "https://paymaster.example.com",
+        fee: { mode: "sponsored" } as const,
+      },
     };
 
     it("should explain itself when the SDK config omits privacy", async () => {
@@ -581,11 +584,11 @@ describe("Wallet", () => {
       );
     });
 
-    it("should require a paymaster and an explicit fee mode", async () => {
-      // Not defaulted on purpose: `default` mode needs no API key but the
-      // forwarder keeps the whole suggested-max gas withdrawal, so choosing it
-      // silently would overcharge. See the forwarder's execute_private.
-      const { paymasterUrl: _url, fee: _fee, ...incomplete } = privacyConfig;
+    it("should require a paymaster config to submit", async () => {
+      // Not defaulted on purpose: `default` mode needs no API key but its
+      // withdrawal takes the suggested-max gas rather than the estimate, so
+      // choosing it silently would overcharge.
+      const { paymaster: _paymaster, ...incomplete } = privacyConfig;
       const partialSdk = new StarkZap({ ...config, privacy: incomplete });
       vi.spyOn(partialSdk.getProvider(), "getChainId").mockResolvedValue(
         config.chainId!.toFelt252() as constants.StarknetChainId
@@ -594,8 +597,26 @@ describe("Wallet", () => {
       const wallet = await partialSdk.connectWallet({ account: { signer } });
 
       await expect(wallet.privacy()).rejects.toThrow(
-        "`privacy.paymasterUrl` and `privacy.fee` are both required"
+        "`privacy.paymaster` is required"
       );
+    });
+
+    it("cannot be handed half a paymaster config", () => {
+      // Pairing the endpoint with the fee mode moved this from a runtime throw
+      // to the type: an endpoint without a fee mode does not compile, so there
+      // is no half-configured state left for wallet.privacy() to reject.
+      //
+      // `@ts-expect-error` is the assertion — it fails the typecheck if the
+      // expression below ever becomes valid, i.e. if the pairing is loosened.
+      const halfConfigured: PrivacyConfig = {
+        poolContractAddress: "0x123",
+        prover: "https://prover.example.com",
+        discovery: "https://discovery.example.com",
+        // @ts-expect-error - `fee` is required whenever `paymaster` is given
+        paymaster: { url: "https://paymaster.example.com" },
+      };
+
+      expect(halfConfigured.paymaster?.url).toBeDefined();
     });
 
     it("should build the client from the SDK config and reuse it", async () => {

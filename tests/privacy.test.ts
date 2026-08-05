@@ -943,7 +943,7 @@ describe("privacy", () => {
           }),
           {
             poolContractAddress: POOL_HEX,
-            paymasterUrl: "https://paymaster.example.com",
+            url: "https://paymaster.example.com",
             fee,
             provider,
           }

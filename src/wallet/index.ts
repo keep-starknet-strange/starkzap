@@ -658,8 +658,7 @@ export class Wallet extends BaseWallet {
    * read {@link PrivacyClient.transfers}.
    *
    * @returns A paymaster-bound privacy client
-   * @throws If `privacy` is missing from the SDK config, or omits
-   *   `paymasterUrl` / `fee`
+   * @throws If `privacy` is missing from the SDK config, or omits `paymaster`
    *
    * @example
    * ```ts
@@ -669,8 +668,10 @@ export class Wallet extends BaseWallet {
    *     poolContractAddress: POOL,
    *     prover: PROVER,
    *     discovery: DISCOVERY,
-   *     paymasterUrl: "https://my-app.example.com/api/paymaster",
-   *     fee: { mode: "sponsored" },
+   *     paymaster: {
+   *       url: "https://my-app.example.com/api/paymaster",
+   *       fee: { mode: "sponsored" },
+   *     },
    *   },
    * });
    * const wallet = await sdk.connectWallet({ account: { signer } });
@@ -687,7 +688,8 @@ export class Wallet extends BaseWallet {
       throw new Error(
         "[starkzap] wallet.privacy() requires 'privacy' in the SDK config. " +
           "Add it to StarkZap({ privacy: { poolContractAddress, prover, discovery, " +
-          "paymasterUrl, fee } }), or call createPrivacy(wallet, config) directly."
+          "paymaster: { url, fee } } }), or call createPrivacy(wallet, config) " +
+          "directly."
       );
     }
 
@@ -707,28 +709,27 @@ export class Wallet extends BaseWallet {
   private async createPrivacyClient(
     config: PrivacyConfig
   ): Promise<PrivacyClient> {
-    // Deliberately not defaulted. `default` fee mode needs no API key but the
-    // forwarder keeps the whole suggested-max gas withdrawal — measured at ~16x
-    // the sponsored pool fee — so picking one silently would overcharge on the
-    // user's behalf. Sponsored modes need a key, which needs a proxy.
-    if (!config.paymasterUrl || !config.fee) {
+    // One check, not two: `PrivacyPaymasterConfig` carries the endpoint and the
+    // fee mode together, so there is no half-configured state to reject. The
+    // fee mode is never defaulted — `default` needs no API key but its
+    // withdrawal takes the suggested *maximum* gas rather than the estimate, so
+    // choosing it unasked would overcharge on the user's behalf.
+    if (!config.paymaster) {
       throw new Error(
         "[starkzap] Privacy transactions are submitted by a paymaster's relayer, " +
-          "so `privacy.paymasterUrl` and `privacy.fee` are both required. Use " +
-          '`fee: { mode: "sponsored" }` (relayer pays gas, pool fee in STRK — needs ' +
-          "an API key, so point paymasterUrl at a proxy holding it), or `fee: { mode: " +
-          '"default", gasToken }` (no key, but the forwarder keeps the full ' +
-          "suggested-max gas amount rather than refunding the unused part)."
+          "so `privacy.paymaster` is required. Use `{ url, fee: { mode: " +
+          '"sponsored" } }` (relayer pays gas, pool fee in STRK — needs an API ' +
+          "key, so point `url` at a proxy holding it), or `{ url, fee: { mode: " +
+          '"default", gasToken } }` (no key, but the withdrawal takes the full ' +
+          "suggested-max gas rather than refunding the unused part)."
       );
     }
 
     const transfers = await createPrivacy(this, config);
 
     return withPaymaster(transfers, {
+      ...config.paymaster,
       poolContractAddress: config.poolContractAddress,
-      paymasterUrl: config.paymasterUrl,
-      fee: config.fee,
-      ...(config.tip && { tip: config.tip }),
       provider: this.provider,
     });
   }

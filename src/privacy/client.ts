@@ -10,9 +10,8 @@ import type { Address } from "@/types";
 import { fromAddress } from "@/types";
 import {
   PrivacyPaymaster,
-  type PrivacyFeeMode,
   type PrivacyFeeQuote,
-  type PrivacyTip,
+  type PrivacyPaymasterConfig,
 } from "@/privacy/paymaster";
 import {
   waitForProvableBlock,
@@ -113,16 +112,13 @@ export interface PrivacyClient extends Pick<
   submit(callAndProof: CallAndProof): Promise<string>;
 }
 
-/** What {@link withPaymaster} needs beyond the SDK client. */
-export interface PaymasterBinding {
+/**
+ * What {@link withPaymaster} needs beyond the SDK client: a
+ * {@link PrivacyPaymasterConfig}, plus the two things only the caller knows.
+ */
+export interface PaymasterBinding extends PrivacyPaymasterConfig {
   /** Pool the client is bound to. */
   poolContractAddress: string;
-  /** Paymaster endpoint — a proxy holding the API key, not the paymaster itself. */
-  paymasterUrl: string;
-  /** How the fee is paid. */
-  fee: PrivacyFeeMode;
-  /** Optional priority. Omit to let the paymaster choose. */
-  tip?: PrivacyTip;
   /** Provider used to read the chain head when resolving the proving block. */
   provider: RpcProvider;
 }
@@ -143,7 +139,7 @@ export function withPaymaster(
   transfers: PrivateTransfersInterface,
   binding: PaymasterBinding
 ): PrivacyClient {
-  const paymaster = new PrivacyPaymaster(binding.paymasterUrl);
+  const paymaster = new PrivacyPaymaster(binding.url);
   const pool = fromAddress(binding.poolContractAddress);
 
   // Hash of this client's most recent submission. A proof must read pool state

@@ -30,6 +30,43 @@ export type PrivacyFeeMode =
  */
 export type PrivacyTip = "slow" | "normal" | "fast";
 
+/**
+ * Where and how to submit private transactions.
+ *
+ * Present or absent as a unit. Submission needs an endpoint *and* a fee mode,
+ * so pairing them in one object puts that requirement in the type: neither
+ * {@link withPaymaster} nor `wallet.privacy()` can be handed half a
+ * configuration, and the check happens at compile time rather than as a throw
+ * on first use.
+ *
+ * Omit the whole object to compose and prove with `createPrivacy` and submit
+ * through your own infrastructure.
+ */
+export interface PrivacyPaymasterConfig {
+  /**
+   * Paymaster endpoint.
+   *
+   * Point this at a proxy that holds the API key rather than at the paymaster
+   * itself: `sponsored` and `sponsored_private` need one. `default` mode needs
+   * no key at all, so it can address the paymaster directly.
+   */
+  url: string;
+  /**
+   * How the fee is paid. Deliberately never defaulted.
+   *
+   * `default` mode is the tempting choice, being the only one that works
+   * without an API key, but its withdrawal takes the paymaster's suggested
+   * *maximum* gas rather than the estimate, so the user pays for headroom they
+   * may not use. {@link PrivacyPaymaster.quote} reports both figures.
+   *
+   * Every mode withdraws from the shielded balance and is submitted by the
+   * relayer, so the choice is about cost, not about privacy.
+   */
+  fee: PrivacyFeeMode;
+  /** Transaction priority. Omit to let the paymaster choose. */
+  tip?: PrivacyTip;
+}
+
 /** The withdrawal a proof must include so the forwarder is reimbursed. */
 export interface PrivacyFeeAction {
   /** Forwarder address that must receive the fee. */

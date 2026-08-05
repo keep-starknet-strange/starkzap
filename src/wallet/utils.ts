@@ -85,7 +85,7 @@ export function assertProofSendable(
       "[starkzap] A SNIP-29 paymaster cannot carry a transaction proof: its " +
         "executable-transaction shape has no field for one, so the proof would be " +
         "dropped and the pool would revert. Submit through a privacy paymaster " +
-        "instead (configure `privacy.paymasterUrl`), or self-submit with " +
+        "instead (configure `privacy.paymaster`), or self-submit with " +
         '`feeMode: "user_pays"` and `unsafeUserPays: true`.'
     );
   }
@@ -96,7 +96,7 @@ export function assertProofSendable(
         "be sent from this account, incrementing its nonce and paying gas from its " +
         "public balance, so the chain would record who performed the private " +
         "operation. Submit through a privacy paymaster (configure " +
-        "`privacy.paymasterUrl` and use `wallet.privacy()`), or pass " +
+        "`privacy.paymaster` and use `wallet.privacy()`), or pass " +
         "`unsafeUserPays: true` to accept revealing the sender."
     );
   }
