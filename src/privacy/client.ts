@@ -1,4 +1,4 @@
-import type { RpcProvider } from "starknet";
+import type { Call, RpcProvider, Signature, TypedData } from "starknet";
 import type {
   CallAndProof,
   PrivateTransfersBuilder,
@@ -12,6 +12,8 @@ import {
   PrivacyPaymaster,
   type PrivacyFeeQuote,
   type PrivacyPaymasterConfig,
+  type PrivacyInvoke,
+  type PrivacySignedInvoke,
 } from "@/privacy/paymaster";
 import {
   waitForProvableBlock,
@@ -41,6 +43,39 @@ export interface PrivacySendOptions extends Omit<
    * a devnet where blocks arrive instantly, or a test.
    */
   wait?: ProvableBlockOptions;
+  /**
+   * Public calls to relay in the same transaction as the private one.
+   *
+   * For the step that has to happen in public anyway — the ERC20 `approve` before
+   * a deposit is the standard case. Without this it is a separate transaction
+   * that the user signs and pays for themselves; with it, the relayer submits it
+   * through the account's `execute_from_outside`, so it lands atomically with the
+   * pool action.
+   *
+   * These calls are *not* private. They name the account, so use this for work
+   * that is already public, not to hide anything.
+   *
+   * Requires {@link PaymasterBinding.account}, and requires that account to
+   * support SNIP-9 outside execution — a property of the user's wallet, not of
+   * your configuration. `wallet.privacy()` wires this up; a client built by hand
+   * through {@link withPaymaster} has to pass `account` itself.
+   *
+   * Build these with `wallet.tx()` rather than by hand — `calls()` resolves the
+   * fluent builder into exactly this shape, so the ERC20 and protocol helpers are
+   * all available:
+   *
+   * ```ts
+   * invoke: await wallet.tx().approve(STRK, poolAddress, amount).calls()
+   * ```
+   *
+   * Merging the approve does not remove what a deposit proof needs from the
+   * chain. The approve is checked when the deposit *executes*, so it does not
+   * have to age — but the depositor's balance is read at the proving block, so
+   * funds that have just arrived still need
+   * {@link PrivacySendOptions.provingBlockId} or a wait on the balance. Wrapping
+   * saves a transaction, not the settling.
+   */
+  invoke?: Call[];
 }
 
 /**
@@ -86,14 +121,28 @@ export interface PrivacyClient extends Pick<
    * final action, proves, and submits through the paymaster's relayer so the
    * account never appears on-chain.
    *
+   * Pass {@link PrivacySendOptions.invoke} to carry public calls in the same
+   * transaction (an `approve` before a deposit typically). Those calls are
+   * relayed through the account's `execute_from_outside`, so they are signed and
+   * are not private. The private part still is.
+   *
    * @param compose - Adds the operations to perform
-   * @param options - SDK execute options, plus proving-block overrides
+   * @param options - SDK execute options, proving-block overrides, and any
+   *   public calls to relay
    * @returns The submitted transaction hash
    *
    * @example
    * ```ts
    * const hash = await privacy.send((b) =>
    *   b.with(STRK, (t) => t.transfer({ recipient: bob, amount })).surplusTo(me)
+   * );
+   * ```
+   *
+   * @example Deposit without a separate approve transaction
+   * ```ts
+   * const hash = await privacy.send(
+   *   (b) => b.with(STRK, (t) => t.deposit({ amount })),
+   *   { invoke: await wallet.tx().approve(STRK, poolAddress, amount).calls() }
    * );
    * ```
    */
@@ -125,6 +174,23 @@ export interface PaymasterBinding extends PrivacyPaymasterConfig {
   poolContractAddress: string;
   /** Provider used to read the chain head when resolving the proving block. */
   provider: RpcProvider;
+  /**
+   * The account behind the client, needed only to relay public calls alongside
+   * the private transaction. See {@link PrivacySendOptions.invoke}.
+   *
+   * Address and signer travel together deliberately: a signature is worthless
+   * without knowing which account it is for, and the paymaster builds the typed
+   * data from the address before there is anything to sign.
+   *
+   * Nothing else on this client needs it. Private transactions are authorised by
+   * the proof alone, which is what keeps the account off-chain.
+   */
+  account?: {
+    /** Account the relayed calls belong to. Must support SNIP-9. */
+    address: Address;
+    /** Signs the paymaster's SNIP-12 typed data, e.g. `wallet.signMessage`. */
+    signTypedData: (typedData: TypedData) => Promise<Signature>;
+  };
 }
 
 /**
@@ -155,8 +221,42 @@ export function withPaymaster(
   // callers do not have to.
   let lastSubmittedTxHash: string | undefined;
 
-  const quote = (): Promise<PrivacyFeeQuote> =>
-    paymaster.quote(pool, binding.fee, binding.tip);
+  const quote = (invoke?: PrivacyInvoke): Promise<PrivacyFeeQuote> =>
+    paymaster.quote(pool, binding.fee, {
+      ...(binding.tip && { tip: binding.tip }),
+      ...(invoke && { invoke }),
+    });
+
+  /**
+   * Turn requested calls into a {@link PrivacyInvoke} plus the signer for it.
+   *
+   * The two are returned together so the signing step cannot be reached without
+   * the signer that made the request valid. Checked before quoting, so a client
+   * with no signer fails on the request itself rather than after a round trip
+   * that returns typed data nothing can sign.
+   */
+  function resolveInvoke(calls: Call[] | undefined):
+    | {
+        invoke: PrivacyInvoke;
+        signTypedData: (typedData: TypedData) => Promise<Signature>;
+      }
+    | undefined {
+    if (!calls?.length) return undefined;
+
+    const account = binding.account;
+    if (!account) {
+      throw new Error(
+        "[starkzap] `send({ invoke })` relays calls through the account's " +
+          "`execute_from_outside`, so it needs that account and a way to sign " +
+          "for it. `wallet.privacy()` provides both; a client built with " +
+          "`withPaymaster` has to pass `account: { address, signTypedData }`."
+      );
+    }
+    return {
+      invoke: { userAddress: account.address, calls },
+      signTypedData: account.signTypedData,
+    };
+  }
 
   /** Block the previous send landed in, or -1 when there is nothing to age. */
   async function previousBlock(): Promise<number> {
@@ -193,10 +293,12 @@ export function withPaymaster(
    * @param parameters - The `parameters` of the quote whose fee this proof
    *   already commits to. Omitted only by the public {@link PrivacyClient.submit}
    *   entry point, which has no quote of its own and so fetches one.
+   * @param invoke - Signed public calls, when the same quote wrapped any.
    */
   async function submit(
     callAndProof: CallAndProof,
-    parameters?: unknown
+    parameters?: unknown,
+    invoke?: PrivacySignedInvoke
   ): Promise<string> {
     try {
       const hash = await paymaster.execute(
@@ -204,7 +306,8 @@ export function withPaymaster(
         callAndProof.proof,
         // Echoed rather than rebuilt: `parameters` carry server-chosen fields
         // (tip, time bounds) that the paymaster expects back verbatim.
-        parameters ?? (await quote()).parameters
+        parameters ?? (await quote()).parameters,
+        invoke
       );
       lastSubmittedTxHash = hash;
       return hash;
@@ -236,10 +339,31 @@ export function withPaymaster(
     submit,
 
     async send(compose, options) {
-      const { feeAction, parameters } = await quote();
+      const relay = resolveInvoke(options?.invoke);
+      const { feeAction, parameters, typedData } = await quote(relay?.invoke);
+
+      // Signed here, before the wait and the proof, rather than after: the
+      // signature does not depend on the proof, and asking for it first means a
+      // user who declines has not already paid for proving. The typed data is
+      // valid for a window the paymaster sets which comfortably outlasts the
+      // block wait plus proving. If a chain ever slow enough to blow that
+      // window turns up, the paymaster rejects the `execute` cleanly rather
+      // than anything landing half-done.
+      //
+      // `typedData` is echoed exactly as received: the signature covers those
+      // bytes, and the paymaster picks the nonce, so rebuilding it invalidates it.
+      const signedInvoke: PrivacySignedInvoke | undefined =
+        relay && typedData
+          ? {
+              userAddress: relay.invoke.userAddress,
+              typedData,
+              signature: await relay.signTypedData(typedData),
+            }
+          : undefined;
+
       const provingBlockId = await resolveProvingBlock(options);
 
-      const { wait: _wait, ...sdkOptions } = options ?? {};
+      const { wait: _wait, invoke: _invoke, ...sdkOptions } = options ?? {};
       // ProvingBlockId is starknet.js's BlockIdentifier, so a plain number is
       // the block-number form; `{ block_number: n }` is not accepted.
       const builder = transfers.build({
@@ -263,7 +387,7 @@ export function withPaymaster(
       }
 
       const { callAndProof } = await builder.execute();
-      return submit(callAndProof, parameters);
+      return submit(callAndProof, parameters, signedInvoke);
     },
   };
 }

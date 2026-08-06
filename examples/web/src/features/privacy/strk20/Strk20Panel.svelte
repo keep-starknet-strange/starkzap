@@ -6,7 +6,9 @@
   import TextField from "~/lib/ui/TextField.svelte";
   import { tokens } from "~/lib/stores/tokens";
   import { walletState } from "~/lib/stores/wallet";
+  import Segmented from "~/lib/ui/Segmented.svelte";
   import {
+    approveMode,
     balances,
     busy,
     client,
@@ -142,8 +144,9 @@
   </Card>
 
   {#if token}
-    <!-- Two transactions: a transparent approve, then the proof. The approve
-         does not have to age, so both go through on one press. -->
+    <!-- The pool pulls public funds, so the approve is transparent either way.
+         The switch only decides whether it is its own transaction or rides in
+         the paymaster's bundle. -->
     <Card>
       <Text variant="subtitle">Deposit</Text>
       <TextField
@@ -152,8 +155,18 @@
         inputmode="decimal"
         bind:value={depositAmount}
       />
+      <Text variant="muted">Approve</Text>
+      <Segmented
+        options={[
+          { label: "Separate tx", value: "separate" },
+          { label: "In paymaster bundle", value: "bundled" },
+        ]}
+        bind:value={$approveMode}
+      />
       <Text variant="muted">
-        Sends an ERC20 approve first; the pool cannot pull funds without it.
+        {$approveMode === "separate"
+          ? "Two transactions: you sign and pay for the approve, then the relayer submits the private deposit."
+          : "One transaction: the approve is relayed through your account's execute_from_outside alongside the pool action, so there is nothing separate to sign or pay for. Needs an account that supports SNIP-9."}
       </Text>
       <Button
         title="Deposit"
