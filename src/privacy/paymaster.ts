@@ -1,5 +1,5 @@
-import { hash } from "starknet";
-import type { Call } from "starknet";
+import { CallData, hash, num } from "starknet";
+import type { Call, Signature, TypedData } from "starknet";
 import { fromAddress, type Address } from "@/types";
 import { assertSafeHttpUrl } from "@/utils";
 
@@ -122,6 +122,51 @@ export interface PrivacyPaymasterConfig {
   maxFee?: bigint;
 }
 
+/**
+ * User calls to relay alongside the pool action, as `invoke_and_apply_action`.
+ *
+ * The paymaster's plain `apply_action` carries the pool call and nothing else, so
+ * anything the caller needs beside it, like the ERC20 `approve` a deposit needs,
+ * most often has to be its own transaction paid for and signed by the user in
+ * public. Wrapping it here puts it in the same relayed transaction instead.
+ *
+ * The account must support SNIP-9 outside execution, since that is how the
+ * relayer submits the call on its behalf. That is a property of the user's
+ * account rather than of your configuration, so it can hold for one wallet and
+ * not another. {@link PrivacyPaymaster.quote} names the failure when it does not.
+ */
+export interface PrivacyInvoke {
+  /** Account the calls belong to, and whose `execute_from_outside` runs them. */
+  userAddress: Address;
+  /** Calls to relay. Converted to the paymaster's `to`/`selector` shape. */
+  calls: Call[];
+}
+
+/**
+ * The same calls, authorised.
+ *
+ * `quote()` returns SNIP-12 `typedData` for a {@link PrivacyInvoke}; the user
+ * signs it, and both travel back on {@link PrivacyPaymaster.execute}. Echo the
+ * typed data as it was given rather than rebuilding it. The signature covers
+ * those exact bytes.
+ */
+export interface PrivacySignedInvoke {
+  /** Same account the quote was built for. */
+  userAddress: Address;
+  /** The typed data from the quote, unchanged. */
+  typedData: TypedData;
+  /** The user's signature over it. */
+  signature: Signature;
+}
+
+/** Options for {@link PrivacyPaymaster.quote}. */
+export interface PrivacyQuoteOptions {
+  /** Transaction priority. Omit to let the paymaster choose. */
+  tip?: PrivacyTip;
+  /** User calls to relay with the pool action. Omit for a pool action alone. */
+  invoke?: PrivacyInvoke;
+}
+
 /** The withdrawal a proof must include so the forwarder is reimbursed. */
 export interface PrivacyFeeAction {
   /** Forwarder address that must receive the fee. */
@@ -168,6 +213,14 @@ export interface PrivacyFeeQuote {
    * rather than the transaction.
    */
   gas?: PrivacyGasQuote;
+  /**
+   * SNIP-12 data the user must sign, present only when the quote was built with
+   * {@link PrivacyQuoteOptions.invoke}.
+   *
+   * Sign it, then pass it back with the signature as a
+   * {@link PrivacySignedInvoke} on {@link PrivacyPaymaster.execute}.
+   */
+  typedData?: TypedData;
   /**
    * Execution parameters to hand back to {@link PrivacyPaymaster.execute}
    * verbatim. The spec says to echo these rather than rebuild them, so a
@@ -251,6 +304,58 @@ export class PrivacyPaymasterError extends Error {
     super(message);
     this.name = "PrivacyPaymasterError";
   }
+}
+
+/**
+ * The paymaster's call shape, which names the selector rather than the entrypoint.
+ *
+ * Calldata is compiled and hex-encoded rather than passed through. `CallData`
+ * emits *decimal* felt strings, which is what every call built by `wallet.tx()`
+ * or the ERC20 helpers carries, and the paymaster rejects a felt without an `0x`
+ * prefix outright (`-32602 Invalid params`). Compiling first also accepts the
+ * object form of `calldata`, so a hand-written call works either way.
+ */
+function toPaymasterCall(call: Call) {
+  return {
+    // Passed through, not normalised: addresses reach here already 0x-prefixed
+    // via `fromAddress`, and `num.toHex` would strip their padding for no gain.
+    to: call.contractAddress,
+    selector: hash.getSelectorFromName(call.entrypoint),
+    calldata: CallData.compile(call.calldata ?? []).map((felt) =>
+      num.toHex(felt)
+    ),
+  };
+}
+
+/**
+ * Name the one failure `invoke_and_apply_action` has that `apply_action` does not.
+ *
+ * Wrapping a user call means the relayer submits it through the account's own
+ * `execute_from_outside`, so the account has to support SNIP-9 outside execution.
+ * An account that does not (or an address that is not a deployed account at all)
+ * is refused at build time with code `156` and the reason `invalid version`, which
+ * reads as a version-negotiation bug in this client rather than as a fact about
+ * the account.
+ */
+function explainInvokeRejection(
+  error: unknown,
+  invoke: PrivacyInvoke
+): unknown {
+  if (
+    error instanceof PrivacyPaymasterError &&
+    error.code === 156 &&
+    reasonFrom(error.data) === "invalid version"
+  ) {
+    return new PrivacyPaymasterError(
+      error.code,
+      `[starkzap] The paymaster will not relay calls for ${invoke.userAddress}: ` +
+        "the account does not support outside execution (SNIP-9), which is how " +
+        "`invoke_and_apply_action` submits them on its behalf. Send those calls " +
+        "as their own transaction and quote without `invoke` instead.",
+      error.data
+    );
+  }
+  return error;
 }
 
 /**
@@ -392,28 +497,54 @@ export class PrivacyPaymaster {
    * action list as the final withdrawal. The forwarder collects it from the
    * proof, so a proof built without it is rejected with code 165.
    *
+   * Pass {@link PrivacyQuoteOptions.invoke} to relay user calls alongside the
+   * pool action. The quote then also returns the SNIP-12 `typedData` those calls
+   * have to be signed over.
+   *
    * @param poolAddress - Privacy pool the transaction targets
    * @param feeMode - How the fee is paid
-   * @param tip - Optional priority
-   * @returns The fee to include, the gas figures behind it, and the parameters
-   *   to echo back on execute
+   * @param options - Priority, and any user calls to relay
+   * @returns The fee to include, the gas figures behind it, the parameters to
+   *   echo back on execute, and `typedData` when calls were wrapped
    */
   async quote(
     poolAddress: Address,
     feeMode: PrivacyFeeMode,
-    tip?: PrivacyTip
+    options?: PrivacyQuoteOptions
   ): Promise<PrivacyFeeQuote> {
+    const invoke = options?.invoke;
+    const apply_action = { pool_address: poolAddress };
+
     const result = await this.send<{
       fee_action?: { recipient: string; token: string; amount: string };
       fee?: unknown;
+      typed_data?: unknown;
       parameters?: unknown;
     }>("paymaster_buildTransaction", {
-      transaction: {
-        type: "apply_action",
-        apply_action: { pool_address: poolAddress },
-      },
-      parameters: this.parameters(feeMode, tip),
+      transaction: invoke
+        ? {
+            type: "invoke_and_apply_action",
+            apply_action,
+            invoke: {
+              user_address: invoke.userAddress,
+              calls: invoke.calls.map(toPaymasterCall),
+            },
+          }
+        : { type: "apply_action", apply_action },
+      parameters: this.parameters(feeMode, options?.tip),
+    }).catch((error: unknown) => {
+      throw invoke ? explainInvokeRejection(error, invoke) : error;
     });
+
+    // Requested but absent means the paymaster did not honour the wrapping, and
+    // submitting without a signature would fail after the proof is paid for.
+    if (invoke && result.typed_data === undefined) {
+      throw new PrivacyPaymasterError(
+        -1,
+        "[starkzap] The paymaster accepted `invoke_and_apply_action` but returned " +
+          "no `typed_data`, so the wrapped calls cannot be authorised."
+      );
+    }
 
     const action = result.fee_action;
     if (!action) {
@@ -428,9 +559,12 @@ export class PrivacyPaymaster {
     return {
       feeAction: parseFeeAction(action, this.maxFee),
       ...(gas && { gas }),
+      ...(result.typed_data !== undefined && {
+        typedData: result.typed_data as TypedData,
+      }),
       // Echoed back verbatim; falls back to a locally built copy if the service
       // omits them, which older deployments do.
-      parameters: result.parameters ?? this.parameters(feeMode, tip),
+      parameters: result.parameters ?? this.parameters(feeMode, options?.tip),
     };
   }
 
@@ -450,28 +584,36 @@ export class PrivacyPaymaster {
    * @param call - The pool's `apply_actions` call
    * @param proof - Proof data and facts from the proving service
    * @param parameters - The `parameters` from {@link quote}
+   * @param invoke - The signed user calls, when the quote wrapped any. Must be
+   *   the same account and the same `typedData` the quote returned
    * @returns The submitted transaction hash
    */
   async execute(
     call: Call,
     proof: { data: string; proofFacts: string[] },
-    parameters: unknown
+    parameters: unknown,
+    invoke?: PrivacySignedInvoke
   ): Promise<string> {
+    const apply_action = {
+      apply_actions_call: toPaymasterCall(call),
+      proof: proof.data,
+      proof_facts: proof.proofFacts,
+    };
+
     const result = await this.send<{ transaction_hash: string }>(
       "paymaster_executeTransaction",
       {
-        transaction: {
-          type: "apply_action",
-          apply_action: {
-            apply_actions_call: {
-              to: call.contractAddress,
-              selector: hash.getSelectorFromName(call.entrypoint),
-              calldata: call.calldata ?? [],
-            },
-            proof: proof.data,
-            proof_facts: proof.proofFacts,
-          },
-        },
+        transaction: invoke
+          ? {
+              type: "invoke_and_apply_action",
+              apply_action,
+              invoke: {
+                user_address: invoke.userAddress,
+                typed_data: invoke.typedData,
+                signature: invoke.signature,
+              },
+            }
+          : { type: "apply_action", apply_action },
         parameters,
       }
     );

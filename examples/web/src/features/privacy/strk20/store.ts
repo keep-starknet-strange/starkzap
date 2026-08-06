@@ -47,6 +47,20 @@ export const waitingBlocks = writable<number | null>(null);
 export const fee = writable<PrivacyFeeQuote | null>(null);
 
 /**
+ * How a deposit's ERC20 `approve` gets on-chain.
+ *
+ * `"separate"` sends it as its own transaction the user signs and pays for.
+ * `"bundled"` hands it to `send({ invoke })`, so the paymaster relays it through
+ * the account's `execute_from_outside` in the same transaction as the pool action.
+ *
+ * A switch rather than a default because the two differ in a way only a live
+ * transaction settles: bundling relies on the relayer running the wrapped call
+ * *before* the pool action, or the pool's `transferFrom` finds no allowance.
+ * Nothing about the request says which order it uses.
+ */
+export const approveMode = writable<"separate" | "bundled">("separate");
+
+/**
  * The quoted fee as something a person can read.
  *
  * `feeAction` gives base units and a token address, which is the whole cost to
@@ -250,12 +264,15 @@ async function run(
 /**
  * Deposit into the pool.
  *
- * Two transactions: the ERC20 approve is transparent and cannot share the
- * privacy transaction, because the proof owns that one. The approve does not
- * have to age — it is checked when the deposit executes, not when it is proven
- * — so the deposit follows straight after it. What must be visible at the
- * proving block is the *balance*, which `waitForFundedBalance` checks directly,
- * covering funds that arrived from a faucet or another wallet.
+ * The ERC20 `approve` is transparent either way — the pool pulls public funds, so
+ * that step names the account whatever happens. {@link approveMode} decides only
+ * whether it travels as its own transaction or inside the paymaster's bundle.
+ *
+ * Either way the approve does not have to age: it is checked when the deposit
+ * executes, not when it is proven. What must be visible at the proving block is
+ * the *balance*, which `waitForFundedBalance` checks directly, covering funds
+ * that arrived from a faucet or another wallet. Bundling saves a transaction, not
+ * that wait.
  *
  * This is also where registration happens: `autoRegister` folds it in, and a
  * standalone register could not pay the pool fee from an empty balance.
@@ -265,23 +282,39 @@ export async function deposit(token: Token, input: string): Promise<void> {
   if (!wallet || !PRIVACY_CONFIG || !input.trim()) return;
 
   const amount = Amount.parse(input, token);
-  busy.set(true);
-  error.set(null);
-  try {
-    step.set("Deposit: approving…");
-    const approve = await wallet
-      .tx()
-      .approve(token, fromAddress(PRIVACY_CONFIG.poolContractAddress), amount)
-      .send();
-    await approve.wait();
-    log(`approve ${approve.hash} landed`, "info");
-  } catch (err) {
-    fail("Deposit approve", err);
-    step.set(null);
+  const pool = fromAddress(PRIVACY_CONFIG.poolContractAddress);
+  const bundled = get(approveMode) === "bundled";
+
+  // Built the same way for both modes; only the destination differs. `calls()`
+  // resolves the builder without sending, which is exactly what `invoke` takes.
+  const approveCalls = await wallet.tx().approve(token, pool, amount).calls();
+
+  if (!bundled) {
+    busy.set(true);
+    error.set(null);
+    try {
+      step.set("Deposit: approving…");
+      const approve = await wallet
+        .tx()
+        .add(...approveCalls)
+        .send();
+      await approve.wait();
+      log(`approve ${approve.hash} landed (separate transaction)`, "info");
+    } catch (err) {
+      fail("Deposit approve", err);
+      step.set(null);
+      busy.set(false);
+      return;
+    }
     busy.set(false);
-    return;
+  } else {
+    log(
+      "approve bundled into the privacy transaction — the relayer submits it " +
+        "through the account's execute_from_outside, so there is no separate " +
+        "transaction to sign or wait for",
+      "info"
+    );
   }
-  busy.set(false);
 
   const provider = wallet.getProvider();
   await run(
@@ -294,6 +327,7 @@ export async function deposit(token: Token, input: string): Promise<void> {
       autoRegister: true,
       autoSetup: true,
       autoDiscover: { notes: "refresh", channels: "refresh" },
+      ...(bundled && { invoke: approveCalls }),
       // Overrides the client's own sequencing: this proof reads the depositor's
       // ERC20 balance, which the client has no way to know about.
       provingBlockId: await waitForFundedBalance(

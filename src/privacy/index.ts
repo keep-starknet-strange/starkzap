@@ -24,6 +24,9 @@ export {
   type PrivacyFeeMode,
   type PrivacyFeeQuote,
   type PrivacyGasQuote,
+  type PrivacyInvoke,
+  type PrivacyQuoteOptions,
+  type PrivacySignedInvoke,
   type PrivacyPaymasterConfig,
   type PrivacyTip,
 } from "@/privacy/paymaster";

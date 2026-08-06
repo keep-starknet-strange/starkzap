@@ -24,7 +24,7 @@ import { screeningVerdict } from "@/privacy/errors";
 import { PrivacyPaymaster, PrivacyPaymasterError } from "@/privacy/paymaster";
 import { createPrivacy, revokePrivacy } from "@/privacy/create";
 import { signatureDerivation } from "@/privacy/viewing-key";
-import { withPaymaster } from "@/privacy/client";
+import { withPaymaster, type PrivateTransfersBuilder } from "@/privacy/client";
 import { PrivySigner, StarkSigner } from "@/signer";
 import type { SignerInterface } from "@/signer";
 import { AccountProvider } from "@/wallet/accounts/provider";
@@ -743,6 +743,177 @@ describe("privacy", () => {
     });
 
     /**
+     * `invoke_and_apply_action` relays user calls — an ERC20 `approve`, usually —
+     * in the same transaction as the pool action, instead of leaving them as a
+     * separate public transaction the user pays for. The paymaster answers with
+     * SNIP-12 typed data for the user to sign.
+     *
+     * Shapes here are the ones mainnet actually returned when probed.
+     */
+    describe("relaying user calls", () => {
+      const USER = fromAddress("0x7dbc0");
+      // Decimal calldata on purpose: this is what `CallData.compile` produces, so
+      // it is what every call from `wallet.tx()` and the ERC20 helpers carries. A
+      // fixture without calldata cannot catch the paymaster rejecting unprefixed
+      // felts, which is exactly how that shipped once.
+      const APPROVE = {
+        contractAddress: POOL,
+        entrypoint: "approve",
+        calldata: ["1000000000000000000", "0"],
+      };
+      const TYPED_DATA = {
+        types: {},
+        domain: {
+          name: "Account.execute_from_outside",
+          version: "1",
+          chainId: "SN_MAIN",
+        },
+        primaryType: "OutsideExecution",
+        message: {},
+      };
+      const quoted = (over: Record<string, unknown> = {}) => ({
+        result: {
+          fee_action: { recipient: "0x75a1", token: STRK, amount: "0xa" },
+          typed_data: TYPED_DATA,
+          parameters: {},
+          ...over,
+        },
+      });
+
+      it("asks for the wrapped type and returns the data to sign", async () => {
+        const sent = stubFetch(quoted());
+
+        const quote = await new PrivacyPaymaster(URL).quote(
+          POOL,
+          { mode: "sponsored" },
+          { invoke: { userAddress: USER, calls: [APPROVE] } }
+        );
+
+        expect(sent[0]!.params).toMatchObject({
+          transaction: {
+            type: "invoke_and_apply_action",
+            apply_action: { pool_address: POOL },
+            invoke: { user_address: USER },
+          },
+        });
+        // Calls go over in the paymaster's shape: a selector, not an entrypoint.
+        const call = (
+          sent[0]!.params as unknown as {
+            transaction: {
+              invoke: {
+                calls: { to: string; selector: string; calldata: string[] }[];
+              };
+            };
+          }
+        ).transaction.invoke.calls[0]!;
+        expect(call.to).toBe(POOL);
+        expect(call.selector).toBe(starknetHash.getSelectorFromName("approve"));
+        // Every felt 0x-prefixed, values preserved. The paymaster answers
+        // `-32602 Invalid params` for a bare decimal, so this is not cosmetic.
+        expect(call.calldata).toEqual(["0xde0b6b3a7640000", "0x0"]);
+        expect(quote.typedData).toEqual(TYPED_DATA);
+      });
+
+      it("asks for the plain type, and returns no typed data, without it", async () => {
+        const sent = stubFetch(quoted({ typed_data: undefined }));
+
+        const quote = await new PrivacyPaymaster(URL).quote(POOL, {
+          mode: "sponsored",
+        });
+
+        expect(sent[0]!.params).toMatchObject({
+          transaction: { type: "apply_action" },
+        });
+        expect(quote.typedData).toBeUndefined();
+      });
+
+      it("names the account requirement rather than echoing `invalid version`", async () => {
+        // What mainnet answers for an address that cannot do outside execution.
+        // Reads as a version bug in this client; it is a fact about the account.
+        stubFetch({
+          error: {
+            code: 156,
+            message: "An error occurred (TRANSACTION_EXECUTION_ERROR)",
+            data: { execution_error: "invalid version" },
+          },
+        });
+
+        const error = await rejectedBy(() =>
+          new PrivacyPaymaster(URL).quote(
+            POOL,
+            { mode: "sponsored" },
+            { invoke: { userAddress: USER, calls: [APPROVE] } }
+          )
+        );
+
+        expect(error.message).toContain("outside execution (SNIP-9)");
+        expect(error.message).toContain(USER);
+      });
+
+      it("leaves `invalid version` alone when no calls were wrapped", async () => {
+        // Same code and reason, but nothing was being relayed — so the account
+        // requirement is not the explanation and must not be asserted.
+        stubFetch({
+          error: {
+            code: 156,
+            message: "An error occurred (TRANSACTION_EXECUTION_ERROR)",
+            data: { execution_error: "invalid version" },
+          },
+        });
+
+        const error = await rejectedBy(() =>
+          new PrivacyPaymaster(URL).quote(POOL, { mode: "sponsored" })
+        );
+
+        expect(error.message).toContain("invalid version");
+        expect(error.message).not.toContain("SNIP-9");
+      });
+
+      it("refuses a wrapped quote the paymaster did not authorise", async () => {
+        // Accepted the type but sent no typed data: submitting would fail after
+        // the proof has already been paid for.
+        stubFetch(quoted({ typed_data: undefined }));
+
+        const error = await rejectedBy(() =>
+          new PrivacyPaymaster(URL).quote(
+            POOL,
+            { mode: "sponsored" },
+            { invoke: { userAddress: USER, calls: [APPROVE] } }
+          )
+        );
+
+        expect(error.message).toContain("no `typed_data`");
+      });
+
+      it("submits the signed calls alongside the proof", async () => {
+        const sent = stubFetch({ result: { transaction_hash: "0xsent" } });
+
+        await new PrivacyPaymaster(URL).execute(
+          { contractAddress: POOL, entrypoint: "apply_actions" },
+          { data: "0x1", proofFacts: ["0x2"] },
+          { version: "0x1" },
+          {
+            userAddress: USER,
+            typedData: TYPED_DATA,
+            signature: ["0x3", "0x4"],
+          }
+        );
+
+        expect(sent[0]!.params).toMatchObject({
+          transaction: {
+            type: "invoke_and_apply_action",
+            // Echoed unchanged: the signature covers these exact bytes.
+            invoke: {
+              user_address: USER,
+              typed_data: TYPED_DATA,
+              signature: ["0x3", "0x4"],
+            },
+          },
+        });
+      });
+    });
+
+    /**
      * The gas figures are what make the cost explicable: `default` mode charges
      * the suggested maximum, not the estimate, and the gap is what a user pays
      * for without using. They used to be dropped on the floor.
@@ -1283,9 +1454,19 @@ describe("privacy", () => {
     const POOL_HEX = `0x${POOL_ADDRESS.toString(16)}`;
     const FORWARDER = fromAddress("0x75a1");
 
+    /** Typed data the stub hands back when a build wraps user calls. */
+    const RELAY_TYPED_DATA = {
+      domain: { name: "Account.execute_from_outside", version: "2" },
+      primaryType: "OutsideExecution",
+      types: {},
+      message: { Nonce: "0xserverchosen" },
+    };
+    const RELAY_SIGNATURE = ["0xr", "0xs"];
+
     /** Paymaster whose quote names `amount`, and whose execute always succeeds. */
     function paymasterStub(amount: string, token: string) {
       const submitted: Record<string, never>[] = [];
+      const built: Record<string, never>[] = [];
       vi.stubGlobal(
         "fetch",
         vi.fn((_url: string, init?: RequestInit) => {
@@ -1294,6 +1475,15 @@ describe("privacy", () => {
             params: Record<string, never>;
           };
           if (body.method === "paymaster_buildTransaction") {
+            built.push(body.params);
+            // A real paymaster returns typed data only for the wrapped type, so
+            // the stub does too: it is what makes the client's branch observable.
+            const wrapped =
+              (
+                body.params as unknown as {
+                  transaction: { type: string };
+                }
+              ).transaction.type === "invoke_and_apply_action";
             return Promise.resolve({
               status: 200,
               ok: true,
@@ -1302,6 +1492,7 @@ describe("privacy", () => {
                   result: {
                     fee_action: { recipient: FORWARDER, token, amount },
                     parameters: { version: "0x1", tip: "normal" },
+                    ...(wrapped && { typed_data: RELAY_TYPED_DATA }),
                   },
                 }),
             } as Response);
@@ -1315,7 +1506,7 @@ describe("privacy", () => {
           } as Response);
         })
       );
-      return submitted;
+      return { submitted, built };
     }
 
     function env(head = 500) {
@@ -1334,7 +1525,14 @@ describe("privacy", () => {
           .mockResolvedValue({ block_number: head, isError: () => false }),
       } as unknown as RpcProvider;
 
-      const bind = async (fee = { mode: "sponsored" } as const) =>
+      // Only `send({ invoke })` uses this; the private path never signs.
+      const signTypedData = vi.fn().mockResolvedValue(RELAY_SIGNATURE);
+      const RELAY_ACCOUNT = fromAddress("0xacc0");
+
+      const bind = async (
+        fee = { mode: "sponsored" } as const,
+        { withAccount = false } = {}
+      ) =>
         withPaymaster(
           await createPrivacy(wallet, {
             poolContractAddress: POOL_HEX,
@@ -1347,10 +1545,20 @@ describe("privacy", () => {
             url: "https://paymaster.example.com",
             fee,
             provider,
+            ...(withAccount && {
+              account: { address: RELAY_ACCOUNT, signTypedData },
+            }),
           }
         );
 
-      return { mocknet, env: sdkEnv, provider, bind };
+      return {
+        mocknet,
+        env: sdkEnv,
+        provider,
+        bind,
+        signTypedData,
+        relayAccount: RELAY_ACCOUNT,
+      };
     }
 
     afterEach(() => {
@@ -1359,7 +1567,7 @@ describe("privacy", () => {
 
     it("submits a funded transaction through the paymaster", async () => {
       const { mocknet, env: sdkEnv, bind } = env();
-      const submitted = paymasterStub(
+      const { submitted } = paymasterStub(
         "0xa",
         `0x${BigInt(sdkEnv.ace).toString(16)}`
       );
@@ -1430,7 +1638,7 @@ describe("privacy", () => {
 
     it("echoes the parameters the quote returned rather than rebuilding them", async () => {
       const { env: sdkEnv, bind } = env();
-      const submitted = paymasterStub(
+      const { submitted } = paymasterStub(
         "0x0",
         `0x${BigInt(sdkEnv.ace).toString(16)}`
       );
@@ -1642,6 +1850,182 @@ describe("privacy", () => {
       expect("execute" in privacy).toBe(false);
       expect("createProofInvocation" in privacy).toBe(false);
       expect(typeof privacy.transfers.build).toBe("function");
+    });
+
+    describe("relaying public calls with send({ invoke })", () => {
+      /** Composes a deposit, which is the flow that wants a public `approve`. */
+      const deposit =
+        (sdkEnv: { ace: string; alice: { address: bigint } }) =>
+        (b: PrivateTransfersBuilder) =>
+          b
+            .with(sdkEnv.ace, (t) => t.deposit({ amount: 100n }))
+            .surplusTo(`0x${sdkEnv.alice.address.toString(16)}`);
+
+      const options = {
+        autoSetup: true,
+        autoDiscover: { notes: "refresh" },
+      } as const;
+
+      it("quotes the wrapped type and submits the signature over the quote's own typed data", async () => {
+        const {
+          mocknet,
+          env: sdkEnv,
+          bind,
+          signTypedData,
+          relayAccount,
+        } = env();
+        const { submitted, built } = paymasterStub(
+          "0xa",
+          `0x${BigInt(sdkEnv.ace).toString(16)}`
+        );
+        const privacy = await bind(
+          { mode: "sponsored" },
+          { withAccount: true }
+        );
+        mocknet.executeOutside(
+          await privacy.transfers.build().register().execute()
+        );
+
+        const approve = {
+          contractAddress: `0x${BigInt(sdkEnv.ace).toString(16)}`,
+          entrypoint: "approve",
+          calldata: ["0x1", "0x2"],
+        };
+        const hash = await privacy.send(deposit(sdkEnv), {
+          ...options,
+          invoke: [approve],
+        });
+
+        expect(hash).toBe("0xsent");
+        // Build asked for the wrapped type, naming the binding's account.
+        expect(built[0]!).toMatchObject({
+          transaction: {
+            type: "invoke_and_apply_action",
+            invoke: { user_address: relayAccount },
+          },
+        });
+        // The signature covers the bytes the paymaster chose, echoed unchanged --
+        // it picks the nonce, so a rebuilt copy would not verify.
+        expect(signTypedData).toHaveBeenCalledWith(RELAY_TYPED_DATA);
+        expect(submitted[0]!).toMatchObject({
+          transaction: {
+            type: "invoke_and_apply_action",
+            invoke: {
+              user_address: relayAccount,
+              typed_data: RELAY_TYPED_DATA,
+              signature: RELAY_SIGNATURE,
+            },
+          },
+        });
+      });
+
+      it("asks for the signature before proving, not after", async () => {
+        // Ordering is the whole point: the signature does not depend on the proof,
+        // so a user who declines must not have paid for proving first. Reverse the
+        // two in `send` and this fails.
+        const { mocknet, env: sdkEnv, bind, signTypedData, provider } = env();
+        paymasterStub("0xa", `0x${BigInt(sdkEnv.ace).toString(16)}`);
+        const privacy = await bind(
+          { mode: "sponsored" },
+          { withAccount: true }
+        );
+        mocknet.executeOutside(
+          await privacy.transfers.build().register().execute()
+        );
+
+        const order: string[] = [];
+        signTypedData.mockImplementation(() => {
+          order.push("sign");
+          return Promise.resolve(RELAY_SIGNATURE);
+        });
+        vi.mocked(provider.getBlockNumber).mockImplementation(() => {
+          order.push("resolve-proving-block");
+          return Promise.resolve(500);
+        });
+
+        await privacy.send(deposit(sdkEnv), {
+          ...options,
+          invoke: [
+            {
+              contractAddress: `0x${BigInt(sdkEnv.ace).toString(16)}`,
+              entrypoint: "approve",
+            },
+          ],
+        });
+
+        expect(order[0]).toBe("sign");
+        expect(order).toContain("resolve-proving-block");
+      });
+
+      it("refuses before touching the network when nothing can sign", async () => {
+        const { env: sdkEnv, bind } = env();
+        paymasterStub("0xa", `0x${BigInt(sdkEnv.ace).toString(16)}`);
+        // Bound without an account, as `withPaymaster` allows.
+        const privacy = await bind();
+
+        await expect(
+          privacy.send(deposit(sdkEnv), {
+            ...options,
+            invoke: [
+              {
+                contractAddress: `0x${BigInt(sdkEnv.ace).toString(16)}`,
+                entrypoint: "approve",
+              },
+            ],
+          })
+        ).rejects.toThrow(/needs that account and a way to sign/);
+        // Rejected on the request itself: no quote was even attempted.
+        expect(vi.mocked(fetch)).not.toHaveBeenCalled();
+      });
+
+      it("leaves the unwrapped path alone", async () => {
+        const { mocknet, env: sdkEnv, bind, signTypedData } = env();
+        const { submitted, built } = paymasterStub(
+          "0xa",
+          `0x${BigInt(sdkEnv.ace).toString(16)}`
+        );
+        // An account is available, but no calls are passed.
+        const privacy = await bind(
+          { mode: "sponsored" },
+          { withAccount: true }
+        );
+        mocknet.executeOutside(
+          await privacy.transfers.build().register().execute()
+        );
+
+        await privacy.send(deposit(sdkEnv), options);
+
+        // Merely having a signer must not drag a signature into the private path.
+        expect(built[0]!).toMatchObject({
+          transaction: { type: "apply_action" },
+        });
+        expect(submitted[0]!).toMatchObject({
+          transaction: { type: "apply_action" },
+        });
+        expect(signTypedData).not.toHaveBeenCalled();
+      });
+
+      it("ignores an empty call list rather than wrapping nothing", async () => {
+        const { mocknet, env: sdkEnv, bind, signTypedData } = env();
+        const { built } = paymasterStub(
+          "0xa",
+          `0x${BigInt(sdkEnv.ace).toString(16)}`
+        );
+        const privacy = await bind(
+          { mode: "sponsored" },
+          { withAccount: true }
+        );
+        mocknet.executeOutside(
+          await privacy.transfers.build().register().execute()
+        );
+
+        await privacy.send(deposit(sdkEnv), { ...options, invoke: [] });
+
+        expect(built[0]!).toMatchObject({
+          transaction: { type: "apply_action" },
+        });
+        expect(signTypedData).not.toHaveBeenCalled();
+      });
     });
   });
 
