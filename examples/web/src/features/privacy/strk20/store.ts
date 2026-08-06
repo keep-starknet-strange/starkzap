@@ -271,8 +271,8 @@ async function run(
  * Either way the approve does not have to age: it is checked when the deposit
  * executes, not when it is proven. What must be visible at the proving block is
  * the *balance*, which `waitForFundedBalance` checks directly, covering funds
- * that arrived from a faucet or another wallet. Bundling saves a transaction, not
- * that wait.
+ * that arrived in a transaction this app did not send. Bundling saves a
+ * transaction, not that wait.
  *
  * This is also where registration happens: `autoRegister` folds it in, and a
  * standalone register could not pay the pool fee from an empty balance.

@@ -241,7 +241,8 @@ export const useStrk20Store = create<Strk20Store>((set, get) => {
      * have to age — it is checked when the deposit executes, not when it is
      * proven — so the deposit follows straight after it. What must be visible at
      * the proving block is the *balance*, which `waitForFundedBalance` checks
-     * directly, covering funds that arrived from a faucet or another wallet.
+     * directly, covering funds that arrived in a transaction this app did not
+     * send.
      *
      * This is also where registration happens: `autoRegister` folds it in, and a
      * standalone register could not pay the pool fee from an empty balance.

@@ -122,9 +122,9 @@ describe("privacy", () => {
 
   /**
    * The state-based waits exist because counting blocks from a receipt only
-   * works for transactions this process saw. An account funded from a faucet,
-   * a bridge or another wallet has no receipt here, so the precondition has to
-   * be read off-chain state instead.
+   * works for transactions this process saw. An account funded by a transaction
+   * it did not send has no receipt here, so the precondition has to be read off
+   * chain state instead.
    */
   describe("waitForProvableState", () => {
     function providerWithHeads(...heads: number[]): RpcProvider {

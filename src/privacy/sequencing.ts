@@ -114,10 +114,9 @@ export async function waitForProvableBlock(
  * Wait until the state a proof depends on is visible at the proving block, and
  * return that block number.
  *
- * Use this instead of {@link waitForProvableBlock} when the state was written
- * by something you never saw a receipt for — an account funded from a faucet,
- * a bridge, or another wallet. Checking the state directly covers those cases;
- * counting blocks from a receipt cannot.
+ * Use this instead of {@link waitForProvableBlock} when the state was written by
+ * a transaction you did not send, and so have no receipt for. Checking the state
+ * directly covers that; counting blocks from a receipt cannot.
  *
  * @param provider - RPC provider used to read the chain head and the state
  * @param isVisible - Predicate run against a candidate proving block
