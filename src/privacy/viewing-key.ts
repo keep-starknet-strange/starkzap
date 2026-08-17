@@ -68,8 +68,12 @@ export type ViewingKeyDerivation = (
 export function assertCanonicalViewingKey(key: string | bigint): bigint {
   const value = BigInt(key);
   if (value < 1n || value >= HALF_ORDER) {
+    const problem =
+      value < 1n
+        ? "not positive"
+        : `${value.toString(2).length} bits, so at or above n/2`;
     throw new Error(
-      `[starkzap] The viewing key ${num.toHex(value)} is outside the range the ` +
+      `[starkzap] The derived viewing key is ${problem}, outside the range the ` +
         "privacy pool accepts (1 <= key < n/2). A custom " +
         "`viewingKeyDerivation` must fold its output into that range."
     );
