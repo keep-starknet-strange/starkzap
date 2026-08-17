@@ -35,6 +35,7 @@ import {
 } from "@/core/config";
 import { resolveExamplePaymasterNodeUrl } from "@/core/paymaster";
 import { ensureCartridgeAdapter } from "@/core/cartridge";
+import { feeOptions } from "@/core/settings";
 import { useTokensStore } from "@/core/tokens/store";
 import { useTxBannerStore } from "@/core/tx-banner/store";
 import { usePrivacyStore } from "@/features/privacy/store";
@@ -274,7 +275,7 @@ export const useWalletStore = create<WalletStore>((set, get) => ({
         account: { signer },
         accountPreset: ACCOUNT_PRESETS[presetName],
         ...(sponsored && paymasterNodeUrl
-          ? { feeMode: "sponsored" as const }
+          ? { feeMode: { type: "paymaster" as const } }
           : {}),
       });
       // Guard the resume path: refuse if this key/preset resolves to a
@@ -395,7 +396,7 @@ export const useWalletStore = create<WalletStore>((set, get) => ({
     set({ connecting: true, error: null });
     const tx = await useTxBannerStore
       .getState()
-      .notify("Deploy account", () => wallet.deploy());
+      .notify("Deploy account", () => wallet.deploy(feeOptions()));
     if (tx) await get().checkDeployment();
     set({ connecting: false });
   },

@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import type { FeeMode } from "starkzap-native";
 import { useWalletStore } from "@/core/wallet/store";
 
 interface SettingsStore {
@@ -22,9 +23,9 @@ export function useSponsoredAvailable(): boolean {
 }
 
 /** Fee options for a transaction, or undefined to let the user pay. */
-export function feeOptions(): { feeMode: "sponsored" } | undefined {
+export function feeOptions(): { feeMode: FeeMode } | undefined {
   const available = useWalletStore.getState().paymasterNodeUrl !== null;
   return available && useSettingsStore.getState().sponsored
-    ? { feeMode: "sponsored" }
+    ? { feeMode: { type: "paymaster" } }
     : undefined;
 }

@@ -1,4 +1,5 @@
 import { writable, get } from "svelte/store";
+import type { FeeMode } from "starkzap";
 import { PAYMASTER_NODE_URL } from "./config";
 
 // Whether sponsorship can be offered at all. The SDK only gets a paymaster when
@@ -7,11 +8,11 @@ import { PAYMASTER_NODE_URL } from "./config";
 export const sponsoredAvailable = Boolean(PAYMASTER_NODE_URL);
 
 // Global "sponsored" preference — the paymaster pays the gas, so the user pays
-// nothing. Features that support it pass `{ feeMode: "sponsored" }`.
+// nothing. Features that support it pass `{ feeMode: { type: "paymaster" } }`.
 export const sponsored = writable(false);
 
-export function feeOptions(): { feeMode: "sponsored" } | undefined {
+export function feeOptions(): { feeMode: FeeMode } | undefined {
   return sponsoredAvailable && get(sponsored)
-    ? { feeMode: "sponsored" }
+    ? { feeMode: { type: "paymaster" } }
     : undefined;
 }

@@ -181,7 +181,7 @@ Once connected (via any strategy), the wallet panel appears with these actions:
 | **Check Status**   | `Check Status`   | Calls `wallet.isDeployed()` which queries the RPC node for the account's contract class. Updates the status badge to "Deployed" or "Not Deployed".      | RPC node is unreachable or rate-limited.                                                                       |
 | **Deploy Account** | `Deploy Account` | Calls `wallet.deploy()` to submit a `DEPLOY_ACCOUNT` transaction. Waits for on-chain confirmation via `tx.wait()`.                                      | Account has no STRK balance to pay gas. Account is already deployed. The class hash is not declared on-chain.  |
 | **Test Transfer**  | `Test Transfer`  | Executes a 0-STRK transfer to self (`wallet.execute()` with `transfer(self, 0)`). A safe, no-op transaction to verify end-to-end signing and execution. | Account is not deployed. Insufficient STRK for gas.                                                            |
-| **Sponsored Tx**   | `Sponsored Tx`   | Same 0-STRK self-transfer, but with `{ feeMode: "sponsored" }`. Gas fees are paid by the AVNU paymaster instead of the account.                         | Server not running. `AVNU_API_KEY` not set or invalid. Paymaster doesn't support the account class or network. |
+| **Sponsored Tx**   | `Sponsored Tx`   | Same 0-STRK self-transfer, but with `{ feeMode: { type: "paymaster" } }`. Gas fees are paid by the AVNU paymaster instead of the account.               | Server not running. `AVNU_API_KEY` not set or invalid. Paymaster doesn't support the account class or network. |
 | **Copy Address**   | Clipboard icon   | Copies the full account address to clipboard.                                                                                                           | Clipboard API not available (non-HTTPS).                                                                       |
 | **Disconnect**     | `Disconnect`     | Clears wallet state. For Cartridge wallets, also calls `disconnect()` to end the session.                                                               | --                                                                                                             |
 
@@ -216,7 +216,7 @@ await wallet.swap(
     amountIn,
     slippageBps: 100n,
   },
-  { feeMode: "sponsored" }
+  { feeMode: { type: "paymaster" } }
 );
 ```
 
@@ -264,7 +264,7 @@ await wallet.dca().create(
       minBuyAmount: Amount.parse("0.1", buyToken),
     },
   },
-  { feeMode: "sponsored" }
+  { feeMode: { type: "paymaster" } }
 );
 
 await wallet.dca().create({
