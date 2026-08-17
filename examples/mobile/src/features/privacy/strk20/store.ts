@@ -2,6 +2,7 @@ import { create } from "zustand";
 import {
   Amount,
   fromAddress,
+  revokePrivacy,
   screeningVerdict,
   waitForFundedBalance,
   type PrivacyClient,
@@ -169,7 +170,16 @@ export const useStrk20Store = create<Strk20Store>((set, get) => {
     waitingBlocks: null,
     fee: null,
 
+    /**
+     * Drop the privacy capability, revoking the viewing key with it.
+     *
+     * Call this on logout, on network switch and before every login. The client
+     * holds a live viewing key, so releasing the reference alone would leave the
+     * key usable by anything still holding one — and this store outlives the
+     * login that created it.
+     */
     clear: () => {
+      const current = get().client;
       set({
         client: null,
         registered: null,
@@ -178,6 +188,7 @@ export const useStrk20Store = create<Strk20Store>((set, get) => {
         fee: null,
         error: null,
       });
+      if (current) revokePrivacy(current.transfers);
     },
 
     connect: async () => {

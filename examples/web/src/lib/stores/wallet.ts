@@ -24,6 +24,7 @@ import {
 import { sdkLogger, log } from "./logger";
 import { feeOptions } from "./settings";
 import * as privacy from "~/features/privacy/store";
+import * as strk20 from "~/features/privacy/strk20/store";
 import {
   generateAuthorizationSignature,
   getAccessToken as getPrivyAccessToken,
@@ -129,6 +130,10 @@ async function connect(
   presetName?: string
 ): Promise<void> {
   walletState.update((s) => ({ ...s, connecting: true, error: null }));
+  // Before the new account exists, not after: both privacy stores are
+  // module-global, so a client left behind here would serve the next account
+  // using the previous one's viewing key, notes and discovery state.
+  strk20.clear();
   try {
     const wallet = await onboard();
     walletState.update((s) => ({
@@ -334,8 +339,10 @@ export async function deploy(): Promise<void> {
   }
 }
 
-export function disconnect(): void {
+export async function disconnect(): Promise<void> {
+  const { wallet } = get(walletState);
   privacy.clear();
+  strk20.clear();
   clearHint();
   walletState.set({
     wallet: null,
@@ -345,4 +352,13 @@ export function disconnect(): void {
     connecting: false,
     error: null,
   });
+  // The SDK caches its own privacy client per wallet, so clearing the stores is
+  // not enough to end the session's capabilities. Reported rather than thrown:
+  // the UI state is already cleared, and a keychain that refused to close is
+  // worth seeing without leaving the app half logged out.
+  try {
+    await wallet?.disconnect();
+  } catch (err) {
+    log(`Disconnect cleanup failed: ${err}`, "error");
+  }
 }
