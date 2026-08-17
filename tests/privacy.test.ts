@@ -468,6 +468,24 @@ describe("privacy", () => {
       });
     });
 
+    it("refuses a result carrying no transaction hash", async () => {
+      // `result` is present, so none of the transport guards fire. Without the
+      // check the caller receives `undefined` as a successful hash.
+      stubFetch({ result: {} });
+
+      await expect(
+        new PrivacyPaymaster(URL).execute(
+          {
+            contractAddress: POOL,
+            entrypoint: "apply_actions",
+            calldata: ["0x1"],
+          },
+          { data: "0xproof", proofFacts: [] },
+          { version: "0x1", fee_mode: { mode: "sponsored" } }
+        )
+      ).rejects.toThrow(/no transaction hash/);
+    });
+
     /** Reject with a payload captured verbatim from AVNU's live paymaster. */
     function rejectWith(error: unknown) {
       stubFetch({ error });
