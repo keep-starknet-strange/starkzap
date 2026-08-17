@@ -121,12 +121,15 @@ cp .env.example .env
 
 Edit `.env` with your credentials:
 
-| Variable             | Required | Default                             | Description                                                                        |
-| -------------------- | -------- | ----------------------------------- | ---------------------------------------------------------------------------------- |
-| `PRIVY_APP_ID`       | Yes      | --                                  | Your Privy application ID (from the [Privy dashboard](https://dashboard.privy.io)) |
-| `PRIVY_APP_SECRET`   | Yes      | --                                  | Your Privy application secret                                                      |
-| `AVNU_API_KEY`       | Yes      | --                                  | AVNU paymaster API key (enables sponsored/gasless mode)                            |
-| `AVNU_PAYMASTER_URL` | No       | `https://sepolia.paymaster.avnu.fi` | Override the paymaster endpoint (e.g. for mainnet)                                 |
+| Variable                     | Required   | Default                              | Description                                                                                   |
+| ---------------------------- | ---------- | ------------------------------------ | --------------------------------------------------------------------------------------------- |
+| `ENABLE_PRIVY`               | No         | off                                  | Set to `true` to register the Privy wallet routes. Without it they do not exist.              |
+| `PRIVY_APP_ID`               | With Privy | --                                   | Your Privy application ID (from the [Privy dashboard](https://dashboard.privy.io))            |
+| `PRIVY_APP_SECRET`           | With Privy | --                                   | Your Privy application secret                                                                 |
+| `ENABLE_PAYMASTER`           | No         | off                                  | Set to `true` to register the paymaster proxy routes. Without it they do not exist.           |
+| `AVNU_API_KEY`               | No         | --                                   | AVNU paymaster API key. Needed for the sponsored fee modes; `default` mode works without one. |
+| `AVNU_PAYMASTER_URL_MAINNET` | No         | `https://starknet.paymaster.avnu.fi` | Override the mainnet upstream.                                                                |
+| `AVNU_PAYMASTER_URL_SEPOLIA` | No         | `https://sepolia.paymaster.avnu.fi`  | Override the Sepolia upstream.                                                                |
 
 ### Installing and Running
 
@@ -161,14 +164,14 @@ npx tsx server.ts
 
 The Express server (port 3001) exposes these routes:
 
-| Endpoint                             | Method | Auth         | Description                                                                                                                                                        |
-| ------------------------------------ | ------ | ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `/api/health`                        | GET    | No           | Returns `{ status: "ok" }`. Used by the web app to check if the server is reachable before attempting Privy operations.                                            |
-| `/api/privy-wallet/starknet`         | POST   | Bearer token | Creates a new Starknet wallet via Privy or returns the existing one for the authenticated user. Returns `{ wallet: { id, address, publicKey }, accounts, isNew }`. |
-| `/api/privy-wallet/register-account` | POST   | Bearer token | Associates a computed account address with a preset for the user. Body: `{ preset, address, deployed? }`.                                                          |
-| `/api/privy-wallet/set-deployed`     | POST   | Bearer token | Updates the deployment status of a registered account. Body: `{ preset, deployed }`.                                                                               |
-| `/api/privy-wallet/sign`             | POST   | No           | Signs a transaction hash using a Privy wallet. Body: `{ walletId, hash }`. Returns `{ signature }`.                                                                |
-| `/api/paymaster`                     | POST   | No           | Proxies the request body to the AVNU paymaster URL, attaching the `x-paymaster-api-key` header. Returns the paymaster response as-is.                              |
+| Endpoint                             | Method | Auth         | Description                                                                                                                                                                                                                                                                                   |
+| ------------------------------------ | ------ | ------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `/api/health`                        | GET    | No           | Returns `{ status: "ok" }`. Used by the web app to check if the server is reachable before attempting Privy operations.                                                                                                                                                                       |
+| `/api/privy-wallet/starknet`         | POST   | Bearer token | Creates a new Starknet wallet via Privy or returns the existing one for the authenticated user. Returns `{ wallet: { id, address, publicKey }, accounts, isNew }`.                                                                                                                            |
+| `/api/privy-wallet/register-account` | POST   | Bearer token | Associates a computed account address with a preset for the user. Body: `{ preset, address, deployed? }`.                                                                                                                                                                                     |
+| `/api/privy-wallet/set-deployed`     | POST   | Bearer token | Updates the deployment status of a registered account. Body: `{ preset, deployed }`.                                                                                                                                                                                                          |
+| `/api/privy-wallet/sign`             | POST   | Bearer token | Signs a transaction hash with the authenticated user's own wallet. Body: `{ hash, authorizationSignature? }`. A `walletId` is optional and rejected with 403 unless it matches that user's wallet. Returns `{ signature }`.                                                                   |
+| `/api/paymaster/:network`            | POST   | No           | Proxies the request body to the AVNU paymaster for `mainnet` or `sepolia`, attaching the `x-paymaster-api-key` header. Forwards the upstream status and body as-is. The bare `/api/paymaster` answers 400: each AVNU deployment whitelists only its own pool, so the network has to be named. |
 
 Wallet data is persisted in `wallets.json` (auto-created). This is a simple file store for development -- use a real database in production.
 
@@ -296,7 +299,7 @@ If you use the in-app selector and want custom RPC endpoints for both networks, 
 
 On mainnet, the Vesu market browser can load pool metadata without a connected Starknet wallet. Wallet connection is still required for positions, health checks, and transaction submission.
 
-For mainnet, also set `AVNU_PAYMASTER_URL` in the server's `.env` to `https://mainnet.paymaster.avnu.fi`.
+The server picks its upstream from the network in the request path, so mainnet needs no extra configuration. Override `AVNU_PAYMASTER_URL_MAINNET` only to point at a different deployment.
 
 ### Bridge
 
