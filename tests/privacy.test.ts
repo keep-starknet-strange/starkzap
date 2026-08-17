@@ -1925,6 +1925,10 @@ describe("privacy", () => {
         waitForTransaction: vi
           .fn()
           .mockResolvedValue({ block_number: head, isError: () => false }),
+        // The pool's own published fee, which sponsored quotes are checked
+        // against. High enough that the amounts these tests quote pass; the
+        // tests for that check set it themselves.
+        callContract: vi.fn().mockResolvedValue(["0xffffffff"]),
       } as unknown as RpcProvider;
 
       // Only `send({ invoke })` uses this; the private path never signs.
@@ -2362,6 +2366,91 @@ describe("privacy", () => {
 
         // The caller's own error, and the proof never reached the paymaster.
         expect(submitted).toHaveLength(0);
+      });
+    });
+
+    /**
+     * Under `sponsored` the withdrawal is the pool fee and nothing else, and the
+     * pool publishes that figure. It is the one part of a quote that can be
+     * checked without trusting the endpoint, which caps what a substituted fee
+     * recipient could collect.
+     */
+    describe("sponsored fee against the pool's own figure", () => {
+      /** Quote a sponsored fee of `quoted` while the pool publishes `published`. */
+      async function withFees(quoted: string, published: string) {
+        const { env: sdkEnv, bind, provider } = env();
+        paymasterStub(quoted, `0x${BigInt(sdkEnv.ace).toString(16)}`);
+        vi.mocked(provider.callContract).mockResolvedValue([
+          published,
+        ] as never);
+        return { privacy: await bind(), provider };
+      }
+
+      it("accepts a fee equal to the published one", async () => {
+        const { privacy } = await withFees("0x64", "0x64");
+
+        await expect(privacy.quote()).resolves.toMatchObject({
+          feeAction: { amount: 0x64n },
+        });
+      });
+
+      it("accepts a fee below the published one", async () => {
+        // Charging less costs the relayer, not the caller, and the pool refuses
+        // an underpaid fee itself.
+        const { privacy } = await withFees("0x10", "0x64");
+
+        await expect(privacy.quote()).resolves.toBeDefined();
+      });
+
+      it("refuses a fee above the published one", async () => {
+        const { privacy } = await withFees("0x65", "0x64");
+
+        await expect(privacy.quote()).rejects.toThrow(
+          /above the 100 this pool publishes/
+        );
+      });
+
+      it("reads the pool's fee from the pool the client is bound to", async () => {
+        const { privacy, provider } = await withFees("0x64", "0x64");
+
+        await privacy.quote();
+
+        expect(provider.callContract).toHaveBeenCalledWith({
+          contractAddress: fromAddress(POOL_HEX),
+          entrypoint: "get_fee_amount",
+          calldata: [],
+        });
+      });
+
+      it("leaves the other fee modes alone, having nothing to compare", async () => {
+        // `default` mixes in a gas ceiling; `sponsored_private` converts the fee.
+        const { env: sdkEnv, bind, provider } = env();
+        paymasterStub("0xffff", `0x${BigInt(sdkEnv.ace).toString(16)}`);
+        vi.mocked(provider.callContract).mockResolvedValue(["0x1"] as never);
+
+        const privacy = await bind({
+          mode: "default",
+          gasToken: fromAddress(`0x${BigInt(sdkEnv.ace).toString(16)}`),
+        } as never);
+
+        await expect(privacy.quote()).resolves.toBeDefined();
+        expect(provider.callContract).not.toHaveBeenCalled();
+      });
+
+      it("reports a failed read and lets the quote through", async () => {
+        // A second opinion that could not be taken is worth saying, not worth
+        // failing a transaction the paymaster already priced.
+        const { privacy, provider } = await withFees("0x64", "0x64");
+        vi.mocked(provider.callContract).mockRejectedValue(
+          new Error("rpc unavailable")
+        );
+        const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+        await expect(privacy.quote()).resolves.toBeDefined();
+        expect(warn).toHaveBeenCalledWith(
+          expect.stringContaining("Could not read the pool's own fee")
+        );
+        warn.mockRestore();
       });
     });
 
