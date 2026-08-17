@@ -3,6 +3,7 @@ import type {
   CallAndProof,
   PrivateTransfersBuilder,
   PrivateTransfersInterface,
+  Warning,
   ExecuteOptions as SdkExecuteOptions,
 } from "@starkware-libs/starknet-privacy-sdk";
 
@@ -81,6 +82,28 @@ export interface PrivacySendOptions extends Omit<
    * saves a transaction, not the settling.
    */
   invoke?: Call[];
+  /**
+   * Called with the privacy SDK's warnings about the composed transaction, before
+   * it is submitted. Only called when there are any.
+   *
+   * `USER_LINKAGE` is the one to expect: the SDK saying this transaction may
+   * connect the user's private and public identities, which for a withdrawal back
+   * to the deposit address it will. Whether that is acceptable is yours to
+   * decide, so nothing is refused on your behalf.
+   *
+   * Awaited, so you can ask the user. **Throw to abort** — your error propagates
+   * unchanged, so the reason reaches your own UI. Returning normally submits.
+   *
+   * By this point the proof exists and has been paid for. Aborting saves the pool
+   * fee and the submission, not the proving.
+   *
+   * {@link PrivacyClient.simulate} also returns warnings and uses a mock prover,
+   * so it can flag a linkage before you pay for anything. It is not a preview of
+   * this send, though: it reports on the actions you hand it, and `send` adds the
+   * paymaster's fee withdrawal to them, which is itself a withdrawal that can
+   * carry its own warning.
+   */
+  onWarnings?: (warnings: Warning[]) => unknown;
 }
 
 /**
@@ -397,7 +420,12 @@ export function withPaymaster(
 
       const provingBlockId = await resolveProvingBlock(options);
 
-      const { wait: _wait, invoke: _invoke, ...sdkOptions } = options ?? {};
+      const {
+        wait: _wait,
+        invoke: _invoke,
+        onWarnings: _onWarnings,
+        ...sdkOptions
+      } = options ?? {};
       // ProvingBlockId is starknet.js's BlockIdentifier, so a plain number is
       // the block-number form; `{ block_number: n }` is not accepted.
       const builder = transfers.build({
@@ -420,12 +448,20 @@ export function withPaymaster(
         );
       }
 
-      const { callAndProof } = await builder.execute();
+      const { callAndProof, warnings } = await builder.execute();
+
+      // Reported rather than acted on. The SDK raises `USER_LINKAGE` for a
+      // transaction that may connect the user's private and public identities,
+      // and only the caller knows whether that is acceptable here.
+      if (warnings.length > 0 && options?.onWarnings) {
+        await options.onWarnings(warnings);
+      }
+
       return submit(callAndProof, parameters, signedInvoke);
     },
   };
 }
 
 /** Re-exported so callers can type a bound client without importing the SDK. */
-export type { CallAndProof, PrivateTransfersBuilder };
+export type { CallAndProof, PrivateTransfersBuilder, Warning };
 export type { Address };
