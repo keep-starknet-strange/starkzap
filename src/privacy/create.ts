@@ -311,22 +311,38 @@ export async function createPrivacy(
   // it lives exactly as long as the session that authorised it. Whether the key
   // matches the one the pool registered is left to the discovery service, which
   // rejects a mismatch outright.
-  let viewingKey: string | undefined;
+  let viewingKey: Promise<string> | undefined;
   let revoked = false;
+  const revokedError = () =>
+    new Error(
+      "[starkzap] This privacy client was revoked, so its viewing key is no " +
+        "longer available. Build a new one with `wallet.privacy()` or " +
+        "`createPrivacy()` after reconnecting."
+    );
+
   const getViewingKey = async (): Promise<string> => {
-    if (revoked) {
-      throw new Error(
-        "[starkzap] This privacy client was revoked, so its viewing key is no " +
-          "longer available. Build a new one with `wallet.privacy()` or " +
-          "`createPrivacy()` after reconnecting."
-      );
-    }
-    if (viewingKey === undefined) {
-      const derived = await derive(context, signer);
-      assertCanonicalViewingKey(derived);
-      viewingKey = derived;
-    }
-    return viewingKey;
+    if (revoked) throw revokedError();
+
+    // The promise is cached, not the key. Two callers arriving together then
+    // share one derivation instead of each asking the signer to sign. A failed
+    // derivation clears the cache so a transient signer error can be retried.
+    viewingKey ??= derive(context, signer).then(
+      (derived) => {
+        assertCanonicalViewingKey(derived);
+        return derived;
+      },
+      (error: unknown) => {
+        viewingKey = undefined;
+        throw error;
+      }
+    );
+
+    const key = await viewingKey;
+    // Checked again here. Revocation can land while the derivation above is
+    // waiting, and returning the key then would let it outlive the session that
+    // authorised it.
+    if (revoked) throw revokedError();
+    return key;
   };
 
   const transfers = sdk.createPrivateTransfers({

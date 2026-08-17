@@ -1387,6 +1387,56 @@ describe("privacy", () => {
         );
       });
 
+      it("refuses a key whose derivation finished after revocation", async () => {
+        const { mocknet, wallet } = mockEnv();
+        let release = (): void => {};
+        const suspended = new Promise<void>((resolve) => {
+          release = resolve;
+        });
+
+        const transfers = await createPrivacy(wallet, {
+          poolContractAddress: POOL_HEX,
+          prover: new MockProofProvider(mocknet.pool),
+          discovery: new ContractDiscoveryProvider(mocknet.pool),
+          proofInvocationFactory: new MockProofInvocationFactory(),
+          viewingKeyDerivation: async () => {
+            await suspended;
+            return "0x1";
+          },
+        });
+
+        // Revocation lands while the derivation is still waiting, which is the
+        // window a check taken only before the await would miss.
+        const pending = transfers.discoverNotes();
+        revokePrivacy(transfers);
+        release();
+
+        await expect(pending).rejects.toThrow("privacy client was revoked");
+      });
+
+      it("derives once for callers arriving together", async () => {
+        const { mocknet, wallet } = mockEnv();
+        const derivations = vi.fn().mockResolvedValue("0x1");
+
+        const transfers = await createPrivacy(wallet, {
+          poolContractAddress: POOL_HEX,
+          prover: new MockProofProvider(mocknet.pool),
+          discovery: new ContractDiscoveryProvider(mocknet.pool),
+          proofInvocationFactory: new MockProofInvocationFactory(),
+          viewingKeyDerivation: derivations,
+        });
+
+        await Promise.all([
+          transfers.discoverNotes(),
+          transfers.discoverNotes(),
+          transfers.discoverNotes(),
+        ]);
+
+        // Each derivation asks the signer to sign, so repeating it would prompt
+        // the user once per concurrent call.
+        expect(derivations).toHaveBeenCalledTimes(1);
+      });
+
       it("leaves other clients alone", async () => {
         const { create } = mockEnv();
         const [first, second] = await Promise.all([create(), create()]);
