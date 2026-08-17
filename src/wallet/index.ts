@@ -726,6 +726,7 @@ export class Wallet extends BaseWallet {
       ...config.paymaster,
       poolContractAddress: config.poolContractAddress,
       provider: this.provider,
+      chainId: this.chainId,
       // Only for `send({ invoke })`, which relays public calls alongside the
       // private transaction. The private path never signs: the proof authorises
       // it, which is what keeps this account off-chain.

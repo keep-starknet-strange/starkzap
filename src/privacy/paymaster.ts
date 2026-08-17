@@ -1,4 +1,4 @@
-import { CallData, hash, num } from "starknet";
+import { CallData, hash, num, shortString } from "starknet";
 import type { Call, Signature, TypedData } from "starknet";
 import { fromAddress, type Address } from "@/types";
 import { assertSafeHttpUrl } from "@/utils";
@@ -120,6 +120,23 @@ export interface PrivacyPaymasterConfig {
    * whose fee happens to sit above the guess.
    */
   maxFee?: bigint;
+  /**
+   * Fee recipients to accept. A quote naming any other is refused.
+   *
+   * Nothing on chain says which recipient is legitimate. The pool's own
+   * `get_fee_collector()` is a different address that the forwarder pays onward,
+   * so this is the only way to bind the recipient to something the endpoint does
+   * not control.
+   *
+   * Setting it also makes the caller check on the typed data mean something. That
+   * check compares the signature's caller against this recipient, and both arrive
+   * in the same response, so until one side is anchored here it catches a mismatch
+   * rather than a substitution.
+   *
+   * Left unset by default: the address is per deployment and per network, and an
+   * operator rotating it would break every transaction until this is updated.
+   */
+  allowedFeeRecipients?: readonly Address[];
 }
 
 /**
@@ -140,6 +157,14 @@ export interface PrivacyInvoke {
   userAddress: Address;
   /** Calls to relay. Converted to the paymaster's `to`/`selector` shape. */
   calls: Call[];
+  /**
+   * Chain the signature must be bound to, as a literal like `SN_SEPOLIA` or a
+   * felt. Required, because the account computes its message hash from the chain
+   * it is running on: typed data naming a different one produces a signature that
+   * fails here and stays valid on that other chain, where the same account
+   * address usually exists too.
+   */
+  chainId: string;
 }
 
 /**
@@ -359,6 +384,162 @@ function explainInvokeRejection(
 }
 
 /**
+ * Read a felt, or `undefined` when the value is not one.
+ *
+ * `num.isBigNumberish` does the validating because it is stricter than `BigInt`:
+ * `BigInt("")` and `BigInt(" ")` both return zero, which would let a blank field
+ * compare equal to `0x0`. The catch covers `"0x"`, which passes the guard and
+ * then fails to convert.
+ */
+function asFelt(value: unknown): bigint | undefined {
+  if (!num.isBigNumberish(value)) return undefined;
+  try {
+    return num.toBigInt(value);
+  } catch {
+    return undefined;
+  }
+}
+
+/** Read a chain id, which arrives as a short string but may be a felt. */
+function asChainId(value: unknown): bigint | undefined {
+  const felt = asFelt(value);
+  if (felt !== undefined) return felt;
+  if (typeof value !== "string" || value.length === 0) return undefined;
+  try {
+    return BigInt(shortString.encodeShortString(value));
+  } catch {
+    return undefined;
+  }
+}
+
+/** Compare two felts by value, so padding and radix do not matter. */
+function sameFelt(a: unknown, b: unknown): boolean {
+  const left = asFelt(a);
+  return left !== undefined && left === asFelt(b);
+}
+
+/**
+ * Check what the paymaster asked the user to sign against what was requested.
+ *
+ * The response decides what the account will execute, so signing it unread lets a
+ * compromised or misconfigured endpoint swap the calls, redirect the execution to
+ * a different caller, or widen the validity window. A type assertion on the
+ * response is not a check: these are.
+ *
+ * The chain is deliberately absent. An endpoint pointed at the wrong network
+ * fails earlier and more clearly, when the paymaster refuses a pool it does not
+ * know with code 156.
+ */
+function assertSignableTypedData(
+  typedData: TypedData,
+  invoke: PrivacyInvoke,
+  forwarder: Address
+): void {
+  const reject = (why: string): never => {
+    throw new PrivacyPaymasterError(
+      -1,
+      "[starkzap] The privacy paymaster asked for a signature over something " +
+        `other than the requested transaction: ${why}. Nothing was signed.`,
+      typedData
+    );
+  };
+
+  if (typedData.primaryType !== "OutsideExecution") {
+    reject(
+      `the primary type is "${String(typedData.primaryType)}", not "OutsideExecution"`
+    );
+  }
+
+  const domain = (typedData.domain ?? {}) as Record<string, unknown>;
+  const wanted = asChainId(invoke.chainId);
+  if (wanted === undefined || asChainId(domain.chainId) !== wanted) {
+    reject(
+      `it is bound to chain ${String(domain.chainId)}, not ${invoke.chainId}`
+    );
+  }
+
+  const message = (typedData.message ?? {}) as Record<string, unknown>;
+
+  // The forwarder collecting the fee is the only address allowed to relay these
+  // calls, so another caller means the signature authorises someone else's use of
+  // it. Both values come from this same response, so on its own this catches a
+  // mismatch rather than a substitution. `allowedFeeRecipients` anchors the
+  // recipient to configuration, which is what makes this check a real one.
+  if (!sameFelt(message.Caller, forwarder)) {
+    reject(
+      `the caller is ${String(message.Caller)}, not the forwarder ${forwarder} ` +
+        "that collects the fee"
+    );
+  }
+
+  const now = BigInt(Math.floor(Date.now() / 1000));
+
+  // An outside execution with no upper bound is an authorisation that never
+  // expires, so an unreadable one is refused rather than skipped.
+  const before = asFelt(message["Execute Before"]);
+  if (before === undefined) {
+    reject(
+      `it has no readable \`Execute Before\`, so the signature would never expire`
+    );
+  } else if (before <= now) {
+    reject(`it expired at ${before}, and the clock now reads ${now}`);
+  }
+
+  const after = asFelt(message["Execute After"]);
+  if (after !== undefined && after > now) {
+    reject(`it cannot be used until ${after}, and the clock now reads ${now}`);
+  }
+
+  const calls = message.Calls;
+  if (!Array.isArray(calls) || calls.length !== invoke.calls.length) {
+    reject(
+      `it carries ${Array.isArray(calls) ? calls.length : "no"} calls, not the ` +
+        `${invoke.calls.length} requested`
+    );
+    return;
+  }
+
+  invoke.calls.forEach((call, index) => {
+    // Compared against the same conversion the request used, so a difference is a
+    // real difference rather than one of formatting.
+    const expected = toPaymasterCall(call);
+    const actual = (calls[index] ?? {}) as Record<string, unknown>;
+
+    if (!sameFelt(actual.To, expected.to)) {
+      reject(
+        `call ${index} targets ${String(actual.To)} instead of ${expected.to}`
+      );
+    }
+    if (!sameFelt(actual.Selector, expected.selector)) {
+      reject(
+        `call ${index} runs selector ${String(actual.Selector)} instead of ` +
+          `${expected.selector} (\`${call.entrypoint}\`)`
+      );
+    }
+
+    const calldata = actual.Calldata;
+    if (
+      !Array.isArray(calldata) ||
+      calldata.length !== expected.calldata.length
+    ) {
+      reject(
+        `call ${index} carries ${Array.isArray(calldata) ? calldata.length : "no"} ` +
+          `calldata felts, not the ${expected.calldata.length} requested`
+      );
+      return;
+    }
+    expected.calldata.forEach((felt, position) => {
+      if (!sameFelt(calldata[position], felt)) {
+        reject(
+          `call ${index} calldata differs at position ${position}: ` +
+            `${String(calldata[position])} instead of ${felt}`
+        );
+      }
+    });
+  });
+}
+
+/**
  * Read the paymaster's fee action, validating rather than trusting it.
  *
  * This is a trust boundary. The response decides which address receives how much
@@ -367,9 +548,16 @@ function explainInvokeRejection(
  * malformed amount is named here instead of surfacing as a bare BigInt
  * `SyntaxError` from inside a quote.
  */
+/** Caller-declared bounds on what a quote may claim about its fee. */
+interface FeeActionPolicy {
+  maxFee?: bigint;
+  allowedFeeRecipients?: readonly Address[];
+}
+
 function parseFeeAction(
   action: { recipient: string; token: string; amount: string },
-  maxFee: bigint | undefined
+  feeMode: PrivacyFeeMode,
+  policy: FeeActionPolicy
 ): PrivacyFeeAction {
   let feeAction: PrivacyFeeAction;
   try {
@@ -383,6 +571,53 @@ function parseFeeAction(
       -1,
       "[starkzap] The privacy paymaster returned a fee action starkzap cannot " +
         `use: ${error instanceof Error ? error.message : String(error)}`,
+      action
+    );
+  }
+
+  const { allowedFeeRecipients, maxFee } = policy;
+
+  if (allowedFeeRecipients !== undefined) {
+    if (allowedFeeRecipients.length === 0) {
+      throw new PrivacyPaymasterError(
+        -1,
+        "[starkzap] `allowedFeeRecipients` is an empty list, so no quote can be " +
+          "accepted. Name the fee recipients you trust, or leave it unset.",
+        action
+      );
+    }
+    if (
+      !allowedFeeRecipients.some((allowed) =>
+        sameFelt(feeAction.recipient, allowed)
+      )
+    ) {
+      throw new PrivacyPaymasterError(
+        -1,
+        `[starkzap] The privacy paymaster wants its fee sent to ` +
+          `${feeAction.recipient}, which is not in \`allowedFeeRecipients\`. ` +
+          "Nothing was withdrawn.",
+        action
+      );
+    }
+  }
+
+  // The token is ours to check in the two modes where we name it. Under
+  // `sponsored` the deployment picks the token, so there is nothing to compare
+  // against and `maxFee` is the only bound on what leaves the pool.
+  const chosenToken =
+    feeMode.mode === "default"
+      ? feeMode.gasToken
+      : feeMode.mode === "sponsored_private"
+        ? feeMode.poolFeeToken
+        : undefined;
+
+  if (chosenToken !== undefined && !sameFelt(feeAction.token, chosenToken)) {
+    throw new PrivacyPaymasterError(
+      -1,
+      `[starkzap] The privacy paymaster quoted its fee in ${feeAction.token}, ` +
+        `but \`${feeMode.mode}\` mode was configured to pay in ${chosenToken}. ` +
+        "Nothing was withdrawn. A proof built on this quote would spend a token " +
+        "you did not choose.",
       action
     );
   }
@@ -470,23 +705,34 @@ function parseGasQuote(fee: unknown): PrivacyGasQuote | undefined {
  */
 export class PrivacyPaymaster {
   private readonly url: string;
-  private readonly maxFee: bigint | undefined;
+  private readonly policy: FeeActionPolicy;
   private readonly fetchImpl: typeof fetch | undefined;
 
   /**
    * @param url - Paymaster endpoint, or a proxy in front of it
    * @param options.maxFee - Ceiling on the quoted fee, in base units of the fee
    *   token. See {@link PrivacyPaymasterConfig.maxFee}
+   * @param options.allowedFeeRecipients - Recipients to accept. See
+   *   {@link PrivacyPaymasterConfig.allowedFeeRecipients}
    * @param options.fetch - Transport override. See
    *   {@link PrivacyPaymasterConfig.fetch}
    */
   constructor(
     url: string,
-    options?: { maxFee?: bigint; fetch?: typeof fetch }
+    options?: {
+      maxFee?: bigint;
+      allowedFeeRecipients?: readonly Address[];
+      fetch?: typeof fetch;
+    }
   ) {
     assertSafeHttpUrl(url, "Privacy paymaster URL");
     this.url = url;
-    this.maxFee = options?.maxFee;
+    this.policy = {
+      ...(options?.maxFee !== undefined && { maxFee: options.maxFee }),
+      ...(options?.allowedFeeRecipients !== undefined && {
+        allowedFeeRecipients: options.allowedFeeRecipients,
+      }),
+    };
     this.fetchImpl = options?.fetch;
   }
 
@@ -555,9 +801,21 @@ export class PrivacyPaymaster {
       );
     }
 
+    const feeAction = parseFeeAction(action, feeMode, this.policy);
+
+    // Checked before the caller can sign it, and after the fee action, because
+    // the forwarder it names is what the caller has to be.
+    if (invoke && result.typed_data !== undefined) {
+      assertSignableTypedData(
+        result.typed_data as TypedData,
+        invoke,
+        feeAction.recipient
+      );
+    }
+
     const gas = parseGasQuote(result.fee);
     return {
-      feeAction: parseFeeAction(action, this.maxFee),
+      feeAction,
       ...(gas && { gas }),
       ...(result.typed_data !== undefined && {
         typedData: result.typed_data as TypedData,

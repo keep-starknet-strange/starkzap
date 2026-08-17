@@ -780,6 +780,10 @@ describe("privacy", () => {
         entrypoint: "approve",
         calldata: ["1000000000000000000", "0"],
       };
+      // Faithful to a real response: the caller is the forwarder that collects
+      // the fee, and the calls are the requested ones in the paymaster's own
+      // to/selector/calldata shape. A fixture with an empty message cannot catch
+      // typed data that authorises something else.
       const TYPED_DATA = {
         types: {},
         domain: {
@@ -788,7 +792,19 @@ describe("privacy", () => {
           chainId: "SN_MAIN",
         },
         primaryType: "OutsideExecution",
-        message: {},
+        message: {
+          Caller: "0x75a1",
+          Nonce: "0xd81715a5eb341fbc984610847b7f9826",
+          "Execute After": "0x1",
+          "Execute Before": `0x${(Math.floor(Date.now() / 1000) + 3600).toString(16)}`,
+          Calls: [
+            {
+              To: POOL,
+              Selector: starknetHash.getSelectorFromName("approve"),
+              Calldata: ["0xde0b6b3a7640000", "0x0"],
+            },
+          ],
+        },
       };
       const quoted = (over: Record<string, unknown> = {}) => ({
         result: {
@@ -805,7 +821,9 @@ describe("privacy", () => {
         const quote = await new PrivacyPaymaster(URL).quote(
           POOL,
           { mode: "sponsored" },
-          { invoke: { userAddress: USER, calls: [APPROVE] } }
+          {
+            invoke: { userAddress: USER, calls: [APPROVE], chainId: "SN_MAIN" },
+          }
         );
 
         expect(sent[0]!.params).toMatchObject({
@@ -831,6 +849,162 @@ describe("privacy", () => {
         // `-32602 Invalid params` for a bare decimal, so this is not cosmetic.
         expect(call.calldata).toEqual(["0xde0b6b3a7640000", "0x0"]);
         expect(quote.typedData).toEqual(TYPED_DATA);
+      });
+
+      /**
+       * The response decides what the account will execute, so each of these is a
+       * substitution a compromised or misconfigured endpoint could attempt. The
+       * quote has to refuse before the caller ever sees something to sign.
+       */
+      describe("refuses typed data that does not match the request", () => {
+        const tamper = (message: Record<string, unknown>) =>
+          rejectedBy(() => {
+            stubFetch(
+              quoted({
+                typed_data: {
+                  ...TYPED_DATA,
+                  message: { ...TYPED_DATA.message, ...message },
+                },
+              })
+            );
+            return new PrivacyPaymaster(URL).quote(
+              POOL,
+              { mode: "sponsored" },
+              {
+                invoke: {
+                  userAddress: USER,
+                  calls: [APPROVE],
+                  chainId: "SN_MAIN",
+                },
+              }
+            );
+          });
+
+        const oneCall = (call: Record<string, unknown>) => ({
+          Calls: [{ ...TYPED_DATA.message.Calls[0], ...call }],
+        });
+
+        it("rejects a substituted target", async () => {
+          const error = await tamper(oneCall({ To: "0xdead" }));
+          expect(error.message).toMatch(/call 0 targets 0xdead/);
+        });
+
+        it("rejects a substituted selector", async () => {
+          const error = await tamper(
+            oneCall({ Selector: starknetHash.getSelectorFromName("transfer") })
+          );
+          expect(error.message).toMatch(/call 0 runs selector/);
+        });
+
+        it("rejects altered calldata", async () => {
+          const error = await tamper(
+            oneCall({ Calldata: ["0xde0b6b3a7640000", "0x1"] })
+          );
+          expect(error.message).toMatch(/calldata differs at position 1/);
+        });
+
+        it("rejects an extra call smuggled alongside ours", async () => {
+          const error = await tamper({
+            Calls: [
+              TYPED_DATA.message.Calls[0],
+              { To: "0xdead", Selector: "0x1", Calldata: [] },
+            ],
+          });
+          expect(error.message).toMatch(/carries 2 calls, not the 1 requested/);
+        });
+
+        it("rejects a caller that is not the fee's forwarder", async () => {
+          const error = await tamper({ Caller: "0xdead" });
+          expect(error.message).toMatch(/the caller is 0xdead/);
+        });
+
+        it("rejects typed data that has already expired", async () => {
+          const error = await tamper({ "Execute Before": "0x1" });
+          expect(error.message).toMatch(/expired at 1/);
+        });
+
+        it("rejects typed data with no expiry at all", async () => {
+          const error = await tamper({ "Execute Before": undefined });
+          expect(error.message).toMatch(/no readable `Execute Before`/);
+        });
+
+        it("rejects typed data bound to another chain", async () => {
+          // The account hashes the message with the chain it runs on, so this
+          // signature would fail here and stay valid on the chain named instead --
+          // where the same account address usually exists.
+          const error = await rejectedBy(() => {
+            stubFetch(
+              quoted({
+                typed_data: {
+                  ...TYPED_DATA,
+                  domain: { ...TYPED_DATA.domain, chainId: "SN_SEPOLIA" },
+                },
+              })
+            );
+            return new PrivacyPaymaster(URL).quote(
+              POOL,
+              { mode: "sponsored" },
+              {
+                invoke: {
+                  userAddress: USER,
+                  calls: [APPROVE],
+                  chainId: "SN_MAIN",
+                },
+              }
+            );
+          });
+          expect(error.message).toMatch(
+            /bound to chain SN_SEPOLIA, not SN_MAIN/
+          );
+        });
+
+        it("accepts a chain given as a felt rather than a literal", async () => {
+          stubFetch(
+            quoted({
+              typed_data: {
+                ...TYPED_DATA,
+                domain: {
+                  ...TYPED_DATA.domain,
+                  chainId: shortString.encodeShortString("SN_MAIN"),
+                },
+              },
+            })
+          );
+
+          const quote = await new PrivacyPaymaster(URL).quote(
+            POOL,
+            { mode: "sponsored" },
+            {
+              invoke: {
+                userAddress: USER,
+                calls: [APPROVE],
+                chainId: "SN_MAIN",
+              },
+            }
+          );
+
+          expect(quote.typedData).toBeDefined();
+        });
+
+        it("rejects a primary type that is not an outside execution", async () => {
+          const error = await rejectedBy(() => {
+            stubFetch(
+              quoted({ typed_data: { ...TYPED_DATA, primaryType: "Transfer" } })
+            );
+            return new PrivacyPaymaster(URL).quote(
+              POOL,
+              { mode: "sponsored" },
+              {
+                invoke: {
+                  userAddress: USER,
+                  calls: [APPROVE],
+                  chainId: "SN_MAIN",
+                },
+              }
+            );
+          });
+          expect(error.message).toMatch(/primary type is "Transfer"/);
+        });
       });
 
       it("asks for the plain type, and returns no typed data, without it", async () => {
@@ -861,7 +1035,13 @@ describe("privacy", () => {
           new PrivacyPaymaster(URL).quote(
             POOL,
             { mode: "sponsored" },
-            { invoke: { userAddress: USER, calls: [APPROVE] } }
+            {
+              invoke: {
+                userAddress: USER,
+                calls: [APPROVE],
+                chainId: "SN_MAIN",
+              },
+            }
           )
         );
 
@@ -897,7 +1077,13 @@ describe("privacy", () => {
           new PrivacyPaymaster(URL).quote(
             POOL,
             { mode: "sponsored" },
-            { invoke: { userAddress: USER, calls: [APPROVE] } }
+            {
+              invoke: {
+                userAddress: USER,
+                calls: [APPROVE],
+                chainId: "SN_MAIN",
+              },
+            }
           )
         );
 
@@ -1010,6 +1196,123 @@ describe("privacy", () => {
           },
           parameters: {},
         },
+      });
+
+      /**
+       * The fee leaves the caller's shielded balance, so the token it is
+       * denominated in is part of what the user agreed to. In the two modes where
+       * the caller names that token, a quote naming a different one is refused.
+       * Under `sponsored` the deployment picks it, so `maxFee` is the only bound.
+       */
+      it("rejects a fee token other than the configured gas token", async () => {
+        stubFetch(feeAction({ token: STRK }));
+
+        const error = await rejectedBy(() =>
+          new PrivacyPaymaster(URL).quote(POOL, {
+            mode: "default",
+            gasToken: fromAddress("0xe7"),
+          })
+        );
+
+        expect(error.message).toMatch(/quoted its fee in/);
+        expect(error.message).toMatch(
+          /`default` mode was configured to pay in/
+        );
+      });
+
+      it("rejects a fee token other than the configured pool fee token", async () => {
+        stubFetch(feeAction({ token: STRK }));
+
+        const error = await rejectedBy(() =>
+          new PrivacyPaymaster(URL).quote(POOL, {
+            mode: "sponsored_private",
+            poolFeeToken: fromAddress("0xe7"),
+          })
+        );
+
+        expect(error.message).toMatch(/`sponsored_private` mode/);
+      });
+
+      it("accepts whichever token the deployment picks under sponsored", async () => {
+        stubFetch(feeAction({ token: STRK }));
+
+        const quote = await new PrivacyPaymaster(URL).quote(POOL, {
+          mode: "sponsored",
+        });
+
+        expect(quote.feeAction.token).toBe(fromAddress(STRK));
+      });
+
+      /**
+       * Nothing on chain says which fee recipient is legitimate, so this is the
+       * only way to bind it to something the paymaster does not control.
+       */
+      describe("allowedFeeRecipients", () => {
+        it("accepts a recipient on the list", async () => {
+          stubFetch(feeAction({ recipient: "0x75a1" }));
+
+          const quote = await new PrivacyPaymaster(URL, {
+            allowedFeeRecipients: [
+              fromAddress("0xdead"),
+              fromAddress("0x75a1"),
+            ],
+          }).quote(POOL, { mode: "sponsored" });
+
+          expect(quote.feeAction.recipient).toBe(fromAddress("0x75a1"));
+        });
+
+        it("refuses a recipient that is not on the list", async () => {
+          stubFetch(feeAction({ recipient: "0xdead" }));
+
+          const error = await rejectedBy(() =>
+            new PrivacyPaymaster(URL, {
+              allowedFeeRecipients: [fromAddress("0x75a1")],
+            }).quote(POOL, { mode: "sponsored" })
+          );
+
+          expect(error.message).toMatch(/not in `allowedFeeRecipients`/);
+          expect(error.message).toMatch(/Nothing was withdrawn/);
+        });
+
+        it("compares by value, so padding does not matter", async () => {
+          // An integrator pastes an address in whatever form they have it.
+          stubFetch(feeAction({ recipient: "0x75a1" }));
+
+          const quote = await new PrivacyPaymaster(URL, {
+            allowedFeeRecipients: [
+              `0x${"0".repeat(60)}75a1` as unknown as ReturnType<
+                typeof fromAddress
+              >,
+            ],
+          }).quote(POOL, { mode: "sponsored" });
+
+          expect(quote.feeAction.recipient).toBe(fromAddress("0x75a1"));
+        });
+
+        it("names an empty list rather than blaming the quote", async () => {
+          stubFetch(feeAction({ recipient: "0x75a1" }));
+
+          const error = await rejectedBy(() =>
+            new PrivacyPaymaster(URL, { allowedFeeRecipients: [] }).quote(
+              POOL,
+              {
+                mode: "sponsored",
+              }
+            )
+          );
+
+          expect(error.message).toMatch(/is an empty list/);
+        });
+
+        it("accepts any recipient when left unset", async () => {
+          stubFetch(feeAction({ recipient: "0xdead" }));
+
+          const quote = await new PrivacyPaymaster(URL).quote(POOL, {
+            mode: "sponsored",
+          });
+
+          expect(quote.feeAction.recipient).toBe(fromAddress("0xdead"));
+        });
       });
 
       it("rejects a recipient that is not an address", async () => {
@@ -1523,14 +1826,36 @@ describe("privacy", () => {
     const POOL_HEX = `0x${POOL_ADDRESS.toString(16)}`;
     const FORWARDER = fromAddress("0x75a1");
 
-    /** Typed data the stub hands back when a build wraps user calls. */
-    const RELAY_TYPED_DATA = {
-      domain: { name: "Account.execute_from_outside", version: "2" },
-      primaryType: "OutsideExecution",
-      types: {},
-      message: { Nonce: "0xserverchosen" },
-    };
     const RELAY_SIGNATURE = ["0xr", "0xs"];
+
+    /**
+     * Typed data for the calls the request actually carried, as a real paymaster
+     * builds it: the forwarder as caller, and the requested calls echoed back.
+     */
+    function relayTypedData(calls: unknown) {
+      return {
+        domain: {
+          name: "Account.execute_from_outside",
+          version: "2",
+          chainId: "SN_MAIN",
+        },
+        primaryType: "OutsideExecution",
+        types: {},
+        message: {
+          Caller: FORWARDER,
+          Nonce: "0xserverchosen",
+          "Execute After": "0x1",
+          "Execute Before": `0x${(Math.floor(Date.now() / 1000) + 3600).toString(16)}`,
+          Calls: (
+            calls as { to: string; selector: string; calldata: string[] }[]
+          ).map((call) => ({
+            To: call.to,
+            Selector: call.selector,
+            Calldata: call.calldata,
+          })),
+        },
+      };
+    }
 
     /** Paymaster whose quote names `amount`, and whose execute always succeeds. */
     function paymasterStub(amount: string, token: string) {
@@ -1561,7 +1886,15 @@ describe("privacy", () => {
                   result: {
                     fee_action: { recipient: FORWARDER, token, amount },
                     parameters: { version: "0x1", tip: "normal" },
-                    ...(wrapped && { typed_data: RELAY_TYPED_DATA }),
+                    ...(wrapped && {
+                      typed_data: relayTypedData(
+                        (
+                          body.params as unknown as {
+                            transaction: { invoke: { calls: unknown } };
+                          }
+                        ).transaction.invoke.calls
+                      ),
+                    }),
                   },
                 }),
             } as Response);
@@ -1614,6 +1947,7 @@ describe("privacy", () => {
             url: "https://paymaster.example.com",
             fee,
             provider,
+            chainId: ChainId.MAINNET,
             ...(withAccount && {
               account: { address: RELAY_ACCOUNT, signTypedData },
             }),
@@ -2013,14 +2347,29 @@ describe("privacy", () => {
           },
         });
         // The signature covers the bytes the paymaster chose, echoed unchanged --
-        // it picks the nonce, so a rebuilt copy would not verify.
-        expect(signTypedData).toHaveBeenCalledWith(RELAY_TYPED_DATA);
+        // it picks the nonce, so a rebuilt copy would not verify. Asserting the
+        // round trip rather than a fixture: what was signed is what was submitted.
+        expect(signTypedData).toHaveBeenCalledTimes(1);
+        const signedOver = signTypedData.mock.calls[0]![0];
+        expect(signedOver).toMatchObject({
+          primaryType: "OutsideExecution",
+          message: {
+            Caller: FORWARDER,
+            Calls: [
+              {
+                To: approve.contractAddress,
+                Selector: starknetHash.getSelectorFromName("approve"),
+                Calldata: approve.calldata,
+              },
+            ],
+          },
+        });
         expect(submitted[0]!).toMatchObject({
           transaction: {
             type: "invoke_and_apply_action",
             invoke: {
               user_address: relayAccount,
-              typed_data: RELAY_TYPED_DATA,
+              typed_data: signedOver,
               signature: RELAY_SIGNATURE,
             },
           },

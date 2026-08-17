@@ -6,7 +6,7 @@ import type {
   ExecuteOptions as SdkExecuteOptions,
 } from "@starkware-libs/starknet-privacy-sdk";
 
-import type { Address } from "@/types";
+import type { Address, ChainId } from "@/types";
 import { fromAddress } from "@/types";
 import {
   PrivacyPaymaster,
@@ -186,6 +186,11 @@ export interface PaymasterBinding extends PrivacyPaymasterConfig {
   /** Provider used to read the chain head when resolving the proving block. */
   provider: RpcProvider;
   /**
+   * Chain this client is bound to. Used to check that typed data from the
+   * paymaster is bound to the same one before anything signs it.
+   */
+  chainId: ChainId;
+  /**
    * The account behind the client, needed only to relay public calls alongside
    * the private transaction. See {@link PrivacySendOptions.invoke}.
    *
@@ -222,6 +227,9 @@ export function withPaymaster(
 ): PrivacyClient {
   const paymaster = new PrivacyPaymaster(binding.url, {
     ...(binding.maxFee !== undefined && { maxFee: binding.maxFee }),
+    ...(binding.allowedFeeRecipients !== undefined && {
+      allowedFeeRecipients: binding.allowedFeeRecipients,
+    }),
     ...(binding.fetch && { fetch: binding.fetch }),
   });
   const pool = fromAddress(binding.poolContractAddress);
@@ -264,7 +272,11 @@ export function withPaymaster(
       );
     }
     return {
-      invoke: { userAddress: account.address, calls },
+      invoke: {
+        userAddress: account.address,
+        calls,
+        chainId: binding.chainId.toLiteral(),
+      },
       signTypedData: account.signTypedData,
     };
   }
