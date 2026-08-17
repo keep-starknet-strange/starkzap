@@ -313,21 +313,6 @@ export const PRIVACY_CONFIG: PrivacyConfig | undefined =
       }
     : undefined;
 
-/**
- * Executor contracts for the anonymous swap and lending flows. Absent entries
- * hide the corresponding operation; the core flows do not need them.
- */
-export const PRIVACY_ANONYMIZERS = {
-  swap: pick(
-    env.VITE_PRIVACY_SWAP_ANONYMIZER_MAINNET as string | undefined,
-    env.VITE_PRIVACY_SWAP_ANONYMIZER_SEPOLIA as string | undefined
-  ),
-  lending: pick(
-    env.VITE_PRIVACY_LENDING_ANONYMIZER_MAINNET as string | undefined,
-    env.VITE_PRIVACY_LENDING_ANONYMIZER_SEPOLIA as string | undefined
-  ),
-};
-
 // Switch network by reloading with the query param — mirrors the old behavior
 // (a fresh SDK + wallet per network is simpler than live-rebuilding).
 export function switchNetwork(next: AppNetwork): void {
