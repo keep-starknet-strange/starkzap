@@ -3,6 +3,7 @@ import {
   RpcError,
   ec,
   hash as starknetHash,
+  shortString,
   type RpcProvider,
   type Signature,
 } from "starknet";
@@ -1825,6 +1826,45 @@ describe("privacy", () => {
       );
       // A failed invocation leaves a cached nonce that would poison the retry.
       expect(invalidate).toHaveBeenCalled();
+    });
+
+    it("awaits an async compose, so actions added after a suspension survive", async () => {
+      // TypeScript accepts an async callback where a `void` return is declared, so
+      // this compiles for any caller. Without the await the builder is still empty
+      // when the proof is built, and the transaction silently does nothing the
+      // caller asked for.
+      const { mocknet, env: sdkEnv, bind } = env();
+      const { submitted: submittedProbe } = paymasterStub(
+        "0x0",
+        `0x${BigInt(sdkEnv.ace).toString(16)}`
+      );
+      const privacy = await bind();
+      mocknet.executeOutside(
+        await privacy.transfers.build().register().execute()
+      );
+
+      const hash = await privacy.send(
+        async (b) => {
+          await Promise.resolve();
+          b.with(sdkEnv.ace, (t) => t.deposit({ amount: 100n })).surplusTo(
+            `0x${sdkEnv.alice.address.toString(16)}`
+          );
+        },
+        { autoSetup: true, autoDiscover: { notes: "refresh" } }
+      );
+
+      expect(hash).toBe("0xsent");
+      // The hash alone proves nothing: an empty builder still yields a
+      // submittable proof. The action list is the evidence — without the await it
+      // carries only the auto-setup channel and no Deposit at all.
+      const actions = (
+        submittedProbe[0]! as unknown as {
+          transaction: {
+            apply_action: { apply_actions_call: { calldata: string[] } };
+          };
+        }
+      ).transaction.apply_action.apply_actions_call.calldata;
+      expect(actions).toContain(shortString.encodeShortString("Deposit"));
     });
 
     it("delegates reads to the SDK client untouched", async () => {
