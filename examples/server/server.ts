@@ -295,15 +295,23 @@ if (ENABLE_PAYMASTER) {
         body: JSON.stringify(req.body),
       });
 
-      const data = await response.json();
+      // Read once as text and forward the upstream's own status and content type.
+      // Anything in front of the paymaster can answer with an empty body or an
+      // HTML error page — a 429 or a 502 from a CDN — and decoding that as JSON
+      // here would hide the real status behind this proxy's own error. Your proxy
+      // needs the same behaviour.
+      const body = await response.text();
       if (!response.ok) {
         console.log(
           `[Paymaster] Error ${response.status}:`,
-          JSON.stringify(data)
+          body.slice(0, 500)
         );
       }
 
-      res.status(response.status).json(data);
+      const contentType = response.headers.get("content-type");
+      res.status(response.status);
+      if (contentType) res.type(contentType);
+      res.send(body);
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : String(error);
       console.log(`[Paymaster] Exception:`, message);
