@@ -26,10 +26,15 @@ export interface PrivacySendOptions extends Omit<
   "provingBlockId"
 > {
   /**
-   * Prove against this block instead of one resolved from the chain head.
+   * Prove against this block instead of one picked from the chain head.
    *
-   * Only pass this if you are tracking provability yourself. The default
-   * already waits for the previous private transaction from this client to age.
+   * Use it when the proof depends on something this client cannot see, such as a
+   * deposit's funds having arrived. `waitForFundedBalance` returns such a block.
+   *
+   * This sets the earliest block, not an exact one. A block older than this
+   * client's last transaction cannot work, because the proof would not include
+   * that transaction. The client waits for it instead. So the block used may be
+   * later than the one you pass, never earlier.
    */
   provingBlockId?: number;
   /**
@@ -282,11 +287,22 @@ export function withPaymaster(
   async function resolveProvingBlock(
     options?: PrivacySendOptions
   ): Promise<number> {
-    if (options?.provingBlockId !== undefined) return options.provingBlockId;
+    const previous = await previousBlock();
+
+    // The caller's block is used only if it already includes our last
+    // transaction. An older one would prove against state that still shows the
+    // notes it spent, which the pool rejects. Waiting for a later block instead
+    // is safe: what the wait helpers check stays true as the chain grows.
+    if (
+      options?.provingBlockId !== undefined &&
+      options.provingBlockId >= previous
+    ) {
+      return options.provingBlockId;
+    }
 
     return waitForProvableBlock(
       binding.provider,
-      await previousBlock(),
+      previous,
       options?.wait ?? {}
     );
   }
