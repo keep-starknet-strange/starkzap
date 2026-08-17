@@ -481,6 +481,13 @@ export function withPaymaster(
       // ProvingBlockId is starknet.js's BlockIdentifier, so a plain number is
       // the block-number form; `{ block_number: n }` is not accepted.
       const builder = transfers.build({
+        // Defaulted because the fee withdrawal appended below is in the
+        // paymaster's token, which the caller never has to name. Without a
+        // selection strategy the builder finds no notes to pay it from and the
+        // whole transaction fails for insufficient balance while the notes sit
+        // there unused. Listed first so a caller can choose another strategy, and
+        // notes named explicitly on the builder still win over both.
+        autoSelectNotes: "naive",
         ...sdkOptions,
         provingBlockId,
       });

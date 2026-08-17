@@ -2454,6 +2454,42 @@ describe("privacy", () => {
       });
     });
 
+    it("spends existing notes without being asked to select them", async () => {
+      // `send` appends a fee withdrawal in the paymaster's token, which the
+      // caller never names, so it defaults a note-selection strategy. Without one
+      // the builder picks no inputs and the transaction fails for insufficient
+      // balance while the notes sit there unspent.
+      const { mocknet, env: sdkEnv, bind } = env();
+      paymasterStub("0x0", `0x${BigInt(sdkEnv.ace).toString(16)}`);
+      const privacy = await bind();
+      const me = `0x${sdkEnv.alice.address.toString(16)}`;
+
+      // Funded through the builder rather than `send`, so no earlier submission
+      // has to age before the next proof.
+      mocknet.executeOutside(
+        await privacy.transfers
+          .build({ autoSetup: true })
+          .register()
+          .with(sdkEnv.ace, (t) => t.deposit({ amount: 1000n }))
+          .surplusTo(me)
+          .execute()
+      );
+
+      // Deliberately no `autoSelectNotes` here: that is the point.
+      const hash = await privacy.send(
+        (b) =>
+          b
+            .with(sdkEnv.ace, (t) => t.withdraw({ recipient: me, amount: 10n }))
+            .surplusTo(me),
+        {
+          autoSetup: true,
+          autoDiscover: { notes: "refresh", channels: "refresh" },
+        }
+      );
+
+      expect(hash).toBe("0xsent");
+    });
+
     it("delegates reads to the SDK client untouched", async () => {
       const { bind } = env();
       paymasterStub("0x0", "0x1");
