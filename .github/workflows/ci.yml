@@ -115,6 +115,12 @@ jobs:
           # needs the token too — not just the workspace install above.
           NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+      # The bundlers below strip types without checking them, so a green build
+      # says nothing about types. Both examples consume the SDK's public surface,
+      # which makes these the only checks that catch a breaking change to it.
+      - name: Typecheck Mobile Example
+        run: npm run -s typecheck --prefix examples/mobile
+
       - name: Build Mobile Example (iOS Bundle)
         working-directory: examples/mobile
         run: npx expo export --platform ios --output-dir /tmp/mobile-ios-build
@@ -127,6 +133,9 @@ jobs:
         run: npm ci --prefix examples/web
         env:
           NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Typecheck Web Example
+        run: npm run -s check --prefix examples/web
 
       - name: Build Web Example
         run: npm run -s build --prefix examples/web
