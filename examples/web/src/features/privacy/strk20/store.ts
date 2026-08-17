@@ -285,14 +285,21 @@ export async function deposit(token: Token, input: string): Promise<void> {
   const pool = fromAddress(PRIVACY_CONFIG.poolContractAddress);
   const bundled = get(approveMode) === "bundled";
 
-  // Built the same way for both modes; only the destination differs. `calls()`
-  // resolves the builder without sending, which is exactly what `invoke` takes.
-  const approveCalls = await wallet.tx().approve(token, pool, amount).calls();
+  busy.set(true);
+  error.set(null);
+  try {
+    // Built the same way for both modes; only the destination differs. `calls()`
+    // resolves the builder without sending, which is exactly what `invoke` takes.
+    const approveCalls = await wallet.tx().approve(token, pool, amount).calls();
 
-  if (!bundled) {
-    busy.set(true);
-    error.set(null);
-    try {
+    if (bundled) {
+      log(
+        "approve bundled into the privacy transaction — the relayer submits it " +
+          "through the account's execute_from_outside, so there is no separate " +
+          "transaction to sign or wait for",
+        "info"
+      );
+    } else {
       step.set("Deposit: approving…");
       const approve = await wallet
         .tx()
@@ -300,45 +307,40 @@ export async function deposit(token: Token, input: string): Promise<void> {
         .send();
       await approve.wait();
       log(`approve ${approve.hash} landed (separate transaction)`, "info");
-    } catch (err) {
-      fail("Deposit approve", err);
-      step.set(null);
-      busy.set(false);
-      return;
     }
-    busy.set(false);
-  } else {
-    log(
-      "approve bundled into the privacy transaction — the relayer submits it " +
-        "through the account's execute_from_outside, so there is no separate " +
-        "transaction to sign or wait for",
-      "info"
-    );
-  }
 
-  const provider = wallet.getProvider();
-  await run(
-    "Deposit",
-    (b) =>
-      b
-        .with(token.address, (t) => t.deposit({ amount: amount.toBase() }))
-        .surplusTo(wallet.address),
-    {
-      autoRegister: true,
-      autoSetup: true,
-      autoDiscover: { notes: "refresh", channels: "refresh" },
-      ...(bundled && { invoke: approveCalls }),
-      // Overrides the client's own sequencing: this proof reads the depositor's
-      // ERC20 balance, which the client has no way to know about.
-      provingBlockId: await waitForFundedBalance(
-        provider,
-        token,
-        fromAddress(wallet.address),
-        amount.toBase(),
-        { onAttempt: logAttempts("Deposit · balance visible") }
-      ),
-    }
-  );
+    step.set("Deposit: waiting for the balance to be visible…");
+    // Overrides the client's own sequencing: this proof reads the depositor's
+    // ERC20 balance, which the client has no way to know about.
+    const provingBlockId = await waitForFundedBalance(
+      wallet.getProvider(),
+      token,
+      fromAddress(wallet.address),
+      amount.toBase(),
+      { onAttempt: logAttempts("Deposit · balance visible") }
+    );
+
+    await run(
+      "Deposit",
+      (b) =>
+        b
+          .with(token.address, (t) => t.deposit({ amount: amount.toBase() }))
+          .surplusTo(wallet.address),
+      {
+        autoRegister: true,
+        autoSetup: true,
+        autoDiscover: { notes: "refresh", channels: "refresh" },
+        ...(bundled && { invoke: approveCalls }),
+        provingBlockId,
+      }
+    );
+  } catch (err) {
+    fail("Deposit", err);
+  } finally {
+    waitingBlocks.set(null);
+    step.set(null);
+    busy.set(false);
+  }
 }
 
 export function transfer(
