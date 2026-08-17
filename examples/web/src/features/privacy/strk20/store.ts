@@ -4,6 +4,7 @@ import {
   fromAddress,
   revokePrivacy,
   screeningVerdict,
+  Tx,
   waitForFundedBalance,
   type PrivacyClient,
   type PrivacyFeeQuote,
@@ -241,14 +242,18 @@ function logAttempts(what: string): (attempt: ProvableAttempt) => void {
  *
  * `send()` owns the fee, the proving block and submission, so all this adds is
  * UI state: the busy flag, the step label, and error translation.
+ *
+ * @returns Whether the transaction executed. False also means the error store
+ *   holds the reason, so a caller can keep the user's input for a retry.
  */
 async function run(
   label: string,
   compose: Parameters<PrivacyClient["send"]>[0],
   options?: PrivacySendOptions
-): Promise<void> {
+): Promise<boolean> {
   const privacy = get(client);
-  if (!privacy) return;
+  const wallet = localWallet(get(walletState).wallet);
+  if (!privacy || !wallet) return false;
 
   busy.set(true);
   error.set(null);
@@ -260,11 +265,20 @@ async function run(
     });
     log(`${label} submitted by the paymaster's relayer: ${hash}`, "success");
 
+    // The relayer's hash means the transaction was broadcast, not that it
+    // worked. Waiting for the receipt is what turns a revert into an error
+    // instead of a success message.
+    step.set(`${label}: waiting for it to execute…`);
+    await new Tx(hash, wallet.getProvider(), wallet.getChainId()).wait();
+    log(`${label} executed on-chain`, "success");
+
     step.set(`${label}: refreshing…`);
     fee.set(await privacy.quote());
     await refresh();
+    return true;
   } catch (err) {
     fail(label, err);
+    return false;
   } finally {
     waitingBlocks.set(null);
     step.set(null);
@@ -288,9 +302,9 @@ async function run(
  * This is also where registration happens: `autoRegister` folds it in, and a
  * standalone register could not pay the pool fee from an empty balance.
  */
-export async function deposit(token: Token, input: string): Promise<void> {
+export async function deposit(token: Token, input: string): Promise<boolean> {
   const wallet = localWallet(get(walletState).wallet);
-  if (!wallet || !PRIVACY_CONFIG || !input.trim()) return;
+  if (!wallet || !PRIVACY_CONFIG || !input.trim()) return false;
 
   const amount = Amount.parse(input, token);
   const pool = fromAddress(PRIVACY_CONFIG.poolContractAddress);
@@ -331,7 +345,7 @@ export async function deposit(token: Token, input: string): Promise<void> {
       { onAttempt: logAttempts("Deposit · balance visible") }
     );
 
-    await run(
+    return await run(
       "Deposit",
       (b) =>
         b
@@ -347,6 +361,7 @@ export async function deposit(token: Token, input: string): Promise<void> {
     );
   } catch (err) {
     fail("Deposit", err);
+    return false;
   } finally {
     waitingBlocks.set(null);
     step.set(null);
@@ -358,9 +373,9 @@ export function transfer(
   token: Token,
   recipient: string,
   input: string
-): Promise<void> {
+): Promise<boolean> {
   const wallet = localWallet(get(walletState).wallet);
-  if (!wallet) return Promise.resolve();
+  if (!wallet) return Promise.resolve(false);
   const amount = Amount.parse(input, token);
 
   return run(
@@ -391,9 +406,9 @@ export function withdraw(
   token: Token,
   recipient: string,
   input: string
-): Promise<void> {
+): Promise<boolean> {
   const wallet = localWallet(get(walletState).wallet);
-  if (!wallet || !recipient.trim()) return Promise.resolve();
+  if (!wallet || !recipient.trim()) return Promise.resolve(false);
   const amount = Amount.parse(input, token);
 
   return run(

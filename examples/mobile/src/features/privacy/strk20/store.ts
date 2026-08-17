@@ -4,6 +4,7 @@ import {
   fromAddress,
   revokePrivacy,
   screeningVerdict,
+  Tx,
   waitForFundedBalance,
   type PrivacyClient,
   type PrivacyFeeQuote,
@@ -43,9 +44,17 @@ interface Strk20Store {
   connect: () => Promise<void>;
   clear: () => void;
   refresh: () => Promise<void>;
-  deposit: (token: Token, input: string) => Promise<void>;
-  transfer: (token: Token, recipient: string, input: string) => Promise<void>;
-  withdraw: (token: Token, recipient: string, input: string) => Promise<void>;
+  deposit: (token: Token, input: string) => Promise<boolean>;
+  transfer: (
+    token: Token,
+    recipient: string,
+    input: string
+  ) => Promise<boolean>;
+  withdraw: (
+    token: Token,
+    recipient: string,
+    input: string
+  ) => Promise<boolean>;
   recipientReady: (recipient: string, token: Token) => Promise<boolean>;
 }
 
@@ -143,17 +152,30 @@ export const useStrk20Store = create<Strk20Store>((set, get) => {
     label: string,
     compose: Parameters<PrivacyClient["send"]>[0],
     options?: PrivacySendOptions
-  ) {
+  ): Promise<boolean> {
     const privacy = get().client;
-    if (!privacy) return;
+    const wallet = localWallet(useWalletStore.getState().wallet);
+    if (!privacy || !wallet) return false;
 
     set({ busy: true, error: null, step: `${label}: proving and submitting…` });
     try {
-      await privacy.send(compose, { wait: { onAttempt: onWait }, ...options });
+      const hash = await privacy.send(compose, {
+        wait: { onAttempt: onWait },
+        ...options,
+      });
+
+      // The relayer's hash means the transaction was broadcast, not that it
+      // worked. Waiting for the receipt is what turns a revert into an error
+      // instead of a success message.
+      set({ step: `${label}: waiting for it to execute…` });
+      await new Tx(hash, wallet.getProvider(), wallet.getChainId()).wait();
+
       set({ step: `${label}: refreshing…`, fee: await privacy.quote() });
       await get().refresh();
+      return true;
     } catch (err) {
       set({ error: describe(err) });
+      return false;
     } finally {
       set({ waitingBlocks: null, step: null, busy: false });
     }
@@ -266,7 +288,7 @@ export const useStrk20Store = create<Strk20Store>((set, get) => {
         ? "sepolia"
         : "mainnet";
       const config = privacyConfig(network, paymasterProxyUrl(network) || null);
-      if (!wallet || !config || !input.trim()) return;
+      if (!wallet || !config || !input.trim()) return false;
 
       const amount = Amount.parse(input, token);
       set({ busy: true, error: null, step: "Deposit: approving…" });
@@ -288,7 +310,7 @@ export const useStrk20Store = create<Strk20Store>((set, get) => {
           { onAttempt: onWait }
         );
 
-        await run(
+        return await run(
           "Deposit",
           (b) =>
             b
@@ -305,6 +327,7 @@ export const useStrk20Store = create<Strk20Store>((set, get) => {
         );
       } catch (err) {
         set({ error: describe(err) });
+        return false;
       } finally {
         set({ waitingBlocks: null, step: null, busy: false });
       }
@@ -312,7 +335,7 @@ export const useStrk20Store = create<Strk20Store>((set, get) => {
 
     transfer: (token, recipient, input) => {
       const wallet = localWallet(useWalletStore.getState().wallet);
-      if (!wallet) return Promise.resolve();
+      if (!wallet) return Promise.resolve(false);
       const amount = Amount.parse(input, token);
 
       return run(
@@ -344,7 +367,7 @@ export const useStrk20Store = create<Strk20Store>((set, get) => {
      */
     withdraw: (token, recipient, input) => {
       const wallet = localWallet(useWalletStore.getState().wallet);
-      if (!wallet || !recipient.trim()) return Promise.resolve();
+      if (!wallet || !recipient.trim()) return Promise.resolve(false);
       const amount = Amount.parse(input, token);
 
       return run(
