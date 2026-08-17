@@ -600,7 +600,7 @@ export class PrivacyPaymaster {
       proof_facts: proof.proofFacts,
     };
 
-    const result = await this.send<{ transaction_hash: string }>(
+    const result = await this.send<{ transaction_hash?: unknown }>(
       "paymaster_executeTransaction",
       {
         transaction: invoke
@@ -617,7 +617,17 @@ export class PrivacyPaymaster {
         parameters,
       }
     );
-    return result.transaction_hash;
+
+    const hash = result.transaction_hash;
+    if (typeof hash !== "string" || hash.length === 0) {
+      throw new PrivacyPaymasterError(
+        -1,
+        "[starkzap] The privacy paymaster returned no transaction hash. The " +
+          "transaction may still have been submitted.",
+        result
+      );
+    }
+    return hash;
   }
 
   /** Execution parameters in the shape the paymaster expects. */
