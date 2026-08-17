@@ -2269,6 +2269,102 @@ describe("privacy", () => {
       expect(actions).toContain(shortString.encodeShortString("Deposit"));
     });
 
+    /**
+     * The SDK raises `USER_LINKAGE` when a transaction may connect the user's
+     * private and public identities. Whether that is acceptable is the caller's
+     * call, so it is reported and never acted on.
+     *
+     * The warning is injected rather than provoked: which compositions the SDK
+     * considers linking is its heuristic to change, and pinning it here would
+     * make these tests fail on an upstream tweak that costs us nothing.
+     */
+    describe("privacy warnings", () => {
+      const LINKAGE = {
+        code: "USER_LINKAGE",
+        message: "the recipient is the depositor",
+      };
+
+      /** Real build and real proof, with warnings attached to the result. */
+      function warnWith(
+        privacy: Awaited<ReturnType<typeof withPaymaster>>,
+        warnings: unknown[]
+      ) {
+        const build = privacy.transfers.build.bind(privacy.transfers);
+        vi.spyOn(privacy.transfers, "build").mockImplementation((options?) => {
+          const builder = build(options);
+          const execute = builder.execute.bind(builder);
+          builder.execute = async () => ({
+            ...(await execute()),
+            warnings: warnings as never,
+          });
+          return builder;
+        });
+      }
+
+      async function ready() {
+        const { mocknet, env: sdkEnv, bind } = env();
+        const submitted = paymasterStub(
+          "0x0",
+          `0x${BigInt(sdkEnv.ace).toString(16)}`
+        );
+        const privacy = await bind();
+        mocknet.executeOutside(
+          await privacy.transfers.build().register().execute()
+        );
+        const compose = (b: PrivateTransfersBuilder) =>
+          b
+            .with(sdkEnv.ace, (t) => t.deposit({ amount: 100n }))
+            .surplusTo(`0x${sdkEnv.alice.address.toString(16)}`);
+        return { privacy, compose, submitted: submitted.submitted };
+      }
+
+      const options = {
+        autoSetup: true,
+        autoDiscover: { notes: "refresh" },
+      } as const;
+
+      it("reports warnings without refusing the transaction", async () => {
+        const { privacy, compose } = await ready();
+        warnWith(privacy, [LINKAGE]);
+        const seen: unknown[] = [];
+
+        const hash = await privacy.send(compose, {
+          ...options,
+          onWarnings: (warnings) => seen.push(...warnings),
+        });
+
+        expect(hash).toBe("0xsent");
+        expect(seen).toEqual([LINKAGE]);
+      });
+
+      it("does not call back when there is nothing to report", async () => {
+        const { privacy, compose } = await ready();
+        warnWith(privacy, []);
+        const onWarnings = vi.fn();
+
+        await privacy.send(compose, { ...options, onWarnings });
+
+        expect(onWarnings).not.toHaveBeenCalled();
+      });
+
+      it("lets the caller abort by throwing, before anything is submitted", async () => {
+        const { privacy, compose, submitted } = await ready();
+        warnWith(privacy, [LINKAGE]);
+
+        await expect(
+          privacy.send(compose, {
+            ...options,
+            onWarnings: () => {
+              throw new Error("the user declined the linkage");
+            },
+          })
+        ).rejects.toThrow("the user declined the linkage");
+
+        // The caller's own error, and the proof never reached the paymaster.
+        expect(submitted).toHaveLength(0);
+      });
+    });
+
     it("delegates reads to the SDK client untouched", async () => {
       const { bind } = env();
       paymasterStub("0x0", "0x1");
