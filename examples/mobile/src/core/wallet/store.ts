@@ -149,7 +149,7 @@ interface WalletStore {
   }) => Promise<void>;
   checkDeployment: () => Promise<void>;
   deploy: () => Promise<void>;
-  disconnect: () => void;
+  disconnect: () => Promise<void>;
 }
 
 function buildSdk(networkIndex: number) {
@@ -211,7 +211,7 @@ export const useWalletStore = create<WalletStore>((set, get) => ({
   // returns to login (disconnect clears the hint, so no resume reverts it).
   switchNetwork: () => {
     get().setNetworkIndex((get().networkIndex + 1) % NETWORKS.length);
-    get().disconnect();
+    void get().disconnect();
   },
 
   connectCartridge: async () => {
@@ -297,6 +297,7 @@ export const useWalletStore = create<WalletStore>((set, get) => ({
         networkIndex: get().networkIndex,
         address: wallet.address,
       });
+      useStrk20Store.getState().clear();
       // Establish the confidential capability now, while the key is in scope.
       usePrivacyStore.getState().init(privateKey.trim());
       await get().checkDeployment();
@@ -399,7 +400,8 @@ export const useWalletStore = create<WalletStore>((set, get) => ({
     set({ connecting: false });
   },
 
-  disconnect: () => {
+  disconnect: async () => {
+    const { wallet } = get();
     usePrivacyStore.getState().clear();
     useStrk20Store.getState().clear();
     clearHint();
@@ -412,5 +414,14 @@ export const useWalletStore = create<WalletStore>((set, get) => ({
       isDeployed: null,
       error: null,
     });
+    // The SDK caches its own privacy client per wallet, so clearing the stores is
+    // not enough to end the session's capabilities. Reported rather than thrown:
+    // the session is already gone, and a keychain that refused to close is worth
+    // seeing without leaving the app half logged out.
+    try {
+      await wallet?.disconnect();
+    } catch (err) {
+      set({ error: String(err) });
+    }
   },
 }));

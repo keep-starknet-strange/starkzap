@@ -2,6 +2,7 @@ import { writable, derived, get } from "svelte/store";
 import {
   Amount,
   fromAddress,
+  revokePrivacy,
   screeningVerdict,
   waitForFundedBalance,
   type PrivacyClient,
@@ -133,8 +134,18 @@ export function unavailableReason(walletType: string | null): string | null {
   return null;
 }
 
+/**
+ * Drop the privacy capability, revoking the viewing key with it.
+ *
+ * Call this on logout and before every login. The client holds a live viewing
+ * key, so releasing the reference alone would leave the key usable by anything
+ * still holding one — and this store is module-global, so it outlives the login
+ * that created it.
+ */
 export function clear(): void {
+  const current = get(client);
   client.set(null);
+  if (current) revokePrivacy(current.transfers);
   registered.set(null);
   balances.set([]);
   waitingBlocks.set(null);
