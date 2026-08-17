@@ -263,11 +263,63 @@ export function withPaymaster(
   // callers do not have to.
   let lastSubmittedTxHash: string | undefined;
 
-  const quote = (invoke?: PrivacyInvoke): Promise<PrivacyFeeQuote> =>
-    paymaster.quote(pool, binding.fee, {
+  /**
+   * Refuse a sponsored fee larger than the one the pool itself publishes.
+   *
+   * Under `sponsored` the relayer fronts the gas, so the withdrawal is the pool
+   * fee and nothing else — and the pool exposes that figure on chain. Reading it
+   * makes the amount the one part of a quote that does not rest on trusting the
+   * endpoint, and it caps what a substituted fee recipient could ever collect.
+   *
+   * Only that mode. `default` mixes in a gas ceiling the pool knows nothing
+   * about, and `sponsored_private` converts the fee into another token at a rate
+   * that is not on chain, so neither has a published figure to compare against.
+   *
+   * A quote *below* the published fee is left alone: the pool refuses an
+   * underpaid fee itself, so that direction costs the relayer rather than the
+   * caller.
+   */
+  async function assertWithinPublishedFee(
+    feeAction: PrivacyFeeQuote["feeAction"]
+  ): Promise<void> {
+    if (binding.fee.mode !== "sponsored") return;
+
+    let published: bigint;
+    try {
+      const [value] = await binding.provider.callContract({
+        contractAddress: pool,
+        entrypoint: "get_fee_amount",
+        calldata: [],
+      });
+      published = BigInt(value ?? "");
+    } catch (error) {
+      // Reported, not fatal. This is a second opinion on the fee, and a read
+      // that could not be taken is a reason to say so rather than to fail a
+      // transaction the paymaster already priced.
+      console.warn(
+        "[starkzap] Could not read the pool's own fee to check the quote " +
+          `against it: ${error instanceof Error ? error.message : String(error)}`
+      );
+      return;
+    }
+
+    if (feeAction.amount > published) {
+      throw new Error(
+        `[starkzap] The paymaster quoted a pool fee of ${feeAction.amount}, ` +
+          `above the ${published} this pool publishes as its own fee. Nothing ` +
+          "was withdrawn."
+      );
+    }
+  }
+
+  async function quote(invoke?: PrivacyInvoke): Promise<PrivacyFeeQuote> {
+    const feeQuote = await paymaster.quote(pool, binding.fee, {
       ...(binding.tip && { tip: binding.tip }),
       ...(invoke && { invoke }),
     });
+    await assertWithinPublishedFee(feeQuote.feeAction);
+    return feeQuote;
+  }
 
   /**
    * Turn requested calls into a {@link PrivacyInvoke} plus the signer for it.
