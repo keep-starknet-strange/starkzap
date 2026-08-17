@@ -265,33 +265,38 @@ export const useStrk20Store = create<Strk20Store>((set, get) => {
           .approve(token, fromAddress(config.poolContractAddress), amount)
           .send();
         await tx.wait();
-      } catch (err) {
-        set({ error: describe(err), step: null, busy: false });
-        return;
-      }
-      set({ busy: false });
 
-      await run(
-        "Deposit",
-        (b) =>
-          b
-            .with(token.address, (t) => t.deposit({ amount: amount.toBase() }))
-            .surplusTo(wallet.address),
-        {
-          autoRegister: true,
-          autoSetup: true,
-          autoDiscover: { notes: "refresh", channels: "refresh" },
-          // Overrides the client's own sequencing: this proof reads the
-          // depositor's ERC20 balance, which the client cannot know about.
-          provingBlockId: await waitForFundedBalance(
-            wallet.getProvider(),
-            token,
-            fromAddress(wallet.address),
-            amount.toBase(),
-            { onAttempt: onWait }
-          ),
-        }
-      );
+        set({ step: "Deposit: waiting for the balance to be visible…" });
+        // Overrides the client's own sequencing: this proof reads the
+        // depositor's ERC20 balance, which the client cannot know about.
+        const provingBlockId = await waitForFundedBalance(
+          wallet.getProvider(),
+          token,
+          fromAddress(wallet.address),
+          amount.toBase(),
+          { onAttempt: onWait }
+        );
+
+        await run(
+          "Deposit",
+          (b) =>
+            b
+              .with(token.address, (t) =>
+                t.deposit({ amount: amount.toBase() })
+              )
+              .surplusTo(wallet.address),
+          {
+            autoRegister: true,
+            autoSetup: true,
+            autoDiscover: { notes: "refresh", channels: "refresh" },
+            provingBlockId,
+          }
+        );
+      } catch (err) {
+        set({ error: describe(err) });
+      } finally {
+        set({ waitingBlocks: null, step: null, busy: false });
+      }
     },
 
     transfer: (token, recipient, input) => {
