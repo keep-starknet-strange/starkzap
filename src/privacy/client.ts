@@ -126,7 +126,13 @@ export interface PrivacyClient extends Pick<
    * relayed through the account's `execute_from_outside`, so they are signed and
    * are not private. The private part still is.
    *
-   * @param compose - Adds the operations to perform
+   * The callback may be `async`, and is awaited. Its return type is `unknown`
+   * rather than `void | Promise<void>` because the builder is fluent: callers
+   * naturally return it from a chain, and TypeScript's rule that a `void` return
+   * accepts any value does not extend to a union, so the narrower type would
+   * reject every chained callback.
+   *
+   * @param compose - Adds the operations to perform. Awaited, so it may be async
    * @param options - SDK execute options, proving-block overrides, and any
    *   public calls to relay
    * @returns The submitted transaction hash
@@ -147,7 +153,7 @@ export interface PrivacyClient extends Pick<
    * ```
    */
   send(
-    compose: (builder: PrivateTransfersBuilder) => void,
+    compose: (builder: PrivateTransfersBuilder) => unknown,
     options?: PrivacySendOptions
   ): Promise<string>;
 
@@ -371,7 +377,7 @@ export function withPaymaster(
         provingBlockId,
       });
 
-      compose(builder);
+      await compose(builder);
 
       // The forwarder collects its fee from this withdrawal, so a proof without
       // it is rejected (code 165). A zero amount means the deployment charges
