@@ -15,6 +15,7 @@ import {
   type WalletInterface,
 } from "starkzap-native";
 import { paymasterProxyUrl, privacyConfig } from "@/core/config";
+import { feeOptions } from "@/core/settings";
 import { NETWORKS } from "@/core/network";
 import { useTokensStore } from "@/core/tokens/store";
 import { useWalletStore } from "@/core/wallet/store";
@@ -296,7 +297,7 @@ export const useStrk20Store = create<Strk20Store>((set, get) => {
         const tx = await wallet
           .tx()
           .approve(token, fromAddress(config.poolContractAddress), amount)
-          .send();
+          .send(feeOptions());
         await tx.wait();
 
         set({ step: "Deposit: waiting for the balance to be visible…" });

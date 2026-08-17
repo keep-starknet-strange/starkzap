@@ -212,7 +212,8 @@ export const useDcaStore = create<DcaStore>((set, get) => ({
           .cancel(
             order.providerId === "ekubo"
               ? { orderId: order.id }
-              : { orderAddress: order.orderAddress }
+              : { orderAddress: order.orderAddress },
+            feeOptions()
           )
       );
     if (tx) await get().loadOrders();
