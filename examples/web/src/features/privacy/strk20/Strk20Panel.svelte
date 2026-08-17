@@ -172,7 +172,11 @@
         title="Deposit"
         loading={$busy}
         disabled={blocked || !depositAmount.trim()}
-        onclick={() => token && deposit(token, depositAmount).then(() => (depositAmount = ""))}
+        onclick={() =>
+          token &&
+          deposit(token, depositAmount).then((ok) => {
+            if (ok) depositAmount = "";
+          })}
       />
     </Card>
 

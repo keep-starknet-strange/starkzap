@@ -152,9 +152,9 @@ export default function Strk20Panel() {
               loading={busy}
               disabled={blocked || !depositAmount.trim()}
               onPress={() =>
-                void deposit(token, depositAmount).then(() =>
-                  setDepositAmount("")
-                )
+                void deposit(token, depositAmount).then((ok) => {
+                  if (ok) setDepositAmount("");
+                })
               }
             />
           </Card>
