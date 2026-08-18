@@ -1861,6 +1861,9 @@ describe("privacy", () => {
     function paymasterStub(amount: string, token: string) {
       const submitted: Record<string, never>[] = [];
       const built: Record<string, never>[] = [];
+      // Numbered from the second, so a test with one send still sees "0xsent"
+      // while one with two can tell them apart.
+      let submissions = 0;
       vi.stubGlobal(
         "fetch",
         vi.fn((_url: string, init?: RequestInit) => {
@@ -1900,11 +1903,13 @@ describe("privacy", () => {
             } as Response);
           }
           submitted.push(body.params);
+          submissions += 1;
+          const transaction_hash =
+            submissions === 1 ? "0xsent" : `0xsent${submissions}`;
           return Promise.resolve({
             status: 200,
             ok: true,
-            json: () =>
-              Promise.resolve({ result: { transaction_hash: "0xsent" } }),
+            json: () => Promise.resolve({ result: { transaction_hash } }),
           } as Response);
         })
       );
@@ -2488,6 +2493,56 @@ describe("privacy", () => {
       );
 
       expect(hash).toBe("0xsent");
+    });
+
+    it("runs overlapping sends one at a time", async () => {
+      // Two sends started together would otherwise both read the same earlier
+      // submission and prove against the same state, and the second would spend
+      // notes the first already consumed.
+      const { mocknet, env: sdkEnv, bind, provider } = env();
+      paymasterStub("0x0", `0x${BigInt(sdkEnv.ace).toString(16)}`);
+      const privacy = await bind();
+      const me = `0x${sdkEnv.alice.address.toString(16)}`;
+      mocknet.executeOutside(
+        await privacy.transfers.build().register().execute()
+      );
+
+      // Each send resolves its proving block through the provider, so the head
+      // reads mark where one send ends and the next begins.
+      const order: string[] = [];
+      let head = 500;
+      vi.mocked(provider.getBlockNumber).mockImplementation(() => {
+        order.push("resolve");
+        // The chain moves on between sends, so the second one's wait for the
+        // first to age can actually finish.
+        const current = head;
+        head += 20;
+        return Promise.resolve(current);
+      });
+      const deposit = (b: PrivateTransfersBuilder) =>
+        b.with(sdkEnv.ace, (t) => t.deposit({ amount: 100n })).surplusTo(me);
+      const options = {
+        autoSetup: true,
+        autoDiscover: { notes: "refresh" },
+        wait: { pollIntervalMs: 1 },
+      } as const;
+
+      const first = privacy.send(deposit, options);
+      const second = privacy.send(deposit, options);
+      const hashes = await Promise.all([first, second]);
+
+      // Distinct hashes, in the order the sends were started.
+      expect(hashes).toEqual(["0xsent", "0xsent2"]);
+
+      // The assertion that proves ordering rather than mere success: the second
+      // send aged against the *first send's* transaction, which it could only
+      // know about once that send had finished writing it.
+      expect(vi.mocked(provider.waitForTransaction)).toHaveBeenCalledWith(
+        "0xsent",
+        expect.anything()
+      );
+      // Concurrent sends would each resolve a block from the same starting point.
+      expect(order).toHaveLength(2);
     });
 
     it("delegates reads to the SDK client untouched", async () => {
