@@ -7,6 +7,7 @@ import {
   type RpcProvider,
   type Signature,
 } from "starknet";
+import { createEmptyRegistry } from "@starkware-libs/starknet-privacy-sdk";
 import {
   Mocknet,
   MockProofInvocationFactory,
@@ -2614,10 +2615,37 @@ describe("privacy", () => {
               .surplusTo(`0x${sdkEnv.alice.address.toString(16)}`),
           { autoSetup: true, autoDiscover: { notes: "refresh" } }
         )
-      ).resolves.toEqual({
+      ).resolves.toMatchObject({
         transactionHash: "0xsent",
         trackingId: "track-1",
       });
+    });
+
+    it("compiles against a copy of a registry the caller keeps", async () => {
+      // Compiling resolves the state the transaction will produce, and it runs
+      // before the proof exists. Writing the caller's registry there would record
+      // a transaction that proving or submission may yet refuse.
+      const { mocknet, env: sdkEnv, bind } = env();
+      paymasterStub("0x0", `0x${BigInt(sdkEnv.ace).toString(16)}`);
+      const privacy = await bind();
+      mocknet.executeOutside(
+        await privacy.transfers.build().register().execute()
+      );
+      const registry = createEmptyRegistry();
+
+      const result = await privacy.send(
+        (b) =>
+          b
+            .with(sdkEnv.ace, (t) => t.deposit({ amount: 100n }))
+            .surplusTo(`0x${sdkEnv.alice.address.toString(16)}`),
+        { autoSetup: true, autoDiscover: { notes: "refresh" }, registry }
+      );
+
+      expect(registry.notes.size).toBe(0);
+      expect(registry.channels.size).toBe(0);
+      // Handed back instead, for the caller to adopt once they are satisfied.
+      expect(result.registry).not.toBe(registry);
+      expect(result.registry.notes.size).toBeGreaterThan(0);
     });
 
     /**
@@ -2720,8 +2748,9 @@ describe("privacy", () => {
         expect(vi.mocked(provider.getBlockNumber)).not.toHaveBeenCalled();
       });
 
-      it("leaves the shared registry alone", async () => {
-        // `registryConst` is what makes a simulation safe beside a live send.
+      it("writes no private state", async () => {
+        // `registryConst` is what makes a simulation safe beside a live send: any
+        // registry the caller passed is read, copied, and left as it was.
         const { privacy, compose, options } = await ready();
 
         await privacy.simulate(compose, { autoSetup: true });
