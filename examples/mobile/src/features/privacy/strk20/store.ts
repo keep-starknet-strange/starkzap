@@ -160,7 +160,7 @@ export const useStrk20Store = create<Strk20Store>((set, get) => {
 
     set({ busy: true, error: null, step: `${label}: proving and submitting…` });
     try {
-      const hash = await privacy.send(compose, {
+      const { transactionHash } = await privacy.send(compose, {
         wait: { onAttempt: onWait },
         ...options,
       });
@@ -169,7 +169,11 @@ export const useStrk20Store = create<Strk20Store>((set, get) => {
       // worked. Waiting for the receipt is what turns a revert into an error
       // instead of a success message.
       set({ step: `${label}: waiting for it to execute…` });
-      await new Tx(hash, wallet.getProvider(), wallet.getChainId()).wait();
+      await new Tx(
+        transactionHash,
+        wallet.getProvider(),
+        wallet.getChainId()
+      ).wait();
 
       set({ step: `${label}: refreshing…`, fee: await privacy.quote() });
       await get().refresh();
