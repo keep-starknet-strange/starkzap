@@ -263,6 +263,42 @@ export function withPaymaster(
   // callers do not have to.
   let lastSubmittedTxHash: string | undefined;
 
+  // Settles once everything queued so far has finished.
+  let queue: Promise<void> = Promise.resolve();
+
+  /**
+   * Run one build-prove-submit at a time.
+   *
+   * Two proofs cannot be built at once on one client, whatever they contain. The
+   * SDK fetches the pool nonce once and caches it, so overlapping proofs share a
+   * nonce and one is stale before it is submitted. They also share the registry
+   * they compile against, and the checkpoint that says which block to prove from.
+   * Two transfers of different tokens still collide on all three.
+   *
+   * `submit` takes its turn too, even though its proof may have been built
+   * somewhere else entirely. Submitting writes that checkpoint, and a failed
+   * submit clears this client's nonce cache — which would strand a proof another
+   * send is halfway through building.
+   *
+   * Waiting is cheap next to that: a send takes minutes, and the pool accepts a
+   * proof for hundreds of blocks.
+   *
+   * Scope is this client, meaning one account and one pool. Separate accounts get
+   * separate clients and never wait on each other, and reads are not queued at
+   * all. What a queue cannot cover is a reload, which starts with no memory of a
+   * send from moments before.
+   */
+  function sequenced<T>(work: () => Promise<T>): Promise<T> {
+    // Wait for the current queue, then become the thing others wait for.
+    const result = queue.then(work);
+    // Tracks completion, not success: one failed send must not block the next.
+    queue = result.then(
+      () => undefined,
+      () => undefined
+    );
+    return result;
+  }
+
   /**
    * Refuse a sponsored fee larger than the one the pool itself publishes.
    *
@@ -445,80 +481,88 @@ export function withPaymaster(
     simulate: (actions, options) => transfers.simulate(actions, options),
     invalidateProofNonceCache: () => transfers.invalidateProofNonceCache(),
     quote,
-    submit,
 
-    async send(compose, options) {
-      const relay = resolveInvoke(options?.invoke);
-      const { feeAction, parameters, typedData } = await quote(relay?.invoke);
+    // Both entry points that write `lastSubmittedTxHash` go through the queue, so
+    // a caller mixing the two still gets one proof at a time.
+    submit: (callAndProof) => sequenced(() => submit(callAndProof)),
 
-      // Signed here, before the wait and the proof, rather than after: the
-      // signature does not depend on the proof, and asking for it first means a
-      // user who declines has not already paid for proving. The typed data is
-      // valid for a window the paymaster sets which comfortably outlasts the
-      // block wait plus proving. If a chain ever slow enough to blow that
-      // window turns up, the paymaster rejects the `execute` cleanly rather
-      // than anything landing half-done.
-      //
-      // `typedData` is echoed exactly as received: the signature covers those
-      // bytes, and the paymaster picks the nonce, so rebuilding it invalidates it.
-      const signedInvoke: PrivacySignedInvoke | undefined =
-        relay && typedData
-          ? {
-              userAddress: relay.invoke.userAddress,
-              typedData,
-              signature: await relay.signTypedData(typedData),
-            }
-          : undefined;
-
-      const provingBlockId = await resolveProvingBlock(options);
-
-      const {
-        wait: _wait,
-        invoke: _invoke,
-        onWarnings: _onWarnings,
-        ...sdkOptions
-      } = options ?? {};
-      // ProvingBlockId is starknet.js's BlockIdentifier, so a plain number is
-      // the block-number form; `{ block_number: n }` is not accepted.
-      const builder = transfers.build({
-        // Defaulted because the fee withdrawal appended below is in the
-        // paymaster's token, which the caller never has to name. Without a
-        // selection strategy the builder finds no notes to pay it from and the
-        // whole transaction fails for insufficient balance while the notes sit
-        // there unused. Listed first so a caller can choose another strategy, and
-        // notes named explicitly on the builder still win over both.
-        autoSelectNotes: "naive",
-        ...sdkOptions,
-        provingBlockId,
-      });
-
-      await compose(builder);
-
-      // The forwarder collects its fee from this withdrawal, so a proof without
-      // it is rejected (code 165). A zero amount means the deployment charges
-      // nothing, and the withdrawal must then be omitted rather than sent as a
-      // no-op transfer.
-      if (feeAction.amount > 0n) {
-        builder.with(feeAction.token, (t) =>
-          t.withdraw({
-            recipient: feeAction.recipient,
-            amount: feeAction.amount,
-          })
-        );
-      }
-
-      const { callAndProof, warnings } = await builder.execute();
-
-      // Reported rather than acted on. The SDK raises `USER_LINKAGE` for a
-      // transaction that may connect the user's private and public identities,
-      // and only the caller knows whether that is acceptable here.
-      if (warnings.length > 0 && options?.onWarnings) {
-        await options.onWarnings(warnings);
-      }
-
-      return submit(callAndProof, parameters, signedInvoke);
-    },
+    send: (compose, options) => sequenced(() => sendOnce(compose, options)),
   };
+
+  async function sendOnce(
+    compose: (builder: PrivateTransfersBuilder) => unknown,
+    options?: PrivacySendOptions
+  ): Promise<string> {
+    const relay = resolveInvoke(options?.invoke);
+    const { feeAction, parameters, typedData } = await quote(relay?.invoke);
+
+    // Signed here, before the wait and the proof, rather than after: the
+    // signature does not depend on the proof, and asking for it first means a
+    // user who declines has not already paid for proving. The typed data is
+    // valid for a window the paymaster sets which comfortably outlasts the
+    // block wait plus proving. If a chain ever slow enough to blow that
+    // window turns up, the paymaster rejects the `execute` cleanly rather
+    // than anything landing half-done.
+    //
+    // `typedData` is echoed exactly as received: the signature covers those
+    // bytes, and the paymaster picks the nonce, so rebuilding it invalidates it.
+    const signedInvoke: PrivacySignedInvoke | undefined =
+      relay && typedData
+        ? {
+            userAddress: relay.invoke.userAddress,
+            typedData,
+            signature: await relay.signTypedData(typedData),
+          }
+        : undefined;
+
+    const provingBlockId = await resolveProvingBlock(options);
+
+    const {
+      wait: _wait,
+      invoke: _invoke,
+      onWarnings: _onWarnings,
+      ...sdkOptions
+    } = options ?? {};
+    // ProvingBlockId is starknet.js's BlockIdentifier, so a plain number is
+    // the block-number form; `{ block_number: n }` is not accepted.
+    const builder = transfers.build({
+      // Defaulted because the fee withdrawal appended below is in the
+      // paymaster's token, which the caller never has to name. Without a
+      // selection strategy the builder finds no notes to pay it from and the
+      // whole transaction fails for insufficient balance while the notes sit
+      // there unused. Listed first so a caller can choose another strategy, and
+      // notes named explicitly on the builder still win over both.
+      autoSelectNotes: "naive",
+      ...sdkOptions,
+      provingBlockId,
+    });
+
+    await compose(builder);
+
+    // The forwarder collects its fee from this withdrawal, so a proof without
+    // it is rejected (code 165). A zero amount means the deployment charges
+    // nothing, and the withdrawal must then be omitted rather than sent as a
+    // no-op transfer.
+    if (feeAction.amount > 0n) {
+      builder.with(feeAction.token, (t) =>
+        t.withdraw({
+          recipient: feeAction.recipient,
+          amount: feeAction.amount,
+        })
+      );
+    }
+
+    const { callAndProof, warnings } = await builder.execute();
+
+    // Reported rather than acted on. The SDK raises `USER_LINKAGE` for a
+    // transaction that may connect the user's private and public identities,
+    // and only the caller knows whether that is acceptable here.
+    if (warnings.length > 0 && options?.onWarnings) {
+      await options.onWarnings(warnings);
+    }
+
+    return submit(callAndProof, parameters, signedInvoke);
+  }
 }
 
 /** Re-exported so callers can type a bound client without importing the SDK. */
