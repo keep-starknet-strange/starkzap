@@ -191,6 +191,32 @@ describe("wallet utils", () => {
       expect(() => assertProofSendable(proof, "user_pays", true)).not.toThrow();
     });
 
+    it("refuses a proof with no proof data", () => {
+      // `simulate` runs a mock prover, so its result has the right shape and no
+      // proof behind it. Submitting one reverts on chain saying neither.
+      expect(() =>
+        assertProofSendable(
+          { data: "", proofFacts: ["0x1"] },
+          "user_pays",
+          true
+        )
+      ).toThrow(/carries no proof data/);
+    });
+
+    it("refuses a proof with no facts", () => {
+      expect(() =>
+        assertProofSendable({ data: "0x1", proofFacts: [] }, "user_pays", true)
+      ).toThrow(/carries no proof data/);
+    });
+
+    it("names the emptiness before the fee mode", () => {
+      // An empty proof is wrong however it would have been submitted, so it is
+      // reported as such rather than as a paymaster problem.
+      expect(() =>
+        assertProofSendable({ data: "", proofFacts: [] }, { type: "paymaster" })
+      ).toThrow(/carries no proof data/);
+    });
+
     it("refuses to self-submit a proof by default", () => {
       // Self-submission works on-chain, which is exactly why it needs a gate:
       // nothing would tell the caller their address is now on the transaction.
@@ -294,6 +320,51 @@ describe("wallet utils", () => {
       ).toThrow("generated against block 105, only 5 block(s) behind");
     });
 
+    it("accepts a base block inside the pool's validity window", () => {
+      expect(() =>
+        assertProofBaseBlockAged(
+          { data: "0x1", proofFacts: factsWithBase(100) },
+          200,
+          10,
+          450
+        )
+      ).not.toThrow();
+    });
+
+    it("accepts a base block at exactly the window's edge", () => {
+      expect(() =>
+        assertProofBaseBlockAged(
+          { data: "0x1", proofFacts: factsWithBase(100) },
+          550,
+          10,
+          450
+        )
+      ).not.toThrow();
+    });
+
+    it("rejects a base block the pool no longer accepts", () => {
+      // The window has an upper edge too: too old is the same wasted submission
+      // as too young, and the reviewer's point was that only one end was checked.
+      expect(() =>
+        assertProofBaseBlockAged(
+          { data: "0x1", proofFacts: factsWithBase(100) },
+          551,
+          10,
+          450
+        )
+      ).toThrow(/451 blocks behind the head \(551\).*expired/s);
+    });
+
+    it("checks only the lower bound when the window is unknown", () => {
+      expect(() =>
+        assertProofBaseBlockAged(
+          { data: "0x1", proofFacts: factsWithBase(100) },
+          100_000,
+          10
+        )
+      ).not.toThrow();
+    });
+
     it("skips the RPC entirely when there is no base block to check", async () => {
       // An unrecognised proof shape must not cost a round-trip.
       const provider = {
@@ -304,6 +375,70 @@ describe("wallet utils", () => {
         assertProofFresh({ data: "0x1", proofFacts: ["0x1"] }, provider, 10)
       ).resolves.toBeUndefined();
       expect(provider.getBlockNumber).not.toHaveBeenCalled();
+    });
+
+    describe("the validity window comes from the pool", () => {
+      const POOL = "0xp001";
+      const aged = { data: "0x1", proofFacts: factsWithBase(100) };
+
+      /** Head far past the window, so only the upper bound can reject it. */
+      function providerAt(head: number, window?: string | Error) {
+        return {
+          getBlockNumber: vi.fn().mockResolvedValue(head),
+          callContract:
+            window instanceof Error
+              ? vi.fn().mockRejectedValue(window)
+              : vi.fn().mockResolvedValue(window === undefined ? [] : [window]),
+        } as unknown as RpcProvider;
+      }
+
+      it("reads the window from the pool it is given", async () => {
+        const provider = providerAt(200, "0x1c2");
+
+        await assertProofFresh(aged, provider, 10, POOL);
+
+        expect(provider.callContract).toHaveBeenCalledWith({
+          contractAddress: POOL,
+          entrypoint: "get_proof_validity_blocks",
+          calldata: [],
+        });
+      });
+
+      it("rejects a proof past the window it read", async () => {
+        // 450 blocks of window, 500 blocks of age.
+        const provider = providerAt(600, "0x1c2");
+
+        await expect(
+          assertProofFresh(aged, provider, 10, POOL)
+        ).rejects.toThrow(/expired/);
+      });
+
+      it("does not read the pool when none is configured", async () => {
+        const provider = providerAt(100_000, "0x1c2");
+
+        await expect(
+          assertProofFresh(aged, provider, 10)
+        ).resolves.toBeUndefined();
+        expect(provider.callContract).not.toHaveBeenCalled();
+      });
+
+      it("lets the proof through when the window cannot be read", async () => {
+        // Best-effort, like the head read above it: a check that cannot be taken
+        // must not fail a transaction that would otherwise work.
+        const provider = providerAt(100_000, new Error("rpc down"));
+
+        await expect(
+          assertProofFresh(aged, provider, 10, POOL)
+        ).resolves.toBeUndefined();
+      });
+
+      it("ignores a window it cannot make sense of", async () => {
+        const provider = providerAt(100_000, "0x0");
+
+        await expect(
+          assertProofFresh(aged, provider, 10, POOL)
+        ).resolves.toBeUndefined();
+      });
     });
 
     it("rejects a too-recent proof once the head is known", async () => {

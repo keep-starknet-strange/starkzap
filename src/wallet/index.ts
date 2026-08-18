@@ -515,7 +515,8 @@ export class Wallet extends BaseWallet {
       await assertProofFresh(
         options.proof,
         this.provider,
-        PROOF_BASE_BLOCK_DEPTH
+        PROOF_BASE_BLOCK_DEPTH,
+        this.privacyConfig?.poolContractAddress
       );
     }
 

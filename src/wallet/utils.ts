@@ -105,6 +105,18 @@ export function assertProofSendable(
 ): void {
   if (!proof) return;
 
+  // A simulated proof is the shape without the substance: `simulate` runs a mock
+  // prover, so its data is empty. Submitting one reverts on chain for reasons that
+  // name neither the proof nor the simulation it came from.
+  if (proof.data.length === 0 || proof.proofFacts.length === 0) {
+    throw new Error(
+      "[starkzap] This proof carries no proof data, so the transaction would " +
+        "revert on chain. A result from `simulate()` has the right shape but no " +
+        "proof behind it — it is for estimating a fee, not for submitting. Prove " +
+        "the transaction for real before sending it."
+    );
+  }
+
   if (isPaymasterMode(feeMode)) {
     throw new Error(
       "[starkzap] A SNIP-29 paymaster cannot carry a transaction proof: its " +
@@ -154,21 +166,34 @@ export function proofBaseBlock(proof: TransactionProof): number | undefined {
  * @param proof - The proof about to be submitted
  * @param head - Current chain head
  * @param depth - Blocks the base block must trail the head by
+ * @param validityBlocks - Blocks the pool still accepts a proof for, when known
  */
 export function assertProofBaseBlockAged(
   proof: TransactionProof,
   head: number,
-  depth: number
+  depth: number,
+  validityBlocks?: number
 ): void {
   const base = proofBaseBlock(proof);
   if (base === undefined) return;
+  const age = head - base;
 
-  if (head - base < depth) {
+  if (age < depth) {
     throw new Error(
-      `[starkzap] This proof was generated against block ${base}, only ${
-        head - base
-      } block(s) behind the head (${head}). The sequencer requires at least ${depth}. ` +
-        "Wait for the chain to advance and prove again — see `waitForProvableBlock`."
+      `[starkzap] This proof was generated against block ${base}, only ${age} ` +
+        `block(s) behind the head (${head}). The sequencer requires at least ` +
+        `${depth}. Wait for the chain to advance and prove again — see ` +
+        "`waitForProvableBlock`."
+    );
+  }
+
+  // The window has an upper edge as well as a lower one. A proof too old is
+  // refused by the pool, which is the same wasted submission as one too young.
+  if (validityBlocks !== undefined && age > validityBlocks) {
+    throw new Error(
+      `[starkzap] This proof was generated against block ${base}, ${age} blocks ` +
+        `behind the head (${head}). The pool accepts a proof for ${validityBlocks} ` +
+        "blocks, so this one has expired. Prove the transaction again."
     );
   }
 }
@@ -185,22 +210,51 @@ export function assertProofBaseBlockAged(
  * @param proof - The proof about to be submitted
  * @param provider - Provider used to read the chain head
  * @param depth - Blocks the base block must trail the head by
+ * @param poolAddress - Pool to read the validity window from, when configured
  */
 export async function assertProofFresh(
   proof: TransactionProof,
   provider: RpcProvider,
-  depth: number
+  depth: number,
+  poolAddress?: string
 ): Promise<void> {
   if (proofBaseBlock(proof) === undefined) return;
 
-  let head: number;
-  try {
-    head = await provider.getBlockNumber();
-  } catch {
-    return;
-  }
+  // Both reads together: they do not depend on each other, so checking the upper
+  // bound as well as the lower one costs one round trip rather than two.
+  const [head, validityBlocks] = await Promise.all([
+    provider.getBlockNumber().catch(() => undefined),
+    readProofValidityBlocks(provider, poolAddress),
+  ]);
+  if (head === undefined) return;
 
-  assertProofBaseBlockAged(proof, head, depth);
+  assertProofBaseBlockAged(proof, head, depth, validityBlocks);
+}
+
+/**
+ * How long the pool still accepts a proof for, or `undefined` when unknown.
+ *
+ * The figure is per deployment and has a setter, so it is read rather than
+ * assumed. Undefined on any failure, which leaves only the lower bound checked —
+ * the same best-effort stance {@link assertProofFresh} takes for the chain head.
+ */
+async function readProofValidityBlocks(
+  provider: RpcProvider,
+  poolAddress: string | undefined
+): Promise<number | undefined> {
+  if (poolAddress === undefined) return undefined;
+
+  try {
+    const [value] = await provider.callContract({
+      contractAddress: poolAddress,
+      entrypoint: "get_proof_validity_blocks",
+      calldata: [],
+    });
+    const blocks = Number(num.toBigInt(value ?? ""));
+    return Number.isSafeInteger(blocks) && blocks > 0 ? blocks : undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 /**
