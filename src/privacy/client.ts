@@ -1,6 +1,7 @@
 import type { Call, RpcProvider, Signature, TypedData } from "starknet";
 import type {
   CallAndProof,
+  PrivateRegistry,
   PrivateTransfersBuilder,
   PrivateTransfersInterface,
   Warning,
@@ -119,6 +120,20 @@ export interface PrivacySimulation {
   feeAction: PrivacyFeeQuote["feeAction"];
 }
 
+/** What {@link PrivacyClient.send} reports about the transaction it submitted. */
+export interface PrivacySendResult extends PrivacySubmission {
+  /**
+   * The private state the transaction leaves behind: notes spent and created,
+   * channels opened, and how far discovery scanned.
+   *
+   * A copy. Pass `registry` in the options to compile against one you keep, and
+   * this layer still never writes to it — adopt this result when you are
+   * satisfied the transaction landed, or discard it and let discovery rebuild.
+   * Ignore it entirely to have each transaction discover its own state.
+   */
+  registry: PrivateRegistry;
+}
+
 /**
  * A privacy pool client that owns the fee, the proving block and submission.
  *
@@ -163,8 +178,7 @@ export interface PrivacyClient extends Pick<
    * nothing about the paymaster's fee.
    *
    * Cheap on purpose. It costs a quote and a simulation, waits for no block, and
-   * passes `registryConst` so the shared registry is left untouched — which also
-   * makes it safe to run while a send is in flight.
+   * writes no private state, so it is safe to run while a send is in flight.
    *
    * The mock proof is deliberately not returned. It has the shape of a proof and
    * none of the substance, and handing one back invites submitting it.
@@ -201,9 +215,9 @@ export interface PrivacyClient extends Pick<
    * @param compose - Adds the operations to perform. Awaited, so it may be async
    * @param options - SDK execute options, proving-block overrides, and any
    *   public calls to relay
-   * @returns The transaction hash, and the relayer's tracking id when it gave
-   *   one. Nothing can look a tracking id up later, so this is the only chance to
-   *   record it.
+   * @returns The transaction hash, the relayer's tracking id when it gave one,
+   *   and the private state the transaction leaves behind. Nothing can look a
+   *   tracking id up later, so this is the only chance to record it.
    *
    * @example
    * ```ts
@@ -223,7 +237,7 @@ export interface PrivacyClient extends Pick<
   send(
     compose: (builder: PrivateTransfersBuilder) => unknown,
     options?: PrivacySendOptions
-  ): Promise<PrivacySubmission>;
+  ): Promise<PrivacySendResult>;
 
   /**
    * Submit a proof you composed and generated yourself.
@@ -311,9 +325,9 @@ export function withPaymaster(
    *
    * Two proofs cannot be built at once on one client, whatever they contain. The
    * SDK fetches the pool nonce once and caches it, so overlapping proofs share a
-   * nonce and one is stale before it is submitted. They also share the registry
-   * they compile against, and the checkpoint that says which block to prove from.
-   * Two transfers of different tokens still collide on all three.
+   * nonce and one is stale before it is submitted. They also share the checkpoint
+   * that says which block to prove from. Two transfers of different tokens still
+   * collide on both.
    *
    * `submit` takes its turn too, even though its proof may have been built
    * somewhere else entirely. Submitting writes that checkpoint, and a failed
@@ -562,7 +576,8 @@ export function withPaymaster(
     const builder = transfers.build({
       autoSelectNotes: "naive",
       ...sdkOptions,
-      // Nothing built here is submitted, so the shared registry is left alone.
+      // Nothing built here is submitted, so a registry the caller passed is left
+      // untouched and the copy is dropped.
       registryConst: true,
     });
 
@@ -578,7 +593,7 @@ export function withPaymaster(
   async function sendOnce(
     compose: (builder: PrivateTransfersBuilder) => unknown,
     options?: PrivacySendOptions
-  ): Promise<PrivacySubmission> {
+  ): Promise<PrivacySendResult> {
     const relay = resolveInvoke(options?.invoke);
     const { feeAction, parameters, typedData } = await quote(relay?.invoke);
 
@@ -621,13 +636,20 @@ export function withPaymaster(
       autoSelectNotes: "naive",
       ...sdkOptions,
       provingBlockId,
+      // Compiling resolves the private state this transaction will produce, and
+      // it happens before the proof exists. So a caller who keeps a registry has
+      // it written by attempts that go on to fail at proving or submission. This
+      // compiles against a copy instead, returned below for the caller to adopt
+      // once they are satisfied. Forced, not defaulted: the return value promises
+      // their registry is untouched.
+      registryConst: true,
     });
 
     await compose(builder);
 
     appendFeeWithdrawal(builder, feeAction);
 
-    const { callAndProof, warnings } = await builder.execute();
+    const { callAndProof, warnings, registry } = await builder.execute();
 
     // Reported rather than acted on. The SDK raises `USER_LINKAGE` for a
     // transaction that may connect the user's private and public identities,
@@ -636,10 +658,13 @@ export function withPaymaster(
       await options.onWarnings(warnings);
     }
 
-    return submit(callAndProof, parameters, signedInvoke);
+    return {
+      ...(await submit(callAndProof, parameters, signedInvoke)),
+      registry,
+    };
   }
 }
 
 /** Re-exported so callers can type a bound client without importing the SDK. */
-export type { CallAndProof, PrivateTransfersBuilder, Warning };
+export type { CallAndProof, PrivateRegistry, PrivateTransfersBuilder, Warning };
 export type { Address };

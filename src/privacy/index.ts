@@ -15,6 +15,9 @@ export {
   type PaymasterBinding,
   type PrivacyClient,
   type PrivacySendOptions,
+  type PrivacySendResult,
+  type PrivacySimulation,
+  type PrivateRegistry,
 } from "@/privacy/client";
 export { screeningVerdict, type ScreeningVerdict } from "@/privacy/errors";
 export {
@@ -28,6 +31,7 @@ export {
   type PrivacyQuoteOptions,
   type PrivacySignedInvoke,
   type PrivacyPaymasterConfig,
+  type PrivacySubmission,
   type PrivacyTip,
 } from "@/privacy/paymaster";
 export { loadPrivacySdk, type PrivacySdkModule } from "@/privacy/runtime";
