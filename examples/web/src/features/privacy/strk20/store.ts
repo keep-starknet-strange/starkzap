@@ -259,17 +259,27 @@ async function run(
   error.set(null);
   try {
     step.set(`${label}: proving and submitting…`);
-    const hash = await privacy.send(compose, {
+    const { transactionHash, trackingId } = await privacy.send(compose, {
       wait: { onAttempt: logAttempts(label) },
       ...options,
     });
-    log(`${label} submitted by the paymaster's relayer: ${hash}`, "success");
+    // The tracking id cannot be looked up later, so it is logged now: it is what
+    // a relayer operator asks for about a transaction that misbehaved.
+    log(
+      `${label} submitted by the paymaster's relayer: ${transactionHash}` +
+        (trackingId ? ` (tracking ${trackingId})` : ""),
+      "success"
+    );
 
     // The relayer's hash means the transaction was broadcast, not that it
     // worked. Waiting for the receipt is what turns a revert into an error
     // instead of a success message.
     step.set(`${label}: waiting for it to execute…`);
-    await new Tx(hash, wallet.getProvider(), wallet.getChainId()).wait();
+    await new Tx(
+      transactionHash,
+      wallet.getProvider(),
+      wallet.getChainId()
+    ).wait();
     log(`${label} executed on-chain`, "success");
 
     step.set(`${label}: refreshing…`);

@@ -15,6 +15,7 @@ import {
   type PrivacyPaymasterConfig,
   type PrivacyInvoke,
   type PrivacySignedInvoke,
+  type PrivacySubmission,
 } from "@/privacy/paymaster";
 import {
   waitForProvableBlock,
@@ -163,18 +164,20 @@ export interface PrivacyClient extends Pick<
    * @param compose - Adds the operations to perform. Awaited, so it may be async
    * @param options - SDK execute options, proving-block overrides, and any
    *   public calls to relay
-   * @returns The submitted transaction hash
+   * @returns The transaction hash, and the relayer's tracking id when it gave
+   *   one. Nothing can look a tracking id up later, so this is the only chance to
+   *   record it.
    *
    * @example
    * ```ts
-   * const hash = await privacy.send((b) =>
+   * const { transactionHash } = await privacy.send((b) =>
    *   b.with(STRK, (t) => t.transfer({ recipient: bob, amount })).surplusTo(me)
    * );
    * ```
    *
    * @example Deposit without a separate approve transaction
    * ```ts
-   * const hash = await privacy.send(
+   * const { transactionHash } = await privacy.send(
    *   (b) => b.with(STRK, (t) => t.deposit({ amount })),
    *   { invoke: await wallet.tx().approve(STRK, poolAddress, amount).calls() }
    * );
@@ -183,7 +186,7 @@ export interface PrivacyClient extends Pick<
   send(
     compose: (builder: PrivateTransfersBuilder) => unknown,
     options?: PrivacySendOptions
-  ): Promise<string>;
+  ): Promise<PrivacySubmission>;
 
   /**
    * Submit a proof you composed and generated yourself.
@@ -194,9 +197,9 @@ export interface PrivacyClient extends Pick<
    * paymaster rejects a proof without it.
    *
    * @param callAndProof - The pool call and its proof
-   * @returns The submitted transaction hash
+   * @returns The transaction hash, and the relayer's tracking id when it gave one
    */
-  submit(callAndProof: CallAndProof): Promise<string>;
+  submit(callAndProof: CallAndProof): Promise<PrivacySubmission>;
 }
 
 /**
@@ -444,9 +447,9 @@ export function withPaymaster(
     callAndProof: CallAndProof,
     parameters?: unknown,
     invoke?: PrivacySignedInvoke
-  ): Promise<string> {
+  ): Promise<PrivacySubmission> {
     try {
-      const hash = await paymaster.execute(
+      const submission = await paymaster.execute(
         callAndProof.call,
         callAndProof.proof,
         // Echoed rather than rebuilt: `parameters` carry server-chosen fields
@@ -454,8 +457,8 @@ export function withPaymaster(
         parameters ?? (await quote()).parameters,
         invoke
       );
-      lastSubmittedTxHash = hash;
-      return hash;
+      lastSubmittedTxHash = submission.transactionHash;
+      return submission;
     } catch (error) {
       // The pool nonce baked into a failed invocation is now stale. Clearing it
       // makes the *next* attempt clean.
@@ -492,7 +495,7 @@ export function withPaymaster(
   async function sendOnce(
     compose: (builder: PrivateTransfersBuilder) => unknown,
     options?: PrivacySendOptions
-  ): Promise<string> {
+  ): Promise<PrivacySubmission> {
     const relay = resolveInvoke(options?.invoke);
     const { feeAction, parameters, typedData } = await quote(relay?.invoke);
 

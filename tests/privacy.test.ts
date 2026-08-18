@@ -450,7 +450,7 @@ describe("privacy", () => {
         { version: "0x1", fee_mode: { mode: "sponsored" } }
       );
 
-      expect(hash).toBe("0xabc");
+      expect(hash).toEqual({ transactionHash: "0xabc" });
       expect(sent[0]!.method).toBe("paymaster_executeTransaction");
       expect(sent[0]!.params).toMatchObject({
         transaction: {
@@ -466,6 +466,40 @@ describe("privacy", () => {
           },
         },
       });
+    });
+
+    it("keeps the relayer's tracking id when it returns one", async () => {
+      // Nothing can look one up afterwards, so this response is the only place it
+      // ever exists.
+      stubFetch({
+        result: { transaction_hash: "0xabc", tracking_id: "track-7" },
+      });
+
+      await expect(
+        new PrivacyPaymaster(URL).execute(
+          { contractAddress: POOL, entrypoint: "apply_actions" },
+          { data: "0x1", proofFacts: [] },
+          { version: "0x1" }
+        )
+      ).resolves.toEqual({
+        transactionHash: "0xabc",
+        trackingId: "track-7",
+      });
+    });
+
+    it("omits the tracking id when the deployment gives none", async () => {
+      // It is optional in the response, so absent must not become `undefined`
+      // sitting on the object.
+      stubFetch({ result: { transaction_hash: "0xabc", tracking_id: "" } });
+
+      const submission = await new PrivacyPaymaster(URL).execute(
+        { contractAddress: POOL, entrypoint: "apply_actions" },
+        { data: "0x1", proofFacts: [] },
+        { version: "0x1" }
+      );
+
+      expect(submission).toEqual({ transactionHash: "0xabc" });
+      expect("trackingId" in submission).toBe(false);
     });
 
     it("refuses a result carrying no transaction hash", async () => {
@@ -1909,7 +1943,13 @@ describe("privacy", () => {
           return Promise.resolve({
             status: 200,
             ok: true,
-            json: () => Promise.resolve({ result: { transaction_hash } }),
+            json: () =>
+              Promise.resolve({
+                result: {
+                  transaction_hash,
+                  tracking_id: `track-${submissions}`,
+                },
+              }),
           } as Response);
         })
       );
@@ -1996,7 +2036,7 @@ describe("privacy", () => {
         { autoSetup: true, autoDiscover: { notes: "refresh" } }
       );
 
-      expect(hash).toBe("0xsent");
+      expect(hash.transactionHash).toBe("0xsent");
       // The proof authorises this on-chain; no user signature is involved.
       expect(submitted[0]!).toMatchObject({
         transaction: { type: "apply_action" },
@@ -2045,7 +2085,9 @@ describe("privacy", () => {
       paymasterStub("0x0", `0x${BigInt(sdkEnv.ace).toString(16)}`);
       const privacy = await bind();
 
-      await expect(privacy.send((b) => b.register())).resolves.toBe("0xsent");
+      await expect(privacy.send((b) => b.register())).resolves.toMatchObject({
+        transactionHash: "0xsent",
+      });
     });
 
     it("echoes the parameters the quote returned rather than rebuilding them", async () => {
@@ -2101,7 +2143,9 @@ describe("privacy", () => {
         .build()
         .register()
         .execute();
-      await expect(privacy.submit(callAndProof)).resolves.toBe("0xsent");
+      await expect(privacy.submit(callAndProof)).resolves.toMatchObject({
+        transactionHash: "0xsent",
+      });
 
       // No caller-supplied parameters, so this path still has to fetch them.
       const methods = vi.mocked(fetch).mock.calls.map(
@@ -2264,7 +2308,7 @@ describe("privacy", () => {
         { autoSetup: true, autoDiscover: { notes: "refresh" } }
       );
 
-      expect(hash).toBe("0xsent");
+      expect(hash.transactionHash).toBe("0xsent");
       // The hash alone proves nothing: an empty builder still yields a
       // submittable proof. The action list is the evidence — without the await it
       // carries only the auto-setup channel and no Deposit at all.
@@ -2342,7 +2386,7 @@ describe("privacy", () => {
           onWarnings: (warnings) => seen.push(...warnings),
         });
 
-        expect(hash).toBe("0xsent");
+        expect(hash.transactionHash).toBe("0xsent");
         expect(seen).toEqual([LINKAGE]);
       });
 
@@ -2492,7 +2536,7 @@ describe("privacy", () => {
         }
       );
 
-      expect(hash).toBe("0xsent");
+      expect(hash.transactionHash).toBe("0xsent");
     });
 
     it("runs overlapping sends one at a time", async () => {
@@ -2532,7 +2576,10 @@ describe("privacy", () => {
       const hashes = await Promise.all([first, second]);
 
       // Distinct hashes, in the order the sends were started.
-      expect(hashes).toEqual(["0xsent", "0xsent2"]);
+      expect(hashes.map((h) => h.transactionHash)).toEqual([
+        "0xsent",
+        "0xsent2",
+      ]);
 
       // The assertion that proves ordering rather than mere success: the second
       // send aged against the *first send's* transaction, which it could only
@@ -2543,6 +2590,30 @@ describe("privacy", () => {
       );
       // Concurrent sends would each resolve a block from the same starting point.
       expect(order).toHaveLength(2);
+    });
+
+    it("returns the relayer's tracking id alongside the hash", async () => {
+      // Nothing can look a tracking id up later, so the value has to come back
+      // from the submission that produced it or it is gone.
+      const { mocknet, env: sdkEnv, bind } = env();
+      paymasterStub("0x0", `0x${BigInt(sdkEnv.ace).toString(16)}`);
+      const privacy = await bind();
+      mocknet.executeOutside(
+        await privacy.transfers.build().register().execute()
+      );
+
+      await expect(
+        privacy.send(
+          (b) =>
+            b
+              .with(sdkEnv.ace, (t) => t.deposit({ amount: 100n }))
+              .surplusTo(`0x${sdkEnv.alice.address.toString(16)}`),
+          { autoSetup: true, autoDiscover: { notes: "refresh" } }
+        )
+      ).resolves.toEqual({
+        transactionHash: "0xsent",
+        trackingId: "track-1",
+      });
     });
 
     it("delegates reads to the SDK client untouched", async () => {
@@ -2614,7 +2685,7 @@ describe("privacy", () => {
           invoke: [approve],
         });
 
-        expect(hash).toBe("0xsent");
+        expect(hash.transactionHash).toBe("0xsent");
         // Build asked for the wrapped type, naming the binding's account.
         expect(built[0]!).toMatchObject({
           transaction: {

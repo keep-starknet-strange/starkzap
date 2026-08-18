@@ -226,6 +226,20 @@ export interface PrivacyGasQuote {
   gasTokenPriceInStrk: bigint;
 }
 
+/**
+ * What a submission produced.
+ *
+ * `trackingId` is the relayer's own reference and is optional — a deployment need
+ * not give one. Record it if you have anywhere to record it: nothing can look one
+ * up afterwards, so the response that carried it is the only chance to keep it.
+ */
+export interface PrivacySubmission {
+  /** Hash of the submitted transaction. */
+  transactionHash: string;
+  /** The relayer's reference for this submission, when it returned one. */
+  trackingId?: string;
+}
+
 /** What the build step returns. */
 export interface PrivacyFeeQuote {
   /** The withdrawal to append to the proof's action list. */
@@ -832,49 +846,52 @@ export class PrivacyPaymaster {
    * No user signature is involved: the relayer sends it and the pool authorises
    * it from the proof alone, which is what keeps the user's account off-chain.
    *
-   * The response also carries a `tracking_id` — the relayer's own identifier, and
-   * the one AVNU support asks for when a submitted transaction misbehaves. It is
-   * deliberately not returned: surfacing it means changing the return type of
-   * this, of {@link PrivacyClient.send} and of {@link PrivacyClient.submit} from
-   * a hash to an object, which is more than a support identifier is worth. Read
-   * it off the paymaster's own logs, or say so and it can be threaded through.
+   * The response may carry an optional `tracking_id`, the relayer's own reference
+   * for the submission, and it is returned alongside the hash.
+   *
+   * Nothing can look one up: SNIP-29 defines no method for it, the paymaster
+   * answers "method not found", and the deployment documents no query. That is the
+   * reason to keep it rather than to drop it — this response is the only place it
+   * ever exists, so a caller who does not record it here can never recover it. It
+   * is what a relayer operator asks for when a submitted transaction misbehaves,
+   * which makes it useful to people rather than to code.
    *
    * @param call - The pool's `apply_actions` call
    * @param proof - Proof data and facts from the proving service
    * @param parameters - The `parameters` from {@link quote}
    * @param invoke - The signed user calls, when the quote wrapped any. Must be
    *   the same account and the same `typedData` the quote returned
-   * @returns The submitted transaction hash
+   * @returns The transaction hash, and the relayer's tracking id when it gave one
    */
   async execute(
     call: Call,
     proof: { data: string; proofFacts: string[] },
     parameters: unknown,
     invoke?: PrivacySignedInvoke
-  ): Promise<string> {
+  ): Promise<PrivacySubmission> {
     const apply_action = {
       apply_actions_call: toPaymasterCall(call),
       proof: proof.data,
       proof_facts: proof.proofFacts,
     };
 
-    const result = await this.send<{ transaction_hash?: unknown }>(
-      "paymaster_executeTransaction",
-      {
-        transaction: invoke
-          ? {
-              type: "invoke_and_apply_action",
-              apply_action,
-              invoke: {
-                user_address: invoke.userAddress,
-                typed_data: invoke.typedData,
-                signature: invoke.signature,
-              },
-            }
-          : { type: "apply_action", apply_action },
-        parameters,
-      }
-    );
+    const result = await this.send<{
+      transaction_hash?: unknown;
+      tracking_id?: unknown;
+    }>("paymaster_executeTransaction", {
+      transaction: invoke
+        ? {
+            type: "invoke_and_apply_action",
+            apply_action,
+            invoke: {
+              user_address: invoke.userAddress,
+              typed_data: invoke.typedData,
+              signature: invoke.signature,
+            },
+          }
+        : { type: "apply_action", apply_action },
+      parameters,
+    });
 
     const hash = result.transaction_hash;
     if (typeof hash !== "string" || hash.length === 0) {
@@ -885,7 +902,12 @@ export class PrivacyPaymaster {
         result
       );
     }
-    return hash;
+    const trackingId = result.tracking_id;
+    return {
+      transactionHash: hash,
+      ...(typeof trackingId === "string" &&
+        trackingId.length > 0 && { trackingId }),
+    };
   }
 
   /** Execution parameters in the shape the paymaster expects. */

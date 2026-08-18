@@ -673,7 +673,7 @@ export class Wallet extends BaseWallet {
    * const wallet = await sdk.connectWallet({ account: { signer } });
    *
    * const privacy = await wallet.privacy();
-   * const hash = await privacy.send((b) =>
+   * const { transactionHash } = await privacy.send((b) =>
    *   b.with(STRK, (t) => t.deposit({ amount })).surplusTo(wallet.address)
    * );
    * ```
