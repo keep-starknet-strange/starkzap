@@ -98,13 +98,25 @@ export interface PrivacySendOptions extends Omit<
    * By this point the proof exists and has been paid for. Aborting saves the pool
    * fee and the submission, not the proving.
    *
-   * {@link PrivacyClient.simulate} also returns warnings and uses a mock prover,
-   * so it can flag a linkage before you pay for anything. It is not a preview of
-   * this send, though: it reports on the actions you hand it, and `send` adds the
-   * paymaster's fee withdrawal to them, which is itself a withdrawal that can
-   * carry its own warning.
+   * To see the same warnings before paying for anything, call
+   * {@link PrivacyClient.simulate} with this callback and these options first. It
+   * composes what this would compose, fee withdrawal included, against a mock
+   * prover.
    */
   onWarnings?: (warnings: Warning[]) => unknown;
+}
+
+/** What a simulation reports about the transaction `send` would compose. */
+export interface PrivacySimulation {
+  /**
+   * Warnings the SDK raises for it, `USER_LINKAGE` among them.
+   *
+   * The same list {@link PrivacySendOptions.onWarnings} would receive, seen before
+   * paying a prover rather than after.
+   */
+  warnings: Warning[];
+  /** The fee `send` would append, from a quote taken at the same moment. */
+  feeAction: PrivacyFeeQuote["feeAction"];
 }
 
 /**
@@ -126,7 +138,6 @@ export interface PrivacyClient extends Pick<
   | "discoverRequirement"
   | "discoverNotes"
   | "discoverChannels"
-  | "simulate"
   | "invalidateProofNonceCache"
 > {
   /** The privacy SDK's own client, for anything this layer does not wrap. */
@@ -135,11 +146,37 @@ export interface PrivacyClient extends Pick<
   /**
    * What the next transaction will cost, before committing to a proof.
    *
-   * Note this is *not* what `simulate` reports: the pool fee is a separate
-   * withdrawal the paymaster requires, and `simulate` does not know about it.
-   * Show this to users, not the simulated gas.
+   * Show this to users rather than a simulated gas figure: the pool fee is a
+   * separate withdrawal the paymaster requires, and it is what actually leaves the
+   * shielded balance. {@link PrivacyClient.simulate} reports the same figure
+   * alongside the warnings, if you want both in one call.
    */
   quote(): Promise<PrivacyFeeQuote>;
+
+  /**
+   * Run what {@link PrivacyClient.send} would run, without proving it.
+   *
+   * Takes the same callback and the same options, quotes the same fee and appends
+   * the same withdrawal, then simulates against a mock prover. So the warnings it
+   * reports are the ones the real transaction would raise, which the inherited
+   * `simulate` could not tell you: that one takes a raw action list and knows
+   * nothing about the paymaster's fee.
+   *
+   * Cheap on purpose. It costs a quote and a simulation, waits for no block, and
+   * passes `registryConst` so the shared registry is left untouched — which also
+   * makes it safe to run while a send is in flight.
+   *
+   * The mock proof is deliberately not returned. It has the shape of a proof and
+   * none of the substance, and handing one back invites submitting it.
+   *
+   * @param compose - Adds the operations to simulate, as `send` would take them
+   * @param options - The options `send` would take
+   * @returns The warnings, and the fee the real send would withdraw
+   */
+  simulate(
+    compose: (builder: PrivateTransfersBuilder) => unknown,
+    options?: PrivacySendOptions
+  ): Promise<PrivacySimulation>;
 
   /**
    * Compose, prove and submit one private transaction.
@@ -395,6 +432,23 @@ export function withPaymaster(
     };
   }
 
+  /**
+   * Append the paymaster's fee withdrawal as the final action.
+   *
+   * The forwarder collects its fee from this withdrawal, so a proof without it is
+   * rejected (code 165). A zero amount means the deployment charges nothing, and
+   * the withdrawal is then omitted rather than sent as a no-op transfer.
+   */
+  function appendFeeWithdrawal(
+    builder: PrivateTransfersBuilder,
+    feeAction: PrivacyFeeQuote["feeAction"]
+  ): void {
+    if (feeAction.amount === 0n) return;
+    builder.with(feeAction.token, (t) =>
+      t.withdraw({ recipient: feeAction.recipient, amount: feeAction.amount })
+    );
+  }
+
   /** Block the previous send landed in, or -1 when there is nothing to age. */
   async function previousBlock(): Promise<number> {
     if (lastSubmittedTxHash === undefined) return -1;
@@ -481,7 +535,7 @@ export function withPaymaster(
     discoverNotes: (params) => transfers.discoverNotes(params),
     discoverChannels: (recipients, params) =>
       transfers.discoverChannels(recipients, params),
-    simulate: (actions, options) => transfers.simulate(actions, options),
+    simulate: (compose, options) => simulateOnce(compose, options),
     invalidateProofNonceCache: () => transfers.invalidateProofNonceCache(),
     quote,
 
@@ -491,6 +545,35 @@ export function withPaymaster(
 
     send: (compose, options) => sequenced(() => sendOnce(compose, options)),
   };
+
+  async function simulateOnce(
+    compose: (builder: PrivateTransfersBuilder) => unknown,
+    options?: PrivacySendOptions
+  ): Promise<PrivacySimulation> {
+    const relay = resolveInvoke(options?.invoke);
+    const { feeAction } = await quote(relay?.invoke);
+
+    const {
+      wait: _wait,
+      invoke: _invoke,
+      onWarnings: _onWarnings,
+      ...sdkOptions
+    } = options ?? {};
+    const builder = transfers.build({
+      autoSelectNotes: "naive",
+      ...sdkOptions,
+      // Nothing built here is submitted, so the shared registry is left alone.
+      registryConst: true,
+    });
+
+    await compose(builder);
+    appendFeeWithdrawal(builder, feeAction);
+
+    const { warnings } = await builder.simulate({
+      provider: binding.provider,
+    });
+    return { warnings, feeAction };
+  }
 
   async function sendOnce(
     compose: (builder: PrivateTransfersBuilder) => unknown,
@@ -542,18 +625,7 @@ export function withPaymaster(
 
     await compose(builder);
 
-    // The forwarder collects its fee from this withdrawal, so a proof without
-    // it is rejected (code 165). A zero amount means the deployment charges
-    // nothing, and the withdrawal must then be omitted rather than sent as a
-    // no-op transfer.
-    if (feeAction.amount > 0n) {
-      builder.with(feeAction.token, (t) =>
-        t.withdraw({
-          recipient: feeAction.recipient,
-          amount: feeAction.amount,
-        })
-      );
-    }
+    appendFeeWithdrawal(builder, feeAction);
 
     const { callAndProof, warnings } = await builder.execute();
 
