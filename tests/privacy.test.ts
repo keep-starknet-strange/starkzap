@@ -1974,6 +1974,10 @@ describe("privacy", () => {
         // against. High enough that the amounts these tests quote pass; the
         // tests for that check set it themselves.
         callContract: vi.fn().mockResolvedValue(["0xffffffff"]),
+        // The SDK's simulate reads the chain from the provider it is handed.
+        getChainId: vi
+          .fn()
+          .mockResolvedValue(shortString.encodeShortString("SN_MAIN")),
       } as unknown as RpcProvider;
 
       // Only `send({ invoke })` uses this; the private path never signs.
@@ -2613,6 +2617,116 @@ describe("privacy", () => {
       ).resolves.toEqual({
         transactionHash: "0xsent",
         trackingId: "track-1",
+      });
+    });
+
+    /**
+     * The point of this one is that it previews what `send` would do, fee
+     * withdrawal included, rather than reporting on a raw action list.
+     *
+     * The SDK's own simulation is stubbed: it calls a pool view function for gas
+     * estimation, and reproducing that here would test the SDK rather than this
+     * wrapper. What is asserted is the wrapper's part.
+     */
+    describe("simulate", () => {
+      async function ready(fee = "0x64") {
+        const { mocknet, env: sdkEnv, bind, provider } = env();
+        const stub = paymasterStub(fee, `0x${BigInt(sdkEnv.ace).toString(16)}`);
+        const privacy = await bind();
+        mocknet.executeOutside(
+          await privacy.transfers.build().register().execute()
+        );
+
+        const warnings = [{ code: "USER_LINKAGE", message: "linked" }];
+        const withdrawnTo: unknown[] = [];
+        let buildOptions: unknown;
+
+        const build = privacy.transfers.build.bind(privacy.transfers);
+        vi.spyOn(privacy.transfers, "build").mockImplementation((options?) => {
+          buildOptions = options;
+          const builder = build(options);
+          // `with` is overloaded, so the wrapper is typed loosely and cast back.
+          const withFn = builder.with.bind(builder) as (
+            token: unknown,
+            ops?: unknown
+          ) => unknown;
+          builder.with = ((token: unknown, ops?: unknown) => {
+            withdrawnTo.push(token);
+            return withFn(token, ops);
+          }) as typeof builder.with;
+          builder.simulate = async () =>
+            ({ warnings }) as unknown as ReturnType<typeof builder.simulate>;
+          return builder;
+        });
+
+        return {
+          privacy,
+          provider,
+          warnings,
+          withdrawnTo,
+          submitted: stub.submitted,
+          feeToken: `0x${BigInt(sdkEnv.ace).toString(16)}`,
+          options: () => buildOptions,
+          compose: (b: PrivateTransfersBuilder) =>
+            b
+              .with(sdkEnv.ace, (t) => t.deposit({ amount: 100n }))
+              .surplusTo(`0x${sdkEnv.alice.address.toString(16)}`),
+        };
+      }
+
+      it("reports the fee the real send would withdraw, and the warnings", async () => {
+        const { privacy, compose, warnings } = await ready("0x64");
+
+        const simulation = await privacy.simulate(compose, { autoSetup: true });
+
+        expect(simulation.feeAction.amount).toBe(0x64n);
+        expect(simulation.warnings).toEqual(warnings);
+      });
+
+      it("appends the same fee withdrawal `send` would", async () => {
+        // The inherited `simulate` could not: it takes a raw action list and knows
+        // nothing about the paymaster's fee.
+        const { privacy, compose, withdrawnTo, feeToken } = await ready("0x64");
+
+        await privacy.simulate(compose, { autoSetup: true });
+
+        expect(withdrawnTo.map(String)).toContain(fromAddress(feeToken));
+      });
+
+      it("submits nothing", async () => {
+        const { privacy, compose, submitted } = await ready();
+
+        await privacy.simulate(compose, { autoSetup: true });
+
+        expect(submitted).toHaveLength(0);
+      });
+
+      it("does not hand back a proof that cannot be submitted", async () => {
+        // The mock proof has the shape and none of the substance, so returning it
+        // would invite exactly the mistake `assertProofSendable` now refuses.
+        const { privacy, compose } = await ready();
+
+        const simulation = await privacy.simulate(compose, { autoSetup: true });
+
+        expect(simulation).not.toHaveProperty("callAndProof");
+      });
+
+      it("waits for no block", async () => {
+        // A preview that costs a ten-block wait is not a preview.
+        const { privacy, compose, provider } = await ready();
+
+        await privacy.simulate(compose, { autoSetup: true });
+
+        expect(vi.mocked(provider.getBlockNumber)).not.toHaveBeenCalled();
+      });
+
+      it("leaves the shared registry alone", async () => {
+        // `registryConst` is what makes a simulation safe beside a live send.
+        const { privacy, compose, options } = await ready();
+
+        await privacy.simulate(compose, { autoSetup: true });
+
+        expect(options()).toMatchObject({ registryConst: true });
       });
     });
 
