@@ -132,6 +132,21 @@ describe("TongoConfidential", () => {
     });
   });
 
+  describe("recipientFromAddress", () => {
+    it("should trim the address before decoding it", async () => {
+      // Addresses arrive pasted, and base58 decoding does not tolerate
+      // surrounding whitespace. The decoder is reached through the lazily
+      // loaded module held on the instance, so this covers that route too.
+      const c = await createConfidential();
+
+      expect(c.recipientFromAddress("  encoded-address  ")).toEqual({
+        x: 7n,
+        y: 8n,
+      });
+      expect(MockPubKeyBase58ToAffine).toHaveBeenCalledWith("encoded-address");
+    });
+  });
+
   describe("getState", () => {
     it("should return decrypted state", async () => {
       const c = await createConfidential();
