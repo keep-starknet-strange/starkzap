@@ -2,6 +2,7 @@ import type { constants } from "starknet";
 import type {
   DiscoveryProviderInterface,
   OhttpOption,
+  ProofProviderConfig,
   ProofProviderInterface,
   PrivateTransfersInterface,
 } from "@starkware-libs/starknet-privacy-sdk";
@@ -23,6 +24,13 @@ import {
 type CreatePrivateTransfersParams = Parameters<
   PrivacySdkModule["createPrivateTransfers"]
 >[0];
+
+/**
+ * Options of the SDK's own indexer discovery provider.
+ */
+type IndexerOptions = NonNullable<
+  ConstructorParameters<PrivacySdkModule["IndexerDiscoveryProvider"]>[2]
+>;
 
 /**
  * Validate a service URL and strip trailing slashes.
@@ -345,7 +353,33 @@ export async function createPrivacy(
     return key;
   };
 
-  const transfers = sdk.createPrivateTransfers({
+  let provingProvider: CreatePrivateTransfersParams["provingProvider"];
+  if (typeof prover === "string") {
+    const proving: ProofProviderConfig = { url: prover, chainId };
+    if (ohttp !== undefined) {
+      proving.ohttp = ohttp;
+    }
+    provingProvider = proving;
+  } else {
+    provingProvider = prover;
+  }
+
+  let discoveryProvider: CreatePrivateTransfersParams["discoveryProvider"];
+  if (typeof discovery === "string") {
+    const indexer: IndexerOptions = {};
+    if (ohttp !== undefined) {
+      indexer.ohttp = ohttp;
+    }
+    discoveryProvider = new sdk.IndexerDiscoveryProvider(
+      discovery,
+      config.poolContractAddress,
+      indexer
+    );
+  } else {
+    discoveryProvider = discovery;
+  }
+
+  const params: CreatePrivateTransfersParams = {
     account: {
       address: wallet.address,
       // The SDK signs a synthetic invocation whose sender is the pool, so it
@@ -353,30 +387,19 @@ export async function createPrivacy(
       signer: new SignerAdapter(signer),
     },
     viewingKeyProvider: { getViewingKey },
-    provingProvider:
-      typeof prover === "string"
-        ? {
-            url: prover,
-            chainId,
-            ...(ohttp !== undefined && { ohttp }),
-          }
-        : prover,
-    discoveryProvider:
-      typeof discovery === "string"
-        ? new sdk.IndexerDiscoveryProvider(
-            discovery,
-            config.poolContractAddress,
-            { ...(ohttp !== undefined && { ohttp }) }
-          )
-        : discovery,
-    ...(config.proofInvocationFactory !== undefined && {
-      proofInvocationFactory: config.proofInvocationFactory,
-    }),
+    provingProvider,
+    discoveryProvider,
     poolContractAddress: config.poolContractAddress,
-    ...(config.subAccountAnonymizerAddress !== undefined && {
-      subAccountAnonymizerAddress: config.subAccountAnonymizerAddress,
-    }),
-  });
+  };
+
+  if (config.proofInvocationFactory !== undefined) {
+    params.proofInvocationFactory = config.proofInvocationFactory;
+  }
+  if (config.subAccountAnonymizerAddress !== undefined) {
+    params.subAccountAnonymizerAddress = config.subAccountAnonymizerAddress;
+  }
+
+  const transfers = sdk.createPrivateTransfers(params);
 
   revocations.set(transfers, () => {
     revoked = true;

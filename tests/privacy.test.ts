@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { getEventListeners } from "node:events";
 import {
   RpcError,
   ec,
@@ -119,6 +120,57 @@ describe("privacy", () => {
           timeoutMs: 20,
         })
       ).rejects.toThrow(/Timed out after 20ms waiting for block 100/);
+    });
+
+    it("rejects at once when the signal is already aborted", async () => {
+      // Checked before the first read, so an abort that lands while the caller
+      // was setting the wait up costs no RPC call at all.
+      const provider = providerWithHeads(120);
+
+      await expect(
+        waitForProvableBlock(provider, 100, {
+          signal: AbortSignal.abort(new Error("gone")),
+        })
+      ).rejects.toThrow("gone");
+      expect(provider.getBlockNumber).not.toHaveBeenCalled();
+    });
+
+    it("rejects mid-wait when the signal aborts, and stops polling", async () => {
+      // The head never advances, so without the signal this would poll until
+      // `timeoutMs`. The abort has to cut the sleep short, not wait it out.
+      const provider = providerWithHeads(101);
+      const controller = new AbortController();
+
+      const started = Date.now();
+      const wait = waitForProvableBlock(provider, 100, {
+        pollIntervalMs: 5_000,
+        timeoutMs: 60_000,
+        signal: controller.signal,
+        onAttempt: () => controller.abort(new Error("disconnected")),
+      });
+
+      await expect(wait).rejects.toThrow("disconnected");
+      expect(provider.getBlockNumber).toHaveBeenCalledTimes(1);
+      // The interval is what proves the abort was not simply slept through: an
+      // `abort` event never fires twice, so a listener-only implementation waits
+      // the full 5s and then rejects for the same reason at the next loop top.
+      expect(Date.now() - started).toBeLessThan(2_000);
+    });
+
+    it("leaves no abort listener behind once a wait finishes", async () => {
+      // One listener is added per sleep. A wait that polls many times on a
+      // long-lived signal would accumulate them until Node warns about a leak,
+      // so each sleep has to remove its own on the normal path too.
+      const provider = providerWithHeads(105, 108, 111);
+      const controller = new AbortController();
+
+      await waitForProvableBlock(provider, 100, {
+        pollIntervalMs: 1,
+        signal: controller.signal,
+      });
+
+      // Three polls, so two sleeps, so two listeners were added and removed.
+      expect(getEventListeners(controller.signal, "abort")).toHaveLength(0);
     });
   });
 
