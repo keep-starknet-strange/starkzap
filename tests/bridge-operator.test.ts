@@ -86,6 +86,8 @@ describe("BridgeOperator", () => {
     await expect(
       operatorPrivate.createBridge(token, wallet, starknetWallet)
     ).rejects.toThrow("OFT bridging requires a LayerZero API key");
-    expect(mockToEthWalletConfig).toHaveBeenCalledTimes(1);
+    // Rejected before the wallet config is built: that build reads the wallet's
+    // chain id over RPC, and a missing API key does not need it.
+    expect(mockToEthWalletConfig).not.toHaveBeenCalled();
   });
 });

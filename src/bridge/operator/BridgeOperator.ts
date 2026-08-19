@@ -347,11 +347,63 @@ export class BridgeOperator implements BridgeOperatorInterface {
     throw new Error(`Unsupported chain "${token.chain}".`);
   }
 
+  /**
+   * Reject a protocol whose static configuration is missing before any RPC call.
+   *
+   * The cases in {@link createEthereumBridge} read the key again through the
+   * same helpers, so each message lives in one place and neither call touches
+   * the network.
+   */
+  private assertProtocolConfigured(token: EthereumBridgeToken): void {
+    if (token.id === "lords") return;
+
+    switch (token.protocol) {
+      case Protocol.OFT:
+      case Protocol.OFT_MIGRATED:
+        this.requireLayerZeroApiKey();
+        return;
+      case Protocol.LAYERSWAP:
+        this.requireLayerswapApiKey();
+        return;
+      default:
+        return;
+    }
+  }
+
+  /** LayerZero API key, or an error naming the setting that supplies it. */
+  private requireLayerZeroApiKey(): string {
+    const apiKey = this.bridgingConfig?.layerZeroApiKey;
+    if (!apiKey) {
+      throw new Error(
+        "OFT bridging requires a LayerZero API key. " +
+          'Set "bridging.layerZeroApiKey" in the SDK configuration.'
+      );
+    }
+    return apiKey;
+  }
+
+  /** Layerswap API key, or an error naming the setting that supplies it. */
+  private requireLayerswapApiKey(): string {
+    const apiKey = this.bridgingConfig?.layerswapApiKey;
+    if (!apiKey) {
+      throw new Error(
+        "Layerswap bridging requires an API key. " +
+          'Set "bridging.layerswapApiKey" in the SDK configuration.'
+      );
+    }
+    return apiKey;
+  }
+
   private async createEthereumBridge(
     token: EthereumBridgeToken,
     externalWallet: ConnectedEthereumWallet,
     starknetWallet: WalletInterface
   ): Promise<BridgeInterface<EthereumAddress>> {
+    // Before the wallet config, which reads the wallet's chain id over RPC. A
+    // missing API key is knowable without that round-trip, so it should not cost
+    // one.
+    this.assertProtocolConfigured(token);
+
     const walletConfig = await toEthWalletConfig(
       externalWallet,
       this.bridgingConfig?.ethereumRpcUrl
@@ -398,13 +450,7 @@ export class BridgeOperator implements BridgeOperatorInterface {
       }
       case Protocol.OFT:
       case Protocol.OFT_MIGRATED: {
-        const apiKey = this.bridgingConfig?.layerZeroApiKey;
-        if (!apiKey) {
-          throw new Error(
-            "OFT bridging requires a LayerZero API key. " +
-              'Set "bridging.layerZeroApiKey" in the SDK configuration.'
-          );
-        }
+        const apiKey = this.requireLayerZeroApiKey();
         const { OftBridge } = await import("@/bridge/ethereum/oft/OftBridge");
         return new OftBridge(
           requireContractRouted(token, ContractRoutedEthereumBridgeToken),
@@ -415,13 +461,7 @@ export class BridgeOperator implements BridgeOperatorInterface {
         );
       }
       case Protocol.LAYERSWAP: {
-        const apiKey = this.bridgingConfig?.layerswapApiKey;
-        if (!apiKey) {
-          throw new Error(
-            "Layerswap bridging requires an API key. " +
-              'Set "bridging.layerswapApiKey" in the SDK configuration.'
-          );
-        }
+        const apiKey = this.requireLayerswapApiKey();
         const { LayerswapBridge } =
           await import("@/bridge/ethereum/layerswap/LayerswapBridge");
         const baseUrl = this.bridgingConfig?.layerswapBaseUrl;
