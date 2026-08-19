@@ -1,8 +1,7 @@
 import type { ContractTransaction } from "ethers";
-import { getAddress, Interface } from "ethers";
 import { type EthereumAddress, ExternalChain } from "@/types";
 import type { Address, Amount } from "@/types";
-import { fromEthereumAddress } from "@/connect/ethersRuntime";
+import { fromEthereumAddress, requireEthers } from "@/connect/ethersRuntime";
 import type { Call } from "starknet";
 
 const LAYERZERO_API_BASE = "https://transfer.layerzero-api.com/v1";
@@ -153,6 +152,12 @@ export class LayerZeroApi {
     approvalTx: ContractTransaction | null
   ): EthereumAddress | null {
     if (!approvalTx?.data) return null;
+    // Sync accessor is safe: the caller holds an ethers `ContractTransaction`,
+    // which cannot exist unless ethers has already been loaded. Resolved
+    // outside the try block so a missing module is not swallowed as `null`.
+    const { getAddress, Interface } = requireEthers(
+      "LayerZero approval parsing"
+    );
     try {
       const approveInterface = new Interface([
         "function approve(address spender, uint256 value)",

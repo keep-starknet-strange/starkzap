@@ -20,7 +20,7 @@ import type {
   EthereumWalletConfig,
 } from "@/bridge";
 import { ERC20EthereumToken } from "@/bridge/ethereum/EtherToken";
-import { getAddress, Interface, type TransactionRequest } from "ethers";
+import type { Interface, TransactionRequest } from "ethers";
 import { FeeErrorCause } from "@/types/errors";
 import { BridgeDirection, CCTPFees } from "@/bridge/ethereum/cctp/CCTPFees";
 import {
@@ -38,31 +38,55 @@ import {
   STARKNET_DOMAIN_ID,
 } from "@/bridge/ethereum/cctp/constants";
 import { EthereumBridge } from "@/bridge/ethereum/EthereumBridge";
-import { fromEthereumAddress } from "@/connect/ethersRuntime";
+import {
+  fromEthereumAddress,
+  loadEthers,
+  requireEthers,
+} from "@/connect/ethersRuntime";
 import type { Tx } from "@/tx";
 import { cairo, type Call, CallData, uint256 } from "starknet";
 import type { WalletInterface } from "@/wallet";
 import { type StarkZapLogger } from "@/logger";
 
 export class CCTPBridge extends EthereumBridge {
-  private static readonly MAINNET_TOKEN_MESSENGER = fromEthereumAddress(
-    "0x28b5a0e9C621a5BadaA536219b3a228C8168cf5d",
-    { getAddress }
-  );
-  private static readonly SEPOLIA_TOKEN_MESSENGER = fromEthereumAddress(
-    "0x8FE6B999Dc680CcFDD5Bf7EB0974218be2542DAA",
-    { getAddress }
-  );
+  // The ethers-derived statics below are lazy so that this module never
+  // references the optional "ethers" peer at module-evaluation time. The
+  // sync `requireEthers` accessor is safe here: these getters are only
+  // reached from instances, which are constructed after `BridgeOperator`
+  // has awaited `loadEthers`.
+  private static _mainnetTokenMessenger?: EthereumAddress;
+  private static get MAINNET_TOKEN_MESSENGER(): EthereumAddress {
+    return (CCTPBridge._mainnetTokenMessenger ??= fromEthereumAddress(
+      "0x28b5a0e9C621a5BadaA536219b3a228C8168cf5d",
+      { getAddress: requireEthers("CCTP bridge operations").getAddress }
+    ));
+  }
+
+  private static _sepoliaTokenMessenger?: EthereumAddress;
+  private static get SEPOLIA_TOKEN_MESSENGER(): EthereumAddress {
+    return (CCTPBridge._sepoliaTokenMessenger ??= fromEthereumAddress(
+      "0x8FE6B999Dc680CcFDD5Bf7EB0974218be2542DAA",
+      { getAddress: requireEthers("CCTP bridge operations").getAddress }
+    ));
+  }
 
   private static DEFAULT_CCTP_DEPOSIT_GAS = 104_581n;
 
-  private static TOKEN_MESSENGER_INTERFACE = new Interface([
-    "function depositForBurn(uint256 amount, uint32 destinationDomain, bytes32 mintRecipient, address burnToken, bytes32 destinationCaller, uint256 maxFee, uint32 minFinalityThreshold)",
-  ]);
+  private static _tokenMessengerInterface?: Interface;
+  private static get TOKEN_MESSENGER_INTERFACE(): Interface {
+    const { Interface } = requireEthers("CCTP bridge operations");
+    return (CCTPBridge._tokenMessengerInterface ??= new Interface([
+      "function depositForBurn(uint256 amount, uint32 destinationDomain, bytes32 mintRecipient, address burnToken, bytes32 destinationCaller, uint256 maxFee, uint32 minFinalityThreshold)",
+    ]));
+  }
 
-  private static MESSAGE_TRANSMITTER_INTERFACE = new Interface([
-    "function receiveMessage(bytes message, bytes attestation)",
-  ]);
+  private static _messageTransmitterInterface?: Interface;
+  private static get MESSAGE_TRANSMITTER_INTERFACE(): Interface {
+    const { Interface } = requireEthers("CCTP bridge operations");
+    return (CCTPBridge._messageTransmitterInterface ??= new Interface([
+      "function receiveMessage(bytes message, bytes attestation)",
+    ]));
+  }
 
   private static readonly DUMMY_SN_ADDRESS = fromAddress(
     "0x0000000000000000000000000000000000000000000000000000000000000001"
@@ -185,7 +209,7 @@ export class CCTPBridge extends EthereumBridge {
     const [calls, fastTransferBpFee] = await Promise.all([
       this.buildInitiateWithdrawCalls(
         fromEthereumAddress("0x0000000000000000000000000000000000000001", {
-          getAddress,
+          getAddress: (await loadEthers("CCTP bridge operations")).getAddress,
         }),
         await this.token.amount(1n),
         fastTransfer

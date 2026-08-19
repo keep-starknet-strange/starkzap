@@ -18,12 +18,18 @@ export async function loadAvnuSdk(feature: string): Promise<AvnuSdkModule> {
     return cachedAvnuSdk;
   }
 
-  loadingAvnuSdk ??= import("@avnu/avnu-sdk")
-    .then((module) => {
+  // NOTE: the import() must be wrapped in try/catch (not a .catch() chain):
+  // webpack only downgrades an unresolvable dynamic import to a build warning
+  // (with a runtime error) when the import() sits inside a try block — the
+  // same pattern the Cartridge loader in src/wallet/cartridge.ts relies on.
+  // With a .then()/.catch() chain instead, consumers without the optional
+  // peer installed get a hard "Module not found" build error.
+  loadingAvnuSdk ??= (async () => {
+    try {
+      const module = await import("@avnu/avnu-sdk");
       cachedAvnuSdk = module as unknown as AvnuSdkModule;
       return cachedAvnuSdk;
-    })
-    .catch((error) => {
+    } catch (error) {
       const detail =
         error instanceof Error && error.message
           ? ` Original error: ${error.message}`
@@ -31,10 +37,10 @@ export async function loadAvnuSdk(feature: string): Promise<AvnuSdkModule> {
       throw new Error(
         `[starkzap] ${feature} requires optional peer dependency "@avnu/avnu-sdk". Install it with: npm i @avnu/avnu-sdk.${detail}`
       );
-    })
-    .finally(() => {
+    } finally {
       loadingAvnuSdk = undefined;
-    });
+    }
+  })();
 
   return await loadingAvnuSdk;
 }

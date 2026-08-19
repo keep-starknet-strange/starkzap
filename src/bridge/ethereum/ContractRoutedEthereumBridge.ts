@@ -14,7 +14,8 @@ import type {
   EthereumTransactionDetails,
   EthereumWalletConfig,
 } from "@/bridge/ethereum/types";
-import { Contract, type ContractTransaction, type InterfaceAbi } from "ethers";
+import type { Contract, ContractTransaction, InterfaceAbi } from "ethers";
+import { requireEthers } from "@/connect/ethersRuntime";
 import { FeeErrorCause } from "@/types/errors";
 import type { WalletInterface } from "@/wallet";
 import CANONICAL_BRIDGE_ABI from "@/abi/ethereum/canonicalBridge.json";
@@ -45,6 +46,10 @@ export abstract class ContractRoutedEthereumBridge extends EthereumBridge {
     bridgeAbi: InterfaceAbi = CANONICAL_BRIDGE_ABI
   ) {
     super(bridgeToken, config, starknetWallet, logger);
+    // Sync accessor is safe: bridges are only constructed after
+    // `BridgeOperator.createEthereumBridge` has awaited `loadEthers`, and the
+    // `config.signer` passed in is itself an ethers object.
+    const { Contract } = requireEthers("Ethereum bridge construction");
     this.bridge = new Contract(
       bridgeToken.bridgeAddress,
       bridgeAbi,
