@@ -8,9 +8,9 @@ import {
   DUMMY_SN_ADDRESS,
   type EthereumCompleteWithdrawFeeEstimation,
   type EthereumInitiateWithdrawFeeEstimation,
-  type EthereumWalletConfig,
   type OftDepositFeeEstimation,
 } from "@/bridge/ethereum/types";
+import { type EthereumWalletConfig } from "@/bridge/ethereum/ethers-interop";
 import type {
   Address,
   ExternalAddress,

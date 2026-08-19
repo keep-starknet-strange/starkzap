@@ -1,9 +1,4 @@
-export {
-  TongoConfidential,
-  loadTongoSdk,
-  type TongoAccount,
-  type TongoSdkModule,
-} from "@/confidential/tongo";
+export { TongoConfidential } from "@/confidential/tongo";
 export type {
   ConfidentialConfig,
   ConfidentialFundDetails,

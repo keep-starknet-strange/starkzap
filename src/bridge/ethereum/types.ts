@@ -14,18 +14,13 @@ export const DUMMY_SN_ADDRESS = fromAddress(
  */
 export const DUMMY_L1_ADDRESS =
   "0x0000000000000000000000000000000000000001" as EthereumAddress;
-import type { PreparedTransactionRequest, Provider, Signer } from "ethers";
 
-export type EthereumWalletConfig = {
-  signer: Signer;
-  provider: Provider;
-};
-
-export type EthereumTransactionDetails = {
-  method: string;
-  args: string[];
-  transaction: PreparedTransactionRequest;
-};
+// Nothing in this file may import `ethers`, not even as a type. The fee
+// estimations below are reached by every consumer through the
+// `BridgeDepositFeeEstimation` unions, so an `ethers` reference here makes an
+// optional peer mandatory for all of them. `EthereumWalletConfig` and
+// `EthereumTransactionDetails` live in `@/bridge/ethereum/ethers-interop` for
+// exactly that reason.
 
 export type ApprovalFeeEstimation = {
   approvalFee: Amount;

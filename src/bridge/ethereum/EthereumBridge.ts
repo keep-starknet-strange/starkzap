@@ -14,10 +14,8 @@ import {
   type EthereumTokenInterface,
   intoEthereumToken,
 } from "@/bridge/ethereum/EtherToken";
-import {
-  type ApprovalFeeEstimation,
-  type EthereumWalletConfig,
-} from "@/bridge/ethereum/types";
+import { type ApprovalFeeEstimation } from "@/bridge/ethereum/types";
+import { type EthereumWalletConfig } from "@/bridge/ethereum/ethers-interop";
 import type {
   ContractTransaction,
   ContractTransactionReceipt,

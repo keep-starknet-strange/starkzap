@@ -8,12 +8,14 @@ import {
   WithdrawalState,
 } from "@/bridge/monitor/types";
 import { CctpMonitor } from "@/bridge/monitor/cctp/CctpMonitor";
+import { NOOP_LOGGER } from "@/logger";
 
 function makeMonitor(): CctpMonitor {
   return new CctpMonitor({
     chainId: ChainId.SEPOLIA,
     starknetProvider: {} as RpcProvider,
     ethereumProvider: {} as Provider,
+    logger: NOOP_LOGGER,
   });
 }
 

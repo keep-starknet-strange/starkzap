@@ -363,11 +363,4 @@ describe("TongoConfidential", () => {
       });
     });
   });
-
-  describe("getTongoAccount", () => {
-    it("should return the underlying tongo account", async () => {
-      const c = await createConfidential();
-      expect(c.getTongoAccount()).toBe(mockTongoAccount);
-    });
-  });
 });

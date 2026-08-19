@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeAll, vi } from "vitest";
+import type { constants } from "starknet";
 import { StarkZap } from "@/sdk";
 import { StarkSigner } from "@/signer";
 import { OpenZeppelinPreset, ArgentPreset, BraavosPreset } from "@/account";
@@ -59,7 +60,7 @@ describe("Wallet", () => {
   beforeAll(() => {
     sdk = new StarkZap(config);
     vi.spyOn(sdk.getProvider(), "getChainId").mockResolvedValue(
-      config.chainId!.toFelt252()
+      config.chainId!.toFelt252() as constants.StarknetChainId
     );
     console.log(`Running tests on ${network}`);
   });
@@ -547,7 +548,7 @@ describe("Wallet", () => {
         paymaster: { nodeUrl: "https://paymaster.example.com" },
       });
       vi.spyOn(paymasterSdk.getProvider(), "getChainId").mockResolvedValue(
-        config.chainId!.toFelt252()
+        config.chainId!.toFelt252() as constants.StarknetChainId
       );
       const signer = new StarkSigner(testPrivateKeys.random());
       const wallet = await paymasterSdk.connectWallet({
@@ -639,7 +640,7 @@ describe("Wallet", () => {
         ? ChainId.SEPOLIA
         : ChainId.MAINNET;
       vi.spyOn(sdk.getProvider(), "getChainId").mockResolvedValue(
-        mismatchChain.toFelt252()
+        mismatchChain.toFelt252() as constants.StarknetChainId
       );
 
       await expect(
@@ -685,7 +686,7 @@ describe("StarkZap", () => {
     it("should reject in react-native-like runtime", async () => {
       const sdk = new StarkZap(config);
       vi.spyOn(sdk.getProvider(), "getChainId").mockResolvedValue(
-        config.chainId!.toFelt252()
+        config.chainId!.toFelt252() as constants.StarknetChainId
       );
       try {
         vi.stubGlobal("window", {});

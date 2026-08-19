@@ -19,10 +19,10 @@ import type {
 } from "@/bridge/ethereum/layerswap/types";
 import {
   type EthereumCompleteWithdrawFeeEstimation,
-  type EthereumWalletConfig,
   type LayerswapDepositFeeEstimation,
   type LayerswapInitiateWithdrawFeeEstimation,
 } from "@/bridge/ethereum/types";
+import { type EthereumWalletConfig } from "@/bridge/ethereum/ethers-interop";
 import {
   type Address,
   Amount,

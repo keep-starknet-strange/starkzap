@@ -1,9 +1,9 @@
 import { CanonicalEthereumBridge } from "@/bridge/ethereum/canonical/CanonicalEthereumBridge";
 import { ethereumAddress } from "@/bridge/ethereum/EtherToken";
-import type { EthereumTransactionDetails } from "@/bridge/ethereum/types";
+import type { EthereumTransactionDetails } from "@/bridge/ethereum/ethers-interop";
 import type { Address, ExternalAddress } from "@/types";
 import { Amount, ContractRoutedEthereumBridgeToken } from "@/types";
-import type { EthereumWalletConfig } from "@/bridge/ethereum/types";
+import type { EthereumWalletConfig } from "@/bridge/ethereum/ethers-interop";
 import type { WalletInterface } from "@/wallet";
 import { type Call, CallData, uint256 } from "starknet";
 import type { L1Message } from "@starknet-io/starknet-types-0103";

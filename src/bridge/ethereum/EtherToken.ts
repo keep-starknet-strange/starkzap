@@ -5,7 +5,7 @@ import {
 } from "@/types/bridge/external-chain";
 import type { Contract, ContractTransaction, Provider, Signer } from "ethers";
 import ERC20_ABI from "@/abi/ethereum/erc20.json";
-import { type EthereumWalletConfig } from "@/bridge/ethereum/types";
+import { type EthereumWalletConfig } from "@/bridge/ethereum/ethers-interop";
 import {
   fromEthereumAddress,
   loadEthers,

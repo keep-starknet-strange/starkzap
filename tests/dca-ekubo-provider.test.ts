@@ -145,10 +145,9 @@ describe("EkuboDcaProvider", () => {
         "5000000",
       ]),
     });
-    expect(Number(prepared.calls[1]!.calldata[3])).toBeGreaterThan(1_000);
-    expect(Number(prepared.calls[1]!.calldata[4])).toBeGreaterThan(
-      Number(prepared.calls[1]!.calldata[3])
-    );
+    const mintCalldata = prepared.calls[1]!.calldata as string[];
+    expect(Number(mintCalldata[3])).toBeGreaterThan(1_000);
+    expect(Number(mintCalldata[4])).toBeGreaterThan(Number(mintCalldata[3]));
     expect(prepared.calls[2]).toMatchObject({
       contractAddress: preset.positions,
       entrypoint: "clear",
@@ -635,10 +634,10 @@ describe("EkuboDcaProvider", () => {
       apiBase: "https://mock-ekubo",
       quoteApiBase: "https://mock-quoter",
       fetcher: fetchMock as unknown as typeof fetch,
+      // No fallbackTwammPoolFee: the timeout must surface even with nothing to
+      // fall back to.
       presets: {
-        SN_SEPOLIA: {
-          fallbackTwammPoolFee: undefined,
-        },
+        SN_SEPOLIA: {},
       },
     });
     const context = {

@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
-import { RpcProvider } from "starknet";
+import { RpcProvider, type constants } from "starknet";
 import { StarkZap } from "@/sdk";
 import { StarkSigner } from "@/signer";
 import { OpenZeppelinPreset } from "@/account";
@@ -12,7 +12,7 @@ describe("Sponsorship (AVNU Paymaster)", () => {
 
   beforeAll(() => {
     vi.spyOn(RpcProvider.prototype, "getChainId").mockResolvedValue(
-      devnetConfig.chainId!.toFelt252()
+      devnetConfig.chainId!.toFelt252() as constants.StarknetChainId
     );
   });
 
@@ -24,8 +24,7 @@ describe("Sponsorship (AVNU Paymaster)", () => {
     it("should allow feeMode=sponsored without explicit sponsor config", async () => {
       // AVNU paymaster is built into starknet.js, no config needed
       const sdk = new StarkZap({
-        rpcUrl: devnetConfig.rpcUrl,
-        chainId: devnetConfig.chainId,
+        ...devnetConfig,
       });
 
       const wallet = await sdk.connectWallet({
@@ -42,8 +41,7 @@ describe("Sponsorship (AVNU Paymaster)", () => {
 
     it("should accept custom paymaster config", async () => {
       const sdk = new StarkZap({
-        rpcUrl: devnetConfig.rpcUrl,
-        chainId: devnetConfig.chainId,
+        ...devnetConfig,
         paymaster: {
           nodeUrl: "https://sepolia.paymaster.avnu.fi",
         },
@@ -63,8 +61,7 @@ describe("Sponsorship (AVNU Paymaster)", () => {
   describe("Execute options", () => {
     it("should support feeMode override per operation", async () => {
       const sdk = new StarkZap({
-        rpcUrl: devnetConfig.rpcUrl,
-        chainId: devnetConfig.chainId,
+        ...devnetConfig,
       });
 
       // Connect with user_pays by default
@@ -96,8 +93,7 @@ describe("Sponsorship (AVNU Paymaster)", () => {
 
     it("should support timeBounds for sponsored transactions", async () => {
       const sdk = new StarkZap({
-        rpcUrl: devnetConfig.rpcUrl,
-        chainId: devnetConfig.chainId,
+        ...devnetConfig,
       });
 
       const wallet = await sdk.connectWallet({

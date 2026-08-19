@@ -155,10 +155,11 @@ describe("wallet utils", () => {
 
     it("includes deploymentData when provided", () => {
       const deploymentData = {
+        address: "0x123",
         class_hash: "0xabc",
-        contract_address_salt: "0xdef",
-        constructor_calldata: ["0x1"],
-        version: "0x1" as const,
+        salt: "0xdef",
+        calldata: ["0x1"],
+        version: 1 as const,
       };
       const result = paymasterDetails({
         feeMode: { type: "paymaster" },

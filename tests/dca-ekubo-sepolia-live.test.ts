@@ -29,7 +29,7 @@ async function createLiveWallet() {
   }
 
   const sdk = new StarkZap({
-    rpcUrl: testnetConfig.rpcUrl,
+    ...testnetConfig,
     chainId: ChainId.SEPOLIA,
   });
 
