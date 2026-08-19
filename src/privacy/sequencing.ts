@@ -39,10 +39,52 @@ export interface ProvableBlockOptions {
    * and "it hung" is indistinguishable from "it was waiting for a block".
    */
   onAttempt?: (attempt: ProvableAttempt) => void;
+  /**
+   * Cancels the wait. The returned promise rejects with the signal's reason,
+   * which is an `AbortError` unless you passed one to `AbortController.abort()`.
+   *
+   * A wait can block for minutes, so give it one whenever the reason to wait can
+   * disappear: a disconnect, a screen the user navigated away from, a component
+   * that unmounted. Without it the poll keeps hitting the RPC until it succeeds
+   * or `timeoutMs` runs out.
+   *
+   * Only the waiting is cancellable. Nothing here can abort a proof already in
+   * flight, so a caller that aborts still has to decide what to do with a
+   * `send()` that is past this point.
+   */
+  signal?: AbortSignal;
 }
 
-const sleep = (ms: number): Promise<void> =>
-  new Promise((resolve) => setTimeout(resolve, ms));
+/**
+ * Sleep, or reject as soon as `signal` aborts.
+ *
+ * The listener is removed on the normal path too — these loops sleep once per
+ * poll, and a long wait on a shared signal would otherwise pile up listeners
+ * until Node warns about a leak.
+ */
+const sleep = (ms: number, signal?: AbortSignal): Promise<void> =>
+  new Promise((resolve, reject) => {
+    if (signal === undefined) {
+      setTimeout(resolve, ms);
+      return;
+    }
+    // Checked before listening: an `abort` event does not fire again for a
+    // signal that is already aborted, so a listener alone would sleep the whole
+    // interval out before anyone noticed.
+    if (signal.aborted) {
+      reject(signal.reason);
+      return;
+    }
+    const onAbort = (): void => {
+      clearTimeout(timer);
+      reject(signal.reason);
+    };
+    const timer = setTimeout(() => {
+      signal.removeEventListener("abort", onAbort);
+      resolve();
+    }, ms);
+    signal.addEventListener("abort", onAbort, { once: true });
+  });
 
 /**
  * Wait until a block is old enough to prove against, and return the block
@@ -63,9 +105,10 @@ const sleep = (ms: number): Promise<void> =>
  *
  * @param provider - RPC provider used to read the chain head
  * @param sinceBlock - Receipt block of the state the next proof must see
- * @param options - Depth, poll interval and timeout overrides
+ * @param options - Depth, poll interval, timeout and abort overrides
  * @returns The block number to pass as the proving block
- * @throws If the chain head does not advance far enough within `timeoutMs`
+ * @throws If the chain head does not advance far enough within `timeoutMs`,
+ *   or with `options.signal`'s reason if it aborts
  *
  * @example
  * ```ts
@@ -91,6 +134,7 @@ export async function waitForProvableBlock(
 
   let attempt = 0;
   for (;;) {
+    options.signal?.throwIfAborted();
     const latest = await provider.getBlockNumber();
     const ready = sinceBlock < latest - depth;
     options.onAttempt?.({
@@ -106,7 +150,7 @@ export async function waitForProvableBlock(
         `[starkzap] Timed out after ${timeoutMs}ms waiting for block ${sinceBlock} to be ${depth} blocks behind the chain head (head is ${latest}).`
       );
     }
-    await sleep(pollIntervalMs);
+    await sleep(pollIntervalMs, options.signal);
   }
 }
 
@@ -120,9 +164,10 @@ export async function waitForProvableBlock(
  *
  * @param provider - RPC provider used to read the chain head and the state
  * @param isVisible - Predicate run against a candidate proving block
- * @param options - Depth, poll interval and timeout overrides
+ * @param options - Depth, poll interval, timeout and abort overrides
  * @returns The block number to pass as the proving block
- * @throws If the state is not visible within `timeoutMs`
+ * @throws If the state is not visible within `timeoutMs`, or with
+ *   `options.signal`'s reason if it aborts
  */
 export async function waitForProvableState(
   provider: RpcProvider,
@@ -135,6 +180,7 @@ export async function waitForProvableState(
 
   let attempt = 0;
   for (;;) {
+    options.signal?.throwIfAborted();
     const head = await provider.getBlockNumber();
     const provingBlock = head - depth;
     const ready = provingBlock >= 0 && (await isVisible(provingBlock));
@@ -146,7 +192,7 @@ export async function waitForProvableState(
         `[starkzap] Timed out waiting for the state a proof depends on to be visible ${depth} blocks behind the chain head.`
       );
     }
-    await sleep(pollIntervalMs);
+    await sleep(pollIntervalMs, options.signal);
   }
 }
 
@@ -159,7 +205,7 @@ export async function waitForProvableState(
  *
  * @param provider - RPC provider used to read the chain head and class hash
  * @param address - Account whose deployment must be visible
- * @param options - Depth, poll interval and timeout overrides
+ * @param options - Depth, poll interval, timeout and abort overrides
  * @returns The block number to pass as the proving block
  */
 export function waitForDeployedAccount(
@@ -203,7 +249,7 @@ export function waitForDeployedAccount(
  * @param token - Token being deposited
  * @param owner - Address whose balance must be visible
  * @param amount - Minimum balance required, in base units
- * @param options - Depth, poll interval and timeout overrides
+ * @param options - Depth, poll interval, timeout and abort overrides
  * @returns The block number to pass as the proving block
  */
 export function waitForFundedBalance(
