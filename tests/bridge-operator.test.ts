@@ -3,6 +3,20 @@ import { BridgeOperator } from "@/bridge/operator/BridgeOperator";
 import { type BridgeToken, ExternalChain, Protocol } from "@/types";
 import type { ConnectedExternalWallet } from "@/connect";
 import type { WalletInterface } from "@/wallet";
+import { NOOP_LOGGER } from "@/logger";
+
+// The signer/provider pair is built by `toEthWalletConfig`, which needs a real
+// EIP-1193 provider and an ethers `BrowserProvider`. This file is about which
+// bridge `createBridge` picks, so the config is stubbed rather than built.
+const { mockToEthWalletConfig } = vi.hoisted(() => ({
+  mockToEthWalletConfig: vi
+    .fn()
+    .mockResolvedValue({ provider: {}, signer: {} }),
+}));
+
+vi.mock("@/bridge/ethereum/ethers-interop", () => ({
+  toEthWalletConfig: mockToEthWalletConfig,
+}));
 
 type BridgeOperatorPrivate = {
   createBridge(
@@ -34,7 +48,7 @@ function mockToken(
 describe("BridgeOperator", () => {
   it("createBridge should reject when token and wallet chains do not match", async () => {
     const starknetWallet = {} as WalletInterface;
-    const operator = new BridgeOperator(starknetWallet);
+    const operator = new BridgeOperator(starknetWallet, undefined, NOOP_LOGGER);
     const operatorPrivate = operator as unknown as BridgeOperatorPrivate;
     const token = mockToken({
       name: "USDC",
@@ -54,27 +68,24 @@ describe("BridgeOperator", () => {
 
   it("createBridge should reject OFT bridges when LayerZero API key is missing", async () => {
     const starknetWallet = {} as WalletInterface;
-    const operator = new BridgeOperator(starknetWallet, {
-      ethereumRpcUrl: "https://rpc.example.com",
-    });
+    const operator = new BridgeOperator(
+      starknetWallet,
+      { ethereumRpcUrl: "https://rpc.example.com" },
+      NOOP_LOGGER
+    );
     const operatorPrivate = operator as unknown as BridgeOperatorPrivate;
     const token = mockToken({
       id: "usdc",
       chain: ExternalChain.ETHEREUM,
       protocol: Protocol.OFT,
     });
-    const toEthWalletConfig = vi.fn().mockResolvedValue({
-      provider: {},
-      signer: {},
-    });
     const wallet = {
       chain: ExternalChain.ETHEREUM,
-      toEthWalletConfig,
     } as unknown as ConnectedExternalWallet;
 
     await expect(
       operatorPrivate.createBridge(token, wallet, starknetWallet)
     ).rejects.toThrow("OFT bridging requires a LayerZero API key");
-    expect(toEthWalletConfig).toHaveBeenCalledTimes(1);
+    expect(mockToEthWalletConfig).toHaveBeenCalledTimes(1);
   });
 });

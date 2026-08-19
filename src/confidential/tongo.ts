@@ -1,5 +1,10 @@
 import type { Call } from "starknet";
 import type { Amount } from "@/types/amount";
+import {
+  loadTongoSdk,
+  type TongoAccount,
+  type TongoSdkModule,
+} from "@/confidential/tongoRuntime";
 import type {
   ConfidentialConfig,
   ConfidentialFundDetails,
@@ -10,54 +15,6 @@ import type {
   ConfidentialState,
   ConfidentialRecipient,
 } from "@/confidential/types";
-
-export type TongoSdkModule = typeof import("@fatsolutions/tongo-sdk");
-
-/** The underlying `Account` class instance from the Tongo SDK. */
-export type TongoAccount = InstanceType<TongoSdkModule["Account"]>;
-
-let cachedTongoSdk: TongoSdkModule | undefined;
-let loadingTongoSdk: Promise<TongoSdkModule> | undefined;
-
-/**
- * Lazily loads @fatsolutions/tongo-sdk and caches the module namespace object.
- *
- * The dependency is an optional peer dependency: it is only required when
- * Tongo confidential transfers are actually used. This is the single place
- * where the SDK's presence is checked at runtime.
- */
-export async function loadTongoSdk(
-  feature = "Tongo confidential transfers"
-): Promise<TongoSdkModule> {
-  if (cachedTongoSdk) {
-    return cachedTongoSdk;
-  }
-
-  // NOTE: the import() must be wrapped in try/catch (not a .catch() chain):
-  // webpack only downgrades an unresolvable dynamic import to a build warning
-  // (with a runtime error) when the import() sits inside a try block. With a
-  // .then()/.catch() chain instead, consumers without the optional peer
-  // installed get a hard "Module not found" build error.
-  loadingTongoSdk ??= (async () => {
-    try {
-      const module = await import("@fatsolutions/tongo-sdk");
-      cachedTongoSdk = module as unknown as TongoSdkModule;
-      return cachedTongoSdk;
-    } catch (error) {
-      const detail =
-        error instanceof Error && error.message
-          ? ` Original error: ${error.message}`
-          : "";
-      throw new Error(
-        `[starkzap] ${feature} requires optional peer dependency "@fatsolutions/tongo-sdk". Install it with: npm i @fatsolutions/tongo-sdk.${detail}`
-      );
-    } finally {
-      loadingTongoSdk = undefined;
-    }
-  })();
-
-  return await loadingTongoSdk;
-}
 
 /**
  * Confidential transfers backed by the Tongo protocol.
@@ -72,6 +29,25 @@ export async function loadTongoSdk(
  * *notes* and needs a remote prover whose output rides on the transaction
  * rather than inside a call. Pick whichever protocol you are integrating —
  * there is no shared interface to code against.
+ *
+ * ## Reaching the rest of the Tongo SDK
+ *
+ * This class wraps the operations that produce `Call`s, plus balance and unit
+ * conversion. Tongo's `Account` does more than that: transaction history and
+ * per-event reads, audit and ex-post proofs, raw encrypted state, and manual
+ * decryption. For any of those, construct the SDK's `Account` yourself with the
+ * same config you passed here:
+ *
+ * ```ts
+ * import { Account } from "@fatsolutions/tongo-sdk";
+ *
+ * const tongo = new Account(privateKey, contractAddress, provider);
+ * const history = await tongo.getTxHistory(fromBlock);
+ * ```
+ *
+ * A second instance is equivalent to the one inside this class rather than a
+ * rival to it — `Account` holds no chain state, and reads its nonce and balance
+ * fresh on every call, so the two cannot disagree.
  *
  * @example
  * ```ts
@@ -251,15 +227,5 @@ export class TongoConfidential {
       sender: details.sender,
     });
     return [op.toCalldata()];
-  }
-
-  /**
-   * Access the underlying Tongo Account for advanced operations.
-   *
-   * Use this for event reading, audit proofs, or other operations
-   * not covered by the convenience methods.
-   */
-  getTongoAccount(): TongoAccount {
-    return this.account;
   }
 }

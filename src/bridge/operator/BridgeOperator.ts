@@ -32,6 +32,7 @@ import {
   type SolanaAddress,
   SolanaBridgeToken,
 } from "@/types";
+import { toEthWalletConfig } from "@/bridge/ethereum/ethers-interop";
 import { loadEthers } from "@/connect/ethersRuntime";
 import { loadSolanaWeb3 } from "@/connect/solanaWeb3Runtime";
 import { loadHyperlane } from "@/bridge/solana/hyperlaneRuntime";
@@ -351,8 +352,8 @@ export class BridgeOperator implements BridgeOperatorInterface {
     externalWallet: ConnectedEthereumWallet,
     starknetWallet: WalletInterface
   ): Promise<BridgeInterface<EthereumAddress>> {
-    await loadEthers("Ethereum bridge operations");
-    const walletConfig = await externalWallet.toEthWalletConfig(
+    const walletConfig = await toEthWalletConfig(
+      externalWallet,
       this.bridgingConfig?.ethereumRpcUrl
     );
 
