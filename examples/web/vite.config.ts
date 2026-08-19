@@ -36,6 +36,8 @@ export default defineConfig({
   },
   resolve: {
     alias: {
+      // More specific first: Vite matches aliases in order.
+      "starkzap/privacy": path.resolve(__dirname, "../../src/privacy/index.ts"),
       starkzap: path.resolve(__dirname, "../../src/index.ts"),
       "@": path.resolve(__dirname, "../../src"),
       "~": path.resolve(__dirname, "src"),

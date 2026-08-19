@@ -2,18 +2,21 @@ import { create } from "zustand";
 import {
   Amount,
   fromAddress,
+  Tx,
+  type Token,
+  type Wallet,
+  type WalletInterface,
+} from "starkzap-native";
+import {
+  connectPrivacy,
   revokePrivacy,
   screeningVerdict,
-  Tx,
   waitForFundedBalance,
   type PrivacyClient,
   type PrivacyFeeQuote,
   type PrivacySendOptions,
   type ProvableAttempt,
-  type Token,
-  type Wallet,
-  type WalletInterface,
-} from "starkzap-native";
+} from "starkzap-native/privacy";
 import { paymasterProxyUrl, privacyConfig } from "@/core/config";
 import { feeOptions } from "@/core/settings";
 import { NETWORKS } from "@/core/network";
@@ -108,12 +111,13 @@ export function unavailableReason(
 /**
  * Narrow to a locally-signed wallet.
  *
- * `privacy()` is defined on `Wallet` but not on `WalletInterface`, because
- * `CartridgeWallet` cannot derive a viewing key. Testing for the method is the
- * runtime mirror of that compile-time gate.
+ * `getAccountProvider()` is defined on `Wallet` but not on `WalletInterface`,
+ * because it exposes the signer — which is what derives the viewing key, and what
+ * `CartridgeWallet` cannot provide. Testing for the method is the runtime mirror
+ * of that compile-time gate.
  */
 function localWallet(wallet: WalletInterface | null): Wallet | null {
-  return wallet && "privacy" in wallet ? (wallet as Wallet) : null;
+  return wallet && "getAccountProvider" in wallet ? (wallet as Wallet) : null;
 }
 
 /** Turn screening rejections into something a user can act on. */
@@ -220,12 +224,20 @@ export const useStrk20Store = create<Strk20Store>((set, get) => {
 
     connect: async () => {
       const wallet = localWallet(useWalletStore.getState().wallet);
-      if (!wallet) return;
+      const network = NETWORKS[
+        useWalletStore.getState().networkIndex
+      ].chainId.isSepolia()
+        ? "sepolia"
+        : "mainnet";
+      const config = privacyConfig(network, paymasterProxyUrl(network) || null);
+      // `unavailableReason` already tells the user when the config is missing;
+      // this guard is what narrows it for `connectPrivacy`.
+      if (!wallet || !config) return;
       set({ connecting: true, error: null });
       try {
-        // `wallet.privacy()` reads `privacy` from the SDK config and caches the
-        // client, so repeated calls are cheap.
-        const privacy = await wallet.privacy();
+        // Cached per wallet and revoked on `wallet.disconnect()`, so repeated
+        // calls are cheap and the viewing key does not outlive the session.
+        const privacy = await connectPrivacy(wallet, config);
         set({ client: privacy, fee: await privacy.quote() });
         await get().refresh();
       } catch (err) {

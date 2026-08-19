@@ -2,18 +2,21 @@ import { writable, derived, get } from "svelte/store";
 import {
   Amount,
   fromAddress,
+  Tx,
+  type Token,
+  type Wallet,
+  type WalletInterface,
+} from "starkzap";
+import {
+  connectPrivacy,
   revokePrivacy,
   screeningVerdict,
-  Tx,
   waitForFundedBalance,
   type PrivacyClient,
   type PrivacyFeeQuote,
   type PrivacySendOptions,
   type ProvableAttempt,
-  type Token,
-  type Wallet,
-  type WalletInterface,
-} from "starkzap";
+} from "starkzap/privacy";
 import { PRIVACY_CONFIG } from "~/lib/stores/config";
 import { tokens } from "~/lib/stores/tokens";
 import { walletState } from "~/lib/stores/wallet";
@@ -116,12 +119,13 @@ export const gasNote = derived([fee, tokens], ([$fee, $tokens]) => {
 /**
  * Narrow to a locally-signed wallet.
  *
- * `privacy()` is defined on `Wallet` but not on `WalletInterface`, because
- * `CartridgeWallet` cannot derive a viewing key. Testing for the method is the
- * runtime mirror of that compile-time gate.
+ * `getAccountProvider()` is defined on `Wallet` but not on `WalletInterface`,
+ * because it exposes the signer — which is what derives the viewing key, and what
+ * `CartridgeWallet` cannot provide. Testing for the method is the runtime mirror
+ * of that compile-time gate.
  */
 function localWallet(wallet: WalletInterface | null): Wallet | null {
-  return wallet && "privacy" in wallet ? (wallet as Wallet) : null;
+  return wallet && "getAccountProvider" in wallet ? (wallet as Wallet) : null;
 }
 
 /** Why the STRK20 tab cannot be used, or null when it can. */
@@ -157,13 +161,15 @@ export function clear(): void {
 /** Create the privacy client from the SDK config and load state. */
 export async function connect(): Promise<void> {
   const wallet = localWallet(get(walletState).wallet);
-  if (!wallet) return;
+  // `unavailableReason` already tells the user when the config is missing; this
+  // guard is what narrows it for `connectPrivacy`.
+  if (!wallet || !PRIVACY_CONFIG) return;
   connecting.set(true);
   error.set(null);
   try {
-    // `wallet.privacy()` reads `privacy` from the SDK config and caches the
-    // client, so repeated calls are cheap.
-    const privacy = await wallet.privacy();
+    // Cached per wallet and revoked on `wallet.disconnect()`, so repeated calls
+    // are cheap and the viewing key does not outlive the session.
+    const privacy = await connectPrivacy(wallet, PRIVACY_CONFIG);
     client.set(privacy);
     // Surfaced before the first send: the pool fee is a separate withdrawal the
     // paymaster requires, and `simulate` knows nothing about it.

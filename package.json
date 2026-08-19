@@ -23,6 +23,10 @@
       "types": "./dist/src/index.d.ts",
       "import": "./dist/src/index.js"
     },
+    "./privacy": {
+      "types": "./dist/src/privacy/index.d.ts",
+      "import": "./dist/src/privacy/index.js"
+    },
     "./cartridge": {
       "types": "./dist/src/cartridge.d.ts",
       "import": "./dist/src/cartridge.js"

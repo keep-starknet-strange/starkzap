@@ -1,3 +1,4 @@
+export { connectPrivacy } from "@/privacy/connect";
 export {
   createPrivacy,
   revokePrivacy,
