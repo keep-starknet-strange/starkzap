@@ -55,6 +55,11 @@ jobs:
       - name: Build
         run: npm run -s build
 
+      - name: Declaration leak check
+        run: npm run -s check:declarations
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Unit tests
         run: npm run -s test
 
