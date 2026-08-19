@@ -1,9 +1,4 @@
 import type { Call } from "starknet";
-import {
-  Account as TongoAccount,
-  pubKeyBase58ToAffine,
-} from "@fatsolutions/tongo-sdk";
-import type { ConfidentialProvider } from "@/confidential/interface";
 import type { Amount } from "@/types/amount";
 import type {
   ConfidentialConfig,
@@ -16,14 +11,62 @@ import type {
   ConfidentialRecipient,
 } from "@/confidential/types";
 
+export type TongoSdkModule = typeof import("@fatsolutions/tongo-sdk");
+
+/** The underlying `Account` class instance from the Tongo SDK. */
+export type TongoAccount = InstanceType<TongoSdkModule["Account"]>;
+
+let cachedTongoSdk: TongoSdkModule | undefined;
+let loadingTongoSdk: Promise<TongoSdkModule> | undefined;
+
 /**
- * Tongo implementation of the {@link ConfidentialProvider} interface.
+ * Lazily loads @fatsolutions/tongo-sdk and caches the module namespace object.
+ *
+ * The dependency is an optional peer dependency: it is only required when
+ * Tongo confidential transfers are actually used. This is the single place
+ * where the SDK's presence is checked at runtime.
+ */
+export async function loadTongoSdk(
+  feature = "Tongo confidential transfers"
+): Promise<TongoSdkModule> {
+  if (cachedTongoSdk) {
+    return cachedTongoSdk;
+  }
+
+  loadingTongoSdk ??= import("@fatsolutions/tongo-sdk")
+    .then((module) => {
+      cachedTongoSdk = module as unknown as TongoSdkModule;
+      return cachedTongoSdk;
+    })
+    .catch((error) => {
+      const detail =
+        error instanceof Error && error.message
+          ? ` Original error: ${error.message}`
+          : "";
+      throw new Error(
+        `[starkzap] ${feature} requires optional peer dependency "@fatsolutions/tongo-sdk". Install it with: npm i @fatsolutions/tongo-sdk.${detail}`
+      );
+    })
+    .finally(() => {
+      loadingTongoSdk = undefined;
+    });
+
+  return await loadingTongoSdk;
+}
+
+/**
+ * Confidential transfers backed by the Tongo protocol.
  *
  * Each instance is bound to a single Tongo private key and contract.
+ * Every operation returns plain `Call`s, so they batch with any other
+ * calls in a single transaction via {@link TxBuilder}.
  *
- * In addition to the standard {@link ConfidentialProvider} methods,
- * this class exposes Tongo-specific operations: {@link ragequit},
- * {@link rollover}, and direct access to the underlying Tongo account.
+ * This is one of two independent privacy integrations and is not
+ * interchangeable with the STRK20 privacy pool: Tongo keeps an encrypted
+ * *balance* per account and proves locally, while the privacy pool spends
+ * *notes* and needs a remote prover whose output rides on the transaction
+ * rather than inside a call. Pick whichever protocol you are integrating —
+ * there is no shared interface to code against.
  *
  * @example
  * ```ts
@@ -32,7 +75,7 @@ import type {
  * const sdk = new StarkZap({ network: "mainnet" });
  * const wallet = await sdk.connectWallet({ ... });
  *
- * const confidential = new TongoConfidential({
+ * const confidential = await TongoConfidential.create({
  *   privateKey: tongoPrivateKey,
  *   contractAddress: TONGO_CONTRACT,
  *   provider: wallet.getProvider(),
@@ -49,18 +92,35 @@ import type {
  * console.log(`Confidential balance: ${state.balance}`);
  * ```
  */
-export class TongoConfidential implements ConfidentialProvider {
+export class TongoConfidential {
   readonly id = "tongo";
+  private readonly sdk: TongoSdkModule;
   private readonly account: TongoAccount;
 
-  constructor(config: ConfidentialConfig) {
+  private constructor(sdk: TongoSdkModule, account: TongoAccount) {
+    this.sdk = sdk;
+    this.account = account;
+  }
+
+  /**
+   * Create a Tongo confidential account.
+   *
+   * Async because `@fatsolutions/tongo-sdk` is an optional peer dependency
+   * loaded on first use; if it is not installed this rejects with an install
+   * hint rather than breaking the `starkzap` import.
+   */
+  static async create(config: ConfidentialConfig): Promise<TongoConfidential> {
+    const sdk = await loadTongoSdk();
+
     // Cast needed: starkzap uses starknet v10 while tongo-sdk (1.5.0) uses v9.
     // The Provider types are runtime-compatible but differ in private fields.
-    this.account = new TongoAccount(
+    const account = new sdk.Account(
       config.privateKey,
       config.contractAddress,
       config.provider as never
     );
+
+    return new TongoConfidential(sdk, account);
   }
 
   /** The Tongo address (base58-encoded public key) for this account. */
@@ -78,7 +138,7 @@ export class TongoConfidential implements ConfidentialProvider {
    * {@link address}) into the `{ x, y }` recipient used by {@link transfer}.
    */
   recipientFromAddress(address: string): ConfidentialRecipient {
-    return pubKeyBase58ToAffine(address.trim());
+    return this.sdk.pubKeyBase58ToAffine(address.trim());
   }
 
   /**

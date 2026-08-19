@@ -1,39 +1,26 @@
 import { create } from "zustand";
 import {
   Amount,
+  TongoConfidential,
   fromAddress,
-  type ConfidentialProvider,
   type ConfidentialRecipient,
-  type ConfidentialRolloverDetails,
 } from "starkzap-native";
-import type { Call, RpcProvider } from "starknet";
+import type { RpcProvider } from "starknet";
 import { useWalletStore } from "@/core/wallet/store";
 import { useTxBannerStore } from "@/core/tx-banner/store";
-import {
-  PRIVACY_PROVIDERS,
-  type PrivacyProviderDef,
-  type PrivacyToken,
-} from "./providers";
+import { privacyTokens, type PrivacyToken } from "./tokens";
 
-// rollover is a Tongo extra, not part of the base ConfidentialProvider — treat
-// it as an optional capability so other providers (e.g. STRK20) can omit it.
-type MaybeRollover = {
-  rollover?: (details: ConfidentialRolloverDetails) => Promise<Call[]>;
-};
-
-// Mints a confidential provider for a token; created at login so it can close
+// Mints a confidential account for a token; created at login so it can close
 // over the private key without the store ever holding it as plain state.
 type Make = (
-  def: PrivacyProviderDef,
   token: PrivacyToken,
   rpc: RpcProvider
-) => ConfidentialProvider;
+) => Promise<TongoConfidential>;
 
 interface PrivacyStore {
   make: Make | null; // null unless logged in with a private key
-  providerId: string;
   tokenSymbol: string;
-  instance: ConfidentialProvider | null;
+  instance: TongoConfidential | null;
   token: PrivacyToken | null;
   connecting: boolean;
   busy: boolean;
@@ -45,7 +32,6 @@ interface PrivacyStore {
 
   init: (privateKey: string) => void;
   clear: () => void;
-  setProvider: (id: string) => void;
   setToken: (symbol: string) => void;
   connect: () => Promise<void>;
   refresh: () => Promise<void>;
@@ -67,7 +53,6 @@ const CLEARED = {
 
 export const usePrivacyStore = create<PrivacyStore>((set, get) => ({
   make: null,
-  providerId: PRIVACY_PROVIDERS[0]?.id ?? "tongo",
   tokenSymbol: "",
   ...CLEARED,
   connecting: false,
@@ -75,24 +60,26 @@ export const usePrivacyStore = create<PrivacyStore>((set, get) => ({
 
   init: (privateKey) =>
     set({
-      make: (def, token, rpc) =>
-        def.create({ token, privateKey, provider: rpc }),
+      make: (token, rpc) =>
+        TongoConfidential.create({
+          privateKey,
+          contractAddress: fromAddress(token.contractAddress),
+          provider: rpc,
+        }),
     }),
   clear: () => set({ make: null, tokenSymbol: "", ...CLEARED }),
-  setProvider: (id) => set({ providerId: id, ...CLEARED }),
   setToken: (symbol) => set({ tokenSymbol: symbol, ...CLEARED }),
 
   connect: async () => {
     const { wallet, networkIndex } = useWalletStore.getState();
-    const { make, providerId, tokenSymbol } = get();
-    const def = PRIVACY_PROVIDERS.find((p) => p.id === providerId);
-    const token = def
-      ?.tokensForNetwork(networkIndex)
-      .find((t) => t.symbol === tokenSymbol);
-    if (!wallet || !make || !def || !token) return;
+    const { make, tokenSymbol } = get();
+    const token = privacyTokens(networkIndex).find(
+      (t) => t.symbol === tokenSymbol
+    );
+    if (!wallet || !make || !token) return;
     set({ connecting: true, error: null });
     try {
-      const instance = make(def, token, wallet.getProvider());
+      const instance = await make(token, wallet.getProvider());
       set({
         instance,
         token,
@@ -184,15 +171,13 @@ export const usePrivacyStore = create<PrivacyStore>((set, get) => ({
   },
   rollover: async () => {
     const { wallet } = useWalletStore.getState();
-    const roller = get().instance as
-      | (ConfidentialProvider & MaybeRollover)
-      | null;
-    if (!wallet || !roller?.rollover) return;
+    const roller = get().instance;
+    if (!wallet || !roller) return;
     set({ busy: true });
     const tx = await useTxBannerStore
       .getState()
       .notify("Rollover", async () => {
-        const calls = await roller.rollover!({ sender: wallet.address });
+        const calls = await roller.rollover({ sender: wallet.address });
         return wallet.execute(calls);
       });
     set({ busy: false });

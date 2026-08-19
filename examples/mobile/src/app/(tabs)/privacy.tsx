@@ -6,14 +6,13 @@ import { Amount } from "starkzap-native";
 import { Screen, Card, Text, Button, TextField, Select } from "@/ui";
 import { useWalletStore } from "@/core/wallet/store";
 import { usePrivacyStore } from "@/features/privacy/store";
-import { PRIVACY_PROVIDERS } from "@/features/privacy/providers";
+import { privacyTokens } from "@/features/privacy/tokens";
 
 export default function PrivacyTab() {
   const wallet = useWalletStore((s) => s.wallet);
   const networkIndex = useWalletStore((s) => s.networkIndex);
   const {
     make,
-    providerId,
     tokenSymbol,
     instance,
     token,
@@ -39,8 +38,7 @@ export default function PrivacyTab() {
 
   if (!wallet) return <Redirect href="/" />;
 
-  const def = PRIVACY_PROVIDERS.find((p) => p.id === providerId);
-  const tokenOptions = (def?.tokensForNetwork(networkIndex) ?? []).map((t) => ({
+  const tokenOptions = privacyTokens(networkIndex).map((t) => ({
     label: t.symbol,
     value: t.symbol,
   }));
@@ -71,7 +69,7 @@ export default function PrivacyTab() {
       refreshing={false}
     >
       <Card>
-        <Text variant="label">Provider · {def?.label ?? providerId}</Text>
+        <Text variant="label">Provider · Tongo</Text>
         <Text variant="label">Token</Text>
         <Select
           title="Select a token"

@@ -20,7 +20,7 @@ import type {
   Token,
 } from "@/types";
 import type {
-  ConfidentialProvider,
+  TongoConfidential,
   ConfidentialFundDetails,
   ConfidentialTransferDetails,
   ConfidentialWithdrawDetails,
@@ -512,7 +512,7 @@ export class TxBuilder {
    * The provider returns all necessary calls (including ERC20 approve
    * when required), so no manual approve step is needed.
    *
-   * @param confidential - A {@link ConfidentialProvider} instance
+   * @param confidential - A {@link TongoConfidential} instance
    * @param details - Fund parameters (amount, sender)
    * @returns this (for chaining)
    *
@@ -524,7 +524,7 @@ export class TxBuilder {
    * ```
    */
   confidentialFund(
-    confidential: ConfidentialProvider,
+    confidential: TongoConfidential,
     details: ConfidentialFundDetails
   ): this {
     this.queueAsyncCalls(confidential.fund(details));
@@ -536,7 +536,7 @@ export class TxBuilder {
    *
    * Generates ZK proofs for the confidential transfer.
    *
-   * @param confidential - A {@link ConfidentialProvider} instance
+   * @param confidential - A {@link TongoConfidential} instance
    * @param details - Transfer parameters (amount, recipient pubkey, sender)
    * @returns this (for chaining)
    *
@@ -552,7 +552,7 @@ export class TxBuilder {
    * ```
    */
   confidentialTransfer(
-    confidential: ConfidentialProvider,
+    confidential: TongoConfidential,
     details: ConfidentialTransferDetails
   ): this {
     this.queueAsyncCalls(confidential.transfer(details));
@@ -562,7 +562,7 @@ export class TxBuilder {
   /**
    * Withdraw from a confidential account to a public address.
    *
-   * @param confidential - A {@link ConfidentialProvider} instance
+   * @param confidential - A {@link TongoConfidential} instance
    * @param details - Withdraw parameters (amount, recipient, sender)
    * @returns this (for chaining)
    *
@@ -578,7 +578,7 @@ export class TxBuilder {
    * ```
    */
   confidentialWithdraw(
-    confidential: ConfidentialProvider,
+    confidential: TongoConfidential,
     details: ConfidentialWithdrawDetails
   ): this {
     this.queueAsyncCalls(confidential.withdraw(details));

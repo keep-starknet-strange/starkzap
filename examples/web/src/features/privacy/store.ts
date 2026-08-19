@@ -2,38 +2,25 @@ import { writable, get } from "svelte/store";
 import {
   Amount,
   fromAddress,
-  type ConfidentialProvider,
+  TongoConfidential,
   type ConfidentialRecipient,
-  type ConfidentialRolloverDetails,
 } from "starkzap";
 import type { Call, RpcProvider } from "starknet";
 import { walletState } from "~/lib/stores/wallet";
 import { log } from "~/lib/stores/logger";
-import {
-  PRIVACY_PROVIDERS,
-  type PrivacyProviderDef,
-  type PrivacyToken,
-} from "./providers";
+import { privacyTokens, type PrivacyToken } from "./tokens";
 
-// rollover is a Tongo extra, not part of the base ConfidentialProvider — treat
-// it as an optional capability so other providers (e.g. STRK20) can omit it.
-type MaybeRollover = {
-  rollover?: (details: ConfidentialRolloverDetails) => Promise<Call[]>;
-};
-
-// Mints a confidential provider for a token; set at login so it closes over the
+// Mints a confidential account for a token; set at login so it closes over the
 // private key without the store ever holding it as plain state.
 type Make = (
-  def: PrivacyProviderDef,
   token: PrivacyToken,
   rpc: RpcProvider
-) => ConfidentialProvider;
+) => Promise<TongoConfidential>;
 
 let make: Make | null = null; // null unless logged in with a private key
 
-export const providerId = writable(PRIVACY_PROVIDERS[0]?.id ?? "tongo");
 export const tokenSymbol = writable("");
-export const instance = writable<ConfidentialProvider | null>(null);
+export const instance = writable<TongoConfidential | null>(null);
 export const token = writable<PrivacyToken | null>(null);
 export const connecting = writable(false);
 export const busy = writable(false);
@@ -57,18 +44,20 @@ function reset() {
 
 // Called from the wallet store on private-key connect.
 export function init(privateKey: string): void {
-  make = (def, tok, rpc) =>
-    def.create({ token: tok, privateKey, provider: rpc });
+  make = (tok, rpc) =>
+    TongoConfidential.create({
+      privateKey,
+      contractAddress: fromAddress(tok.contractAddress),
+      // The monorepo resolves two identical `starknet` copies (one nested
+      // under @cartridge/controller); bridge the nominal mismatch.
+      provider: rpc as never,
+    });
   enabled.set(true);
 }
 export function clear(): void {
   make = null;
   enabled.set(false);
   tokenSymbol.set("");
-  reset();
-}
-export function setProvider(id: string) {
-  providerId.set(id);
   reset();
 }
 export function setToken(symbol: string) {
@@ -78,14 +67,16 @@ export function setToken(symbol: string) {
 
 export async function connect(): Promise<void> {
   const { wallet } = get(walletState);
-  const def = PRIVACY_PROVIDERS.find((p) => p.id === get(providerId));
-  const tok = def?.tokens().find((t) => t.symbol === get(tokenSymbol));
-  if (!wallet || !make || !def || !tok) return;
+  const tok = privacyTokens().find((t) => t.symbol === get(tokenSymbol));
+  if (!wallet || !make || !tok) return;
   connecting.set(true);
   error.set(null);
   try {
     // Dual `starknet` copies in the monorepo — same runtime type.
-    const inst = make(def, tok, wallet.getProvider() as unknown as RpcProvider);
+    const inst = await make(
+      tok,
+      wallet.getProvider() as unknown as RpcProvider
+    );
     instance.set(inst);
     token.set(tok);
     address.set(inst.address);
@@ -181,9 +172,9 @@ export function transfer(amount: string, toAddress: string): Promise<void> {
 }
 
 export function rollover(): Promise<void> {
-  const roller = get(instance) as (ConfidentialProvider & MaybeRollover) | null;
-  if (!roller?.rollover) return Promise.resolve();
+  const roller = get(instance);
+  if (!roller) return Promise.resolve();
   return run("Rollover", (_tok, wallet) =>
-    roller.rollover!({ sender: wallet.address })
+    roller.rollover({ sender: wallet.address })
   );
 }

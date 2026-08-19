@@ -21,6 +21,7 @@ const {
   rolloverCall,
   mockTongoAccount,
   MockAccount,
+  MockPubKeyBase58ToAffine,
 } = vi.hoisted(() => {
   const approveCall: Call = {
     contractAddress: "0xTOKEN",
@@ -75,6 +76,8 @@ const {
     return mockTongoAccount;
   });
 
+  const MockPubKeyBase58ToAffine = vi.fn().mockReturnValue({ x: 7n, y: 8n });
+
   return {
     approveCall,
     fundCall,
@@ -84,17 +87,19 @@ const {
     rolloverCall,
     mockTongoAccount,
     MockAccount,
+    MockPubKeyBase58ToAffine,
   };
 });
 
 vi.mock("@fatsolutions/tongo-sdk", () => ({
   Account: MockAccount,
+  pubKeyBase58ToAffine: MockPubKeyBase58ToAffine,
 }));
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
-function createConfidential(): TongoConfidential {
-  return new TongoConfidential({
+function createConfidential(): Promise<TongoConfidential> {
+  return TongoConfidential.create({
     privateKey: 123n,
     contractAddress: "0xTONGO" as never,
     provider: {} as never,
@@ -104,32 +109,47 @@ function createConfidential(): TongoConfidential {
 // ─── Tests ──────────────────────────────────────────────────────────────────
 
 describe("TongoConfidential", () => {
-  describe("constructor", () => {
-    it("should create a TongoAccount with the provided config", () => {
-      const c = createConfidential();
+  describe("create", () => {
+    it("should create a TongoAccount with the provided config", async () => {
+      const c = await createConfidential();
       expect(MockAccount).toHaveBeenCalledWith(123n, "0xTONGO", {});
       expect(c).toBeDefined();
     });
   });
 
   describe("address", () => {
-    it("should delegate to account.tongoAddress()", () => {
-      const c = createConfidential();
+    it("should delegate to account.tongoAddress()", async () => {
+      const c = await createConfidential();
       expect(c.address).toBe("mockBase58Address");
       expect(mockTongoAccount.tongoAddress).toHaveBeenCalled();
     });
   });
 
   describe("recipientId", () => {
-    it("should return the account public key", () => {
-      const c = createConfidential();
+    it("should return the account public key", async () => {
+      const c = await createConfidential();
       expect(c.recipientId).toEqual({ x: 42n, y: 99n });
+    });
+  });
+
+  describe("recipientFromAddress", () => {
+    it("should trim the address before decoding it", async () => {
+      // Addresses arrive pasted, and base58 decoding does not tolerate
+      // surrounding whitespace. The decoder is reached through the lazily
+      // loaded module held on the instance, so this covers that route too.
+      const c = await createConfidential();
+
+      expect(c.recipientFromAddress("  encoded-address  ")).toEqual({
+        x: 7n,
+        y: 8n,
+      });
+      expect(MockPubKeyBase58ToAffine).toHaveBeenCalledWith("encoded-address");
     });
   });
 
   describe("getState", () => {
     it("should return decrypted state", async () => {
-      const c = createConfidential();
+      const c = await createConfidential();
       const state = await c.getState();
       expect(state).toEqual({ balance: 100n, pending: 23n, nonce: 1n });
       expect(mockTongoAccount.state).toHaveBeenCalled();
@@ -138,7 +158,7 @@ describe("TongoConfidential", () => {
 
   describe("getNonce", () => {
     it("should return the account nonce", async () => {
-      const c = createConfidential();
+      const c = await createConfidential();
       const nonce = await c.getNonce();
       expect(nonce).toBe(1n);
       expect(mockTongoAccount.nonce).toHaveBeenCalled();
@@ -147,7 +167,7 @@ describe("TongoConfidential", () => {
 
   describe("toConfidentialUnits", () => {
     it("should convert erc20 amount to confidential units", async () => {
-      const c = createConfidential();
+      const c = await createConfidential();
       const result = await c.toConfidentialUnits(Amount.fromRaw(1000n, 0));
       expect(result).toBe(200n);
       expect(mockTongoAccount.erc20ToTongo).toHaveBeenCalledWith(1000n);
@@ -156,7 +176,7 @@ describe("TongoConfidential", () => {
 
   describe("toPublicUnits", () => {
     it("should convert confidential units to erc20 amount", async () => {
-      const c = createConfidential();
+      const c = await createConfidential();
       const result = await c.toPublicUnits(100n);
       expect(result).toBe(50n);
       expect(mockTongoAccount.tongoToErc20).toHaveBeenCalledWith(100n);
@@ -165,7 +185,7 @@ describe("TongoConfidential", () => {
 
   describe("fund", () => {
     it("should return approve + fund calls from tongo account", async () => {
-      const c = createConfidential();
+      const c = await createConfidential();
       const details: ConfidentialFundDetails = {
         amount: Amount.fromRaw(100n, 0),
         sender: "0xSENDER" as never,
@@ -185,7 +205,7 @@ describe("TongoConfidential", () => {
         approve: undefined,
         toCalldata: () => fundCall,
       });
-      const c = createConfidential();
+      const c = await createConfidential();
       const calls = await c.fund({
         amount: Amount.fromRaw(100n, 0),
         sender: "0xSENDER" as never,
@@ -195,7 +215,7 @@ describe("TongoConfidential", () => {
 
     it("should pass fee_to_sender when feeTo is set", async () => {
       mockTongoAccount.fund.mockClear();
-      const c = createConfidential();
+      const c = await createConfidential();
       const details: ConfidentialFundDetails = {
         amount: Amount.fromRaw(100n, 0),
         sender: "0xSENDER" as never,
@@ -211,7 +231,7 @@ describe("TongoConfidential", () => {
 
     it("should omit fee_to_sender when feeTo is undefined", async () => {
       mockTongoAccount.fund.mockClear();
-      const c = createConfidential();
+      const c = await createConfidential();
       await c.fund({
         amount: Amount.fromRaw(100n, 0),
         sender: "0xSENDER" as never,
@@ -224,7 +244,7 @@ describe("TongoConfidential", () => {
   describe("transfer", () => {
     it("should return transfer call with recipient pubkey", async () => {
       mockTongoAccount.transfer.mockClear();
-      const c = createConfidential();
+      const c = await createConfidential();
       const details: ConfidentialTransferDetails = {
         amount: Amount.fromRaw(50n, 0),
         to: { x: 1n, y: 2n },
@@ -243,7 +263,7 @@ describe("TongoConfidential", () => {
 
     it("should pass fee_to_sender when feeTo is set", async () => {
       mockTongoAccount.transfer.mockClear();
-      const c = createConfidential();
+      const c = await createConfidential();
       await c.transfer({
         amount: Amount.fromRaw(50n, 0),
         to: { x: 1n, y: 2n },
@@ -262,7 +282,7 @@ describe("TongoConfidential", () => {
   describe("withdraw", () => {
     it("should return withdraw call", async () => {
       mockTongoAccount.withdraw.mockClear();
-      const c = createConfidential();
+      const c = await createConfidential();
       const details: ConfidentialWithdrawDetails = {
         amount: Amount.fromRaw(25n, 0),
         to: "0xRECIPIENT" as never,
@@ -281,7 +301,7 @@ describe("TongoConfidential", () => {
 
     it("should pass fee_to_sender when feeTo is set", async () => {
       mockTongoAccount.withdraw.mockClear();
-      const c = createConfidential();
+      const c = await createConfidential();
       await c.withdraw({
         amount: Amount.fromRaw(25n, 0),
         to: "0xRECIPIENT" as never,
@@ -300,7 +320,7 @@ describe("TongoConfidential", () => {
   describe("ragequit", () => {
     it("should return ragequit call", async () => {
       mockTongoAccount.ragequit.mockClear();
-      const c = createConfidential();
+      const c = await createConfidential();
       const details: ConfidentialRagequitDetails = {
         to: "0xRECIPIENT" as never,
         sender: "0xSENDER" as never,
@@ -315,7 +335,7 @@ describe("TongoConfidential", () => {
 
     it("should pass fee_to_sender when feeTo is set", async () => {
       mockTongoAccount.ragequit.mockClear();
-      const c = createConfidential();
+      const c = await createConfidential();
       await c.ragequit({
         to: "0xRECIPIENT" as never,
         sender: "0xSENDER" as never,
@@ -332,7 +352,7 @@ describe("TongoConfidential", () => {
   describe("rollover", () => {
     it("should return rollover call", async () => {
       mockTongoAccount.rollover.mockClear();
-      const c = createConfidential();
+      const c = await createConfidential();
       const details: ConfidentialRolloverDetails = {
         sender: "0xSENDER" as never,
       };
@@ -345,8 +365,8 @@ describe("TongoConfidential", () => {
   });
 
   describe("getTongoAccount", () => {
-    it("should return the underlying tongo account", () => {
-      const c = createConfidential();
+    it("should return the underlying tongo account", async () => {
+      const c = await createConfidential();
       expect(c.getTongoAccount()).toBe(mockTongoAccount);
     });
   });
