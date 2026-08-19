@@ -7,9 +7,8 @@ import {
   DevnetPreset,
   fromAddress,
   type AccountClassConfig,
-  type PrivacyConfig,
-  type PrivacyFeeMode,
 } from "starkzap";
+import { type PrivacyConfig, type PrivacyFeeMode } from "starkzap/privacy";
 
 // App-level configuration: network resolution + env-derived endpoints.
 // Ported from the old main.ts config section (unchanged behavior).

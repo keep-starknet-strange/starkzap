@@ -38,10 +38,7 @@ import {
   paymasterDetails,
   preflightTransaction,
 } from "@/wallet/utils";
-import { createPrivacy, revokePrivacy } from "@/privacy/create";
-import { withPaymaster, type PrivacyClient } from "@/privacy/client";
 import { PROOF_BASE_BLOCK_DEPTH } from "@/privacy/sequencing";
-import type { PrivacyConfig } from "@/privacy/create";
 import type { WalletInterface } from "@/wallet/interface";
 import { BaseWallet } from "@/wallet/base";
 import {
@@ -132,8 +129,20 @@ export class Wallet extends BaseWallet {
   private readonly explorerConfig: ExplorerConfig | undefined;
   private readonly defaultFeeMode: FeeMode;
   private readonly defaultTimeBounds: PaymasterTimeBounds | undefined;
-  private readonly privacyConfig: PrivacyConfig | undefined;
-  private privacyClient: Promise<PrivacyClient> | null = null;
+  /**
+   * Privacy pool this wallet's proofs are checked against, when one is known.
+   *
+   * The address alone rather than the privacy config: it is read to look up the
+   * pool's proof validity window in {@link Wallet.execute}, and naming no privacy
+   * type is what keeps the optional privacy SDK out of this class's declaration.
+   * Set by `connectPrivacy` from `starkzap/privacy`.
+   */
+  private privacyPoolAddress: Address | undefined;
+  /**
+   * Teardown for capabilities that hold key material derived from this wallet's
+   * signer. Run by {@link Wallet.disconnect}.
+   */
+  private readonly revocable: Array<() => unknown> = [];
   private deployedCache: boolean | null = null;
   private deployedCacheExpiresAt = 0;
   private sponsoredDeployLock: Promise<void> | null = null;
@@ -147,7 +156,6 @@ export class Wallet extends BaseWallet {
     explorerConfig?: ExplorerConfig;
     defaultFeeMode: FeeMode;
     defaultTimeBounds?: PaymasterTimeBounds;
-    privacyConfig?: PrivacyConfig | undefined;
     stakingConfig: StakingConfig | undefined;
     bridgingConfig?: BridgingConfig | undefined;
     logging?: LoggerConfig;
@@ -165,7 +173,6 @@ export class Wallet extends BaseWallet {
     this.explorerConfig = options.explorerConfig;
     this.defaultFeeMode = options.defaultFeeMode;
     this.defaultTimeBounds = options.defaultTimeBounds;
-    this.privacyConfig = options.privacyConfig;
   }
 
   /**
@@ -240,7 +247,6 @@ export class Wallet extends BaseWallet {
       ...(config.explorer && { explorerConfig: config.explorer }),
       defaultFeeMode: feeMode,
       ...(timeBounds && { defaultTimeBounds: timeBounds }),
-      ...(config.privacy && { privacyConfig: config.privacy }),
       stakingConfig: options.config.staking,
       bridgingConfig: options.config.bridging,
       ...(config.logging && { logging: config.logging }),
@@ -516,7 +522,7 @@ export class Wallet extends BaseWallet {
         options.proof,
         this.provider,
         PROOF_BASE_BLOCK_DEPTH,
-        this.privacyConfig?.poolContractAddress
+        this.privacyPoolAddress
       );
     }
 
@@ -644,98 +650,30 @@ export class Wallet extends BaseWallet {
   }
 
   /**
-   * Privacy pool client for this wallet, configured from `privacy` in the
-   * SDK config.
+   * Register teardown to run when this wallet disconnects.
    *
-   * Returns a client that owns the pool fee, the proving block and submission —
-   * see {@link PrivacyClient}. Submission goes through the paymaster's relayer,
-   * so the account never appears on-chain; self-submitting would defeat the
-   * point. For the privacy SDK's own client, use `createPrivacy` directly, or
-   * read {@link PrivacyClient.transfers}.
+   * For capabilities built from this wallet's signer, which is what
+   * `connectPrivacy` in `starkzap/privacy` uses: a viewing key derived from the
+   * signer must not outlive the session that authorised it, and only this class
+   * knows when that session ends.
    *
-   * @returns A paymaster-bound privacy client
-   * @throws If `privacy` is missing from the SDK config, or omits `paymaster`
-   *
-   * @example
-   * ```ts
-   * const sdk = new StarkZap({
-   *   network: "mainnet",
-   *   privacy: {
-   *     poolContractAddress: POOL,
-   *     prover: PROVER,
-   *     discovery: DISCOVERY,
-   *     paymaster: {
-   *       url: "https://my-app.example.com/api/paymaster",
-   *       fee: { mode: "sponsored" },
-   *     },
-   *   },
-   * });
-   * const wallet = await sdk.connectWallet({ account: { signer } });
-   *
-   * const privacy = await wallet.privacy();
-   * const { transactionHash } = await privacy.send((b) =>
-   *   b.with(STRK, (t) => t.deposit({ amount })).surplusTo(wallet.address)
-   * );
-   * ```
+   * @param teardown - Run once on {@link Wallet.disconnect}. Awaited, and a
+   *   rejection is swallowed so one capability cannot fail the disconnect.
    */
-  async privacy(): Promise<PrivacyClient> {
-    const config = this.privacyConfig;
-    if (!config) {
-      throw new Error(
-        "[starkzap] wallet.privacy() requires 'privacy' in the SDK config. " +
-          "Add it to StarkZap({ privacy: { poolContractAddress, prover, discovery, " +
-          "paymaster: { url, fee } } }), or call createPrivacy(wallet, config) " +
-          "directly."
-      );
-    }
-
-    this.privacyClient ??= this.createPrivacyClient(config).catch(
-      (error: unknown) => {
-        // Don't cache a failure — a missing dependency or an unreachable
-        // service should be retryable once fixed.
-        this.privacyClient = null;
-        throw error;
-      }
-    );
-
-    return this.privacyClient;
+  addRevocable(teardown: () => unknown): void {
+    this.revocable.push(teardown);
   }
 
-  /** Bind a privacy SDK client to the configured paymaster. */
-  private async createPrivacyClient(
-    config: PrivacyConfig
-  ): Promise<PrivacyClient> {
-    // One check, not two: `PrivacyPaymasterConfig` carries the endpoint and the
-    // fee mode together, so there is no half-configured state to reject. The
-    // fee mode is never defaulted — `default` needs no API key but its
-    // withdrawal takes the suggested *maximum* gas rather than the estimate, so
-    // choosing it unasked would overcharge on the user's behalf.
-    if (!config.paymaster) {
-      throw new Error(
-        "[starkzap] Privacy transactions are submitted by a paymaster's relayer, " +
-          "so `privacy.paymaster` is required. Use `{ url, fee: { mode: " +
-          '"sponsored" } }` (relayer pays gas, pool fee in STRK — needs an API ' +
-          "key, so point `url` at a proxy holding it), or `{ url, fee: { mode: " +
-          '"default", gasToken } }` (no key, but the withdrawal takes the full ' +
-          "suggested-max gas rather than refunding the unused part)."
-      );
-    }
-
-    const transfers = await createPrivacy(this, config);
-
-    return withPaymaster(transfers, {
-      ...config.paymaster,
-      poolContractAddress: config.poolContractAddress,
-      provider: this.provider,
-      chainId: this.chainId,
-      // Only for `send({ invoke })`, which relays public calls alongside the
-      // private transaction. The private path never signs: the proof authorises
-      // it, which is what keeps this account off-chain.
-      account: {
-        address: this.address,
-        signTypedData: (typedData) => this.signMessage(typedData),
-      },
-    });
+  /**
+   * Privacy pool whose proof validity window {@link Wallet.execute} reads.
+   *
+   * Set by `connectPrivacy`. Without it the freshness check falls back to a
+   * built-in window rather than the pool's own.
+   *
+   * @param poolContractAddress - The pool this wallet's proofs are built against
+   */
+  setPrivacyPool(poolContractAddress: Address): void {
+    this.privacyPoolAddress = poolContractAddress;
   }
 
   /**
@@ -757,18 +695,23 @@ export class Wallet extends BaseWallet {
     await super.disconnect();
     this.clearDeploymentCache();
 
-    // Revoked, not merely forgotten. Dropping the cache would leave the viewing
-    // key alive inside any client the caller still holds — and the key outliving
-    // the session that authorised it is the thing to prevent. Revoking cuts the
-    // key off at its source, and since the SDK asks for it on every operation
-    // rather than caching it, that ends every client built from this one.
-    const client = this.privacyClient;
-    this.privacyClient = null;
-    await client?.then(
-      (privacy) => revokePrivacy(privacy.transfers),
-      // Creation failed, so there is no key to revoke. Swallowed rather than
-      // rethrown: a failed client must not make disconnecting fail.
-      () => undefined
+    // Revoked, not merely forgotten. A privacy client holds a viewing key
+    // derived from this wallet's signer, and dropping the reference would leave
+    // that key alive inside any client the caller still holds. Revoking cuts it
+    // off at the source, which ends every client built from this wallet.
+    //
+    // Rejections are swallowed: one capability failing to tear down must not
+    // make disconnecting fail, and a client that never finished being built has
+    // no key to revoke.
+    const pending = this.revocable.splice(0);
+    await Promise.all(
+      pending.map(async (teardown) => {
+        try {
+          await teardown();
+        } catch {
+          // Nothing to do — see above.
+        }
+      })
     );
   }
 }

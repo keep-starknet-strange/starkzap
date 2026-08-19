@@ -6,7 +6,6 @@ import {
 } from "starknet";
 import type { NetworkPreset, NetworkName } from "@/network";
 import type { LoggerConfig } from "@/logger";
-import type { PrivacyConfig } from "@/privacy/create";
 import type { Address } from "@/types";
 
 /** Supported Starknet chain identifiers */
@@ -262,17 +261,6 @@ export interface SDKConfig {
    * @see {@link BridgingConfig}
    */
   bridging?: BridgingConfig;
-
-  /**
-   * Optional: configuration for the STRK20 privacy pool.
-   *
-   * Supplying it enables the `wallet.privacy()` shortcut on locally-signed
-   * wallets. Without it, privacy operations require calling `createPrivacy()`
-   * with an explicit config.
-   *
-   * @see {@link PrivacyConfig}
-   */
-  privacy?: PrivacyConfig;
 
   /**
    * Optional logging configuration for SDK diagnostics.

@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeAll, vi } from "vitest";
+import { connectPrivacy } from "@/privacy/connect";
 import type { constants } from "starknet";
 import { StarkZap } from "@/sdk";
 import { StarkSigner } from "@/signer";
@@ -575,28 +576,15 @@ describe("Wallet", () => {
       },
     };
 
-    it("should explain itself when the SDK config omits privacy", async () => {
-      const signer = new StarkSigner(testPrivateKeys.key1);
-      const wallet = await sdk.connectWallet({ account: { signer } });
-
-      await expect(wallet.privacy()).rejects.toThrow(
-        "requires 'privacy' in the SDK config"
-      );
-    });
-
     it("should require a paymaster config to submit", async () => {
       // Not defaulted on purpose: `default` mode needs no API key but its
       // withdrawal takes the suggested-max gas rather than the estimate, so
       // choosing it silently would overcharge.
       const { paymaster: _paymaster, ...incomplete } = privacyConfig;
-      const partialSdk = new StarkZap({ ...config, privacy: incomplete });
-      vi.spyOn(partialSdk.getProvider(), "getChainId").mockResolvedValue(
-        config.chainId!.toFelt252() as constants.StarknetChainId
-      );
       const signer = new StarkSigner(testPrivateKeys.key1);
-      const wallet = await partialSdk.connectWallet({ account: { signer } });
+      const wallet = await sdk.connectWallet({ account: { signer } });
 
-      await expect(wallet.privacy()).rejects.toThrow(
+      await expect(connectPrivacy(wallet, incomplete)).rejects.toThrow(
         "`privacy.paymaster` is required"
       );
     });
@@ -604,7 +592,7 @@ describe("Wallet", () => {
     it("cannot be handed half a paymaster config", () => {
       // Pairing the endpoint with the fee mode moved this from a runtime throw
       // to the type: an endpoint without a fee mode does not compile, so there
-      // is no half-configured state left for wallet.privacy() to reject.
+      // is no half-configured state left for `connectPrivacy` to reject.
       //
       // `@ts-expect-error` is the assertion — it fails the typecheck if the
       // expression below ever becomes valid, i.e. if the pairing is loosened.
@@ -619,38 +607,30 @@ describe("Wallet", () => {
       expect(halfConfigured.paymaster?.url).toBeDefined();
     });
 
-    it("should build the client from the SDK config and reuse it", async () => {
-      const privacySdk = new StarkZap({ ...config, privacy: privacyConfig });
-      vi.spyOn(privacySdk.getProvider(), "getChainId").mockResolvedValue(
-        config.chainId!.toFelt252() as constants.StarknetChainId
-      );
+    it("should cache the client per wallet and drop it on disconnect", async () => {
       const signer = new StarkSigner(testPrivateKeys.key1);
-      const wallet = await privacySdk.connectWallet({ account: { signer } });
+      const wallet = await sdk.connectWallet({ account: { signer } });
 
-      const first = await wallet.privacy();
+      const first = await connectPrivacy(wallet, privacyConfig);
 
       // One client means one PrivateRegistry: two clients for the same wallet
       // and pool would hold note/channel state that silently drifts apart.
-      expect(await wallet.privacy()).toBe(first);
+      expect(await connectPrivacy(wallet, privacyConfig)).toBe(first);
 
       // A disconnect ends the session that authorised the viewing key, so the
       // client derived from it must not survive.
       await wallet.disconnect();
-      expect(await wallet.privacy()).not.toBe(first);
+      expect(await connectPrivacy(wallet, privacyConfig)).not.toBe(first);
     });
 
     it("should revoke the viewing key on disconnect, not just forget it", async () => {
       // Clearing the cache alone would leave the key alive inside the client the
       // caller is still holding — which is the thing that must not outlive the
       // session. So the old client has to refuse, not merely be replaced.
-      const privacySdk = new StarkZap({ ...config, privacy: privacyConfig });
-      vi.spyOn(privacySdk.getProvider(), "getChainId").mockResolvedValue(
-        config.chainId!.toFelt252() as constants.StarknetChainId
-      );
       const signer = new StarkSigner(testPrivateKeys.key1);
-      const wallet = await privacySdk.connectWallet({ account: { signer } });
+      const wallet = await sdk.connectWallet({ account: { signer } });
 
-      const stale = await wallet.privacy();
+      const stale = await connectPrivacy(wallet, privacyConfig);
       await wallet.disconnect();
 
       await expect(stale.discoverNotes()).rejects.toThrow(

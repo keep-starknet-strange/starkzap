@@ -1,9 +1,9 @@
 import Constants, { ExecutionEnvironment } from "expo-constants";
+import { fromAddress } from "starkzap-native";
 import {
-  fromAddress,
   type PrivacyConfig,
   type PrivacyFeeMode,
-} from "starkzap-native";
+} from "starkzap-native/privacy";
 
 // Public env vars (Expo inlines EXPO_PUBLIC_* at build time).
 export const PRIVY_SERVER_URL = process.env.EXPO_PUBLIC_PRIVY_SERVER_URL ?? "";
