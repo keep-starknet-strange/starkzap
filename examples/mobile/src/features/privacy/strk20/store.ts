@@ -305,8 +305,12 @@ export const useStrk20Store = create<Strk20Store>((set, get) => {
         await tx.wait();
 
         set({ step: "Deposit: waiting for the balance to be visible…" });
-        // Overrides the client's own sequencing: this proof reads the
-        // depositor's ERC20 balance, which the client cannot know about.
+        // This proof reads the depositor's ERC20 balance, which the client
+        // cannot know about. This block is already `PROOF_BASE_BLOCK_DEPTH`
+        // behind the head, and passing it does not bypass the client's own
+        // sequencing: the client uses it only if it is at or after the block its
+        // last private transaction landed in, and waits for a later one
+        // otherwise.
         const provingBlockId = await waitForFundedBalance(
           wallet.getProvider(),
           token,
