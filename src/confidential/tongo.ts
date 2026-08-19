@@ -33,12 +33,17 @@ export async function loadTongoSdk(
     return cachedTongoSdk;
   }
 
-  loadingTongoSdk ??= import("@fatsolutions/tongo-sdk")
-    .then((module) => {
+  // NOTE: the import() must be wrapped in try/catch (not a .catch() chain):
+  // webpack only downgrades an unresolvable dynamic import to a build warning
+  // (with a runtime error) when the import() sits inside a try block. With a
+  // .then()/.catch() chain instead, consumers without the optional peer
+  // installed get a hard "Module not found" build error.
+  loadingTongoSdk ??= (async () => {
+    try {
+      const module = await import("@fatsolutions/tongo-sdk");
       cachedTongoSdk = module as unknown as TongoSdkModule;
       return cachedTongoSdk;
-    })
-    .catch((error) => {
+    } catch (error) {
       const detail =
         error instanceof Error && error.message
           ? ` Original error: ${error.message}`
@@ -46,10 +51,10 @@ export async function loadTongoSdk(
       throw new Error(
         `[starkzap] ${feature} requires optional peer dependency "@fatsolutions/tongo-sdk". Install it with: npm i @fatsolutions/tongo-sdk.${detail}`
       );
-    })
-    .finally(() => {
+    } finally {
       loadingTongoSdk = undefined;
-    });
+    }
+  })();
 
   return await loadingTongoSdk;
 }
