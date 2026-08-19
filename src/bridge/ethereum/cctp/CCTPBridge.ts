@@ -17,8 +17,8 @@ import type {
   CCTPDepositFeeEstimation,
   CCTPInitiateWithdrawFeeEstimation,
   EthereumCompleteWithdrawFeeEstimation,
-  EthereumWalletConfig,
 } from "@/bridge";
+import type { EthereumWalletConfig } from "@/bridge/ethereum/ethers-interop";
 import { ERC20EthereumToken } from "@/bridge/ethereum/EtherToken";
 import type { Interface, TransactionRequest } from "ethers";
 import { FeeErrorCause } from "@/types/errors";

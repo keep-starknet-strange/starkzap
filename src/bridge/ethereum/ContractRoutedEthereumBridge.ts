@@ -9,11 +9,11 @@ import {
   type ExternalAddress,
   type ExternalTransactionResponse,
 } from "@/types";
+import type { EthereumCompleteWithdrawFeeEstimation } from "@/bridge/ethereum/types";
 import type {
-  EthereumCompleteWithdrawFeeEstimation,
   EthereumTransactionDetails,
   EthereumWalletConfig,
-} from "@/bridge/ethereum/types";
+} from "@/bridge/ethereum/ethers-interop";
 import type { Contract, ContractTransaction, InterfaceAbi } from "ethers";
 import { requireEthers } from "@/connect/ethersRuntime";
 import { FeeErrorCause } from "@/types/errors";

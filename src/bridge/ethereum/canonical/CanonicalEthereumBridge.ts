@@ -3,10 +3,12 @@ import type {
   BridgeDepositOptions,
   EthereumDepositFeeEstimation,
   EthereumInitiateWithdrawFeeEstimation,
-  EthereumTransactionDetails,
-  EthereumWalletConfig,
   InitiateBridgeWithdrawOptions,
 } from "@/bridge";
+import type {
+  EthereumTransactionDetails,
+  EthereumWalletConfig,
+} from "@/bridge/ethereum/ethers-interop";
 import { DUMMY_L1_ADDRESS, DUMMY_SN_ADDRESS } from "@/bridge/ethereum/types";
 import {
   type Address,

@@ -1,6 +1,6 @@
 import { describeValue } from "@/connect/utils";
 import { type EthereumAddress, ExternalChain } from "@/types";
-import type { EthereumWalletConfig } from "@/bridge";
+import type { EthereumWalletConfig } from "@/bridge/ethereum/ethers-interop";
 import type { ChainId } from "@/types";
 import { loadEthers } from "@/connect/ethersRuntime";
 import { fromEthereumAddress } from "@/connect/ethersRuntime";
