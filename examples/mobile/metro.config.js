@@ -27,7 +27,13 @@ config.resolver.blockList = [].concat(
 
 // ...and resolve `starkzap` straight to its built entry instead, so Metro never
 // walks node_modules for it (which also trips the 0.84 path-collapse bug).
-const coreDist = path.join(workspaceRoot, "dist", "src");
+//
+// The target comes from core's own `exports` map rather than a path guess: a
+// subpath is not always a single file. `./cartridge` is `dist/src/cartridge.js`,
+// but `./privacy` is a directory barrel at `dist/src/privacy/index.js`, and
+// guessing `dist/src/<subpath>.js` resolves that one to a file that was never
+// emitted.
+const coreExports = require(path.join(workspaceRoot, "package.json")).exports;
 
 // Packages installed in THIS example but lazily `import()`-ed by the prebuilt
 // starkzap core (resolved from dist/). Without pinning, those dynamic imports
@@ -53,12 +59,23 @@ config.resolver.resolveRequest = (context, moduleName, platform) => {
     const resolver = priorResolveRequest ?? context.resolveRequest;
     return resolver(context, path.join(workspaceRoot, distMatch[1]), platform);
   }
-  if (moduleName === "starkzap") {
-    return { type: "sourceFile", filePath: path.join(coreDist, "index.js") };
-  }
-  if (moduleName.startsWith("starkzap/")) {
-    const sub = moduleName.slice("starkzap/".length);
-    return { type: "sourceFile", filePath: path.join(coreDist, `${sub}.js`) };
+  if (moduleName === "starkzap" || moduleName.startsWith("starkzap/")) {
+    const subpath =
+      moduleName === "starkzap"
+        ? "."
+        : `.${moduleName.slice("starkzap".length)}`;
+    const target = coreExports[subpath]?.import;
+    // Loud rather than silent: falling through would send Metro back to the
+    // blocked self-symlink and surface as the path-collapse crash instead of
+    // the missing entry point.
+    if (!target) {
+      throw new Error(
+        `[metro.config] "${moduleName}" is not an entry point in starkzap's ` +
+          `exports map. Add it to the root package.json "exports", or import ` +
+          `from one that is.`
+      );
+    }
+    return { type: "sourceFile", filePath: path.join(workspaceRoot, target) };
   }
   return priorResolveRequest
     ? priorResolveRequest(context, moduleName, platform)
