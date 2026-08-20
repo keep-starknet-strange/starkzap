@@ -149,7 +149,7 @@ export interface PrivacyConfig {
    * {@link PrivacyPaymasterConfig}.
    *
    * Ignored by {@link createPrivacy} itself, which composes and proves but never
-   * submits. It is read when the config reaches {@link Wallet.privacy()} or
+   * submits. It is read when the config reaches `connectPrivacy` or
    * `withPaymaster`, both of which require it.
    *
    * Omit it to submit through your own infrastructure. The only route left
@@ -200,7 +200,7 @@ const revocations = new WeakMap<PrivateTransfersInterface, () => void>();
  * Safe to call more than once, and on a client that was never used.
  *
  * @param transfers - A client from {@link createPrivacy}, or the `transfers` of
- *   one from `wallet.privacy()`
+ *   one from `connectPrivacy`
  */
 export function revokePrivacy(transfers: PrivateTransfersInterface): void {
   revocations.get(transfers)?.();
@@ -324,7 +324,7 @@ export async function createPrivacy(
   const revokedError = () =>
     new Error(
       "[starkzap] This privacy client was revoked, so its viewing key is no " +
-        "longer available. Build a new one with `wallet.privacy()` or " +
+        "longer available. Build a new one with `connectPrivacy()` or " +
         "`createPrivacy()` after reconnecting."
     );
 

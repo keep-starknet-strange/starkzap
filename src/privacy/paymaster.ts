@@ -43,7 +43,7 @@ export type PrivacyTip = "slow" | "normal" | "fast";
  *
  * Present or absent as a unit. Submission needs an endpoint *and* a fee mode,
  * so pairing them in one object puts that requirement in the type: neither
- * {@link withPaymaster} nor `wallet.privacy()` can be handed half a
+ * {@link withPaymaster} nor `connectPrivacy` can be handed half a
  * configuration, and the check happens at compile time rather than as a throw
  * on first use.
  *

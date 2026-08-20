@@ -228,7 +228,7 @@ export type ExecuteOptions = TransactionFeeOptions & {
    * nonce, and pays gas from your public balance, so the chain records exactly
    * who performed the "private" operation. Requires `unsafeUserPays`.
    *
-   * Submit through a privacy paymaster instead as `wallet.privacy()` does, and
+   * Submit through a privacy paymaster instead as `connectPrivacy` does, and
    * the relayer's account appears on-chain in place of yours.
    */
   proof?: TransactionProof;

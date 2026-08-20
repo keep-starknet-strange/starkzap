@@ -176,7 +176,7 @@ function buildSdk(networkIndex: number) {
     // OFT is mainnet-only.
     ...(isMain && OFT_PUBLIC_KEY ? { layerZeroApiKey: OFT_PUBLIC_KEY } : {}),
   };
-  // Enables wallet.privacy(); absent when this network has no endpoints set.
+  // Enables connectPrivacy(); absent when this network has no endpoints set.
   const privacy = privacyConfig(
     isMain ? "mainnet" : "sepolia",
     paymasterNodeUrl
