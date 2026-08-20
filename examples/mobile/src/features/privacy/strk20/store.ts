@@ -186,7 +186,7 @@ export function unavailableReason(
     );
   }
   if (walletType !== "privatekey") {
-    return "The privacy pool needs a private-key login: the viewing key is derived from a deterministic signature, which Privy and Cartridge signers do not provide.";
+    return "The privacy pool needs a private-key login: the viewing key is derived from the account key inside the signer, which the Privy and Cartridge signers cannot do — they can sign, and a signature is deliberately not accepted as a substitute.";
   }
   return null;
 }

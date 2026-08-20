@@ -13,9 +13,9 @@ import type { Wallet } from "@/wallet";
 import { assertSafeHttpUrl } from "@/utils";
 import { loadPrivacySdk, type PrivacySdkModule } from "@/privacy/runtime";
 import {
+  accountLeafDerivation,
   assertCanonicalViewingKey,
-  assertDeterministicSigner,
-  signatureDerivation,
+  assertViewingKeySigner,
   type ViewingKeyContext,
   type ViewingKeyDerivation,
 } from "@/privacy/viewing-key";
@@ -162,9 +162,11 @@ export interface PrivacyConfig {
   /**
    * How the viewing key is derived for this account.
    *
-   * Defaults to {@link signatureDerivation}, which needs nothing but
-   * `signRaw`. Replace it to follow a different scheme like a wallet-native KDF,
-   * a hardware device command, or an externally held key.
+   * Defaults to {@link accountLeafDerivation} — SNIP-44 `account-leaf-v1`, run
+   * inside the signer — which requires a signer implementing
+   * {@link SignerInterface.deriveViewingKey}. Set this to use a different scheme:
+   * a wallet-native KDF, a hardware device command, an externally held key, or to
+   * support a signer that only signs.
    *
    * The pool stores the first key an account registers and it cannot be
    * replaced, so changing this for an account that already registered orphans
@@ -278,11 +280,11 @@ export async function createPrivacy(
 ): Promise<PrivateTransfersInterface> {
   const signer = wallet.getAccountProvider().getSigner();
 
-  // The default derivation's precondition is checkable without signing, so
-  // check it here rather than letting the first private operation fail. A
-  // custom derivation owns its own preconditions.
+  // The default derivation's precondition is checkable without touching the
+  // network or the signer, so check it here rather than letting the first
+  // private operation fail. A custom derivation owns its own preconditions.
   if (config.viewingKeyDerivation === undefined) {
-    assertDeterministicSigner(signer);
+    assertViewingKeySigner(signer);
   }
 
   // Validated before the SDK is loaded, so a bad URL fails without touching the
@@ -308,7 +310,7 @@ export async function createPrivacy(
 
   const chainId = wallet.getChainId().toFelt252() as constants.StarknetChainId;
 
-  const derive = config.viewingKeyDerivation ?? signatureDerivation;
+  const derive = config.viewingKeyDerivation ?? accountLeafDerivation;
   const context: ViewingKeyContext = {
     chainId,
     accountAddress: wallet.address,

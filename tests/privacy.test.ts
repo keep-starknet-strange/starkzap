@@ -26,9 +26,12 @@ import {
 import { screeningVerdict } from "@/privacy/errors";
 import { PrivacyPaymaster, PrivacyPaymasterError } from "@/privacy/paymaster";
 import { createPrivacy, revokePrivacy } from "@/privacy/create";
-import { signatureDerivation } from "@/privacy/viewing-key";
 import { withPaymaster, type PrivateTransfersBuilder } from "@/privacy/client";
-import { PrivySigner, StarkSigner } from "@/signer";
+import {
+  deriveAccountLeafViewingKey,
+  PrivySigner,
+  StarkSigner,
+} from "@/signer";
 import type { SignerInterface } from "@/signer";
 import { AccountProvider } from "@/wallet/accounts/provider";
 import { ChainId, fromAddress } from "@/types";
@@ -1534,10 +1537,8 @@ describe("privacy", () => {
   });
 
   describe("createPrivacy", () => {
-    /** A signer that makes no determinism claim. */
+    /** A signer that can sign but cannot derive a viewing key. */
     class ForeignSigner implements SignerInterface {
-      readonly deterministic?: boolean;
-
       getPubKey(): Promise<string> {
         return Promise.resolve("0x1");
       }
@@ -1552,18 +1553,18 @@ describe("privacy", () => {
       discovery: "https://discovery.example.com",
     };
 
-    it("rejects a wallet whose signer is not a StarkSigner", async () => {
+    it("rejects a signer that cannot derive a viewing key", async () => {
       await expect(
         createPrivacy(walletWith(new ForeignSigner()), config)
-      ).rejects.toThrow("requires a signer that declares");
+      ).rejects.toThrow("implements `deriveViewingKey`");
     });
 
-    it("rejects a Privy signer, which makes no determinism claim", async () => {
+    it("rejects a Privy signer, which can only sign", async () => {
       // The concrete case the gate exists for. `PrivySigner` satisfies
       // starkzap's SignerInterface, so nothing but this check stops it — and
-      // `rawSign` delegates to a remote service whose ECDSA nonce policy we
-      // cannot verify. A non-deterministic signature would derive a different
-      // viewing key per login and orphan every existing note.
+      // `rawSign` reaches a remote service that offers signing, not a KDF over
+      // the account key. Deriving from a signature instead is what would expose
+      // the viewing key to anyone who obtained that signature.
       const privy = new PrivySigner({
         walletId: "wallet-1",
         publicKey: "0x1",
@@ -1571,7 +1572,7 @@ describe("privacy", () => {
       });
 
       await expect(createPrivacy(walletWith(privy), config)).rejects.toThrow(
-        "requires a signer that declares"
+        "implements `deriveViewingKey`"
       );
     });
 
@@ -1583,19 +1584,33 @@ describe("privacy", () => {
       expect(signRaw).not.toHaveBeenCalled();
     });
 
-    it("accepts any signer that declares determinism", async () => {
-      // The point of the property over an `instanceof StarkSigner` check: a
-      // custom signer that genuinely is RFC-6979 can opt in, and the claim
+    it("accepts any signer implementing the derivation, not just StarkSigner", async () => {
+      // The point of testing the method over an `instanceof StarkSigner` check:
+      // a wallet or device that runs the profile itself can opt in, and doing so
       // survives two copies of starkzap in one dependency tree.
-      class DeterministicSigner extends ForeignSigner {
-        override readonly deterministic = true;
+      class KdfSigner extends ForeignSigner {
+        deriveViewingKey(): Promise<string> {
+          return Promise.resolve("0x1");
+        }
       }
 
       // Reaching URL validation proves the signer gate let it through.
       await expect(
-        createPrivacy(walletWith(new DeterministicSigner()), {
+        createPrivacy(walletWith(new KdfSigner()), {
           ...config,
           prover: "ftp://prover.example.com",
+        })
+      ).rejects.toThrow("Privacy proving service URL must use");
+    });
+
+    it("accepts a sign-only signer when a custom derivation is supplied", async () => {
+      // The documented way out for a signer that cannot run the KDF: the caller
+      // owns the scheme, so the precondition does not apply.
+      await expect(
+        createPrivacy(walletWith(new ForeignSigner()), {
+          ...config,
+          prover: "ftp://prover.example.com",
+          viewingKeyDerivation: () => Promise.resolve("0x1"),
         })
       ).rejects.toThrow("Privacy proving service URL must use");
     });
@@ -1859,25 +1874,30 @@ describe("privacy", () => {
       expect(mocknet.pool.is_registered(env.alice.address)).toBe(true);
     });
 
-    it("registers with the viewing key derived from the wallet's signer", async () => {
+    it("registers with the viewing key the signer derives itself", async () => {
       const { mocknet, env, wallet, create } = mockEnv();
+      const signer = wallet.getAccountProvider().getSigner();
+      const signRaw = vi.spyOn(signer, "signRaw");
       const transfers = await create();
 
       mocknet.executeOutside(await transfers.build().register().execute());
 
-      // The key the pool stores must be the one starkzap derives from the
-      // signer, not one the SDK generated on its own.
-      const derived = await signatureDerivation(
-        {
-          chainId: ChainId.MAINNET.toFelt252(),
-          accountAddress: wallet.address,
-          poolAddress: POOL_HEX,
-        },
-        wallet.getAccountProvider().getSigner()
-      );
-      const expected = BigInt(ec.starkCurve.getStarkKey(derived));
+      // The key the pool stores must be the one starkzap derived, not one the
+      // SDK generated on its own — and for a signer that implements
+      // `deriveViewingKey`, that is the SNIP-44 key rather than a folded
+      // signature.
+      const derived = deriveAccountLeafViewingKey(testPrivateKeys.key1, {
+        chainId: ChainId.MAINNET.toFelt252(),
+        accountAddress: wallet.address,
+        poolAddress: POOL_HEX,
+      });
 
-      expect(mocknet.pool.get_public_key(env.alice.address)).toBe(expected);
+      expect(mocknet.pool.get_public_key(env.alice.address)).toBe(
+        BigInt(ec.starkCurve.getStarkKey(derived))
+      );
+      // The reason to prefer that route: registration now commits to a key that
+      // no signature anywhere discloses.
+      expect(signRaw).not.toHaveBeenCalled();
     });
 
     it("deposits into the pool and discovers the resulting note", async () => {
