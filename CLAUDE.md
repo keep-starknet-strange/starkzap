@@ -22,7 +22,7 @@ The main output is a typed ESM library built from `src/` and exported via `src/i
 | Build | `tsc` + `tsc-alias` | Outputs to `dist/` |
 | Lint/Format | ESLint 9 + Prettier 3 | TS lint rules + prettier compatibility config |
 | Tests | Vitest (unit + integration projects) | Integration uses `starknet-devnet` |
-| Docs | TypeDoc + Mintlify | API docs in `docs/api`, site content in `mintlify-docs/` |
+| Docs | Separate repo | Prose docs live in [`starknet-io/starknet-docs`](https://github.com/starknet-io/starknet-docs) under `build/starkzap/` — not in this repo. There is no generated API reference; JSDoc in `src/` is the only reference material here |
 </stack>
 
 <structure>
@@ -35,11 +35,10 @@ The main output is a typed ESM library built from `src/` and exported via `src/i
 | `src/staking/` | Staking module + validator preset registry |
 | `src/types/` | Shared domain types and config contracts |
 | `src/network/` | Network presets and chain metadata |
-| `scripts/` | Preset generation + docs export scripts |
+| `scripts/` | Preset generation + the declaration-leak check |
 | `tests/` | Unit tests + `tests/integration/` devnet-backed tests |
-| `docs/` | Guide + generated API/docs export artifacts |
 | `examples/` | Web/mobile/server usage samples |
-| `mintlify-docs/` | Docs site project |
+| `packages/native/` | `starkzap-native` — React Native wrapper, mirrors core's entry points |
 </structure>
 
 <critical_paths>
@@ -79,10 +78,9 @@ The main output is a typed ESM library built from `src/` and exported via `src/i
 | Integration tests | `npm run test:integration` | Starts devnet via Vitest global setup |
 | Full test matrix | `npm run test:all` | Unit + integration |
 | Coverage | `npm run test:coverage` | Unit coverage thresholds enabled |
+| Declaration leak check | `npm run check:declarations` | Packs the build and typechecks it as a consumer with no optional peers. Needs `npm run build` first |
 | Generate token presets | `npm run generate:tokens` / `npm run generate:tokens:sepolia` | Writes `src/erc20/token/presets*.ts` |
 | Generate validator presets | `npm run generate:validators` / `npm run generate:validators:sepolia` | Requires `VOYAGER_API_KEY` |
-| API docs | `npm run docs:api` | TypeDoc output to `docs/api/` |
-| Export docs bundle | `npm run docs:export` | Rebuilds `docs/export/` |
 </commands>
 
 <workflows>
@@ -101,17 +99,34 @@ The main output is a typed ESM library built from `src/` and exported via `src/i
 4. Review generated diffs for obvious schema/source regressions before merging.
 </workflow>
 
-<workflow name="update-doc-artifacts">
-1. Update source docs (`docs/guide.md` or source code JSDoc).
-2. Run `npm run docs:api`.
-3. If export bundle is needed, run `npm run docs:export`.
-4. Treat `docs/api/**` and `docs/export/**` as generated outputs.
+<workflow name="update-docs">
+Prose docs are **not in this repo**. They live in
+[`starknet-io/starknet-docs`](https://github.com/starknet-io/starknet-docs) under
+`build/starkzap/`, wherever the developer has that repo checked out — ask rather
+than guess the path, and check `git status` there first, since it often carries
+unrelated work in progress.
+
+1. If the change is about behaviour or API, change the public API and its JSDoc here
+   first. JSDoc is the source of truth for behaviour; the docs site restates it for
+   humans. Prose-only work in the docs repo — wording, examples, structure, typos —
+   needs no change here.
+2. In the docs checkout, update the affected pages under `build/starkzap/`. Grep for
+   every symbol whose name, entry point, or signature changed — a page can be wrong
+   without mentioning the symbol you changed, e.g. an import that still names the
+   root entry after a symbol moved to a subpath.
+3. Verify rather than eyeball: for every entry point in `package.json`'s `exports`,
+   extract its declared exports from the emitted `.d.ts`, then check each
+   `import { … } from "starkzap…"` in the pages against the right one. Runtime
+   `Object.keys()` misses type-only exports, so read the declarations.
+4. Leave the docs repo uncommitted for review unless asked otherwise; it is a
+   separate repo with its own review process.
 </workflow>
 </workflows>
 
 <boundaries>
 <gated_operations>
 - Dependency changes in `package.json` or `package-lock.json` require human approval.
+- Committing or pushing in the separate docs repo requires human approval — it is not this project.
 - Any command that publishes/releases artifacts requires human approval.
 - Changing generated presets requires running generator scripts (not manual edits).
 - Running integration tests against forked RPC (`FORK_NETWORK`) requires explicit intent.
@@ -124,8 +139,6 @@ DO NOT modify manually:
 - `src/erc20/token/presets.sepolia.ts`
 - `src/staking/validator/presets.ts`
 - `src/staking/validator/presets.sepolia.ts`
-- `docs/api/**` (generated)
-- `docs/export/**` (generated)
 </forbidden>
 </boundaries>
 
@@ -142,6 +155,5 @@ DO NOT modify manually:
 <skills>
 - `skills/integration-testing.md`
 - `skills/presets-regeneration.md`
-- `skills/docs-export.md`
 - `skills/starknet-upgrade.md`
 </skills>

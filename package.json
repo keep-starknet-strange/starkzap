@@ -100,9 +100,6 @@
     "generate:tokens:sepolia": "npx tsx scripts/generate-token-presets.ts --network sepolia",
     "generate:validators": "npx tsx scripts/generate-validator-presets.ts --network mainnet",
     "generate:validators:sepolia": "npx tsx scripts/generate-validator-presets.ts --network sepolia",
-    "docs:api": "typedoc --options typedoc.json",
-    "docs:export": "npm run docs:api && node scripts/docs-export.mjs",
-    "docs:check": "npm run docs:api",
     "example:server": "npm run start --prefix examples/server",
     "prepare": "husky"
   },
@@ -127,8 +124,6 @@
     "starknet-devnet": "^0.8.2",
     "tsc-alias": "^1.8.16",
     "tsx": "^4.21.0",
-    "typedoc": "^0.28.16",
-    "typedoc-plugin-markdown": "^4.10.0",
     "typescript": "^5.9.3",
     "typescript-eslint": "^8.53.1",
     "utf-8-validate": "^6.0.6",
