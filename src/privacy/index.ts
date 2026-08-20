@@ -5,9 +5,9 @@ export {
   type PrivacyConfig,
 } from "@/privacy/create";
 export {
+  accountLeafDerivation,
   assertCanonicalViewingKey,
-  assertDeterministicSigner,
-  signatureDerivation,
+  assertViewingKeySigner,
   type ViewingKeyContext,
   type ViewingKeyDerivation,
 } from "@/privacy/viewing-key";
