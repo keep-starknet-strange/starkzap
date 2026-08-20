@@ -236,7 +236,7 @@ const PRIVACY_OHTTP =
   (env.VITE_PRIVACY_OHTTP as string | undefined)?.trim() !== "false";
 
 /**
- * Config for `createPrivacy` / `wallet.privacy()`, or `undefined` when this
+ * Config for `connectPrivacy` / `createPrivacy`, or `undefined` when this
  * network has no privacy endpoints set — the STRK20 tab then explains what is
  * missing instead of failing at call time.
  */

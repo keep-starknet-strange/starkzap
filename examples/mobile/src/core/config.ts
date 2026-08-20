@@ -92,7 +92,7 @@ const PRIVACY_OHTTP_RELAY = process.env.EXPO_PUBLIC_PRIVACY_OHTTP_RELAY ?? "";
 const PRIVACY_OHTTP = process.env.EXPO_PUBLIC_PRIVACY_OHTTP !== "false";
 
 /**
- * Config for `createPrivacy` / `wallet.privacy()` on the given network, or
+ * Config for `connectPrivacy` / `createPrivacy` on the given network, or
  * `undefined` when its endpoints are unset — the STRK20 tab then explains
  * what is missing instead of failing at call time.
  */

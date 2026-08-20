@@ -133,7 +133,8 @@ export function assertProofSendable(
         "be sent from this account, incrementing its nonce and paying gas from its " +
         "public balance, so the chain would record who performed the private " +
         "operation. Submit through a privacy paymaster (configure " +
-        "`privacy.paymaster` and use `wallet.privacy()`), or pass " +
+        "`privacy.paymaster` and use `connectPrivacy()` from " +
+        "`starkzap/privacy`), or pass " +
         "`unsafeUserPays: true` to accept revealing the sender."
     );
   }

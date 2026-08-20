@@ -65,7 +65,7 @@ export interface PrivacySendOptions extends Omit<
    *
    * Requires {@link PaymasterBinding.account}, and requires that account to
    * support SNIP-9 outside execution — a property of the user's wallet, not of
-   * your configuration. `wallet.privacy()` wires this up; a client built by hand
+   * your configuration. `connectPrivacy` wires this up; a client built by hand
    * through {@link withPaymaster} has to pass `account` itself.
    *
    * Build these with `wallet.tx()` rather than by hand — `calls()` resolves the
@@ -290,7 +290,7 @@ export interface PaymasterBinding extends PrivacyPaymasterConfig {
  * Add fee handling, block sequencing and paymaster submission to a raw privacy
  * SDK client.
  *
- * `wallet.privacy()` returns an already-bound client; this is for code that
+ * `connectPrivacy` returns an already-bound client; this is for code that
  * called {@link createPrivacy} directly and now wants the same behaviour
  * without reimplementing the fee dance.
  *
@@ -432,7 +432,7 @@ export function withPaymaster(
       throw new Error(
         "[starkzap] `send({ invoke })` relays calls through the account's " +
           "`execute_from_outside`, so it needs that account and a way to sign " +
-          "for it. `wallet.privacy()` provides both; a client built with " +
+          "for it. `connectPrivacy()` provides both; a client built with " +
           "`withPaymaster` has to pass `account: { address, signTypedData }`."
       );
     }
