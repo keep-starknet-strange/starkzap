@@ -15,6 +15,7 @@ import {
   type PrivacyClient,
   type PrivacyFeeQuote,
   type PrivacySendOptions,
+  type PrivacySimulation,
   type ProvableAttempt,
 } from "starkzap-native/privacy";
 import { paymasterProxyUrl, privacyConfig } from "@/core/config";
@@ -28,6 +29,72 @@ export interface PrivacyBalance {
   token: Token;
   amount: Amount;
   notes: number;
+}
+
+/**
+ * One privacy operation, built but not run.
+ *
+ * Named so simulating and sending take the *same* value: the form is read once,
+ * and both paths use what it produced. Rebuilding from the inputs for the second
+ * path would let a user simulate one transaction and send another.
+ */
+interface Operation {
+  label: string;
+  compose: Parameters<PrivacyClient["send"]>[0];
+  options: PrivacySendOptions | undefined;
+}
+
+/** An operation that has been simulated and is waiting on the user. */
+export interface PendingSend extends Operation {
+  warnings: PrivacySimulation["warnings"];
+}
+
+/** A private transfer, for either simulating or sending. */
+function transferOp(
+  token: Token,
+  recipient: string,
+  input: string,
+  surplusTo: string
+): Operation {
+  const amount = Amount.parse(input, token);
+  return {
+    label: "Transfer",
+    compose: (b) =>
+      b
+        .with(token.address, (t) =>
+          t.transfer({ recipient: recipient.trim(), amount: amount.toBase() })
+        )
+        .surplusTo(surplusTo),
+    options: {
+      autoSetup: true,
+      autoSelectNotes: "naive",
+      autoDiscover: { notes: "refresh", channels: "refresh" },
+    },
+  };
+}
+
+/** A withdrawal to a public address, for either simulating or sending. */
+function withdrawOp(
+  token: Token,
+  recipient: string,
+  input: string,
+  surplusTo: string
+): Operation {
+  const amount = Amount.parse(input, token);
+  return {
+    label: "Withdraw",
+    compose: (b) =>
+      b
+        .with(token.address, (t) =>
+          t.withdraw({ recipient: recipient.trim(), amount: amount.toBase() })
+        )
+        // Surplus is a *private* note, so it stays in the pool with us.
+        .surplusTo(surplusTo),
+    options: {
+      autoSelectNotes: "naive",
+      autoDiscover: { notes: "refresh", channels: "refresh" },
+    },
+  };
 }
 
 interface Strk20Store {
@@ -44,9 +111,13 @@ interface Strk20Store {
   waitingBlocks: number | null;
   /** Pool fee the paymaster last quoted, shown before the user commits. */
   fee: PrivacyFeeQuote | null;
+  /** A simulated send waiting on the user to confirm or cancel it. */
+  pending: PendingSend | null;
 
   connect: () => Promise<void>;
   clear: () => void;
+  confirmPending: () => Promise<boolean>;
+  cancelPending: () => void;
   refresh: () => Promise<void>;
   deposit: (token: Token, input: string) => Promise<boolean>;
   transfer: (
@@ -59,6 +130,18 @@ interface Strk20Store {
     recipient: string,
     input: string
   ) => Promise<boolean>;
+  /** Simulate a transfer and park the result for the user to read. */
+  simulateTransfer: (
+    token: Token,
+    recipient: string,
+    input: string
+  ) => Promise<void>;
+  /** Simulate a withdrawal and park the result for the user to read. */
+  simulateWithdraw: (
+    token: Token,
+    recipient: string,
+    input: string
+  ) => Promise<void>;
   recipientReady: (recipient: string, token: Token) => Promise<boolean>;
 }
 
@@ -148,16 +231,70 @@ export const useStrk20Store = create<Strk20Store>((set, get) => {
   }
 
   /**
-   * Run one privacy operation through the client.
+   * Run what `send` would run, without proving it.
+   *
+   * `simulate` takes the same callback and options, quotes the same fee and
+   * appends the same withdrawal, then runs against a mock prover. So the warnings
+   * are the ones the real transaction would raise — a withdrawal back to the
+   * deposit address raises `USER_LINKAGE` — and nothing has been paid for when
+   * the user reads them.
+   *
+   * `send`'s own `onWarnings` callback reports the same list, but only after the
+   * proof exists and has been paid for. Declining there wastes the proving.
+   *
+   * @returns The warnings, or null when the simulation itself failed
+   */
+  async function simulateOp(
+    op: Operation
+  ): Promise<PrivacySimulation["warnings"] | null> {
+    const privacy = get().client;
+    if (!privacy) return null;
+
+    set({
+      busy: true,
+      error: null,
+      step: `${op.label}: simulating…`,
+      pending: null,
+    });
+    try {
+      const { warnings } = await privacy.simulate(op.compose, op.options);
+      return warnings;
+    } catch (err) {
+      set({ error: describe(err) });
+      return null;
+    } finally {
+      set({ step: null, busy: false });
+    }
+  }
+
+  /** Simulate and show the result, whether or not it warned. */
+  async function preview(op: Operation): Promise<void> {
+    const warnings = await simulateOp(op);
+    if (warnings) set({ pending: { ...op, warnings } });
+  }
+
+  /** Simulate, then send straight away unless there is something to read. */
+  async function run(op: Operation): Promise<boolean> {
+    const warnings = await simulateOp(op);
+    if (!warnings) return false;
+    if (warnings.length > 0) {
+      set({ pending: { ...op, warnings } });
+      return false;
+    }
+    return submit(op);
+  }
+
+  /**
+   * Prove and submit one privacy operation.
    *
    * `send()` owns the fee, the proving block and submission, so all this adds is
    * UI state: the busy flag, the step label, and error translation.
    */
-  async function run(
-    label: string,
-    compose: Parameters<PrivacyClient["send"]>[0],
-    options?: PrivacySendOptions
-  ): Promise<boolean> {
+  async function submit({
+    label,
+    compose,
+    options,
+  }: Operation): Promise<boolean> {
     const privacy = get().client;
     const wallet = localWallet(useWalletStore.getState().wallet);
     if (!privacy || !wallet) return false;
@@ -200,6 +337,17 @@ export const useStrk20Store = create<Strk20Store>((set, get) => {
     balances: [],
     waitingBlocks: null,
     fee: null,
+    pending: null,
+
+    /** Submit the operation the user just confirmed, warnings and all. */
+    confirmPending: async () => {
+      const held = get().pending;
+      if (!held) return false;
+      set({ pending: null });
+      return submit(held);
+    },
+
+    cancelPending: () => set({ pending: null }),
 
     /**
      * Drop the privacy capability, revoking the viewing key with it.
@@ -218,6 +366,7 @@ export const useStrk20Store = create<Strk20Store>((set, get) => {
         waitingBlocks: null,
         fee: null,
         error: null,
+        pending: null,
       });
       if (current) revokePrivacy(current.transfers);
     },
@@ -331,21 +480,26 @@ export const useStrk20Store = create<Strk20Store>((set, get) => {
           { onAttempt: onWait }
         );
 
-        return await run(
-          "Deposit",
-          (b) =>
+        // Submitted without the warning check the other two get. The approve is
+        // already on-chain by now, so a confirmation here would arrive after the
+        // step that costs money — and a deposit names the account publicly
+        // whatever happens, so `USER_LINKAGE` would tell the user nothing the
+        // form does not already say.
+        return await submit({
+          label: "Deposit",
+          compose: (b) =>
             b
               .with(token.address, (t) =>
                 t.deposit({ amount: amount.toBase() })
               )
               .surplusTo(wallet.address),
-          {
+          options: {
             autoRegister: true,
             autoSetup: true,
             autoDiscover: { notes: "refresh", channels: "refresh" },
             provingBlockId,
-          }
-        );
+          },
+        });
       } catch (err) {
         set({ error: describe(err) });
         return false;
@@ -357,25 +511,13 @@ export const useStrk20Store = create<Strk20Store>((set, get) => {
     transfer: (token, recipient, input) => {
       const wallet = localWallet(useWalletStore.getState().wallet);
       if (!wallet) return Promise.resolve(false);
-      const amount = Amount.parse(input, token);
+      return run(transferOp(token, recipient, input, wallet.address));
+    },
 
-      return run(
-        "Transfer",
-        (b) =>
-          b
-            .with(token.address, (t) =>
-              t.transfer({
-                recipient: recipient.trim(),
-                amount: amount.toBase(),
-              })
-            )
-            .surplusTo(wallet.address),
-        {
-          autoSetup: true,
-          autoSelectNotes: "naive",
-          autoDiscover: { notes: "refresh", channels: "refresh" },
-        }
-      );
+    simulateTransfer: async (token, recipient, input) => {
+      const wallet = localWallet(useWalletStore.getState().wallet);
+      if (!wallet) return;
+      await preview(transferOp(token, recipient, input, wallet.address));
     },
 
     /**
@@ -389,25 +531,13 @@ export const useStrk20Store = create<Strk20Store>((set, get) => {
     withdraw: (token, recipient, input) => {
       const wallet = localWallet(useWalletStore.getState().wallet);
       if (!wallet || !recipient.trim()) return Promise.resolve(false);
-      const amount = Amount.parse(input, token);
+      return run(withdrawOp(token, recipient, input, wallet.address));
+    },
 
-      return run(
-        "Withdraw",
-        (b) =>
-          b
-            .with(token.address, (t) =>
-              t.withdraw({
-                recipient: recipient.trim(),
-                amount: amount.toBase(),
-              })
-            )
-            // Surplus is a *private* note, so it stays in the pool with us.
-            .surplusTo(wallet.address),
-        {
-          autoSelectNotes: "naive",
-          autoDiscover: { notes: "refresh", channels: "refresh" },
-        }
-      );
+    simulateWithdraw: async (token, recipient, input) => {
+      const wallet = localWallet(useWalletStore.getState().wallet);
+      if (!wallet || !recipient.trim()) return;
+      await preview(withdrawOp(token, recipient, input, wallet.address));
     },
 
     /**

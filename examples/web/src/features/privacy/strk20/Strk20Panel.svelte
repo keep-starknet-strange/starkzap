@@ -11,16 +11,21 @@
     approveMode,
     balances,
     busy,
+    cancelPending,
     client,
+    confirmPending,
     connect,
     connecting,
     deposit,
     error,
     feeLabel,
     gasNote,
+    pending,
     recipientReady,
     refresh,
     registered,
+    simulateTransfer,
+    simulateWithdraw,
     step,
     transfer,
     unavailableReason,
@@ -118,6 +123,45 @@
 
   </Card>
 
+  <!--
+    Warnings `simulate` raised, shown before anything has been proven or paid
+    for. Confirming submits exactly what was simulated.
+  -->
+  {#if $pending}
+    <Card>
+      <Text variant="subtitle">{$pending.label}: simulated</Text>
+      {#if $pending.warnings.length === 0}
+        <Text variant="body">
+          No warnings. Nothing about this transaction links your private and
+          public activity.
+        </Text>
+      {:else}
+        {#each $pending.warnings as warning, i (`${warning.code}-${i}`)}
+          <Text variant="body">{warning.message}</Text>
+        {/each}
+      {/if}
+      <Text variant="muted">
+        Run against a mock prover, so nothing has been paid for yet. Confirming
+        quotes the fee again, proves the transaction and submits it. Nothing is
+        refused on your behalf — whether this is acceptable is your call.
+      </Text>
+      <div class="head">
+        <Button
+          title={`Confirm ${$pending.label.toLowerCase()}`}
+          loading={$busy}
+          disabled={$busy}
+          onclick={confirmPending}
+        />
+        <Button
+          variant="secondary"
+          title="Cancel"
+          disabled={$busy}
+          onclick={cancelPending}
+        />
+      </div>
+    </Card>
+  {/if}
+
   <!-- Balances: one discovery call covers every token. -->
   <Card>
     <Text variant="subtitle">Private balances</Text>
@@ -200,12 +244,20 @@
           private transfer yet.
         </Text>
       {/if}
-      <Button
-        title="Send privately"
-        loading={$busy}
-        disabled={blocked || !sendAmount.trim() || toReady !== true}
-        onclick={() => token && transfer(token, sendTo, sendAmount)}
-      />
+      <div class="head">
+        <Button
+          variant="secondary"
+          title="Simulate"
+          disabled={blocked || !sendAmount.trim() || toReady !== true}
+          onclick={() => token && simulateTransfer(token, sendTo, sendAmount)}
+        />
+        <Button
+          title="Send privately"
+          loading={$busy}
+          disabled={blocked || !sendAmount.trim() || toReady !== true}
+          onclick={() => token && transfer(token, sendTo, sendAmount)}
+        />
+      </div>
     </Card>
 
     <Card>
@@ -232,12 +284,21 @@
         title="Use my own address (links the two ends)"
         onclick={() => (withdrawTo = $walletState.address ?? "")}
       />
-      <Button
-        title="Withdraw"
-        loading={$busy}
-        disabled={blocked || !withdrawAmount.trim() || !withdrawTo.trim()}
-        onclick={() => token && withdraw(token, withdrawTo, withdrawAmount)}
-      />
+      <div class="head">
+        <Button
+          variant="secondary"
+          title="Simulate"
+          disabled={blocked || !withdrawAmount.trim() || !withdrawTo.trim()}
+          onclick={() =>
+            token && simulateWithdraw(token, withdrawTo, withdrawAmount)}
+        />
+        <Button
+          title="Withdraw"
+          loading={$busy}
+          disabled={blocked || !withdrawAmount.trim() || !withdrawTo.trim()}
+          onclick={() => token && withdraw(token, withdrawTo, withdrawAmount)}
+        />
+      </div>
     </Card>
   {/if}
 {/if}

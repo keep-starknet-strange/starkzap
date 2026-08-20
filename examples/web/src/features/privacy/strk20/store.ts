@@ -15,6 +15,7 @@ import {
   type PrivacyClient,
   type PrivacyFeeQuote,
   type PrivacySendOptions,
+  type PrivacySimulation,
   type ProvableAttempt,
 } from "starkzap/privacy";
 import { PRIVACY_CONFIG } from "~/lib/stores/config";
@@ -27,6 +28,24 @@ export interface PrivacyBalance {
   token: Token;
   private: Amount;
   notes: number;
+}
+
+/**
+ * One privacy operation, built but not run.
+ *
+ * Named so simulating and sending take the *same* value: the form is read once,
+ * and both paths use what it produced. Rebuilding from the inputs for the second
+ * path would let a user simulate one transaction and send another.
+ */
+interface Operation {
+  label: string;
+  compose: Parameters<PrivacyClient["send"]>[0];
+  options: PrivacySendOptions | undefined;
+}
+
+/** An operation that has been simulated and is waiting on the user. */
+export interface PendingSend extends Operation {
+  warnings: PrivacySimulation["warnings"];
 }
 
 export const client = writable<PrivacyClient | null>(null);
@@ -50,6 +69,9 @@ export const waitingBlocks = writable<number | null>(null);
 
 /** Pool fee the paymaster last quoted, shown before the user commits. */
 export const fee = writable<PrivacyFeeQuote | null>(null);
+
+/** A simulated send waiting on the user to confirm or cancel it. */
+export const pending = writable<PendingSend | null>(null);
 
 /**
  * How a deposit's ERC20 `approve` gets on-chain.
@@ -156,6 +178,7 @@ export function clear(): void {
   waitingBlocks.set(null);
   fee.set(null);
   error.set(null);
+  pending.set(null);
 }
 
 /** Create the privacy client from the SDK config and load state. */
@@ -244,7 +267,81 @@ function logAttempts(what: string): (attempt: ProvableAttempt) => void {
 }
 
 /**
- * Run one privacy operation through the client.
+ * Simulate one operation, then submit it unless it warns.
+ *
+ * `simulate` runs what `send` would run against a mock prover: same fee quote,
+ * same fee withdrawal, same warnings — but no proof, so nothing has been paid for
+ * when the user sees them. A withdrawal back to the deposit address raises
+ * `USER_LINKAGE` here, which is the whole point of asking first.
+ *
+ * The alternative is `send`'s own `onWarnings` callback, which reports the same
+ * list. That one fires after the proof exists and has been paid for, so declining
+ * there wastes the proving.
+ *
+ * @returns Whether the transaction executed. False also means either the error
+ *   store or the pending store holds the reason, so a caller can keep the user's
+ *   input for a retry.
+ */
+async function simulateOp(
+  op: Operation
+): Promise<PrivacySimulation["warnings"] | null> {
+  const privacy = get(client);
+  if (!privacy) return null;
+
+  busy.set(true);
+  error.set(null);
+  pending.set(null);
+  try {
+    step.set(`${op.label}: simulating…`);
+    const { warnings } = await privacy.simulate(op.compose, op.options);
+    log(
+      warnings.length === 0
+        ? `${op.label} simulated clean — no warnings`
+        : `${op.label} raised ${warnings.length} warning(s) before proving: ` +
+            warnings.map((w) => w.code).join(", "),
+      "info"
+    );
+    return warnings;
+  } catch (err) {
+    fail(op.label, err);
+    return null;
+  } finally {
+    step.set(null);
+    busy.set(false);
+  }
+}
+
+/** Simulate and show the result, whether or not it warned. */
+export async function preview(op: Operation): Promise<void> {
+  const warnings = await simulateOp(op);
+  if (warnings) pending.set({ ...op, warnings });
+}
+
+/** Simulate, then send straight away unless there is something to read. */
+async function run(op: Operation): Promise<boolean> {
+  const warnings = await simulateOp(op);
+  if (!warnings) return false;
+  if (warnings.length > 0) {
+    pending.set({ ...op, warnings });
+    return false;
+  }
+  return submit(op);
+}
+
+/** Submit the operation the user just confirmed, warnings and all. */
+export async function confirmPending(): Promise<boolean> {
+  const held = get(pending);
+  if (!held) return false;
+  pending.set(null);
+  return submit(held);
+}
+
+export function cancelPending(): void {
+  pending.set(null);
+}
+
+/**
+ * Prove and submit one privacy operation.
  *
  * `send()` owns the fee, the proving block and submission, so all this adds is
  * UI state: the busy flag, the step label, and error translation.
@@ -252,11 +349,11 @@ function logAttempts(what: string): (attempt: ProvableAttempt) => void {
  * @returns Whether the transaction executed. False also means the error store
  *   holds the reason, so a caller can keep the user's input for a retry.
  */
-async function run(
-  label: string,
-  compose: Parameters<PrivacyClient["send"]>[0],
-  options?: PrivacySendOptions
-): Promise<boolean> {
+async function submit({
+  label,
+  compose,
+  options,
+}: Operation): Promise<boolean> {
   const privacy = get(client);
   const wallet = localWallet(get(walletState).wallet);
   if (!privacy || !wallet) return false;
@@ -364,20 +461,25 @@ export async function deposit(token: Token, input: string): Promise<boolean> {
       { onAttempt: logAttempts("Deposit · balance visible") }
     );
 
-    return await run(
-      "Deposit",
-      (b) =>
+    // Submitted without the warning check the other two get. The approve is
+    // already on-chain by now (or bundled into this very transaction), so a
+    // confirmation here would arrive after the step that costs money — and a
+    // deposit names the account publicly whatever happens, so `USER_LINKAGE`
+    // would tell the user nothing the form does not already say.
+    return await submit({
+      label: "Deposit",
+      compose: (b) =>
         b
           .with(token.address, (t) => t.deposit({ amount: amount.toBase() }))
           .surplusTo(wallet.address),
-      {
+      options: {
         autoRegister: true,
         autoSetup: true,
         autoDiscover: { notes: "refresh", channels: "refresh" },
         ...(bundled && { invoke: approveCalls }),
         provingBlockId,
-      }
-    );
+      },
+    });
   } catch (err) {
     fail("Deposit", err);
     return false;
@@ -388,6 +490,30 @@ export async function deposit(token: Token, input: string): Promise<boolean> {
   }
 }
 
+/** A private transfer, for either simulating or sending. */
+function transferOp(
+  token: Token,
+  recipient: string,
+  input: string,
+  surplusTo: string
+): Operation {
+  const amount = Amount.parse(input, token);
+  return {
+    label: "Transfer",
+    compose: (b) =>
+      b
+        .with(token.address, (t) =>
+          t.transfer({ recipient: recipient.trim(), amount: amount.toBase() })
+        )
+        .surplusTo(surplusTo),
+    options: {
+      autoSetup: true,
+      autoSelectNotes: "naive",
+      autoDiscover: { notes: "refresh", channels: "refresh" },
+    },
+  };
+}
+
 export function transfer(
   token: Token,
   recipient: string,
@@ -395,22 +521,18 @@ export function transfer(
 ): Promise<boolean> {
   const wallet = localWallet(get(walletState).wallet);
   if (!wallet) return Promise.resolve(false);
-  const amount = Amount.parse(input, token);
+  return run(transferOp(token, recipient, input, wallet.address));
+}
 
-  return run(
-    "Transfer",
-    (b) =>
-      b
-        .with(token.address, (t) =>
-          t.transfer({ recipient: recipient.trim(), amount: amount.toBase() })
-        )
-        .surplusTo(wallet.address),
-    {
-      autoSetup: true,
-      autoSelectNotes: "naive",
-      autoDiscover: { notes: "refresh", channels: "refresh" },
-    }
-  );
+/** Simulate a transfer and park the result for the user to read. */
+export async function simulateTransfer(
+  token: Token,
+  recipient: string,
+  input: string
+): Promise<void> {
+  const wallet = localWallet(get(walletState).wallet);
+  if (!wallet) return;
+  await preview(transferOp(token, recipient, input, wallet.address));
 }
 
 /**
@@ -421,6 +543,29 @@ export function transfer(
  * from puts the pool's two ends on one address and links them. Withdrawing to
  * yourself is legitimate — it just has to be a choice, not a default.
  */
+function withdrawOp(
+  token: Token,
+  recipient: string,
+  input: string,
+  surplusTo: string
+): Operation {
+  const amount = Amount.parse(input, token);
+  return {
+    label: "Withdraw",
+    compose: (b) =>
+      b
+        .with(token.address, (t) =>
+          t.withdraw({ recipient: recipient.trim(), amount: amount.toBase() })
+        )
+        // Surplus is a *private* note, so it stays in the pool with us.
+        .surplusTo(surplusTo),
+    options: {
+      autoSelectNotes: "naive",
+      autoDiscover: { notes: "refresh", channels: "refresh" },
+    },
+  };
+}
+
 export function withdraw(
   token: Token,
   recipient: string,
@@ -428,22 +573,18 @@ export function withdraw(
 ): Promise<boolean> {
   const wallet = localWallet(get(walletState).wallet);
   if (!wallet || !recipient.trim()) return Promise.resolve(false);
-  const amount = Amount.parse(input, token);
+  return run(withdrawOp(token, recipient, input, wallet.address));
+}
 
-  return run(
-    "Withdraw",
-    (b) =>
-      b
-        .with(token.address, (t) =>
-          t.withdraw({ recipient: recipient.trim(), amount: amount.toBase() })
-        )
-        // Surplus is a *private* note, so it stays in the pool with us.
-        .surplusTo(wallet.address),
-    {
-      autoSelectNotes: "naive",
-      autoDiscover: { notes: "refresh", channels: "refresh" },
-    }
-  );
+/** Simulate a withdrawal and park the result for the user to read. */
+export async function simulateWithdraw(
+  token: Token,
+  recipient: string,
+  input: string
+): Promise<void> {
+  const wallet = localWallet(get(walletState).wallet);
+  if (!wallet || !recipient.trim()) return;
+  await preview(withdrawOp(token, recipient, input, wallet.address));
 }
 
 /**

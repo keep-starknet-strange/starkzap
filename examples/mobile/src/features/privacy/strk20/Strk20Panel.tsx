@@ -20,11 +20,16 @@ export default function Strk20Panel() {
     balances,
     waitingBlocks,
     fee,
+    pending,
     connect,
     deposit,
     transfer,
     withdraw,
     recipientReady,
+    simulateTransfer,
+    simulateWithdraw,
+    confirmPending,
+    cancelPending,
   } = useStrk20Store();
 
   const [symbol, setSymbol] = useState("");
@@ -105,6 +110,42 @@ export default function Strk20Panel() {
         {error ? <Text variant="muted">{error}</Text> : null}
       </Card>
 
+      {pending ? (
+        <Card>
+          <Text variant="label">{pending.label}: simulated</Text>
+          {pending.warnings.length === 0 ? (
+            <Text variant="body">
+              No warnings. Nothing about this transaction links your private and
+              public activity.
+            </Text>
+          ) : (
+            pending.warnings.map((warning, i) => (
+              <Text key={`${warning.code}-${i}`} variant="body">
+                {warning.message}
+              </Text>
+            ))
+          )}
+          <Text variant="muted">
+            Run against a mock prover, so nothing has been paid for yet.
+            Confirming quotes the fee again, proves the transaction and submits
+            it. Nothing is refused on your behalf — whether this is acceptable
+            is your call.
+          </Text>
+          <Button
+            title={`Confirm ${pending.label.toLowerCase()}`}
+            loading={busy}
+            disabled={busy}
+            onPress={() => void confirmPending()}
+          />
+          <Button
+            title="Cancel"
+            variant="secondary"
+            disabled={busy}
+            onPress={cancelPending}
+          />
+        </Card>
+      ) : null}
+
       <Card>
         <Text variant="label">Private balances</Text>
         {balances.length === 0 ? (
@@ -183,6 +224,12 @@ export default function Strk20Panel() {
               </Text>
             ) : null}
             <Button
+              title="Simulate"
+              variant="secondary"
+              disabled={blocked || !sendAmount.trim() || toReady !== true}
+              onPress={() => void simulateTransfer(token, sendTo, sendAmount)}
+            />
+            <Button
               title="Send privately"
               loading={busy}
               disabled={blocked || !sendAmount.trim() || toReady !== true}
@@ -217,6 +264,14 @@ export default function Strk20Panel() {
               title="Use my own address (links the two ends)"
               variant="secondary"
               onPress={() => setWithdrawTo(address ?? "")}
+            />
+            <Button
+              title="Simulate"
+              variant="secondary"
+              disabled={blocked || !withdrawAmount.trim() || !withdrawTo.trim()}
+              onPress={() =>
+                void simulateWithdraw(token, withdrawTo, withdrawAmount)
+              }
             />
             <Button
               title="Withdraw"
