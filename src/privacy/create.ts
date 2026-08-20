@@ -132,9 +132,10 @@ export interface PrivacyConfig {
    */
   ohttp?: OhttpOption;
   /**
-   * Sub-account anonymizer contract address. Only needed for `subaccounts(...)`.
+   * Shadow account anonymizer contract address. Only needed for
+   * `shadowAccounts(...)`.
    */
-  subAccountAnonymizerAddress?: string;
+  shadowAccountAnonymizerAddress?: string;
   /**
    * Override how proof invocations are constructed.
    *
@@ -397,8 +398,9 @@ export async function createPrivacy(
   if (config.proofInvocationFactory !== undefined) {
     params.proofInvocationFactory = config.proofInvocationFactory;
   }
-  if (config.subAccountAnonymizerAddress !== undefined) {
-    params.subAccountAnonymizerAddress = config.subAccountAnonymizerAddress;
+  if (config.shadowAccountAnonymizerAddress !== undefined) {
+    params.shadowAccountAnonymizerAddress =
+      config.shadowAccountAnonymizerAddress;
   }
 
   const transfers = sdk.createPrivateTransfers(params);

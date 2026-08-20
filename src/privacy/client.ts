@@ -621,7 +621,7 @@ export function withPaymaster(
     appendFeeWithdrawal(builder, feeAction);
 
     const { warnings } = await builder.simulate({
-      provider: binding.provider,
+      node: binding.provider,
     });
     return { warnings, feeAction };
   }

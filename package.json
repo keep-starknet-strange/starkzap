@@ -40,7 +40,7 @@
     "@hyperlane-xyz/sdk": "^14.4.0",
     "@hyperlane-xyz/utils": "^14.4.0",
     "@solana/web3.js": "^1.98.4",
-    "@starkware-libs/starknet-privacy-sdk": "^0.14.3-rc.4",
+    "@starkware-libs/starknet-privacy-sdk": "^0.14.3-rc.5",
     "ethers": "^6.16.0"
   },
   "peerDependenciesMeta": {
@@ -121,7 +121,7 @@
     "@hyperlane-xyz/sdk": "^14.4.0",
     "@hyperlane-xyz/utils": "^14.4.0",
     "@solana/web3.js": "^1.98.4",
-    "@starkware-libs/starknet-privacy-sdk": "^0.14.3-rc.4",
+    "@starkware-libs/starknet-privacy-sdk": "^0.14.3-rc.5",
     "@vitest/coverage-v8": "^4.0.17",
     "bestzip": "^2.2.1",
     "dotenv": "^17.2.3",
