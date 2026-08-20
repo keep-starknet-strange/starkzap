@@ -23,7 +23,7 @@
     "@reown/appkit-adapter-ethers": "1.8.19",
     "@reown/appkit-adapter-solana": "1.8.19",
     "@solana/web3.js": "^1.98.4",
-    "@starkware-libs/starknet-privacy-sdk": "^0.14.3-rc.4",
+    "@starkware-libs/starknet-privacy-sdk": "^0.14.3-rc.5",
     "ethers": "^6.16.0",
     "starknet": "^10.5.0",
     "starkzap": "file:../.."

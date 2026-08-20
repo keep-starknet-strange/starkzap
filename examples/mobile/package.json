@@ -15,7 +15,7 @@
     "@reown/appkit-react-native": "^2.0.5",
     "@reown/appkit-solana-react-native": "^2.0.5",
     "@solana/web3.js": "^1.98.4",
-    "@starkware-libs/starknet-privacy-sdk": "^0.14.3-rc.4",
+    "@starkware-libs/starknet-privacy-sdk": "^0.14.3-rc.5",
     "@walletconnect/react-native-compat": "^2.23.10",
     "@walletconnect/safe-json": "^1.0.2",
     "assert": "^2.1.0",
