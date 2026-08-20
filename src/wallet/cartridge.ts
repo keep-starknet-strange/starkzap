@@ -9,6 +9,7 @@ import {
 import { Tx } from "@/tx";
 import {
   type BridgingConfig,
+  type PaycrestConfig,
   ChainId,
   type DeployOptions,
   type EnsureReadyOptions,
@@ -148,12 +149,14 @@ export class CartridgeWallet extends BaseWallet {
     classHash: string,
     stakingConfig: StakingConfig | undefined,
     bridgingConfig: BridgingConfig | undefined,
+    paycrestConfig: PaycrestConfig | undefined,
     options: CartridgeWalletOptions = {}
   ) {
     super({
       address: fromAddress(walletAccount.address),
       stakingConfig,
       bridgingConfig,
+      paycrestConfig,
       ...(options.logging && { logging: options.logging }),
     });
     this.controller = controller;
@@ -172,7 +175,8 @@ export class CartridgeWallet extends BaseWallet {
   static async create(
     options: CartridgeWalletOptions = {},
     stakingConfig?: StakingConfig | undefined,
-    bridgingConfig?: BridgingConfig | undefined
+    bridgingConfig?: BridgingConfig | undefined,
+    paycrestConfig?: PaycrestConfig | undefined
   ): Promise<CartridgeWallet> {
     const { default: Controller, toSessionPolicies } =
       await loadCartridgeControllerModule();
@@ -255,6 +259,7 @@ export class CartridgeWallet extends BaseWallet {
       classHash,
       stakingConfig,
       bridgingConfig,
+      paycrestConfig,
       options
     );
   }

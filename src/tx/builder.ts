@@ -12,6 +12,7 @@ import type {
   LendingWithdrawRequest,
 } from "@/lending";
 import type { TrovesDepositParams, TrovesWithdrawParams } from "@/troves";
+import type { OfframpInput } from "@/paycrest";
 import type {
   Address,
   Amount,
@@ -331,6 +332,29 @@ export class TxBuilder {
    */
   trovesWithdraw(params: TrovesWithdrawParams): this {
     this.queueAsyncCalls(this.wallet.troves().populateWithdraw(params));
+    return this;
+  }
+
+  /**
+   * Add a Paycrest off-ramp (gateway path) — emits an ERC20 approve to
+   * the Cairo Gateway plus a `create_order` Call carrying the encrypted
+   * recipient details.
+   *
+   * Gateway path only. The API path requires an HTTP order-creation
+   * step that doesn't fit the synchronous builder shape — call
+   * `wallet.paycrest().offramp(wallet, { ..., path: "api" })` instead.
+   */
+  paycrestOfframp(input: OfframpInput): this {
+    if (input.path !== undefined && input.path !== "gateway") {
+      throw new Error(
+        `tx.paycrestOfframp only supports the gateway path. For api-path offramp, call wallet.paycrest().offramp(...) directly.`
+      );
+    }
+    const p = this.wallet
+      .paycrest()
+      .populateOfframp(this.wallet, input)
+      .then((r) => r.calls);
+    this.queueAsyncCalls(p);
     return this;
   }
 
