@@ -42,8 +42,21 @@ const coreExports = require(path.join(workspaceRoot, "package.json")).exports;
 // Only the BARE specifiers here — those are what starkzap core lazily
 // `import()`s. Pinning subpaths (e.g. `ethers/lib/...`) would hijack other
 // packages that bring their own version (e.g. @hyperlane-xyz uses ethers v5).
+//
+// The privacy SDK is here for a second reason: it is installed in *both* trees,
+// so without pinning the app's own `import` of it and core's lazy `import()` of
+// it resolve to two different directories — two Metro modules with the same
+// name. The app's static import then lands in the main bundle while the loader
+// asks for the other one, which the dev server serves as a split chunk whose
+// module ids the main bundle does not know, failing with `Requiring unknown
+// module`. Pinning collapses them back to one module.
 const appNodeModules = path.resolve(__dirname, "node_modules");
-const APP_PINNED = ["@avnu/avnu-sdk", "ethers", "@solana/web3.js"];
+const APP_PINNED = [
+  "@avnu/avnu-sdk",
+  "ethers",
+  "@solana/web3.js",
+  "@starkware-libs/starknet-privacy-sdk",
+];
 const priorResolveRequest = config.resolver.resolveRequest;
 config.resolver.resolveRequest = (context, moduleName, platform) => {
   if (APP_PINNED.includes(moduleName)) {
