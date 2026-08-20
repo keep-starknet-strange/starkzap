@@ -590,21 +590,28 @@ export async function simulateWithdraw(
 /**
  * Whether a recipient can receive a private transfer yet.
  *
- * The SDK cannot build a transfer to an account with no viewing key on-chain,
- * so the UI checks before offering the action.
+ * The SDK cannot build a transfer to an account with no viewing key registered
+ * on the pool, so the UI checks before offering the action. This asks the same
+ * question the compiler asks — does the recipient have channel context — because
+ * that is what a transfer needs and what it fails on.
+ *
+ * `discoverRequirement` looks like the call for this and is not. Against the
+ * indexer discovery service its `Register` verdict reports whether the *sender*
+ * is registered, so once you have deposited it answers "ready" for any address
+ * at all, and the transfer then dies inside the compiler with "Missing channel
+ * context for recipient". Only the on-chain discovery provider gives that verdict
+ * the meaning its name suggests, which is why the mock-backed tests never saw it.
+ *
+ * A recipient who is registered but has no channel with us yet passes, as it
+ * should: opening that channel is exactly what `autoSetup` does.
  */
-export async function recipientReady(
-  recipient: string,
-  token: Token
-): Promise<boolean> {
+export async function recipientReady(recipient: string): Promise<boolean> {
   const privacy = get(client);
-  if (!privacy || !recipient.trim()) return false;
+  const address = recipient.trim();
+  if (!privacy || !address) return false;
   try {
-    const requirement = await privacy.discoverRequirement(
-      recipient.trim(),
-      token.address
-    );
-    return requirement !== 0; // SetupRequirement.Register === 0
+    const { channels } = await privacy.discoverChannels([address]);
+    return Boolean(channels?.get(address)?.publicKey);
   } catch {
     return false;
   }

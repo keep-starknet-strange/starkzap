@@ -5,6 +5,12 @@ dist
 node_modules
 .expo
 expo-env.d.ts
+# Native projects `expo prebuild` / `expo run:*` generate. Gitignored, but
+# prettier still walks them, and the CMake output under android/app/.cxx is JSON
+# it wants to reformat — which fails the pre-commit hook on any machine that has
+# built the app locally, while CI never sees it.
+examples/mobile/android
+examples/mobile/ios
 docs
 examples/flappy-bird
 .claude

@@ -69,9 +69,7 @@ export default function Strk20Panel() {
 
   async function checkRecipient(value: string) {
     setSendTo(value);
-    setToReady(
-      token && value.trim() ? await recipientReady(value, token) : null
-    );
+    setToReady(value.trim() ? await recipientReady(value) : null);
   }
 
   return (

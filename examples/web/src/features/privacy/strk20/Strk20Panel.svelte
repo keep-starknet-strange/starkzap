@@ -49,7 +49,7 @@
   // transfer to an account without one, so this is checked before offering it.
   let toReady = $state<boolean | null>(null);
   async function checkRecipient() {
-    toReady = token && sendTo.trim() ? await recipientReady(sendTo, token) : null;
+    toReady = sendTo.trim() ? await recipientReady(sendTo) : null;
   }
 
   const tokenOptions = $derived([

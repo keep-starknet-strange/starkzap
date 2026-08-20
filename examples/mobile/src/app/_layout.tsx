@@ -1,5 +1,18 @@
 import "@/polyfills";
 
+// Pulls the privacy SDK into the main bundle. starkzap core reaches it through a
+// lazy `import()` so that consumers who skip the feature never resolve it — but
+// Metro's dev server turns that `import()` into a separate chunk with its own
+// module ID space, and on native the ids it registers do not match the ones the
+// main bundle asks for. `loadPrivacySdk` then fails with `Requiring unknown
+// module "…"`. Importing it statically here means there is no chunk to load and
+// the async require resolves from the main registry instead.
+//
+// Only the dev server splits: `expo export` inlines everything, dev build or not,
+// which is why the CI bundle step never saw this. Same reason as `@/polyfills`
+// above — an app has to name a module for it to be in Metro's graph at all.
+import "@starkware-libs/starknet-privacy-sdk";
+
 import { lazy, Suspense, type ReactNode } from "react";
 import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
