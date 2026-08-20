@@ -2811,13 +2811,40 @@ describe("privacy", () => {
         expect(simulation).not.toHaveProperty("callAndProof");
       });
 
-      it("waits for no block", async () => {
-        // A preview that costs a ten-block wait is not a preview.
+      it("proves against the block `send` would, not the chain head", async () => {
+        // Channels and notes are discovered *at* the proving block, so a
+        // simulation against the head answers for a different transaction than
+        // the one submitted: a recipient registered in the last few blocks passes
+        // here and then fails proving with no channel context.
+        const { privacy, compose, options } = await ready();
+
+        await privacy.simulate(compose, { autoSetup: true });
+
+        // env()'s head is 500 and the depth window is 10.
+        expect(options()).toMatchObject({
+          provingBlockId: 500 - PROOF_BASE_BLOCK_DEPTH,
+        });
+      });
+
+      it("reads the head once and waits for no block", async () => {
+        // A preview that costs a ten-block wait is not a preview. One read is the
+        // proving block; polling would mean it is waiting.
         const { privacy, compose, provider } = await ready();
 
         await privacy.simulate(compose, { autoSetup: true });
 
-        expect(vi.mocked(provider.getBlockNumber)).not.toHaveBeenCalled();
+        expect(vi.mocked(provider.getBlockNumber)).toHaveBeenCalledTimes(1);
+      });
+
+      it("honours a proving block the caller pinned", async () => {
+        const { privacy, compose, options } = await ready();
+
+        await privacy.simulate(compose, {
+          autoSetup: true,
+          provingBlockId: 123,
+        });
+
+        expect(options()).toMatchObject({ provingBlockId: 123 });
       });
 
       it("writes no private state", async () => {

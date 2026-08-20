@@ -19,6 +19,7 @@ import {
   type PrivacySubmission,
 } from "@/privacy/paymaster";
 import {
+  PROOF_BASE_BLOCK_DEPTH,
   waitForProvableBlock,
   type ProvableBlockOptions,
 } from "@/privacy/sequencing";
@@ -171,14 +172,21 @@ export interface PrivacyClient extends Pick<
   /**
    * Run what {@link PrivacyClient.send} would run, without proving it.
    *
-   * Takes the same callback and the same options, quotes the same fee and appends
-   * the same withdrawal, then simulates against a mock prover. So the warnings it
-   * reports are the ones the real transaction would raise, which the inherited
-   * `simulate` could not tell you: that one takes a raw action list and knows
-   * nothing about the paymaster's fee.
+   * Takes the same callback and the same options, quotes the same fee, appends
+   * the same withdrawal and resolves the same proving block, then simulates
+   * against a mock prover. So the warnings it reports are the ones the real
+   * transaction would raise, which the inherited `simulate` could not tell you:
+   * that one takes a raw action list and knows nothing about the paymaster's fee.
    *
-   * Cheap on purpose. It costs a quote and a simulation, waits for no block, and
-   * writes no private state, so it is safe to run while a send is in flight.
+   * Resolving the proving block matters more than it sounds: channels and notes
+   * are discovered *at* that block, so a simulation against the chain head would
+   * answer for a different transaction than the one submitted.
+   *
+   * Cheap on purpose. It costs a quote, a chain-head read and a simulation. It
+   * waits for no block and writes no private state, so it is safe to run while a
+   * send is in flight — the trade being that in that window it reads a slightly
+   * older block than the send will prove against, since waiting for the previous
+   * transaction to age is exactly what this must not do.
    *
    * The mock proof is deliberately not returned. It has the shape of a proof and
    * none of the substance, and handing one back invites submitting it.
@@ -478,6 +486,18 @@ export function withPaymaster(
     return receipt.isError() ? -1 : receipt.block_number;
   }
 
+  /**
+   * The block a proof would use if it could be built right now.
+   *
+   * One chain-head read, no polling — the non-waiting counterpart to
+   * {@link resolveProvingBlock}. Clamped at 0 so a chain shallower than the depth
+   * window yields a block that exists rather than a negative one.
+   */
+  async function provableBlockNow(): Promise<number> {
+    const head = await binding.provider.getBlockNumber();
+    return Math.max(0, head - PROOF_BASE_BLOCK_DEPTH);
+  }
+
   async function resolveProvingBlock(
     options?: PrivacySendOptions
   ): Promise<number> {
@@ -567,6 +587,21 @@ export function withPaymaster(
     const relay = resolveInvoke(options?.invoke);
     const { feeAction } = await quote(relay?.invoke);
 
+    // The block `send` would prove at, resolved without waiting for it. It has
+    // to be resolved at all: the SDK discovers recipient channels and notes *at
+    // the proving block*, so simulating against the chain head would report the
+    // warnings of a different transaction than the one submitted — and a
+    // recipient who registered within the last few blocks would pass here and
+    // then fail proving with no channel context.
+    //
+    // Deliberately not `resolveProvingBlock`: that one waits for the previous
+    // private transaction to age, and this call is documented as waiting for no
+    // block and safe to run while a send is in flight. The cost is that a
+    // simulation run inside that window sees a slightly older block than the
+    // send will prove against.
+    const provingBlockId =
+      options?.provingBlockId ?? (await provableBlockNow());
+
     const {
       wait: _wait,
       invoke: _invoke,
@@ -576,6 +611,7 @@ export function withPaymaster(
     const builder = transfers.build({
       autoSelectNotes: "naive",
       ...sdkOptions,
+      provingBlockId,
       // Nothing built here is submitted, so a registry the caller passed is left
       // untouched and the copy is dropped.
       registryConst: true,
