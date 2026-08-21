@@ -238,17 +238,30 @@ export async function refresh(): Promise<void> {
     // One discovery call covers every token, so balances are a grouping of it.
     const { notes } = await transfers.discoverNotes();
 
-    balances.set(
-      list.map((token) => {
-        const owned = notes.get(BigInt(token.address)) ?? [];
-        const total = owned.reduce((sum, note) => sum + note.amount, 0n);
-        return {
-          token,
-          private: Amount.fromRaw(total, token),
-          notes: owned.length,
-        };
-      })
-    );
+    const held = list.map((token) => {
+      const owned = notes.get(BigInt(token.address)) ?? [];
+      const total = owned.reduce((sum, note) => sum + note.amount, 0n);
+      return {
+        token,
+        private: Amount.fromRaw(total, token),
+        notes: owned.length,
+        each: owned.map((note) => Amount.fromRaw(note.amount, token)),
+      };
+    });
+    balances.set(held);
+
+    // The individual notes, not just the total: a total cannot distinguish a send
+    // that spent the note the previous one produced from a send that spent an
+    // untouched one, and the panel only ever shows the latest reading anyway.
+    const summary = held
+      .filter((b) => b.notes > 0)
+      .map(
+        (b) =>
+          `${b.private.toFormatted(true)} across ${b.notes} note${b.notes === 1 ? "" : "s"} ` +
+          `[${b.each.map((a) => a.toFormatted()).join(", ")}]`
+      )
+      .join("; ");
+    log(`private balances: ${summary || "none"}`, "info");
 
     // Registration is per account, not per token, so any token answers it.
     const probe = list[0];
@@ -384,7 +397,14 @@ async function submit({
   try {
     step.set(`${label}: proving and submitting…`);
     const { transactionHash, trackingId } = await privacy.send(compose, {
-      wait: { onAttempt: logAttempts(label), signal: abort.signal },
+      wait: {
+        onAttempt: logAttempts(label),
+        signal: abort.signal,
+        // Faster than the 2s default because Sepolia blocks land every 1-2s: at
+        // the default the poll steps over head values, and the log then shows a
+        // proving block chosen a block later than the wait actually allowed.
+        pollIntervalMs: 500,
+      },
       ...options,
     });
     // The tracking id cannot be looked up later, so it is logged now: it is what
@@ -399,12 +419,21 @@ async function submit({
     // worked. Waiting for the receipt is what turns a revert into an error
     // instead of a success message.
     step.set(`${label}: waiting for it to execute…`);
-    await new Tx(
+    const tx = new Tx(
       transactionHash,
       wallet.getProvider(),
       wallet.getChainId()
-    ).wait();
-    log(`${label} executed on-chain`, "success");
+    );
+    await tx.wait();
+    // The block is logged because it is what the *next* send is sequenced
+    // against: that one proves at this block or later, never before it. Without
+    // it the log cannot show whether the proving block that follows was right.
+    const receipt = await tx.receipt();
+    log(
+      `${label} executed on-chain` +
+        (receipt.isError() ? "" : ` in block ${receipt.block_number}`),
+      "success"
+    );
 
     // Past the receipt, the funds have moved. What follows is bookkeeping, and a
     // quote or a refresh that fails must not be reported as a failed transaction.
