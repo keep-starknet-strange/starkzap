@@ -416,7 +416,7 @@ function explainInvokeRejection(
  * compare equal to `0x0`. The catch covers `"0x"`, which passes the guard and
  * then fails to convert.
  */
-function asFelt(value: unknown): bigint | undefined {
+export function asFelt(value: unknown): bigint | undefined {
   if (!num.isBigNumberish(value)) return undefined;
   try {
     return num.toBigInt(value);
@@ -586,10 +586,16 @@ function parseFeeAction(
 ): PrivacyFeeAction {
   let feeAction: PrivacyFeeAction;
   try {
+    const amount = asFelt(action.amount);
+    if (amount === undefined) {
+      throw new Error(
+        `the amount ${JSON.stringify(action.amount)} is not a felt`
+      );
+    }
     feeAction = {
       recipient: fromAddress(action.recipient),
       token: fromAddress(action.token),
-      amount: BigInt(action.amount),
+      amount,
     };
   } catch (error) {
     throw new PrivacyPaymasterError(

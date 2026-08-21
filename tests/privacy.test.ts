@@ -1447,6 +1447,16 @@ describe("privacy", () => {
         ).rejects.toThrow("fee action starkzap cannot use");
       });
 
+      it("rejects a blank amount rather than reading it as no fee", async () => {
+        // `BigInt("")` is `0n`, which would pass every check below as a fee of
+        // zero.
+        stubFetch(feeAction({ amount: "" }));
+
+        await expect(
+          new PrivacyPaymaster(URL).quote(POOL, { mode: "sponsored" })
+        ).rejects.toThrow("fee action starkzap cannot use");
+      });
+
       it("rejects a fee above the configured ceiling", async () => {
         stubFetch(feeAction({ amount: "0xb" }));
 
@@ -2585,6 +2595,19 @@ describe("privacy", () => {
 
         await expect(privacy.quote()).resolves.toBeDefined();
         expect(provider.callContract).not.toHaveBeenCalled();
+      });
+
+      it("reports an empty read the same way as a failed one", async () => {
+        // An empty result read as `0n` would refuse every nonzero quote as being
+        // above a fee the pool never published.
+        const { privacy, provider } = await withFees("0x64", "0x64");
+        vi.mocked(provider.callContract).mockResolvedValue([] as never);
+        const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+        await expect(privacy.quote()).resolves.toBeDefined();
+        expect(warn.mock.calls[0]![0]).toContain(
+          "Could not read the pool's own fee"
+        );
       });
 
       it("reports a failed read and lets the quote through", async () => {
