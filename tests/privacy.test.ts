@@ -87,6 +87,11 @@ describe("privacy", () => {
     });
 
     it("treats exactly-at-the-boundary as not yet provable", async () => {
+      // Not an off-by-one against `assertProofBaseBlockAged`, which accepts an
+      // age of exactly `depth`. That one checks the base block against the head
+      // at submission; this checks that the previous transaction is behind the
+      // base block. The privacy SDK's README runs the same strict comparison in
+      // its own recipe, and reproving one block later costs a single poll.
       const provider = providerWithHeads(110, 112);
 
       await expect(

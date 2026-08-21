@@ -136,6 +136,15 @@ export async function waitForProvableBlock(
   for (;;) {
     options.signal?.throwIfAborted();
     const latest = await provider.getBlockNumber();
+    // Strictly below, so the proving block is always past `sinceBlock`. This is
+    // the privacy SDK's own recipe, whose loop runs `while (lastTxBlockNumber >=
+    // latestBlock - 10)` and then proves at `latestBlock - 10` -- the same
+    // comparison. Its rule of thumb is stronger still: state a proof reads, the
+    // nullifier set included, should be written well before the base block.
+    //
+    // `assertProofBaseBlockAged` is looser by one because it checks a different
+    // thing: the base block against the head at submission, which is the
+    // sequencer's window. Two constraints, not two versions of one.
     const ready = sinceBlock < latest - depth;
     options.onAttempt?.({
       attempt: ++attempt,
