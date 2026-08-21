@@ -11,6 +11,7 @@ import type {
 import type { Address, ChainId } from "@/types";
 import { fromAddress } from "@/types";
 import {
+  asFelt,
   PrivacyPaymaster,
   type PrivacyFeeQuote,
   type PrivacyPaymasterConfig,
@@ -390,7 +391,13 @@ export function withPaymaster(
         entrypoint: "get_fee_amount",
         calldata: [],
       });
-      published = BigInt(value ?? "");
+      const amount = asFelt(value);
+      if (amount === undefined) {
+        throw new Error(
+          `the pool answered with ${JSON.stringify(value)}, which is not a fee`
+        );
+      }
+      published = amount;
     } catch (error) {
       // Reported, not fatal. This is a second opinion on the fee, and a read
       // that could not be taken is a reason to say so rather than to fail a
