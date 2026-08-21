@@ -137,9 +137,11 @@ export function deriveAccountLeafViewingKey(
   const contextBytes = serializeContext(context);
   const domain = encode.utf8ToUint8Array(DOMAIN_SEPARATOR);
 
-  // The counter only advances for digests the profile rejects: at or above
-  // `LIMIT`, or reducing to zero. Both are ~2^-250 events, so this is a loop
-  // that runs once.
+  // The counter advances only for digests the profile rejects: at or above
+  // `LIMIT`, or reducing to zero. The first is not rare — `2^256 % n` is itself
+  // close to `n`, so about one digest in 32 is rejected and the loop runs
+  // twice. The second is a ~2^-251 event. SNIP-44's `rejection-sampling` test
+  // vector covers the retry.
   for (let counter = 0n; counter < 2n ** 32n; counter++) {
     const digest = hmacSha256(
       key,
