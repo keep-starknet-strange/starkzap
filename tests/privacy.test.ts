@@ -8,7 +8,11 @@ import {
   type RpcProvider,
   type Signature,
 } from "starknet";
-import { createEmptyRegistry } from "@starkware-libs/starknet-privacy-sdk";
+import {
+  AddressMap,
+  createEmptyRegistry,
+  type PrivateRegistry,
+} from "@starkware-libs/starknet-privacy-sdk";
 import {
   Mocknet,
   MockProofInvocationFactory,
@@ -1221,11 +1225,38 @@ describe("privacy", () => {
         expect(sent[0]!.params).toMatchObject({
           transaction: {
             type: "invoke_and_apply_action",
-            // Echoed unchanged: the signature covers these exact bytes.
+            // Typed data echoed unchanged: the signature covers these exact
+            // bytes. A felt array is already in the shape the paymaster wants.
             invoke: {
               user_address: USER,
               typed_data: TYPED_DATA,
               signature: ["0x3", "0x4"],
+            },
+          },
+        });
+      });
+
+      it("normalises an object-form signature to felts", async () => {
+        // What a raw starknet.js signer returns: `r` and `s` as bigints, which
+        // `JSON.stringify` refuses to serialise. Echoing that shape threw a
+        // `TypeError` here -- after the proof had already been paid for.
+        const sent = stubFetch({ result: { transaction_hash: "0xsent" } });
+        const signature = ec.starkCurve.sign("0x1", testPrivateKeys.key1);
+
+        await new PrivacyPaymaster(URL).execute(
+          { contractAddress: POOL, entrypoint: "apply_actions" },
+          { data: "0x1", proofFacts: ["0x2"] },
+          { version: "0x1" },
+          { userAddress: USER, typedData: TYPED_DATA, signature }
+        );
+
+        expect(sent[0]!.params).toMatchObject({
+          transaction: {
+            invoke: {
+              signature: [
+                `0x${signature.r.toString(16)}`,
+                `0x${signature.s.toString(16)}`,
+              ],
             },
           },
         });
@@ -1967,7 +1998,9 @@ describe("privacy", () => {
     const POOL_HEX = `0x${POOL_ADDRESS.toString(16)}`;
     const FORWARDER = fromAddress("0x75a1");
 
-    const RELAY_SIGNATURE = ["0xr", "0xs"];
+    // Felts, not mnemonics: `execute` normalises the signature to hex, so a
+    // placeholder that is not a number cannot travel through it.
+    const RELAY_SIGNATURE = ["0xbeef", "0xcafe"];
 
     /**
      * Typed data for the calls the request actually carried, as a real paymaster
@@ -2268,6 +2301,68 @@ describe("privacy", () => {
           ).method
       );
       expect(methods).toContain("paymaster_buildTransaction");
+    });
+
+    it("keeps the caller's scan position in the registry it hands back", async () => {
+      // `PrivacySendResult.registry` is documented as a registry to adopt, and
+      // the SDK's clone copies channels and notes but not the cursor. Adopting a
+      // registry whose cursor was dropped rescans from genesis.
+      const { env: sdkEnv, bind } = env();
+      paymasterStub("0x0", `0x${BigInt(sdkEnv.ace).toString(16)}`);
+      const privacy = await bind();
+
+      const registry: PrivateRegistry = createEmptyRegistry();
+      // `AddressMap`'s element type is internal to the SDK, so the shape is
+      // asserted rather than named. Nothing here reads it; identity is the test.
+      const cursor = {
+        blockId: 400,
+        incomingChannels: new AddressMap(),
+      } as NonNullable<PrivateRegistry["cursor"]>;
+      registry.cursor = cursor;
+
+      const result = await privacy.send((b) => b.register(), { registry });
+
+      expect(result.registry).not.toBe(registry);
+      expect(result.registry.cursor).toBe(cursor);
+    });
+
+    it("refuses a proof the pool's validity window has already closed", async () => {
+      // `submit()` takes a proof built anywhere, including one that sat around
+      // while the chain moved on. The pool answers `PROOF_EXPIRED` for it, and
+      // the proving is already paid for either way -- so it has to fail here.
+      const { provider, env: sdkEnv, bind } = env(500);
+      const { submitted, built } = paymasterStub(
+        "0x0",
+        `0x${BigInt(sdkEnv.ace).toString(16)}`
+      );
+      const privacy = await bind();
+
+      // The window is per deployment and read live, so the pool names it: 450
+      // blocks, the test default. This proof is 499 blocks behind the head.
+      vi.mocked(provider.callContract).mockImplementation(
+        ({ entrypoint }: { entrypoint: string }) =>
+          Promise.resolve([
+            entrypoint === "get_proof_validity_blocks" ? "0x1c2" : "0xffffffff",
+          ])
+      );
+
+      await expect(
+        privacy.submit({
+          call: { contractAddress: POOL_HEX, entrypoint: "apply_actions" },
+          proof: {
+            data: "0x1",
+            output: [],
+            proofFacts: [shortString.encodeShortString("VIRTUAL_SNOS0"), "0x1"],
+          },
+        })
+      ).rejects.toThrow(
+        /accepts a proof for 450 blocks, so this one has expired/
+      );
+
+      // Nothing reached the relayer: this is a local refusal, not a rejection
+      // the paymaster had to make.
+      expect(built).toHaveLength(0);
+      expect(submitted).toHaveLength(0);
     });
 
     it("proves against head - depth on the first send", async () => {
@@ -2716,6 +2811,43 @@ describe("privacy", () => {
       expect(order).toHaveLength(2);
     });
 
+    it("bounds the wait on the previous transaction", async () => {
+      // The hash is the relayer's word. One it returns but never broadcasts is
+      // never found, and every later send on this client queues behind this wait,
+      // so it cannot be allowed to poll for as long as the node will answer.
+      const { mocknet, env: sdkEnv, bind, provider } = env();
+      paymasterStub("0x0", `0x${BigInt(sdkEnv.ace).toString(16)}`);
+      const privacy = await bind();
+      const me = `0x${sdkEnv.alice.address.toString(16)}`;
+      mocknet.executeOutside(
+        await privacy.transfers.build().register().execute()
+      );
+      let head = 500;
+      vi.mocked(provider.getBlockNumber).mockImplementation(() => {
+        const current = head;
+        head += 20;
+        return Promise.resolve(current);
+      });
+
+      const deposit = (b: PrivateTransfersBuilder) =>
+        b.with(sdkEnv.ace, (t) => t.deposit({ amount: 100n })).surplusTo(me);
+      const options = {
+        autoSetup: true,
+        autoDiscover: { notes: "refresh" },
+        wait: { pollIntervalMs: 100, timeoutMs: 1_000 },
+      } as const;
+
+      await privacy.send(deposit, options);
+      await privacy.send(deposit, options);
+
+      // The caller's own budget, spent as starknet.js counts it: one poll per
+      // interval until the timeout would have elapsed.
+      expect(vi.mocked(provider.waitForTransaction)).toHaveBeenCalledWith(
+        "0xsent",
+        expect.objectContaining({ retryInterval: 100, retries: 10 })
+      );
+    });
+
     it("returns the relayer's tracking id alongside the hash", async () => {
       // Nothing can look a tracking id up later, so the value has to come back
       // from the submission that produced it or it is gone.
@@ -2828,6 +2960,18 @@ describe("privacy", () => {
 
         expect(simulation.feeAction.amount).toBe(0x64n);
         expect(simulation.warnings).toEqual(warnings);
+      });
+
+      it("hands the warnings to `onWarnings` too", async () => {
+        // The callback's own documentation sends integrators to `simulate` first,
+        // because here the warnings arrive before a prover has been paid. It was
+        // accepted and never called on this path.
+        const { privacy, compose, warnings } = await ready("0x64");
+        const onWarnings = vi.fn();
+
+        await privacy.simulate(compose, { autoSetup: true, onWarnings });
+
+        expect(onWarnings).toHaveBeenCalledWith(warnings);
       });
 
       it("appends the same fee withdrawal `send` would", async () => {

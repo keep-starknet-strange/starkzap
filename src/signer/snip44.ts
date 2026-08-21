@@ -117,7 +117,7 @@ function serializeContext(context: ViewingKeyContext): Uint8Array {
  * @param privateKey - The account's private scalar, hex or bigint
  * @param context - Chain, account, pool and key slot to bind the key to
  * @returns The viewing key as a 0x-hex string, in `[1, n/2)`
- * @throws If the private key is outside `[1, n)`
+ * @throws If the private key is not a scalar in `[1, n)`
  *
  * @see {@link https://github.com/starknet-io/SNIPs/pull/177|SNIP-44}
  */
@@ -125,10 +125,18 @@ export function deriveAccountLeafViewingKey(
   privateKey: string | bigint,
   context: ViewingKeyContext
 ): string {
-  const scalar = BigInt(privateKey);
-  if (scalar < 1n || scalar >= ORDER) {
+  // `BigInt` rejects malformed input with a bare `SyntaxError` naming neither
+  // this function nor the key. Unreadable and out of range are the same fact to
+  // the caller -- there is no scalar to derive from -- so they share one error.
+  let scalar: bigint | undefined;
+  try {
+    scalar = BigInt(privateKey);
+  } catch {
+    scalar = undefined;
+  }
+  if (scalar === undefined || scalar < 1n || scalar >= ORDER) {
     throw new Error(
-      "[starkzap] The account private key is outside the Stark curve's scalar " +
+      "[starkzap] The account private key is not a scalar in the Stark curve's " +
         "range [1, n), so no viewing key can be derived from it."
     );
   }

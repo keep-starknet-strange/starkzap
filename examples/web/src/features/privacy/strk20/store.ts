@@ -162,6 +162,14 @@ export function unavailableReason(walletType: string | null): string | null {
 }
 
 /**
+ * Cancels the block waits of whatever operation is in flight.
+ *
+ * Module-global like the stores, and for the same reason: the operation outlives
+ * the component that started it.
+ */
+let inFlight: AbortController | null = null;
+
+/**
  * Drop the privacy capability, revoking the viewing key with it.
  *
  * Call this on logout and before every login. The client holds a live viewing
@@ -170,6 +178,12 @@ export function unavailableReason(walletType: string | null): string | null {
  * that created it.
  */
 export function clear(): void {
+  // The waits are the long part of a send — minutes of polling — and they are
+  // what leaves the UI looking stuck after a logout. Proving is not cancellable,
+  // so an operation already past that point still submits; the SDK says as much.
+  inFlight?.abort(new Error("The privacy session was closed."));
+  inFlight = null;
+
   const current = get(client);
   client.set(null);
   if (current) revokePrivacy(current.transfers);
@@ -179,6 +193,11 @@ export function clear(): void {
   fee.set(null);
   error.set(null);
   pending.set(null);
+  // Owned by an operation that is no longer going to finish, so nothing else
+  // will clear them: a `busy` left set disables every button until a reload.
+  busy.set(false);
+  step.set(null);
+  connecting.set(false);
 }
 
 /** Create the privacy client from the SDK config and load state. */
@@ -358,12 +377,14 @@ async function submit({
   const wallet = localWallet(get(walletState).wallet);
   if (!privacy || !wallet) return false;
 
+  const abort = new AbortController();
+  inFlight = abort;
   busy.set(true);
   error.set(null);
   try {
     step.set(`${label}: proving and submitting…`);
     const { transactionHash, trackingId } = await privacy.send(compose, {
-      wait: { onAttempt: logAttempts(label) },
+      wait: { onAttempt: logAttempts(label), signal: abort.signal },
       ...options,
     });
     // The tracking id cannot be looked up later, so it is logged now: it is what
@@ -385,14 +406,25 @@ async function submit({
     ).wait();
     log(`${label} executed on-chain`, "success");
 
+    // Past the receipt, the funds have moved. What follows is bookkeeping, and a
+    // quote or a refresh that fails must not be reported as a failed transaction.
     step.set(`${label}: refreshing…`);
-    fee.set(await privacy.quote());
-    await refresh();
+    try {
+      fee.set(await privacy.quote());
+      await refresh();
+    } catch (err) {
+      error.set(
+        `${label} executed on-chain, but reloading the balances failed: ${describe(err)}`
+      );
+    }
     return true;
   } catch (err) {
-    fail(label, err);
+    // A logout cancelled it. The user asked for that, and the stores this would
+    // write to were just cleared.
+    if (!abort.signal.aborted) fail(label, err);
     return false;
   } finally {
+    if (inFlight === abort) inFlight = null;
     waitingBlocks.set(null);
     step.set(null);
     busy.set(false);
@@ -419,13 +451,17 @@ export async function deposit(token: Token, input: string): Promise<boolean> {
   const wallet = localWallet(get(walletState).wallet);
   if (!wallet || !PRIVACY_CONFIG || !input.trim()) return false;
 
-  const amount = Amount.parse(input, token);
   const pool = fromAddress(PRIVACY_CONFIG.poolContractAddress);
   const bundled = get(approveMode) === "bundled";
 
+  const abort = new AbortController();
+  inFlight = abort;
   busy.set(true);
   error.set(null);
   try {
+    // Inside the try: a rejected amount is user input, not a broken deposit, and
+    // parsing it outside meant the throw escaped into an unhandled rejection.
+    const amount = Amount.parse(input, token);
     // Built the same way for both modes; only the destination differs. `calls()`
     // resolves the builder without sending, which is exactly what `invoke` takes.
     const approveCalls = await wallet.tx().approve(token, pool, amount).calls();
@@ -458,7 +494,10 @@ export async function deposit(token: Token, input: string): Promise<boolean> {
       token,
       fromAddress(wallet.address),
       amount.toBase(),
-      { onAttempt: logAttempts("Deposit · balance visible") }
+      {
+        onAttempt: logAttempts("Deposit · balance visible"),
+        signal: abort.signal,
+      }
     );
 
     // Submitted without the warning check the other two get. The approve is
@@ -481,9 +520,10 @@ export async function deposit(token: Token, input: string): Promise<boolean> {
       },
     });
   } catch (err) {
-    fail("Deposit", err);
+    if (!abort.signal.aborted) fail("Deposit", err);
     return false;
   } finally {
+    if (inFlight === abort) inFlight = null;
     waitingBlocks.set(null);
     step.set(null);
     busy.set(false);
@@ -521,7 +561,8 @@ export function transfer(
 ): Promise<boolean> {
   const wallet = localWallet(get(walletState).wallet);
   if (!wallet) return Promise.resolve(false);
-  return run(transferOp(token, recipient, input, wallet.address));
+  const op = build(() => transferOp(token, recipient, input, wallet.address));
+  return op ? run(op) : Promise.resolve(false);
 }
 
 /** Simulate a transfer and park the result for the user to read. */
@@ -532,7 +573,8 @@ export async function simulateTransfer(
 ): Promise<void> {
   const wallet = localWallet(get(walletState).wallet);
   if (!wallet) return;
-  await preview(transferOp(token, recipient, input, wallet.address));
+  const op = build(() => transferOp(token, recipient, input, wallet.address));
+  if (op) await preview(op);
 }
 
 /**
@@ -573,7 +615,8 @@ export function withdraw(
 ): Promise<boolean> {
   const wallet = localWallet(get(walletState).wallet);
   if (!wallet || !recipient.trim()) return Promise.resolve(false);
-  return run(withdrawOp(token, recipient, input, wallet.address));
+  const op = build(() => withdrawOp(token, recipient, input, wallet.address));
+  return op ? run(op) : Promise.resolve(false);
 }
 
 /** Simulate a withdrawal and park the result for the user to read. */
@@ -584,7 +627,8 @@ export async function simulateWithdraw(
 ): Promise<void> {
   const wallet = localWallet(get(walletState).wallet);
   if (!wallet || !recipient.trim()) return;
-  await preview(withdrawOp(token, recipient, input, wallet.address));
+  const op = build(() => withdrawOp(token, recipient, input, wallet.address));
+  if (op) await preview(op);
 }
 
 /**
@@ -614,6 +658,22 @@ export async function recipientReady(recipient: string): Promise<boolean> {
     return Boolean(channels?.get(address)?.publicKey);
   } catch {
     return false;
+  }
+}
+
+/**
+ * Build an operation, reporting a bad amount rather than throwing.
+ *
+ * `Amount.parse` rejects input the form still accepts — "1.2.3", or more decimal
+ * places than the token has. Thrown from a click handler it escapes this store's
+ * error handling entirely: an unhandled rejection, and a UI that does nothing.
+ */
+function build(make: () => Operation): Operation | null {
+  try {
+    return make();
+  } catch (err) {
+    fail("Reading the amount", err);
+    return null;
   }
 }
 
