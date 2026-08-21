@@ -89,7 +89,10 @@ const PRIVACY_DISCOVERY_SEPOLIA =
 const PRIVACY_OHTTP_RELAY = process.env.EXPO_PUBLIC_PRIVACY_OHTTP_RELAY ?? "";
 // OHTTP defaults to on: without it the viewing key reaches the prover and
 // discovery service in plaintext (inside TLS, but readable by the operator).
-const PRIVACY_OHTTP = process.env.EXPO_PUBLIC_PRIVACY_OHTTP !== "false";
+// Exported because it decides more than the SDK config: OHTTP is the one part
+// of STRK20 that needs `crypto.subtle`, so with it off the tab also runs in
+// Expo Go. See the gate in app/(tabs)/privacy.tsx.
+export const PRIVACY_OHTTP = process.env.EXPO_PUBLIC_PRIVACY_OHTTP !== "false";
 
 /**
  * Config for `connectPrivacy` / `createPrivacy` on the given network, or

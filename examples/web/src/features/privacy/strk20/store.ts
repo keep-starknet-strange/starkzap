@@ -156,7 +156,7 @@ export function unavailableReason(walletType: string | null): string | null {
     return "Set VITE_PRIVACY_POOL_*, VITE_PRIVACY_PROVER_* and VITE_PRIVACY_DISCOVERY_* for this network in .env.";
   }
   if (walletType !== "privatekey") {
-    return "The privacy pool needs a private-key login: the viewing key is derived from the account key inside the signer, which the Privy and Cartridge signers cannot do — they can sign, and a signature is deliberately not accepted as a substitute.";
+    return "The privacy pool needs a private-key login: the viewing key is derived from the account key inside the signer, which the Privy and Cartridge signers cannot do.";
   }
   return null;
 }
