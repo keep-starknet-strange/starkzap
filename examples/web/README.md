@@ -97,7 +97,7 @@ This grants the session permission to call `transfer` on the STRK contract. Tran
 **What happens under the hood:**
 
 1. The web app sends a health check to `http://localhost:3001/api/health`.
-2. A POST to `/api/user/register` creates or retrieves a Privy Starknet wallet for the given email.
+2. A POST to `/api/privy-wallet/starknet`, authenticated with the browser Privy login's access token as `Authorization: Bearer <token>`, creates or retrieves a Privy Starknet wallet for the authenticated user.
 3. The server returns the wallet ID, public key, and address.
 4. The SDK calls `sdk.onboard()` with `OnboardStrategy.Privy`, passing a `resolve` callback that returns the wallet ID, public key, and signing server URL.
 5. A `PrivySigner` is created internally. All subsequent signing requests are sent to the server's `/api/privy-wallet/sign` endpoint, which calls the Privy Node SDK to sign the hash remotely.

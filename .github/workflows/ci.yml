@@ -50,7 +50,7 @@ jobs:
           cache: npm
 
       - name: Install
-        run: npm ci
+        run: npm ci --ignore-scripts
         env:
           # Authenticates the @starkware-libs scope against GitHub Packages;
           # the scope->registry mapping lives in the committed .npmrc.
@@ -101,7 +101,7 @@ jobs:
           cache: npm
 
       - name: Install (workspaces)
-        run: npm ci
+        run: npm ci --ignore-scripts
         env:
           NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -109,7 +109,7 @@ jobs:
         run: npm run -s build:all
 
       - name: Install Mobile Example
-        run: npm ci --prefix examples/mobile
+        run: npm ci --ignore-scripts --prefix examples/mobile
         env:
           # The example depends on the privacy SDK directly, so this install
           # needs the token too — not just the workspace install above.
@@ -130,7 +130,7 @@ jobs:
         run: npx expo export --platform android --output-dir /tmp/mobile-android-build
 
       - name: Install Web Example
-        run: npm ci --prefix examples/web
+        run: npm ci --ignore-scripts --prefix examples/web
         env:
           NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
