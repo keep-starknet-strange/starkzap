@@ -15,6 +15,7 @@
     "baseUrl": ".",
     "paths": {
       "starkzap": ["../../src/index.ts"],
+      "starkzap/privacy": ["../../src/privacy/index.ts"],
       "@/*": ["../../src/*"],
       "~/*": ["src/*"]
     }

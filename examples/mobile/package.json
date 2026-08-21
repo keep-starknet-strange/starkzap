@@ -3,11 +3,11 @@
   "main": "expo-router/entry",
   "version": "1.0.0",
   "dependencies": {
-    "@avnu/avnu-sdk": "4.2.0-next.2",
+    "@avnu/avnu-sdk": "4.2.0",
     "@ethersproject/shims": "^5.8.0",
-    "@fatsolutions/tongo-sdk": "^1.5.0",
     "@expo/ui": "~57.0.2",
     "@expo/vector-icons": "^15.0.2",
+    "@fatsolutions/tongo-sdk": "^1.5.0",
     "@privy-io/expo": "^0.69.4",
     "@privy-io/expo-native-extensions": "^0.0.11",
     "@react-native-async-storage/async-storage": "2.2.0",
@@ -15,6 +15,7 @@
     "@reown/appkit-react-native": "^2.0.5",
     "@reown/appkit-solana-react-native": "^2.0.5",
     "@solana/web3.js": "^1.98.4",
+    "@starkware-libs/starknet-privacy-sdk": "^0.14.3-rc.5",
     "@walletconnect/react-native-compat": "^2.23.10",
     "@walletconnect/safe-json": "^1.0.2",
     "assert": "^2.1.0",
@@ -44,7 +45,10 @@
     "react-native": "0.86.0",
     "react-native-gesture-handler": "~2.32.0",
     "react-native-get-random-values": "~1.11.0",
+    "react-native-nitro-modules": "^0.36.5",
     "react-native-passkeys": "^0.4.1",
+    "react-native-quick-base64": "^3.0.1",
+    "react-native-quick-crypto": "^1.1.7",
     "react-native-reanimated": "4.5.0",
     "react-native-safe-area-context": "~5.7.0",
     "react-native-screens": "4.25.2",
@@ -67,7 +71,8 @@
     "android": "expo run:android",
     "ios": "expo run:ios",
     "web": "expo start --web",
-    "lint": "expo lint"
+    "lint": "expo lint",
+    "typecheck": "tsc --noEmit"
   },
   "private": true
 }

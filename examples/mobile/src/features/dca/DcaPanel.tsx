@@ -9,14 +9,18 @@ import {
   Select,
   Segmented,
   IconSymbol,
+  Toggle,
 } from "@/ui";
 import { useTheme } from "@/theme";
 import { useTokensStore } from "@/core/tokens/store";
 import { PROVIDER_OPTIONS_LIST } from "@/core/wallet/store";
+import { useSettingsStore, useSponsoredAvailable } from "@/core/settings";
 import { useBalancesStore } from "@/features/balances/store";
 import { DCA_FREQUENCIES, useDcaStore } from "@/features/dca/store";
 
 export function DcaPanel() {
+  const sponsoredAvailable = useSponsoredAvailable();
+  const { sponsored, setSponsored } = useSettingsStore();
   const { colors, spacing } = useTheme();
   const tokens = useTokensStore((s) => s.tokens);
   const { balances, refresh } = useBalancesStore();
@@ -157,6 +161,13 @@ export function DcaPanel() {
           {previewing ? "Estimating…" : `≈ ${estPerCycle} per cycle`}
         </Text>
 
+        {sponsoredAvailable ? (
+          <Toggle
+            label="Sponsored"
+            value={sponsored}
+            onValueChange={setSponsored}
+          />
+        ) : null}
         <Button
           title="Create DCA order"
           loading={submitting}

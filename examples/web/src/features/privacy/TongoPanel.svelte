@@ -5,7 +5,7 @@
   import Button from "~/lib/ui/Button.svelte";
   import Select from "~/lib/ui/Select.svelte";
   import TextField from "~/lib/ui/TextField.svelte";
-  import { privacyTokens } from "./tokens";
+  import { tongoTokens } from "./tokens";
   import {
     tokenSymbol,
     instance,
@@ -38,10 +38,10 @@
     setTimeout(() => (copied = false), 1200);
   }
 
-  const tokenOptions = [
+  const tokenOptions = $derived([
     { label: "Select a token", value: "" },
-    ...privacyTokens().map((t) => ({ label: t.symbol, value: t.symbol })),
-  ];
+    ...$tongoTokens.map((t) => ({ label: t.symbol, value: t.symbol })),
+  ]);
   const fmt = (base: bigint) =>
     $token ? Amount.fromRaw(base, $token.decimals, $token.symbol).toFormatted(true) : "—";
 
@@ -59,7 +59,6 @@
   }
 </script>
 
-<Text variant="title">Privacy</Text>
 
 {#if !$enabled}
   <Text variant="muted">

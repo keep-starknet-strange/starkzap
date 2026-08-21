@@ -1,6 +1,7 @@
 import { useEffect } from "react";
-import { Card, Text, Button, TextField, Select } from "@/ui";
+import { Card, Text, Button, TextField, Select, Toggle } from "@/ui";
 import { useTheme } from "@/theme";
+import { useSettingsStore, useSponsoredAvailable } from "@/core/settings";
 import {
   useLendingStore,
   marketId,
@@ -8,6 +9,8 @@ import {
 } from "@/features/lending/store";
 
 export function BorrowPanel() {
+  const sponsoredAvailable = useSponsoredAvailable();
+  const { sponsored, setSponsored } = useSettingsStore();
   const { colors } = useTheme();
   const {
     markets,
@@ -109,6 +112,13 @@ export function BorrowPanel() {
           </Text>
         ) : null}
 
+        {sponsoredAvailable ? (
+          <Toggle
+            label="Sponsored"
+            value={sponsored}
+            onValueChange={setSponsored}
+          />
+        ) : null}
         <Button
           title="Borrow"
           loading={borrowSubmitting}

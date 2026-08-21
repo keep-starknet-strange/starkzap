@@ -9,14 +9,18 @@ import {
   TextField,
   Select,
   IconSymbol,
+  Toggle,
 } from "@/ui";
 import { useTheme } from "@/theme";
 import { useWalletStore } from "@/core/wallet/store";
 import { useTokensStore } from "@/core/tokens/store";
+import { useSettingsStore, useSponsoredAvailable } from "@/core/settings";
 import { useBalancesStore } from "@/features/balances/store";
 import { useTransfersStore } from "@/features/transfers/store";
 
 export default function TransfersTab() {
+  const sponsoredAvailable = useSponsoredAvailable();
+  const { sponsored, setSponsored } = useSettingsStore();
   const { colors, spacing } = useTheme();
   const wallet = useWalletStore((s) => s.wallet);
   const tokens = useTokensStore((s) => s.tokens);
@@ -116,6 +120,13 @@ export default function TransfersTab() {
         variant="secondary"
         onPress={() => addItem(firstToken)}
       />
+      {sponsoredAvailable ? (
+        <Toggle
+          label="Sponsored"
+          value={sponsored}
+          onValueChange={setSponsored}
+        />
+      ) : null}
       <Button
         title="Send"
         loading={submitting}
