@@ -691,6 +691,17 @@ export class Wallet extends BaseWallet {
     return this.account.estimateInvokeFee(calls);
   }
 
+  /**
+   * Release what this wallet handed out.
+   *
+   * The wallet itself stays usable: the account, the signer and the provider are
+   * untouched, so it still signs and sends, and `connectPrivacy` builds a fresh
+   * client with a freshly derived viewing key. Nothing enforces an end of
+   * session, and a flag that did would buy nothing -- the viewing key is
+   * deterministic, so whoever holds the private key can derive it again whatever
+   * this object says. To end a session for real, drop the wallet and build a new
+   * one on the next login, which is what the examples do.
+   */
   override async disconnect(): Promise<void> {
     await super.disconnect();
     this.clearDeploymentCache();

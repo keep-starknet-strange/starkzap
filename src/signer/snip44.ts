@@ -114,6 +114,19 @@ function serializeContext(context: ViewingKeyContext): Uint8Array {
  * because the pool stores the key's public x-coordinate on first registration
  * and treats it as authoritative.
  *
+ * Stark-curve keys only. SNIP-44 also admits a secp256k1 account leaf, and this
+ * range check refuses one: secp256k1's order is larger, so such a key lands
+ * Nothing here produces one -- `StarkSigner` is the only signer that derives at
+ * all.
+ *
+ * Supporting one means a second profile with its own separator and version,
+ * chosen by the signer's curve, and this one left as it is. Not a widened range,
+ * and never a curve inferred from the scalar's size: the curve belongs to the
+ * signer, and a scalar below `n` given to `StarkSigner` is a Stark key. Nothing
+ * that feeds the HMAC may move -- separator, context version, context widths,
+ * modulus, fold -- because the pool stores the key's public x-coordinate at
+ * first registration and cannot be told a new one.
+ *
  * @param privateKey - The account's private scalar, hex or bigint
  * @param context - Chain, account, pool and key slot to bind the key to
  * @returns The viewing key as a 0x-hex string, in `[1, n/2)`
