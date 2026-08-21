@@ -76,11 +76,10 @@ export function assertViewingKeySigner(signer: SignerInterface): void {
       "[starkzap] The default viewing-key derivation needs a signer that " +
         "implements `deriveViewingKey`, which derives the key from the account " +
         "key inside the signer (SNIP-44 `account-leaf-v1`). `StarkSigner` does; " +
-        "signers that only sign, such as the Privy and Cartridge ones, cannot — " +
-        "a signature is deliberately not accepted as a substitute, because " +
-        "anyone who obtains it can reconstruct the viewing key. Either implement " +
-        "the method on your signer (`deriveAccountLeafViewingKey` is exported " +
-        "for that) or pass your own `viewingKeyDerivation`."
+        "signers that only sign, such as the Privy and Cartridge ones, cannot " +
+        "run a KDF over their key material at all. Either implement the method " +
+        "on your signer (`deriveAccountLeafViewingKey` is exported for that) or " +
+        "pass your own `viewingKeyDerivation`."
     );
   }
 }

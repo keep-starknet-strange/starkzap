@@ -1,4 +1,4 @@
-import { ec, num } from "starknet";
+import { ec, encode, num } from "starknet";
 import type { ViewingKeyContext } from "@/signer/interface";
 
 /** Stark curve order. */
@@ -56,7 +56,9 @@ function hmacSha256(key: Uint8Array, data: Uint8Array): Uint8Array {
  *
  * Fixed width on purpose. Trimming leading zeros would let two different
  * contexts serialize to the same bytes, which is exactly what the separation
- * between accounts and pools rests on.
+ * between accounts and pools rests on. That rules out starknet's
+ * `encode.bigIntToUint8Array`, which takes no width and returns the shortest
+ * encoding.
  */
 function i2osp(value: bigint, length: number): Uint8Array {
   if (value < 0n) {
@@ -77,35 +79,15 @@ function i2osp(value: bigint, length: number): Uint8Array {
   return out;
 }
 
-/** Big-endian byte decoding, the inverse of {@link i2osp}. */
-function os2ip(bytes: Uint8Array): bigint {
-  let value = 0n;
-  for (const byte of bytes) {
-    value = (value << 8n) | BigInt(byte);
-  }
-  return value;
-}
-
-function concatBytes(...parts: Uint8Array[]): Uint8Array {
-  const total = parts.reduce((sum, part) => sum + part.length, 0);
-  const out = new Uint8Array(total);
-  let offset = 0;
-  for (const part of parts) {
-    out.set(part, offset);
-    offset += part.length;
-  }
-  return out;
-}
-
 /** The 116-byte serialized derivation context. */
 function serializeContext(context: ViewingKeyContext): Uint8Array {
-  const bytes = concatBytes(
+  const bytes = encode.concatenateArrayBuffer([
     i2osp(CONTEXT_VERSION, 4),
     i2osp(BigInt(context.chainId), 32),
     i2osp(BigInt(context.accountAddress), 32),
     i2osp(BigInt(context.poolAddress), 32),
-    i2osp(BigInt(context.keyIndex ?? 0), 16)
-  );
+    i2osp(BigInt(context.keyIndex ?? 0), 16),
+  ]);
 
   // Cheap, and it is the one thing a silent mistake here would not surface: a
   // context of the wrong width still hashes, just to a key nothing can read.
@@ -153,7 +135,7 @@ export function deriveAccountLeafViewingKey(
 
   const key = i2osp(scalar, 32);
   const contextBytes = serializeContext(context);
-  const domain = new TextEncoder().encode(DOMAIN_SEPARATOR);
+  const domain = encode.utf8ToUint8Array(DOMAIN_SEPARATOR);
 
   // The counter only advances for digests the profile rejects: at or above
   // `LIMIT`, or reducing to zero. Both are ~2^-250 events, so this is a loop
@@ -161,10 +143,10 @@ export function deriveAccountLeafViewingKey(
   for (let counter = 0n; counter < 2n ** 32n; counter++) {
     const digest = hmacSha256(
       key,
-      concatBytes(domain, contextBytes, i2osp(counter, 4))
+      encode.concatenateArrayBuffer([domain, contextBytes, i2osp(counter, 4)])
     );
 
-    const candidate = os2ip(digest);
+    const candidate = encode.uint8ArrayToBigInt(digest);
     if (candidate >= LIMIT) continue;
 
     const x = candidate % ORDER;

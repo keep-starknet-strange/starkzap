@@ -116,6 +116,27 @@ describe("deriveAccountLeafViewingKey (SNIP-44 account-leaf-v1)", () => {
       );
     }
   });
+
+  it("should reject a context field that does not fit its slot", () => {
+    // `keyIndex` is a plain number and the addresses are unchecked felt
+    // strings, so the width guards sit on caller input, not on internal
+    // callers. A field that overflowed silently would truncate and hand back a
+    // key that reads someone else's notes.
+    expect(() =>
+      deriveAccountLeafViewingKey(key, { ...context, keyIndex: -1 })
+    ).toThrow(/negative/);
+
+    expect(() =>
+      deriveAccountLeafViewingKey(key, { ...context, keyIndex: 2 ** 128 })
+    ).toThrow(/does not fit in 16 bytes/);
+
+    expect(() =>
+      deriveAccountLeafViewingKey(key, {
+        ...context,
+        accountAddress: num.toHex(2n ** 256n),
+      })
+    ).toThrow(/does not fit in 32 bytes/);
+  });
 });
 
 describe("accountLeafDerivation", () => {
