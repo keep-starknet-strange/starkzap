@@ -18,7 +18,12 @@ import {
   type PrivacySimulation,
   type ProvableAttempt,
 } from "starkzap-native/privacy";
-import { paymasterProxyUrl, privacyConfig } from "@/core/config";
+import {
+  paymasterProxyUrl,
+  privacyConfig,
+  PRIVY_SERVER_URL,
+} from "@/core/config";
+import { resolveExamplePaymasterNodeUrl } from "@/core/paymaster";
 import { feeOptions } from "@/core/settings";
 import { NETWORKS } from "@/core/network";
 import { useTokensStore } from "@/core/tokens/store";
@@ -169,6 +174,28 @@ export function feeLabel(
     : `${amount} base units of ${address}`;
 }
 
+/**
+ * Privacy config for a network, with the paymaster resolved as the app resolves
+ * it everywhere else.
+ *
+ * Privacy transactions are relayer-submitted, so the paymaster is not optional
+ * here: an explicit proxy URL wins, and Sepolia otherwise falls back to the
+ * example server's route. Reading `paymasterProxyUrl` alone reported the whole
+ * tab as unconfigured for anyone running only the example server.
+ */
+function configFor(networkIndex: number) {
+  const chainId = NETWORKS[networkIndex].chainId;
+  const network = chainId.isSepolia() ? "sepolia" : "mainnet";
+  return privacyConfig(
+    network,
+    resolveExamplePaymasterNodeUrl({
+      explicitProxyUrl: paymasterProxyUrl(network),
+      privyServerUrl: PRIVY_SERVER_URL,
+      chainId: chainId.toLiteral(),
+    })
+  );
+}
+
 /** Why the STRK20 tab cannot be used on this network, or null when it can. */
 export function unavailableReason(
   networkIndex: number,
@@ -177,11 +204,12 @@ export function unavailableReason(
   const network = NETWORKS[networkIndex].chainId.isSepolia()
     ? "sepolia"
     : "mainnet";
-  if (!privacyConfig(network, paymasterProxyUrl(network) || null)) {
+  if (!configFor(networkIndex)) {
     return (
       `Set EXPO_PUBLIC_PRIVACY_POOL_*, EXPO_PUBLIC_PRIVACY_PROVER_* and ` +
       `EXPO_PUBLIC_PRIVACY_DISCOVERY_* for ${network}, plus ` +
-      `EXPO_PUBLIC_PAYMASTER_PROXY_URL_${network.toUpperCase()} — privacy transactions are submitted by a ` +
+      `EXPO_PUBLIC_PAYMASTER_PROXY_URL_${network.toUpperCase()} (or, on Sepolia, ` +
+      `EXPO_PUBLIC_PRIVY_SERVER_URL) — privacy transactions are submitted by a ` +
       `paymaster's relayer, which is what keeps your account off-chain.`
     );
   }
@@ -216,6 +244,31 @@ function describe(err: unknown): string {
 }
 
 export const useStrk20Store = create<Strk20Store>((set, get) => {
+  /**
+   * Cancels the block waits of whatever operation is in flight.
+   *
+   * Lives with the store, and for the same reason: the operation outlives the
+   * screen that started it.
+   */
+  let inFlight: AbortController | null = null;
+
+  /**
+   * Build an operation, reporting a bad amount rather than throwing.
+   *
+   * `Amount.parse` rejects input the keypad still allows — "1.2.3", or more
+   * decimal places than the token has. Thrown from an `onPress` handler it
+   * escapes this store's error handling entirely: an unhandled rejection, and a
+   * UI that does nothing.
+   */
+  function build(make: () => Operation): Operation | null {
+    try {
+      return make();
+    } catch (err) {
+      set({ error: describe(err) });
+      return null;
+    }
+  }
+
   /**
    * Log every poll of a block wait, and mirror it into `waitingBlocks`.
    *
@@ -299,10 +352,12 @@ export const useStrk20Store = create<Strk20Store>((set, get) => {
     const wallet = localWallet(useWalletStore.getState().wallet);
     if (!privacy || !wallet) return false;
 
+    const abort = new AbortController();
+    inFlight = abort;
     set({ busy: true, error: null, step: `${label}: proving and submitting…` });
     try {
       const { transactionHash } = await privacy.send(compose, {
-        wait: { onAttempt: onWait },
+        wait: { onAttempt: onWait, signal: abort.signal },
         ...options,
       });
 
@@ -316,13 +371,28 @@ export const useStrk20Store = create<Strk20Store>((set, get) => {
         wallet.getChainId()
       ).wait();
 
-      set({ step: `${label}: refreshing…`, fee: await privacy.quote() });
-      await get().refresh();
+      // Past the receipt the funds have moved. What follows is bookkeeping, and a
+      // quote or a refresh that fails must not be reported as a failed
+      // transaction.
+      set({ step: `${label}: refreshing…` });
+      try {
+        set({ fee: await privacy.quote() });
+        await get().refresh();
+      } catch (err) {
+        set({
+          error:
+            `${label} executed on-chain, but reloading the balances ` +
+            `failed: ${describe(err)}`,
+        });
+      }
       return true;
     } catch (err) {
-      set({ error: describe(err) });
+      // A logout cancelled it. The user asked for that, and the state this would
+      // write to was just cleared.
+      if (!abort.signal.aborted) set({ error: describe(err) });
       return false;
     } finally {
+      if (inFlight === abort) inFlight = null;
       set({ waitingBlocks: null, step: null, busy: false });
     }
   }
@@ -358,6 +428,13 @@ export const useStrk20Store = create<Strk20Store>((set, get) => {
      * login that created it.
      */
     clear: () => {
+      // The waits are the long part of a send — minutes of polling — and they are
+      // what leaves the UI looking stuck after a logout. Proving is not
+      // cancellable, so an operation already past that point still submits; the
+      // SDK says as much.
+      inFlight?.abort(new Error("The privacy session was closed."));
+      inFlight = null;
+
       const current = get().client;
       set({
         client: null,
@@ -367,18 +444,18 @@ export const useStrk20Store = create<Strk20Store>((set, get) => {
         fee: null,
         error: null,
         pending: null,
+        // Owned by an operation that is no longer going to finish, so nothing
+        // else will clear them: a `busy` left set disables every button.
+        busy: false,
+        step: null,
+        connecting: false,
       });
       if (current) revokePrivacy(current.transfers);
     },
 
     connect: async () => {
       const wallet = localWallet(useWalletStore.getState().wallet);
-      const network = NETWORKS[
-        useWalletStore.getState().networkIndex
-      ].chainId.isSepolia()
-        ? "sepolia"
-        : "mainnet";
-      const config = privacyConfig(network, paymasterProxyUrl(network) || null);
+      const config = configFor(useWalletStore.getState().networkIndex);
       // `unavailableReason` already tells the user when the config is missing;
       // this guard is what narrows it for `connectPrivacy`.
       if (!wallet || !config) return;
@@ -448,17 +525,17 @@ export const useStrk20Store = create<Strk20Store>((set, get) => {
      */
     deposit: async (token, input) => {
       const wallet = localWallet(useWalletStore.getState().wallet);
-      const network = NETWORKS[
-        useWalletStore.getState().networkIndex
-      ].chainId.isSepolia()
-        ? "sepolia"
-        : "mainnet";
-      const config = privacyConfig(network, paymasterProxyUrl(network) || null);
+      const config = configFor(useWalletStore.getState().networkIndex);
       if (!wallet || !config || !input.trim()) return false;
 
-      const amount = Amount.parse(input, token);
+      const abort = new AbortController();
+      inFlight = abort;
       set({ busy: true, error: null, step: "Deposit: approving…" });
       try {
+        // Inside the try: a rejected amount is user input, not a broken deposit,
+        // and parsing it outside meant the throw escaped into an unhandled
+        // rejection with nothing shown.
+        const amount = Amount.parse(input, token);
         const tx = await wallet
           .tx()
           .approve(token, fromAddress(config.poolContractAddress), amount)
@@ -477,7 +554,7 @@ export const useStrk20Store = create<Strk20Store>((set, get) => {
           token,
           fromAddress(wallet.address),
           amount.toBase(),
-          { onAttempt: onWait }
+          { onAttempt: onWait, signal: abort.signal }
         );
 
         // Submitted without the warning check the other two get. The approve is
@@ -501,9 +578,10 @@ export const useStrk20Store = create<Strk20Store>((set, get) => {
           },
         });
       } catch (err) {
-        set({ error: describe(err) });
+        if (!abort.signal.aborted) set({ error: describe(err) });
         return false;
       } finally {
+        if (inFlight === abort) inFlight = null;
         set({ waitingBlocks: null, step: null, busy: false });
       }
     },
@@ -511,13 +589,19 @@ export const useStrk20Store = create<Strk20Store>((set, get) => {
     transfer: (token, recipient, input) => {
       const wallet = localWallet(useWalletStore.getState().wallet);
       if (!wallet) return Promise.resolve(false);
-      return run(transferOp(token, recipient, input, wallet.address));
+      const op = build(() =>
+        transferOp(token, recipient, input, wallet.address)
+      );
+      return op ? run(op) : Promise.resolve(false);
     },
 
     simulateTransfer: async (token, recipient, input) => {
       const wallet = localWallet(useWalletStore.getState().wallet);
       if (!wallet) return;
-      await preview(transferOp(token, recipient, input, wallet.address));
+      const op = build(() =>
+        transferOp(token, recipient, input, wallet.address)
+      );
+      if (op) await preview(op);
     },
 
     /**
@@ -531,13 +615,19 @@ export const useStrk20Store = create<Strk20Store>((set, get) => {
     withdraw: (token, recipient, input) => {
       const wallet = localWallet(useWalletStore.getState().wallet);
       if (!wallet || !recipient.trim()) return Promise.resolve(false);
-      return run(withdrawOp(token, recipient, input, wallet.address));
+      const op = build(() =>
+        withdrawOp(token, recipient, input, wallet.address)
+      );
+      return op ? run(op) : Promise.resolve(false);
     },
 
     simulateWithdraw: async (token, recipient, input) => {
       const wallet = localWallet(useWalletStore.getState().wallet);
       if (!wallet || !recipient.trim()) return;
-      await preview(withdrawOp(token, recipient, input, wallet.address));
+      const op = build(() =>
+        withdrawOp(token, recipient, input, wallet.address)
+      );
+      if (op) await preview(op);
     },
 
     /**

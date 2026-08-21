@@ -110,10 +110,13 @@ describe("deriveAccountLeafViewingKey (SNIP-44 account-leaf-v1)", () => {
     ).toBe(deriveAccountLeafViewingKey(key, context));
   });
 
-  it("should reject a private key outside the curve's scalar range", () => {
-    for (const invalid of [0n, ORDER, ORDER + 1n]) {
+  it("should reject a private key that is not a scalar in range", () => {
+    // The unreadable ones matter as much as the out-of-range ones: `BigInt`
+    // rejects them with a bare `SyntaxError` that names neither starkzap nor the
+    // key, which reads as an internal fault rather than bad input.
+    for (const invalid of [0n, ORDER, ORDER + 1n, "0xzz", "", "not a key"]) {
       expect(() => deriveAccountLeafViewingKey(invalid, context)).toThrow(
-        /scalar range/
+        /not a scalar/
       );
     }
   });

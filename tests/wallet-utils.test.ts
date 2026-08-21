@@ -320,6 +320,19 @@ describe("wallet utils", () => {
       ).toThrow("generated against block 105, only 5 block(s) behind");
     });
 
+    it("names the real problem for a base block ahead of the head", () => {
+      // Sharing the lower-bound message here reads as "wait a little longer",
+      // which no wait fixes: the proof is either from another chain or this node
+      // is behind. It also printed a negative age.
+      expect(() =>
+        assertProofBaseBlockAged(
+          { data: "0x1", proofFacts: factsWithBase(113) },
+          110,
+          10
+        )
+      ).toThrow(/block 113, which is ahead of the head \(110\)/);
+    });
+
     it("accepts a base block inside the pool's validity window", () => {
       expect(() =>
         assertProofBaseBlockAged(

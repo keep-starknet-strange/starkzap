@@ -24,6 +24,7 @@ import {
   waitForProvableBlock,
   type ProvableBlockOptions,
 } from "@/privacy/sequencing";
+import { assertProofFresh } from "@/wallet/utils";
 
 /** Options for a single {@link PrivacyClient.send}. */
 export interface PrivacySendOptions extends Omit<
@@ -132,6 +133,9 @@ export interface PrivacySendResult extends PrivacySubmission {
    * this layer still never writes to it — adopt this result when you are
    * satisfied the transaction landed, or discard it and let discovery rebuild.
    * Ignore it entirely to have each transaction discover its own state.
+   *
+   * The scan position is preserved across that copy. The SDK's own clone drops
+   * it, which would make adopting a registry cost a full rescan from genesis.
    */
   registry: PrivateRegistry;
 }
@@ -255,6 +259,9 @@ export interface PrivacyClient extends Pick<
    * built against {@link PrivacyClient.transfers}. You are responsible for
    * having included the fee withdrawal from {@link PrivacyClient.quote}. The
    * paymaster rejects a proof without it.
+   *
+   * A proof outside the pool's validity window is refused here rather than sent,
+   * so one that sat around too long costs nothing to discover.
    *
    * @param callAndProof - The pool call and its proof
    * @returns The transaction hash, and the relayer's tracking id when it gave one
@@ -480,8 +487,15 @@ export function withPaymaster(
   }
 
   /** Block the previous send landed in, or -1 when there is nothing to age. */
-  async function previousBlock(): Promise<number> {
+  async function previousBlock(wait?: ProvableBlockOptions): Promise<number> {
     if (lastSubmittedTxHash === undefined) return -1;
+
+    // Bounded, because the hash is the relayer's word: one it returns but never
+    // broadcasts is never found, and every later send on this client queues
+    // behind this wait. The same budget the caller gave the block wait, spent as
+    // starknet.js counts it -- one poll per interval.
+    const pollIntervalMs = wait?.pollIntervalMs ?? 2_000;
+    const timeoutMs = wait?.timeoutMs ?? 300_000;
 
     // `errorStates: []` so a reverted previous transaction does not fail *this*
     // send: it still occupies a block, and ageing that block is harmless.
@@ -489,6 +503,8 @@ export function withPaymaster(
       lastSubmittedTxHash,
       {
         errorStates: [],
+        retryInterval: pollIntervalMs,
+        retries: Math.max(1, Math.ceil(timeoutMs / pollIntervalMs)),
       }
     );
     return receipt.isError() ? -1 : receipt.block_number;
@@ -509,7 +525,7 @@ export function withPaymaster(
   async function resolveProvingBlock(
     options?: PrivacySendOptions
   ): Promise<number> {
-    const previous = await previousBlock();
+    const previous = await previousBlock(options?.wait);
 
     // The caller's block is used only if it already includes our last
     // transaction. An older one would prove against state that still shows the
@@ -544,6 +560,13 @@ export function withPaymaster(
     parameters?: unknown,
     invoke?: PrivacySignedInvoke
   ): Promise<PrivacySubmission> {
+    await assertProofFresh(
+      callAndProof.proof,
+      binding.provider,
+      PROOF_BASE_BLOCK_DEPTH,
+      pool
+    );
+
     try {
       const submission = await paymaster.execute(
         callAndProof.call,
@@ -631,6 +654,14 @@ export function withPaymaster(
     const { warnings } = await builder.simulate({
       node: binding.provider,
     });
+
+    // Same callback as `send`, and this is the path its documentation points at:
+    // here the warnings arrive before anything has been paid for. Returned as
+    // well, so a caller can have them either way.
+    if (warnings.length > 0 && options?.onWarnings) {
+      await options.onWarnings(warnings);
+    }
+
     return { warnings, feeAction };
   }
 
@@ -692,6 +723,17 @@ export function withPaymaster(
     appendFeeWithdrawal(builder, feeAction);
 
     const { callAndProof, warnings, registry } = await builder.execute();
+
+    // The SDK's clone copies channels and notes but not the discovery cursor, so
+    // a caller who adopts this registry -- the flow this result documents -- would
+    // silently restart scanning from genesis. Their own cursor is carried over,
+    // and only when this run did not set a newer one.
+    if (
+      registry.cursor === undefined &&
+      options?.registry?.cursor !== undefined
+    ) {
+      registry.cursor = options.registry.cursor;
+    }
 
     // Reported rather than acted on. The SDK raises `USER_LINKAGE` for a
     // transaction that may connect the user's private and public identities,

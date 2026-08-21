@@ -1,4 +1,4 @@
-import { CallData, hash, num, shortString } from "starknet";
+import { CallData, hash, num, shortString, stark } from "starknet";
 import type { Call, Signature, TypedData } from "starknet";
 import { fromAddress, type Address } from "@/types";
 import { assertSafeHttpUrl } from "@/utils";
@@ -450,10 +450,6 @@ function sameFelt(a: unknown, b: unknown): boolean {
  * compromised or misconfigured endpoint swap the calls, redirect the execution to
  * a different caller, or widen the validity window. A type assertion on the
  * response is not a check: these are.
- *
- * The chain is deliberately absent. An endpoint pointed at the wrong network
- * fails earlier and more clearly, when the paymaster refuses a pool it does not
- * know with code 156.
  */
 function assertSignableTypedData(
   typedData: TypedData,
@@ -916,7 +912,7 @@ export class PrivacyPaymaster {
             invoke: {
               user_address: invoke.userAddress,
               typed_data: invoke.typedData,
-              signature: invoke.signature,
+              signature: stark.signatureToHexArray(invoke.signature),
             },
           }
         : { type: "apply_action", apply_action },

@@ -179,6 +179,14 @@ export function assertProofBaseBlockAged(
   if (base === undefined) return;
   const age = head - base;
 
+  if (age < 0) {
+    throw new Error(
+      `[starkzap] This proof was generated against block ${base}, which is ` +
+        `ahead of the head (${head}). Either it was not proved against this ` +
+        "chain, or this RPC node is behind the one that proved it."
+    );
+  }
+
   if (age < depth) {
     throw new Error(
       `[starkzap] This proof was generated against block ${base}, only ${age} ` +

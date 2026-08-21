@@ -20,6 +20,12 @@
  * two incompatible `WalletAccount` versions), which is not ours to fix. This
  * gate is scoped to declarations starkzap ships.
  *
+ * Every published entry point is checked, not just the root: a subpath has its
+ * own module graph, so a peer leaking into `starkzap/privacy` is invisible from
+ * `starkzap`. No peer is installed for any of them. Instead each entry declares
+ * the peers it is *allowed* to name -- the subject of that subpath -- and an
+ * unresolved module outside that list is the leak.
+ *
  * Usage: node scripts/check-declaration-leaks.mjs
  */
 import { execFileSync } from "node:child_process";
@@ -29,6 +35,53 @@ import { join } from "node:path";
 
 const repo = process.cwd();
 const work = mkdtempSync(join(tmpdir(), "starkzap-decl-"));
+
+/**
+ * The published entry points, and the optional peers each may legitimately name.
+ *
+ * Keep in step with `exports` in package.json. An entry missing from here is
+ * never checked, which is the failure mode this list exists to prevent.
+ */
+const ENTRIES = [
+  // The root entry may name none of them: every consumer's module graph reaches
+  // it, whichever features they use.
+  { specifier: "starkzap", allowed: [] },
+  // The privacy SDK is what this subpath is *for*, so its types are named on
+  // purpose. Anything else appearing here is the leak.
+  {
+    specifier: "starkzap/privacy",
+    allowed: ["@starkware-libs/starknet-privacy-sdk"],
+  },
+  { specifier: "starkzap/cartridge", allowed: ["@cartridge/controller"] },
+];
+
+/**
+ * Errors in shipped declarations, minus the peers this entry is allowed to name.
+ *
+ * An unresolvable import is `TS2307` and names the module, so the allowance is
+ * matched against that name -- and its subpaths, since a peer's `/testing` entry
+ * is the same dependency.
+ */
+function leaks(output, allowed) {
+  return output
+    .split("\n")
+    .filter(
+      (line) =>
+        line.includes("node_modules/starkzap/") && line.includes("error TS")
+    )
+    .filter((line) => {
+      const missing = /error TS2307: Cannot find module '([^']+)'/.exec(
+        line
+      )?.[1];
+      return !(
+        missing &&
+        allowed.some(
+          (peer) => missing === peer || missing.startsWith(`${peer}/`)
+        )
+      );
+    })
+    .map((line) => line.replace(/^.*node_modules\/starkzap\//, ""));
+}
 
 /** Run a command, returning stdout and never throwing on a non-zero exit. */
 function run(command, args, cwd) {
@@ -70,26 +123,30 @@ try {
       type: "module",
     })
   );
-  writeFileSync(
-    join(work, "tsconfig.json"),
-    JSON.stringify({
-      compilerOptions: {
-        target: "ES2022",
-        module: "NodeNext",
-        moduleResolution: "NodeNext",
-        strict: true,
-        noEmit: true,
-        // The flag that makes a leak visible rather than silently `any`.
-        skipLibCheck: false,
-      },
-      files: ["consumer.ts"],
-    })
-  );
-  // A namespace import, so every re-export from the root entry is reached.
-  writeFileSync(
-    join(work, "consumer.ts"),
-    'import * as starkzap from "starkzap";\nexport const exportCount = Object.keys(starkzap).length;\n'
-  );
+  // One fixture per entry point: a namespace import reaches every re-export, and
+  // separate typecheck runs keep each entry's allowance to itself.
+  ENTRIES.forEach(({ specifier }, index) => {
+    writeFileSync(
+      join(work, `consumer-${index}.ts`),
+      `import * as entry from "${specifier}";\n` +
+        `export const exportCount = Object.keys(entry).length;\n`
+    );
+    writeFileSync(
+      join(work, `tsconfig-${index}.json`),
+      JSON.stringify({
+        compilerOptions: {
+          target: "ES2022",
+          module: "NodeNext",
+          moduleResolution: "NodeNext",
+          strict: true,
+          noEmit: true,
+          // The flag that makes a leak visible rather than silently `any`.
+          skipLibCheck: false,
+        },
+        files: [`consumer-${index}.ts`],
+      })
+    );
+  });
 
   console.log("• installing the tarball with no optional peers");
   const install = run(
@@ -102,36 +159,36 @@ try {
     throw new Error("installing the tarball failed");
   }
 
-  console.log("• typechecking as a consumer would");
-  const tsc = run(
-    join(repo, "node_modules", ".bin", "tsc"),
-    ["-p", "tsconfig.json"],
-    work
-  );
+  let failed = false;
+  ENTRIES.forEach(({ specifier, allowed }, index) => {
+    console.log(`• typechecking \`${specifier}\` as a consumer would`);
+    const tsc = run(
+      join(repo, "node_modules", ".bin", "tsc"),
+      ["-p", `tsconfig-${index}.json`],
+      work
+    );
 
-  const ours = tsc.out
-    .split("\n")
-    .filter(
-      (line) =>
-        line.includes("node_modules/starkzap/") && line.includes("error TS")
-    )
-    .map((line) => line.replace(/^.*node_modules\/starkzap\//, ""));
+    const ours = leaks(tsc.out, allowed);
+    if (ours.length === 0) return;
 
-  if (ours.length > 0) {
+    failed = true;
     console.error(
-      `\n✗ ${ours.length} error(s) in shipped declarations. A consumer without the\n` +
-        "  optional peers cannot typecheck against this build:\n"
+      `\n✗ ${ours.length} error(s) reaching \`${specifier}\`. A consumer with only\n` +
+        `  ${allowed.length > 0 ? allowed.join(", ") : "no optional peer"} installed cannot typecheck against this build:\n`
     );
     for (const line of ours) console.error(`    ${line}`);
+  });
+
+  if (failed) {
     console.error(
-      "\n  Fix by keeping the peer's types out of anything reachable from the package\n" +
-        "  entry: move them to a module the barrels do not re-export, or replace them\n" +
+      "\n  Fix by keeping the peer's types out of anything reachable from that entry\n" +
+        "  point: move them to a module the barrels do not re-export, or replace them\n" +
         "  with types this package owns. See src/bridge/ethereum/ethers-interop.ts and\n" +
         "  src/confidential/tongoRuntime.ts for the two shapes that work.\n"
     );
     process.exitCode = 1;
   } else {
-    console.log("\n✓ no shipped declaration requires an optional peer");
+    console.log("\n✓ no entry point requires a peer it is not allowed to name");
   }
 } finally {
   rmSync(work, { recursive: true, force: true });
