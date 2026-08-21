@@ -316,6 +316,7 @@ export function withPaymaster(
       allowedFeeRecipients: binding.allowedFeeRecipients,
     }),
     ...(binding.fetch && { fetch: binding.fetch }),
+    ...(binding.timeoutMs !== undefined && { timeoutMs: binding.timeoutMs }),
   });
   const pool = fromAddress(binding.poolContractAddress);
 

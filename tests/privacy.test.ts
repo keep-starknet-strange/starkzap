@@ -770,6 +770,30 @@ describe("privacy", () => {
       ).rejects.toThrow("returned no fee action");
     });
 
+    it("gives up on a request that never answers", async () => {
+      // Honours the signal the way real fetch does. A mock that ignored it would
+      // hang this test rather than fail it, which is also what a `fetch` wrapper
+      // that drops the signal does in production.
+      const hangs: typeof fetch = (_input, init) =>
+        new Promise((_resolve, reject) => {
+          init?.signal?.addEventListener(
+            "abort",
+            () => reject(init.signal?.reason),
+            { once: true }
+          );
+        });
+
+      const error = await rejectedBy(() =>
+        new PrivacyPaymaster(URL, { fetch: hangs, timeoutMs: 10 }).quote(POOL, {
+          mode: "sponsored",
+        })
+      );
+
+      expect(error.message).toContain(
+        "did not answer paymaster_buildTransaction within 10ms"
+      );
+    });
+
     /**
      * A proxy that holds the API key is itself worth gating, and gating it needs
      * a credential. Rather than growing a field per concern, the transport is

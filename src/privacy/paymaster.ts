@@ -104,6 +104,17 @@ export interface PrivacyPaymasterConfig {
    */
   fetch?: typeof fetch;
   /**
+   * Give up on a paymaster request after this many milliseconds.
+   *
+   * Defaults to two minutes. The ceiling has to cover an `execute`, whose body
+   * is the whole proof, so it is generous rather than tight. Its job is to stop
+   * a hung endpoint from stalling the client forever, not to enforce latency.
+   *
+   * A {@link PrivacyPaymasterConfig.fetch} wrapper that sets its own `signal`
+   * overrides this.
+   */
+  timeoutMs?: number;
+  /**
    * Refuse a quote whose fee exceeds this, in base units of the fee token.
    *
    * The paymaster's response decides how much of the shielded balance leaves the
@@ -698,6 +709,14 @@ function parseGasQuote(fee: unknown): PrivacyGasQuote | undefined {
 }
 
 /**
+ * Default ceiling on a single paymaster request.
+ *
+ * Sized for `paymaster_executeTransaction`, which uploads the whole proof and is
+ * megabytes on a link the SDK does not choose.
+ */
+const DEFAULT_TIMEOUT_MS = 120_000;
+
+/**
  * Minimal client for a privacy-capable paymaster.
  *
  * The privacy transaction types (`apply_action`) are not part of SNIP-29, so
@@ -721,6 +740,7 @@ export class PrivacyPaymaster {
   private readonly url: string;
   private readonly policy: FeeActionPolicy;
   private readonly fetchImpl: typeof fetch | undefined;
+  private readonly timeoutMs: number;
 
   /**
    * @param url - Paymaster endpoint, or a proxy in front of it
@@ -730,6 +750,8 @@ export class PrivacyPaymaster {
    *   {@link PrivacyPaymasterConfig.allowedFeeRecipients}
    * @param options.fetch - Transport override. See
    *   {@link PrivacyPaymasterConfig.fetch}
+   * @param options.timeoutMs - Request ceiling. See
+   *   {@link PrivacyPaymasterConfig.timeoutMs}
    */
   constructor(
     url: string,
@@ -737,6 +759,7 @@ export class PrivacyPaymaster {
       maxFee?: bigint;
       allowedFeeRecipients?: readonly Address[];
       fetch?: typeof fetch;
+      timeoutMs?: number;
     }
   ) {
     assertSafeHttpUrl(url, "Privacy paymaster URL");
@@ -748,6 +771,7 @@ export class PrivacyPaymaster {
       }),
     };
     this.fetchImpl = options?.fetch;
+    this.timeoutMs = options?.timeoutMs ?? DEFAULT_TIMEOUT_MS;
   }
 
   /**
@@ -939,6 +963,20 @@ export class PrivacyPaymaster {
         Accept: "application/json",
       },
       body: JSON.stringify({ jsonrpc: "2.0", id: 1, method, params }),
+      // Last in the object so a wrapper spreading `init` keeps it, and one
+      // setting its own `signal` wins.
+      signal: AbortSignal.timeout(this.timeoutMs),
+    }).catch((error: unknown) => {
+      // Matched by name rather than `instanceof`: this rejects with a
+      // `DOMException`, which does not extend `Error` in browsers.
+      if ((error as { name?: unknown } | null)?.name !== "TimeoutError") {
+        throw error;
+      }
+      throw new PrivacyPaymasterError(
+        -1,
+        `[starkzap] The privacy paymaster did not answer ${method} within ` +
+          `${this.timeoutMs}ms. Raise \`timeoutMs\` if this endpoint needs longer.`
+      );
     });
 
     // Undefined when the body is not JSON at all — typically an error page from
