@@ -12,6 +12,7 @@ import {
   type SignerInterface,
 } from "@/signer";
 import { testPrivateKeys } from "./config";
+import snip44Vectors from "./fixtures/snip-44-test-vectors.json";
 
 const ORDER = ec.starkCurve.CURVE.n;
 const HALF_ORDER = ORDER / 2n;
@@ -187,4 +188,51 @@ describe("assertCanonicalViewingKey", () => {
       expect(() => assertCanonicalViewingKey(key)).toThrow(/canonical|range/i);
     }
   });
+});
+
+describe("SNIP-44 published test vectors", () => {
+  // The only check in this file that is not self-referential. Every other
+  // assertion compares this implementation against itself, so it proves the
+  // derivation is stable, not that it is the one the pool expects. These
+  // vectors come from the SNIP author, so they prove the second thing.
+  //
+  // Source: adrienlacombe/SNIPs, branch
+  // `snip-44-strk20-viewing-key-derivation`, assets/snip-44/test-vectors.json.
+  // Vendored verbatim; refresh it if the SNIP lands with changes.
+  const vectorContext: ViewingKeyContext = {
+    chainId: snip44Vectors.context.chain_id,
+    accountAddress: snip44Vectors.context.account_address,
+    poolAddress: snip44Vectors.context.pool_address,
+    keyIndex: snip44Vectors.context.key_index,
+  };
+
+  it("should agree on the constants the profile pins", () => {
+    expect(BigInt(snip44Vectors.constants.stark_curve_order)).toBe(ORDER);
+    expect(BigInt(snip44Vectors.constants.lower_half_boundary)).toBe(
+      HALF_ORDER
+    );
+    expect(BigInt(snip44Vectors.constants.rejection_limit)).toBe(
+      2n ** 256n - (2n ** 256n % ORDER)
+    );
+  });
+
+  // The `rejection-sampling` vector accepts at counter 1, so it walks the
+  // reject-and-retry path. That path is live rather than theoretical: roughly
+  // one digest in 32 lands at or above the limit.
+  for (const vector of snip44Vectors.vectors) {
+    it(`should reproduce the ${vector.id} vector`, () => {
+      const derived = deriveAccountLeafViewingKey(
+        vector.account_leaf_private_key_be32,
+        vectorContext
+      );
+
+      expect(BigInt(derived)).toBe(BigInt(vector.viewing_key));
+
+      // The pool stores the x coordinate rather than the key itself, so this
+      // is the value that has to agree across implementations.
+      expect(BigInt(ec.starkCurve.getStarkKey(derived))).toBe(
+        BigInt(vector.public_key_x)
+      );
+    });
+  }
 });
