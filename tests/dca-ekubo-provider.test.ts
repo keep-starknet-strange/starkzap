@@ -5,6 +5,8 @@ import { DCA_CONTINUOUS_FREQUENCY } from "@/dca/interface";
 import { EkuboDcaProvider, getEkuboDcaPreset } from "@/dca/ekubo";
 import {
   assertNonNegativeInteger,
+  decodeEkuboOrderId,
+  encodeEkuboOrderId,
   parseEkuboOrdersResponse,
   parseIsoDurationSeconds,
   parseOrderInfoResult,
@@ -484,6 +486,15 @@ describe("EkuboDcaProvider", () => {
     });
   });
 
+  it.each([
+    ["empty", ""],
+    ["whitespace-only", "   "],
+  ])("rejects a %s string instead of parsing it as zero", (_label, value) => {
+    expect(() => parsePositiveBigInt(value, "tokenId")).toThrow(
+      "Invalid tokenId"
+    );
+  });
+
   it("preserves negative bigint validation errors", () => {
     expect(() => parsePositiveBigInt("-1", "tokenId")).toThrow(
       "tokenId cannot be negative"
@@ -665,5 +676,70 @@ describe("EkuboDcaProvider", () => {
 
     await vi.advanceTimersByTimeAsync(20_000);
     await promise;
+  });
+});
+
+describe("decodeEkuboOrderId", () => {
+  const base = {
+    positions: fromAddress("0x333"),
+    tokenId: 42n,
+    orderKey: {
+      sellToken: sellToken.address,
+      buyToken: buyToken.address,
+      fee: 170141183460469235273462165868118016n,
+      startTime: 1_757_000_000,
+      endTime: 1_757_600_000,
+    },
+  };
+
+  function idWithTimes(startTime: string, endTime: string): string {
+    const parts = encodeEkuboOrderId(base).split(":");
+    parts[6] = startTime;
+    parts[7] = endTime;
+    return parts.join(":");
+  }
+
+  it("round-trips a realistic order id", () => {
+    expect(decodeEkuboOrderId(encodeEkuboOrderId(base))).toEqual(base);
+  });
+
+  it("accepts timestamps up to Number.MAX_SAFE_INTEGER exactly", () => {
+    const max = String(Number.MAX_SAFE_INTEGER);
+    const decoded = decodeEkuboOrderId(idWithTimes("0", max));
+    expect(decoded.orderKey.startTime).toBe(0);
+    expect(decoded.orderKey.endTime).toBe(Number.MAX_SAFE_INTEGER);
+  });
+
+  it.each([
+    ["MAX_SAFE_INTEGER + 1", "9007199254740992"],
+    ["MAX_SAFE_INTEGER + 2, the report's PoC", "9007199254740993"],
+    ["u64::MAX", "18446744073709551615"],
+    ["2^128", "340282366920938463463374607431768211456"],
+    [
+      "felt-sized",
+      "3618502788666131213697322783095070105623107215331596699973092056135872020480",
+    ],
+  ])("rejects a startTime of %s instead of rounding it", (_label, value) => {
+    expect(() => decodeEkuboOrderId(idWithTimes(value, "1757600000"))).toThrow(
+      /startTime .* exceeds Number.MAX_SAFE_INTEGER/
+    );
+  });
+
+  it("rejects an oversized endTime with its own label", () => {
+    expect(() =>
+      decodeEkuboOrderId(idWithTimes("1757000000", "9007199254740993"))
+    ).toThrow(/endTime .* exceeds Number.MAX_SAFE_INTEGER/);
+  });
+
+  it.each([
+    ["negative", "-1"],
+    ["non-numeric", "soon"],
+    ["decimal", "1757000000.5"],
+    ["empty", ""],
+    ["whitespace-only", " "],
+  ])("still rejects a %s timestamp", (_label, value) => {
+    expect(() =>
+      decodeEkuboOrderId(idWithTimes(value, "1757600000"))
+    ).toThrow();
   });
 });
