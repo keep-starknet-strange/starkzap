@@ -380,12 +380,16 @@ export class CctpMonitor implements BridgeMonitorInterface {
     l1Timestamp: number
   ): Promise<{ fromBlock: number; toBlock: number }> {
     const latest = await this.starknetProvider.getBlock();
-    const sample = await this.starknetProvider.getBlock(
-      latest.block_number - SAMPLE_BLOCKS
-    );
+    // A chain younger than the sample window has no block that far back, and
+    // a negative block number makes `getBlock` throw. Clamp to genesis and
+    // average over the blocks that exist.
+    const sampleNumber = Math.max(0, latest.block_number - SAMPLE_BLOCKS);
+    const sampled = latest.block_number - sampleNumber;
+    const sample =
+      sampled > 0 ? await this.starknetProvider.getBlock(sampleNumber) : latest;
     const avgBlockTime = Math.max(
       1,
-      (latest.timestamp - sample.timestamp) / SAMPLE_BLOCKS
+      sampled > 0 ? (latest.timestamp - sample.timestamp) / sampled : 1
     );
 
     const secondsSinceL1Confirm = latest.timestamp - l1Timestamp;
