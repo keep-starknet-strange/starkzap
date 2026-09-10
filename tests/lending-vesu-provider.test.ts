@@ -265,6 +265,35 @@ describe("VesuLendingProvider", () => {
     expect(prepared.calls[1]!.entrypoint).toBe("deposit");
   });
 
+  it("caps the vToken cache and evicts the oldest entry", async () => {
+    const callContract = vi.fn().mockResolvedValue([fromAddress("0x1234")]);
+    const provider = new VesuLendingProvider();
+    const context = createContext(callContract);
+    const tokenAt = (i: number) => ({
+      ...debtToken,
+      address: fromAddress(`0x${(0x1000 + i).toString(16)}`),
+    });
+    const deposit = (i: number) =>
+      provider.prepareDeposit(context, {
+        token: tokenAt(i),
+        amount: Amount.parse("1", debtToken),
+      });
+
+    for (let i = 0; i < 130; i++) await deposit(i);
+
+    const cache = (provider as unknown as { vTokenCache: Map<string, unknown> })
+      .vTokenCache;
+    expect(cache.size).toBe(128);
+    expect(callContract).toHaveBeenCalledTimes(130);
+
+    // The two oldest were evicted, so the first token is looked up again;
+    // the newest is still cached.
+    await deposit(0);
+    expect(callContract).toHaveBeenCalledTimes(131);
+    await deposit(129);
+    expect(callContract).toHaveBeenCalledTimes(131);
+  });
+
   it("rejects delegated withdraw owner overrides", async () => {
     const callContract = vi.fn();
     const provider = new VesuLendingProvider();
