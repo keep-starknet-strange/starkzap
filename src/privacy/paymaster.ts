@@ -425,8 +425,8 @@ export function asFelt(value: unknown): bigint | undefined {
   }
 }
 
-/** Read a chain id, which arrives as a short string but may be a felt. */
-function asChainId(value: unknown): bigint | undefined {
+/** Read a value that arrives as a short string but may be a felt. */
+function asShortStringFelt(value: unknown): bigint | undefined {
   const felt = asFelt(value);
   if (felt !== undefined) return felt;
   if (typeof value !== "string" || value.length === 0) return undefined;
@@ -436,6 +436,20 @@ function asChainId(value: unknown): bigint | undefined {
     return undefined;
   }
 }
+
+/** SNIP-12 domain name every SNIP-9 outside execution is signed under. */
+const SNIP9_DOMAIN_NAME = "Account.execute_from_outside";
+
+/**
+ * The version and SNIP-12 revision pairs SNIP-9 defines. `execute_from_outside`
+ * is version 1 hashed under revision 0 (Pedersen); `execute_from_outside_v2` is
+ * version 2 under revision 1 (Poseidon). Any other pairing hashes to something
+ * the account will not recognise.
+ */
+const SNIP9_DOMAINS: ReadonlyArray<{ version: bigint; revision: bigint }> = [
+  { version: 1n, revision: 0n },
+  { version: 2n, revision: 1n },
+];
 
 /** Compare two felts by value, so padding and radix do not matter. */
 function sameFelt(a: unknown, b: unknown): boolean {
@@ -472,10 +486,34 @@ function assertSignableTypedData(
   }
 
   const domain = (typedData.domain ?? {}) as Record<string, unknown>;
-  const wanted = asChainId(invoke.chainId);
-  if (wanted === undefined || asChainId(domain.chainId) !== wanted) {
+  const wanted = asShortStringFelt(invoke.chainId);
+  if (wanted === undefined || asShortStringFelt(domain.chainId) !== wanted) {
     reject(
       `it is bound to chain ${String(domain.chainId)}, not ${invoke.chainId}`
+    );
+  }
+
+  // The rest of the domain decides which hash the account computes. Under any
+  // other name, version or revision the signature fails on chain, after the proof
+  // has been paid for, so it is refused here before anything is signed.
+  if (asShortStringFelt(domain.name) !== asShortStringFelt(SNIP9_DOMAIN_NAME)) {
+    reject(
+      `its domain is "${String(domain.name)}", not "${SNIP9_DOMAIN_NAME}"`
+    );
+  }
+  const version = asShortStringFelt(domain.version);
+  // SNIP-12 reads a missing revision as 0.
+  const revision =
+    domain.revision === undefined ? 0n : asShortStringFelt(domain.revision);
+  if (
+    !SNIP9_DOMAINS.some(
+      (known) => known.version === version && known.revision === revision
+    )
+  ) {
+    reject(
+      `its domain version ${String(domain.version)} with revision ` +
+        `${String(domain.revision ?? 0)} is not a SNIP-9 pairing (1 with 0, ` +
+        "or 2 with 1)"
     );
   }
 

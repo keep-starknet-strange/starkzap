@@ -907,6 +907,7 @@ describe("privacy", () => {
       // the fee, and the calls are the requested ones in the paymaster's own
       // to/selector/calldata shape. A fixture with an empty message cannot catch
       // typed data that authorises something else.
+      const SNIP9_NAME = "Account.execute_from_outside";
       const TYPED_DATA = {
         types: {},
         domain: {
@@ -1107,6 +1108,61 @@ describe("privacy", () => {
           );
 
           expect(quote.typedData).toBeDefined();
+        });
+
+        function quoteWithDomain(domain: Record<string, unknown>) {
+          stubFetch(
+            quoted({
+              typed_data: {
+                ...TYPED_DATA,
+                domain: { ...TYPED_DATA.domain, ...domain },
+              },
+            })
+          );
+          return new PrivacyPaymaster(URL).quote(
+            POOL,
+            { mode: "sponsored" },
+            {
+              invoke: {
+                userAddress: USER,
+                calls: [APPROVE],
+                chainId: "SN_MAIN",
+              },
+            }
+          );
+        }
+
+        it("rejects a domain that is not the SNIP-9 outside execution", async () => {
+          // Same message under another letterhead hashes to something the
+          // account never accepts, and the failure would surface only after the
+          // proof was paid for.
+          const error = await rejectedBy(() =>
+            quoteWithDomain({ name: "Vulnerable DEX" })
+          );
+          expect(error.message).toMatch(
+            /domain is "Vulnerable DEX", not "Account.execute_from_outside"/
+          );
+        });
+
+        it("rejects a version and revision that SNIP-9 does not pair", async () => {
+          // Version 2 is hashed under revision 1; without it the wallet would
+          // hash with Pedersen and the account with Poseidon.
+          const error = await rejectedBy(() =>
+            quoteWithDomain({ version: "2" })
+          );
+          expect(error.message).toMatch(/version 2 with revision 0/);
+        });
+
+        it("accepts both SNIP-9 domains, as literals or felts", async () => {
+          for (const domain of [
+            { version: "1" },
+            { version: "2", revision: "1" },
+            { version: "0x2", revision: 1 },
+            { name: shortString.encodeShortString(SNIP9_NAME), version: "1" },
+          ]) {
+            const quote = await quoteWithDomain(domain);
+            expect(quote.typedData).toBeDefined();
+          }
         });
 
         it("rejects a primary type that is not an outside execution", async () => {
@@ -2017,6 +2073,7 @@ describe("privacy", () => {
           name: "Account.execute_from_outside",
           version: "2",
           chainId: "SN_MAIN",
+          revision: "1",
         },
         primaryType: "OutsideExecution",
         types: {},
