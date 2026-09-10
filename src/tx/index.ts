@@ -92,6 +92,10 @@ export class Tx {
    * reaches a final state (accepted or reverted).
    *
    * @param callback - Called on each status change with `{ finality, execution }`
+   * @param options - Poll interval, timeout and error callback. See
+   *   {@link TxWatchOptions}. Polling errors and the timeout go to
+   *   `options.onError`; a throw from that callback is logged and does not stop
+   *   the watch
    * @returns Unsubscribe function — call it to stop watching early
    *
    * @example
@@ -120,13 +124,26 @@ export class Tx {
     }
     const startedAt = Date.now();
 
+    // `poll()` runs detached, so a throw from the caller's `onError` would
+    // surface as an unhandled rejection and, in Node, take the process down.
+    // Reported on the console because the watch has no logger and the error is
+    // the caller's own; the poll itself carries on.
+    const reportError = (error: Error) => {
+      try {
+        options.onError?.(error);
+      } catch (thrown) {
+        console.error("[starkzap] tx.watch onError callback threw:", thrown);
+      }
+    };
+
     const poll = async () => {
       while (!stopped) {
         if (timeoutMs > 0 && Date.now() - startedAt >= timeoutMs) {
-          const err = new Error(
-            `Transaction watch timed out after ${timeoutMs}ms for ${this.hash}`
+          reportError(
+            new Error(
+              `Transaction watch timed out after ${timeoutMs}ms for ${this.hash}`
+            )
           );
-          options.onError?.(err);
           stopped = true;
           return;
         }
@@ -146,7 +163,7 @@ export class Tx {
             return;
           }
         } catch (error) {
-          options.onError?.(
+          reportError(
             error instanceof Error
               ? error
               : new Error("Failed to poll transaction status")
