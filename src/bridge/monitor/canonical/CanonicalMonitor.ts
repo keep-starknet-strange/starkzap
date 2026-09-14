@@ -38,6 +38,15 @@ export class CanonicalMonitor implements BridgeMonitorInterface {
     this.logger = options.logger;
   }
 
+  /**
+   * Report a deposit's progress from its Ethereum transaction hash.
+   *
+   * The Starknet leg is found from the receipt's first `LogMessageToL2` event.
+   * Deposits sent by the SDK emit exactly one. Pass a hash from a transaction
+   * that batched several deposits, and the status returned is the first
+   * deposit's; see `deriveStarknetDepositTxHash`. Pass `starknetTxHash` when
+   * it is already known to skip the derivation.
+   */
   async monitorDeposit(
     externalTxHash: string,
     starknetTxHash?: string
