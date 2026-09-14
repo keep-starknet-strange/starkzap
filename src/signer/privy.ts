@@ -50,6 +50,13 @@ export interface PrivySignerConfig {
    * @default 10000
    */
   requestTimeoutMs?: number;
+  /**
+   * Accept a plain `http://` `serverUrl` on a non-loopback host.
+   *
+   * Every signing request carries the message hash and any session headers, so
+   * leave this unset except on a trusted network. Loopback is always accepted.
+   */
+  allowInsecureHttp?: boolean;
 }
 
 /**
@@ -140,6 +147,7 @@ export class PrivySigner implements SignerInterface {
         headers: config.headers,
         buildBody: config.buildBody,
         requestTimeoutMs: config.requestTimeoutMs,
+        allowInsecureHttp: config.allowInsecureHttp,
       });
   }
 
@@ -158,11 +166,13 @@ export class PrivySigner implements SignerInterface {
       headers: PrivySigningHeaders | undefined;
       buildBody: PrivySigningBody | undefined;
       requestTimeoutMs: number | undefined;
+      allowInsecureHttp: boolean | undefined;
     }
   ) {
     const normalizedUrl = assertSafeHttpUrl(
       serverUrl,
-      "PrivySigner serverUrl"
+      "PrivySigner serverUrl",
+      { allowInsecureHttp: options.allowInsecureHttp }
     ).toString();
     const timeoutMs = options.requestTimeoutMs ?? 10_000;
     if (!Number.isFinite(timeoutMs) || timeoutMs <= 0) {

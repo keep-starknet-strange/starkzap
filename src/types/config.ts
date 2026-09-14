@@ -234,6 +234,19 @@ export interface SDKConfig {
   network?: NetworkName | NetworkPreset;
   /** Starknet JSON-RPC endpoint URL (overrides network preset) */
   rpcUrl?: string;
+  /**
+   * Accept plain `http://` URLs on hosts other than loopback.
+   *
+   * Applies to `rpcUrl`, the Cartridge controller and RPC URLs, and the Privy
+   * `serverUrl`. Loopback hosts are always accepted, so a local devnet or proxy
+   * on `localhost` needs nothing. Set this only for a trusted network such as a
+   * LAN devnet reached from a device or emulator; everything sent over plain
+   * http is readable in transit. The privacy module has its own flag on
+   * `PrivacyConfig`, since its URLs carry the viewing key.
+   *
+   * @default false
+   */
+  allowInsecureHttp?: boolean;
   /** Target chain (overrides network preset) */
   chainId?: ChainId;
   /** Optional: custom paymaster config (default: AVNU paymaster) */

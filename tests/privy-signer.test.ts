@@ -60,13 +60,31 @@ describe("PrivySigner", () => {
     );
   });
 
-  it("should allow http server urls", async () => {
+  it("should reject plain http server urls off loopback unless allowed", async () => {
+    // The signing request carries the hash and any session headers.
     expect(
       () =>
         new PrivySigner({
           walletId: "wallet-1",
           publicKey: "0xabc",
           serverUrl: "http://example.com/sign",
+        })
+    ).toThrow(/non-loopback host/);
+    expect(
+      () =>
+        new PrivySigner({
+          walletId: "wallet-1",
+          publicKey: "0xabc",
+          serverUrl: "http://localhost:3001/sign",
+        })
+    ).not.toThrow();
+    expect(
+      () =>
+        new PrivySigner({
+          walletId: "wallet-1",
+          publicKey: "0xabc",
+          serverUrl: "http://example.com/sign",
+          allowInsecureHttp: true,
         })
     ).not.toThrow();
   });

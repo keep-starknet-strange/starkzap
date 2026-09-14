@@ -129,6 +129,7 @@ async function build(
     poolContractAddress: config.poolContractAddress,
     provider: wallet.getProvider(),
     chainId: wallet.getChainId(),
+    ...(config.allowInsecureHttp && { allowInsecureHttp: true }),
     // Only for `send({ invoke })`, which relays public calls alongside the
     // private transaction. The private path never signs: the proof authorises
     // it, which is what keeps this account off-chain.

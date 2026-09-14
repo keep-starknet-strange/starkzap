@@ -41,8 +41,12 @@ type IndexerOptions = NonNullable<
  * nor the cause. A path prefix is kept — the SDK supports a gateway mounted
  * under one.
  */
-function asBaseUrl(value: string, label: string): string {
-  assertSafeHttpUrl(value, label);
+function asBaseUrl(
+  value: string,
+  label: string,
+  allowInsecureHttp: boolean | undefined
+): string {
+  assertSafeHttpUrl(value, label, { allowInsecureHttp });
   return value.trim().replace(/\/+$/, "");
 }
 
@@ -56,8 +60,9 @@ function asBaseUrl(value: string, label: string): string {
  * read every envelope sealed to it.
  *
  * Warned rather than thrown. {@link assertSafeHttpUrl} allows `http://` on
- * purpose so local development works, and plain HTTP inside a trusted network is
- * a judgement an integrator is entitled to make. Emitted with `console.warn`
+ * loopback so local development works, and {@link PrivacyConfig.allowInsecureHttp}
+ * opens it elsewhere: plain HTTP inside a trusted network is a judgement an
+ * integrator is entitled to make. Emitted with `console.warn`
  * rather than the SDK logger because that logger defaults to silent, and a
  * security downgrade nobody sees is not a warning.
  *
@@ -85,14 +90,19 @@ function warnIfPlaintext(url: string, label: string): void {
  * Every other field of `OhttpOption` passes through untouched.
  */
 function normalizeOhttp(
-  option: OhttpOption | undefined
+  option: OhttpOption | undefined,
+  allowInsecureHttp: boolean | undefined
 ): OhttpOption | undefined {
   if (option === undefined || typeof option === "boolean") return option;
   if (option.relayUrl === undefined) return option;
 
   return {
     ...option,
-    relayUrl: asBaseUrl(option.relayUrl, "Privacy OHTTP relay URL"),
+    relayUrl: asBaseUrl(
+      option.relayUrl,
+      "Privacy OHTTP relay URL",
+      allowInsecureHttp
+    ),
   };
 }
 
@@ -131,6 +141,19 @@ export interface PrivacyConfig {
    * than aim it at a plaintext deployment.
    */
   ohttp?: OhttpOption;
+  /**
+   * Accept plain `http://` on non-loopback hosts for `prover`, `discovery`, the
+   * OHTTP `relayUrl` and `paymaster.url`.
+   *
+   * The prover and discovery services receive the viewing key, so over plain
+   * http on a shared network anyone on the path can read every private
+   * transaction. Loopback is always accepted; set this only for a trusted
+   * network such as a LAN reached from a device or emulator. A warning is still
+   * printed for any plain-http service URL.
+   *
+   * @default false
+   */
+  allowInsecureHttp?: boolean;
   /**
    * Shadow account anonymizer contract address. Only needed for
    * `shadowAccounts(...)`.
@@ -292,13 +315,21 @@ export async function createPrivacy(
   // network or the optional dependency.
   const prover =
     typeof config.prover === "string"
-      ? asBaseUrl(config.prover, "Privacy proving service URL")
+      ? asBaseUrl(
+          config.prover,
+          "Privacy proving service URL",
+          config.allowInsecureHttp
+        )
       : config.prover;
   const discovery =
     typeof config.discovery === "string"
-      ? asBaseUrl(config.discovery, "Privacy discovery service URL")
+      ? asBaseUrl(
+          config.discovery,
+          "Privacy discovery service URL",
+          config.allowInsecureHttp
+        )
       : config.discovery;
-  const ohttp = normalizeOhttp(config.ohttp);
+  const ohttp = normalizeOhttp(config.ohttp, config.allowInsecureHttp);
 
   if (typeof prover === "string") {
     warnIfPlaintext(prover, "Privacy proving service URL");

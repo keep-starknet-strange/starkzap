@@ -304,6 +304,8 @@ export const PRIVACY_CONFIG: PrivacyConfig | undefined =
         // account never appears on-chain. Same proxy as the sponsored toggle:
         // it forwards any method with the API key attached.
         paymaster: { url: PAYMASTER_NODE_URL, fee: PRIVACY_FEE },
+        // Dev builds may use a plain-http proxy on the LAN; production must not.
+        allowInsecureHttp: Boolean(env.DEV),
         ohttp: PRIVACY_OHTTP
           ? PRIVACY_OHTTP_RELAY
             ? { relayUrl: PRIVACY_OHTTP_RELAY }

@@ -278,6 +278,8 @@ export interface PaymasterBinding extends PrivacyPaymasterConfig {
   poolContractAddress: string;
   /** Provider used to read the chain head when resolving the proving block. */
   provider: RpcProvider;
+  /** Accept a plain `http://` `url` on a non-loopback host. See `PrivacyConfig.allowInsecureHttp`. */
+  allowInsecureHttp?: boolean;
   /**
    * Chain this client is bound to. Used to check that typed data from the
    * paymaster is bound to the same one before anything signs it.
@@ -325,6 +327,7 @@ export function withPaymaster(
     }),
     ...(binding.fetch && { fetch: binding.fetch }),
     ...(binding.timeoutMs !== undefined && { timeoutMs: binding.timeoutMs }),
+    ...(binding.allowInsecureHttp && { allowInsecureHttp: true }),
   });
   const pool = fromAddress(binding.poolContractAddress);
 

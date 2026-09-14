@@ -219,7 +219,12 @@ function buildExplorerUrl(
   const encodedHash = encodeURIComponent(hash);
 
   if (config && "baseUrl" in config && config.baseUrl) {
-    const baseUrl = assertSafeHttpUrl(config.baseUrl, "explorer.baseUrl");
+    // A link the app renders, never a channel the SDK sends over, so plain
+    // http is a display choice rather than a data exposure. Other schemes are
+    // still refused.
+    const baseUrl = assertSafeHttpUrl(config.baseUrl, "explorer.baseUrl", {
+      allowInsecureHttp: true,
+    });
     const normalizedBaseUrl = new URL(baseUrl.toString());
     if (!normalizedBaseUrl.pathname.endsWith("/")) {
       normalizedBaseUrl.pathname = `${normalizedBaseUrl.pathname}/`;

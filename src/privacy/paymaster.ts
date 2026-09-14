@@ -792,6 +792,8 @@ export class PrivacyPaymaster {
    *   {@link PrivacyPaymasterConfig.fetch}
    * @param options.timeoutMs - Request ceiling. See
    *   {@link PrivacyPaymasterConfig.timeoutMs}
+   * @param options.allowInsecureHttp - Accept a plain `http://` `url` on a
+   *   non-loopback host. Loopback is always accepted
    */
   constructor(
     url: string,
@@ -800,9 +802,12 @@ export class PrivacyPaymaster {
       allowedFeeRecipients?: readonly Address[];
       fetch?: typeof fetch;
       timeoutMs?: number;
+      allowInsecureHttp?: boolean;
     }
   ) {
-    assertSafeHttpUrl(url, "Privacy paymaster URL");
+    assertSafeHttpUrl(url, "Privacy paymaster URL", {
+      allowInsecureHttp: options?.allowInsecureHttp,
+    });
     this.url = url;
     this.policy = {
       ...(options?.maxFee !== undefined && { maxFee: options.maxFee }),

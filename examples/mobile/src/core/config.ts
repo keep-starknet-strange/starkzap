@@ -167,6 +167,8 @@ export function privacyConfig(
     // Privacy transactions are submitted by the paymaster's relayer, so the
     // account never appears on-chain. Same proxy the sponsored flow uses.
     paymaster: { url: paymasterUrl, fee },
+    // Same reason as the SDK config: a device reaches the proxy over the LAN.
+    allowInsecureHttp: __DEV__,
     ohttp: PRIVACY_OHTTP ? (relay ? { relayUrl: relay } : true) : false,
   };
 }

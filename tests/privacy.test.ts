@@ -1741,9 +1741,22 @@ describe("privacy", () => {
       ).rejects.toThrow("Privacy proving service URL must use");
     });
 
+    it("refuses a plain-http service URL off loopback unless allowed", async () => {
+      // Both services receive the viewing key. Loopback is fine on its own;
+      // anything else needs `allowInsecureHttp`.
+      await expect(
+        createPrivacy(walletWith(new StarkSigner(testPrivateKeys.key1)), {
+          ...config,
+          prover: "https://prover.example.com",
+          discovery: "http://discovery.example.com",
+        })
+      ).rejects.toThrow(
+        /Privacy discovery service URL uses plain http.*allowInsecureHttp/
+      );
+    });
+
     it("warns when a service URL is plain http, and not when it is https", async () => {
-      // Both services receive the viewing key, so cleartext exposes it. Warned
-      // rather than thrown: http is allowed on purpose for local development.
+      // Allowed on purpose here, so the remaining protection is the warning.
       const warn = vi
         .spyOn(console, "warn")
         .mockImplementation(() => undefined);
@@ -1752,6 +1765,7 @@ describe("privacy", () => {
           ...config,
           prover: "https://prover.example.com",
           discovery: "http://discovery.example.com",
+          allowInsecureHttp: true,
         });
 
         expect(warn).toHaveBeenCalledTimes(1);
