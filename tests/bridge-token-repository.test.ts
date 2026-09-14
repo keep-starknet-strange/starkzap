@@ -158,6 +158,22 @@ describe("BridgeTokenRepository", () => {
     );
   });
 
+  it("drops rows that are not objects instead of failing on them", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      statusText: "OK",
+      json: async () => [null, 42, ...mockApiResponse()],
+    });
+
+    const repository = new BridgeTokenRepository({
+      fetchFn: fetchMock as unknown as typeof fetch,
+      layerswapOptions: emptyLayerswapApi(),
+    });
+
+    await expect(repository.getTokens()).resolves.toHaveLength(3);
+  });
+
   it("should map API tokens into protocol-specific token classes", async () => {
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,

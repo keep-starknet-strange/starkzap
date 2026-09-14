@@ -312,9 +312,9 @@ export class LayerswapApi implements LayerswapTokenSource {
   }
 
   private async unwrap<T>(response: Response): Promise<T> {
-    let json: LsApiResponse<T>;
+    let parsed: unknown;
     try {
-      json = (await response.json()) as LsApiResponse<T>;
+      parsed = await response.json();
     } catch {
       // CDN/edge errors (e.g. 502 with HTML body) won't be JSON. Surface
       // them as a structured LayerswapApiError instead of a raw SyntaxError.
@@ -324,6 +324,16 @@ export class LayerswapApi implements LayerswapTokenSource {
         `Layerswap API returned non-JSON response (HTTP ${response.status})`
       );
     }
+    // A literal `null` or a bare value parses fine but has no `error` or
+    // `data` to read; name it rather than fail on the property access.
+    if (parsed === null || typeof parsed !== "object") {
+      throw new LayerswapApiError(
+        response.status,
+        undefined,
+        `Layerswap API returned a non-object body (HTTP ${response.status})`
+      );
+    }
+    const json = parsed as LsApiResponse<T>;
     if (!response.ok || json.error) {
       throw new LayerswapApiError(
         response.status,

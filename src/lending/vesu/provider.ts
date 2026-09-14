@@ -178,9 +178,9 @@ export class VesuLendingProvider implements LendingProvider {
     if (!response.ok) {
       throw new Error(`Vesu markets request failed (${response.status})`);
     }
-    const payload = (await response.json()) as VesuMarketsResponse;
+    const payload = (await response.json()) as VesuMarketsResponse | null;
 
-    return (payload.data ?? [])
+    return (payload?.data ?? [])
       .filter((entry) => this.isSupportedMarket(entry))
       .map((entry) => this.toMarket(entry))
       .filter((market): market is LendingMarket => market != null);
@@ -635,9 +635,9 @@ export class VesuLendingProvider implements LendingProvider {
     if (!response.ok) {
       throw new Error(`Vesu positions request failed (${response.status})`);
     }
-    const payload = (await response.json()) as VesuPositionsResponse;
+    const payload = (await response.json()) as VesuPositionsResponse | null;
     const positions: LendingUserPosition[] = [];
-    for (const entry of payload.data ?? []) {
+    for (const entry of payload?.data ?? []) {
       if (
         entry.protocolVersion?.toLowerCase() !== "v2" ||
         entry.isDeprecated === true

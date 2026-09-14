@@ -215,7 +215,13 @@ export class Troves {
           `Troves API failed: ${res.status} ${res.statusText} - ${path}`
         );
       }
-      return (await res.json()) as T;
+      const body: unknown = await res.json();
+      // Every Troves endpoint answers with an object or an array; a literal
+      // `null` would otherwise surface as a TypeError at the first field read.
+      if (body === null || typeof body !== "object") {
+        throw new Error(`Troves API returned an unexpected body for ${path}`);
+      }
+      return body as T;
     } catch (error) {
       const name =
         error && typeof error === "object" && "name" in error

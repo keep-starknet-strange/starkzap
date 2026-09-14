@@ -259,9 +259,9 @@ export class CctpMonitor implements BridgeMonitorInterface {
         signal: AbortSignal.timeout(10_000),
       });
       if (!response.ok) return null;
-      const data = (await response.json()) as CCTPMessagesResponse;
+      const data = (await response.json()) as CCTPMessagesResponse | null;
 
-      const message = data.messages[0] ?? null;
+      const message = data?.messages?.[0] ?? null;
       if (message) {
         const isComplete =
           message.status === "complete" && message.attestation !== "PENDING";
@@ -357,9 +357,9 @@ export class CctpMonitor implements BridgeMonitorInterface {
         signal: AbortSignal.timeout(10_000),
       });
       if (!response.ok) return null;
-      const data = (await response.json()) as CCTPMessagesResponse;
+      const data = (await response.json()) as CCTPMessagesResponse | null;
 
-      const message = data.messages[0] ?? null;
+      const message = data?.messages?.[0] ?? null;
       if (!message) return null;
 
       const isComplete =

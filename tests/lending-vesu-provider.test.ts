@@ -58,6 +58,23 @@ describe("VesuLendingProvider", () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
+  it("treats a null body as no markets and no positions", async () => {
+    // A CDN edge case can return the literal JSON `null`; that is an empty
+    // result, not a TypeError on `.data`.
+    const fetcher = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => null,
+    });
+    const provider = new VesuLendingProvider({
+      fetcher: fetcher as unknown as typeof fetch,
+    });
+
+    await expect(provider.getMarkets(ChainId.MAINNET)).resolves.toEqual([]);
+    await expect(
+      provider.getPositions(createContext(vi.fn()), {})
+    ).resolves.toEqual([]);
+  });
+
   it("skips malformed position API items instead of failing the full response", async () => {
     const fetcher = vi.fn().mockResolvedValue({
       ok: true,
