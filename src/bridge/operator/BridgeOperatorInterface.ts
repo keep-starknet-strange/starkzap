@@ -28,6 +28,15 @@ export interface BridgeOperatorInterface {
   /**
    * Bridge tokens from an external chain into Starknet.
    *
+   * On Ethereum this is two transactions from the external wallet when the
+   * bridge's allowance is short: an ERC20 `approve` sized to `amount`, then the
+   * deposit. Do not start a second deposit of the same token before the first
+   * has resolved. Both would read the same allowance, both would send an
+   * `approve`, and since `approve` sets rather than adds, the second deposit
+   * lands with less allowance than it needs and reverts; tokens such as USDT
+   * also reject a change from a non-zero allowance. Serialize deposits per
+   * token yourself, or set an allowance that covers them all before starting.
+   *
    * @param recipient - Starknet address to receive bridged funds
    * @param amount - Amount to bridge
    * @param token - Bridge token descriptor (chain, protocol, bridge contracts)

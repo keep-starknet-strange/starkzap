@@ -56,6 +56,16 @@ export abstract class EthereumBridge implements BridgeInterface<EthereumAddress>
     );
   }
 
+  /**
+   * Approve if needed, then deposit.
+   *
+   * Not safe to call concurrently on one instance. `approveSpendingOf` reads
+   * the allowance, sends an `approve` sized to the amount, and the deposit
+   * spends it; a second call before the first finishes sees the same starting
+   * allowance and sends its own `approve`, which replaces rather than adds.
+   * The allowance cache is cleared after each deposit, so sequential calls are
+   * fine. Ordering is left to the caller; see `BridgeOperatorInterface.deposit`.
+   */
   abstract deposit(
     recipient: Address,
     amount: Amount,
