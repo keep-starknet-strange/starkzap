@@ -22,6 +22,7 @@ import type {
   ExecuteOptions,
   ExplorerConfig,
   FeeMode,
+  PaycrestConfig,
   PreflightOptions,
   PreflightResult,
   ProviderOptions,
@@ -140,12 +141,14 @@ export class Wallet extends BaseWallet {
     defaultTimeBounds?: PaymasterTimeBounds;
     stakingConfig: StakingConfig | undefined;
     bridgingConfig?: BridgingConfig | undefined;
+    paycrestConfig?: PaycrestConfig | undefined;
     logging?: LoggerConfig;
   }) {
     super({
       address: options.address,
       stakingConfig: options.stakingConfig,
       bridgingConfig: options.bridgingConfig,
+      paycrestConfig: options.paycrestConfig,
       ...(options.logging && { logging: options.logging }),
     });
     this.accountProvider = options.accountProvider;
@@ -231,6 +234,7 @@ export class Wallet extends BaseWallet {
       ...(timeBounds && { defaultTimeBounds: timeBounds }),
       stakingConfig: options.config.staking,
       bridgingConfig: options.config.bridging,
+      paycrestConfig: options.config.paycrest,
       ...(config.logging && { logging: config.logging }),
     });
 

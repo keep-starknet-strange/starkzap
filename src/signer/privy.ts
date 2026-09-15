@@ -1,6 +1,7 @@
 import type { Signature } from "starknet";
 import type { SignerInterface } from "@/signer/interface";
 import { assertSafeHttpUrl } from "@/utils";
+import { fetchJsonWithTimeout } from "@/utils/http";
 
 type PrivySigningHeaders =
   | Record<string, string>
@@ -178,68 +179,54 @@ export class PrivySigner implements SignerInterface {
         hash,
       };
 
-      const controller =
-        typeof AbortController !== "undefined"
-          ? new AbortController()
-          : undefined;
-      const timeoutHandle =
-        controller &&
-        setTimeout(() => {
-          controller.abort();
-        }, timeoutMs);
-
-      let response: Awaited<ReturnType<typeof fetch>>;
-      try {
-        const requestInit: RequestInit = {
+      // Timeout + abort plumbing is shared with the Paycrest client via
+      // `fetchJsonWithTimeout`; the Privy-specific JSON/error/signature
+      // handling stays in the `parse` callback below.
+      return fetchJsonWithTimeout<string>(
+        normalizedUrl,
+        {
           method: "POST",
           headers: { "Content-Type": "application/json", ...extraHeaders },
           body: JSON.stringify(payload),
-        };
-        if (controller) {
-          requestInit.signal = controller.signal;
+        },
+        {
+          fetchImpl: fetch,
+          timeoutMs,
+          onTimeout: () =>
+            new Error(`Privy signing request timed out after ${timeoutMs}ms`),
+        },
+        async (response) => {
+          let data: unknown;
+          try {
+            data = await response.json();
+          } catch (err) {
+            // Propagate abort rather than masking it as a JSON parse failure.
+            if (err instanceof Error && err.name === "AbortError") throw err;
+            throw new Error("Privy signing failed: invalid JSON response");
+          }
+
+          if (!response.ok) {
+            const err =
+              typeof data === "object" && data !== null
+                ? (data as Record<string, unknown>)
+                : {};
+            throw new Error(
+              (typeof err.details === "string" && err.details) ||
+                (typeof err.error === "string" && err.error) ||
+                "Privy signing failed"
+            );
+          }
+
+          const signature =
+            typeof data === "object" && data !== null
+              ? (data as Record<string, unknown>).signature
+              : undefined;
+          if (typeof signature !== "string") {
+            throw new Error("Privy signing failed: invalid server response");
+          }
+          return signature;
         }
-
-        response = await fetch(normalizedUrl, requestInit);
-      } catch (error) {
-        if (error instanceof Error && error.name === "AbortError") {
-          throw new Error(
-            `Privy signing request timed out after ${timeoutMs}ms`
-          );
-        }
-        throw error;
-      } finally {
-        if (timeoutHandle) {
-          clearTimeout(timeoutHandle);
-        }
-      }
-
-      let data: unknown;
-      try {
-        data = await response.json();
-      } catch {
-        throw new Error("Privy signing failed: invalid JSON response");
-      }
-
-      if (!response.ok) {
-        const err =
-          typeof data === "object" && data !== null
-            ? (data as Record<string, unknown>)
-            : {};
-        throw new Error(
-          (typeof err.details === "string" && err.details) ||
-            (typeof err.error === "string" && err.error) ||
-            "Privy signing failed"
-        );
-      }
-
-      const signature =
-        typeof data === "object" && data !== null
-          ? (data as Record<string, unknown>).signature
-          : undefined;
-      if (typeof signature !== "string") {
-        throw new Error("Privy signing failed: invalid server response");
-      }
-      return signature;
+      );
     };
   }
 
