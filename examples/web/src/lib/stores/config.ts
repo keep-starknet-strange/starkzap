@@ -318,7 +318,27 @@ const PRIVACY_FEE_RECIPIENTS = pick(
   ?.split(",")
   .map((address) => fromAddress(address.trim()));
 
+/**
+ * Env keys the STRK20 config still needs for this network. Empty when the
+ * config is complete, so the tab can name exactly what is missing.
+ */
+export const PRIVACY_CONFIG_MISSING: readonly string[] = (() => {
+  const suffix = NETWORK === "mainnet" ? "MAINNET" : "SEPOLIA";
+  return [
+    [PRIVACY_POOL, `VITE_PRIVACY_POOL_${suffix}`],
+    [PRIVACY_PROVER, `VITE_PRIVACY_PROVER_${suffix}`],
+    [PRIVACY_DISCOVERY, `VITE_PRIVACY_DISCOVERY_${suffix}`],
+    [PAYMASTER_NODE_URL, `VITE_PAYMASTER_PROXY_URL_${suffix}`],
+    [PRIVACY_FEE, "VITE_PRIVACY_FEE_MODE (see its comment)"],
+    [PRIVACY_MAX_FEE, `VITE_PRIVACY_MAX_FEE_${suffix}`],
+    [PRIVACY_FEE_RECIPIENTS?.length, `VITE_PRIVACY_FEE_RECIPIENTS_${suffix}`],
+  ]
+    .filter(([value]) => !value)
+    .map(([, key]) => key as string);
+})();
+
 export const PRIVACY_CONFIG: PrivacyConfig | undefined =
+  PRIVACY_CONFIG_MISSING.length === 0 &&
   PRIVACY_POOL &&
   PRIVACY_PROVER &&
   PRIVACY_DISCOVERY &&
