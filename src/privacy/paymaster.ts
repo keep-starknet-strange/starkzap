@@ -41,11 +41,11 @@ export type PrivacyTip = "slow" | "normal" | "fast";
 /**
  * Where and how to submit private transactions.
  *
- * Present or absent as a unit. Submission needs an endpoint *and* a fee mode,
- * so pairing them in one object puts that requirement in the type: neither
- * {@link withPaymaster} nor `connectPrivacy` can be handed half a
- * configuration, and the check happens at compile time rather than as a throw
- * on first use.
+ * Present or absent as a unit. Submission needs an endpoint, a fee mode and the
+ * two bounds on what a quote may claim, so pairing them in one object puts that
+ * requirement in the type: neither {@link withPaymaster} nor `connectPrivacy`
+ * can be handed half a configuration, and the check happens at compile time
+ * rather than as a throw on first use.
  *
  * Omit the whole object to compose and prove with `createPrivacy` and submit
  * through your own infrastructure.
@@ -119,35 +119,44 @@ export interface PrivacyPaymasterConfig {
    *
    * The paymaster's response decides how much of the shielded balance leaves the
    * pool: {@link PrivacyClient.send} appends the withdrawal it names, and the
-   * proof then commits to it. A ceiling is the only thing standing between a
-   * misconfigured or compromised endpoint and the caller's balance.
+   * proof then commits to it. This ceiling is the only thing standing between a
+   * misconfigured or compromised endpoint and the caller's balance, which is
+   * why it is required rather than defaulted: no single figure fits every
+   * deployment, and a guess would either refuse honest quotes or bound nothing.
    *
-   * Which token the amount is denominated in depends on the mode — `default` and
-   * `sponsored_private` take the token you chose, `sponsored` takes whichever the
-   * deployment picked — so the rejection names the token alongside the amount.
+   * What the withdrawal covers depends on the mode, so size the ceiling for
+   * the mode you run. Under `sponsored` and `sponsored_private` the relayer
+   * pays the gas and the withdrawal is the deployment's flat pool fee, so a
+   * ceiling a little above that fee is tight and safe. Under `default` the
+   * withdrawal is the pool fee plus gas at the paymaster's *suggested maximum*,
+   * not its estimate, so the ceiling has to leave room for that headroom at the
+   * gas prices you expect; {@link PrivacyGasQuote} reports both figures.
    *
-   * Left unset by default: the right ceiling depends on what an integrator
-   * considers a reasonable fee, and guessing one would break every deployment
-   * whose fee happens to sit above the guess.
+   * Which token the amount is denominated in also depends on the mode —
+   * `default` and `sponsored_private` take the token you chose, `sponsored`
+   * takes whichever the deployment picked — so the rejection names the token
+   * alongside the amount.
    */
-  maxFee?: bigint;
+  maxFee: bigint;
   /**
-   * Fee recipients to accept. A quote naming any other is refused.
+   * Fee recipients to accept. A quote naming any other is refused, and an
+   * empty list refuses every quote.
    *
    * Nothing on chain says which recipient is legitimate. The pool's own
    * `get_fee_collector()` is a different address that the forwarder pays onward,
    * so this is the only way to bind the recipient to something the endpoint does
    * not control.
    *
-   * Setting it also makes the caller check on the typed data mean something. That
-   * check compares the signature's caller against this recipient, and both arrive
-   * in the same response, so until one side is anchored here it catches a mismatch
-   * rather than a substitution.
+   * It is also what makes the caller check on the typed data mean something.
+   * That check compares the signature's caller against the quoted recipient,
+   * and both arrive in the same response, so without an anchor here it would
+   * catch a mismatch rather than a substitution.
    *
-   * Left unset by default: the address is per deployment and per network, and an
-   * operator rotating it would break every transaction until this is updated.
+   * The address is per deployment and per network, so it is required rather
+   * than shipped with the SDK: take it from your paymaster operator, and expect
+   * to update it when they rotate the forwarder.
    */
-  allowedFeeRecipients?: readonly Address[];
+  allowedFeeRecipients: readonly Address[];
 }
 
 /**
@@ -609,8 +618,8 @@ function assertSignableTypedData(
  */
 /** Caller-declared bounds on what a quote may claim about its fee. */
 interface FeeActionPolicy {
-  maxFee?: bigint;
-  allowedFeeRecipients?: readonly Address[];
+  maxFee: bigint;
+  allowedFeeRecipients: readonly Address[];
 }
 
 function parseFeeAction(
@@ -642,33 +651,31 @@ function parseFeeAction(
 
   const { allowedFeeRecipients, maxFee } = policy;
 
-  if (allowedFeeRecipients !== undefined) {
-    if (allowedFeeRecipients.length === 0) {
-      throw new PrivacyPaymasterError(
-        -1,
-        "[starkzap] `allowedFeeRecipients` is an empty list, so no quote can be " +
-          "accepted. Name the fee recipients you trust, or leave it unset.",
-        action
-      );
-    }
-    if (
-      !allowedFeeRecipients.some((allowed) =>
-        sameFelt(feeAction.recipient, allowed)
-      )
-    ) {
-      throw new PrivacyPaymasterError(
-        -1,
-        `[starkzap] The privacy paymaster wants its fee sent to ` +
-          `${feeAction.recipient}, which is not in \`allowedFeeRecipients\`. ` +
-          "Nothing was withdrawn.",
-        action
-      );
-    }
+  if (allowedFeeRecipients.length === 0) {
+    throw new PrivacyPaymasterError(
+      -1,
+      "[starkzap] `allowedFeeRecipients` is an empty list, so no quote can be " +
+        "accepted. Name the fee recipients you trust.",
+      action
+    );
+  }
+  if (
+    !allowedFeeRecipients.some((allowed) =>
+      sameFelt(feeAction.recipient, allowed)
+    )
+  ) {
+    throw new PrivacyPaymasterError(
+      -1,
+      `[starkzap] The privacy paymaster wants its fee sent to ` +
+        `${feeAction.recipient}, which is not in \`allowedFeeRecipients\`. ` +
+        "Nothing was withdrawn.",
+      action
+    );
   }
 
   // The token is ours to check in the two modes where we name it. Under
   // `sponsored` the deployment picks the token, so there is nothing to compare
-  // against and `maxFee` is the only bound on what leaves the pool.
+  // against and `maxFee` is the only bound on how much leaves the pool.
   const chosenToken =
     feeMode.mode === "default"
       ? feeMode.gasToken
@@ -687,7 +694,7 @@ function parseFeeAction(
     );
   }
 
-  if (maxFee !== undefined && feeAction.amount > maxFee) {
+  if (feeAction.amount > maxFee) {
     throw new PrivacyPaymasterError(
       -1,
       `[starkzap] The privacy paymaster quoted a fee of ${feeAction.amount} ` +
@@ -785,9 +792,9 @@ export class PrivacyPaymaster {
   /**
    * @param url - Paymaster endpoint, or a proxy in front of it
    * @param options.maxFee - Ceiling on the quoted fee, in base units of the fee
-   *   token. See {@link PrivacyPaymasterConfig.maxFee}
-   * @param options.allowedFeeRecipients - Recipients to accept. See
-   *   {@link PrivacyPaymasterConfig.allowedFeeRecipients}
+   *   token. Required; see {@link PrivacyPaymasterConfig.maxFee} for sizing
+   * @param options.allowedFeeRecipients - Recipients to accept. Required and
+   *   non-empty; see {@link PrivacyPaymasterConfig.allowedFeeRecipients}
    * @param options.fetch - Transport override. See
    *   {@link PrivacyPaymasterConfig.fetch}
    * @param options.timeoutMs - Request ceiling. See
@@ -797,26 +804,24 @@ export class PrivacyPaymaster {
    */
   constructor(
     url: string,
-    options?: {
-      maxFee?: bigint;
-      allowedFeeRecipients?: readonly Address[];
+    options: {
+      maxFee: bigint;
+      allowedFeeRecipients: readonly Address[];
       fetch?: typeof fetch;
       timeoutMs?: number;
       allowInsecureHttp?: boolean;
     }
   ) {
     assertSafeHttpUrl(url, "Privacy paymaster URL", {
-      allowInsecureHttp: options?.allowInsecureHttp,
+      allowInsecureHttp: options.allowInsecureHttp,
     });
     this.url = url;
     this.policy = {
-      ...(options?.maxFee !== undefined && { maxFee: options.maxFee }),
-      ...(options?.allowedFeeRecipients !== undefined && {
-        allowedFeeRecipients: options.allowedFeeRecipients,
-      }),
+      maxFee: options.maxFee,
+      allowedFeeRecipients: options.allowedFeeRecipients,
     };
-    this.fetchImpl = options?.fetch;
-    this.timeoutMs = options?.timeoutMs ?? DEFAULT_TIMEOUT_MS;
+    this.fetchImpl = options.fetch;
+    this.timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
   }
 
   /**

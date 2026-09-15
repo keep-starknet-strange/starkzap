@@ -573,6 +573,8 @@ describe("Wallet", () => {
       paymaster: {
         url: "https://paymaster.example.com",
         fee: { mode: "sponsored" } as const,
+        maxFee: 10n ** 19n,
+        allowedFeeRecipients: [fromAddress("0x75a1")],
       },
     };
 

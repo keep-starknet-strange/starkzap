@@ -321,10 +321,8 @@ export function withPaymaster(
   binding: PaymasterBinding
 ): PrivacyClient {
   const paymaster = new PrivacyPaymaster(binding.url, {
-    ...(binding.maxFee !== undefined && { maxFee: binding.maxFee }),
-    ...(binding.allowedFeeRecipients !== undefined && {
-      allowedFeeRecipients: binding.allowedFeeRecipients,
-    }),
+    maxFee: binding.maxFee,
+    allowedFeeRecipients: binding.allowedFeeRecipients,
     ...(binding.fetch && { fetch: binding.fetch }),
     ...(binding.timeoutMs !== undefined && { timeoutMs: binding.timeoutMs }),
     ...(binding.allowInsecureHttp && { allowInsecureHttp: true }),

@@ -385,6 +385,14 @@ describe("privacy", () => {
       "0x04718f5a0fc34cc1af16a1cdee98ffb20c31f5cd61d6ab07201858f4287c938d"
     );
     const URL = "https://paymaster.example.com";
+    /**
+     * The bounds every quote is checked against. Both are required, so every
+     * construction names them; the fixtures' recipients and amounts fit.
+     */
+    const POLICY = {
+      maxFee: 10n ** 30n,
+      allowedFeeRecipients: [fromAddress("0x75a1"), fromAddress("0x1")],
+    };
 
     /** Stub fetch, returning each body in turn, and record the requests. */
     function stubFetch(...bodies: unknown[]) {
@@ -417,9 +425,9 @@ describe("privacy", () => {
     });
 
     it("rejects a paymaster URL that is not http(s)", () => {
-      expect(() => new PrivacyPaymaster("ftp://paymaster.example.com")).toThrow(
-        "Privacy paymaster URL"
-      );
+      expect(
+        () => new PrivacyPaymaster("ftp://paymaster.example.com", POLICY)
+      ).toThrow("Privacy paymaster URL");
     });
 
     it("quotes a default-mode fee and returns it in base units", async () => {
@@ -435,7 +443,7 @@ describe("privacy", () => {
         },
       });
 
-      const quote = await new PrivacyPaymaster(URL).quote(POOL, {
+      const quote = await new PrivacyPaymaster(URL, POLICY).quote(POOL, {
         mode: "default",
         gasToken: STRK,
       });
@@ -471,7 +479,7 @@ describe("privacy", () => {
         },
       });
 
-      const quote = await new PrivacyPaymaster(URL).quote(POOL, {
+      const quote = await new PrivacyPaymaster(URL, POLICY).quote(POOL, {
         mode: "sponsored",
       });
 
@@ -489,7 +497,7 @@ describe("privacy", () => {
         },
       });
 
-      await new PrivacyPaymaster(URL).quote(POOL, {
+      await new PrivacyPaymaster(URL, POLICY).quote(POOL, {
         mode: "sponsored_private",
         poolFeeToken: STRK,
       });
@@ -505,7 +513,7 @@ describe("privacy", () => {
     it("submits the call as to/selector/calldata with the proof alongside", async () => {
       const sent = stubFetch({ result: { transaction_hash: "0xabc" } });
 
-      const hash = await new PrivacyPaymaster(URL).execute(
+      const hash = await new PrivacyPaymaster(URL, POLICY).execute(
         {
           contractAddress: POOL,
           entrypoint: "apply_actions",
@@ -541,7 +549,7 @@ describe("privacy", () => {
       });
 
       await expect(
-        new PrivacyPaymaster(URL).execute(
+        new PrivacyPaymaster(URL, POLICY).execute(
           { contractAddress: POOL, entrypoint: "apply_actions" },
           { data: "0x1", proofFacts: [] },
           { version: "0x1" }
@@ -557,7 +565,7 @@ describe("privacy", () => {
       // sitting on the object.
       stubFetch({ result: { transaction_hash: "0xabc", tracking_id: "" } });
 
-      const submission = await new PrivacyPaymaster(URL).execute(
+      const submission = await new PrivacyPaymaster(URL, POLICY).execute(
         { contractAddress: POOL, entrypoint: "apply_actions" },
         { data: "0x1", proofFacts: [] },
         { version: "0x1" }
@@ -573,7 +581,7 @@ describe("privacy", () => {
       stubFetch({ result: {} });
 
       await expect(
-        new PrivacyPaymaster(URL).execute(
+        new PrivacyPaymaster(URL, POLICY).execute(
           {
             contractAddress: POOL,
             entrypoint: "apply_actions",
@@ -588,12 +596,14 @@ describe("privacy", () => {
     /** Reject with a payload captured verbatim from AVNU's live paymaster. */
     function rejectWith(error: unknown) {
       stubFetch({ error });
-      return new PrivacyPaymaster(URL).quote(POOL, { mode: "sponsored" }).then(
-        () => {
-          throw new Error("expected the paymaster call to reject");
-        },
-        (e: unknown) => e as PrivacyPaymasterError
-      );
+      return new PrivacyPaymaster(URL, POLICY)
+        .quote(POOL, { mode: "sponsored" })
+        .then(
+          () => {
+            throw new Error("expected the paymaster call to reject");
+          },
+          (e: unknown) => e as PrivacyPaymasterError
+        );
     }
 
     it("surfaces the reason from an object-shaped `data`", async () => {
@@ -650,7 +660,7 @@ describe("privacy", () => {
         },
       });
 
-      const error = await new PrivacyPaymaster(URL)
+      const error = await new PrivacyPaymaster(URL, POLICY)
         .execute(
           { contractAddress: POOL, entrypoint: "apply_actions" },
           { data: "0x1", proofFacts: [] },
@@ -704,7 +714,7 @@ describe("privacy", () => {
       );
 
       const error = await rejectedBy(() =>
-        new PrivacyPaymaster(URL).quote(POOL, { mode: "sponsored" })
+        new PrivacyPaymaster(URL, POLICY).quote(POOL, { mode: "sponsored" })
       );
 
       expect(error.code).toBe(413);
@@ -727,7 +737,7 @@ describe("privacy", () => {
       );
 
       const error = await rejectedBy(() =>
-        new PrivacyPaymaster(URL).quote(POOL, { mode: "sponsored" })
+        new PrivacyPaymaster(URL, POLICY).quote(POOL, { mode: "sponsored" })
       );
 
       expect(error).toBeInstanceOf(PrivacyPaymasterError);
@@ -749,7 +759,7 @@ describe("privacy", () => {
       );
 
       await expect(
-        new PrivacyPaymaster(URL).quote(POOL, { mode: "sponsored" })
+        new PrivacyPaymaster(URL, POLICY).quote(POOL, { mode: "sponsored" })
       ).rejects.toThrow("returned no result");
     });
 
@@ -766,7 +776,7 @@ describe("privacy", () => {
       );
 
       await expect(
-        new PrivacyPaymaster(URL).quote(POOL, { mode: "sponsored" })
+        new PrivacyPaymaster(URL, POLICY).quote(POOL, { mode: "sponsored" })
       ).rejects.toThrow("non-JSON response (HTTP 502)");
     });
 
@@ -775,7 +785,7 @@ describe("privacy", () => {
       stubFetch({ result: { parameters: {} } });
 
       await expect(
-        new PrivacyPaymaster(URL).quote(POOL, { mode: "sponsored" })
+        new PrivacyPaymaster(URL, POLICY).quote(POOL, { mode: "sponsored" })
       ).rejects.toThrow("returned no fee action");
     });
 
@@ -793,7 +803,11 @@ describe("privacy", () => {
         });
 
       const error = await rejectedBy(() =>
-        new PrivacyPaymaster(URL, { fetch: hangs, timeoutMs: 10 }).quote(POOL, {
+        new PrivacyPaymaster(URL, {
+          ...POLICY,
+          fetch: hangs,
+          timeoutMs: 10,
+        }).quote(POOL, {
           mode: "sponsored",
         })
       );
@@ -830,7 +844,7 @@ describe("privacy", () => {
         stubFetch({ result: {} });
 
         const error = await rejectedBy(() =>
-          new PrivacyPaymaster(URL, { fetch: mine }).quote(POOL, {
+          new PrivacyPaymaster(URL, { ...POLICY, fetch: mine }).quote(POOL, {
             mode: "sponsored",
           })
         );
@@ -855,6 +869,7 @@ describe("privacy", () => {
         };
 
         const paymaster = new PrivacyPaymaster(URL, {
+          ...POLICY,
           fetch: (input, init) =>
             mine(input, {
               ...init,
@@ -878,7 +893,9 @@ describe("privacy", () => {
           },
         });
 
-        await new PrivacyPaymaster(URL).quote(POOL, { mode: "sponsored" });
+        await new PrivacyPaymaster(URL, POLICY).quote(POOL, {
+          mode: "sponsored",
+        });
 
         expect(sent[0]!.method).toBe("paymaster_buildTransaction");
       });
@@ -942,7 +959,7 @@ describe("privacy", () => {
       it("asks for the wrapped type and returns the data to sign", async () => {
         const sent = stubFetch(quoted());
 
-        const quote = await new PrivacyPaymaster(URL).quote(
+        const quote = await new PrivacyPaymaster(URL, POLICY).quote(
           POOL,
           { mode: "sponsored" },
           {
@@ -991,7 +1008,7 @@ describe("privacy", () => {
                 },
               })
             );
-            return new PrivacyPaymaster(URL).quote(
+            return new PrivacyPaymaster(URL, POLICY).quote(
               POOL,
               { mode: "sponsored" },
               {
@@ -1065,7 +1082,7 @@ describe("privacy", () => {
                 },
               })
             );
-            return new PrivacyPaymaster(URL).quote(
+            return new PrivacyPaymaster(URL, POLICY).quote(
               POOL,
               { mode: "sponsored" },
               {
@@ -1095,7 +1112,7 @@ describe("privacy", () => {
             })
           );
 
-          const quote = await new PrivacyPaymaster(URL).quote(
+          const quote = await new PrivacyPaymaster(URL, POLICY).quote(
             POOL,
             { mode: "sponsored" },
             {
@@ -1119,7 +1136,7 @@ describe("privacy", () => {
               },
             })
           );
-          return new PrivacyPaymaster(URL).quote(
+          return new PrivacyPaymaster(URL, POLICY).quote(
             POOL,
             { mode: "sponsored" },
             {
@@ -1170,7 +1187,7 @@ describe("privacy", () => {
             stubFetch(
               quoted({ typed_data: { ...TYPED_DATA, primaryType: "Transfer" } })
             );
-            return new PrivacyPaymaster(URL).quote(
+            return new PrivacyPaymaster(URL, POLICY).quote(
               POOL,
               { mode: "sponsored" },
               {
@@ -1189,7 +1206,7 @@ describe("privacy", () => {
       it("asks for the plain type, and returns no typed data, without it", async () => {
         const sent = stubFetch(quoted({ typed_data: undefined }));
 
-        const quote = await new PrivacyPaymaster(URL).quote(POOL, {
+        const quote = await new PrivacyPaymaster(URL, POLICY).quote(POOL, {
           mode: "sponsored",
         });
 
@@ -1211,7 +1228,7 @@ describe("privacy", () => {
         });
 
         const error = await rejectedBy(() =>
-          new PrivacyPaymaster(URL).quote(
+          new PrivacyPaymaster(URL, POLICY).quote(
             POOL,
             { mode: "sponsored" },
             {
@@ -1240,7 +1257,7 @@ describe("privacy", () => {
         });
 
         const error = await rejectedBy(() =>
-          new PrivacyPaymaster(URL).quote(POOL, { mode: "sponsored" })
+          new PrivacyPaymaster(URL, POLICY).quote(POOL, { mode: "sponsored" })
         );
 
         expect(error.message).toContain("invalid version");
@@ -1253,7 +1270,7 @@ describe("privacy", () => {
         stubFetch(quoted({ typed_data: undefined }));
 
         const error = await rejectedBy(() =>
-          new PrivacyPaymaster(URL).quote(
+          new PrivacyPaymaster(URL, POLICY).quote(
             POOL,
             { mode: "sponsored" },
             {
@@ -1272,7 +1289,7 @@ describe("privacy", () => {
       it("submits the signed calls alongside the proof", async () => {
         const sent = stubFetch({ result: { transaction_hash: "0xsent" } });
 
-        await new PrivacyPaymaster(URL).execute(
+        await new PrivacyPaymaster(URL, POLICY).execute(
           { contractAddress: POOL, entrypoint: "apply_actions" },
           { data: "0x1", proofFacts: ["0x2"] },
           { version: "0x1" },
@@ -1304,7 +1321,7 @@ describe("privacy", () => {
         const sent = stubFetch({ result: { transaction_hash: "0xsent" } });
         const signature = ec.starkCurve.sign("0x1", testPrivateKeys.key1);
 
-        await new PrivacyPaymaster(URL).execute(
+        await new PrivacyPaymaster(URL, POLICY).execute(
           { contractAddress: POOL, entrypoint: "apply_actions" },
           { data: "0x1", proofFacts: ["0x2"] },
           { version: "0x1" },
@@ -1349,7 +1366,7 @@ describe("privacy", () => {
       it("reports the estimate alongside what will actually be withdrawn", async () => {
         stubFetch(withFee(FEE_BLOCK));
 
-        const { gas } = await new PrivacyPaymaster(URL).quote(POOL, {
+        const { gas } = await new PrivacyPaymaster(URL, POLICY).quote(POOL, {
           mode: "sponsored",
         });
 
@@ -1363,7 +1380,7 @@ describe("privacy", () => {
       it("omits them when the deployment sends none", async () => {
         stubFetch(withFee(undefined));
 
-        const quote = await new PrivacyPaymaster(URL).quote(POOL, {
+        const quote = await new PrivacyPaymaster(URL, POLICY).quote(POOL, {
           mode: "sponsored",
         });
 
@@ -1377,7 +1394,7 @@ describe("privacy", () => {
           withFee({ ...FEE_BLOCK, suggested_max_fee_in_strk: "not-a-number" })
         );
 
-        const quote = await new PrivacyPaymaster(URL).quote(POOL, {
+        const quote = await new PrivacyPaymaster(URL, POLICY).quote(POOL, {
           mode: "sponsored",
         });
 
@@ -1414,7 +1431,7 @@ describe("privacy", () => {
         stubFetch(feeAction({ token: STRK }));
 
         const error = await rejectedBy(() =>
-          new PrivacyPaymaster(URL).quote(POOL, {
+          new PrivacyPaymaster(URL, POLICY).quote(POOL, {
             mode: "default",
             gasToken: fromAddress("0xe7"),
           })
@@ -1430,7 +1447,7 @@ describe("privacy", () => {
         stubFetch(feeAction({ token: STRK }));
 
         const error = await rejectedBy(() =>
-          new PrivacyPaymaster(URL).quote(POOL, {
+          new PrivacyPaymaster(URL, POLICY).quote(POOL, {
             mode: "sponsored_private",
             poolFeeToken: fromAddress("0xe7"),
           })
@@ -1442,7 +1459,7 @@ describe("privacy", () => {
       it("accepts whichever token the deployment picks under sponsored", async () => {
         stubFetch(feeAction({ token: STRK }));
 
-        const quote = await new PrivacyPaymaster(URL).quote(POOL, {
+        const quote = await new PrivacyPaymaster(URL, POLICY).quote(POOL, {
           mode: "sponsored",
         });
 
@@ -1458,6 +1475,7 @@ describe("privacy", () => {
           stubFetch(feeAction({ recipient: "0x75a1" }));
 
           const quote = await new PrivacyPaymaster(URL, {
+            ...POLICY,
             allowedFeeRecipients: [
               fromAddress("0xdead"),
               fromAddress("0x75a1"),
@@ -1472,6 +1490,7 @@ describe("privacy", () => {
 
           const error = await rejectedBy(() =>
             new PrivacyPaymaster(URL, {
+              ...POLICY,
               allowedFeeRecipients: [fromAddress("0x75a1")],
             }).quote(POOL, { mode: "sponsored" })
           );
@@ -1485,6 +1504,7 @@ describe("privacy", () => {
           stubFetch(feeAction({ recipient: "0x75a1" }));
 
           const quote = await new PrivacyPaymaster(URL, {
+            ...POLICY,
             allowedFeeRecipients: [
               `0x${"0".repeat(60)}75a1` as unknown as ReturnType<
                 typeof fromAddress
@@ -1499,25 +1519,26 @@ describe("privacy", () => {
           stubFetch(feeAction({ recipient: "0x75a1" }));
 
           const error = await rejectedBy(() =>
-            new PrivacyPaymaster(URL, { allowedFeeRecipients: [] }).quote(
-              POOL,
-              {
-                mode: "sponsored",
-              }
-            )
+            new PrivacyPaymaster(URL, {
+              ...POLICY,
+              allowedFeeRecipients: [],
+            }).quote(POOL, {
+              mode: "sponsored",
+            })
           );
 
           expect(error.message).toMatch(/is an empty list/);
         });
 
-        it("accepts any recipient when left unset", async () => {
-          stubFetch(feeAction({ recipient: "0xdead" }));
-
-          const quote = await new PrivacyPaymaster(URL).quote(POOL, {
-            mode: "sponsored",
+        it("cannot be built without a recipient list", () => {
+          // Nothing on chain names the legitimate recipient, so the list is
+          // required rather than defaulted. `@ts-expect-error` is the
+          // assertion: it fails the typecheck if the field becomes optional.
+          // @ts-expect-error - `allowedFeeRecipients` is required
+          const paymaster = new PrivacyPaymaster(URL, {
+            maxFee: 10n,
           });
-
-          expect(quote.feeAction.recipient).toBe(fromAddress("0xdead"));
+          expect(paymaster).toBeDefined();
         });
       });
 
@@ -1525,7 +1546,7 @@ describe("privacy", () => {
         stubFetch(feeAction({ recipient: "not-an-address" }));
 
         await expect(
-          new PrivacyPaymaster(URL).quote(POOL, { mode: "sponsored" })
+          new PrivacyPaymaster(URL, POLICY).quote(POOL, { mode: "sponsored" })
         ).rejects.toThrow("fee action starkzap cannot use");
       });
 
@@ -1535,7 +1556,7 @@ describe("privacy", () => {
         stubFetch(feeAction({ amount: "twelve" }));
 
         await expect(
-          new PrivacyPaymaster(URL).quote(POOL, { mode: "sponsored" })
+          new PrivacyPaymaster(URL, POLICY).quote(POOL, { mode: "sponsored" })
         ).rejects.toThrow("fee action starkzap cannot use");
       });
 
@@ -1545,7 +1566,7 @@ describe("privacy", () => {
         stubFetch(feeAction({ amount: "" }));
 
         await expect(
-          new PrivacyPaymaster(URL).quote(POOL, { mode: "sponsored" })
+          new PrivacyPaymaster(URL, POLICY).quote(POOL, { mode: "sponsored" })
         ).rejects.toThrow("fee action starkzap cannot use");
       });
 
@@ -1553,7 +1574,7 @@ describe("privacy", () => {
         stubFetch(feeAction({ amount: "0xb" }));
 
         await expect(
-          new PrivacyPaymaster(URL, { maxFee: 10n }).quote(POOL, {
+          new PrivacyPaymaster(URL, { ...POLICY, maxFee: 10n }).quote(POOL, {
             mode: "sponsored",
           })
         ).rejects.toThrow(
@@ -1565,19 +1586,20 @@ describe("privacy", () => {
         stubFetch(feeAction({ amount: "0xa" }));
 
         const { feeAction: action } = await new PrivacyPaymaster(URL, {
+          ...POLICY,
           maxFee: 10n,
         }).quote(POOL, { mode: "sponsored" });
         expect(action.amount).toBe(10n);
       });
 
-      it("has no ceiling unless one is configured", async () => {
-        stubFetch(feeAction({ amount: "0xde0b6b3a7640000" }));
-
-        const { feeAction: action } = await new PrivacyPaymaster(URL).quote(
-          POOL,
-          { mode: "sponsored" }
-        );
-        expect(action.amount).toBe(1_000_000_000_000_000_000n);
+      it("cannot be built without a ceiling", () => {
+        // The ceiling is the only bound on how much of the shielded balance a
+        // quote may withdraw, so it is required rather than defaulted.
+        // @ts-expect-error - `maxFee` is required
+        const paymaster = new PrivacyPaymaster(URL, {
+          allowedFeeRecipients: POLICY.allowedFeeRecipients,
+        });
+        expect(paymaster).toBeDefined();
       });
     });
   });
@@ -2215,6 +2237,8 @@ describe("privacy", () => {
             poolContractAddress: POOL_HEX,
             url: "https://paymaster.example.com",
             fee,
+            maxFee: 10n ** 30n,
+            allowedFeeRecipients: [FORWARDER],
             provider,
             chainId: ChainId.MAINNET,
             ...(withAccount && {

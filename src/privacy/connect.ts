@@ -57,7 +57,14 @@ const clients = new WeakMap<Wallet, Promise<PrivacyClient>>();
  *   poolContractAddress: POOL,
  *   prover: "https://prover.example.com",
  *   discovery: "https://discovery.example.com",
- *   paymaster: { url: "https://paymaster.example.com", fee: { mode: "sponsored" } },
+ *   paymaster: {
+ *     url: "https://paymaster.example.com",
+ *     fee: { mode: "sponsored" },
+ *     // Both required: the ceiling on what a quote may withdraw, and the
+ *     // forwarder addresses allowed to receive it.
+ *     maxFee: 10n ** 19n,
+ *     allowedFeeRecipients: [FORWARDER],
+ *   },
  * });
  *
  * const { transactionHash } = await privacy.send((b) =>
@@ -106,19 +113,22 @@ async function build(
   wallet: Wallet,
   config: PrivacyConfig
 ): Promise<PrivacyClient> {
-  // One check, not two: `PrivacyPaymasterConfig` carries the endpoint and the
-  // fee mode together, so there is no half-configured state to reject. The fee
-  // mode is never defaulted — `default` needs no API key but its withdrawal
-  // takes the suggested *maximum* gas rather than the estimate, so choosing it
-  // unasked would overcharge on the user's behalf.
+  // One check, not several: `PrivacyPaymasterConfig` carries the endpoint, the
+  // fee mode and the two quote bounds together, so there is no half-configured
+  // state to reject. The fee mode is never defaulted — `default` needs no API
+  // key but its withdrawal takes the suggested *maximum* gas rather than the
+  // estimate, so choosing it unasked would overcharge on the user's behalf.
   if (!config.paymaster) {
     throw new Error(
       "[starkzap] Privacy transactions are submitted by a paymaster's relayer, " +
         "so `privacy.paymaster` is required. Use `{ url, fee: { mode: " +
-        '"sponsored" } }` (relayer pays gas, pool fee in STRK — needs an API ' +
-        "key, so point `url` at a proxy holding it), or `{ url, fee: { mode: " +
-        '"default", gasToken } }` (no key, but the withdrawal takes the full ' +
-        "suggested-max gas rather than refunding the unused part)."
+        '"sponsored" }, maxFee, allowedFeeRecipients }` (relayer pays gas, pool ' +
+        "fee in STRK — needs an API key, so point `url` at a proxy holding it), " +
+        'or `{ url, fee: { mode: "default", gasToken }, maxFee, ' +
+        "allowedFeeRecipients }` (no key, but the withdrawal takes the full " +
+        "suggested-max gas rather than refunding the unused part). `maxFee` caps " +
+        "what a quote may withdraw and `allowedFeeRecipients` names who may " +
+        "receive it; both are required."
     );
   }
 

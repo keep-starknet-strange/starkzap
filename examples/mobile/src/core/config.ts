@@ -108,6 +108,19 @@ export const PRIVACY_OHTTP = process.env.EXPO_PUBLIC_PRIVACY_OHTTP !== "false";
 const PRIVACY_FEE_MODE =
   process.env.EXPO_PUBLIC_PRIVACY_FEE_MODE?.trim() || "sponsored";
 const PRIVACY_FEE_TOKEN = process.env.EXPO_PUBLIC_PRIVACY_FEE_TOKEN?.trim();
+// Both required by the SDK. The ceiling caps what a quote may withdraw from the
+// shielded balance, in base units of the fee token; size it for the fee mode
+// (the flat pool fee under sponsored modes, pool fee plus suggested-max gas
+// under `default`). The recipients are the forwarder addresses your paymaster
+// operator gave you, comma-separated; a quote naming any other is refused.
+const PRIVACY_MAX_FEE_MAINNET =
+  process.env.EXPO_PUBLIC_PRIVACY_MAX_FEE_MAINNET ?? "";
+const PRIVACY_MAX_FEE_SEPOLIA =
+  process.env.EXPO_PUBLIC_PRIVACY_MAX_FEE_SEPOLIA ?? "";
+const PRIVACY_FEE_RECIPIENTS_MAINNET =
+  process.env.EXPO_PUBLIC_PRIVACY_FEE_RECIPIENTS_MAINNET ?? "";
+const PRIVACY_FEE_RECIPIENTS_SEPOLIA =
+  process.env.EXPO_PUBLIC_PRIVACY_FEE_RECIPIENTS_SEPOLIA ?? "";
 
 function privacyFee(): PrivacyFeeMode | undefined {
   const disabled = (why: string) => {
@@ -157,7 +170,27 @@ export function privacyConfig(
     isMain ? PRIVACY_DISCOVERY_MAINNET : PRIVACY_DISCOVERY_SEPOLIA
   ).trim();
   const fee = privacyFee();
-  if (!pool || !prover || !discovery || !paymasterUrl || !fee) return undefined;
+  const maxFee = (
+    isMain ? PRIVACY_MAX_FEE_MAINNET : PRIVACY_MAX_FEE_SEPOLIA
+  ).trim();
+  const recipients = (
+    isMain ? PRIVACY_FEE_RECIPIENTS_MAINNET : PRIVACY_FEE_RECIPIENTS_SEPOLIA
+  )
+    .split(",")
+    .map((address) => address.trim())
+    .filter(Boolean)
+    .map((address) => fromAddress(address));
+  if (
+    !pool ||
+    !prover ||
+    !discovery ||
+    !paymasterUrl ||
+    !fee ||
+    !maxFee ||
+    recipients.length === 0
+  ) {
+    return undefined;
+  }
 
   const relay = PRIVACY_OHTTP_RELAY.trim();
   return {
@@ -166,7 +199,12 @@ export function privacyConfig(
     discovery,
     // Privacy transactions are submitted by the paymaster's relayer, so the
     // account never appears on-chain. Same proxy the sponsored flow uses.
-    paymaster: { url: paymasterUrl, fee },
+    paymaster: {
+      url: paymasterUrl,
+      fee,
+      maxFee: BigInt(maxFee),
+      allowedFeeRecipients: recipients,
+    },
     // Same reason as the SDK config: a device reaches the proxy over the LAN.
     allowInsecureHttp: __DEV__,
     ohttp: PRIVACY_OHTTP ? (relay ? { relayUrl: relay } : true) : false,

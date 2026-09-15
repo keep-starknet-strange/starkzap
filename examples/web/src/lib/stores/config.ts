@@ -290,12 +290,30 @@ function privacyFee(): PrivacyFeeMode | undefined {
 
 const PRIVACY_FEE = privacyFee();
 
+// Both required by the SDK. The ceiling caps what a quote may withdraw from the
+// shielded balance, in base units of the fee token; size it for the fee mode
+// (the flat pool fee under sponsored modes, pool fee plus suggested-max gas
+// under `default`). The recipients are the forwarder addresses your paymaster
+// operator gave you, comma-separated; a quote naming any other is refused.
+const PRIVACY_MAX_FEE = pick(
+  env.VITE_PRIVACY_MAX_FEE_MAINNET as string | undefined,
+  env.VITE_PRIVACY_MAX_FEE_SEPOLIA as string | undefined
+);
+const PRIVACY_FEE_RECIPIENTS = pick(
+  env.VITE_PRIVACY_FEE_RECIPIENTS_MAINNET as string | undefined,
+  env.VITE_PRIVACY_FEE_RECIPIENTS_SEPOLIA as string | undefined
+)
+  ?.split(",")
+  .map((address) => fromAddress(address.trim()));
+
 export const PRIVACY_CONFIG: PrivacyConfig | undefined =
   PRIVACY_POOL &&
   PRIVACY_PROVER &&
   PRIVACY_DISCOVERY &&
   PAYMASTER_NODE_URL &&
-  PRIVACY_FEE
+  PRIVACY_FEE &&
+  PRIVACY_MAX_FEE &&
+  PRIVACY_FEE_RECIPIENTS?.length
     ? {
         poolContractAddress: PRIVACY_POOL,
         prover: PRIVACY_PROVER,
@@ -303,7 +321,12 @@ export const PRIVACY_CONFIG: PrivacyConfig | undefined =
         // Privacy transactions are submitted by the paymaster's relayer, so the
         // account never appears on-chain. Same proxy as the sponsored toggle:
         // it forwards any method with the API key attached.
-        paymaster: { url: PAYMASTER_NODE_URL, fee: PRIVACY_FEE },
+        paymaster: {
+          url: PAYMASTER_NODE_URL,
+          fee: PRIVACY_FEE,
+          maxFee: BigInt(PRIVACY_MAX_FEE),
+          allowedFeeRecipients: PRIVACY_FEE_RECIPIENTS,
+        },
         // Dev builds may use a plain-http proxy on the LAN; production must not.
         allowInsecureHttp: Boolean(env.DEV),
         ohttp: PRIVACY_OHTTP
