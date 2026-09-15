@@ -42,6 +42,20 @@ export const LAYERSWAP_API_KEY_MAINNET =
   process.env.EXPO_PUBLIC_LAYERSWAP_API_KEY_MAINNET ?? "";
 export const LAYERSWAP_API_KEY_TESTNET =
   process.env.EXPO_PUBLIC_LAYERSWAP_API_KEY_TESTNET ?? "";
+// Starknet contracts Layerswap may call besides the bridge token, per network,
+// comma-separated. Unset, the SDK signs only the token transfer and refuses any
+// helper call. Inspect the route's deposit action before listing anything.
+export function layerswapAllowedContracts(network: "mainnet" | "testnet") {
+  const raw =
+    (network === "mainnet"
+      ? process.env.EXPO_PUBLIC_LAYERSWAP_ALLOWED_CONTRACTS_MAINNET
+      : process.env.EXPO_PUBLIC_LAYERSWAP_ALLOWED_CONTRACTS_TESTNET) ?? "";
+  return raw
+    .split(",")
+    .map((address) => address.trim())
+    .filter(Boolean)
+    .map((address) => fromAddress(address));
+}
 // LayerZero API key ("OFT public key") — enables OFT bridging (mainnet only).
 export const OFT_PUBLIC_KEY = process.env.EXPO_PUBLIC_OFT_PUBLIC_KEY ?? "";
 

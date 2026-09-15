@@ -1,4 +1,4 @@
-import { Amount } from "@/types";
+import { Amount, type Address } from "@/types";
 import { DUMMY_SN_ADDRESS } from "@/bridge/ethereum/types";
 import { FeeErrorCause } from "@/types/errors";
 import type { LsDepositAction } from "@/bridge/ethereum/layerswap/types";
@@ -9,15 +9,22 @@ import { type Call, CallData, num, uint256 } from "starknet";
 /**
  * Parse and validate Layerswap's Starknet deposit-action `call_data`.
  *
- * Layerswap delivers Starknet calls as a JSON-encoded `Call` or `Call[]`.
- * Since these calls are signed by the user's Starknet wallet, we require the
- * payload to contain a `transfer` on the bridge token contract. Layerswap can
- * include extra helper calls to its own contracts, so those are passed through;
- * direct calls to the bridge token contract must still be transfers.
+ * Layerswap delivers Starknet calls as a JSON-encoded `Call` or `Call[]`, and
+ * the user's wallet signs whatever comes back, so every call is checked against
+ * a whitelist. A call on the bridge token must be a `transfer`, and at least
+ * one such transfer must be present. Any other call must target a contract in
+ * `allowedContracts`, the integrator-vetted list from
+ * `bridging.layerswapAllowedContracts`. With no list, only the transfer is
+ * accepted: an API response that adds an `approve` or a call to an unknown
+ * contract is refused before anything is signed.
+ *
+ * Addresses only, any entrypoint on a listed contract. Per-address entrypoint
+ * restrictions can be added if a route ever needs them.
  */
 export function parseLayerswapStarknetCalls(
   action: LsDepositAction,
-  expectedContractAddress: string
+  expectedContractAddress: string,
+  allowedContracts: readonly Address[] = []
 ): Call[] {
   if (!action.call_data) {
     throw new Error(
@@ -44,6 +51,7 @@ export function parseLayerswapStarknetCalls(
   }
 
   const expected = num.toHex64(expectedContractAddress);
+  const allowed = new Set(allowedContracts.map((a) => num.toHex64(a)));
 
   let hasExpectedTransfer = false;
   const calls = raw.map((entry, i) => {
@@ -58,13 +66,18 @@ export function parseLayerswapStarknetCalls(
       );
     }
     const call = entry as Call;
-    if (num.toHex64(call.contractAddress) === expected) {
+    const target = num.toHex64(call.contractAddress);
+    if (target === expected) {
       if (call.entrypoint !== "transfer") {
         throw new Error(
           `Layerswap call_data entry ${i} uses unexpected bridge-token entrypoint "${call.entrypoint}" (expected "transfer").`
         );
       }
       hasExpectedTransfer = true;
+    } else if (!allowed.has(target)) {
+      throw new Error(
+        `Layerswap call_data entry ${i} calls ${call.contractAddress} (entrypoint "${call.entrypoint}"), which is not the bridge token and not in \`bridging.layerswapAllowedContracts\`. Nothing was signed. Inspect this call, and list the contract if it is a Layerswap helper you trust.`
+      );
     }
     return call;
   });

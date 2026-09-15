@@ -65,7 +65,8 @@ export class LayerswapBridge extends EthereumBridge {
     starknetWallet: WalletInterface,
     apiKey: string,
     logger: StarkZapLogger,
-    apiConfig?: Omit<LayerswapApiConfig, "apiKey">
+    apiConfig?: Omit<LayerswapApiConfig, "apiKey">,
+    private readonly allowedContracts: readonly Address[] = []
   ) {
     super(bridgeToken, config, starknetWallet, logger);
     this.api = new LayerswapApi({ apiKey, ...apiConfig });
@@ -215,7 +216,8 @@ export class LayerswapBridge extends EthereumBridge {
 
     const calls = parseLayerswapStarknetCalls(
       action,
-      this.bridgeToken.starknetAddress.toString()
+      this.bridgeToken.starknetAddress.toString(),
+      this.allowedContracts
     );
     const tx = await this.starknetWallet.execute(calls, options);
 

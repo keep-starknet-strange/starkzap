@@ -194,6 +194,23 @@ export interface BridgingConfig {
    */
   layerswapBaseUrl?: string;
 
+  /**
+   * Starknet contracts Layerswap may call in a withdrawal, besides the bridge
+   * token.
+   *
+   * Layerswap delivers the Starknet side of a withdrawal as calls the user's
+   * wallet signs as-is. The SDK requires a `transfer` on the bridge token and
+   * refuses any other call unless its contract is listed here. Unset or empty,
+   * nothing else is signed: a deposit action carrying a helper call fails
+   * before signing, naming the address, and the withdrawal is not sent.
+   *
+   * Before enabling a Layerswap route, inspect its deposit action, confirm
+   * which Layerswap contracts it calls and why, and list those addresses.
+   * Compared by value, so padding does not matter. Listing the bridge token
+   * itself changes nothing: calls on it must be `transfer` regardless.
+   */
+  layerswapAllowedContracts?: readonly Address[];
+
   /** Custom Ethereum JSON-RPC endpoint used for gas estimation in Ethereum bridges. */
   ethereumRpcUrl?: string;
 

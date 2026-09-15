@@ -72,7 +72,8 @@ export class SolanaLayerswapBridge implements BridgeInterface<SolanaAddress> {
     readonly starknetWallet: WalletInterface,
     apiKey: string,
     private readonly logger: StarkZapLogger,
-    apiConfig?: Omit<LayerswapApiConfig, "apiKey">
+    apiConfig?: Omit<LayerswapApiConfig, "apiKey">,
+    private readonly allowedContracts: readonly Address[] = []
   ) {
     this.api = new LayerswapApi({ apiKey, ...apiConfig });
     this.starknetToken = new Erc20(
@@ -257,7 +258,8 @@ export class SolanaLayerswapBridge implements BridgeInterface<SolanaAddress> {
 
     const calls = parseLayerswapStarknetCalls(
       action,
-      this.bridgeToken.starknetAddress.toString()
+      this.bridgeToken.starknetAddress.toString(),
+      this.allowedContracts
     );
     const tx = await this.starknetWallet.execute(calls, options);
 

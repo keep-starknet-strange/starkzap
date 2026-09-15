@@ -150,6 +150,15 @@ const LAYERSWAP_API_KEY =
     : (env.VITE_LAYERSWAP_API_KEY_TESTNET as string | undefined)) ??
   (env.VITE_LAYERSWAP_API_KEY as string | undefined);
 const LAYERSWAP_BASE_URL = env.VITE_LAYERSWAP_BASE_URL as string | undefined;
+// Starknet contracts Layerswap may call besides the bridge token, per network.
+// Unset, the SDK signs only the token transfer and refuses any helper call.
+// Inspect the route's deposit action before listing anything here.
+const LAYERSWAP_ALLOWED_CONTRACTS = pick(
+  env.VITE_LAYERSWAP_ALLOWED_CONTRACTS_MAINNET as string | undefined,
+  env.VITE_LAYERSWAP_ALLOWED_CONTRACTS_TESTNET as string | undefined
+)
+  ?.split(",")
+  .map((address) => fromAddress(address.trim()));
 
 const ETH_BRIDGING_RPC_URL = ALCHEMY_API_KEY
   ? NETWORK === "mainnet"
@@ -180,6 +189,9 @@ export function buildBridgingConfig() {
     ...(OFT_PUBLIC_KEY && { layerZeroApiKey: OFT_PUBLIC_KEY }),
     ...(LAYERSWAP_API_KEY && { layerswapApiKey: LAYERSWAP_API_KEY }),
     ...(LAYERSWAP_BASE_URL && { layerswapBaseUrl: LAYERSWAP_BASE_URL }),
+    ...(LAYERSWAP_ALLOWED_CONTRACTS?.length && {
+      layerswapAllowedContracts: LAYERSWAP_ALLOWED_CONTRACTS,
+    }),
   };
 }
 
