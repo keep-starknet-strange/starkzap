@@ -75,6 +75,23 @@ describe("VesuLendingProvider", () => {
     ).resolves.toEqual([]);
   });
 
+  it("treats a non-array data field as no markets and no positions", async () => {
+    // Same contract as the null body: a malformed success response yields an
+    // empty result rather than a TypeError from iterating `data`.
+    const fetcher = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ data: {} }),
+    });
+    const provider = new VesuLendingProvider({
+      fetcher: fetcher as unknown as typeof fetch,
+    });
+
+    await expect(provider.getMarkets(ChainId.MAINNET)).resolves.toEqual([]);
+    await expect(
+      provider.getPositions(createContext(vi.fn()), {})
+    ).resolves.toEqual([]);
+  });
+
   it("skips malformed position API items instead of failing the full response", async () => {
     const fetcher = vi.fn().mockResolvedValue({
       ok: true,

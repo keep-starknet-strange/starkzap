@@ -16,9 +16,9 @@ describe("assertSafeHttpUrl", () => {
 
   it.each([
     "http://localhost:5050",
-    "http://devnet.localhost:5050",
     "http://127.0.0.1:5050",
     "http://127.1.2.3:5050",
+    "http://127.1:5050",
     "http://[::1]:5050",
   ])("accepts plain http on the loopback host %s", (url) => {
     expect(assertSafeHttpUrl(url, "rpcUrl").href).toBe(new URL(url).href);
@@ -29,6 +29,9 @@ describe("assertSafeHttpUrl", () => {
     "http://192.168.1.20:5050",
     "http://rpc.example.com",
     "http://localhost.example.com",
+    "http://devnet.localhost:5050",
+    "http://127.attacker.example",
+    "http://127.0.0.1.nip.io",
   ])("rejects plain http on the non-loopback host %s", (url) => {
     expect(() => assertSafeHttpUrl(url, "rpcUrl")).toThrow(
       /rpcUrl uses plain http:\/\/ on a non-loopback host.*allowInsecureHttp/

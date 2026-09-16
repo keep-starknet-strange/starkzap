@@ -180,7 +180,7 @@ export class VesuLendingProvider implements LendingProvider {
     }
     const payload = (await response.json()) as VesuMarketsResponse | null;
 
-    return (payload?.data ?? [])
+    return (Array.isArray(payload?.data) ? payload.data : [])
       .filter((entry) => this.isSupportedMarket(entry))
       .map((entry) => this.toMarket(entry))
       .filter((market): market is LendingMarket => market != null);
@@ -637,7 +637,7 @@ export class VesuLendingProvider implements LendingProvider {
     }
     const payload = (await response.json()) as VesuPositionsResponse | null;
     const positions: LendingUserPosition[] = [];
-    for (const entry of payload?.data ?? []) {
+    for (const entry of Array.isArray(payload?.data) ? payload.data : []) {
       if (
         entry.protocolVersion?.toLowerCase() !== "v2" ||
         entry.isDeprecated === true

@@ -3,7 +3,7 @@ export interface SafeHttpUrlOptions {
   /**
    * Accept plain `http://` on hosts other than loopback.
    *
-   * Loopback (`localhost`, `*.localhost`, `127.0.0.0/8`, `[::1]`) is always
+   * Loopback (`localhost`, `127.0.0.0/8`, `[::1]`) is always
    * accepted, since traffic to it never leaves the machine. Anything else over
    * plain http is readable by everyone on the path, so it has to be asked for.
    */
@@ -13,8 +13,8 @@ export interface SafeHttpUrlOptions {
 function isLoopback(hostname: string): boolean {
   return (
     hostname === "localhost" ||
-    hostname.endsWith(".localhost") ||
-    hostname.startsWith("127.") ||
+    // `URL` canonicalises every IPv4 spelling to dotted quad before this runs.
+    /^127\.\d+\.\d+\.\d+$/.test(hostname) ||
     hostname === "[::1]"
   );
 }
