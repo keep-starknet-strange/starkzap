@@ -150,6 +150,15 @@ const LAYERSWAP_API_KEY =
     : (env.VITE_LAYERSWAP_API_KEY_TESTNET as string | undefined)) ??
   (env.VITE_LAYERSWAP_API_KEY as string | undefined);
 const LAYERSWAP_BASE_URL = env.VITE_LAYERSWAP_BASE_URL as string | undefined;
+// Starknet contracts Layerswap may call besides the bridge token, per network.
+// Unset, the SDK signs only the token transfer and refuses any helper call.
+// Inspect the route's deposit action before listing anything here.
+const LAYERSWAP_ALLOWED_CONTRACTS = pick(
+  env.VITE_LAYERSWAP_ALLOWED_CONTRACTS_MAINNET as string | undefined,
+  env.VITE_LAYERSWAP_ALLOWED_CONTRACTS_TESTNET as string | undefined
+)
+  ?.split(",")
+  .map((address) => fromAddress(address.trim()));
 
 const ETH_BRIDGING_RPC_URL = ALCHEMY_API_KEY
   ? NETWORK === "mainnet"
@@ -180,6 +189,9 @@ export function buildBridgingConfig() {
     ...(OFT_PUBLIC_KEY && { layerZeroApiKey: OFT_PUBLIC_KEY }),
     ...(LAYERSWAP_API_KEY && { layerswapApiKey: LAYERSWAP_API_KEY }),
     ...(LAYERSWAP_BASE_URL && { layerswapBaseUrl: LAYERSWAP_BASE_URL }),
+    ...(LAYERSWAP_ALLOWED_CONTRACTS?.length && {
+      layerswapAllowedContracts: LAYERSWAP_ALLOWED_CONTRACTS,
+    }),
   };
 }
 
@@ -290,12 +302,50 @@ function privacyFee(): PrivacyFeeMode | undefined {
 
 const PRIVACY_FEE = privacyFee();
 
+// Both required by the SDK. The ceiling caps what a quote may withdraw from the
+// shielded balance, in base units of the fee token; size it for the fee mode
+// (the flat pool fee under sponsored modes, pool fee plus suggested-max gas
+// under `default`). The recipients are the forwarder addresses your paymaster
+// operator gave you, comma-separated; a quote naming any other is refused.
+const PRIVACY_MAX_FEE = pick(
+  env.VITE_PRIVACY_MAX_FEE_MAINNET as string | undefined,
+  env.VITE_PRIVACY_MAX_FEE_SEPOLIA as string | undefined
+);
+const PRIVACY_FEE_RECIPIENTS = pick(
+  env.VITE_PRIVACY_FEE_RECIPIENTS_MAINNET as string | undefined,
+  env.VITE_PRIVACY_FEE_RECIPIENTS_SEPOLIA as string | undefined
+)
+  ?.split(",")
+  .map((address) => fromAddress(address.trim()));
+
+/**
+ * Env keys the STRK20 config still needs for this network. Empty when the
+ * config is complete, so the tab can name exactly what is missing.
+ */
+export const PRIVACY_CONFIG_MISSING: readonly string[] = (() => {
+  const suffix = NETWORK === "mainnet" ? "MAINNET" : "SEPOLIA";
+  return [
+    [PRIVACY_POOL, `VITE_PRIVACY_POOL_${suffix}`],
+    [PRIVACY_PROVER, `VITE_PRIVACY_PROVER_${suffix}`],
+    [PRIVACY_DISCOVERY, `VITE_PRIVACY_DISCOVERY_${suffix}`],
+    [PAYMASTER_NODE_URL, `VITE_PAYMASTER_PROXY_URL_${suffix}`],
+    [PRIVACY_FEE, "VITE_PRIVACY_FEE_MODE (see its comment)"],
+    [PRIVACY_MAX_FEE, `VITE_PRIVACY_MAX_FEE_${suffix}`],
+    [PRIVACY_FEE_RECIPIENTS?.length, `VITE_PRIVACY_FEE_RECIPIENTS_${suffix}`],
+  ]
+    .filter(([value]) => !value)
+    .map(([, key]) => key as string);
+})();
+
 export const PRIVACY_CONFIG: PrivacyConfig | undefined =
+  PRIVACY_CONFIG_MISSING.length === 0 &&
   PRIVACY_POOL &&
   PRIVACY_PROVER &&
   PRIVACY_DISCOVERY &&
   PAYMASTER_NODE_URL &&
-  PRIVACY_FEE
+  PRIVACY_FEE &&
+  PRIVACY_MAX_FEE &&
+  PRIVACY_FEE_RECIPIENTS?.length
     ? {
         poolContractAddress: PRIVACY_POOL,
         prover: PRIVACY_PROVER,
@@ -303,7 +353,14 @@ export const PRIVACY_CONFIG: PrivacyConfig | undefined =
         // Privacy transactions are submitted by the paymaster's relayer, so the
         // account never appears on-chain. Same proxy as the sponsored toggle:
         // it forwards any method with the API key attached.
-        paymaster: { url: PAYMASTER_NODE_URL, fee: PRIVACY_FEE },
+        paymaster: {
+          url: PAYMASTER_NODE_URL,
+          fee: PRIVACY_FEE,
+          maxFee: BigInt(PRIVACY_MAX_FEE),
+          allowedFeeRecipients: PRIVACY_FEE_RECIPIENTS,
+        },
+        // Dev builds may use a plain-http proxy on the LAN; production must not.
+        allowInsecureHttp: Boolean(env.DEV),
         ohttp: PRIVACY_OHTTP
           ? PRIVACY_OHTTP_RELAY
             ? { relayUrl: PRIVACY_OHTTP_RELAY }

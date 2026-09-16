@@ -35,6 +35,13 @@ import type {
  *
  * Create a builder via `wallet.tx()`, chain operations, then call `.send()`.
  *
+ * Some operations prepare their calls asynchronously, such as a swap that needs
+ * a quote. An error from that preparation is held and thrown by the first of
+ * {@link calls}, {@link estimateFee}, {@link simulate} or {@link send}. A builder
+ * that is never sent or otherwise resolved never reports it. Holding the error
+ * rather than letting the promise reject is what keeps an abandoned builder
+ * from raising an unhandled rejection.
+ *
  * @example
  * ```ts
  * // Approve + stake in one transaction

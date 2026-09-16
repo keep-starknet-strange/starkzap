@@ -105,6 +105,8 @@ export interface CartridgeWalletOptions {
   timeBounds?: PaymasterTimeBounds;
   explorer?: ExplorerConfig;
   logging?: LoggerConfig;
+  /** Accept plain `http://` on non-loopback hosts. See `SDKConfig.allowInsecureHttp`. */
+  allowInsecureHttp?: boolean;
 }
 
 /**
@@ -184,10 +186,9 @@ export class CartridgeWallet extends BaseWallet {
     }
 
     if (options.rpcUrl) {
-      const rpcUrl = assertSafeHttpUrl(
-        options.rpcUrl,
-        "Cartridge RPC URL"
-      ).toString();
+      const rpcUrl = assertSafeHttpUrl(options.rpcUrl, "Cartridge RPC URL", {
+        allowInsecureHttp: options.allowInsecureHttp,
+      }).toString();
       controllerOptions.chains = [{ rpcUrl }];
     }
 
@@ -202,7 +203,8 @@ export class CartridgeWallet extends BaseWallet {
     if (options.url) {
       controllerOptions.url = assertSafeHttpUrl(
         options.url,
-        "Cartridge controller URL"
+        "Cartridge controller URL",
+        { allowInsecureHttp: options.allowInsecureHttp }
       ).toString();
     }
 
@@ -234,7 +236,8 @@ export class CartridgeWallet extends BaseWallet {
 
     const nodeUrl = assertSafeHttpUrl(
       options.rpcUrl ?? controller.rpcUrl(),
-      "Cartridge RPC URL"
+      "Cartridge RPC URL",
+      { allowInsecureHttp: options.allowInsecureHttp }
     ).toString();
     const provider = new RpcProvider({ nodeUrl });
 

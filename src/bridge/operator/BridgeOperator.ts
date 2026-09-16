@@ -471,7 +471,8 @@ export class BridgeOperator implements BridgeOperatorInterface {
           starknetWallet,
           apiKey,
           this.logger,
-          baseUrl ? { baseUrl } : undefined
+          baseUrl ? { baseUrl } : undefined,
+          this.bridgingConfig?.layerswapAllowedContracts
         );
       }
       default:
@@ -523,7 +524,8 @@ export class BridgeOperator implements BridgeOperatorInterface {
           starknetWallet,
           apiKey,
           this.logger,
-          baseUrl ? { baseUrl } : undefined
+          baseUrl ? { baseUrl } : undefined,
+          this.bridgingConfig?.layerswapAllowedContracts
         );
       }
       default:

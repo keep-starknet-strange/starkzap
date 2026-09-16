@@ -146,7 +146,11 @@ export function parsePositiveBigInt(value: unknown, label: string): bigint {
   let parsed: bigint;
 
   try {
-    parsed = BigInt(String(value));
+    const text = String(value);
+    // `BigInt("")` and `BigInt("  ")` are `0n`, so a blank field would pass as
+    // zero instead of being refused.
+    if (text.trim() === "") throw new Error("empty");
+    parsed = BigInt(text);
   } catch {
     throw new Error(`Invalid ${label}`);
   }
@@ -316,6 +320,24 @@ export function encodeEkuboOrderId(params: {
   ].join(":");
 }
 
+/**
+ * Parse an order-id timestamp into a `number` without losing precision.
+ *
+ * `EkuboOrderKey` stores times as `number`, so a value above
+ * `Number.MAX_SAFE_INTEGER` would round silently and end up in cancel calldata
+ * as a different order key. Real Ekubo timestamps are unix seconds, far below
+ * the limit, so anything above it is a malformed id and is refused.
+ */
+function parseSafeTimestamp(value: unknown, label: string): number {
+  const parsed = parsePositiveBigInt(value, label);
+  if (parsed > BigInt(Number.MAX_SAFE_INTEGER)) {
+    throw new Error(
+      `${label} ${parsed} exceeds Number.MAX_SAFE_INTEGER and cannot be represented exactly`
+    );
+  }
+  return Number(parsed);
+}
+
 export function decodeEkuboOrderId(orderId: string): ParsedEkuboOrderId {
   const parts = orderId.split(":");
   if (parts.length !== 8 || parts[0] !== ORDER_ID_PREFIX) {
@@ -331,8 +353,8 @@ export function decodeEkuboOrderId(orderId: string): ParsedEkuboOrderId {
       sellToken: fromAddress(parts[3]!),
       buyToken: fromAddress(parts[4]!),
       fee: parsePositiveBigInt(parts[5], "fee"),
-      startTime: Number(parsePositiveBigInt(parts[6], "startTime")),
-      endTime: Number(parsePositiveBigInt(parts[7], "endTime")),
+      startTime: parseSafeTimestamp(parts[6], "startTime"),
+      endTime: parseSafeTimestamp(parts[7], "endTime"),
     },
   };
 }

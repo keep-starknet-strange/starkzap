@@ -3,6 +3,7 @@ import type { Provider, TransactionReceipt } from "ethers";
 import type { RpcProvider } from "starknet";
 import {
   checkStarknetTxStatus,
+  findMailboxMessageId,
   getEthereumTxStatus,
 } from "@/bridge/monitor/utils";
 import { BridgeTransferStatus } from "@/bridge/monitor/types";
@@ -143,5 +144,48 @@ describe("getEthereumTxStatus", () => {
     const { status, receipt } = await getEthereumTxStatus(txHash, provider);
     expect(status).toBe(BridgeTransferStatus.CONFIRMED_ON_L1);
     expect(receipt).toBe(ok);
+  });
+});
+
+describe("findMailboxMessageId", () => {
+  const MAILBOX =
+    "0x00000000000000000000000000000000000000000000000000000000000abc";
+  const KEY = "0xd15";
+  // message id 0x1_0000_0000_0000_0000_0000_0000_0000_0002 as a u256
+  const dispatch = (from: string, low = "0x2", high = "0x1") => ({
+    from_address: from,
+    keys: [KEY],
+    data: [low, high],
+  });
+
+  it("reads the message id from the mailbox's DispatchId event", () => {
+    expect(findMailboxMessageId([dispatch(MAILBOX)], MAILBOX, KEY)).toBe(
+      "0x100000000000000000000000000000002"
+    );
+  });
+
+  it("compares the emitter by value, not by padding", () => {
+    expect(findMailboxMessageId([dispatch("0xabc")], MAILBOX, KEY)).not.toBe(
+      null
+    );
+  });
+
+  it("ignores a DispatchId emitted by any other contract", () => {
+    // A forged event first in the receipt must not shadow the real one.
+    const forged = dispatch("0xbad", "0x9", "0x9");
+    expect(findMailboxMessageId([forged], MAILBOX, KEY)).toBe(null);
+    expect(
+      findMailboxMessageId([forged, dispatch(MAILBOX)], MAILBOX, KEY)
+    ).toBe("0x100000000000000000000000000000002");
+  });
+
+  it("returns null when the mailbox event has no u256 payload", () => {
+    expect(
+      findMailboxMessageId(
+        [{ from_address: MAILBOX, keys: [KEY], data: ["0x2"] }],
+        MAILBOX,
+        KEY
+      )
+    ).toBe(null);
   });
 });

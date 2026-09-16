@@ -128,7 +128,9 @@ export class StarkZap {
         "StarkZap requires either 'network' or 'rpcUrl' to be specified"
       );
     }
-    const normalizedRpcUrl = assertSafeHttpUrl(rpcUrl, "rpcUrl").toString();
+    const normalizedRpcUrl = assertSafeHttpUrl(rpcUrl, "rpcUrl", {
+      allowInsecureHttp: config.allowInsecureHttp,
+    }).toString();
 
     // Resolve chainId (explicit > network preset)
     const chainId = config.chainId ?? networkPreset?.chainId;
@@ -147,10 +149,11 @@ export class StarkZap {
     if (explorer?.baseUrl) {
       explorer = {
         ...explorer,
-        baseUrl: assertSafeHttpUrl(
-          explorer.baseUrl,
-          "explorer.baseUrl"
-        ).toString(),
+        // A link the app renders, never a channel the SDK sends over, so
+        // plain http is a display choice rather than a data exposure.
+        baseUrl: assertSafeHttpUrl(explorer.baseUrl, "explorer.baseUrl", {
+          allowInsecureHttp: true,
+        }).toString(),
       };
     }
 
@@ -395,6 +398,7 @@ export class StarkZap {
         ...(privy.requestTimeoutMs && {
           requestTimeoutMs: privy.requestTimeoutMs,
         }),
+        ...(this.config.allowInsecureHttp && { allowInsecureHttp: true }),
       });
 
       const wallet = await this.connectWallet({
@@ -474,6 +478,7 @@ export class StarkZap {
         chainId: this.config.chainId,
         ...(explorer && { explorer }),
         ...(this.config.logging && { logging: this.config.logging }),
+        ...(this.config.allowInsecureHttp && { allowInsecureHttp: true }),
       },
       this.config.staking,
       this.config.bridging

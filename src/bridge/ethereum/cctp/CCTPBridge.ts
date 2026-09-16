@@ -521,9 +521,9 @@ export class CCTPBridge extends EthereumBridge {
             attestation: string;
             message: string | null;
           }[];
-        };
+        } | null;
 
-        const msg = data.messages[0];
+        const msg = data?.messages?.[0];
         if (msg?.status === "complete" && msg.attestation !== "PENDING") {
           return {
             status: "complete",

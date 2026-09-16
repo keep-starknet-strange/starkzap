@@ -34,6 +34,8 @@ type VesuChain = "SN_MAIN" | "SN_SEPOLIA";
 const VESU_SCALE = 10n ** 18n;
 const BASIS_POINTS_SCALE = 10_000n;
 const MAX_BORROW_SAFETY_BPS = 9_900n;
+/** Same ceiling as the wallet's ERC20 and staking caches. */
+const MAX_VTOKEN_CACHE_SIZE = 128;
 
 interface VesuApiDecimalValue {
   value?: string;
@@ -176,9 +178,9 @@ export class VesuLendingProvider implements LendingProvider {
     if (!response.ok) {
       throw new Error(`Vesu markets request failed (${response.status})`);
     }
-    const payload = (await response.json()) as VesuMarketsResponse;
+    const payload = (await response.json()) as VesuMarketsResponse | null;
 
-    return (payload.data ?? [])
+    return (Array.isArray(payload?.data) ? payload.data : [])
       .filter((entry) => this.isSupportedMarket(entry))
       .map((entry) => this.toMarket(entry))
       .filter((market): market is LendingMarket => market != null);
@@ -633,9 +635,9 @@ export class VesuLendingProvider implements LendingProvider {
     if (!response.ok) {
       throw new Error(`Vesu positions request failed (${response.status})`);
     }
-    const payload = (await response.json()) as VesuPositionsResponse;
+    const payload = (await response.json()) as VesuPositionsResponse | null;
     const positions: LendingUserPosition[] = [];
-    for (const entry of payload.data ?? []) {
+    for (const entry of Array.isArray(payload?.data) ? payload.data : []) {
       if (
         entry.protocolVersion?.toLowerCase() !== "v2" ||
         entry.isDeprecated === true
@@ -1012,6 +1014,13 @@ export class VesuLendingProvider implements LendingProvider {
       }
       return fromAddress(candidate);
     })();
+    // Bounded like the wallet caches. Only successful lookups stay, so the
+    // set of live keys is the set of real (pool, asset) pairs, but the cap
+    // keeps that a fact about Vesu rather than about this map.
+    if (this.vTokenCache.size >= MAX_VTOKEN_CACHE_SIZE) {
+      const oldest = this.vTokenCache.keys().next().value;
+      if (oldest !== undefined) this.vTokenCache.delete(oldest);
+    }
     this.vTokenCache.set(key, promise);
     // Evict from cache on failure so subsequent calls can retry.
     promise.catch(() => this.vTokenCache.delete(key));

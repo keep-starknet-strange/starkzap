@@ -14,6 +14,45 @@ describe("assertSafeHttpUrl", () => {
     expect(result.port).toBe("5050");
   });
 
+  it.each([
+    "http://localhost:5050",
+    "http://127.0.0.1:5050",
+    "http://127.1.2.3:5050",
+    "http://127.1:5050",
+    "http://[::1]:5050",
+  ])("accepts plain http on the loopback host %s", (url) => {
+    expect(assertSafeHttpUrl(url, "rpcUrl").href).toBe(new URL(url).href);
+  });
+
+  it.each([
+    "http://10.0.2.2:5050",
+    "http://192.168.1.20:5050",
+    "http://rpc.example.com",
+    "http://localhost.example.com",
+    "http://devnet.localhost:5050",
+    "http://127.attacker.example",
+    "http://127.0.0.1.nip.io",
+  ])("rejects plain http on the non-loopback host %s", (url) => {
+    expect(() => assertSafeHttpUrl(url, "rpcUrl")).toThrow(
+      /rpcUrl uses plain http:\/\/ on a non-loopback host.*allowInsecureHttp/
+    );
+  });
+
+  it("accepts plain http anywhere when allowInsecureHttp is set", () => {
+    const result = assertSafeHttpUrl("http://10.0.2.2:5050", "rpcUrl", {
+      allowInsecureHttp: true,
+    });
+    expect(result.hostname).toBe("10.0.2.2");
+  });
+
+  it("does not let allowInsecureHttp open other schemes", () => {
+    expect(() =>
+      assertSafeHttpUrl("javascript:alert(1)", "rpcUrl", {
+        allowInsecureHttp: true,
+      })
+    ).toThrow("rpcUrl must use http:// or https://");
+  });
+
   it("preserves path, query, and fragment", () => {
     const result = assertSafeHttpUrl(
       "https://rpc.example.com/v1?key=abc#section",

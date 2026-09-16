@@ -1,4 +1,4 @@
-import { hash, num, type RpcProvider, uint256 } from "starknet";
+import { hash, num, type RpcProvider } from "starknet";
 import type { Connection } from "@solana/web3.js";
 import type { MultiProtocolProvider } from "@hyperlane-xyz/sdk";
 import type { ChainId } from "@/types";
@@ -12,7 +12,10 @@ import {
   type WithdrawalStateInput,
   type WithdrawMonitorResult,
 } from "@/bridge/monitor/types";
-import { checkStarknetTxStatus } from "@/bridge/monitor/utils";
+import {
+  checkStarknetTxStatus,
+  findMailboxMessageId,
+} from "@/bridge/monitor/utils";
 import type { HyperlaneRuntime } from "@/bridge/solana/hyperlaneRuntime";
 import {
   hyperlaneChainName,
@@ -249,14 +252,12 @@ export class SolanaHyperlaneMonitor implements BridgeMonitorInterface {
         return false;
       }
 
-      const event = receipt.events.find((e) =>
-        e.keys.includes(this.dispatchIdEventKey)
+      const messageId = findMailboxMessageId(
+        receipt.events,
+        this.starknetMailbox,
+        this.dispatchIdEventKey
       );
-      if (!event) return false;
-
-      if (event.data.length < 2) return false;
-      const data = { low: event.data[0]!, high: event.data[1]! };
-      const messageId = num.toHex(uint256.uint256ToBN(data));
+      if (!messageId) return false;
 
       const solanaAdapter = new hyperlane.sdk.SealevelCoreAdapter(
         solanaChain,
