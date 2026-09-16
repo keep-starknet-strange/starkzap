@@ -46,7 +46,7 @@ export const LAYERSWAP_API_KEY_TESTNET =
 // comma-separated. Unset, the SDK signs only the token transfer and refuses any
 // helper call. Inspect the route's deposit action before listing anything.
 export function layerswapAllowedContracts(network: "mainnet" | "testnet") {
-  const raw =
+  const raw: string =
     (network === "mainnet"
       ? process.env.EXPO_PUBLIC_LAYERSWAP_ALLOWED_CONTRACTS_MAINNET
       : process.env.EXPO_PUBLIC_LAYERSWAP_ALLOWED_CONTRACTS_TESTNET) ?? "";
@@ -131,9 +131,9 @@ const PRIVACY_MAX_FEE_MAINNET =
   process.env.EXPO_PUBLIC_PRIVACY_MAX_FEE_MAINNET ?? "";
 const PRIVACY_MAX_FEE_SEPOLIA =
   process.env.EXPO_PUBLIC_PRIVACY_MAX_FEE_SEPOLIA ?? "";
-const PRIVACY_FEE_RECIPIENTS_MAINNET =
+const PRIVACY_FEE_RECIPIENTS_MAINNET: string =
   process.env.EXPO_PUBLIC_PRIVACY_FEE_RECIPIENTS_MAINNET ?? "";
-const PRIVACY_FEE_RECIPIENTS_SEPOLIA =
+const PRIVACY_FEE_RECIPIENTS_SEPOLIA: string =
   process.env.EXPO_PUBLIC_PRIVACY_FEE_RECIPIENTS_SEPOLIA ?? "";
 
 function privacyFee(): PrivacyFeeMode | undefined {
