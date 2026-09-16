@@ -10,7 +10,7 @@
   import SwapScreen from "~/features/swap/SwapScreen.svelte";
   import StakingScreen from "~/features/staking/StakingScreen.svelte";
   import YieldPanel from "~/features/yield/YieldPanel.svelte";
-  import PrivacyPanel from "~/features/privacy/PrivacyPanel.svelte";
+  import PrivacyScreen from "~/features/privacy/PrivacyScreen.svelte";
   import LendingScreen from "~/features/lending/LendingScreen.svelte";
   import BridgePanel from "~/features/bridge/BridgePanel.svelte";
 
@@ -21,7 +21,7 @@
     { key: "swap", label: "Swap", component: SwapScreen },
     { key: "staking", label: "Staking", component: StakingScreen },
     { key: "lending", label: "Lending", component: LendingScreen },
-    { key: "privacy", label: "Privacy", component: PrivacyPanel },
+    { key: "privacy", label: "Privacy", component: PrivacyScreen },
     { key: "yield", label: "Yield", component: YieldPanel },
     { key: "bridge", label: "Bridge", component: BridgePanel },
   ];

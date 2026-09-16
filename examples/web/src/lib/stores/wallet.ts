@@ -14,13 +14,18 @@ import {
   CHAIN_ID,
   buildBridgingConfig,
   ACCOUNT_PRESETS,
+  PRIVY_APP_ID,
   PRIVY_SERVER_URL,
   AUTO_PRIVATE_KEY,
   AUTO_ACCOUNT_PRESET,
+  PAYMASTER_NODE_URL,
 } from "./config";
 import { sdkLogger, log } from "./logger";
+import { feeOptions } from "./settings";
 import * as privacy from "~/features/privacy/store";
+import * as strk20 from "~/features/privacy/strk20/store";
 import {
+  generateAuthorizationSignature,
   getAccessToken as getPrivyAccessToken,
   init as privyInit,
   loggedIn as privyLoggedIn,
@@ -93,6 +98,8 @@ export const sdk = new StarkZap({
   chainId: CHAIN_ID,
   logging: { logger: sdkLogger },
   ...(bridging ? { bridging } : {}),
+  // Enables the "Sponsored" toggles. Absent when no proxy is set.
+  ...(PAYMASTER_NODE_URL ? { paymaster: { nodeUrl: PAYMASTER_NODE_URL } } : {}),
 });
 
 interface WalletState {
@@ -119,6 +126,10 @@ async function connect(
   presetName?: string
 ): Promise<void> {
   walletState.update((s) => ({ ...s, connecting: true, error: null }));
+  // Before the new account exists, not after: both privacy stores are
+  // module-global, so a client left behind here would serve the next account
+  // using the previous one's viewing key, notes and discovery state.
+  strk20.clear();
   try {
     const wallet = await onboard();
     walletState.update((s) => ({
@@ -212,7 +223,11 @@ export function connectPrivy(presetName: string): Promise<void> {
           err.details || err.error || "Failed to fetch Privy wallet"
         );
       }
-      const { wallet: walletData } = await res.json();
+      // `privyApiUrl` comes from the server rather than a constant here: the
+      // authorization signature covers the request URL, so both sides have to
+      // agree on it byte for byte, and the server is the one that decides it.
+      const { wallet: walletData, privyApiUrl } = await res.json();
+
       const { wallet } = await sdk.onboard({
         strategy: OnboardStrategy.Privy,
         deploy: "never",
@@ -223,6 +238,33 @@ export function connectPrivy(presetName: string): Promise<void> {
             walletId: walletData.id,
             publicKey: walletData.publicKey,
             serverUrl: `${PRIVY_SERVER_URL}/api/privy-wallet/sign`,
+            headers: async () => {
+              const accessToken = await getPrivyAccessToken();
+              if (!accessToken) {
+                throw new Error("Privy session expired, sign in again");
+              }
+              return { Authorization: `Bearer ${accessToken}` };
+            },
+            // The wallet is owned by the Privy user, so only their signature
+            // authorizes a request — the server holds no key of its own. Signing
+            // happens in the embedded-wallet iframe; the server just relays.
+            buildBody: async ({ walletId: signingWalletId, hash }) => {
+              const { signature } = await generateAuthorizationSignature({
+                version: 1,
+                method: "POST",
+                url: `${privyApiUrl.replace(
+                  /\/+$/,
+                  ""
+                )}/v1/wallets/${signingWalletId}/raw_sign`,
+                headers: { "privy-app-id": PRIVY_APP_ID! },
+                body: { params: { hash } },
+              });
+              return {
+                walletId: signingWalletId,
+                hash,
+                authorizationSignature: signature,
+              };
+            },
           }),
         },
       });
@@ -279,7 +321,9 @@ export async function deploy(): Promise<void> {
   walletState.update((s) => ({ ...s, connecting: true, error: null }));
   try {
     log("Deploying account…", "info");
-    const tx = await wallet.deploy();
+    // Honours the same sponsored preference as every other transaction, so a
+    // brand-new account can be deployed without holding STRK first.
+    const tx = await wallet.deploy(feeOptions());
     await tx.wait();
     log("Account deployed", "success");
     await checkDeployment();
@@ -291,8 +335,10 @@ export async function deploy(): Promise<void> {
   }
 }
 
-export function disconnect(): void {
+export async function disconnect(): Promise<void> {
+  const { wallet } = get(walletState);
   privacy.clear();
+  strk20.clear();
   clearHint();
   walletState.set({
     wallet: null,
@@ -302,4 +348,13 @@ export function disconnect(): void {
     connecting: false,
     error: null,
   });
+  // The SDK caches its own privacy client per wallet, so clearing the stores is
+  // not enough to end the session's capabilities. Reported rather than thrown:
+  // the UI state is already cleared, and a keychain that refused to close is
+  // worth seeing without leaving the app half logged out.
+  try {
+    await wallet?.disconnect();
+  } catch (err) {
+    log(`Disconnect cleanup failed: ${err}`, "error");
+  }
 }

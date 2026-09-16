@@ -1,3 +1,4 @@
 node_modules/
 .env
 wallets.json
+.privacy-stack/

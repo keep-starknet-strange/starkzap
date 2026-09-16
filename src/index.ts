@@ -35,6 +35,10 @@ export * from "@/swap";
 // Confidential
 export * from "@/confidential";
 
+// Privacy (STRK20 privacy pool)
+// Privacy lives at `starkzap/privacy`: its types name the optional privacy SDK,
+// so re-exporting them here would make that peer mandatory for everyone.
+
 // Lending
 export * from "@/lending";
 

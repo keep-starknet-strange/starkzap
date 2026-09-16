@@ -6,8 +6,10 @@
   import Button from "~/lib/ui/Button.svelte";
   import Select from "~/lib/ui/Select.svelte";
   import Segmented from "~/lib/ui/Segmented.svelte";
+  import Toggle from "~/lib/ui/Toggle.svelte";
   import TextField from "~/lib/ui/TextField.svelte";
   import { NETWORK, switchNetwork, ACCOUNT_PRESETS } from "~/lib/stores/config";
+  import { sponsored, sponsoredAvailable } from "~/lib/stores/settings";
   import type { AppNetwork } from "~/lib/stores/config";
   import {
     walletState,
@@ -91,6 +93,9 @@
           : "not deployed"}
     </Text>
     {#if $walletState.isDeployed === false}
+      {#if sponsoredAvailable}
+        <Toggle label="Sponsored" bind:checked={$sponsored} />
+      {/if}
       <Button
         title="Deploy account"
         loading={$walletState.connecting}

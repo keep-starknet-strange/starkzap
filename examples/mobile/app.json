@@ -32,6 +32,7 @@
     "plugins": [
       "expo-router",
       "expo-secure-store",
+      "react-native-quick-crypto",
       "./plugins/android-wallet-queries",
       [
         "expo-splash-screen",

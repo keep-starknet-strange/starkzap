@@ -17,5 +17,5 @@ export function resolveExamplePaymasterNodeUrl(params: {
     return null;
   }
 
-  return `${privyServerUrl.replace(/\/$/, "")}/api/paymaster`;
+  return `${privyServerUrl.replace(/\/$/, "")}/api/paymaster/sepolia`;
 }

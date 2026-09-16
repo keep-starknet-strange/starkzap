@@ -16,6 +16,9 @@ on:
 
 permissions:
   contents: read
+  # The privacy SDK is on GitHub Packages, which requires auth even for public
+  # packages. The built-in GITHUB_TOKEN covers it — no PAT in repo secrets.
+  packages: read
 
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
@@ -37,11 +40,21 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version-file: .nvmrc
+          # NODE_AUTH_TOKEN is not an npm variable — it only works because
+          # setup-node writes `//npm.pkg.github.com/:_authToken=${NODE_AUTH_TOKEN}`
+          # into an .npmrc, and it only does that when given `registry-url`.
+          # `scope` keeps npmjs.org as the default registry for everything else.
+          registry-url: https://npm.pkg.github.com
+          scope: "@starkware-libs"
           cache-dependency-path: package-lock.json
           cache: npm
 
       - name: Install
-        run: npm ci
+        run: npm ci --ignore-scripts
+        env:
+          # Authenticates the @starkware-libs scope against GitHub Packages;
+          # the scope->registry mapping lives in the committed .npmrc.
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Format check
         run: npm run -s prettier:check
@@ -78,6 +91,9 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version-file: .nvmrc
+          # See the test job: `registry-url` is what makes NODE_AUTH_TOKEN work.
+          registry-url: https://npm.pkg.github.com
+          scope: "@starkware-libs"
           cache-dependency-path: |
             package-lock.json
             examples/web/package-lock.json
@@ -85,13 +101,25 @@ jobs:
           cache: npm
 
       - name: Install (workspaces)
-        run: npm ci
+        run: npm ci --ignore-scripts
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build SDK + Native Package
         run: npm run -s build:all
 
       - name: Install Mobile Example
-        run: npm ci --prefix examples/mobile
+        run: npm ci --ignore-scripts --prefix examples/mobile
+        env:
+          # The example depends on the privacy SDK directly, so this install
+          # needs the token too — not just the workspace install above.
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # The bundlers below strip types without checking them, so a green build
+      # says nothing about types. Both examples consume the SDK's public surface,
+      # which makes these the only checks that catch a breaking change to it.
+      - name: Typecheck Mobile Example
+        run: npm run -s typecheck --prefix examples/mobile
 
       - name: Build Mobile Example (iOS Bundle)
         working-directory: examples/mobile
@@ -102,7 +130,12 @@ jobs:
         run: npx expo export --platform android --output-dir /tmp/mobile-android-build
 
       - name: Install Web Example
-        run: npm ci --prefix examples/web
+        run: npm ci --ignore-scripts --prefix examples/web
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Typecheck Web Example
+        run: npm run -s check --prefix examples/web
 
       - name: Build Web Example
         run: npm run -s build --prefix examples/web
