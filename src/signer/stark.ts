@@ -31,9 +31,7 @@ export class StarkSigner implements SignerInterface {
   /**
    * SNIP-44 `account-leaf-v1`, run against the key this signer holds.
    *
-   * No signature is produced: the key is an HMAC over the private scalar, so
-   * there is no artefact that could be requested and turned back into the
-   * viewing key.
+   * No signature is produced. The key is an HMAC over the private scalar.
    */
   async deriveViewingKey(context: ViewingKeyContext): Promise<string> {
     return deriveAccountLeafViewingKey(this.privateKey, context);

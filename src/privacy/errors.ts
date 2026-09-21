@@ -1,42 +1,30 @@
 /**
- * Screening verdicts surfaced by the proving service.
+ * Screening verdicts from the proving service.
  *
- * Deposits into the privacy pool are screened against sanctions lists before a
- * proof is produced. The check runs server-side so the only thing a client ever
- * sees is a JSON-RPC error on `execute()`.
+ * Deposits are screened against sanctions lists before a proof is produced.
+ * The client sees the result as a JSON-RPC error on `execute()`.
  *
- * - `rejected` — the depositor address is blocked. Terminal: retrying with the
- *   same address will not succeed.
- * - `unavailable` — screening could not complete. Transient: deposits fail
- *   closed (no attestation means no deposit), so the caller may retry later.
+ * - `rejected`: the depositor address is blocked. Retrying will not help.
+ * - `unavailable`: screening could not complete. Retry later.
  */
 export type ScreeningVerdict = "rejected" | "unavailable";
 
 /** JSON-RPC code the proof interceptor returns for a rejected transaction. */
 const TRANSACTION_REJECTED = 10000;
 
-/**
- * Opaque reasons the interceptor emits on the screening checkpoint. These are
- * the only values that denote a screening verdict — a wire contract with the
- * proof interceptor.
- */
+/** The only `data` values that mean a screening verdict. */
 const BLOCKED_REASON = "address_blocked";
 const UNAVAILABLE_REASON = "screening_unavailable";
 
 /**
- * Classify an error thrown by a privacy pool `execute()` as a screening
- * verdict, or `undefined` when it is not one.
+ * Classify an error from a privacy pool `execute()` as a screening verdict, or
+ * `undefined` when it is not one.
  *
- * The privacy SDK exports its own mapper but never applies it, so `execute()`
- * rejects with the raw proving-service error and classification is left to the
- * caller. This does that classification without needing the optional peer
- * dependency loaded, so it is safe to call from any catch block.
+ * Safe to call from any catch block. It does not need the optional peer
+ * dependency.
  *
- * Code `10000` alone is not enough: the interceptor also emits it for non-pool
- * transactions and for unexpected internal faults. Only the exact reason
- * strings above are treated as verdicts, so a transient interceptor failure is
- * never reported as a permanent sanctions rejection the user is told to give
- * up on.
+ * Code `10000` alone is not enough, because the interceptor uses it for other
+ * failures too. Only the exact reason strings count.
  *
  * @param error - The value caught from a privacy pool operation
  * @returns The verdict, or `undefined` if the error is unrelated to screening

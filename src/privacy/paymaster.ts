@@ -6,69 +6,47 @@ import { assertSafeHttpUrl } from "@/utils";
 /**
  * How the fee for a private transaction is paid.
  *
- * Every mode is submitted by the paymaster's relayer through the forwarder, so
- * the user's account never appears on-chain. What differs is who fronts the gas
- * and which token the fee comes out of. In all three the fee is withdrawn
- * from the *shielded* balance, never from a public account.
+ * In every mode the relayer submits the transaction, so the user's account
+ * never appears on-chain. The fee always comes from the shielded balance.
  *
- * - `default` — the user pays gas and the pool fee from their private balance,
- *   in `gasToken`. The withdrawal is sized at the paymaster's *suggested
- *   maximum* rather than its estimate, so it covers headroom that may go
- *   unused. Needs no paymaster API key, which makes it the only mode that works
- *   without an integrator account.
- * - `sponsored` — the relayer fronts the gas. The user pays a pool fee the
- *   paymaster deployment sets, in the token that deployment chooses. Requires
- *   an API key.
- * - `sponsored_private` — as `sponsored`, but the user chooses the token the
- *   pool fee is denominated in. Requires an API key. Only valid for private
- *   transactions.
+ * - `default`: the user pays gas and the pool fee in `gasToken`. The
+ *   withdrawal is sized at the paymaster's suggested maximum, not its
+ *   estimate. Needs no API key.
+ * - `sponsored`: the relayer pays the gas. The user pays a flat pool fee in
+ *   the token the deployment chooses. Needs an API key.
+ * - `sponsored_private`: like `sponsored`, but the user chooses the fee token.
+ *   Needs an API key.
  *
- * Which mode costs less depends on the deployment, the network and current gas,
- * none of which are fixed. {@link PrivacyPaymaster.quote} is the only
- * authority: its `feeAction` names the amount and the token actually required.
+ * {@link PrivacyPaymaster.quote} reports the exact amount and token.
  */
 export type PrivacyFeeMode =
   | { mode: "default"; gasToken: Address }
   | { mode: "sponsored" }
   | { mode: "sponsored_private"; poolFeeToken: Address };
 
-/**
- * Transaction priority. AVNU's build API documents `slow | normal | fast`, and
- * fills in `normal` when it is omitted.
- */
+/** Transaction priority. The paymaster uses `normal` when omitted. */
 export type PrivacyTip = "slow" | "normal" | "fast";
 
 /**
  * Where and how to submit private transactions.
  *
- * Present or absent as a unit. Submission needs an endpoint, a fee mode and the
- * two bounds on what a quote may claim, so pairing them in one object puts that
- * requirement in the type: neither {@link withPaymaster} nor `connectPrivacy`
- * can be handed half a configuration, and the check happens at compile time
- * rather than as a throw on first use.
- *
- * Omit the whole object to compose and prove with `createPrivacy` and submit
- * through your own infrastructure.
+ * Omit the whole object to prove with `createPrivacy` and submit through your
+ * own infrastructure.
  */
 export interface PrivacyPaymasterConfig {
   /**
    * Paymaster endpoint.
    *
-   * Point this at a proxy that holds the API key rather than at the paymaster
-   * itself: `sponsored` and `sponsored_private` need one. `default` mode needs
-   * no key at all, so it can address the paymaster directly.
+   * For `sponsored` and `sponsored_private`, point this at a proxy that holds
+   * the API key. `default` mode needs no key and can use the paymaster
+   * directly.
    */
   url: string;
   /**
-   * How the fee is paid. Deliberately never defaulted.
+   * How the fee is paid. There is no default.
    *
-   * `default` mode is the tempting choice, being the only one that works
-   * without an API key, but its withdrawal takes the paymaster's suggested
-   * *maximum* gas rather than the estimate, so the user pays for headroom they
-   * may not use. {@link PrivacyPaymaster.quote} reports both figures.
-   *
-   * Every mode withdraws from the shielded balance and is submitted by the
-   * relayer, so the choice is about cost, not about privacy.
+   * Every mode is private. The choice is about cost. See
+   * {@link PrivacyFeeMode}.
    */
   fee: PrivacyFeeMode;
   /** Transaction priority. Omit to let the paymaster choose. */
@@ -76,16 +54,7 @@ export interface PrivacyPaymasterConfig {
   /**
    * Transport for paymaster requests. Defaults to the global `fetch`.
    *
-   * The reason to point {@link PrivacyPaymasterConfig.url} at a proxy is that the
-   * proxy holds the API key instead of the browser — which makes the proxy itself
-   * something worth gating, and gating it needs a credential this client would
-   * otherwise have no way to send.
-   *
-   * Wrap `fetch` and the whole question moves to where it belongs: the caller.
-   * Auth headers, a bearer token refreshed per call, `credentials: "include"` for
-   * a cross-origin session, retries and backoff, a timeout via `AbortSignal`,
-   * tracing headers, a custom agent or proxy — all of it composes here, and none
-   * of it needs a field of its own.
+   * Wrap `fetch` to add auth headers, cookies, retries or tracing:
    *
    * ```ts
    * paymaster: {
@@ -99,78 +68,51 @@ export interface PrivacyPaymasterConfig {
    * }
    * ```
    *
-   * Called as `fetch(url, init)` and must resolve to a `Response`. So a wrapper
-   * adds transport behaviour without taking over error handling.
+   * Called as `fetch(url, init)`. Must resolve to a `Response`.
    */
   fetch?: typeof fetch;
   /**
    * Give up on a paymaster request after this many milliseconds.
    *
-   * Defaults to two minutes. The ceiling has to cover an `execute`, whose body
-   * is the whole proof, so it is generous rather than tight. Its job is to stop
-   * a hung endpoint from stalling the client forever, not to enforce latency.
-   *
-   * A {@link PrivacyPaymasterConfig.fetch} wrapper that sets its own `signal`
-   * overrides this.
+   * Defaults to two minutes. An `execute` uploads the whole proof, so keep it
+   * generous. A {@link PrivacyPaymasterConfig.fetch} wrapper that sets its own
+   * `signal` overrides this.
    */
   timeoutMs?: number;
   /**
    * Refuse a quote whose fee exceeds this, in base units of the fee token.
    *
-   * The paymaster's response decides how much of the shielded balance leaves the
-   * pool: {@link PrivacyClient.send} appends the withdrawal it names, and the
-   * proof then commits to it. This ceiling is the only thing standing between a
-   * misconfigured or compromised endpoint and the caller's balance, which is
-   * why it is required rather than defaulted: no single figure fits every
-   * deployment, and a guess would either refuse honest quotes or bound nothing.
+   * This is the only limit on what a bad endpoint can withdraw from the
+   * shielded balance. There is no default, because no single value fits every
+   * deployment.
    *
-   * What the withdrawal covers depends on the mode, so size the ceiling for
-   * the mode you run. Under `sponsored` and `sponsored_private` the relayer
-   * pays the gas and the withdrawal is the deployment's flat pool fee, so a
-   * ceiling a little above that fee is tight and safe. Under `default` the
-   * withdrawal is the pool fee plus gas at the paymaster's *suggested maximum*,
-   * not its estimate, so the ceiling has to leave room for that headroom at the
-   * gas prices you expect; {@link PrivacyGasQuote} reports both figures.
-   *
-   * Which token the amount is denominated in also depends on the mode —
-   * `default` and `sponsored_private` take the token you chose, `sponsored`
-   * takes whichever the deployment picked — so the rejection names the token
-   * alongside the amount.
+   * Size it for your mode. In `sponsored` and `sponsored_private` the
+   * withdrawal is the flat pool fee, so a ceiling a little above it is safe. In
+   * `default` the withdrawal also includes gas at the paymaster's suggested
+   * maximum, so leave room for it.
    */
   maxFee: bigint;
   /**
-   * Fee recipients to accept. A quote naming any other is refused, and an
-   * empty list refuses every quote.
+   * Fee recipients to accept. A quote naming any other recipient is refused.
+   * An empty list refuses every quote.
    *
-   * Nothing on chain says which recipient is legitimate. The pool's own
-   * `get_fee_collector()` is a different address that the forwarder pays onward,
-   * so this is the only way to bind the recipient to something the endpoint does
-   * not control.
-   *
-   * It is also what makes the caller check on the typed data mean something.
-   * That check compares the signature's caller against the quoted recipient,
-   * and both arrive in the same response, so without an anchor here it would
-   * catch a mismatch rather than a substitution.
-   *
-   * The address is per deployment and per network, so it is required rather
-   * than shipped with the SDK: take it from your paymaster operator, and expect
-   * to update it when they rotate the forwarder.
+   * Nothing on chain says which recipient is legitimate, so this list is the
+   * only anchor. Take the address from your paymaster operator. It changes per
+   * deployment and per network.
    */
   allowedFeeRecipients: readonly Address[];
 }
 
 /**
- * User calls to relay alongside the pool action, as `invoke_and_apply_action`.
+ * User calls to relay together with the pool action, as
+ * `invoke_and_apply_action`.
  *
- * The paymaster's plain `apply_action` carries the pool call and nothing else, so
- * anything the caller needs beside it, like the ERC20 `approve` a deposit needs,
- * most often has to be its own transaction paid for and signed by the user in
- * public. Wrapping it here puts it in the same relayed transaction instead.
+ * Without this, a call such as the ERC20 `approve` before a deposit is a
+ * separate public transaction. With it, the relayer includes the call in the
+ * same transaction.
  *
- * The account must support SNIP-9 outside execution, since that is how the
- * relayer submits the call on its behalf. That is a property of the user's
- * account rather than of your configuration, so it can hold for one wallet and
- * not another. {@link PrivacyPaymaster.quote} names the failure when it does not.
+ * The account must support SNIP-9 outside execution.
+ * {@link PrivacyPaymaster.quote} reports when it does not.
  */
 export interface PrivacyInvoke {
   /** Account the calls belong to, and whose `execute_from_outside` runs them. */
@@ -178,22 +120,18 @@ export interface PrivacyInvoke {
   /** Calls to relay. Converted to the paymaster's `to`/`selector` shape. */
   calls: Call[];
   /**
-   * Chain the signature must be bound to, as a literal like `SN_SEPOLIA` or a
-   * felt. Required, because the account computes its message hash from the chain
-   * it is running on: typed data naming a different one produces a signature that
-   * fails here and stays valid on that other chain, where the same account
-   * address usually exists too.
+   * Chain the signature is bound to, as a literal like `SN_SEPOLIA` or a felt.
+   * Typed data for another chain produces a signature that fails here.
    */
   chainId: string;
 }
 
 /**
- * The same calls, authorised.
+ * The same calls, signed.
  *
- * `quote()` returns SNIP-12 `typedData` for a {@link PrivacyInvoke}; the user
- * signs it, and both travel back on {@link PrivacyPaymaster.execute}. Echo the
- * typed data as it was given rather than rebuilding it. The signature covers
- * those exact bytes.
+ * `quote()` returns SNIP-12 `typedData` for a {@link PrivacyInvoke}. The user
+ * signs it. Pass both back on {@link PrivacyPaymaster.execute}. Do not rebuild
+ * the typed data. The signature covers those exact bytes.
  */
 export interface PrivacySignedInvoke {
   /** Same account the quote was built for. */
@@ -223,15 +161,11 @@ export interface PrivacyFeeAction {
 }
 
 /**
- * What the paymaster reckons the *gas* will cost, alongside the fee.
+ * The paymaster's gas estimate, next to the fee.
  *
- * Gas, not your fee — the two coincide only in `default` mode, where the
- * withdrawal is sized at `suggestedMaxInGasToken`. Under the sponsored modes the
- * relayer pays the gas and the withdrawal is a separate flat pool fee, so these
- * figures are informational there.
- *
- * The pair worth showing a user is the estimate against the suggested maximum:
- * the gap is headroom they pay for and may not use, and it is wide.
+ * Gas is your fee only in `default` mode, where the withdrawal equals
+ * `suggestedMaxInGasToken`. In the sponsored modes the relayer pays gas, so
+ * these figures are for display only.
  */
 export interface PrivacyGasQuote {
   /** What the paymaster expects the transaction to cost, in STRK. */
@@ -249,9 +183,8 @@ export interface PrivacyGasQuote {
 /**
  * What a submission produced.
  *
- * `trackingId` is the relayer's own reference and is optional — a deployment need
- * not give one. Record it if you have anywhere to record it: nothing can look one
- * up afterwards, so the response that carried it is the only chance to keep it.
+ * `trackingId` is the relayer's own reference. Not every deployment returns
+ * one. Record it now. Nothing can look it up later.
  */
 export interface PrivacySubmission {
   /** Hash of the submitted transaction. */
@@ -265,11 +198,8 @@ export interface PrivacyFeeQuote {
   /** The withdrawal to append to the proof's action list. */
   feeAction: PrivacyFeeAction;
   /**
-   * Gas figures from the same response, or `undefined` when the deployment
-   * omits them or reports them in a shape this cannot read.
-   *
-   * Never fatal: these are for display, so a malformed figure loses the display
-   * rather than the transaction.
+   * Gas figures from the same response. `undefined` when the deployment omits
+   * them or uses a shape this cannot read. For display only.
    */
   gas?: PrivacyGasQuote;
   /**
@@ -281,32 +211,26 @@ export interface PrivacyFeeQuote {
    */
   typedData?: TypedData;
   /**
-   * Execution parameters to hand back to {@link PrivacyPaymaster.execute}
-   * verbatim. The spec says to echo these rather than rebuild them, so a
-   * tracking or nonce field the service adds is not silently dropped.
+   * Execution parameters to pass back to {@link PrivacyPaymaster.execute}
+   * unchanged. They may carry fields the service added.
    */
   parameters: unknown;
 }
 
 /**
- * Advice to append to a rejection, for the codes whose fix lies on *this* side
- * of the boundary — the paymaster cannot know about `quote()`.
+ * Advice appended to a rejection, for codes whose fix is on the caller's side.
  *
- * Keyed by method, because the same number means different things on the two
- * calls: AVNU's `168` is a fee-mode error when building and a missing proof
- * when executing. Nothing here restates or replaces what the paymaster said;
- * its own wording is always reported verbatim.
+ * Keyed by method. The same code means different things on build and execute.
+ * The paymaster's own message is always reported unchanged.
  *
- * Deliberately tiny. Writing a sentence for a code whose meaning was assumed
- * rather than checked is how this map previously came to describe rejections
- * that AVNU does not emit at all.
+ * Add a code only after checking what the paymaster really emits.
  */
 const REMEDIES: Record<string, Record<number, string>> = {
   paymaster_executeTransaction: {
     // MISSING_FEE_TRANSFER_TO
     165: "Append the `feeAction` from `quote()` as a withdrawal before proving.",
     // POOL_FEE_TOO_LOW
-    167: "The pool fee moved after this proof was built — quote and prove again.",
+    167: "The pool fee changed after this proof was built. Quote and prove again.",
   },
 };
 
@@ -326,14 +250,10 @@ function isRpcErrorBody(value: unknown): value is RpcErrorBody {
 }
 
 /**
- * The human-readable reason out of a JSON-RPC error's `data`.
+ * The human-readable reason from a JSON-RPC error's `data`.
  *
- * The paymaster's `message` is only ever the error's name, e.g. `An error
- * occurred (TRANSACTION_EXECUTION_ERROR)`. What actually went wrong is in
- * `data`, either as a bare string (`"x-paymaster-api-key is invalid"`) or
- * wrapped for SNIP-29's execution errors (`{ execution_error: "privacy pool
- * address is not whitelisted" }`). Reading only the string form drops the
- * sentence that names the most common misconfiguration.
+ * The paymaster's `message` is only the error name. The real reason is in
+ * `data`, as a string or as `{ execution_error: string }`.
  */
 function reasonFrom(data: unknown): string | undefined {
   if (typeof data === "string") return data || undefined;
@@ -346,13 +266,11 @@ function reasonFrom(data: unknown): string | undefined {
 /**
  * Error thrown when the paymaster rejects a request.
  *
- * `message` is the paymaster's own, with the reason from its `data` appended.
- * `code` and `data` are passed through untouched so callers can branch.
+ * `message` is the paymaster's own, with the reason from `data` appended.
+ * `code` and `data` are passed through unchanged.
  *
- * Branch on the *method and code together*, not the number alone: the
- * privacy-specific codes are AVNU's rather than SNIP-29's, and the same number
- * carries different meanings across `paymaster_buildTransaction` and
- * `paymaster_executeTransaction`.
+ * Branch on method and code together. The same code has different meanings
+ * on `paymaster_buildTransaction` and `paymaster_executeTransaction`.
  */
 export class PrivacyPaymasterError extends Error {
   constructor(
@@ -366,18 +284,15 @@ export class PrivacyPaymasterError extends Error {
 }
 
 /**
- * The paymaster's call shape, which names the selector rather than the entrypoint.
+ * Convert a call to the paymaster's shape, which uses a selector instead of an
+ * entrypoint.
  *
- * Calldata is compiled and hex-encoded rather than passed through. `CallData`
- * emits *decimal* felt strings, which is what every call built by `wallet.tx()`
- * or the ERC20 helpers carries, and the paymaster rejects a felt without an `0x`
- * prefix outright (`-32602 Invalid params`). Compiling first also accepts the
- * object form of `calldata`, so a hand-written call works either way.
+ * Calldata is compiled and hex-encoded. `CallData` emits decimal felts, and
+ * the paymaster rejects a felt without `0x`.
  */
 function toPaymasterCall(call: Call) {
   return {
-    // Passed through, not normalised: addresses reach here already 0x-prefixed
-    // via `fromAddress`, and `num.toHex` would strip their padding for no gain.
+    // Addresses arrive 0x-prefixed from `fromAddress`. Keep their padding.
     to: call.contractAddress,
     selector: hash.getSelectorFromName(call.entrypoint),
     calldata: CallData.compile(call.calldata ?? []).map((felt) =>
@@ -387,14 +302,12 @@ function toPaymasterCall(call: Call) {
 }
 
 /**
- * Name the one failure `invoke_and_apply_action` has that `apply_action` does not.
+ * Explain the one failure `invoke_and_apply_action` has that `apply_action`
+ * does not.
  *
- * Wrapping a user call means the relayer submits it through the account's own
- * `execute_from_outside`, so the account has to support SNIP-9 outside execution.
- * An account that does not (or an address that is not a deployed account at all)
- * is refused at build time with code `156` and the reason `invalid version`, which
- * reads as a version-negotiation bug in this client rather than as a fact about
- * the account.
+ * An account without SNIP-9 support is refused at build time with code `156`
+ * and the reason `invalid version`. That reads like a client bug, so name the
+ * real cause.
  */
 function explainInvokeRejection(
   error: unknown,
@@ -420,10 +333,8 @@ function explainInvokeRejection(
 /**
  * Read a felt, or `undefined` when the value is not one.
  *
- * `num.isBigNumberish` does the validating because it is stricter than `BigInt`:
- * `BigInt("")` and `BigInt(" ")` both return zero, which would let a blank field
- * compare equal to `0x0`. The catch covers `"0x"`, which passes the guard and
- * then fails to convert.
+ * `num.isBigNumberish` is stricter than `BigInt`, which turns `""` into zero.
+ * The catch covers `"0x"`, which passes the guard and then fails.
  */
 export function asFelt(value: unknown): bigint | undefined {
   if (!num.isBigNumberish(value)) return undefined;
@@ -450,10 +361,8 @@ function asShortStringFelt(value: unknown): bigint | undefined {
 const SNIP9_DOMAIN_NAME = "Account.execute_from_outside";
 
 /**
- * The version and SNIP-12 revision pairs SNIP-9 defines. `execute_from_outside`
- * is version 1 hashed under revision 0 (Pedersen); `execute_from_outside_v2` is
- * version 2 under revision 1 (Poseidon). Any other pairing hashes to something
- * the account will not recognise.
+ * The version and SNIP-12 revision pairs SNIP-9 defines. Version 1 uses
+ * revision 0 (Pedersen). Version 2 uses revision 1 (Poseidon).
  */
 const SNIP9_DOMAINS: ReadonlyArray<{ version: bigint; revision: bigint }> = [
   { version: 1n, revision: 0n },
@@ -467,12 +376,10 @@ function sameFelt(a: unknown, b: unknown): boolean {
 }
 
 /**
- * Check what the paymaster asked the user to sign against what was requested.
+ * Check what the paymaster asks the user to sign against what was requested.
  *
- * The response decides what the account will execute, so signing it unread lets a
- * compromised or misconfigured endpoint swap the calls, redirect the execution to
- * a different caller, or widen the validity window. A type assertion on the
- * response is not a check: these are.
+ * A bad endpoint could swap the calls, change the caller or widen the validity
+ * window. Refuse before anything is signed.
  */
 function assertSignableTypedData(
   typedData: TypedData,
@@ -502,9 +409,8 @@ function assertSignableTypedData(
     );
   }
 
-  // The rest of the domain decides which hash the account computes. Under any
-  // other name, version or revision the signature fails on chain, after the proof
-  // has been paid for, so it is refused here before anything is signed.
+  // The domain decides which hash the account computes. A wrong one fails on
+  // chain, after the proof is paid for.
   if (asShortStringFelt(domain.name) !== asShortStringFelt(SNIP9_DOMAIN_NAME)) {
     reject(
       `its domain is "${String(domain.name)}", not "${SNIP9_DOMAIN_NAME}"`
@@ -528,11 +434,8 @@ function assertSignableTypedData(
 
   const message = (typedData.message ?? {}) as Record<string, unknown>;
 
-  // The forwarder collecting the fee is the only address allowed to relay these
-  // calls, so another caller means the signature authorises someone else's use of
-  // it. Both values come from this same response, so on its own this catches a
-  // mismatch rather than a substitution. `allowedFeeRecipients` anchors the
-  // recipient to configuration, which is what makes this check a real one.
+  // Only the forwarder that collects the fee may relay these calls.
+  // `allowedFeeRecipients` anchors that address to configuration.
   if (!sameFelt(message.Caller, forwarder)) {
     reject(
       `the caller is ${String(message.Caller)}, not the forwarder ${forwarder} ` +
@@ -542,8 +445,7 @@ function assertSignableTypedData(
 
   const now = BigInt(Math.floor(Date.now() / 1000));
 
-  // An outside execution with no upper bound is an authorisation that never
-  // expires, so an unreadable one is refused rather than skipped.
+  // No upper bound means the signature never expires. Refuse it.
   const before = asFelt(message["Execute Before"]);
   if (before === undefined) {
     reject(
@@ -568,8 +470,7 @@ function assertSignableTypedData(
   }
 
   invoke.calls.forEach((call, index) => {
-    // Compared against the same conversion the request used, so a difference is a
-    // real difference rather than one of formatting.
+    // Compare against the same conversion the request used.
     const expected = toPaymasterCall(call);
     const actual = (calls[index] ?? {}) as Record<string, unknown>;
 
@@ -607,21 +508,18 @@ function assertSignableTypedData(
   });
 }
 
-/**
- * Read the paymaster's fee action, validating rather than trusting it.
- *
- * This is a trust boundary. The response decides which address receives how much
- * of the caller's shielded balance, and the proof then commits to it — so the
- * addresses go through `fromAddress` like every other address in starkzap, and a
- * malformed amount is named here instead of surfacing as a bare BigInt
- * `SyntaxError` from inside a quote.
- */
 /** Caller-declared bounds on what a quote may claim about its fee. */
 interface FeeActionPolicy {
   maxFee: bigint;
   allowedFeeRecipients: readonly Address[];
 }
 
+/**
+ * Read the paymaster's fee action and validate it.
+ *
+ * This is a trust boundary. The response decides which address receives how
+ * much of the shielded balance, and the proof commits to it.
+ */
 function parseFeeAction(
   action: { recipient: string; token: string; amount: string },
   feeMode: PrivacyFeeMode,
@@ -673,9 +571,8 @@ function parseFeeAction(
     );
   }
 
-  // The token is ours to check in the two modes where we name it. Under
-  // `sponsored` the deployment picks the token, so there is nothing to compare
-  // against and `maxFee` is the only bound on how much leaves the pool.
+  // Check the token only in the modes where the caller names it. In
+  // `sponsored` the deployment picks it, so `maxFee` is the only bound.
   const chosenToken =
     feeMode.mode === "default"
       ? feeMode.gasToken
@@ -709,11 +606,9 @@ function parseFeeAction(
 }
 
 /**
- * Read the gas block, or give up on it quietly.
+ * Read the gas block, or return `undefined`.
  *
- * Display-only, so a deployment that omits it or words it differently costs the
- * figures and nothing else. Throwing here would fail a transaction over a number
- * that was never going to be spent.
+ * Display only. A missing or malformed block must not fail the transaction.
  */
 function parseGasQuote(fee: unknown): PrivacyGasQuote | undefined {
   if (typeof fee !== "object" || fee === null) return undefined;
@@ -756,10 +651,8 @@ function parseGasQuote(fee: unknown): PrivacyGasQuote | undefined {
 }
 
 /**
- * Default ceiling on a single paymaster request.
- *
- * Sized for `paymaster_executeTransaction`, which uploads the whole proof and is
- * megabytes on a link the SDK does not choose.
+ * Default ceiling on one paymaster request. Sized for
+ * `paymaster_executeTransaction`, which uploads the whole proof.
  */
 const DEFAULT_TIMEOUT_MS = 120_000;
 
@@ -767,21 +660,15 @@ const DEFAULT_TIMEOUT_MS = 120_000;
  * Minimal client for a privacy-capable paymaster.
  *
  * The privacy transaction types (`apply_action`) are not part of SNIP-29, so
- * starknet.js's `PaymasterRpc` cannot express them. Its executable transaction
- * union has no field for a proof. This talks to the paymaster's JSON-RPC
- * endpoint directly instead.
+ * starknet.js's `PaymasterRpc` cannot express them. This client talks to the
+ * paymaster's JSON-RPC endpoint directly.
  *
- * `@avnu/avnu-sdk` covers some of the same ground, and the shapes here —
- * {@link PrivacyTip}, {@link PrivacyFeeAction} — deliberately mirror it rather
- * than import from it. It is an optional peer so the swap SDK stays out of the
- * dependency graph of anyone who only wants privacy, and importing even its
- * *types* would make it required in order to typecheck against starkzap's own.
- * Its privacy surface is swap-shaped and models `sponsored_private` alone, so it
- * cannot express the no-API-key mode either. A dozen duplicated declarations is
- * the cheaper side of that trade — do not "fix" it by adding the import.
+ * The shapes here mirror `@avnu/avnu-sdk` on purpose, without importing it.
+ * That SDK is an optional peer, and even a type import would make it required.
+ * Do not "fix" this by adding the import.
  *
- * Point `url` at a proxy that holds the API key, never at the paymaster with the
- * key in the browser. `default` mode needs no key at all.
+ * Point `url` at a proxy that holds the API key. Never put the key in the
+ * browser. `default` mode needs no key.
  */
 export class PrivacyPaymaster {
   private readonly url: string;
@@ -792,9 +679,9 @@ export class PrivacyPaymaster {
   /**
    * @param url - Paymaster endpoint, or a proxy in front of it
    * @param options.maxFee - Ceiling on the quoted fee, in base units of the fee
-   *   token. Required; see {@link PrivacyPaymasterConfig.maxFee} for sizing
-   * @param options.allowedFeeRecipients - Recipients to accept. Required and
-   *   non-empty; see {@link PrivacyPaymasterConfig.allowedFeeRecipients}
+   *   token. See {@link PrivacyPaymasterConfig.maxFee}
+   * @param options.allowedFeeRecipients - Recipients to accept. Must not be
+   *   empty. See {@link PrivacyPaymasterConfig.allowedFeeRecipients}
    * @param options.fetch - Transport override. See
    *   {@link PrivacyPaymasterConfig.fetch}
    * @param options.timeoutMs - Request ceiling. See
@@ -827,19 +714,17 @@ export class PrivacyPaymaster {
   /**
    * Ask what the transaction will cost, before proving.
    *
-   * The returned {@link PrivacyFeeAction} must be appended to the proof's
-   * action list as the final withdrawal. The forwarder collects it from the
-   * proof, so a proof built without it is rejected with code 165.
+   * Append the returned {@link PrivacyFeeAction} to the proof's action list as
+   * the final withdrawal. A proof without it is rejected with code 165.
    *
-   * Pass {@link PrivacyQuoteOptions.invoke} to relay user calls alongside the
-   * pool action. The quote then also returns the SNIP-12 `typedData` those calls
-   * have to be signed over.
+   * Pass {@link PrivacyQuoteOptions.invoke} to relay user calls with the pool
+   * action. The quote then also returns the SNIP-12 `typedData` to sign.
    *
    * @param poolAddress - Privacy pool the transaction targets
    * @param feeMode - How the fee is paid
    * @param options - Priority, and any user calls to relay
-   * @returns The fee to include, the gas figures behind it, the parameters to
-   *   echo back on execute, and `typedData` when calls were wrapped
+   * @returns The fee to include, the gas figures, the parameters to pass back
+   *   on execute, and `typedData` when calls were wrapped
    */
   async quote(
     poolAddress: Address,
@@ -870,8 +755,7 @@ export class PrivacyPaymaster {
       throw invoke ? explainInvokeRejection(error, invoke) : error;
     });
 
-    // Requested but absent means the paymaster did not honour the wrapping, and
-    // submitting without a signature would fail after the proof is paid for.
+    // Requested but absent means the paymaster ignored the wrapping.
     if (invoke && result.typed_data === undefined) {
       throw new PrivacyPaymasterError(
         -1,
@@ -891,8 +775,7 @@ export class PrivacyPaymaster {
 
     const feeAction = parseFeeAction(action, feeMode, this.policy);
 
-    // Checked before the caller can sign it, and after the fee action, because
-    // the forwarder it names is what the caller has to be.
+    // Checked after the fee action, because its recipient must be the caller.
     if (invoke && result.typed_data !== undefined) {
       assertSignableTypedData(
         result.typed_data as TypedData,
@@ -908,8 +791,8 @@ export class PrivacyPaymaster {
       ...(result.typed_data !== undefined && {
         typedData: result.typed_data as TypedData,
       }),
-      // Echoed back verbatim; falls back to a locally built copy if the service
-      // omits them, which older deployments do.
+      // Passed back unchanged. Older deployments omit them, so fall back to a
+      // local copy.
       parameters: result.parameters ?? this.parameters(feeMode, options?.tip),
     };
   }
@@ -917,18 +800,11 @@ export class PrivacyPaymaster {
   /**
    * Submit a proven private transaction.
    *
-   * No user signature is involved: the relayer sends it and the pool authorises
-   * it from the proof alone, which is what keeps the user's account off-chain.
+   * No user signature is needed. The proof alone authorises the transaction,
+   * so the user's account stays off-chain.
    *
-   * The response may carry an optional `tracking_id`, the relayer's own reference
-   * for the submission, and it is returned alongside the hash.
-   *
-   * Nothing can look one up: SNIP-29 defines no method for it, the paymaster
-   * answers "method not found", and the deployment documents no query. That is the
-   * reason to keep it rather than to drop it — this response is the only place it
-   * ever exists, so a caller who does not record it here can never recover it. It
-   * is what a relayer operator asks for when a submitted transaction misbehaves,
-   * which makes it useful to people rather than to code.
+   * The response may carry a `tracking_id`. Record it now. Nothing can look it
+   * up later, and a relayer operator asks for it when a transaction misbehaves.
    *
    * @param call - The pool's `apply_actions` call
    * @param proof - Proof data and facts from the proving service
@@ -1003,8 +879,7 @@ export class PrivacyPaymaster {
   }
 
   private async send<T>(method: string, params: unknown): Promise<T> {
-    // Resolved per call rather than captured in the constructor, so replacing
-    // the global (as tests do) still takes effect.
+    // Resolved per call, so tests can replace the global `fetch`.
     const send = this.fetchImpl ?? globalThis.fetch;
     const response = await send(this.url, {
       method: "POST",
@@ -1013,12 +888,10 @@ export class PrivacyPaymaster {
         Accept: "application/json",
       },
       body: JSON.stringify({ jsonrpc: "2.0", id: 1, method, params }),
-      // Last in the object so a wrapper spreading `init` keeps it, and one
-      // setting its own `signal` wins.
+      // Last, so a wrapper that spreads `init` and sets its own `signal` wins.
       signal: AbortSignal.timeout(this.timeoutMs),
     }).catch((error: unknown) => {
-      // Matched by name rather than `instanceof`: this rejects with a
-      // `DOMException`, which does not extend `Error` in browsers.
+      // Matched by name. Browsers reject with a `DOMException`, not an `Error`.
       if ((error as { name?: unknown } | null)?.name !== "TimeoutError") {
         throw error;
       }
@@ -1029,21 +902,19 @@ export class PrivacyPaymaster {
       );
     });
 
-    // Undefined when the body is not JSON at all — typically an error page from
-    // a proxy that failed before reaching the paymaster.
+    // Undefined when the body is not JSON, such as a proxy error page.
     const body: unknown = await response.json().catch(() => undefined);
 
-    // A JSON-RPC error is checked first, and whatever the status: this is the
-    // paymaster itself answering, and its code carries more than the HTTP one.
+    // Check for a JSON-RPC error first, whatever the HTTP status. Its code says
+    // more.
     const error =
       body === undefined ? undefined : (body as { error?: unknown }).error;
     if (isRpcErrorBody(error)) {
       const rpc = error;
-      // The paymaster's own words first, and never replaced: it knows why it
-      // rejected the request and we do not. Ours is only ever appended.
+      // The paymaster's own words first. Ours are only appended.
       const reported = [rpc.message, reasonFrom(rpc.data)]
         .filter(Boolean)
-        .join(" — ");
+        .join(": ");
       const remedy = REMEDIES[method]?.[rpc.code];
       throw new PrivacyPaymasterError(
         rpc.code,
@@ -1053,10 +924,7 @@ export class PrivacyPaymaster {
       );
     }
 
-    // Anything the HTTP layer failed, whether or not the body parsed. The status
-    // is the whole diagnosis here and used to be discarded: a proxy answering
-    // 500 with its own JSON shape reached neither branch above, and the caller
-    // dereferenced an undefined result instead.
+    // An HTTP failure, with or without a JSON body. The status is the diagnosis.
     if (!response.ok || body === undefined) {
       const what =
         body === undefined

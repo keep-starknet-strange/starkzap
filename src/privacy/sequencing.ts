@@ -2,11 +2,9 @@ import { RpcError, num, uint256, type RpcProvider } from "starknet";
 import type { Address, Token } from "@/types";
 
 /**
- * Blocks a proof's base block must trail the chain head by before the
- * sequencer will accept the proof.
+ * How many blocks a proof's base block must trail the chain head.
  *
- * Matches the privacy pool's acceptance window. The prover also reads
- * finalized state, so waiting this long covers both constraints at once.
+ * Matches the privacy pool's acceptance window.
  */
 export const PROOF_BASE_BLOCK_DEPTH = 10;
 
@@ -34,23 +32,17 @@ export interface ProvableBlockOptions {
   /** Give up after this long, in ms (default 300000). */
   timeoutMs?: number;
   /**
-   * Called once per poll, including the one that succeeds. Use it to surface
-   * how long a wait actually blocked — these waits are invisible otherwise,
-   * and "it hung" is indistinguishable from "it was waiting for a block".
+   * Called once per poll, including the last one. Use it to show progress.
+   * Without it, the wait is silent.
    */
   onAttempt?: (attempt: ProvableAttempt) => void;
   /**
-   * Cancels the wait. The returned promise rejects with the signal's reason,
-   * which is an `AbortError` unless you passed one to `AbortController.abort()`.
+   * Cancels the wait. The promise rejects with the signal's reason.
    *
-   * A wait can block for minutes, so give it one whenever the reason to wait can
-   * disappear: a disconnect, a screen the user navigated away from, a component
-   * that unmounted. Without it the poll keeps hitting the RPC until it succeeds
-   * or `timeoutMs` runs out.
+   * A wait can take minutes. Pass a signal when the user can leave the screen
+   * or disconnect.
    *
-   * Only the waiting is cancellable. Nothing here can abort a proof already in
-   * flight, so a caller that aborts still has to decide what to do with a
-   * `send()` that is past this point.
+   * Only the wait is cancelled. A proof already in flight continues.
    */
   signal?: AbortSignal;
 }
@@ -58,9 +50,8 @@ export interface ProvableBlockOptions {
 /**
  * Sleep, or reject as soon as `signal` aborts.
  *
- * The listener is removed on the normal path too — these loops sleep once per
- * poll, and a long wait on a shared signal would otherwise pile up listeners
- * until Node warns about a leak.
+ * The listener is removed on the normal path too, so a long wait does not
+ * leak listeners.
  */
 const sleep = (ms: number, signal?: AbortSignal): Promise<void> =>
   new Promise((resolve, reject) => {
@@ -68,9 +59,7 @@ const sleep = (ms: number, signal?: AbortSignal): Promise<void> =>
       setTimeout(resolve, ms);
       return;
     }
-    // Checked before listening: an `abort` event does not fire again for a
-    // signal that is already aborted, so a listener alone would sleep the whole
-    // interval out before anyone noticed.
+    // An already aborted signal fires no event, so check first.
     if (signal.aborted) {
       reject(signal.reason);
       return;
@@ -90,18 +79,15 @@ const sleep = (ms: number, signal?: AbortSignal): Promise<void> =>
  * Wait until a block is old enough to prove against, and return the block
  * number to prove at.
  *
- * Any on-chain state a pool proof reads — the account's viewing key, the
- * depositor's token balance, the nullifier set — must have been written at
- * least {@link PROOF_BASE_BLOCK_DEPTH} blocks before the proof's base block.
- * That makes this a prerequisite, not a nicety, after:
+ * State a proof reads must be at least {@link PROOF_BASE_BLOCK_DEPTH} blocks
+ * older than the proof's base block. So call this after:
  *
  * - a previous private transaction, before proving the next one;
  * - deploying the account, before `register()`;
  * - funding the account, before `deposit()`.
  *
- * Skipping the wait produces a proof the sequencer rejects, or one that reads
- * a balance the chain doesn't have yet — both surface as opaque failures well
- * after the call that actually caused them.
+ * Without the wait, the sequencer rejects the proof, or the proof reads state
+ * the chain does not have yet.
  *
  * @param provider - RPC provider used to read the chain head
  * @param sinceBlock - Receipt block of the state the next proof must see
@@ -136,15 +122,8 @@ export async function waitForProvableBlock(
   for (;;) {
     options.signal?.throwIfAborted();
     const latest = await provider.getBlockNumber();
-    // Strictly below, so the proving block is always past `sinceBlock`. This is
-    // the privacy SDK's own recipe, whose loop runs `while (lastTxBlockNumber >=
-    // latestBlock - 10)` and then proves at `latestBlock - 10` -- the same
-    // comparison. Its rule of thumb is stronger still: state a proof reads, the
-    // nullifier set included, should be written well before the base block.
-    //
-    // `assertProofBaseBlockAged` is looser by one because it checks a different
-    // thing: the base block against the head at submission, which is the
-    // sequencer's window. Two constraints, not two versions of one.
+    // Strictly below, so the proving block is always past `sinceBlock`. This
+    // is the same comparison the privacy SDK uses.
     const ready = sinceBlock < latest - depth;
     options.onAttempt?.({
       attempt: ++attempt,
@@ -167,9 +146,8 @@ export async function waitForProvableBlock(
  * Wait until the state a proof depends on is visible at the proving block, and
  * return that block number.
  *
- * Use this instead of {@link waitForProvableBlock} when the state was written by
- * a transaction you did not send, and so have no receipt for. Checking the state
- * directly covers that; counting blocks from a receipt cannot.
+ * Use this instead of {@link waitForProvableBlock} when you have no receipt,
+ * because another party sent the transaction.
  *
  * @param provider - RPC provider used to read the chain head and the state
  * @param isVisible - Predicate run against a candidate proving block
@@ -208,9 +186,8 @@ export async function waitForProvableState(
 /**
  * Wait until the account is deployed as of the proving block.
  *
- * `register()` proves against the account's on-chain viewing-key slot, which
- * does not exist until the deploy is finalized — so registering right after
- * deploying produces a proof over a slot that isn't there yet.
+ * `register()` proves against the account's on-chain state. Call this before
+ * registering a freshly deployed account.
  *
  * @param provider - RPC provider used to read the chain head and class hash
  * @param address - Account whose deployment must be visible
@@ -229,9 +206,8 @@ export function waitForDeployedAccount(
         await provider.getClassHashAt(address, blockNumber);
         return true;
       } catch (error) {
-        // Not deployed *yet* at this block — keep waiting. Any other failure is
-        // a real error and must not be mistaken for "not deployed", or this
-        // would poll until the timeout against a broken endpoint.
+        // Not deployed yet at this block, so keep waiting. Any other error is
+        // real and must not be mistaken for "not deployed".
         if (error instanceof RpcError && error.isType("CONTRACT_NOT_FOUND")) {
           return false;
         }
@@ -243,16 +219,14 @@ export function waitForDeployedAccount(
 }
 
 /**
- * Wait until `owner` is known to hold at least `amount` of `token` as of the
- * proving block.
+ * Wait until `owner` holds at least `amount` of `token` as of the proving
+ * block.
  *
- * A deposit proves against the depositor's token balance at its base block. If
- * the transfer that funded the account hasn't propagated that far back, the
- * proof is invalid or the deposit reverts on-chain for insufficient balance.
+ * A deposit proves against the depositor's balance at the base block. Call
+ * this after funding the account, before `deposit()`.
  *
- * Note this is about the *balance*, not the ERC20 allowance: the approve a
- * deposit needs is checked when the transaction executes, not when it is
- * proven, so it does not have to age.
+ * This is about the balance, not the ERC20 allowance. The approve does not
+ * have to age.
  *
  * @param provider - RPC provider used to read the chain head and balance
  * @param token - Token being deposited

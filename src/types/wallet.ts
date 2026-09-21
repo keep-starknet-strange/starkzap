@@ -202,14 +202,13 @@ export type DeployOptions = TransactionFeeOptions;
 // ─── Execute ─────────────────────────────────────────────────────────────────
 
 /**
- * A validity proof carried by the transaction itself rather than by a call.
+ * A validity proof carried by the transaction, not by a call.
  *
- * Privacy-pool transactions are verified by the sequencer before the pool
- * contract reads the resulting facts via syscall, so the proof travels as
- * transaction-level fields and cannot be batched with unrelated calls.
+ * The sequencer verifies the proof before the pool contract runs. So the proof
+ * travels as transaction-level fields and cannot be batched with other calls.
  *
- * Structurally compatible with the privacy SDK's `Proof`, so a
- * `callAndProof.proof` can be passed straight through.
+ * Structurally the same as the privacy SDK's `Proof`, so `callAndProof.proof`
+ * can be passed as is.
  */
 export interface TransactionProof {
   /** Proof data produced by the proving service. */
@@ -223,23 +222,19 @@ export type ExecuteOptions = TransactionFeeOptions & {
   /**
    * Validity proof to attach to the transaction.
    *
-   * Self-submitting a proof is legal at the protocol level but defeats the
-   * point: the transaction carries your address as sender, increments your
-   * nonce, and pays gas from your public balance, so the chain records exactly
-   * who performed the "private" operation. Requires `unsafeUserPays`.
+   * Self-submitting a proof reveals the sender. The chain records your address
+   * as the one that performed the private operation. Requires
+   * `unsafeUserPays`.
    *
-   * Submit through a privacy paymaster instead as `connectPrivacy` does, and
-   * the relayer's account appears on-chain in place of yours.
+   * Prefer a privacy paymaster, as `connectPrivacy` does. Then the relayer's
+   * account appears on-chain instead of yours.
    */
   proof?: TransactionProof;
   /**
-   * Acknowledge that self-submitting {@link ExecuteOptions.proof} reveals the
-   * sender, and send it anyway.
+   * Accept that self-submitting {@link ExecuteOptions.proof} reveals the
+   * sender, and send anyway.
    *
-   * Exists because devnet and the integration tests have no paymaster, so
-   * removing self-submission entirely would remove the ability to test privacy
-   * locally. It is deliberately awkward to type: whoever passes it should know
-   * what it costs.
+   * Meant for devnet and integration tests, which have no paymaster.
    */
   unsafeUserPays?: boolean;
 };

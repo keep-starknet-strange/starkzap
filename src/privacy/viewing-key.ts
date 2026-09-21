@@ -6,29 +6,22 @@ export type { ViewingKeyContext };
 /** Stark curve order. */
 const ORDER = ec.starkCurve.CURVE.n;
 
-/**
- * Upper bound of the range the pool accepts, `floor(n / 2)`.
- *
- * The bound is exclusive: the pool's `is_canonical_key` requires `1 <= k < H`.
- */
+/** Exclusive upper bound of the range the pool accepts: `1 <= k < n / 2`. */
 const HALF_ORDER = ORDER / 2n;
 
 /**
  * How a viewing key is produced for an account.
  *
- * Supply one to {@link PrivacyConfig.viewingKeyDerivation} to replace
- * starkzap's default. An implementation must be **deterministic**: the same
- * context and signer must yield the same key forever, on every device. The
- * pool stores the key's public x-coordinate on first registration and treats
- * it as authoritative, so a derivation that changes its output leaves every
- * existing note encrypted to a key nobody holds.
+ * Pass one to {@link PrivacyConfig.viewingKeyDerivation} to replace the
+ * default. It must be deterministic. The same context and signer must give
+ * the same key on every device, forever. The pool stores the first key and
+ * never lets it change.
  *
- * It must also return a key in the pool's canonical range, `[1, n/2)`;
- * {@link assertCanonicalViewingKey} is applied to whatever it returns.
+ * The key must be in the range `[1, n/2)`. {@link assertCanonicalViewingKey}
+ * checks the result.
  *
  * @param context - Chain, account, pool and key slot to bind the key to
- * @param signer - The account's signer, for derivations that read key material
- *   through it or that delegate to a device
+ * @param signer - The account's signer
  * @returns The viewing key as a 0x-hex string
  */
 export type ViewingKeyDerivation = (
@@ -62,9 +55,7 @@ export function assertCanonicalViewingKey(key: string | bigint): bigint {
 /**
  * Reject a signer the default derivation cannot use.
  *
- * Exported so callers can check the precondition before doing other work —
- * {@link createPrivacy} does, to fail at construction rather than on the first
- * private operation.
+ * {@link createPrivacy} calls this, so a bad signer fails early.
  *
  * @param signer - Signer to check
  * @throws If the signer does not implement
@@ -85,14 +76,11 @@ export function assertViewingKeySigner(signer: SignerInterface): void {
 }
 
 /**
- * starkzap's default derivation: SNIP-44 `account-leaf-v1`, run by the signer.
+ * The default derivation: SNIP-44 `account-leaf-v1`, run by the signer.
  *
- * The signer derives the key from its own key material and returns it, so no
- * signature is produced and nothing exists that could be handed out and turned
- * back into the viewing key. Deterministic by construction — the profile is an
- * HMAC, a pure function of the account key and the context — so the same account
- * yields the same key on every device, forever, which is what the pool requires
- * of a key it registers once and never lets change.
+ * The signer derives the key from its own key material. No signature is
+ * produced. The result is deterministic, so the same account gives the same
+ * key on every device.
  *
  * @param context - Chain, account, pool and key slot to bind the key to
  * @param signer - Must implement {@link SignerInterface.deriveViewingKey}
@@ -107,10 +95,8 @@ export const accountLeafDerivation: ViewingKeyDerivation = async (
   context,
   signer
 ) => {
-  // Checked again here, not just in `createPrivacy`: this is exported, so it can
-  // be handed a signer that never went through that precondition.
+  // Checked again, because this function is exported.
   assertViewingKeySigner(signer);
-  // Non-null asserted rather than re-tested — the line above is the test, and a
-  // second `if` would read as though it could fail.
+  // The line above is the null check.
   return signer.deriveViewingKey!(context);
 };

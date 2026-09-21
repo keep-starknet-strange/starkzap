@@ -35,11 +35,8 @@ type IndexerOptions = NonNullable<
 /**
  * Validate a service URL and strip trailing slashes.
  *
- * The slash matters: the privacy SDK builds sub-paths by plain concatenation
- * (`${url}/ohttp-keys`), so `https://host/` becomes `https://host//ohttp-keys`
- * and 404s from a fetch two layers below this call, naming neither the service
- * nor the cause. A path prefix is kept — the SDK supports a gateway mounted
- * under one.
+ * The privacy SDK builds sub-paths by concatenation, so a trailing slash
+ * causes a 404 deep inside the SDK. A path prefix is kept.
  */
 function asBaseUrl(
   value: string,
@@ -53,27 +50,16 @@ function asBaseUrl(
 /**
  * Warn when a service URL is plain `http://`.
  *
- * Both the prover and the discovery service receive the viewing key, so over
- * cleartext it is readable by anyone on the path. With OHTTP enabled it is worse
- * rather than better: the key config is fetched over that same channel and
- * trusted on first use, so an attacker can serve their own encryption key and
- * read every envelope sealed to it.
+ * The prover and the discovery service receive the viewing key. Over
+ * cleartext, anyone on the path can read it. OHTTP does not help here, because
+ * its key config is fetched over the same channel.
  *
- * Warned rather than thrown. {@link assertSafeHttpUrl} allows `http://` on
- * loopback so local development works, and {@link PrivacyConfig.allowInsecureHttp}
- * opens it elsewhere: plain HTTP inside a trusted network is a judgement an
- * integrator is entitled to make. Emitted with `console.warn`
- * rather than the SDK logger because that logger defaults to silent, and a
- * security downgrade nobody sees is not a warning.
+ * A warning, not an error. Plain HTTP on loopback or a trusted network is the
+ * integrator's call. Uses `console.warn`, because the SDK logger is silent by
+ * default.
  *
- * Silence here does not mean the viewing key is protected. It says nothing about
- * who operates the service: over `https://` with no `ohttp`, the operator still
- * reads the key in the clear — a deployment decision {@link PrivacyConfig.ohttp}
- * describes rather than one to adjudicate here. And it sees nothing at all when
- * `prover` or `discovery` is given as an instance, there being no URL to look at.
- *
- * The privacy SDK's README claims it warns about this itself. It does not; there
- * is no such check in the shipped build.
+ * A `prover` or `discovery` given as an instance has no URL, so it is not
+ * checked.
  */
 function warnIfPlaintext(url: string, label: string): void {
   if (new URL(url).protocol !== "http:") return;
@@ -117,8 +103,8 @@ export interface PrivacyConfig {
   /**
    * Proving service: a base URL, or a {@link ProofProviderInterface} instance.
    *
-   * Passing an instance is how tests substitute the privacy SDK's
-   * `MockProofProvider`, and how an integrator plugs in their own prover.
+   * Pass an instance to use your own prover, or the SDK's `MockProofProvider`
+   * in tests.
    */
   prover: string | ProofProviderInterface;
   /**
@@ -129,27 +115,21 @@ export interface PrivacyConfig {
   /**
    * Enable OHTTP envelope encryption for the discovery and proving services.
    *
-   * Without it the viewing key travels to both services in plaintext (inside
-   * TLS, but readable by the service operator). Pass `true` for defaults, or an
-   * object to pin a key config or route through a relay.
+   * Without it, the service operator can read the viewing key. Pass `true`
+   * for defaults, or an object to pin a key config or use a relay.
    *
-   * Ignored for whichever of `prover` / `discovery` is given as an instance —
-   * an instance owns its own transport.
+   * Ignored for a `prover` or `discovery` given as an instance.
    *
-   * Both services have to support OHTTP. Against one that does not, the SDK's
-   * `GET /ohttp-keys` fetch fails and calls throw, so leave this unset rather
-   * than aim it at a plaintext deployment.
+   * Both services must support OHTTP. Otherwise every call throws.
    */
   ohttp?: OhttpOption;
   /**
    * Accept plain `http://` on non-loopback hosts for `prover`, `discovery`, the
    * OHTTP `relayUrl` and `paymaster.url`.
    *
-   * The prover and discovery services receive the viewing key, so over plain
-   * http on a shared network anyone on the path can read every private
-   * transaction. Loopback is always accepted; set this only for a trusted
-   * network such as a LAN reached from a device or emulator. A warning is still
-   * printed for any plain-http service URL.
+   * Over plain http, anyone on the network can read the viewing key. Loopback
+   * is always accepted. Set this only for a trusted network, such as a LAN
+   * reached from a device or emulator. A warning is still printed.
    *
    * @default false
    */
@@ -160,41 +140,34 @@ export interface PrivacyConfig {
    */
   shadowAccountAnonymizerAddress?: string;
   /**
-   * Override how proof invocations are constructed.
+   * Override how proof invocations are built.
    *
-   * Only needed alongside a mock prover — the SDK's `MockProofProvider`
-   * expects invocations built by its `MockProofInvocationFactory` rather than
-   * real serialized calldata.
+   * Only needed with a mock prover. The SDK's `MockProofProvider` expects
+   * invocations from its `MockProofInvocationFactory`.
    */
   proofInvocationFactory?: CreatePrivateTransfersParams["proofInvocationFactory"];
   /**
-   * Submission through a paymaster's relayer, which is what keeps the account
-   * off-chain. Endpoint and fee mode travel together — see
-   * {@link PrivacyPaymasterConfig}.
+   * Submission through a paymaster's relayer. This keeps the account
+   * off-chain. See {@link PrivacyPaymasterConfig}.
    *
-   * Ignored by {@link createPrivacy} itself, which composes and proves but never
-   * submits. It is read when the config reaches `connectPrivacy` or
-   * `withPaymaster`, both of which require it.
+   * {@link createPrivacy} itself ignores it. `connectPrivacy` and
+   * `withPaymaster` require it.
    *
-   * Omit it to submit through your own infrastructure. The only route left
-   * inside the SDK is then
-   * `wallet.execute(calls, { proof, unsafeUserPays: true })`, which puts the
-   * sender's address, nonce and gas payment on-chain and so undoes the privacy
-   * the pool provides.
+   * Omit it to submit through your own infrastructure. The SDK's own route,
+   * `wallet.execute(calls, { proof, unsafeUserPays: true })`, puts the sender
+   * on-chain and removes the privacy.
    */
   paymaster?: PrivacyPaymasterConfig;
   /**
    * How the viewing key is derived for this account.
    *
-   * Defaults to {@link accountLeafDerivation} — SNIP-44 `account-leaf-v1`, run
-   * inside the signer — which requires a signer implementing
-   * {@link SignerInterface.deriveViewingKey}. Set this to use a different scheme:
-   * a wallet-native KDF, a hardware device command, an externally held key, or to
-   * support a signer that only signs.
+   * Defaults to {@link accountLeafDerivation}, SNIP-44 `account-leaf-v1` run
+   * inside the signer. It requires a signer with
+   * {@link SignerInterface.deriveViewingKey}. Set this for another scheme, or
+   * for a signer that only signs.
    *
-   * The pool stores the first key an account registers and it cannot be
-   * replaced, so changing this for an account that already registered orphans
-   * its notes. The discovery service rejects a mismatched key outright.
+   * The pool stores the first key an account registers. It cannot be replaced.
+   * Changing this for a registered account orphans its notes.
    */
   viewingKeyDerivation?: ViewingKeyDerivation;
 }
@@ -202,28 +175,23 @@ export interface PrivacyConfig {
 /**
  * Revocation handles for the clients this module built.
  *
- * A `WeakMap` rather than a method on the return value, because the return type
- * is the privacy SDK's own interface and has to stay exactly that — the fluent
- * builder, discovery and history APIs are meant to be used as the SDK documents
- * them, not through a starkzap wrapper.
+ * A `WeakMap`, not a method, because the return type must stay the privacy
+ * SDK's own interface.
  */
 const revocations = new WeakMap<PrivateTransfersInterface, () => void>();
 
 /**
  * Stop a privacy client from using its viewing key again.
  *
- * The SDK asks for the key on every operation rather than holding a copy, so
- * cutting it off here ends the client: any call that needs to decrypt now
- * throws. {@link Wallet.disconnect} does this for the client it handed out.
+ * The SDK asks for the key on every operation, so after this every call that
+ * needs to decrypt throws. {@link Wallet.disconnect} calls this for the client
+ * it handed out.
  *
- * What this can and cannot do, stated exactly. It drops the only reference
- * starkzap holds, so the key becomes collectable, and it refuses every later
- * use. It does not scrub memory — JavaScript strings are immutable, so nothing
- * can overwrite them in place. And it does not unread what was already read:
- * notes and channels already discovered stay decrypted in whatever registry the
- * caller is holding.
+ * This does not scrub memory, and it does not undo what was already
+ * decrypted. Notes and channels already discovered stay readable in the
+ * caller's registry.
  *
- * Safe to call more than once, and on a client that was never used.
+ * Safe to call more than once.
  *
  * @param transfers - A client from {@link createPrivacy}, or the `transfers` of
  *   one from `connectPrivacy`
@@ -235,12 +203,10 @@ export function revokePrivacy(transfers: PrivateTransfersInterface): void {
 /**
  * Create a privacy pool client bound to a starkzap wallet.
  *
- * Returns the privacy SDK's own {@link PrivateTransfersInterface} rather than
- * a wrapper, so the fluent builder, discovery and history APIs are used
- * exactly as the SDK documents them. What this function adds is the glue
- * starkzap is responsible for: deriving the viewing key from the account's
- * signer, bridging that signer to the one the SDK expects, resolving the
- * chain, and refusing wallets that cannot support the flow.
+ * Returns the privacy SDK's own {@link PrivateTransfersInterface}, not a
+ * wrapper. Use the builder, discovery and history APIs as the SDK documents
+ * them. This function derives the viewing key, bridges the signer, resolves
+ * the chain and refuses wallets that cannot support the flow.
  *
  * Submit the result with {@link Wallet.execute}, which carries the proof as
  * transaction-level fields:
@@ -252,37 +218,25 @@ export function revokePrivacy(transfers: PrivateTransfersInterface): void {
  * });
  * ```
  *
- * A privacy call can never be batched with other calls as the proof belongs to
- * the transaction, not the call. So it cannot go through {@link TxBuilder}.
+ * A privacy call cannot be batched with other calls. The proof belongs to the
+ * transaction, so it cannot go through {@link TxBuilder}.
  *
- * Two prerequisites are the caller's responsibility, because this layer stays a
- * pass-through rather than sequencing transactions on your behalf:
+ * Two things are the caller's responsibility:
  *
- * - **Depositing needs a prior ERC20 approve to the pool.** Neither this
- *   function nor the privacy SDK builds one, so send it separately
- *   (`wallet.tx().approve(token, pool, amount).send()`) or the deposit reverts
- *   on-chain. It does *not* have to age: the allowance is spent when the
- *   transaction executes rather than when it is proven. Note this differs from
- *   {@link TongoConfidential.fund}, which bundles its own approve.
+ * - **A deposit needs an ERC20 approve to the pool first.** Send it as its own
+ *   transaction with `wallet.tx().approve(token, pool, amount).send()`, or
+ *   pass it as `invoke` to `PrivacyClient.send`. It does not have to age.
+ * - **On-chain state a proof reads must be about 10 blocks old.** This covers
+ *   a top-up before a deposit, the account's deployment before `register()`,
+ *   and the previous privacy transaction. Use {@link waitForFundedBalance} or
+ *   {@link waitForProvableBlock} and pass the result as `provingBlockId`.
  *
- *   Needing a *separate* transaction is this layer's limitation, not the
- *   protocol's. AVNU's paymaster has a second transaction type,
- *   `invoke_and_apply_action`, which wraps a user call in an outside-execution
- *   and relays it alongside the pool action — so the approve and the deposit
- *   land together, without the extra transaction or the wait between them.
- *   {@link PrivacyPaymaster} implements `apply_action` only.
- * - **On-chain state a proof *reads* must be ~10 blocks old.** That covers a
- *   top-up before a deposit, the account's own deployment before `register()`,
- *   and the previous privacy transaction — but not the approve above. Use
- *   {@link waitForFundedBalance} or {@link waitForProvableBlock} and pass the
- *   result as `provingBlockId`.
- *
- * @param wallet - A locally-signed wallet. `CartridgeWallet` is not accepted:
- *   it has no {@link AccountProvider}, so it cannot produce the viewing key.
+ * @param wallet - A locally-signed wallet. `CartridgeWallet` is not accepted.
+ *   It has no {@link AccountProvider}, so it cannot produce the viewing key.
  * @param config - Pool address and service endpoints
  * @returns The privacy SDK client
- * @throws If the optional peer dependency is not installed. Deriving the
- *   viewing key throws separately, on first use — see
+ * @throws If the optional peer dependency is not installed. Viewing key
+ *   derivation throws separately, on first use. See
  *   {@link ViewingKeyDerivation}
  *
  * @example
@@ -304,15 +258,13 @@ export async function createPrivacy(
 ): Promise<PrivateTransfersInterface> {
   const signer = wallet.getAccountProvider().getSigner();
 
-  // The default derivation's precondition is checkable without touching the
-  // network or the signer, so check it here rather than letting the first
-  // private operation fail. A custom derivation owns its own preconditions.
+  // Check the default derivation's precondition now, not on first use. A
+  // custom derivation owns its own checks.
   if (config.viewingKeyDerivation === undefined) {
     assertViewingKeySigner(signer);
   }
 
-  // Validated before the SDK is loaded, so a bad URL fails without touching the
-  // network or the optional dependency.
+  // Validate URLs before loading the SDK, so a bad URL fails fast.
   const prover =
     typeof config.prover === "string"
       ? asBaseUrl(
@@ -349,10 +301,8 @@ export async function createPrivacy(
     poolAddress: config.poolContractAddress,
   };
 
-  // Derived once per client and held in the closure rather than persisted, so
-  // it lives exactly as long as the session that authorised it. Whether the key
-  // matches the one the pool registered is left to the discovery service, which
-  // rejects a mismatch outright.
+  // Derived once per client and held in the closure, never persisted. The
+  // discovery service rejects a key that does not match the registered one.
   let viewingKey: Promise<string> | undefined;
   let revoked = false;
   const revokedError = () =>
@@ -365,9 +315,8 @@ export async function createPrivacy(
   const getViewingKey = async (): Promise<string> => {
     if (revoked) throw revokedError();
 
-    // The promise is cached, not the key. Two callers arriving together then
-    // share one derivation instead of each asking the signer to sign. A failed
-    // derivation clears the cache so a transient signer error can be retried.
+    // Cache the promise, so concurrent callers share one derivation. A failure
+    // clears the cache so the next call can retry.
     viewingKey ??= derive(context, signer).then(
       (derived) => {
         assertCanonicalViewingKey(derived);
@@ -380,9 +329,7 @@ export async function createPrivacy(
     );
 
     const key = await viewingKey;
-    // Checked again here. Revocation can land while the derivation above is
-    // waiting, and returning the key then would let it outlive the session that
-    // authorised it.
+    // Check again. Revocation can happen while the derivation is waiting.
     if (revoked) throw revokedError();
     return key;
   };
@@ -416,8 +363,7 @@ export async function createPrivacy(
   const params: CreatePrivateTransfersParams = {
     account: {
       address: wallet.address,
-      // The SDK signs a synthetic invocation whose sender is the pool, so it
-      // needs the full starknet.js signer surface, not starkzap's minimal one.
+      // The SDK needs the full starknet.js signer surface.
       signer: new SignerAdapter(signer),
     },
     viewingKeyProvider: { getViewingKey },

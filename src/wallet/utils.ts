@@ -47,17 +47,13 @@ export function isPaymasterMode(
 }
 
 /**
-/**
- * Refuse a proof on a wallet that could never have produced one.
+ * Refuse a proof on a wallet that cannot produce one.
  *
- * `CartridgeWallet` has no {@link AccountProvider}, so there is no signer to
- * derive a viewing key from — which means no privacy client can be built for it
- * and no proof can belong to it.
+ * `CartridgeWallet` has no {@link AccountProvider}, so it has no signer to
+ * derive a viewing key from. No proof can belong to it.
  *
- * Separate from {@link assertProofSendable} on purpose. Each wallet knows
- * statically whether it can carry a proof, so it calls the one that applies to
- * it. This used to be a single function branching on the wallet's *name*, which
- * read as a dispatch and pushed a compile-time fact into a runtime string.
+ * Separate from {@link assertProofSendable}. Each wallet calls the check that
+ * applies to it.
  *
  * @param proof - The proof from `execute()` options, if any
  * @param wallet - Wallet name, for the message only
@@ -76,23 +72,19 @@ export function assertProofUnsupported(
 }
 
 /**
- * Reject a proof-carrying transaction that cannot be sent, or should not be sent
- * unknowingly.
+ * Reject a proof-carrying transaction that cannot be sent, or that would
+ * reveal the sender without consent.
  *
- * Two refusals:
+ * Three refusals:
  *
- * - **Paymaster mode.** starknet.js's SNIP-29 paymaster has no field for a
- *   proof, so the proof would be silently dropped and the pool would revert.
- *   A *privacy* paymaster can carry one, but it is not this code path. See
- *   `PrivacyPaymaster`.
- * - **Unacknowledged self-submission.** Sending a proof from the user's own
- *   account works, but records who sent it. That has to be opted into.
+ * - **Empty proof.** A result from `simulate()` has no proof data.
+ * - **Paymaster mode.** A SNIP-29 paymaster has no field for a proof. Use a
+ *   privacy paymaster instead. See `PrivacyPaymaster`.
+ * - **Self-submission without `unsafeUserPays`.** Sending from the user's own
+ *   account records who sent it. The caller must opt in.
  *
- * Which signer the wallet uses is deliberately *not* checked. A Privy-backed
- * `Wallet` signs and sends a proof perfectly well; what a remote signer may not
- * be able to do is derive the viewing key, and `createPrivacy` checks that
- * separately. Refusing here would turn away a wallet that had already built a
- * valid proof through a custom `viewingKeyDerivation`.
+ * The signer type is not checked. A remote signer can send a proof. Whether
+ * it can derive the viewing key is checked in `createPrivacy`.
  *
  * @param proof - The proof from `wallet.execute()` options, if any
  * @param feeMode - The resolved fee mode for this execution
@@ -105,9 +97,7 @@ export function assertProofSendable(
 ): void {
   if (!proof) return;
 
-  // A simulated proof is the shape without the substance: `simulate` runs a mock
-  // prover, so its data is empty. Submitting one reverts on chain for reasons that
-  // name neither the proof nor the simulation it came from.
+  // `simulate()` runs a mock prover, so its proof has no data.
   if (proof.data.length === 0 || proof.proofFacts.length === 0) {
     throw new Error(
       "[starkzap] This proof carries no proof data, so the transaction would " +
@@ -143,10 +133,9 @@ export function assertProofSendable(
 /**
  * The block number a proof was generated from, taken from its proof facts.
  *
- * The facts are a tag-then-payload list; the felt after the `VIRTUAL_SNOS0` tag
- * is the base block. Returns `undefined` when the tag is absent — the layout is
- * the proving service's, not ours, so an unrecognised shape must not turn a
- * valid proof away.
+ * The felt after the `VIRTUAL_SNOS0` tag is the base block. Returns
+ * `undefined` when the tag is absent, so an unknown layout does not reject a
+ * valid proof.
  */
 export function proofBaseBlock(proof: TransactionProof): number | undefined {
   const tag = shortString.encodeShortString("VIRTUAL_SNOS0");
@@ -159,10 +148,10 @@ export function proofBaseBlock(proof: TransactionProof): number | undefined {
 }
 
 /**
- * Reject a proof whose base block is too recent for the sequencer to accept.
+ * Reject a proof whose base block is too recent or too old for the pool.
  *
- * Pure: takes the head rather than reading it, so the comparison is testable
- * without a provider. See {@link assertProofFresh} for the IO wrapper.
+ * Pure. Takes the chain head as an argument, so it is testable without a
+ * provider. {@link assertProofFresh} reads the head and calls this.
  *
  * @param proof - The proof about to be submitted
  * @param head - Current chain head
@@ -196,8 +185,7 @@ export function assertProofBaseBlockAged(
     );
   }
 
-  // The window has an upper edge as well as a lower one. A proof too old is
-  // refused by the pool, which is the same wasted submission as one too young.
+  // The pool also refuses a proof that is too old.
   if (validityBlocks !== undefined && age > validityBlocks) {
     throw new Error(
       `[starkzap] This proof was generated against block ${base}, ${age} blocks ` +
@@ -210,11 +198,8 @@ export function assertProofBaseBlockAged(
 /**
  * Fail fast on a proof the sequencer will refuse, before paying to submit it.
  *
- * Deliberately best-effort. The base block is read from the proof first, so a
- * proof shape we do not recognise costs no RPC call at all, and a failed head
- * read is swallowed: this exists to turn one opaque on-chain revert into a clear
- * local error, and a check that can itself break a working transaction would be
- * worse than the problem it solves.
+ * Best effort. An unknown proof shape or a failed head read skips the check.
+ * The check must never break a working transaction.
  *
  * @param proof - The proof about to be submitted
  * @param provider - Provider used to read the chain head
@@ -229,8 +214,7 @@ export async function assertProofFresh(
 ): Promise<void> {
   if (proofBaseBlock(proof) === undefined) return;
 
-  // Both reads together: they do not depend on each other, so checking the upper
-  // bound as well as the lower one costs one round trip rather than two.
+  // Both reads in parallel. They do not depend on each other.
   const [head, validityBlocks] = await Promise.all([
     provider.getBlockNumber().catch(() => undefined),
     readProofValidityBlocks(provider, poolAddress),
@@ -241,11 +225,10 @@ export async function assertProofFresh(
 }
 
 /**
- * How long the pool still accepts a proof for, or `undefined` when unknown.
+ * How many blocks the pool accepts a proof for, or `undefined` when unknown.
  *
- * The figure is per deployment and has a setter, so it is read rather than
- * assumed. Undefined on any failure, which leaves only the lower bound checked —
- * the same best-effort stance {@link assertProofFresh} takes for the chain head.
+ * Read from the pool, because the figure is per deployment. `undefined` on any
+ * failure, so only the lower bound is checked then.
  */
 async function readProofValidityBlocks(
   provider: RpcProvider,
