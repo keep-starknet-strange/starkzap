@@ -18,7 +18,7 @@ import {
   type PrivacySimulation,
   type ProvableAttempt,
 } from "starkzap/privacy";
-import { PRIVACY_CONFIG } from "~/lib/stores/config";
+import { PRIVACY_CONFIG, PRIVACY_CONFIG_MISSING } from "~/lib/stores/config";
 import { tokens } from "~/lib/stores/tokens";
 import { walletState } from "~/lib/stores/wallet";
 import { log } from "~/lib/stores/logger";
@@ -153,7 +153,7 @@ function localWallet(wallet: WalletInterface | null): Wallet | null {
 /** Why the STRK20 tab cannot be used, or null when it can. */
 export function unavailableReason(walletType: string | null): string | null {
   if (!PRIVACY_CONFIG) {
-    return "Set VITE_PRIVACY_POOL_*, VITE_PRIVACY_PROVER_* and VITE_PRIVACY_DISCOVERY_* for this network in .env.";
+    return `Set ${PRIVACY_CONFIG_MISSING.join(", ")} for this network in .env.`;
   }
   if (walletType !== "privatekey") {
     return "The privacy pool needs a private-key login: the viewing key is derived from the account key inside the signer, which the Privy and Cartridge signers cannot do.";

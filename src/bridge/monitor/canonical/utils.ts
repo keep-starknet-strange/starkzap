@@ -19,11 +19,21 @@ const L2_MSG_TOPIC =
  * re-computes the L2 transaction hash using the same Pedersen-hash formula applied
  * by the Starknet sequencer.
  *
+ * Reads the first `LogMessageToL2` event only. A receipt holds one such event
+ * per L1-to-L2 message, and every deposit the SDK sends is one StarkGate
+ * `deposit` call in its own transaction, so SDK-originated receipts always
+ * have exactly one. A transaction built elsewhere that batches several
+ * deposits, such as a Safe MultiSend or a router contract, carries several,
+ * and this derives the hash of the first one only. The event's topics do not
+ * identify the token or the recipient, so nothing here can pick another; a
+ * caller monitoring such a batch has to know that the status reported is the
+ * first deposit's.
+ *
  * @param receipt - Mined Ethereum transaction receipt of the deposit.
  * @param snChainIdFelt252 - The Starknet chain ID as a felt252 hex string
  *   (e.g. `constants.StarknetChainId.SN_MAIN`). Use `ChainId.toFelt252()`.
- * @returns The predicted Starknet transaction hash, or `null` if the receipt
- *   does not contain a `LogMessageToL2` event.
+ * @returns The predicted Starknet transaction hash of the first
+ *   `LogMessageToL2` event, or `null` if the receipt contains none.
  */
 export function deriveStarknetDepositTxHash(
   receipt: TransactionReceipt,

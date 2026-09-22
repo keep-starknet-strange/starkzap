@@ -1,4 +1,4 @@
-import type { RpcProvider } from "starknet";
+import { num, uint256, type RpcProvider } from "starknet";
 import type { Provider, TransactionReceipt } from "ethers";
 import { BridgeTransferStatus } from "@/bridge/monitor/types";
 import { type StarkZapLogger, NOOP_LOGGER } from "@/logger";
@@ -86,4 +86,36 @@ export async function getEthereumTxStatus(
   }
 
   return { status: BridgeTransferStatus.CONFIRMED_ON_L1, receipt };
+}
+
+/**
+ * Read the Hyperlane message id from a receipt's `DispatchId` event.
+ *
+ * Only an event emitted by the mailbox counts. Any contract can emit an event
+ * with the same key, so a transaction could carry a forged `DispatchId` naming
+ * a message that was already delivered, and a monitor that read it would report
+ * the transfer as complete. Addresses are compared by value, since the RPC and
+ * the registry do not pad them the same way.
+ *
+ * @returns The message id as hex, or `null` when the mailbox emitted none
+ */
+export function findMailboxMessageId(
+  events: ReadonlyArray<{
+    from_address: string;
+    keys: string[];
+    data: string[];
+  }>,
+  mailbox: string,
+  dispatchIdKey: string
+): string | null {
+  const mailboxFelt = num.toBigInt(mailbox);
+  const event = events.find(
+    (e) =>
+      num.toBigInt(e.from_address) === mailboxFelt &&
+      e.keys.includes(dispatchIdKey)
+  );
+  if (!event || event.data.length < 2) return null;
+  return num.toHex(
+    uint256.uint256ToBN({ low: event.data[0]!, high: event.data[1]! })
+  );
 }

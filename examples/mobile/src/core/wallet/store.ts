@@ -31,7 +31,7 @@ import {
   OFT_PUBLIC_KEY,
   alchemyEthRpc,
   alchemySolanaMainnetRpc,
-  privacyConfig,
+  layerswapAllowedContracts,
 } from "@/core/config";
 import { resolveExamplePaymasterNodeUrl } from "@/core/paymaster";
 import { ensureCartridgeAdapter } from "@/core/cartridge";
@@ -169,24 +169,27 @@ function buildSdk(networkIndex: number) {
   const layerswapApiKey = isMain
     ? LAYERSWAP_API_KEY_MAINNET
     : LAYERSWAP_API_KEY_TESTNET;
+  const layerswapAllowed = layerswapAllowedContracts(
+    isMain ? "mainnet" : "testnet"
+  );
   const bridging = {
     ...(ethRpc ? { ethereumRpcUrl: ethRpc } : {}),
     ...(solanaRpc ? { solanaRpcUrl: solanaRpc } : {}),
     ...(layerswapApiKey ? { layerswapApiKey } : {}),
+    ...(layerswapApiKey && layerswapAllowed.length
+      ? { layerswapAllowedContracts: layerswapAllowed }
+      : {}),
     // OFT is mainnet-only.
     ...(isMain && OFT_PUBLIC_KEY ? { layerZeroApiKey: OFT_PUBLIC_KEY } : {}),
   };
-  // Enables connectPrivacy(); absent when this network has no endpoints set.
-  const privacy = privacyConfig(
-    isMain ? "mainnet" : "sepolia",
-    paymasterNodeUrl
-  );
   const sdk = new StarkZap({
     rpcUrl: net.rpcUrl,
     chainId: net.chainId,
+    // A device or emulator reaches a local devnet or proxy over the LAN, not
+    // loopback, so dev builds accept plain http. Release builds must not.
+    allowInsecureHttp: __DEV__,
     ...(paymasterNodeUrl ? { paymaster: { nodeUrl: paymasterNodeUrl } } : {}),
     ...(Object.keys(bridging).length ? { bridging } : {}),
-    ...(privacy ? { privacy } : {}),
   });
   return { sdk, paymasterNodeUrl };
 }

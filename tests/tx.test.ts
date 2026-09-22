@@ -295,6 +295,53 @@ describe("Tx", () => {
       expect(callback).toHaveBeenCalledTimes(1);
     });
 
+    it("survives an onError callback that throws and keeps polling", async () => {
+      const consoleError = vi
+        .spyOn(console, "error")
+        .mockImplementation(() => {});
+      const unhandled = vi.fn();
+      process.on("unhandledRejection", unhandled);
+
+      const mockProvider = {
+        channel: { nodeUrl: "https://starknet-sepolia.example.com" },
+        getTransactionStatus: vi
+          .fn()
+          .mockRejectedValueOnce(new Error("rpc down"))
+          .mockResolvedValue({
+            finality_status: "ACCEPTED_ON_L2",
+            execution_status: "SUCCEEDED",
+          }),
+      } as unknown as RpcProvider;
+
+      const tx = new Tx("0x123", mockProvider, SEPOLIA);
+      const callback = vi.fn();
+      const onError = vi.fn(() => {
+        throw new Error("handler bug");
+      });
+
+      tx.watch(callback, { onError, pollIntervalMs: 1000 });
+
+      try {
+        await vi.advanceTimersByTimeAsync(0);
+        expect(onError).toHaveBeenCalledTimes(1);
+        expect(consoleError).toHaveBeenCalledWith(
+          expect.stringContaining("onError callback threw"),
+          expect.objectContaining({ message: "handler bug" })
+        );
+
+        // The next tick still runs and reaches the final status.
+        await vi.advanceTimersByTimeAsync(1000);
+        expect(callback).toHaveBeenCalledWith({
+          finality: "ACCEPTED_ON_L2",
+          execution: "SUCCEEDED",
+        });
+        expect(unhandled).not.toHaveBeenCalled();
+      } finally {
+        process.off("unhandledRejection", unhandled);
+        consoleError.mockRestore();
+      }
+    });
+
     it("should continue polling on errors", async () => {
       let callCount = 0;
       const mockProvider = {

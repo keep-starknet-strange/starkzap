@@ -206,11 +206,13 @@ export function unavailableReason(
     : "mainnet";
   if (!configFor(networkIndex)) {
     return (
-      `Set EXPO_PUBLIC_PRIVACY_POOL_*, EXPO_PUBLIC_PRIVACY_PROVER_* and ` +
-      `EXPO_PUBLIC_PRIVACY_DISCOVERY_* for ${network}, plus ` +
+      `Set EXPO_PUBLIC_PRIVACY_POOL_*, EXPO_PUBLIC_PRIVACY_PROVER_*, ` +
+      `EXPO_PUBLIC_PRIVACY_DISCOVERY_*, EXPO_PUBLIC_PRIVACY_MAX_FEE_* and ` +
+      `EXPO_PUBLIC_PRIVACY_FEE_RECIPIENTS_* for ${network}, plus ` +
       `EXPO_PUBLIC_PAYMASTER_PROXY_URL_${network.toUpperCase()} (or, on Sepolia, ` +
       `EXPO_PUBLIC_PRIVY_SERVER_URL) — privacy transactions are submitted by a ` +
-      `paymaster's relayer, which is what keeps your account off-chain.`
+      `paymaster's relayer, which is what keeps your account off-chain. The fee ` +
+      `ceiling and forwarder addresses come from your paymaster operator.`
     );
   }
   if (walletType !== "privatekey") {

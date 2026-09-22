@@ -4,6 +4,7 @@ import {
   parseLayerswapStarknetCalls,
 } from "@/bridge/ethereum/layerswap/starknet";
 import type { LsDepositAction } from "@/bridge/ethereum/layerswap/types";
+import { fromAddress } from "@/types";
 
 const TOKEN =
   "0x049d36570d4e46f48e99674bd3fcc84644ddd6b96f7c741b1562b82f9e004dc7";
@@ -85,26 +86,67 @@ describe("parseLayerswapStarknetCalls", () => {
     ).toThrow(/missing required Call fields/);
   });
 
-  it("accepts helper calls to other contracts when the token transfer is present", () => {
+  describe("calls to other contracts", () => {
     const helperCall = {
       contractAddress: RECIPIENT,
       entrypoint: "deposit",
       calldata: ["0x4", "0x5"],
     };
+    const payload = action(JSON.stringify([transferCall(), helperCall]));
 
-    const calls = parseLayerswapStarknetCalls(
-      action(JSON.stringify([transferCall(), helperCall])),
-      TOKEN
-    );
+    it("rejects them when no contract is allowed", () => {
+      // The wallet signs whatever comes back, so an unvetted call is refused
+      // before signing, naming the address and the config key.
+      expect(() => parseLayerswapStarknetCalls(payload, TOKEN)).toThrow(
+        /calls 0x064b4880.*not in `bridging.layerswapAllowedContracts`/
+      );
+      expect(() => parseLayerswapStarknetCalls(payload, TOKEN, [])).toThrow(
+        /not in `bridging.layerswapAllowedContracts`/
+      );
+    });
 
-    expect(calls).toEqual([transferCall(), helperCall]);
+    it("rejects an approve on another token, the report's drain scenario", () => {
+      const drain = {
+        contractAddress: "0x0abc",
+        entrypoint: "approve",
+        calldata: ["0xdead", "0xffff", "0xffff"],
+      };
+      expect(() =>
+        parseLayerswapStarknetCalls(
+          action(JSON.stringify([drain, transferCall()])),
+          TOKEN,
+          [fromAddress(RECIPIENT)]
+        )
+      ).toThrow(/entry 0 calls 0x0abc \(entrypoint "approve"\)/);
+    });
+
+    it("accepts them when the contract is listed, compared by value", () => {
+      const shortForm = fromAddress(RECIPIENT.replace("0x0", "0x"));
+      const calls = parseLayerswapStarknetCalls(payload, TOKEN, [shortForm]);
+      expect(calls).toEqual([transferCall(), helperCall]);
+    });
+
+    it("does not let a listed bridge token open other entrypoints on it", () => {
+      expect(() =>
+        parseLayerswapStarknetCalls(
+          action(
+            JSON.stringify([transferCall(), transferCall(TOKEN, "approve")])
+          ),
+          TOKEN,
+          [fromAddress(TOKEN)]
+        )
+      ).toThrow(/unexpected bridge-token entrypoint/);
+    });
   });
 
   it("rejects payloads without a transfer on the expected token", () => {
+    // The other contract is allowed so the payload reaches this check rather
+    // than being refused as an unlisted call.
     expect(() =>
       parseLayerswapStarknetCalls(
         action(JSON.stringify(transferCall(RECIPIENT))),
-        TOKEN
+        TOKEN,
+        [fromAddress(RECIPIENT)]
       )
     ).toThrow(/does not include a transfer/);
   });

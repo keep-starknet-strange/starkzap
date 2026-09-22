@@ -97,6 +97,8 @@ export const sdk = new StarkZap({
   rpcUrl: RPC_URL,
   chainId: CHAIN_ID,
   logging: { logger: sdkLogger },
+  // Dev builds may point at a plain-http server on the LAN; production must not.
+  allowInsecureHttp: import.meta.env.DEV,
   ...(bridging ? { bridging } : {}),
   // Enables the "Sponsored" toggles. Absent when no proxy is set.
   ...(PAYMASTER_NODE_URL ? { paymaster: { nodeUrl: PAYMASTER_NODE_URL } } : {}),

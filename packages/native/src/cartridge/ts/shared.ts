@@ -3,6 +3,7 @@
  * Prefer importing these instead of redeclaring local copies.
  */
 import { addAddressPadding, hash, num } from "starknet";
+import { assertSafeHttpUrl } from "starkzap";
 export interface FetchLikeResponse {
   ok: boolean;
   status: number;
@@ -94,29 +95,11 @@ export function normalizeContractAddress(
 
 /**
  * Validate and normalize an HTTP(S) URL, stripping trailing slashes.
+ *
+ * Same rule as the core SDK: plain `http://` only on loopback.
  */
 export function normalizeHttpUrl(value: string, label: string): string {
   return assertSafeHttpUrl(value, label).toString().replace(/\/+$/, "");
-}
-
-/**
- * Validate and normalize an HTTP(S) URL.
- */
-export function assertSafeHttpUrl(value: string, label: string): URL {
-  let parsed: URL;
-  try {
-    parsed = new URL(value);
-  } catch {
-    throw new Error(`${label} must be a valid URL`);
-  }
-
-  const protocol = parsed.protocol.toLowerCase();
-
-  if (protocol !== "https:" && protocol !== "http:") {
-    throw new Error(`${label} must use http:// or https://`);
-  }
-
-  return parsed;
 }
 
 export function ensureFetch(

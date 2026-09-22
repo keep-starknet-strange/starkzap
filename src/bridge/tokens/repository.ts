@@ -412,7 +412,12 @@ function buildCacheKey(query: BridgeTokenQuery): string {
 
 function assertArrayPayload(payload: unknown): BridgeTokenApiRecord[] {
   if (Array.isArray(payload)) {
-    return payload as BridgeTokenApiRecord[];
+    // Rows are read field by field below, so a `null` or scalar row would
+    // fail on the first property access. Dropped, like hidden rows are.
+    return payload.filter(
+      (row): row is BridgeTokenApiRecord =>
+        row !== null && typeof row === "object"
+    );
   }
 
   const received = payload === null ? "null" : typeof payload;

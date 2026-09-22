@@ -205,7 +205,12 @@ export class LayerZeroApi {
       );
     }
 
-    const data = (await response.json()) as { quotes: LayerZeroQuote[] };
+    const data = (await response.json()) as {
+      quotes: LayerZeroQuote[];
+    } | null;
+    if (!Array.isArray(data?.quotes)) {
+      throw new Error("LayerZero API returned a body without `quotes`");
+    }
     return data.quotes;
   }
 

@@ -10,6 +10,10 @@ export { Wallet, AccountProvider, BaseWallet } from "@/wallet";
 export type { WalletInterface, WalletOptions } from "@/wallet";
 // Exported for wallet implementations outside this package (e.g. @starkzap/native).
 export { preflightFromSimulation } from "@/wallet/utils";
+// The one URL check the SDK applies to every endpoint it is given, exported so
+// starkzap-native validates its Cartridge URLs by the same rule.
+export { assertSafeHttpUrl } from "@/utils";
+export type { SafeHttpUrlOptions } from "@/utils";
 
 // Transaction
 export { Tx, TxBuilder } from "@/tx";

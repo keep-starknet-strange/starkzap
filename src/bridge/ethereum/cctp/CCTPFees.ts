@@ -67,8 +67,9 @@ export class CCTPFees {
       );
     }
 
-    const data = (await response.json()) as CCTPFeeResponse;
-    return data.data;
+    const data = (await response.json()) as CCTPFeeResponse | null;
+    // An empty list falls through to the fallback fee in the caller.
+    return data?.data ?? [];
   }
 
   private getFallbackFee(
