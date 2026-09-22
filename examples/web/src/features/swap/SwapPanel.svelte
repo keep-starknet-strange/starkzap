@@ -9,7 +9,7 @@
   import Segmented from "~/lib/ui/Segmented.svelte";
   import Toggle from "~/lib/ui/Toggle.svelte";
   import { tokens } from "~/lib/stores/tokens";
-  import { sponsored } from "~/lib/stores/settings";
+  import { sponsored, sponsoredAvailable } from "~/lib/stores/settings";
   import { PROVIDER_OPTIONS_LIST } from "~/lib/stores/wallet";
   import { balances, refresh } from "~/features/balances/store";
   import {
@@ -109,7 +109,9 @@
   {/if}
 </Card>
 
-<Toggle label="Sponsored (gasless)" bind:checked={$sponsored} />
+{#if sponsoredAvailable}
+  <Toggle label="Sponsored" bind:checked={$sponsored} />
+{/if}
 <Button
   title="Swap"
   loading={$submitting}

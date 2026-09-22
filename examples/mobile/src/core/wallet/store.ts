@@ -22,20 +22,24 @@ import {
 } from "starkzap-native";
 import { NETWORKS } from "@/core/network";
 import {
+  PRIVY_APP_ID,
   PRIVY_SERVER_URL,
-  PAYMASTER_PROXY_URL,
+  paymasterProxyUrl,
   LAYERSWAP_API_KEY_MAINNET,
   LAYERSWAP_API_KEY_TESTNET,
   SOLANA_RPC_URL,
   OFT_PUBLIC_KEY,
   alchemyEthRpc,
   alchemySolanaMainnetRpc,
+  privacyConfig,
 } from "@/core/config";
 import { resolveExamplePaymasterNodeUrl } from "@/core/paymaster";
 import { ensureCartridgeAdapter } from "@/core/cartridge";
+import { feeOptions } from "@/core/settings";
 import { useTokensStore } from "@/core/tokens/store";
 import { useTxBannerStore } from "@/core/tx-banner/store";
 import { usePrivacyStore } from "@/features/privacy/store";
+import { useStrk20Store } from "@/features/privacy/strk20/store";
 
 export type WalletType = "cartridge" | "privatekey" | "privy";
 
@@ -133,18 +137,28 @@ interface WalletStore {
   connectPrivy: (params: {
     walletId: string;
     publicKey: string;
-    accessToken: string;
+    privyApiUrl: string;
+    getAccessToken: () => Promise<string | null>;
+    generateAuthorizationSignature: (input: {
+      version: 1;
+      method: "POST";
+      url: string;
+      headers: { "privy-app-id": string };
+      body: { params: { hash: string } };
+    }) => Promise<{ signature: string }>;
     presetName: string;
   }) => Promise<void>;
   checkDeployment: () => Promise<void>;
   deploy: () => Promise<void>;
-  disconnect: () => void;
+  disconnect: () => Promise<void>;
 }
 
 function buildSdk(networkIndex: number) {
   const net = NETWORKS[networkIndex];
   const paymasterNodeUrl = resolveExamplePaymasterNodeUrl({
-    explicitProxyUrl: PAYMASTER_PROXY_URL,
+    explicitProxyUrl: paymasterProxyUrl(
+      net.chainId.isMainnet() ? "mainnet" : "sepolia"
+    ),
     privyServerUrl: PRIVY_SERVER_URL,
     chainId: net.chainId.toLiteral(),
   });
@@ -162,11 +176,17 @@ function buildSdk(networkIndex: number) {
     // OFT is mainnet-only.
     ...(isMain && OFT_PUBLIC_KEY ? { layerZeroApiKey: OFT_PUBLIC_KEY } : {}),
   };
+  // Enables connectPrivacy(); absent when this network has no endpoints set.
+  const privacy = privacyConfig(
+    isMain ? "mainnet" : "sepolia",
+    paymasterNodeUrl
+  );
   const sdk = new StarkZap({
     rpcUrl: net.rpcUrl,
     chainId: net.chainId,
     ...(paymasterNodeUrl ? { paymaster: { nodeUrl: paymasterNodeUrl } } : {}),
     ...(Object.keys(bridging).length ? { bridging } : {}),
+    ...(privacy ? { privacy } : {}),
   });
   return { sdk, paymasterNodeUrl };
 }
@@ -192,7 +212,7 @@ export const useWalletStore = create<WalletStore>((set, get) => ({
   // returns to login (disconnect clears the hint, so no resume reverts it).
   switchNetwork: () => {
     get().setNetworkIndex((get().networkIndex + 1) % NETWORKS.length);
-    get().disconnect();
+    void get().disconnect();
   },
 
   connectCartridge: async () => {
@@ -229,6 +249,7 @@ export const useWalletStore = create<WalletStore>((set, get) => ({
         address: wallet.address,
       });
       usePrivacyStore.getState().clear();
+      useStrk20Store.getState().clear();
       await get().checkDeployment();
     } catch (err) {
       set({ error: String(err) });
@@ -254,7 +275,7 @@ export const useWalletStore = create<WalletStore>((set, get) => ({
         account: { signer },
         accountPreset: ACCOUNT_PRESETS[presetName],
         ...(sponsored && paymasterNodeUrl
-          ? { feeMode: "sponsored" as const }
+          ? { feeMode: { type: "paymaster" as const } }
           : {}),
       });
       // Guard the resume path: refuse if this key/preset resolves to a
@@ -277,6 +298,7 @@ export const useWalletStore = create<WalletStore>((set, get) => ({
         networkIndex: get().networkIndex,
         address: wallet.address,
       });
+      useStrk20Store.getState().clear();
       // Establish the confidential capability now, while the key is in scope.
       usePrivacyStore.getState().init(privateKey.trim());
       await get().checkDeployment();
@@ -287,7 +309,14 @@ export const useWalletStore = create<WalletStore>((set, get) => ({
     }
   },
 
-  connectPrivy: async ({ walletId, publicKey, accessToken, presetName }) => {
+  connectPrivy: async ({
+    walletId,
+    publicKey,
+    privyApiUrl,
+    getAccessToken,
+    generateAuthorizationSignature,
+    presetName,
+  }) => {
     set({ connecting: true, error: null });
     try {
       const { sdk, paymasterNodeUrl } = buildSdk(get().networkIndex);
@@ -303,7 +332,27 @@ export const useWalletStore = create<WalletStore>((set, get) => ({
             walletId,
             publicKey,
             serverUrl: `${PRIVY_SERVER_URL}/api/privy-wallet/sign`,
-            headers: { Authorization: `Bearer ${accessToken}` },
+            headers: async () => {
+              const token = await getAccessToken();
+              if (!token) {
+                throw new Error("Privy session expired, sign in again");
+              }
+              return { Authorization: `Bearer ${token}` };
+            },
+            buildBody: async ({ walletId: signingWalletId, hash }) => {
+              const { signature } = await generateAuthorizationSignature({
+                version: 1,
+                method: "POST",
+                url: `${privyApiUrl.replace(/\/+$/, "")}/v1/wallets/${signingWalletId}/raw_sign`,
+                headers: { "privy-app-id": PRIVY_APP_ID },
+                body: { params: { hash } },
+              });
+              return {
+                walletId: signingWalletId,
+                hash,
+                authorizationSignature: signature,
+              };
+            },
           }),
         },
       });
@@ -321,6 +370,7 @@ export const useWalletStore = create<WalletStore>((set, get) => ({
         address: wallet.address,
       });
       usePrivacyStore.getState().clear();
+      useStrk20Store.getState().clear();
       await get().checkDeployment();
     } catch (err) {
       set({ error: String(err) });
@@ -346,13 +396,15 @@ export const useWalletStore = create<WalletStore>((set, get) => ({
     set({ connecting: true, error: null });
     const tx = await useTxBannerStore
       .getState()
-      .notify("Deploy account", () => wallet.deploy());
+      .notify("Deploy account", () => wallet.deploy(feeOptions()));
     if (tx) await get().checkDeployment();
     set({ connecting: false });
   },
 
-  disconnect: () => {
+  disconnect: async () => {
+    const { wallet } = get();
     usePrivacyStore.getState().clear();
+    useStrk20Store.getState().clear();
     clearHint();
     set({
       sdk: null,
@@ -363,5 +415,14 @@ export const useWalletStore = create<WalletStore>((set, get) => ({
       isDeployed: null,
       error: null,
     });
+    // The SDK caches its own privacy client per wallet, so clearing the stores is
+    // not enough to end the session's capabilities. Reported rather than thrown:
+    // the session is already gone, and a keychain that refused to close is worth
+    // seeing without leaving the app half logged out.
+    try {
+      await wallet?.disconnect();
+    } catch (err) {
+      set({ error: String(err) });
+    }
   },
 }));

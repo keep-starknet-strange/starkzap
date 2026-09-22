@@ -27,14 +27,18 @@ import type {
   ProviderOptions,
   SDKConfig,
   StakingConfig,
+  TransactionProof,
 } from "@/types";
 import {
+  assertProofFresh,
+  assertProofSendable,
   checkDeployed,
   ensureWalletReady,
   normalizeFeeMode,
   paymasterDetails,
   preflightTransaction,
 } from "@/wallet/utils";
+import { PROOF_BASE_BLOCK_DEPTH } from "@/privacy/sequencing";
 import type { WalletInterface } from "@/wallet/interface";
 import { BaseWallet } from "@/wallet/base";
 import {
@@ -125,6 +129,20 @@ export class Wallet extends BaseWallet {
   private readonly explorerConfig: ExplorerConfig | undefined;
   private readonly defaultFeeMode: FeeMode;
   private readonly defaultTimeBounds: PaymasterTimeBounds | undefined;
+  /**
+   * Privacy pool this wallet's proofs are checked against, when one is known.
+   *
+   * The address alone rather than the privacy config: it is read to look up the
+   * pool's proof validity window in {@link Wallet.execute}, and naming no privacy
+   * type is what keeps the optional privacy SDK out of this class's declaration.
+   * Set by `connectPrivacy` from `starkzap/privacy`.
+   */
+  private privacyPoolAddress: Address | undefined;
+  /**
+   * Teardown for capabilities that hold key material derived from this wallet's
+   * signer. Run by {@link Wallet.disconnect}.
+   */
+  private readonly revocable: Array<() => unknown> = [];
   private deployedCache: boolean | null = null;
   private deployedCacheExpiresAt = 0;
   private sponsoredDeployLock: Promise<void> | null = null;
@@ -498,10 +516,20 @@ export class Wallet extends BaseWallet {
     const feeMode = normalizeFeeMode(options.feeMode ?? this.defaultFeeMode);
     const timeBounds = options.timeBounds ?? this.defaultTimeBounds;
 
+    assertProofSendable(options.proof, feeMode, options.unsafeUserPays);
+    if (options.proof) {
+      await assertProofFresh(
+        options.proof,
+        this.provider,
+        PROOF_BASE_BLOCK_DEPTH,
+        this.privacyPoolAddress
+      );
+    }
+
     const transactionHash =
       feeMode !== "user_pays"
         ? await this.executeSponsored(calls, timeBounds, feeMode.gasToken)
-        : await this.executeUserPays(calls);
+        : await this.executeUserPays(calls, options.proof);
 
     return new Tx(
       transactionHash,
@@ -511,14 +539,21 @@ export class Wallet extends BaseWallet {
     );
   }
 
-  private async executeUserPays(calls: Call[]): Promise<string> {
+  private async executeUserPays(
+    calls: Call[],
+    proof?: TransactionProof
+  ): Promise<string> {
     const deployed = await this.isDeployed();
     if (!deployed) {
       throw new Error(
         'Account is not deployed. Call wallet.ensureReady({ deploy: "if_needed" }) before execute() in user_pays mode.'
       );
     }
-    return (await this.account.execute(calls)).transaction_hash;
+
+    const details = proof
+      ? { proof: proof.data, proofFacts: proof.proofFacts }
+      : undefined;
+    return (await this.account.execute(calls, details)).transaction_hash;
   }
 
   private executePaymaster(
@@ -603,6 +638,45 @@ export class Wallet extends BaseWallet {
   }
 
   /**
+   * Get the {@link AccountProvider} backing this wallet.
+   *
+   * Exposes the signer, which is what key-derived features need — the privacy
+   * pool's viewing key is derived from it. `CartridgeWallet` has no equivalent,
+   * which is what keeps signer-dependent features off the Cartridge path at the
+   * type level.
+   */
+  getAccountProvider(): AccountProvider {
+    return this.accountProvider;
+  }
+
+  /**
+   * Register teardown to run when this wallet disconnects.
+   *
+   * For capabilities built from this wallet's signer, which is what
+   * `connectPrivacy` in `starkzap/privacy` uses: a viewing key derived from the
+   * signer must not outlive the session that authorised it, and only this class
+   * knows when that session ends.
+   *
+   * @param teardown - Run once on {@link Wallet.disconnect}. Awaited, and a
+   *   rejection is swallowed so one capability cannot fail the disconnect.
+   */
+  addRevocable(teardown: () => unknown): void {
+    this.revocable.push(teardown);
+  }
+
+  /**
+   * Privacy pool whose proof validity window {@link Wallet.execute} reads.
+   *
+   * Set by `connectPrivacy`. Without it the freshness check falls back to a
+   * built-in window rather than the pool's own.
+   *
+   * @param poolContractAddress - The pool this wallet's proofs are built against
+   */
+  setPrivacyPool(poolContractAddress: Address): void {
+    this.privacyPoolAddress = poolContractAddress;
+  }
+
+  /**
    * Estimate the fee for executing calls.
    *
    * @example
@@ -617,9 +691,39 @@ export class Wallet extends BaseWallet {
     return this.account.estimateInvokeFee(calls);
   }
 
+  /**
+   * Release what this wallet handed out.
+   *
+   * The wallet itself stays usable: the account, the signer and the provider are
+   * untouched, so it still signs and sends, and `connectPrivacy` builds a fresh
+   * client with a freshly derived viewing key. Nothing enforces an end of
+   * session, and a flag that did would buy nothing -- the viewing key is
+   * deterministic, so whoever holds the private key can derive it again whatever
+   * this object says. To end a session for real, drop the wallet and build a new
+   * one on the next login, which is what the examples do.
+   */
   override async disconnect(): Promise<void> {
     await super.disconnect();
     this.clearDeploymentCache();
+
+    // Revoked, not merely forgotten. A privacy client holds a viewing key
+    // derived from this wallet's signer, and dropping the reference would leave
+    // that key alive inside any client the caller still holds. Revoking cuts it
+    // off at the source, which ends every client built from this wallet.
+    //
+    // Rejections are swallowed: one capability failing to tear down must not
+    // make disconnecting fail, and a client that never finished being built has
+    // no key to revoke.
+    const pending = this.revocable.splice(0);
+    await Promise.all(
+      pending.map(async (teardown) => {
+        try {
+          await teardown();
+        } catch {
+          // Nothing to do — see above.
+        }
+      })
+    );
   }
 }
 

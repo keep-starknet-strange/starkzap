@@ -7,12 +7,13 @@ import { useTheme } from "@/theme";
 import { NETWORKS } from "@/core/network";
 import {
   PRIVY_SERVER_URL,
-  PAYMASTER_PROXY_URL,
+  paymasterProxyUrl,
   PRIVY_APP_ID,
   isExpoGo,
 } from "@/core/config";
 import { resolveExamplePaymasterNodeUrl } from "@/core/paymaster";
 import { getDevLogin } from "@/core/dev-login";
+import { useSettingsStore } from "@/core/settings";
 import {
   ACCOUNT_PRESETS,
   getSessionHint,
@@ -41,7 +42,9 @@ export default function Login() {
   const [showKeyForm, setShowKeyForm] = useState(false);
   const [privateKey, setPrivateKey] = useState("");
   const [presetName, setPresetName] = useState("Ready");
-  const [sponsored, setSponsored] = useState(false);
+  // Same preference the per-transaction toggles read, so the choice made at
+  // login carries into every transaction instead of silently resetting.
+  const { sponsored, setSponsored } = useSettingsStore();
   const [resumePrivy, setResumePrivy] = useState(false);
 
   // Resume the last login: Privy has a persisted session (route in to reconnect),
@@ -76,7 +79,7 @@ export default function Login() {
   if (wallet) return <Redirect href="/balances" />;
   if (resumePrivy) return <Redirect href="/privy" />;
 
-  const openPrivy = () => {
+  const openPrivy = async () => {
     if (isExpoGo) {
       Alert.alert(
         "Native build required",
@@ -91,12 +94,27 @@ export default function Login() {
       );
       return;
     }
+    // Privy login needs the example server (wallet creation + signing). Ping its
+    // Privy health endpoint first so a down or Privy-disabled server fails here
+    // with a clear message rather than mid-login. 200 only when Privy is enabled.
+    try {
+      const res = await fetch(`${PRIVY_SERVER_URL}/api/health/privy`);
+      if (!res.ok) throw new Error(String(res.status));
+    } catch {
+      Alert.alert(
+        "Privy server unavailable",
+        `Can't reach the Privy example server at ${PRIVY_SERVER_URL || "(EXPO_PUBLIC_PRIVY_SERVER_URL unset)"}.\n\nStart it with ENABLE_PRIVY=true and set EXPO_PUBLIC_PRIVY_SERVER_URL.`
+      );
+      return;
+    }
     router.push("/privy");
   };
 
   const net = NETWORKS[networkIndex];
   const paymasterAvailable = !!resolveExamplePaymasterNodeUrl({
-    explicitProxyUrl: PAYMASTER_PROXY_URL,
+    explicitProxyUrl: paymasterProxyUrl(
+      net.chainId.isMainnet() ? "mainnet" : "sepolia"
+    ),
     privyServerUrl: PRIVY_SERVER_URL,
     chainId: net.chainId.toLiteral(),
   });

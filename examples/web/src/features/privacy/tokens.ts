@@ -1,4 +1,6 @@
+import { derived } from "svelte/store";
 import { TONGO_CONTRACTS } from "~/lib/stores/config";
+import { tokens } from "~/lib/stores/tokens";
 
 export interface PrivacyToken {
   symbol: string;
@@ -6,21 +8,22 @@ export interface PrivacyToken {
   decimals: number;
 }
 
-const TOKEN_DECIMALS: Record<string, number> = {
-  STRK: 18,
-  ETH: 18,
-  DAI: 18,
-  USDC: 6,
-  "USDC.e": 6,
-  USDT: 6,
-  WBTC: 8,
-};
-
-/** Tokens with a Tongo confidential contract on the configured network. */
-export function privacyTokens(): PrivacyToken[] {
-  return Object.entries(TONGO_CONTRACTS).map(([symbol, contractAddress]) => ({
-    symbol,
-    contractAddress,
-    decimals: TOKEN_DECIMALS[symbol] ?? 18,
-  }));
-}
+/**
+ * Tokens usable with Tongo: the shared list intersected with the tokens that
+ * have a Tongo contract on this network.
+ *
+ * Tongo deploys one contract per token, so — unlike the STRK20 pool, which
+ * serves every token — importing an arbitrary ERC20 does not make it available
+ * here.
+ */
+export const tongoTokens = derived(tokens, ($tokens) =>
+  $tokens
+    .filter((t) => TONGO_CONTRACTS[t.symbol])
+    .map(
+      (t): PrivacyToken => ({
+        symbol: t.symbol,
+        contractAddress: TONGO_CONTRACTS[t.symbol]!,
+        decimals: t.decimals,
+      })
+    )
+);

@@ -1,6 +1,8 @@
 import {
   RpcProvider,
   RpcError,
+  num,
+  shortString,
   TransactionFinalityStatus,
   type Call,
   type PaymasterTimeBounds,
@@ -15,6 +17,7 @@ import type {
   FeeMode,
   PreflightOptions,
   PreflightResult,
+  TransactionProof,
 } from "@/types";
 
 /** Canonical (non-deprecated) fee mode variants. */
@@ -41,6 +44,226 @@ export function isPaymasterMode(
       feeMode !== null &&
       feeMode.type === "paymaster")
   );
+}
+
+/**
+/**
+ * Refuse a proof on a wallet that could never have produced one.
+ *
+ * `CartridgeWallet` has no {@link AccountProvider}, so there is no signer to
+ * derive a viewing key from — which means no privacy client can be built for it
+ * and no proof can belong to it.
+ *
+ * Separate from {@link assertProofSendable} on purpose. Each wallet knows
+ * statically whether it can carry a proof, so it calls the one that applies to
+ * it. This used to be a single function branching on the wallet's *name*, which
+ * read as a dispatch and pushed a compile-time fact into a runtime string.
+ *
+ * @param proof - The proof from `execute()` options, if any
+ * @param wallet - Wallet name, for the message only
+ */
+export function assertProofUnsupported(
+  proof: TransactionProof | undefined,
+  wallet: string
+): void {
+  if (!proof) return;
+
+  throw new Error(
+    `[starkzap] ${wallet} cannot carry a transaction proof: privacy needs a ` +
+      "locally-signed `Wallet`, whose own signer derives the viewing key. Build " +
+      "and submit the proof through one of those instead."
+  );
+}
+
+/**
+ * Reject a proof-carrying transaction that cannot be sent, or should not be sent
+ * unknowingly.
+ *
+ * Two refusals:
+ *
+ * - **Paymaster mode.** starknet.js's SNIP-29 paymaster has no field for a
+ *   proof, so the proof would be silently dropped and the pool would revert.
+ *   A *privacy* paymaster can carry one, but it is not this code path. See
+ *   `PrivacyPaymaster`.
+ * - **Unacknowledged self-submission.** Sending a proof from the user's own
+ *   account works, but records who sent it. That has to be opted into.
+ *
+ * Which signer the wallet uses is deliberately *not* checked. A Privy-backed
+ * `Wallet` signs and sends a proof perfectly well; what a remote signer may not
+ * be able to do is derive the viewing key, and `createPrivacy` checks that
+ * separately. Refusing here would turn away a wallet that had already built a
+ * valid proof through a custom `viewingKeyDerivation`.
+ *
+ * @param proof - The proof from `wallet.execute()` options, if any
+ * @param feeMode - The resolved fee mode for this execution
+ * @param unsafeUserPays - Whether the caller accepted revealing the sender
+ */
+export function assertProofSendable(
+  proof: TransactionProof | undefined,
+  feeMode: FeeMode,
+  unsafeUserPays?: boolean
+): void {
+  if (!proof) return;
+
+  // A simulated proof is the shape without the substance: `simulate` runs a mock
+  // prover, so its data is empty. Submitting one reverts on chain for reasons that
+  // name neither the proof nor the simulation it came from.
+  if (proof.data.length === 0 || proof.proofFacts.length === 0) {
+    throw new Error(
+      "[starkzap] This proof carries no proof data, so the transaction would " +
+        "revert on chain. A result from `simulate()` has the right shape but no " +
+        "proof behind it — it is for estimating a fee, not for submitting. Prove " +
+        "the transaction for real before sending it."
+    );
+  }
+
+  if (isPaymasterMode(feeMode)) {
+    throw new Error(
+      "[starkzap] A SNIP-29 paymaster cannot carry a transaction proof: its " +
+        "executable-transaction shape has no field for one, so the proof would be " +
+        "dropped and the pool would revert. Submit through a privacy paymaster " +
+        "instead (configure `privacy.paymaster`), or self-submit with " +
+        '`feeMode: "user_pays"` and `unsafeUserPays: true`.'
+    );
+  }
+
+  if (!unsafeUserPays) {
+    throw new Error(
+      "[starkzap] Refusing to self-submit a proof-carrying transaction: it would " +
+        "be sent from this account, incrementing its nonce and paying gas from its " +
+        "public balance, so the chain would record who performed the private " +
+        "operation. Submit through a privacy paymaster (configure " +
+        "`privacy.paymaster` and use `connectPrivacy()` from " +
+        "`starkzap/privacy`), or pass " +
+        "`unsafeUserPays: true` to accept revealing the sender."
+    );
+  }
+}
+
+/**
+ * The block number a proof was generated from, taken from its proof facts.
+ *
+ * The facts are a tag-then-payload list; the felt after the `VIRTUAL_SNOS0` tag
+ * is the base block. Returns `undefined` when the tag is absent — the layout is
+ * the proving service's, not ours, so an unrecognised shape must not turn a
+ * valid proof away.
+ */
+export function proofBaseBlock(proof: TransactionProof): number | undefined {
+  const tag = shortString.encodeShortString("VIRTUAL_SNOS0");
+  const facts = proof.proofFacts.map((f) => num.toHex(f));
+  const blockIndex = facts.indexOf(num.toHex(tag)) + 1;
+  if (blockIndex === 0 || blockIndex >= facts.length) return undefined;
+
+  const block = Number(num.toBigInt(facts[blockIndex]!));
+  return Number.isSafeInteger(block) && block > 0 ? block : undefined;
+}
+
+/**
+ * Reject a proof whose base block is too recent for the sequencer to accept.
+ *
+ * Pure: takes the head rather than reading it, so the comparison is testable
+ * without a provider. See {@link assertProofFresh} for the IO wrapper.
+ *
+ * @param proof - The proof about to be submitted
+ * @param head - Current chain head
+ * @param depth - Blocks the base block must trail the head by
+ * @param validityBlocks - Blocks the pool still accepts a proof for, when known
+ */
+export function assertProofBaseBlockAged(
+  proof: TransactionProof,
+  head: number,
+  depth: number,
+  validityBlocks?: number
+): void {
+  const base = proofBaseBlock(proof);
+  if (base === undefined) return;
+  const age = head - base;
+
+  if (age < 0) {
+    throw new Error(
+      `[starkzap] This proof was generated against block ${base}, which is ` +
+        `ahead of the head (${head}). Either it was not proved against this ` +
+        "chain, or this RPC node is behind the one that proved it."
+    );
+  }
+
+  if (age < depth) {
+    throw new Error(
+      `[starkzap] This proof was generated against block ${base}, only ${age} ` +
+        `block(s) behind the head (${head}). The sequencer requires at least ` +
+        `${depth}. Wait for the chain to advance and prove again — see ` +
+        "`waitForProvableBlock`."
+    );
+  }
+
+  // The window has an upper edge as well as a lower one. A proof too old is
+  // refused by the pool, which is the same wasted submission as one too young.
+  if (validityBlocks !== undefined && age > validityBlocks) {
+    throw new Error(
+      `[starkzap] This proof was generated against block ${base}, ${age} blocks ` +
+        `behind the head (${head}). The pool accepts a proof for ${validityBlocks} ` +
+        "blocks, so this one has expired. Prove the transaction again."
+    );
+  }
+}
+
+/**
+ * Fail fast on a proof the sequencer will refuse, before paying to submit it.
+ *
+ * Deliberately best-effort. The base block is read from the proof first, so a
+ * proof shape we do not recognise costs no RPC call at all, and a failed head
+ * read is swallowed: this exists to turn one opaque on-chain revert into a clear
+ * local error, and a check that can itself break a working transaction would be
+ * worse than the problem it solves.
+ *
+ * @param proof - The proof about to be submitted
+ * @param provider - Provider used to read the chain head
+ * @param depth - Blocks the base block must trail the head by
+ * @param poolAddress - Pool to read the validity window from, when configured
+ */
+export async function assertProofFresh(
+  proof: TransactionProof,
+  provider: RpcProvider,
+  depth: number,
+  poolAddress?: string
+): Promise<void> {
+  if (proofBaseBlock(proof) === undefined) return;
+
+  // Both reads together: they do not depend on each other, so checking the upper
+  // bound as well as the lower one costs one round trip rather than two.
+  const [head, validityBlocks] = await Promise.all([
+    provider.getBlockNumber().catch(() => undefined),
+    readProofValidityBlocks(provider, poolAddress),
+  ]);
+  if (head === undefined) return;
+
+  assertProofBaseBlockAged(proof, head, depth, validityBlocks);
+}
+
+/**
+ * How long the pool still accepts a proof for, or `undefined` when unknown.
+ *
+ * The figure is per deployment and has a setter, so it is read rather than
+ * assumed. Undefined on any failure, which leaves only the lower bound checked —
+ * the same best-effort stance {@link assertProofFresh} takes for the chain head.
+ */
+async function readProofValidityBlocks(
+  provider: RpcProvider,
+  poolAddress: string | undefined
+): Promise<number | undefined> {
+  if (poolAddress === undefined) return undefined;
+
+  try {
+    const [value] = await provider.callContract({
+      contractAddress: poolAddress,
+      entrypoint: "get_proof_validity_blocks",
+      calldata: [],
+    });
+    const blocks = Number(num.toBigInt(value ?? ""));
+    return Number.isSafeInteger(blocks) && blocks > 0 ? blocks : undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 /**

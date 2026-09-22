@@ -5,8 +5,10 @@ import {
   ArgentXV050Preset,
   BraavosPreset,
   DevnetPreset,
+  fromAddress,
   type AccountClassConfig,
 } from "starkzap";
+import { type PrivacyConfig, type PrivacyFeeMode } from "starkzap/privacy";
 
 // App-level configuration: network resolution + env-derived endpoints.
 // Ported from the old main.ts config section (unchanged behavior).
@@ -97,6 +99,24 @@ export const RPC_URL = resolveRpcUrl(NETWORK);
 export const PRIVY_SERVER_URL =
   (env.VITE_PRIVY_SERVER_URL as string | undefined) ?? "http://localhost:3001";
 
+// Paymaster (gas sponsorship) endpoint — point it at a proxy that holds the AVNU
+// API key, never at AVNU directly, or the key ships in the bundle. Unset means no
+// paymaster: starknet.js then falls back to AVNU's public endpoint, muted, and
+// always the *Sepolia* one whatever the chain — so sponsored mode is unusable.
+//
+// Per network, because each AVNU deployment only whitelists its own privacy
+// pool: send a mainnet pool to the Sepolia paymaster and it answers "privacy
+// pool address is not whitelisted". Same precedence as the RPC URLs above — the
+// network-specific key wins, and the shared one only applies to VITE_NETWORK.
+export const PAYMASTER_NODE_URL =
+  (NETWORK === "mainnet"
+    ? (env.VITE_PAYMASTER_PROXY_URL_MAINNET as string | undefined)
+    : (env.VITE_PAYMASTER_PROXY_URL_SEPOLIA as string | undefined)
+  )?.trim() ||
+  (ENV_NETWORK === NETWORK
+    ? (env.VITE_PAYMASTER_PROXY_URL as string | undefined)?.trim()
+    : undefined);
+
 // Reown/WalletConnect project id — enables the bridge's external wallet connect.
 export const REOWN_PROJECT_ID = env.VITE_REOWN_PROJECT_ID as string | undefined;
 
@@ -183,6 +203,114 @@ const TONGO_CONTRACTS_MAINNET: Record<string, string> = {
 export const TONGO_CONTRACTS = CHAIN_ID.isSepolia()
   ? TONGO_CONTRACTS_SEPOLIA
   : TONGO_CONTRACTS_MAINNET;
+
+// ─── STRK20 privacy pool ────────────────────────────────────────────────────
+//
+// One pool serves every token, so unlike Tongo there is no per-token contract —
+// just the pool plus the two services. All of it is per-network because the app
+// switches chains at runtime. See .env.example.
+
+function pick(mainnet: string | undefined, sepolia: string | undefined) {
+  return (CHAIN_ID.isSepolia() ? sepolia : mainnet)?.trim() || undefined;
+}
+
+const PRIVACY_POOL = pick(
+  env.VITE_PRIVACY_POOL_MAINNET as string | undefined,
+  env.VITE_PRIVACY_POOL_SEPOLIA as string | undefined
+);
+const PRIVACY_PROVER = pick(
+  env.VITE_PRIVACY_PROVER_MAINNET as string | undefined,
+  env.VITE_PRIVACY_PROVER_SEPOLIA as string | undefined
+);
+const PRIVACY_DISCOVERY = pick(
+  env.VITE_PRIVACY_DISCOVERY_MAINNET as string | undefined,
+  env.VITE_PRIVACY_DISCOVERY_SEPOLIA as string | undefined
+);
+const PRIVACY_OHTTP_RELAY = (
+  env.VITE_PRIVACY_OHTTP_RELAY as string | undefined
+)?.trim();
+
+// OHTTP defaults to on: without it the viewing key reaches the prover and
+// discovery service in plaintext (inside TLS, but readable by the operator).
+const PRIVACY_OHTTP =
+  (env.VITE_PRIVACY_OHTTP as string | undefined)?.trim() !== "false";
+
+/**
+ * Config for `connectPrivacy` / `createPrivacy`, or `undefined` when this
+ * network has no privacy endpoints set — the STRK20 tab then explains what is
+ * missing instead of failing at call time.
+ */
+// How the pool fee is paid. `sponsored` is the sane default: the relayer fronts
+// the gas and the user pays only the pool fee the deployment sets. `default`
+// needs no API key, but its withdrawal is sized at the paymaster's suggested
+// maximum rather than its estimate, so it covers headroom that may go unused.
+// The amounts, and the gap between the modes, move with the network and with
+// gas — quote the paymaster rather than trust a figure written here. `default`
+// needs a gas token, `sponsored_private` a pool-fee token.
+// `||` rather than `??`, and trimmed first: .env.example ships the key with an
+// empty value, which `??` treats as set and passes straight through.
+const PRIVACY_FEE_MODE =
+  (env.VITE_PRIVACY_FEE_MODE as string | undefined)?.trim() || "sponsored";
+const PRIVACY_FEE_TOKEN = (
+  env.VITE_PRIVACY_FEE_TOKEN as string | undefined
+)?.trim();
+
+function privacyFee(): PrivacyFeeMode | undefined {
+  const disabled = (why: string) => {
+    console.warn(`[example] STRK20 disabled: ${why}`);
+    return undefined;
+  };
+  const token = () =>
+    PRIVACY_FEE_TOKEN ? fromAddress(PRIVACY_FEE_TOKEN) : undefined;
+
+  // Matched exhaustively. An unrecognised value used to fall through to
+  // `sponsored_private`, so a typo silently selected the one mode that needs an
+  // API key and lets the user choose the fee token.
+  switch (PRIVACY_FEE_MODE) {
+    case "sponsored":
+      return { mode: "sponsored" };
+    case "default": {
+      const gasToken = token();
+      return gasToken
+        ? { mode: "default", gasToken }
+        : disabled("`default` fee mode needs VITE_PRIVACY_FEE_TOKEN");
+    }
+    case "sponsored_private": {
+      const poolFeeToken = token();
+      return poolFeeToken
+        ? { mode: "sponsored_private", poolFeeToken }
+        : disabled("`sponsored_private` fee mode needs VITE_PRIVACY_FEE_TOKEN");
+    }
+    default:
+      return disabled(
+        `VITE_PRIVACY_FEE_MODE="${PRIVACY_FEE_MODE}" is not one of sponsored, sponsored_private, default`
+      );
+  }
+}
+
+const PRIVACY_FEE = privacyFee();
+
+export const PRIVACY_CONFIG: PrivacyConfig | undefined =
+  PRIVACY_POOL &&
+  PRIVACY_PROVER &&
+  PRIVACY_DISCOVERY &&
+  PAYMASTER_NODE_URL &&
+  PRIVACY_FEE
+    ? {
+        poolContractAddress: PRIVACY_POOL,
+        prover: PRIVACY_PROVER,
+        discovery: PRIVACY_DISCOVERY,
+        // Privacy transactions are submitted by the paymaster's relayer, so the
+        // account never appears on-chain. Same proxy as the sponsored toggle:
+        // it forwards any method with the API key attached.
+        paymaster: { url: PAYMASTER_NODE_URL, fee: PRIVACY_FEE },
+        ohttp: PRIVACY_OHTTP
+          ? PRIVACY_OHTTP_RELAY
+            ? { relayUrl: PRIVACY_OHTTP_RELAY }
+            : true
+          : false,
+      }
+    : undefined;
 
 // Switch network by reloading with the query param — mirrors the old behavior
 // (a fresh SDK + wallet per network is simpler than live-rebuilding).

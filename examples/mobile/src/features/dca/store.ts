@@ -10,6 +10,7 @@ import { useWalletStore } from "@/core/wallet/store";
 import { useTokensStore } from "@/core/tokens/store";
 import { useTxBannerStore } from "@/core/tx-banner/store";
 import { friendlyPairError, type DryRunResult } from "@/core/errors";
+import { feeOptions } from "@/core/settings";
 
 // ISO 8601 durations understood by the DCA providers.
 export const DCA_FREQUENCIES = [
@@ -168,14 +169,17 @@ export const useDcaStore = create<DcaStore>((set, get) => ({
       return false;
     set({ submitting: true });
     const tx = await useTxBannerStore.getState().notify("DCA order", () =>
-      wallet.dca().create({
-        sellToken: sellTok,
-        buyToken: buyTok,
-        sellAmount: Amount.parse(total, sellTok),
-        sellAmountPerCycle: Amount.parse(cycle, sellTok),
-        frequency,
-        provider: get().providerId,
-      })
+      wallet.dca().create(
+        {
+          sellToken: sellTok,
+          buyToken: buyTok,
+          sellAmount: Amount.parse(total, sellTok),
+          sellAmountPerCycle: Amount.parse(cycle, sellTok),
+          frequency,
+          provider: get().providerId,
+        },
+        feeOptions()
+      )
     );
     set({ submitting: false });
     if (tx) await get().loadOrders();
@@ -208,7 +212,8 @@ export const useDcaStore = create<DcaStore>((set, get) => ({
           .cancel(
             order.providerId === "ekubo"
               ? { orderId: order.id }
-              : { orderAddress: order.orderAddress }
+              : { orderAddress: order.orderAddress },
+            feeOptions()
           )
       );
     if (tx) await get().loadOrders();

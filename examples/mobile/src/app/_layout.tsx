@@ -1,11 +1,24 @@
 import "@/polyfills";
 
-import { type ReactNode } from "react";
+// Pulls the privacy SDK into the main bundle. starkzap core reaches it through a
+// lazy `import()` so that consumers who skip the feature never resolve it — but
+// Metro's dev server turns that `import()` into a separate chunk with its own
+// module ID space, and on native the ids it registers do not match the ones the
+// main bundle asks for. `loadPrivacySdk` then fails with `Requiring unknown
+// module "…"`. Importing it statically here means there is no chunk to load and
+// the async require resolves from the main registry instead.
+//
+// Only the dev server splits: `expo export` inlines everything, dev build or not,
+// which is why the CI bundle step never saw this. Same reason as `@/polyfills`
+// above — an app has to name a module for it to be in Metro's graph at all.
+import "@starkware-libs/starknet-privacy-sdk";
+
+import { lazy, Suspense, type ReactNode } from "react";
 import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { useTheme } from "@/theme";
-import { isExpoGo } from "@/core/config";
+import { isExpoGo, PRIVY_APP_ID, PRIVY_CLIENT_ID } from "@/core/config";
 import { TxBanner } from "@/core/tx-banner/TxBanner";
 
 // AppKit (Reown) pulls native modules missing from Expo Go, so it is loaded
@@ -15,6 +28,14 @@ const AppKitHost: ((props: { children: ReactNode }) => ReactNode) | null =
     ? null
     : // eslint-disable-next-line @typescript-eslint/no-require-imports
       (require("../core/appkit") as typeof import("@/core/appkit")).AppKitHost;
+
+const PrivyProvider = isExpoGo
+  ? null
+  : lazy(() =>
+      import("@privy-io/expo").then(({ PrivyProvider }) => ({
+        default: PrivyProvider,
+      }))
+    );
 
 export default function RootLayout() {
   const { colors } = useTheme();
@@ -55,10 +76,22 @@ export default function RootLayout() {
       <StatusBar style="auto" />
     </>
   );
+  const appContent = AppKitHost ? <AppKitHost>{content}</AppKitHost> : content;
 
   return (
     <SafeAreaProvider>
-      {AppKitHost ? <AppKitHost>{content}</AppKitHost> : content}
+      {PrivyProvider && PRIVY_APP_ID ? (
+        <Suspense fallback={null}>
+          <PrivyProvider
+            appId={PRIVY_APP_ID}
+            {...(PRIVY_CLIENT_ID ? { clientId: PRIVY_CLIENT_ID } : {})}
+          >
+            {appContent}
+          </PrivyProvider>
+        </Suspense>
+      ) : (
+        appContent
+      )}
     </SafeAreaProvider>
   );
 }

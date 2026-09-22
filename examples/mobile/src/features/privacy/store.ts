@@ -8,7 +8,7 @@ import {
 import type { RpcProvider } from "starknet";
 import { useWalletStore } from "@/core/wallet/store";
 import { useTxBannerStore } from "@/core/tx-banner/store";
-import { privacyTokens, type PrivacyToken } from "./tokens";
+import { tongoTokens, type PrivacyToken } from "./tokens";
 
 // Mints a confidential account for a token; created at login so it can close
 // over the private key without the store ever holding it as plain state.
@@ -73,7 +73,7 @@ export const usePrivacyStore = create<PrivacyStore>((set, get) => ({
   connect: async () => {
     const { wallet, networkIndex } = useWalletStore.getState();
     const { make, tokenSymbol } = get();
-    const token = privacyTokens(networkIndex).find(
+    const token = tongoTokens(networkIndex).find(
       (t) => t.symbol === tokenSymbol
     );
     if (!wallet || !make || !token) return;

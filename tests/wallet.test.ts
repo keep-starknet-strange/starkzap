@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeAll, vi } from "vitest";
+import { connectPrivacy } from "@/privacy/connect";
 import type { constants } from "starknet";
 import { StarkZap } from "@/sdk";
 import { StarkSigner } from "@/signer";
@@ -7,6 +8,7 @@ import { Amount, ChainId, fromAddress, type Token } from "@/types";
 import type { WalletInterface } from "@/wallet";
 import type { SwapProvider } from "@/swap";
 import type { DcaProvider } from "@/dca";
+import type { PrivacyConfig } from "@/privacy";
 import { getTestConfig, testPrivateKeys } from "./config.js";
 
 function createStubWallet(deployed = true): {
@@ -418,6 +420,75 @@ describe("Wallet", () => {
   });
 
   describe("execute", () => {
+    const proof = { data: "0xdeadbeef", proofFacts: ["0x1", "0x2"] };
+
+    it("should forward a transaction proof as execution details", async () => {
+      const signer = new StarkSigner(testPrivateKeys.key1);
+      const wallet = await sdk.connectWallet({ account: { signer } });
+
+      const account = wallet.getAccount();
+      vi.spyOn(wallet, "isDeployed").mockResolvedValue(true);
+      const executeSpy = vi
+        .spyOn(account, "execute")
+        .mockResolvedValue({ transaction_hash: "0xproof" });
+
+      const calls = [
+        { contractAddress: "0x123", entrypoint: "apply_actions", calldata: [] },
+      ];
+      const tx = await wallet.execute(calls, { proof, unsafeUserPays: true });
+
+      expect(tx.hash).toBe("0xproof");
+      expect(executeSpy).toHaveBeenCalledWith(calls, {
+        proof: proof.data,
+        proofFacts: proof.proofFacts,
+      });
+    });
+
+    it("should pass no execution details when there is no proof", async () => {
+      // starknet.js applies its own defaults for undefined details; passing an
+      // empty object instead would override them.
+      const signer = new StarkSigner(testPrivateKeys.key1);
+      const wallet = await sdk.connectWallet({ account: { signer } });
+
+      const account = wallet.getAccount();
+      vi.spyOn(wallet, "isDeployed").mockResolvedValue(true);
+      const executeSpy = vi
+        .spyOn(account, "execute")
+        .mockResolvedValue({ transaction_hash: "0xplain" });
+
+      await wallet.execute([
+        { contractAddress: "0x123", entrypoint: "transfer", calldata: [] },
+      ]);
+
+      expect(executeSpy).toHaveBeenCalledWith(expect.any(Array), undefined);
+    });
+
+    it("should refuse to send a proof through the paymaster", async () => {
+      // The SNIP-29 paymaster's executable-transaction shape has no field for a
+      // proof, so sending would silently drop it and revert on-chain.
+      const signer = new StarkSigner(testPrivateKeys.key1);
+      const wallet = await sdk.connectWallet({ account: { signer } });
+
+      const account = wallet.getAccount();
+      vi.spyOn(wallet, "isDeployed").mockResolvedValue(true);
+      const paymasterSpy = vi.spyOn(account, "executePaymasterTransaction");
+
+      await expect(
+        wallet.execute(
+          [
+            {
+              contractAddress: "0x123",
+              entrypoint: "apply_actions",
+              calldata: [],
+            },
+          ],
+          { proof, feeMode: { type: "paymaster" } }
+        )
+      ).rejects.toThrow("SNIP-29 paymaster cannot carry a transaction proof");
+
+      expect(paymasterSpy).not.toHaveBeenCalled();
+    });
+
     it("should route to paymaster when gasToken is set via feeMode", async () => {
       const signer = new StarkSigner(testPrivateKeys.key1);
       const wallet = await sdk.connectWallet({
@@ -490,6 +561,80 @@ describe("Wallet", () => {
             mode: "sponsored",
           }),
         })
+      );
+    });
+  });
+
+  describe("privacy", () => {
+    const privacyConfig = {
+      poolContractAddress: "0x123",
+      prover: "https://prover.example.com",
+      discovery: "https://discovery.example.com",
+      paymaster: {
+        url: "https://paymaster.example.com",
+        fee: { mode: "sponsored" } as const,
+      },
+    };
+
+    it("should require a paymaster config to submit", async () => {
+      // Not defaulted on purpose: `default` mode needs no API key but its
+      // withdrawal takes the suggested-max gas rather than the estimate, so
+      // choosing it silently would overcharge.
+      const { paymaster: _paymaster, ...incomplete } = privacyConfig;
+      const signer = new StarkSigner(testPrivateKeys.key1);
+      const wallet = await sdk.connectWallet({ account: { signer } });
+
+      await expect(connectPrivacy(wallet, incomplete)).rejects.toThrow(
+        "`privacy.paymaster` is required"
+      );
+    });
+
+    it("cannot be handed half a paymaster config", () => {
+      // Pairing the endpoint with the fee mode moved this from a runtime throw
+      // to the type: an endpoint without a fee mode does not compile, so there
+      // is no half-configured state left for `connectPrivacy` to reject.
+      //
+      // `@ts-expect-error` is the assertion — it fails the typecheck if the
+      // expression below ever becomes valid, i.e. if the pairing is loosened.
+      const halfConfigured: PrivacyConfig = {
+        poolContractAddress: "0x123",
+        prover: "https://prover.example.com",
+        discovery: "https://discovery.example.com",
+        // @ts-expect-error - `fee` is required whenever `paymaster` is given
+        paymaster: { url: "https://paymaster.example.com" },
+      };
+
+      expect(halfConfigured.paymaster?.url).toBeDefined();
+    });
+
+    it("should cache the client per wallet and drop it on disconnect", async () => {
+      const signer = new StarkSigner(testPrivateKeys.key1);
+      const wallet = await sdk.connectWallet({ account: { signer } });
+
+      const first = await connectPrivacy(wallet, privacyConfig);
+
+      // One client means one PrivateRegistry: two clients for the same wallet
+      // and pool would hold note/channel state that silently drifts apart.
+      expect(await connectPrivacy(wallet, privacyConfig)).toBe(first);
+
+      // A disconnect ends the session that authorised the viewing key, so the
+      // client derived from it must not survive.
+      await wallet.disconnect();
+      expect(await connectPrivacy(wallet, privacyConfig)).not.toBe(first);
+    });
+
+    it("should revoke the viewing key on disconnect, not just forget it", async () => {
+      // Clearing the cache alone would leave the key alive inside the client the
+      // caller is still holding — which is the thing that must not outlive the
+      // session. So the old client has to refuse, not merely be replaced.
+      const signer = new StarkSigner(testPrivateKeys.key1);
+      const wallet = await sdk.connectWallet({ account: { signer } });
+
+      const stale = await connectPrivacy(wallet, privacyConfig);
+      await wallet.disconnect();
+
+      await expect(stale.discoverNotes()).rejects.toThrow(
+        "privacy client was revoked"
       );
     });
   });
