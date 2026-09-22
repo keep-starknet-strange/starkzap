@@ -10,8 +10,7 @@ export { Wallet, AccountProvider, BaseWallet } from "@/wallet";
 export type { WalletInterface, WalletOptions } from "@/wallet";
 // Exported for wallet implementations outside this package (e.g. @starkzap/native).
 export { preflightFromSimulation } from "@/wallet/utils";
-// The one URL check the SDK applies to every endpoint it is given, exported so
-// starkzap-native validates its Cartridge URLs by the same rule.
+// Exported so starkzap-native validates its Cartridge URLs by the same rule.
 export { assertSafeHttpUrl } from "@/utils";
 export type { SafeHttpUrlOptions } from "@/utils";
 
@@ -40,8 +39,8 @@ export * from "@/swap";
 export * from "@/confidential";
 
 // Privacy (STRK20 privacy pool)
-// Privacy lives at `starkzap/privacy`: its types name the optional privacy SDK,
-// so re-exporting them here would make that peer mandatory for everyone.
+// Privacy lives at `starkzap/privacy`. Its types name the optional privacy
+// SDK, so they are not re-exported here.
 
 // Lending
 export * from "@/lending";

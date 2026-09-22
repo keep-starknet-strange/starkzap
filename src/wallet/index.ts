@@ -132,10 +132,8 @@ export class Wallet extends BaseWallet {
   /**
    * Privacy pool this wallet's proofs are checked against, when one is known.
    *
-   * The address alone rather than the privacy config: it is read to look up the
-   * pool's proof validity window in {@link Wallet.execute}, and naming no privacy
-   * type is what keeps the optional privacy SDK out of this class's declaration.
-   * Set by `connectPrivacy` from `starkzap/privacy`.
+   * Only the address, so this class does not depend on any privacy type. Set by
+   * `connectPrivacy` from `starkzap/privacy`.
    */
   private privacyPoolAddress: Address | undefined;
   /**
@@ -640,10 +638,8 @@ export class Wallet extends BaseWallet {
   /**
    * Get the {@link AccountProvider} backing this wallet.
    *
-   * Exposes the signer, which is what key-derived features need — the privacy
-   * pool's viewing key is derived from it. `CartridgeWallet` has no equivalent,
-   * which is what keeps signer-dependent features off the Cartridge path at the
-   * type level.
+   * It exposes the signer, which the privacy pool's viewing key is derived
+   * from. `CartridgeWallet` has no equivalent.
    */
   getAccountProvider(): AccountProvider {
     return this.accountProvider;
@@ -652,13 +648,11 @@ export class Wallet extends BaseWallet {
   /**
    * Register teardown to run when this wallet disconnects.
    *
-   * For capabilities built from this wallet's signer, which is what
-   * `connectPrivacy` in `starkzap/privacy` uses: a viewing key derived from the
-   * signer must not outlive the session that authorised it, and only this class
-   * knows when that session ends.
+   * `connectPrivacy` uses this, so the viewing key does not outlive the
+   * session.
    *
-   * @param teardown - Run once on {@link Wallet.disconnect}. Awaited, and a
-   *   rejection is swallowed so one capability cannot fail the disconnect.
+   * @param teardown - Run once on {@link Wallet.disconnect}. Awaited. A
+   *   rejection is swallowed, so one teardown cannot fail the disconnect.
    */
   addRevocable(teardown: () => unknown): void {
     this.revocable.push(teardown);
@@ -667,8 +661,8 @@ export class Wallet extends BaseWallet {
   /**
    * Privacy pool whose proof validity window {@link Wallet.execute} reads.
    *
-   * Set by `connectPrivacy`. Without it the freshness check falls back to a
-   * built-in window rather than the pool's own.
+   * Set by `connectPrivacy`. Without it, only the lower bound of the window is
+   * checked.
    *
    * @param poolContractAddress - The pool this wallet's proofs are built against
    */
@@ -692,35 +686,27 @@ export class Wallet extends BaseWallet {
   }
 
   /**
-   * Release what this wallet handed out.
+   * Release what this wallet handed out, such as privacy clients.
    *
-   * The wallet itself stays usable: the account, the signer and the provider are
-   * untouched, so it still signs and sends, and `connectPrivacy` builds a fresh
-   * client with a freshly derived viewing key. Nothing enforces an end of
-   * session, and a flag that did would buy nothing -- the viewing key is
-   * deterministic, so whoever holds the private key can derive it again whatever
-   * this object says. To end a session for real, drop the wallet and build a new
-   * one on the next login, which is what the examples do.
+   * The wallet itself stays usable. It still signs and sends, and
+   * `connectPrivacy` builds a fresh client on the next call. To end a session
+   * for real, drop the wallet and build a new one on the next login.
    */
   override async disconnect(): Promise<void> {
     await super.disconnect();
     this.clearDeploymentCache();
 
-    // Revoked, not merely forgotten. A privacy client holds a viewing key
-    // derived from this wallet's signer, and dropping the reference would leave
-    // that key alive inside any client the caller still holds. Revoking cuts it
-    // off at the source, which ends every client built from this wallet.
+    // Revoke, do not just forget. A privacy client the caller still holds
+    // would otherwise keep its viewing key.
     //
-    // Rejections are swallowed: one capability failing to tear down must not
-    // make disconnecting fail, and a client that never finished being built has
-    // no key to revoke.
+    // Rejections are swallowed, so one teardown cannot fail the disconnect.
     const pending = this.revocable.splice(0);
     await Promise.all(
       pending.map(async (teardown) => {
         try {
           await teardown();
         } catch {
-          // Nothing to do — see above.
+          // Swallowed on purpose. See above.
         }
       })
     );

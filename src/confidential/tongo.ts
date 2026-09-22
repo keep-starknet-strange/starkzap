@@ -21,11 +21,11 @@ import type {
  *
  * Each instance is bound to a single Tongo private key and contract.
  *
- * Every operation returns plain `Call`s, so one of them can share a transaction
- * with other calls through {@link TxBuilder}. Do not put two operations for the
- * same account in one transaction. Each is proved against the balance and nonce
- * read when it was built, so the second is already stale once the first applies,
- * and the whole transaction reverts. Send them one after another instead.
+ * Every operation returns plain `Call`s, so one operation can share a
+ * transaction with other calls through {@link TxBuilder}. Do not put two
+ * operations for the same account in one transaction. The second one is proved
+ * against a stale balance and nonce, and the whole transaction reverts. Send
+ * them one after another.
  *
  * This is one of two independent privacy integrations and is not
  * interchangeable with the STRK20 privacy pool: Tongo keeps an encrypted

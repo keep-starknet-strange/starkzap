@@ -32,80 +32,53 @@ export interface PrivacySendOptions extends Omit<
   "provingBlockId"
 > {
   /**
-   * Prove against this block instead of one picked from the chain head.
+   * Prove against this block instead of the chain head.
    *
-   * Use it when the proof depends on something this client cannot see, such as a
-   * deposit's funds having arrived. `waitForFundedBalance` returns such a block.
+   * Use it when the proof depends on a recent event, such as a deposit that
+   * just arrived. `waitForFundedBalance` returns such a block.
    *
-   * This sets the earliest block, not an exact one. A block older than this
-   * client's last transaction cannot work, because the proof would not include
-   * that transaction. The client waits for it instead. So the block used may be
-   * later than the one you pass, never earlier.
+   * This is a minimum. The client may use a later block, never an earlier one.
    */
   provingBlockId?: number;
   /**
-   * Depth, poll interval, timeout and per-poll callback for the wait before
-   * proving.
+   * Options for the wait before proving. Passed to
+   * {@link waitForProvableBlock} unchanged.
    *
-   * Forwarded whole to {@link waitForProvableBlock}. `onAttempt` is the one most
-   * callers want — the wait is silent otherwise, and on a slow chain it is
-   * minutes long, so "it hung" and "it is waiting for a block" look identical.
-   * The rest matter for anything that cannot sit on the default two-second poll:
-   * a devnet where blocks arrive instantly, or a test.
+   * Set `onAttempt` to show progress. Without it, the wait is silent and can
+   * take minutes. Change the poll settings only for a devnet or a test.
    */
   wait?: ProvableBlockOptions;
   /**
-   * Public calls to relay in the same transaction as the private one.
+   * Public calls to include in the same transaction. The usual case is an
+   * ERC20 `approve` before a deposit.
    *
-   * For the step that has to happen in public anyway — the ERC20 `approve` before
-   * a deposit is the standard case. Without this it is a separate transaction
-   * that the user signs and pays for themselves; with it, the relayer submits it
-   * through the account's `execute_from_outside`, so it lands atomically with the
-   * pool action.
+   * These calls are not private. They name the account.
    *
-   * These calls are *not* private. They name the account, so use this for work
-   * that is already public, not to hide anything.
+   * Requires {@link PaymasterBinding.account} and an account with SNIP-9
+   * support. `connectPrivacy` sets this up for you.
    *
-   * Requires {@link PaymasterBinding.account}, and requires that account to
-   * support SNIP-9 outside execution — a property of the user's wallet, not of
-   * your configuration. `connectPrivacy` wires this up; a client built by hand
-   * through {@link withPaymaster} has to pass `account` itself.
-   *
-   * Build these with `wallet.tx()` rather than by hand — `calls()` resolves the
-   * fluent builder into exactly this shape, so the ERC20 and protocol helpers are
-   * all available:
+   * Build the calls with `wallet.tx()`:
    *
    * ```ts
    * invoke: await wallet.tx().approve(STRK, poolAddress, amount).calls()
    * ```
    *
-   * Merging the approve does not remove what a deposit proof needs from the
-   * chain. The approve is checked when the deposit *executes*, so it does not
-   * have to age — but the depositor's balance is read at the proving block, so
-   * funds that have just arrived still need
-   * {@link PrivacySendOptions.provingBlockId} or a wait on the balance. Wrapping
-   * saves a transaction, not the settling.
+   * A deposit of funds that just arrived still needs
+   * {@link PrivacySendOptions.provingBlockId}.
    */
   invoke?: Call[];
   /**
-   * Called with the privacy SDK's warnings about the composed transaction, before
-   * it is submitted. Only called when there are any.
+   * Called with the SDK's warnings before submission. Not called when there
+   * are none.
    *
-   * `USER_LINKAGE` is the one to expect: the SDK saying this transaction may
-   * connect the user's private and public identities, which for a withdrawal back
-   * to the deposit address it will. Whether that is acceptable is yours to
-   * decide, so nothing is refused on your behalf.
+   * Expect `USER_LINKAGE`. It means the transaction may link the user's
+   * private and public identities. You decide whether that is acceptable.
    *
-   * Awaited, so you can ask the user. **Throw to abort** — your error propagates
-   * unchanged, so the reason reaches your own UI. Returning normally submits.
+   * The callback is awaited. Throw to abort. Return to submit. At this point
+   * the proof is already paid for.
    *
-   * By this point the proof exists and has been paid for. Aborting saves the pool
-   * fee and the submission, not the proving.
-   *
-   * To see the same warnings before paying for anything, call
-   * {@link PrivacyClient.simulate} with this callback and these options first. It
-   * composes what this would compose, fee withdrawal included, against a mock
-   * prover.
+   * To see the warnings before you pay, call {@link PrivacyClient.simulate}
+   * with the same callback.
    */
   onWarnings?: (warnings: Warning[]) => unknown;
 }
@@ -113,10 +86,8 @@ export interface PrivacySendOptions extends Omit<
 /** What a simulation reports about the transaction `send` would compose. */
 export interface PrivacySimulation {
   /**
-   * Warnings the SDK raises for it, `USER_LINKAGE` among them.
-   *
-   * The same list {@link PrivacySendOptions.onWarnings} would receive, seen before
-   * paying a prover rather than after.
+   * Warnings the SDK raises, `USER_LINKAGE` among them. The same list
+   * {@link PrivacySendOptions.onWarnings} receives.
    */
   warnings: Warning[];
   /** The fee `send` would append, from a quote taken at the same moment. */
@@ -126,32 +97,26 @@ export interface PrivacySimulation {
 /** What {@link PrivacyClient.send} reports about the transaction it submitted. */
 export interface PrivacySendResult extends PrivacySubmission {
   /**
-   * The private state the transaction leaves behind: notes spent and created,
-   * channels opened, and how far discovery scanned.
+   * The private state after this transaction: notes, channels and scan
+   * position.
    *
-   * A copy. Pass `registry` in the options to compile against one you keep, and
-   * this layer still never writes to it — adopt this result when you are
-   * satisfied the transaction landed, or discard it and let discovery rebuild.
-   * Ignore it entirely to have each transaction discover its own state.
-   *
-   * The scan position is preserved across that copy. The SDK's own clone drops
-   * it, which would make adopting a registry cost a full rescan from genesis.
+   * This is a copy. Your own registry is never changed. Adopt this copy when
+   * the transaction has landed, or ignore it and let discovery rebuild the
+   * state.
    */
   registry: PrivateRegistry;
 }
 
 /**
- * A privacy pool client that owns the fee, the proving block and submission.
+ * A privacy pool client that handles the fee, the proving block and the
+ * submission.
  *
- * Everything else is the privacy SDK's, delegated verbatim. Reads take no fee,
- * build no proof and submit nothing, so there is nothing for this layer to add
- * to them. The SDK's own client is on {@link PrivacyClient.transfers} for
- * anything not covered here.
+ * Everything else comes from the privacy SDK unchanged. For anything not
+ * covered here, use {@link PrivacyClient.transfers}.
  *
- * The paths that *produce* a proof are deliberately not re-exposed: `execute`,
- * `createProofInvocation` and `build` would each let a caller skip the fee
- * withdrawal and then fail on-chain. Use {@link PrivacyClient.send}, or compose
- * against `transfers` yourself and finish with {@link PrivacyClient.submit}.
+ * The SDK's `execute`, `createProofInvocation` and `build` are not exposed.
+ * They would let you skip the fee withdrawal. Use {@link PrivacyClient.send},
+ * or build your own proof and pass it to {@link PrivacyClient.submit}.
  */
 export interface PrivacyClient extends Pick<
   PrivateTransfersInterface,
@@ -165,39 +130,24 @@ export interface PrivacyClient extends Pick<
   readonly transfers: PrivateTransfersInterface;
 
   /**
-   * What the next transaction will cost, before committing to a proof.
+   * The fee of the next transaction.
    *
-   * Show this to users rather than a simulated gas figure: the pool fee is a
-   * separate withdrawal the paymaster requires, and it is what actually leaves the
-   * shielded balance. {@link PrivacyClient.simulate} reports the same figure
-   * alongside the warnings, if you want both in one call.
+   * Show this to users instead of a gas estimate. It is the amount that leaves
+   * the shielded balance.
    */
   quote(): Promise<PrivacyFeeQuote>;
 
   /**
-   * Run what {@link PrivacyClient.send} would run, without proving it.
+   * Run what {@link PrivacyClient.send} would run, without proving.
    *
-   * Takes the same callback and the same options, quotes the same fee, appends
-   * the same withdrawal and resolves the same proving block, then simulates
-   * against a mock prover. So the warnings it reports are the ones the real
-   * transaction would raise, which the inherited `simulate` could not tell you:
-   * that one takes a raw action list and knows nothing about the paymaster's fee.
+   * It uses the same fee, the same withdrawal and the same proving block. So
+   * the warnings it reports are the ones the real transaction would raise.
    *
-   * Resolving the proving block matters more than it sounds: channels and notes
-   * are discovered *at* that block, so a simulation against the chain head would
-   * answer for a different transaction than the one submitted.
+   * It is cheap and safe to call while a send is in flight. It waits for no
+   * block and writes no private state.
    *
-   * Cheap on purpose. It costs a quote, a chain-head read and a simulation. It
-   * waits for no block and writes no private state, so it is safe to run while a
-   * send is in flight — the trade being that in that window it reads a slightly
-   * older block than the send will prove against, since waiting for the previous
-   * transaction to age is exactly what this must not do.
-   *
-   * The mock proof is deliberately not returned. It has the shape of a proof and
-   * none of the substance, and handing one back invites submitting it.
-   *
-   * @param compose - Adds the operations to simulate, as `send` would take them
-   * @param options - The options `send` would take
+   * @param compose - Adds the operations to simulate, as for `send`
+   * @param options - The options for `send`
    * @returns The warnings, and the fee the real send would withdraw
    */
   simulate(
@@ -208,29 +158,23 @@ export interface PrivacyClient extends Pick<
   /**
    * Compose, prove and submit one private transaction.
    *
-   * The callback receives the privacy SDK's own builder, unwrapped. Write
-   * exactly what the SDK documents. This method brackets it: it quotes the fee,
-   * waits for a provable block, appends the paymaster's fee withdrawal as the
-   * final action, proves, and submits through the paymaster's relayer so the
-   * account never appears on-chain.
+   * The callback receives the privacy SDK's builder. Use it as the SDK
+   * documents. This method adds the fee withdrawal, waits for a provable
+   * block, proves, and submits through the relayer. The account never appears
+   * on-chain, unless you pass `invoke`.
    *
-   * Pass {@link PrivacySendOptions.invoke} to carry public calls in the same
-   * transaction (an `approve` before a deposit typically). Those calls are
-   * relayed through the account's `execute_from_outside`, so they are signed and
-   * are not private. The private part still is.
+   * Pass {@link PrivacySendOptions.invoke} to include public calls, such as an
+   * `approve` before a deposit. Those calls name the account on-chain.
    *
-   * The callback may be `async`, and is awaited. Its return type is `unknown`
-   * rather than `void | Promise<void>` because the builder is fluent: callers
-   * naturally return it from a chain, and TypeScript's rule that a `void` return
-   * accepts any value does not extend to a union, so the narrower type would
-   * reject every chained callback.
+   * The callback can be `async`. It may return the builder, so its return type
+   * is `unknown`.
    *
-   * @param compose - Adds the operations to perform. Awaited, so it may be async
-   * @param options - SDK execute options, proving-block overrides, and any
-   *   public calls to relay
+   * @param compose - Adds the operations to perform
+   * @param options - SDK execute options, proving-block overrides and public
+   *   calls to relay
    * @returns The transaction hash, the relayer's tracking id when it gave one,
-   *   and the private state the transaction leaves behind. Nothing can look a
-   *   tracking id up later, so this is the only chance to record it.
+   *   and the private state after the transaction. Record the tracking id
+   *   now. Nothing can look it up later.
    *
    * @example
    * ```ts
@@ -253,15 +197,13 @@ export interface PrivacyClient extends Pick<
   ): Promise<PrivacySendResult>;
 
   /**
-   * Submit a proof you composed and generated yourself.
+   * Submit a proof you built yourself, for example a private swap built
+   * against {@link PrivacyClient.transfers}.
    *
-   * The escape hatch for flows this layer does not model, like a private swap
-   * built against {@link PrivacyClient.transfers}. You are responsible for
-   * having included the fee withdrawal from {@link PrivacyClient.quote}. The
-   * paymaster rejects a proof without it.
+   * The proof must include the fee withdrawal from
+   * {@link PrivacyClient.quote}. The paymaster rejects a proof without it.
    *
-   * A proof outside the pool's validity window is refused here rather than sent,
-   * so one that sat around too long costs nothing to discover.
+   * An expired proof is refused here, before it is sent.
    *
    * @param callAndProof - The pool call and its proof
    * @returns The transaction hash, and the relayer's tracking id when it gave one
@@ -270,8 +212,8 @@ export interface PrivacyClient extends Pick<
 }
 
 /**
- * What {@link withPaymaster} needs beyond the SDK client: a
- * {@link PrivacyPaymasterConfig}, plus the two things only the caller knows.
+ * What {@link withPaymaster} needs: a {@link PrivacyPaymasterConfig}, plus the
+ * pool, provider, chain and account.
  */
 export interface PaymasterBinding extends PrivacyPaymasterConfig {
   /** Pool the client is bound to. */
@@ -280,21 +222,13 @@ export interface PaymasterBinding extends PrivacyPaymasterConfig {
   provider: RpcProvider;
   /** Accept a plain `http://` `url` on a non-loopback host. See `PrivacyConfig.allowInsecureHttp`. */
   allowInsecureHttp?: boolean;
-  /**
-   * Chain this client is bound to. Used to check that typed data from the
-   * paymaster is bound to the same one before anything signs it.
-   */
+  /** Chain this client is bound to. Typed data from the paymaster must match it. */
   chainId: ChainId;
   /**
-   * The account behind the client, needed only to relay public calls alongside
-   * the private transaction. See {@link PrivacySendOptions.invoke}.
+   * The account behind the client. Needed only for
+   * {@link PrivacySendOptions.invoke}.
    *
-   * Address and signer travel together deliberately: a signature is worthless
-   * without knowing which account it is for, and the paymaster builds the typed
-   * data from the address before there is anything to sign.
-   *
-   * Nothing else on this client needs it. Private transactions are authorised by
-   * the proof alone, which is what keeps the account off-chain.
+   * Private transactions do not need it. The proof alone authorises them.
    */
   account?: {
     /** Account the relayed calls belong to. Must support SNIP-9. */
@@ -308,9 +242,8 @@ export interface PaymasterBinding extends PrivacyPaymasterConfig {
  * Add fee handling, block sequencing and paymaster submission to a raw privacy
  * SDK client.
  *
- * `connectPrivacy` returns an already-bound client; this is for code that
- * called {@link createPrivacy} directly and now wants the same behaviour
- * without reimplementing the fee dance.
+ * `connectPrivacy` does this for you. Use this function when you called
+ * {@link createPrivacy} directly.
  *
  * @param transfers - The privacy SDK client, e.g. from {@link createPrivacy}
  * @param binding - Pool, paymaster endpoint, fee mode and provider
@@ -329,41 +262,29 @@ export function withPaymaster(
   });
   const pool = fromAddress(binding.poolContractAddress);
 
-  // Hash of this client's most recent submission. A proof must read pool state
-  // that already includes it, otherwise the next transaction spends notes the
-  // proof still believes are unspent, and the pool rejects it. Tracked here so
-  // callers do not have to.
+  // Hash of this client's last submission. The next proof must read pool state
+  // that includes it, or the pool rejects it.
   let lastSubmittedTxHash: string | undefined;
 
-  // Settles once everything queued so far has finished.
+  // Resolves when all queued work has finished.
   let queue: Promise<void> = Promise.resolve();
 
   /**
    * Run one build-prove-submit at a time.
    *
-   * Two proofs cannot be built at once on one client, whatever they contain. The
-   * SDK fetches the pool nonce once and caches it, so overlapping proofs share a
-   * nonce and one is stale before it is submitted. They also share the checkpoint
-   * that says which block to prove from. Two transfers of different tokens still
-   * collide on both.
+   * One client cannot build two proofs at once. They would share the SDK's
+   * cached pool nonce and the proving checkpoint, and one would fail.
    *
-   * `submit` takes its turn too, even though its proof may have been built
-   * somewhere else entirely. Submitting writes that checkpoint, and a failed
-   * submit clears this client's nonce cache — which would strand a proof another
-   * send is halfway through building.
+   * `submit` is queued too. A failed submit clears the nonce cache, which
+   * would break a proof in progress.
    *
-   * Waiting is cheap next to that: a send takes minutes, and the pool accepts a
-   * proof for hundreds of blocks.
-   *
-   * Scope is this client, meaning one account and one pool. Separate accounts get
-   * separate clients and never wait on each other, and reads are not queued at
-   * all. What a queue cannot cover is a reload, which starts with no memory of a
-   * send from moments before.
+   * The scope is one client, so one account and one pool. Reads are not
+   * queued. A page reload loses the queue.
    */
   function sequenced<T>(work: () => Promise<T>): Promise<T> {
-    // Wait for the current queue, then become the thing others wait for.
+    // Wait for the queue, then become the next item in it.
     const result = queue.then(work);
-    // Tracks completion, not success: one failed send must not block the next.
+    // Track completion, not success. A failed send must not block the next one.
     queue = result.then(
       () => undefined,
       () => undefined
@@ -372,20 +293,12 @@ export function withPaymaster(
   }
 
   /**
-   * Refuse a sponsored fee larger than the one the pool itself publishes.
+   * Refuse a sponsored fee larger than the one the pool publishes on chain.
    *
-   * Under `sponsored` the relayer fronts the gas, so the withdrawal is the pool
-   * fee and nothing else — and the pool exposes that figure on chain. Reading it
-   * makes the amount the one part of a quote that does not rest on trusting the
-   * endpoint, and it caps what a substituted fee recipient could ever collect.
+   * Only `sponsored` mode has a published figure to compare against. The
+   * other modes include gas or a token conversion the pool does not know.
    *
-   * Only that mode. `default` mixes in a gas ceiling the pool knows nothing
-   * about, and `sponsored_private` converts the fee into another token at a rate
-   * that is not on chain, so neither has a published figure to compare against.
-   *
-   * A quote *below* the published fee is left alone: the pool refuses an
-   * underpaid fee itself, so that direction costs the relayer rather than the
-   * caller.
+   * A quote below the published fee is accepted. The pool refuses it itself.
    */
   async function assertWithinPublishedFee(
     feeAction: PrivacyFeeQuote["feeAction"]
@@ -407,9 +320,7 @@ export function withPaymaster(
       }
       published = amount;
     } catch (error) {
-      // Reported, not fatal. This is a second opinion on the fee, and a read
-      // that could not be taken is a reason to say so rather than to fail a
-      // transaction the paymaster already priced.
+      // A warning, not an error. This is only a second check on the fee.
       console.warn(
         "[starkzap] Could not read the pool's own fee to check the quote " +
           `against it: ${error instanceof Error ? error.message : String(error)}`
@@ -438,10 +349,7 @@ export function withPaymaster(
   /**
    * Turn requested calls into a {@link PrivacyInvoke} plus the signer for it.
    *
-   * The two are returned together so the signing step cannot be reached without
-   * the signer that made the request valid. Checked before quoting, so a client
-   * with no signer fails on the request itself rather than after a round trip
-   * that returns typed data nothing can sign.
+   * Checked before quoting, so a client with no signer fails at once.
    */
   function resolveInvoke(calls: Call[] | undefined):
     | {
@@ -473,9 +381,8 @@ export function withPaymaster(
   /**
    * Append the paymaster's fee withdrawal as the final action.
    *
-   * The forwarder collects its fee from this withdrawal, so a proof without it is
-   * rejected (code 165). A zero amount means the deployment charges nothing, and
-   * the withdrawal is then omitted rather than sent as a no-op transfer.
+   * The paymaster rejects a proof without it (code 165). A zero fee adds no
+   * action.
    */
   function appendFeeWithdrawal(
     builder: PrivateTransfersBuilder,
@@ -491,15 +398,13 @@ export function withPaymaster(
   async function previousBlock(wait?: ProvableBlockOptions): Promise<number> {
     if (lastSubmittedTxHash === undefined) return -1;
 
-    // Bounded, because the hash is the relayer's word: one it returns but never
-    // broadcasts is never found, and every later send on this client queues
-    // behind this wait. The same budget the caller gave the block wait, spent as
-    // starknet.js counts it -- one poll per interval.
+    // Bounded. The relayer may return a hash it never broadcasts, and later
+    // sends queue behind this wait. Use the same budget as the block wait.
     const pollIntervalMs = wait?.pollIntervalMs ?? 2_000;
     const timeoutMs = wait?.timeoutMs ?? 300_000;
 
-    // `errorStates: []` so a reverted previous transaction does not fail *this*
-    // send: it still occupies a block, and ageing that block is harmless.
+    // `errorStates: []` so a reverted previous transaction does not fail this
+    // send. It still occupies a block.
     const receipt = await binding.provider.waitForTransaction(
       lastSubmittedTxHash,
       {
@@ -512,11 +417,8 @@ export function withPaymaster(
   }
 
   /**
-   * The block a proof would use if it could be built right now.
-   *
-   * One chain-head read, no polling — the non-waiting counterpart to
-   * {@link resolveProvingBlock}. Clamped at 0 so a chain shallower than the depth
-   * window yields a block that exists rather than a negative one.
+   * The block a proof would use right now. One chain-head read, no waiting.
+   * Never below 0.
    */
   async function provableBlockNow(): Promise<number> {
     const head = await binding.provider.getBlockNumber();
@@ -528,10 +430,8 @@ export function withPaymaster(
   ): Promise<number> {
     const previous = await previousBlock(options?.wait);
 
-    // The caller's block is used only if it already includes our last
-    // transaction. An older one would prove against state that still shows the
-    // notes it spent, which the pool rejects. Waiting for a later block instead
-    // is safe: what the wait helpers check stays true as the chain grows.
+    // Use the caller's block only if it already includes our last transaction.
+    // Otherwise wait for a later block.
     if (
       options?.provingBlockId !== undefined &&
       options.provingBlockId >= previous
@@ -547,14 +447,12 @@ export function withPaymaster(
   }
 
   /**
-   * @param callAndProof - The pool's `apply_actions` call and its proof, as
-   *   returned by the builder's `execute()`. The fee withdrawal has to be among
-   *   the actions already: the proof commits to them, so it cannot be amended
-   *   here, and the paymaster rejects a proof without one (code 165).
-   * @param parameters - The `parameters` of the quote whose fee this proof
-   *   already commits to. Omitted only by the public {@link PrivacyClient.submit}
-   *   entry point, which has no quote of its own and so fetches one.
-   * @param invoke - Signed public calls, when the same quote wrapped any.
+   * @param callAndProof - The pool call and its proof, from the builder's
+   *   `execute()`. It must already include the fee withdrawal.
+   * @param parameters - The `parameters` of the quote this proof commits to.
+   *   Omitted only by the public {@link PrivacyClient.submit}, which fetches a
+   *   fresh quote.
+   * @param invoke - Signed public calls, when the quote wrapped any.
    */
   async function submit(
     callAndProof: CallAndProof,
@@ -572,22 +470,19 @@ export function withPaymaster(
       const submission = await paymaster.execute(
         callAndProof.call,
         callAndProof.proof,
-        // Echoed rather than rebuilt: `parameters` carry server-chosen fields
-        // (tip, time bounds) that the paymaster expects back verbatim.
+        // Sent back unchanged. `parameters` carry fields the paymaster chose,
+        // such as tip and time bounds.
         parameters ?? (await quote()).parameters,
         invoke
       );
       lastSubmittedTxHash = submission.transactionHash;
       return submission;
     } catch (error) {
-      // The pool nonce baked into a failed invocation is now stale. Clearing it
-      // makes the *next* attempt clean.
+      // The pool nonce in the failed invocation is now stale. Clear it so the
+      // next attempt is clean.
       //
-      // Not retried here, and a retry has to mean *re-proving*: the paymaster
-      // remembers the calls it has seen, so re-submitting this same proof answers
-      // `156 :: execution error Tx already sent` rather than trying again.
-      // Proving is slow and spends prover budget, so whether to pay for it twice
-      // is the caller's decision.
+      // No retry here. The paymaster remembers this proof, so a retry must
+      // re-prove. That is slow and costs prover budget, so the caller decides.
       transfers.invalidateProofNonceCache();
       throw error;
     }
@@ -605,8 +500,7 @@ export function withPaymaster(
     invalidateProofNonceCache: () => transfers.invalidateProofNonceCache(),
     quote,
 
-    // Both entry points that write `lastSubmittedTxHash` go through the queue, so
-    // a caller mixing the two still gets one proof at a time.
+    // Both writers of `lastSubmittedTxHash` go through the queue.
     submit: (callAndProof) => sequenced(() => submit(callAndProof)),
 
     send: (compose, options) => sequenced(() => sendOnce(compose, options)),
@@ -619,18 +513,12 @@ export function withPaymaster(
     const relay = resolveInvoke(options?.invoke);
     const { feeAction } = await quote(relay?.invoke);
 
-    // The block `send` would prove at, resolved without waiting for it. It has
-    // to be resolved at all: the SDK discovers recipient channels and notes *at
-    // the proving block*, so simulating against the chain head would report the
-    // warnings of a different transaction than the one submitted — and a
-    // recipient who registered within the last few blocks would pass here and
-    // then fail proving with no channel context.
+    // Resolve the block `send` would prove at, without waiting for it. The SDK
+    // discovers channels and notes at that block, so the chain head would give
+    // the wrong warnings.
     //
-    // Deliberately not `resolveProvingBlock`: that one waits for the previous
-    // private transaction to age, and this call is documented as waiting for no
-    // block and safe to run while a send is in flight. The cost is that a
-    // simulation run inside that window sees a slightly older block than the
-    // send will prove against.
+    // Not `resolveProvingBlock`. That one waits for the previous transaction,
+    // and this call must not wait.
     const provingBlockId =
       options?.provingBlockId ?? (await provableBlockNow());
 
@@ -644,8 +532,7 @@ export function withPaymaster(
       autoSelectNotes: "naive",
       ...sdkOptions,
       provingBlockId,
-      // Nothing built here is submitted, so a registry the caller passed is left
-      // untouched and the copy is dropped.
+      // Nothing is submitted, so the caller's registry stays untouched.
       registryConst: true,
     });
 
@@ -656,9 +543,8 @@ export function withPaymaster(
       node: binding.provider,
     });
 
-    // Same callback as `send`, and this is the path its documentation points at:
-    // here the warnings arrive before anything has been paid for. Returned as
-    // well, so a caller can have them either way.
+    // Same callback as `send`. Here the warnings arrive before anything is paid
+    // for. They are also returned.
     if (warnings.length > 0 && options?.onWarnings) {
       await options.onWarnings(warnings);
     }
@@ -673,16 +559,12 @@ export function withPaymaster(
     const relay = resolveInvoke(options?.invoke);
     const { feeAction, parameters, typedData } = await quote(relay?.invoke);
 
-    // Signed here, before the wait and the proof, rather than after: the
-    // signature does not depend on the proof, and asking for it first means a
-    // user who declines has not already paid for proving. The typed data is
-    // valid for a window the paymaster sets which comfortably outlasts the
-    // block wait plus proving. If a chain ever slow enough to blow that
-    // window turns up, the paymaster rejects the `execute` cleanly rather
-    // than anything landing half-done.
+    // Sign before the wait and the proof. A user who declines has then paid
+    // nothing. The typed data stays valid long enough for the wait and the
+    // proving. If it expires, the paymaster rejects the `execute`.
     //
-    // `typedData` is echoed exactly as received: the signature covers those
-    // bytes, and the paymaster picks the nonce, so rebuilding it invalidates it.
+    // `typedData` is sent back unchanged. The signature covers those exact
+    // bytes.
     const signedInvoke: PrivacySignedInvoke | undefined =
       relay && typedData
         ? {
@@ -701,21 +583,14 @@ export function withPaymaster(
       ...sdkOptions
     } = options ?? {};
     const builder = transfers.build({
-      // Defaulted because the fee withdrawal appended below is in the
-      // paymaster's token, which the caller never has to name. Without a
-      // selection strategy the builder finds no notes to pay it from and the
-      // whole transaction fails for insufficient balance while the notes sit
-      // there unused. Listed first so a caller can choose another strategy, and
-      // notes named explicitly on the builder still win over both.
+      // The fee withdrawal below is in the paymaster's token. Without a
+      // selection strategy the builder finds no notes to pay it. Listed first,
+      // so the caller can override it.
       autoSelectNotes: "naive",
       ...sdkOptions,
       provingBlockId,
-      // Compiling resolves the private state this transaction will produce, and
-      // it happens before the proof exists. So a caller who keeps a registry has
-      // it written by attempts that go on to fail at proving or submission. This
-      // compiles against a copy instead, returned below for the caller to adopt
-      // once they are satisfied. Forced, not defaulted: the return value promises
-      // their registry is untouched.
+      // Compile against a copy of the registry. A failed attempt then never
+      // writes to the caller's registry. The copy is returned below.
       registryConst: true,
     });
 
@@ -725,10 +600,9 @@ export function withPaymaster(
 
     const { callAndProof, warnings, registry } = await builder.execute();
 
-    // The SDK's clone copies channels and notes but not the discovery cursor, so
-    // a caller who adopts this registry -- the flow this result documents -- would
-    // silently restart scanning from genesis. Their own cursor is carried over,
-    // and only when this run did not set a newer one.
+    // The SDK's clone drops the discovery cursor. Without it, a caller who
+    // adopts this registry would rescan from genesis. Carry the caller's cursor
+    // over when this run did not set a newer one.
     if (
       registry.cursor === undefined &&
       options?.registry?.cursor !== undefined
@@ -736,9 +610,8 @@ export function withPaymaster(
       registry.cursor = options.registry.cursor;
     }
 
-    // Reported rather than acted on. The SDK raises `USER_LINKAGE` for a
-    // transaction that may connect the user's private and public identities,
-    // and only the caller knows whether that is acceptable here.
+    // Reported, not acted on. Only the caller knows whether a `USER_LINKAGE`
+    // warning is acceptable.
     if (warnings.length > 0 && options?.onWarnings) {
       await options.onWarnings(warnings);
     }

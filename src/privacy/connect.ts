@@ -8,41 +8,33 @@ import {
 import { withPaymaster, type PrivacyClient } from "@/privacy/client";
 
 /**
- * One client per wallet, so repeated calls neither re-derive the viewing key nor
- * ask the user to sign again.
+ * One client per wallet, so repeated calls do not derive the viewing key again.
  *
- * Keyed weakly: a wallet that goes out of scope takes its client with it. The
- * promise is cached rather than the client, so concurrent callers share one
- * derivation instead of racing.
+ * The promise is cached, so concurrent callers share one derivation.
  */
 const clients = new WeakMap<Wallet, Promise<PrivacyClient>>();
 
 /**
  * Privacy pool client for a wallet, bound to the paymaster that submits for it.
  *
- * The client owns the pool fee, the proving block and submission — see
- * {@link PrivacyClient}. Submission goes through the paymaster's relayer, so the
- * account never appears on chain; self-submitting would defeat the point.
+ * The client handles the pool fee, the proving block and the submission. See
+ * {@link PrivacyClient}. The relayer submits, so the account never appears on
+ * chain, unless you pass `invoke` to `send`.
  *
  * ## Versus `createPrivacy`
  *
- * Both derive the same viewing key from the same signer. The difference is what
- * they return and who cleans up:
- *
- * | | `connectPrivacy` | `createPrivacy` |
+ * | Aspect | `connectPrivacy` | `createPrivacy` |
  * | --- | --- | --- |
- * | Returns | this wrapper: fee, proving block, relayed submission | the privacy SDK's own `PrivateTransfersInterface`, unwrapped |
+ * | Returns | this wrapper | the SDK's own `PrivateTransfersInterface` |
  * | Submission | through the paymaster's relayer | yours to arrange |
- * | Cached per wallet | yes | no — each call derives again |
- * | Revoked on `wallet.disconnect()` | **yes, automatically** | **no — call `revokePrivacy` yourself** |
+ * | Cached per wallet | yes | no |
+ * | Revoked on `wallet.disconnect()` | yes | no, call `revokePrivacy` yourself |
  *
- * Reach for `createPrivacy` when you need the SDK's own surface, for a flow this
- * wrapper does not model — a private swap, say. Everything else wants this
- * function. Either way the viewing key must not outlive the session that
- * authorised it, which this one handles for you.
+ * Use `createPrivacy` only for a flow this wrapper does not model, such as a
+ * private swap.
  *
  * @param wallet - Locally-signed wallet whose signer derives the viewing key
- * @param config - Pool, services and paymaster. Read once per wallet: later
+ * @param config - Pool, services and paymaster. Read once per wallet. Later
  *   calls return the cached client and ignore it.
  * @returns The paymaster-bound client, cached for this wallet
  * @throws If `config.paymaster` is missing
@@ -60,8 +52,7 @@ const clients = new WeakMap<Wallet, Promise<PrivacyClient>>();
  *   paymaster: {
  *     url: "https://paymaster.example.com",
  *     fee: { mode: "sponsored" },
- *     // Both required: the ceiling on what a quote may withdraw, and the
- *     // forwarder addresses allowed to receive it.
+ *     // Both required. See `PrivacyPaymasterConfig`.
  *     maxFee: 10n ** 19n,
  *     allowedFeeRecipients: [FORWARDER],
  *   },
@@ -71,7 +62,7 @@ const clients = new WeakMap<Wallet, Promise<PrivacyClient>>();
  *   b.with(STRK, (t) => t.transfer({ recipient: bob, amount })).surplusTo(wallet.address)
  * );
  *
- * // Revoked with the session, no bookkeeping required.
+ * // Revokes the privacy client too.
  * await wallet.disconnect();
  * ```
  */
@@ -83,15 +74,14 @@ export async function connectPrivacy(
   if (cached) return cached;
 
   const building = build(wallet, config).catch((error: unknown) => {
-    // Not cached on failure: a missing dependency or an unreachable service
-    // should be retryable once fixed.
+    // Not cached on failure, so the caller can retry.
     clients.delete(wallet);
     throw error;
   });
   clients.set(wallet, building);
 
-  // Registered before the client exists, so a disconnect during derivation still
-  // revokes the key it was deriving.
+  // Registered before the client exists, so a disconnect during derivation
+  // still revokes the key.
   wallet.addRevocable(async () => {
     clients.delete(wallet);
     await building.then(
@@ -100,9 +90,7 @@ export async function connectPrivacy(
     );
   });
 
-  // Lets `wallet.execute({ proof })` read this pool's own proof validity window
-  // rather than falling back to a built-in one. Parsed here because the config
-  // takes a plain string, and this is the boundary where it becomes an address.
+  // Lets `wallet.execute({ proof })` read this pool's proof validity window.
   wallet.setPrivacyPool(fromAddress(config.poolContractAddress));
 
   return building;
@@ -113,22 +101,18 @@ async function build(
   wallet: Wallet,
   config: PrivacyConfig
 ): Promise<PrivacyClient> {
-  // One check, not several: `PrivacyPaymasterConfig` carries the endpoint, the
-  // fee mode and the two quote bounds together, so there is no half-configured
-  // state to reject. The fee mode is never defaulted — `default` needs no API
-  // key but its withdrawal takes the suggested *maximum* gas rather than the
-  // estimate, so choosing it unasked would overcharge on the user's behalf.
+  // The fee mode is never defaulted. `default` mode overcharges compared to
+  // `sponsored`, so the caller must choose.
   if (!config.paymaster) {
     throw new Error(
-      "[starkzap] Privacy transactions are submitted by a paymaster's relayer, " +
-        "so `privacy.paymaster` is required. Use `{ url, fee: { mode: " +
-        '"sponsored" }, maxFee, allowedFeeRecipients }` (relayer pays gas, pool ' +
-        "fee in STRK — needs an API key, so point `url` at a proxy holding it), " +
-        'or `{ url, fee: { mode: "default", gasToken }, maxFee, ' +
+      "[starkzap] `privacy.paymaster` is required. A paymaster's relayer " +
+        "submits private transactions. Use `{ url, fee: { mode: " +
+        '"sponsored" }, maxFee, allowedFeeRecipients }` (the relayer pays gas ' +
+        "and needs an API key, so point `url` at a proxy that holds it), or " +
+        '`{ url, fee: { mode: "default", gasToken }, maxFee, ' +
         "allowedFeeRecipients }` (no key, but the withdrawal takes the full " +
-        "suggested-max gas rather than refunding the unused part). `maxFee` caps " +
-        "what a quote may withdraw and `allowedFeeRecipients` names who may " +
-        "receive it; both are required."
+        "suggested-max gas). `maxFee` caps what a quote may withdraw. " +
+        "`allowedFeeRecipients` names who may receive it. Both are required."
     );
   }
 
@@ -140,9 +124,7 @@ async function build(
     provider: wallet.getProvider(),
     chainId: wallet.getChainId(),
     ...(config.allowInsecureHttp && { allowInsecureHttp: true }),
-    // Only for `send({ invoke })`, which relays public calls alongside the
-    // private transaction. The private path never signs: the proof authorises
-    // it, which is what keeps this account off-chain.
+    // Only for `send({ invoke })`. The private path never signs.
     account: {
       address: wallet.address,
       signTypedData: (typedData) => wallet.signMessage(typedData),

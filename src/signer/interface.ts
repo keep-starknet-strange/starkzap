@@ -3,14 +3,11 @@ import type { Signature } from "starknet";
 /**
  * Which account, chain and pool a viewing key belongs to.
  *
- * Every field is folded into the derivation, so two pools, two chains or two
- * accounts never share a key. Felts are normalised before use, so `0x040...`
- * and `0x40...` are the same pool.
+ * Every field is part of the derivation, so two pools, two chains or two
+ * accounts never share a key. Felts are normalised, so `0x040...` and
+ * `0x40...` are the same pool.
  *
- * Declared here rather than with the privacy code because
- * {@link SignerInterface.deriveViewingKey} takes it: a signer has to be able to
- * name this type to implement the method, and signers are written against the
- * root entry point.
+ * Declared here because {@link SignerInterface.deriveViewingKey} takes it.
  */
 export interface ViewingKeyContext {
   /** Chain id as a felt hex string, e.g. `0x534e5f4d41494e` for `SN_MAIN`. */
@@ -54,26 +51,18 @@ export interface SignerInterface {
   /**
    * Derive the STRK20 viewing key for this account, inside the signer.
    *
-   * Optional, but required by the privacy pool: it is how the viewing key is
-   * produced, and there is no fallback that only signs. The key comes from a
-   * purpose-bound KDF over the account's own private scalar, so no signature is
-   * produced and nothing exists that could be requested and turned back into the
-   * key. See {@link https://github.com/starknet-io/SNIPs/pull/177|SNIP-44}, whose
-   * `account-leaf-v1` profile this implements;
-   * `deriveAccountLeafViewingKey` is exported so an implementation does not have
-   * to reproduce it.
+   * Optional, but the privacy pool needs it. The key is a KDF over the
+   * account's private key, as defined by
+   * {@link https://github.com/starknet-io/SNIPs/pull/177|SNIP-44}
+   * `account-leaf-v1`. Use the exported `deriveAccountLeafViewingKey` to
+   * implement it.
    *
-   * Implementations **must** be deterministic — same context, same key, forever,
-   * on every device — and must keep the account private key inside the signer.
-   * They must not expose a general KDF oracle keyed by that key: the domain
-   * separator and the input structure are fixed by the profile, not chosen by
-   * the caller.
+   * Implementations must be deterministic. The same context must give the same
+   * key on every device, forever. The private key must stay inside the signer.
    *
-   * Left undefined by signers that cannot run a KDF over their key material,
-   * such as remote signers that only sign. Privacy features refuse those with a
-   * clear error rather than deriving from a signature, which would disclose the
-   * viewing key to anyone who obtained one. Such a signer can still be used by
-   * passing a `viewingKeyDerivation` of your own.
+   * Leave it undefined for a signer that cannot run a KDF, such as a remote
+   * signer. Privacy features then refuse that signer with a clear error. To use
+   * it anyway, pass your own `viewingKeyDerivation`.
    *
    * @param context - Chain, account, pool and key slot to bind the key to
    * @returns The viewing key as a 0x-hex string, in the pool's canonical range
