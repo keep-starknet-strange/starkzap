@@ -19,7 +19,7 @@ const clients = new WeakMap<Wallet, Promise<PrivacyClient>>();
  *
  * The client handles the pool fee, the proving block and the submission. See
  * {@link PrivacyClient}. The relayer submits, so the account never appears on
- * chain.
+ * chain, unless you pass `invoke` to `send`.
  *
  * ## Versus `createPrivacy`
  *

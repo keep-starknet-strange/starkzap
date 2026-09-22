@@ -161,10 +161,10 @@ export interface PrivacyClient extends Pick<
    * The callback receives the privacy SDK's builder. Use it as the SDK
    * documents. This method adds the fee withdrawal, waits for a provable
    * block, proves, and submits through the relayer. The account never appears
-   * on-chain.
+   * on-chain, unless you pass `invoke`.
    *
    * Pass {@link PrivacySendOptions.invoke} to include public calls, such as an
-   * `approve` before a deposit.
+   * `approve` before a deposit. Those calls name the account on-chain.
    *
    * The callback can be `async`. It may return the builder, so its return type
    * is `unknown`.

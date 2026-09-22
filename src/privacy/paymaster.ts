@@ -6,8 +6,9 @@ import { assertSafeHttpUrl } from "@/utils";
 /**
  * How the fee for a private transaction is paid.
  *
- * In every mode the relayer submits the transaction, so the user's account
- * never appears on-chain. The fee always comes from the shielded balance.
+ * In every mode the relayer submits the transaction. The user's account never
+ * appears on-chain, unless the transaction wraps public calls with `invoke`.
+ * The fee always comes from the shielded balance.
  *
  * - `default`: the user pays gas and the pool fee in `gasToken`. The
  *   withdrawal is sized at the paymaster's suggested maximum, not its
@@ -800,8 +801,9 @@ export class PrivacyPaymaster {
   /**
    * Submit a proven private transaction.
    *
-   * No user signature is needed. The proof alone authorises the transaction,
-   * so the user's account stays off-chain.
+   * No user signature is needed for the pool action. The proof alone
+   * authorises it, so the user's account stays off-chain. Wrapped `invoke`
+   * calls are the exception. They are signed and they name the account.
    *
    * The response may carry a `tracking_id`. Record it now. Nothing can look it
    * up later, and a relayer operator asks for it when a transaction misbehaves.

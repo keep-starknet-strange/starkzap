@@ -79,8 +79,9 @@ const sleep = (ms: number, signal?: AbortSignal): Promise<void> =>
  * Wait until a block is old enough to prove against, and return the block
  * number to prove at.
  *
- * State a proof reads must be at least {@link PROOF_BASE_BLOCK_DEPTH} blocks
- * older than the proof's base block. So call this after:
+ * The proving block is `depth` blocks behind the chain head, with
+ * {@link PROOF_BASE_BLOCK_DEPTH} as the default. State a proof reads must be in
+ * a block before the proving block. So call this after:
  *
  * - a previous private transaction, before proving the next one;
  * - deploying the account, before `register()`;

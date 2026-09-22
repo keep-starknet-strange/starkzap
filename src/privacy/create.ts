@@ -148,7 +148,8 @@ export interface PrivacyConfig {
   proofInvocationFactory?: CreatePrivateTransfersParams["proofInvocationFactory"];
   /**
    * Submission through a paymaster's relayer. This keeps the account
-   * off-chain. See {@link PrivacyPaymasterConfig}.
+   * off-chain, except for calls you relay with `invoke`. See
+   * {@link PrivacyPaymasterConfig}.
    *
    * {@link createPrivacy} itself ignores it. `connectPrivacy` and
    * `withPaymaster` require it.
