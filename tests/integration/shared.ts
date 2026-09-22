@@ -39,27 +39,6 @@ export async function fund(
   return result;
 }
 
-export function forkRPC(version: string): string | null {
-  const env = process.env.FORK_NETWORK;
-  if (!env) {
-    return null;
-  }
-  const url = new URL(env);
-
-  // Pattern to match /rpc/v{major}_{minor} at the end of pathname
-  const rpcVersionPattern = /\/rpc\/v\d+_\d+$/;
-
-  if (rpcVersionPattern.test(url.pathname)) {
-    // Replace existing version
-    url.pathname = url.pathname.replace(rpcVersionPattern, `/rpc/${version}`);
-  } else {
-    // Append version (remove trailing slash if present)
-    url.pathname = url.pathname.replace(/\/$/, "") + `/rpc/${version}`;
-  }
-
-  return url.toString();
-}
-
 export type TestConfig = {
   rpcUrl: string;
   chainId: ChainIdLiteral;

@@ -1,4 +1,9 @@
-import type { Call, Calldata, PaymasterTimeBounds } from "starknet";
+import type {
+  BigNumberish,
+  Call,
+  Calldata,
+  PaymasterTimeBounds,
+} from "starknet";
 import type { SignerInterface } from "@/signer/interface";
 import type { SwapProvider } from "@/swap/interface";
 import type { DcaProvider } from "@/dca/interface";
@@ -196,8 +201,43 @@ export type DeployOptions = TransactionFeeOptions;
 
 // ─── Execute ─────────────────────────────────────────────────────────────────
 
+/**
+ * A validity proof carried by the transaction, not by a call.
+ *
+ * The sequencer verifies the proof before the pool contract runs. So the proof
+ * travels as transaction-level fields and cannot be batched with other calls.
+ *
+ * Structurally the same as the privacy SDK's `Proof`, so `callAndProof.proof`
+ * can be passed as is.
+ */
+export interface TransactionProof {
+  /** Proof data produced by the proving service. */
+  data: string;
+  /** Proof facts the sequencer hands to the contract. */
+  proofFacts: BigNumberish[];
+}
+
 /** Options for `wallet.execute()` */
-export type ExecuteOptions = TransactionFeeOptions;
+export type ExecuteOptions = TransactionFeeOptions & {
+  /**
+   * Validity proof to attach to the transaction.
+   *
+   * Self-submitting a proof reveals the sender. The chain records your address
+   * as the one that performed the private operation. Requires
+   * `unsafeUserPays`.
+   *
+   * Prefer a privacy paymaster, as `connectPrivacy` does. Then the relayer's
+   * account appears on-chain instead of yours.
+   */
+  proof?: TransactionProof;
+  /**
+   * Accept that self-submitting {@link ExecuteOptions.proof} reveals the
+   * sender, and send anyway.
+   *
+   * Meant for devnet and integration tests, which have no paymaster.
+   */
+  unsafeUserPays?: boolean;
+};
 
 // ─── Preflight ───────────────────────────────────────────────────────────────
 

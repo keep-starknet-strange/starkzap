@@ -178,6 +178,39 @@ export interface BridgingConfig {
    */
   layerZeroApiKey?: string;
 
+  /**
+   * Layerswap API key for Layerswap bridge support.
+   *
+   * Required for bridging tokens via Layerswap and for bridge token
+   * discovery (`getBridgingTokens`), which sources Layerswap-bridgeable
+   * tokens from the Layerswap API. If undefined, Layerswap discovery is omitted.
+   */
+  layerswapApiKey?: string;
+
+  /**
+   * Custom Layerswap API base URL.
+   *
+   * Defaults to `https://api.layerswap.io` when omitted.
+   */
+  layerswapBaseUrl?: string;
+
+  /**
+   * Starknet contracts Layerswap may call in a withdrawal, besides the bridge
+   * token.
+   *
+   * Layerswap delivers the Starknet side of a withdrawal as calls the user's
+   * wallet signs as-is. The SDK requires a `transfer` on the bridge token and
+   * refuses any other call unless its contract is listed here. Unset or empty,
+   * nothing else is signed: a deposit action carrying a helper call fails
+   * before signing, naming the address, and the withdrawal is not sent.
+   *
+   * Before enabling a Layerswap route, inspect its deposit action, confirm
+   * which Layerswap contracts it calls and why, and list those addresses.
+   * Compared by value, so padding does not matter. Listing the bridge token
+   * itself changes nothing: calls on it must be `transfer` regardless.
+   */
+  layerswapAllowedContracts?: readonly Address[];
+
   /** Custom Ethereum JSON-RPC endpoint used for gas estimation in Ethereum bridges. */
   ethereumRpcUrl?: string;
 
@@ -251,6 +284,19 @@ export interface SDKConfig {
   network?: NetworkName | NetworkPreset;
   /** Starknet JSON-RPC endpoint URL (overrides network preset) */
   rpcUrl?: string;
+  /**
+   * Accept plain `http://` URLs on hosts other than loopback.
+   *
+   * Applies to `rpcUrl`, the Cartridge controller and RPC URLs, and the Privy
+   * `serverUrl`. Loopback hosts are always accepted, so a local devnet or proxy
+   * on `localhost` needs nothing. Set this only for a trusted network such as a
+   * LAN devnet reached from a device or emulator; everything sent over plain
+   * http is readable in transit. The privacy module has its own flag on
+   * `PrivacyConfig`, since its URLs carry the viewing key.
+   *
+   * @default false
+   */
+  allowInsecureHttp?: boolean;
   /** Target chain (overrides network preset) */
   chainId?: ChainId;
   /** Optional: custom paymaster config (default: AVNU paymaster) */

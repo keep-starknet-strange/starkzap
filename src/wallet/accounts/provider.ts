@@ -1,5 +1,5 @@
 import { hash, num, type Calldata } from "starknet";
-import type { PAYMASTER_API } from "@starknet-io/starknet-types-010";
+import type { PAYMASTER_API } from "@starknet-io/starknet-types-0103";
 import { OpenZeppelinPreset } from "@/account";
 import type { SignerInterface } from "@/signer";
 import { type Address, fromAddress } from "@/types";

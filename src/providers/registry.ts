@@ -13,7 +13,16 @@ export class ProviderRegistry<T extends Identifiable> {
   private readonly providers = new Map<string, T>();
   private defaultId: string | null = null;
 
-  constructor(private readonly domain: string) {}
+  /**
+   * @param domain - Human-readable domain name used in error messages.
+   * @param emptyDefaultHint - Optional guidance appended when no default is
+   *   configured (e.g. how to register a provider and which optional peer
+   *   dependency it needs).
+   */
+  constructor(
+    private readonly domain: string,
+    private readonly emptyDefaultHint?: string
+  ) {}
 
   /** Register a provider. Optionally make it the default. */
   register(provider: T, makeDefault = false): void {
@@ -43,7 +52,10 @@ export class ProviderRegistry<T extends Identifiable> {
   /** Return the default provider. Throws if none is configured. */
   getDefault(): T {
     if (!this.defaultId) {
-      throw new Error(`No default ${this.domain} provider configured`);
+      throw new Error(
+        `No default ${this.domain} provider configured` +
+          (this.emptyDefaultHint ? `. ${this.emptyDefaultHint}` : "")
+      );
     }
     return this.get(this.defaultId);
   }

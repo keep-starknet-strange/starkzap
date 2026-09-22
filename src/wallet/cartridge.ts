@@ -23,6 +23,7 @@ import {
   type StakingConfig,
 } from "@/types";
 import {
+  assertProofUnsupported,
   checkDeployed,
   ensureWalletReady,
   normalizeFeeMode,
@@ -105,6 +106,8 @@ export interface CartridgeWalletOptions {
   timeBounds?: PaymasterTimeBounds;
   explorer?: ExplorerConfig;
   logging?: LoggerConfig;
+  /** Accept plain `http://` on non-loopback hosts. See `SDKConfig.allowInsecureHttp`. */
+  allowInsecureHttp?: boolean;
 }
 
 /**
@@ -187,10 +190,9 @@ export class CartridgeWallet extends BaseWallet {
     }
 
     if (options.rpcUrl) {
-      const rpcUrl = assertSafeHttpUrl(
-        options.rpcUrl,
-        "Cartridge RPC URL"
-      ).toString();
+      const rpcUrl = assertSafeHttpUrl(options.rpcUrl, "Cartridge RPC URL", {
+        allowInsecureHttp: options.allowInsecureHttp,
+      }).toString();
       controllerOptions.chains = [{ rpcUrl }];
     }
 
@@ -205,7 +207,8 @@ export class CartridgeWallet extends BaseWallet {
     if (options.url) {
       controllerOptions.url = assertSafeHttpUrl(
         options.url,
-        "Cartridge controller URL"
+        "Cartridge controller URL",
+        { allowInsecureHttp: options.allowInsecureHttp }
       ).toString();
     }
 
@@ -237,7 +240,8 @@ export class CartridgeWallet extends BaseWallet {
 
     const nodeUrl = assertSafeHttpUrl(
       options.rpcUrl ?? controller.rpcUrl(),
-      "Cartridge RPC URL"
+      "Cartridge RPC URL",
+      { allowInsecureHttp: options.allowInsecureHttp }
     ).toString();
     const provider = new RpcProvider({ nodeUrl });
 
@@ -318,6 +322,8 @@ export class CartridgeWallet extends BaseWallet {
   async execute(calls: Call[], options: ExecuteOptions = {}): Promise<Tx> {
     const feeMode = normalizeFeeMode(options.feeMode ?? this.defaultFeeMode);
     const timeBounds = options.timeBounds ?? this.defaultTimeBounds;
+
+    assertProofUnsupported(options.proof, "CartridgeWallet");
 
     let transaction_hash: string;
 

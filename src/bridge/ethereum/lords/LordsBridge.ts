@@ -1,11 +1,12 @@
 import { CanonicalEthereumBridge } from "@/bridge/ethereum/canonical/CanonicalEthereumBridge";
 import { ethereumAddress } from "@/bridge/ethereum/EtherToken";
-import type { EthereumTransactionDetails } from "@/bridge/ethereum/types";
+import type { EthereumTransactionDetails } from "@/bridge/ethereum/ethers-interop";
 import type { Address, ExternalAddress } from "@/types";
-import { Amount, EthereumBridgeToken } from "@/types";
-import type { EthereumWalletConfig } from "@/bridge/ethereum/types";
+import { Amount, ContractRoutedEthereumBridgeToken } from "@/types";
+import type { EthereumWalletConfig } from "@/bridge/ethereum/ethers-interop";
 import type { WalletInterface } from "@/wallet";
-import { type Call, CallData, RPC, uint256 } from "starknet";
+import { type Call, CallData, uint256 } from "starknet";
+import type { L1Message } from "@starknet-io/starknet-types-0103";
 import { FeeErrorCause } from "@/types/errors";
 import LORDS_BRIDGE_ABI from "@/abi/ethereum/lordsBridge.json";
 import { AutoWithdrawFeesHandler } from "@/bridge/utils/auto-withdraw-fees-handler";
@@ -13,7 +14,7 @@ import type { StarkZapLogger } from "@/logger";
 
 export class LordsBridge extends CanonicalEthereumBridge {
   constructor(
-    bridgeToken: EthereumBridgeToken,
+    bridgeToken: ContractRoutedEthereumBridgeToken,
     config: EthereumWalletConfig,
     starknetWallet: WalletInterface,
     autoWithdrawFeesHandler: AutoWithdrawFeesHandler,
@@ -68,7 +69,7 @@ export class LordsBridge extends CanonicalEthereumBridge {
   ): Promise<{ fee: Amount; l2FeeError?: FeeErrorCause }> {
     try {
       const { low, high } = uint256.bnToUint256(amount.toBase());
-      const l1Message: RPC.RPCSPEC010.L1Message = {
+      const l1Message: L1Message = {
         from_address: await ethereumAddress(this.bridge),
         to_address: this.bridgeToken.starknetBridge.toString(),
         entry_point_selector: "handle_deposit",

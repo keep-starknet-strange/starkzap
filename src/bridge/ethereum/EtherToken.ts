@@ -1,18 +1,21 @@
 import { Amount, type EthereumAddress, EthereumBridgeToken } from "@/types";
 import {
-  Contract,
-  type ContractTransaction,
-  getAddress,
-  type Provider,
-  type Signer,
-} from "ethers";
+  ExternalChain,
+  NATIVE_TOKEN_ADDRESS,
+} from "@/types/bridge/external-chain";
+import type { Contract, ContractTransaction, Provider, Signer } from "ethers";
 import ERC20_ABI from "@/abi/ethereum/erc20.json";
-import { type EthereumWalletConfig } from "@/bridge/ethereum/types";
-import { fromEthereumAddress } from "@/connect/ethersRuntime";
+import { type EthereumWalletConfig } from "@/bridge/ethereum/ethers-interop";
+import {
+  fromEthereumAddress,
+  loadEthers,
+  requireEthers,
+} from "@/connect/ethersRuntime";
 
 export async function ethereumAddress(
   contract: Contract
 ): Promise<EthereumAddress> {
+  const { getAddress } = await loadEthers("Ethereum token address");
   const target = contract.target;
   const address =
     typeof target === "string" ? target : await target.getAddress();
@@ -42,7 +45,13 @@ export function intoEthereumToken(
   bridgeToken: EthereumBridgeToken,
   config: EthereumWalletConfig
 ): EthereumTokenInterface {
-  return bridgeToken.id === "eth"
+  // Native ETH can be identified either by the canonical `"eth"` id or by a
+  // zero-address token (used by providers like Layerswap that assign their
+  // own ids like `"eth-layerswap"` while still referring to native ETH).
+  const isNativeEth =
+    bridgeToken.id === "eth" ||
+    bridgeToken.address === NATIVE_TOKEN_ADDRESS[ExternalChain.ETHEREUM];
+  return isNativeEth
     ? EtherToken.create(config.provider)
     : ERC20EthereumToken.create(bridgeToken.address, config.provider);
 }
@@ -55,6 +64,9 @@ export class ERC20EthereumToken implements EthereumTokenInterface {
   }>;
 
   public static create(address: EthereumAddress, provider: Provider) {
+    // Sync accessor is safe: the caller holds an ethers `Provider`, which
+    // cannot exist unless ethers has already been loaded.
+    const { Contract } = requireEthers("Ethereum ERC20 token");
     const contract = new Contract(address, ERC20_ABI, provider);
     return new ERC20EthereumToken(contract);
   }

@@ -54,9 +54,11 @@ describe("StarkSigner", () => {
 
       const signature = await signer.signRaw(hash);
 
-      expect(signature).toHaveLength(2);
-      expect(signature[0]).toMatch(/^0x[a-fA-F0-9]+$/);
-      expect(signature[1]).toMatch(/^0x[a-fA-F0-9]+$/);
+      expect(Array.isArray(signature)).toBe(true);
+      expect(signature as string[]).toHaveLength(2);
+      for (const felt of signature as string[]) {
+        expect(felt).toMatch(/^0x[a-fA-F0-9]+$/);
+      }
     });
 
     it("should produce consistent signatures for same hash", async () => {

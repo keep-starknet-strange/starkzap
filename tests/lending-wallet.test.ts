@@ -8,7 +8,14 @@ import type {
   TypedData,
 } from "starknet";
 import { BaseWallet } from "@/wallet/base";
-import { Amount, ChainId, fromAddress, type ExecuteOptions } from "@/types";
+import {
+  Amount,
+  ChainId,
+  fromAddress,
+  type ExecuteOptions,
+  type PreflightOptions,
+  type PreflightResult,
+} from "@/types";
 import type { LendingProvider } from "@/lending";
 import type { Tx } from "@/tx";
 import {
@@ -50,10 +57,7 @@ class TestWallet extends BaseWallet {
     return [] as unknown as Signature;
   }
 
-  async preflight(options: {
-    calls: Call[];
-    feeMode?: "user_pays" | { type: "paymaster"; gasToken?: string };
-  }) {
+  async preflight(options: PreflightOptions): Promise<PreflightResult> {
     return this.preflightSpy(options);
   }
 

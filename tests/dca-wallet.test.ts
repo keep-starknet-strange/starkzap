@@ -154,6 +154,14 @@ class TestWallet extends BaseWallet {
 }
 
 describe("BaseWallet DCA abstraction", () => {
+  it("throws an actionable error when no DCA provider is registered", async () => {
+    const wallet = new TestWallet();
+
+    await expect(wallet.dca().getOrders()).rejects.toThrow(
+      /No default DCA provider configured.*registerProvider/s
+    );
+  });
+
   it("executes provider create calls with options", async () => {
     const provider = createDcaProvider();
     const wallet = new TestWallet(provider);

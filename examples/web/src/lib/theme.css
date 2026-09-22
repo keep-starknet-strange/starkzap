@@ -1,0 +1,67 @@
+/* One source of truth for colors, spacing and radii — mirrors mobile's theme
+   (src/theme/index.ts). Light is the default; dark via prefers-color-scheme. */
+:root {
+  --bg: #f6f7f9;
+  --card: #ffffff;
+  --text: #0b0d12;
+  --text-muted: #6b7280;
+  --border: #e4e7ec;
+  --primary: #111827;
+  --primary-text: #ffffff;
+  --accent: #3b5bff;
+  --danger: #dc2626;
+  --success: #16a34a;
+  --scrim: rgba(0, 0, 0, 0.4);
+
+  --sp-xs: 4px;
+  --sp-sm: 8px;
+  --sp-md: 12px;
+  --sp-lg: 16px;
+  --r-sm: 8px;
+  --r-md: 12px;
+  --r-lg: 16px;
+
+  --font-sans: "Outfit", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", monospace;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0b0d12;
+    --card: #15181f;
+    --text: #f3f4f6;
+    --text-muted: #9aa1ad;
+    --border: #262b35;
+    --primary: #f3f4f6;
+    --primary-text: #0b0d12;
+    --accent: #6f86ff;
+    --danger: #f87171;
+    --success: #4ade80;
+    --scrim: rgba(0, 0, 0, 0.5);
+  }
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html,
+body,
+#app {
+  height: 100%;
+}
+
+body {
+  font-family: var(--font-sans);
+  background: var(--bg);
+  color: var(--text);
+  -webkit-font-smoothing: antialiased;
+}
+
+input,
+button,
+select {
+  font-family: inherit;
+}

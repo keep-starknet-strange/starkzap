@@ -50,6 +50,18 @@ describe("Troves", () => {
       );
     });
 
+    it("names a null body instead of failing on the first field read", async () => {
+      const wallet = createMockWallet();
+      const fetcher = vi.fn().mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve(null),
+      });
+      const troves = new Troves(wallet, { fetcher: fetcher as typeof fetch });
+      await expect(troves.getStats()).rejects.toThrow(
+        "Troves API returned an unexpected body for /api/stats"
+      );
+    });
+
     it("should throw on Sepolia without an apiBase override", () => {
       const wallet = createMockWallet(ChainId.SEPOLIA);
       expect(() => new Troves(wallet)).toThrow(

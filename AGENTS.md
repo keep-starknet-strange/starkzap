@@ -58,7 +58,7 @@ Transition rules:
 
 <parallelization>
 SAFE TO PARALLELIZE:
-- Docs changes in `mintlify-docs/` vs SDK logic in `src/`
+- JSDoc-only edits vs SDK logic in `src/`
 - Independent modules (`src/erc20/` vs `src/staking/`) when exports do not overlap
 - Test additions in separate files from implementation files
 

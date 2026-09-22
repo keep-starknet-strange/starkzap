@@ -28,7 +28,7 @@ describe("Staking.getPosition", () => {
 
     const position = await Staking.prototype.getPosition.call(
       stakingLike,
-      rawAddress
+      rawAddress as Address
     );
 
     expect(getPoolMemberInfo).toHaveBeenCalledWith(normalizedAddress);

@@ -5,13 +5,13 @@ import {
   Amount,
   type ExternalTransactionResponse,
   type SolanaAddress,
-  type SolanaBridgeToken,
+  type ContractRoutedSolanaBridgeToken,
 } from "@/types";
 import { FeeErrorCause } from "@/types/errors";
 import type {
-  SolanaDepositFeeEstimation,
-  SolanaWithdrawFeeEstimation,
+  HyperlaneFeeEstimate,
   SolanaWalletConfig,
+  SolanaWithdrawFeeEstimation,
 } from "@/bridge/solana/types";
 import type { WalletInterface } from "@/wallet";
 import type { Tx } from "@/tx";
@@ -39,7 +39,7 @@ const SOLANA_RENT_ESTIMATE = BigInt(Math.round(0.00411336 * 1e9));
 
 export class SolanaHyperlaneBridge implements BridgeInterface<SolanaAddress> {
   private constructor(
-    private readonly bridgeToken: SolanaBridgeToken,
+    private readonly bridgeToken: ContractRoutedSolanaBridgeToken,
     private readonly config: SolanaWalletConfig,
     readonly starknetWallet: WalletInterface,
     private readonly hyperlane: HyperlaneRuntime,
@@ -52,7 +52,7 @@ export class SolanaHyperlaneBridge implements BridgeInterface<SolanaAddress> {
   ) {}
 
   public static async create(
-    bridgeToken: SolanaBridgeToken,
+    bridgeToken: ContractRoutedSolanaBridgeToken,
     config: SolanaWalletConfig,
     starknetWallet: WalletInterface
   ): Promise<SolanaHyperlaneBridge> {
@@ -128,13 +128,13 @@ export class SolanaHyperlaneBridge implements BridgeInterface<SolanaAddress> {
     return { hash: lastSignature };
   }
 
-  async getDepositFeeEstimate(): Promise<SolanaDepositFeeEstimation> {
+  async getDepositFeeEstimate(): Promise<HyperlaneFeeEstimate> {
     const interchainResult = await this.estimateDepositInterchainFee();
     const localResult = await this.estimateDepositLocalFee(
       interchainResult.interchainFee
     );
 
-    const estimate: SolanaDepositFeeEstimation = {
+    const estimate: HyperlaneFeeEstimate = {
       localFee: this.solAmount(localResult.localFee.amount),
       interchainFee: this.solAmount(interchainResult.interchainFee.amount),
     };

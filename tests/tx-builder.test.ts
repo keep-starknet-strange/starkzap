@@ -12,7 +12,7 @@ import type { WalletInterface } from "@/wallet/interface";
 import type { Call } from "starknet";
 import type { Staking } from "@/staking";
 import type { SwapProvider } from "@/swap";
-import type { ConfidentialProvider } from "@/confidential";
+import type { TongoConfidential } from "@/confidential";
 import {
   testLendingCollateralToken as mockSTRK,
   testLendingDebtToken as mockUSDC,
@@ -261,11 +261,11 @@ describe("TxBuilder", () => {
               quote: { amountInBase: 1n, amountOutBase: 2n },
             }),
           } as unknown as SwapProvider,
-          chainId: { toLiteral: () => "SN_SEPOLIA" } as unknown,
+          chainId: ChainId.SEPOLIA,
           tokenIn: mockUSDC,
           tokenOut: mockSTRK,
           amountIn: amount,
-        } as unknown)
+        })
       ).toBe(builder);
       expect(builder.stake(poolAddress, amount)).toBe(builder);
       expect(builder.enterPool(poolAddress, amount)).toBe(builder);
@@ -273,28 +273,22 @@ describe("TxBuilder", () => {
       expect(builder.claimPoolRewards(poolAddress)).toBe(builder);
       expect(builder.exitPoolIntent(poolAddress, amount)).toBe(builder);
       expect(builder.exitPool(poolAddress)).toBe(builder);
-      expect(builder.lendDeposit({ token: mockUSDC, amount } as unknown)).toBe(
-        builder
-      );
-      expect(builder.lendWithdraw({ token: mockUSDC, amount } as unknown)).toBe(
-        builder
-      );
-      expect(builder.lendWithdrawMax({ token: mockUSDC } as unknown)).toBe(
-        builder
-      );
+      expect(builder.lendDeposit({ token: mockUSDC, amount })).toBe(builder);
+      expect(builder.lendWithdraw({ token: mockUSDC, amount })).toBe(builder);
+      expect(builder.lendWithdrawMax({ token: mockUSDC })).toBe(builder);
       expect(
         builder.lendBorrow({
           collateralToken: mockSTRK,
           debtToken: mockUSDC,
           amount,
-        } as unknown)
+        })
       ).toBe(builder);
       expect(
         builder.lendRepay({
           collateralToken: mockSTRK,
           debtToken: mockUSDC,
           amount,
-        } as unknown)
+        })
       ).toBe(builder);
       expect(
         builder.dcaCreate({
@@ -395,8 +389,7 @@ describe("TxBuilder", () => {
         .approve(mockUSDC, dexAddress, amount)
         .calls();
 
-      expect(calls).toHaveLength(1);
-      expect(calls[0].entrypoint).toBe("approve");
+      expect(calls.map((c) => c.entrypoint)).toEqual(["approve"]);
       expect(wallet.erc20).toHaveBeenCalledWith(mockUSDC);
     });
   });
@@ -410,8 +403,7 @@ describe("TxBuilder", () => {
         .transfer(mockUSDC, { to: alice, amount })
         .calls();
 
-      expect(calls).toHaveLength(1);
-      expect(calls[0].entrypoint).toBe("transfer");
+      expect(calls.map((c) => c.entrypoint)).toEqual(["transfer"]);
 
       const erc20 = wallet.erc20(mockUSDC);
       expect(erc20.populateTransfer).toHaveBeenCalledWith([
@@ -834,9 +826,10 @@ describe("TxBuilder", () => {
       expect(mockStaking.isMember).toHaveBeenCalledWith(wallet);
       expect(mockStaking.populateEnter).toHaveBeenCalled();
       expect(mockStaking.populateAdd).not.toHaveBeenCalled();
-      expect(calls).toHaveLength(2);
-      expect(calls[0].entrypoint).toBe("approve");
-      expect(calls[1].entrypoint).toBe("enter_delegation_pool");
+      expect(calls.map((c) => c.entrypoint)).toEqual([
+        "approve",
+        "enter_delegation_pool",
+      ]);
     });
 
     it("should call populateAdd when wallet is already a member", async () => {
@@ -853,9 +846,10 @@ describe("TxBuilder", () => {
       expect(mockStaking.isMember).toHaveBeenCalledWith(wallet);
       expect(mockStaking.populateAdd).toHaveBeenCalled();
       expect(mockStaking.populateEnter).not.toHaveBeenCalled();
-      expect(calls).toHaveLength(2);
-      expect(calls[0].entrypoint).toBe("approve");
-      expect(calls[1].entrypoint).toBe("add_to_delegation_pool");
+      expect(calls.map((c) => c.entrypoint)).toEqual([
+        "approve",
+        "add_to_delegation_pool",
+      ]);
     });
 
     it("should propagate staking resolution errors", async () => {
@@ -881,9 +875,10 @@ describe("TxBuilder", () => {
 
       expect(wallet.staking).toHaveBeenCalledWith(poolAddress);
       // populateEnter returns [approveCall, enterPoolCall]
-      expect(calls).toHaveLength(2);
-      expect(calls[0].entrypoint).toBe("approve");
-      expect(calls[1].entrypoint).toBe("enter_delegation_pool");
+      expect(calls.map((c) => c.entrypoint)).toEqual([
+        "approve",
+        "enter_delegation_pool",
+      ]);
     });
   });
 
@@ -909,8 +904,7 @@ describe("TxBuilder", () => {
         .claimPoolRewards(poolAddress)
         .calls();
 
-      expect(calls).toHaveLength(1);
-      expect(calls[0].entrypoint).toBe("claim_rewards");
+      expect(calls.map((c) => c.entrypoint)).toEqual(["claim_rewards"]);
     });
   });
 
@@ -923,8 +917,9 @@ describe("TxBuilder", () => {
         .exitPoolIntent(poolAddress, amount)
         .calls();
 
-      expect(calls).toHaveLength(1);
-      expect(calls[0].entrypoint).toBe("exit_delegation_pool_intent");
+      expect(calls.map((c) => c.entrypoint)).toEqual([
+        "exit_delegation_pool_intent",
+      ]);
     });
   });
 
@@ -934,8 +929,9 @@ describe("TxBuilder", () => {
 
       const calls = await new TxBuilder(wallet).exitPool(poolAddress).calls();
 
-      expect(calls).toHaveLength(1);
-      expect(calls[0].entrypoint).toBe("exit_delegation_pool_action");
+      expect(calls.map((c) => c.entrypoint)).toEqual([
+        "exit_delegation_pool_action",
+      ]);
     });
   });
 
@@ -949,7 +945,7 @@ describe("TxBuilder", () => {
       const builder = new TxBuilder(wallet);
       const mockConfidential = {
         fund: vi.fn().mockResolvedValue([rawCall]),
-      } as unknown as ConfidentialProvider;
+      } as unknown as TongoConfidential;
 
       expect(
         builder.confidentialFund(mockConfidential, {
@@ -967,7 +963,7 @@ describe("TxBuilder", () => {
       };
       const mockConfidential = {
         fund: vi.fn().mockResolvedValue([fundCall]),
-      } as unknown as ConfidentialProvider;
+      } as unknown as TongoConfidential;
 
       const wallet = createMockWallet();
       const calls = await new TxBuilder(wallet)
@@ -994,7 +990,7 @@ describe("TxBuilder", () => {
       };
       const mockConfidential = {
         transfer: vi.fn().mockResolvedValue([transferCall]),
-      } as unknown as ConfidentialProvider;
+      } as unknown as TongoConfidential;
 
       const wallet = createMockWallet();
       const calls = await new TxBuilder(wallet)
@@ -1023,7 +1019,7 @@ describe("TxBuilder", () => {
       };
       const mockConfidential = {
         withdraw: vi.fn().mockResolvedValue([withdrawCall]),
-      } as unknown as ConfidentialProvider;
+      } as unknown as TongoConfidential;
 
       const wallet = createMockWallet();
       const calls = await new TxBuilder(wallet)
@@ -1042,7 +1038,7 @@ describe("TxBuilder", () => {
     it("should propagate populate errors through send", async () => {
       const mockConfidential = {
         fund: vi.fn().mockRejectedValue(new Error("proof generation failed")),
-      } as unknown as ConfidentialProvider;
+      } as unknown as TongoConfidential;
 
       const wallet = createMockWallet();
       const builder = new TxBuilder(wallet).confidentialFund(mockConfidential, {
@@ -1063,7 +1059,7 @@ describe("TxBuilder", () => {
       };
       const mockConfidential = {
         fund: vi.fn().mockResolvedValue([confidentialCall]),
-      } as unknown as ConfidentialProvider;
+      } as unknown as TongoConfidential;
 
       const wallet = createMockWallet();
       const amount = Amount.parse("100", mockUSDC);
@@ -1100,16 +1096,15 @@ describe("TxBuilder", () => {
         .enterPool(poolAddress, amount)
         .calls();
 
-      expect(calls).toHaveLength(5);
-      // raw call first
+      // Order matters: raw call, approve, transfer, then staking's approve + enter.
+      expect(calls.map((c) => c.entrypoint)).toEqual([
+        rawCall.entrypoint,
+        "approve",
+        "transfer",
+        "approve",
+        "enter_delegation_pool",
+      ]);
       expect(calls[0]).toEqual(rawCall);
-      // approve second
-      expect(calls[1].entrypoint).toBe("approve");
-      // transfer third
-      expect(calls[2].entrypoint).toBe("transfer");
-      // staking approve + enter last
-      expect(calls[3].entrypoint).toBe("approve");
-      expect(calls[4].entrypoint).toBe("enter_delegation_pool");
     });
 
     it("should handle multiple staking operations in parallel", async () => {

@@ -1,4 +1,8 @@
-import type { ChainId, ChainIdLiteral, SolanaBridgeToken } from "@/types";
+import type {
+  ChainId,
+  ChainIdLiteral,
+  ContractRoutedSolanaBridgeToken,
+} from "@/types";
 import type { SolanaWalletConfig } from "@/bridge";
 import type { HyperlaneRuntime } from "@/bridge/solana/hyperlaneRuntime";
 import type {
@@ -136,7 +140,7 @@ export function setupMultiProtocolProvider(
 }
 
 export function bridgeTokenToHyperlaneToken(
-  token: SolanaBridgeToken,
+  token: ContractRoutedSolanaBridgeToken,
   chainId: ChainId,
   hyperlaneChain: HyperlaneChain,
   hyperlane: HyperlaneRuntime

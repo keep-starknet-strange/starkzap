@@ -1,11 +1,8 @@
-import {
-  cancelDcaToCalls,
-  createDcaToCalls,
-  getDcaOrders,
+import type {
   DcaOrderStatus as AvnuDcaOrderStatus,
-  type DcaOrder as AvnuDcaOrder,
-  type DcaTrade as AvnuDcaTrade,
-  type PricingStrategy,
+  DcaOrder as AvnuDcaOrder,
+  DcaTrade as AvnuDcaTrade,
+  PricingStrategy,
 } from "@avnu/avnu-sdk";
 import type { Duration } from "moment";
 import { assertAmountMatchesToken, fromAddress, type ChainId } from "@/types";
@@ -24,20 +21,25 @@ import type {
 } from "@/dca/interface";
 import { validateDcaCreateAmounts } from "@/dca/utils";
 import {
-  DEFAULT_AVNU_API_BASES,
+  type AvnuApiBases,
+  type AvnuSdkModule,
+  loadAvnuSdk,
   normalizeAvnuCalls,
+  resolveAvnuApiBases,
   supportsAvnuChain,
   withAvnuApiBaseFallback,
 } from "@/utils/avnu";
+
+const AVNU_DCA_FEATURE = "AVNU DCA";
 
 function toHexAmount(value: bigint): string {
   return `0x${value.toString(16)}`;
 }
 
 const DCA_STATUS_TO_AVNU: Record<DcaOrderStatus, AvnuDcaOrderStatus> = {
-  INDEXING: AvnuDcaOrderStatus.INDEXING,
-  ACTIVE: AvnuDcaOrderStatus.ACTIVE,
-  CLOSED: AvnuDcaOrderStatus.CLOSED,
+  INDEXING: "INDEXING" as AvnuDcaOrderStatus,
+  ACTIVE: "ACTIVE" as AvnuDcaOrderStatus,
+  CLOSED: "CLOSED" as AvnuDcaOrderStatus,
 };
 
 export interface AvnuDcaProviderOptions {
@@ -178,26 +180,36 @@ function mapOrder(order: AvnuDcaOrder): DcaOrder {
 export class AvnuDcaProvider implements DcaProvider {
   readonly id = "avnu";
 
-  private readonly apiBases: Record<"SN_MAIN" | "SN_SEPOLIA", string[]>;
+  private readonly apiBaseOverrides: AvnuDcaProviderOptions["apiBases"];
+  private resolvedApiBases: AvnuApiBases | undefined;
 
   constructor(options: AvnuDcaProviderOptions = {}) {
-    this.apiBases = {
-      SN_MAIN: options.apiBases?.SN_MAIN ?? [...DEFAULT_AVNU_API_BASES.SN_MAIN],
-      SN_SEPOLIA: options.apiBases?.SN_SEPOLIA ?? [
-        ...DEFAULT_AVNU_API_BASES.SN_SEPOLIA,
-      ],
-    };
+    this.apiBaseOverrides = options.apiBases;
   }
 
   supportsChain(chainId: ChainId): boolean {
     return supportsAvnuChain(chainId);
   }
 
+  /**
+   * Load the avnu SDK (running the optional-peer-dependency check) and resolve
+   * the per-chain API bases from its URL constants on first use.
+   */
+  private async ready(): Promise<{
+    sdk: AvnuSdkModule;
+    apiBases: AvnuApiBases;
+  }> {
+    const sdk = await loadAvnuSdk(AVNU_DCA_FEATURE);
+    this.resolvedApiBases ??= resolveAvnuApiBases(sdk, this.apiBaseOverrides);
+    return { sdk, apiBases: this.resolvedApiBases };
+  }
+
   async getOrders(
     context: DcaProviderContext,
     request: DcaOrdersRequest
   ): Promise<DcaOrdersPage> {
-    const avnuRequest: Parameters<typeof getDcaOrders>[0] = {
+    const { sdk, apiBases } = await this.ready();
+    const avnuRequest: Parameters<AvnuSdkModule["getDcaOrders"]>[0] = {
       traderAddress: request.traderAddress,
     };
 
@@ -215,11 +227,11 @@ export class AvnuDcaProvider implements DcaProvider {
     }
 
     const page = await withAvnuApiBaseFallback({
-      apiBasesByChain: this.apiBases,
+      apiBasesByChain: apiBases,
       chainId: context.chainId,
       feature: "DCA",
       action: "get DCA orders",
-      run: (baseUrl) => getDcaOrders(avnuRequest, { baseUrl }),
+      run: (baseUrl) => sdk.getDcaOrders(avnuRequest, { baseUrl }),
     });
 
     return {
@@ -236,7 +248,8 @@ export class AvnuDcaProvider implements DcaProvider {
     request: DcaCreateRequest
   ): Promise<PreparedDcaAction> {
     validateCreateRequest(request);
-    const createRequest: Parameters<typeof createDcaToCalls>[0] = {
+    const { sdk, apiBases } = await this.ready();
+    const createRequest: Parameters<AvnuSdkModule["createDcaToCalls"]>[0] = {
       sellTokenAddress: request.sellToken.address,
       buyTokenAddress: request.buyToken.address,
       sellAmount: toHexAmount(request.sellAmount.toBase()),
@@ -250,12 +263,12 @@ export class AvnuDcaProvider implements DcaProvider {
     };
 
     const calls = await withAvnuApiBaseFallback({
-      apiBasesByChain: this.apiBases,
+      apiBasesByChain: apiBases,
       chainId: context.chainId,
       feature: "DCA",
       action: "prepare DCA create",
       run: async (baseUrl) => {
-        const response = await createDcaToCalls(createRequest, { baseUrl });
+        const response = await sdk.createDcaToCalls(createRequest, { baseUrl });
 
         return normalizeAvnuCalls(
           response.calls,
@@ -279,14 +292,15 @@ export class AvnuDcaProvider implements DcaProvider {
       throw new Error("AVNU DCA cancel requires an orderAddress");
     }
     const orderAddress = request.orderAddress;
+    const { sdk, apiBases } = await this.ready();
 
     const calls = await withAvnuApiBaseFallback({
-      apiBasesByChain: this.apiBases,
+      apiBasesByChain: apiBases,
       chainId: context.chainId,
       feature: "DCA",
       action: "prepare DCA cancel",
       run: async (baseUrl) => {
-        const response = await cancelDcaToCalls(orderAddress, { baseUrl });
+        const response = await sdk.cancelDcaToCalls(orderAddress, { baseUrl });
 
         return normalizeAvnuCalls(
           response.calls,

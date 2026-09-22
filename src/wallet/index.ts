@@ -28,14 +28,18 @@ import type {
   ProviderOptions,
   SDKConfig,
   StakingConfig,
+  TransactionProof,
 } from "@/types";
 import {
+  assertProofFresh,
+  assertProofSendable,
   checkDeployed,
   ensureWalletReady,
   normalizeFeeMode,
   paymasterDetails,
   preflightTransaction,
 } from "@/wallet/utils";
+import { PROOF_BASE_BLOCK_DEPTH } from "@/privacy/sequencing";
 import type { WalletInterface } from "@/wallet/interface";
 import { BaseWallet } from "@/wallet/base";
 import {
@@ -126,6 +130,18 @@ export class Wallet extends BaseWallet {
   private readonly explorerConfig: ExplorerConfig | undefined;
   private readonly defaultFeeMode: FeeMode;
   private readonly defaultTimeBounds: PaymasterTimeBounds | undefined;
+  /**
+   * Privacy pool this wallet's proofs are checked against, when one is known.
+   *
+   * Only the address, so this class does not depend on any privacy type. Set by
+   * `connectPrivacy` from `starkzap/privacy`.
+   */
+  private privacyPoolAddress: Address | undefined;
+  /**
+   * Teardown for capabilities that hold key material derived from this wallet's
+   * signer. Run by {@link Wallet.disconnect}.
+   */
+  private readonly revocable: Array<() => unknown> = [];
   private deployedCache: boolean | null = null;
   private deployedCacheExpiresAt = 0;
   private sponsoredDeployLock: Promise<void> | null = null;
@@ -502,10 +518,20 @@ export class Wallet extends BaseWallet {
     const feeMode = normalizeFeeMode(options.feeMode ?? this.defaultFeeMode);
     const timeBounds = options.timeBounds ?? this.defaultTimeBounds;
 
+    assertProofSendable(options.proof, feeMode, options.unsafeUserPays);
+    if (options.proof) {
+      await assertProofFresh(
+        options.proof,
+        this.provider,
+        PROOF_BASE_BLOCK_DEPTH,
+        this.privacyPoolAddress
+      );
+    }
+
     const transactionHash =
       feeMode !== "user_pays"
         ? await this.executeSponsored(calls, timeBounds, feeMode.gasToken)
-        : await this.executeUserPays(calls);
+        : await this.executeUserPays(calls, options.proof);
 
     return new Tx(
       transactionHash,
@@ -515,14 +541,21 @@ export class Wallet extends BaseWallet {
     );
   }
 
-  private async executeUserPays(calls: Call[]): Promise<string> {
+  private async executeUserPays(
+    calls: Call[],
+    proof?: TransactionProof
+  ): Promise<string> {
     const deployed = await this.isDeployed();
     if (!deployed) {
       throw new Error(
         'Account is not deployed. Call wallet.ensureReady({ deploy: "if_needed" }) before execute() in user_pays mode.'
       );
     }
-    return (await this.account.execute(calls)).transaction_hash;
+
+    const details = proof
+      ? { proof: proof.data, proofFacts: proof.proofFacts }
+      : undefined;
+    return (await this.account.execute(calls, details)).transaction_hash;
   }
 
   private executePaymaster(
@@ -607,6 +640,41 @@ export class Wallet extends BaseWallet {
   }
 
   /**
+   * Get the {@link AccountProvider} backing this wallet.
+   *
+   * It exposes the signer, which the privacy pool's viewing key is derived
+   * from. `CartridgeWallet` has no equivalent.
+   */
+  getAccountProvider(): AccountProvider {
+    return this.accountProvider;
+  }
+
+  /**
+   * Register teardown to run when this wallet disconnects.
+   *
+   * `connectPrivacy` uses this, so the viewing key does not outlive the
+   * session.
+   *
+   * @param teardown - Run once on {@link Wallet.disconnect}. Awaited. A
+   *   rejection is swallowed, so one teardown cannot fail the disconnect.
+   */
+  addRevocable(teardown: () => unknown): void {
+    this.revocable.push(teardown);
+  }
+
+  /**
+   * Privacy pool whose proof validity window {@link Wallet.execute} reads.
+   *
+   * Set by `connectPrivacy`. Without it, only the lower bound of the window is
+   * checked.
+   *
+   * @param poolContractAddress - The pool this wallet's proofs are built against
+   */
+  setPrivacyPool(poolContractAddress: Address): void {
+    this.privacyPoolAddress = poolContractAddress;
+  }
+
+  /**
    * Estimate the fee for executing calls.
    *
    * @example
@@ -621,9 +689,31 @@ export class Wallet extends BaseWallet {
     return this.account.estimateInvokeFee(calls);
   }
 
+  /**
+   * Release what this wallet handed out, such as privacy clients.
+   *
+   * The wallet itself stays usable. It still signs and sends, and
+   * `connectPrivacy` builds a fresh client on the next call. To end a session
+   * for real, drop the wallet and build a new one on the next login.
+   */
   override async disconnect(): Promise<void> {
     await super.disconnect();
     this.clearDeploymentCache();
+
+    // Revoke, do not just forget. A privacy client the caller still holds
+    // would otherwise keep its viewing key.
+    //
+    // Rejections are swallowed, so one teardown cannot fail the disconnect.
+    const pending = this.revocable.splice(0);
+    await Promise.all(
+      pending.map(async (teardown) => {
+        try {
+          await teardown();
+        } catch {
+          // Swallowed on purpose. See above.
+        }
+      })
+    );
   }
 }
 

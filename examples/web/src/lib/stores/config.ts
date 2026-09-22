@@ -1,0 +1,381 @@
+import {
+  ChainId,
+  OpenZeppelinPreset,
+  ArgentPreset,
+  ArgentXV050Preset,
+  BraavosPreset,
+  DevnetPreset,
+  fromAddress,
+  type AccountClassConfig,
+} from "starkzap";
+import { type PrivacyConfig, type PrivacyFeeMode } from "starkzap/privacy";
+
+// App-level configuration: network resolution + env-derived endpoints.
+// Ported from the old main.ts config section (unchanged behavior).
+
+export type AppNetwork = "mainnet" | "sepolia";
+
+const NETWORK_QUERY_PARAM = "network";
+const NETWORK_STORAGE_KEY = "starkzap:web:network";
+
+const env = import.meta.env;
+const ALCHEMY_API_KEY = env.VITE_ALCHEMY_API_KEY as string | undefined;
+const SOLANA_RPC_URL = env.VITE_SOLANA_RPC_URL as string | undefined;
+
+const DEFAULT_RPC_URLS: Record<AppNetwork, string> = {
+  mainnet: ALCHEMY_API_KEY
+    ? `https://starknet-mainnet.g.alchemy.com/starknet/version/rpc/v0_10/${ALCHEMY_API_KEY}`
+    : "https://api.cartridge.gg/x/starknet/mainnet/rpc/v0_9",
+  sepolia: ALCHEMY_API_KEY
+    ? `https://starknet-sepolia.g.alchemy.com/starknet/version/rpc/v0_10/${ALCHEMY_API_KEY}`
+    : "https://api.cartridge.gg/x/starknet/sepolia/rpc/v0_9",
+};
+
+function normalizeNetwork(value: string | null | undefined): AppNetwork | null {
+  const n = value?.toLowerCase();
+  return n === "mainnet" || n === "sepolia" ? n : null;
+}
+
+const ENV_NETWORK =
+  normalizeNetwork(env.VITE_NETWORK as string | undefined) ?? "sepolia";
+
+function readStoredNetwork(): AppNetwork | null {
+  try {
+    return normalizeNetwork(localStorage.getItem(NETWORK_STORAGE_KEY));
+  } catch {
+    return null;
+  }
+}
+
+function persistSelectedNetwork(network: AppNetwork): void {
+  try {
+    if (network === ENV_NETWORK) localStorage.removeItem(NETWORK_STORAGE_KEY);
+    else localStorage.setItem(NETWORK_STORAGE_KEY, network);
+  } catch {
+    // ignore storage failures; fall back to query/env config
+  }
+}
+
+function readQueryNetwork(): AppNetwork | null {
+  return normalizeNetwork(
+    new URLSearchParams(location.search).get(NETWORK_QUERY_PARAM)
+  );
+}
+
+function resolveConfiguredNetwork(): AppNetwork {
+  const q = readQueryNetwork();
+  if (q) {
+    persistSelectedNetwork(q);
+    return q;
+  }
+  return readStoredNetwork() ?? ENV_NETWORK;
+}
+
+export const NETWORK = resolveConfiguredNetwork();
+export const CHAIN_ID =
+  NETWORK === "mainnet" ? ChainId.MAINNET : ChainId.SEPOLIA;
+
+const SHARED_RPC_URL = env.VITE_RPC_URL as string | undefined;
+const MAINNET_RPC_URL = env.VITE_MAINNET_RPC_URL as string | undefined;
+const SEPOLIA_RPC_URL = env.VITE_SEPOLIA_RPC_URL as string | undefined;
+
+function resolveRpcUrl(network: AppNetwork): string {
+  if (network === "mainnet") {
+    return (
+      MAINNET_RPC_URL ??
+      (ENV_NETWORK === "mainnet" ? SHARED_RPC_URL : undefined) ??
+      DEFAULT_RPC_URLS.mainnet
+    );
+  }
+  return (
+    SEPOLIA_RPC_URL ??
+    (ENV_NETWORK === "sepolia" ? SHARED_RPC_URL : undefined) ??
+    DEFAULT_RPC_URLS.sepolia
+  );
+}
+
+export const RPC_URL = resolveRpcUrl(NETWORK);
+
+export const PRIVY_SERVER_URL =
+  (env.VITE_PRIVY_SERVER_URL as string | undefined) ?? "http://localhost:3001";
+
+// Paymaster (gas sponsorship) endpoint — point it at a proxy that holds the AVNU
+// API key, never at AVNU directly, or the key ships in the bundle. Unset means no
+// paymaster: starknet.js then falls back to AVNU's public endpoint, muted, and
+// always the *Sepolia* one whatever the chain — so sponsored mode is unusable.
+//
+// Per network, because each AVNU deployment only whitelists its own privacy
+// pool: send a mainnet pool to the Sepolia paymaster and it answers "privacy
+// pool address is not whitelisted". Same precedence as the RPC URLs above — the
+// network-specific key wins, and the shared one only applies to VITE_NETWORK.
+export const PAYMASTER_NODE_URL =
+  (NETWORK === "mainnet"
+    ? (env.VITE_PAYMASTER_PROXY_URL_MAINNET as string | undefined)
+    : (env.VITE_PAYMASTER_PROXY_URL_SEPOLIA as string | undefined)
+  )?.trim() ||
+  (ENV_NETWORK === NETWORK
+    ? (env.VITE_PAYMASTER_PROXY_URL as string | undefined)?.trim()
+    : undefined);
+
+// Reown/WalletConnect project id — enables the bridge's external wallet connect.
+export const REOWN_PROJECT_ID = env.VITE_REOWN_PROJECT_ID as string | undefined;
+
+// Privy client credentials — enable in-browser Privy login (email OTP). The
+// browser authenticates with Privy to get an access token, which the example
+// server verifies. Both are required for the web Privy flow.
+export const PRIVY_APP_ID = env.VITE_PRIVY_APP_ID as string | undefined;
+export const PRIVY_CLIENT_ID = env.VITE_PRIVY_CLIENT_ID as string | undefined;
+
+// Auto-connect: when VITE_PRIVATE_KEY is set the app signs in on load with this
+// key + preset (VITE_ACCOUNT_PRESET, default openzeppelin). VITE_NETWORK above
+// selects the network.
+export const AUTO_PRIVATE_KEY = env.VITE_PRIVATE_KEY as string | undefined;
+export const AUTO_ACCOUNT_PRESET =
+  (env.VITE_ACCOUNT_PRESET as string | undefined) ?? "openzeppelin";
+
+// Account class presets selectable in the account screen.
+export const ACCOUNT_PRESETS: Record<string, AccountClassConfig> = {
+  openzeppelin: OpenZeppelinPreset,
+  argent: ArgentPreset,
+  argentx050: ArgentXV050Preset,
+  braavos: BraavosPreset,
+  devnet: DevnetPreset,
+};
+
+// Bridging endpoints (all optional; SDK only wires what's present).
+const OFT_PUBLIC_KEY = env.VITE_OFT_PUBLIC_KEY as string | undefined;
+const LAYERSWAP_API_KEY =
+  (NETWORK === "mainnet"
+    ? (env.VITE_LAYERSWAP_API_KEY_MAINNET as string | undefined)
+    : (env.VITE_LAYERSWAP_API_KEY_TESTNET as string | undefined)) ??
+  (env.VITE_LAYERSWAP_API_KEY as string | undefined);
+const LAYERSWAP_BASE_URL = env.VITE_LAYERSWAP_BASE_URL as string | undefined;
+// Starknet contracts Layerswap may call besides the bridge token, per network.
+// Unset, the SDK signs only the token transfer and refuses any helper call.
+// Inspect the route's deposit action before listing anything here.
+const LAYERSWAP_ALLOWED_CONTRACTS = pick(
+  env.VITE_LAYERSWAP_ALLOWED_CONTRACTS_MAINNET as string | undefined,
+  env.VITE_LAYERSWAP_ALLOWED_CONTRACTS_TESTNET as string | undefined
+)
+  ?.split(",")
+  .map((address) => fromAddress(address.trim()));
+
+const ETH_BRIDGING_RPC_URL = ALCHEMY_API_KEY
+  ? NETWORK === "mainnet"
+    ? `https://eth-mainnet.g.alchemy.com/v2/${ALCHEMY_API_KEY}`
+    : `https://eth-sepolia.g.alchemy.com/v2/${ALCHEMY_API_KEY}`
+  : undefined;
+
+// VITE_SOLANA_RPC_URL wins; else Alchemy (mainnet only — Alchemy serves only
+// solana-mainnet, and clusterApiUrl gets 403'd from browsers).
+const SOL_BRIDGING_RPC_URL =
+  SOLANA_RPC_URL ??
+  (NETWORK === "mainnet" && ALCHEMY_API_KEY
+    ? `https://solana-mainnet.g.alchemy.com/v2/${ALCHEMY_API_KEY}`
+    : undefined);
+
+export function buildBridgingConfig() {
+  if (
+    !ETH_BRIDGING_RPC_URL &&
+    !SOL_BRIDGING_RPC_URL &&
+    !OFT_PUBLIC_KEY &&
+    !LAYERSWAP_API_KEY
+  ) {
+    return undefined;
+  }
+  return {
+    ...(ETH_BRIDGING_RPC_URL && { ethereumRpcUrl: ETH_BRIDGING_RPC_URL }),
+    ...(SOL_BRIDGING_RPC_URL && { solanaRpcUrl: SOL_BRIDGING_RPC_URL }),
+    ...(OFT_PUBLIC_KEY && { layerZeroApiKey: OFT_PUBLIC_KEY }),
+    ...(LAYERSWAP_API_KEY && { layerswapApiKey: LAYERSWAP_API_KEY }),
+    ...(LAYERSWAP_BASE_URL && { layerswapBaseUrl: LAYERSWAP_BASE_URL }),
+    ...(LAYERSWAP_ALLOWED_CONTRACTS?.length && {
+      layerswapAllowedContracts: LAYERSWAP_ALLOWED_CONTRACTS,
+    }),
+  };
+}
+
+// Tongo confidential contract addresses per token (privacy feature).
+// Full list: https://docs.tongo.cash/protocol/contracts.html
+const TONGO_CONTRACTS_SEPOLIA: Record<string, string> = {
+  STRK: "0x408163bfcfc2d76f34b444cb55e09dace5905cf84c0884e4637c2c0f06ab6ed",
+  ETH: "0x2cf0dc1d9e8c7731353dd15e6f2f22140120ef2d27116b982fa4fed87f6fef5",
+  USDC: "0x2caae365e67921979a4e5c16dd70eaa5776cfc6a9592bcb903d91933aaf2552",
+  WBTC: "0x02b9f62f9be99590ad2505e9e89ca746c8fb67bdb6a4be2a1b9a1d867af7339e",
+};
+const TONGO_CONTRACTS_MAINNET: Record<string, string> = {
+  STRK: "0x3a542d7eb73b3e33a2c54e9827ec17a6365e289ec35ccc94dde97950d9db498",
+  ETH: "0x276e11a5428f6de18a38b7abc1d60abc75ce20aa3a925e20a393fcec9104f89",
+  WBTC: "0x6d82c8c467eac77f880a1d5a090e0e0094a557bf67d74b98ba1881200750e27",
+  "USDC.e": "0x72098b84989a45cc00697431dfba300f1f5d144ae916e98287418af4e548d96",
+  USDC: "0x026f79017c3c382148832c6ae50c22502e66f7a2f81ccbdb9e1377af31859d3a",
+  USDT: "0x659c62ba8bc3ac92ace36ba190b350451d0c767aa973dd63b042b59cc065da0",
+  DAI: "0x511741b1ad1777b4ad59fbff49d64b8eb188e2aeb4fc72438278a589d8a10d8",
+};
+export const TONGO_CONTRACTS = CHAIN_ID.isSepolia()
+  ? TONGO_CONTRACTS_SEPOLIA
+  : TONGO_CONTRACTS_MAINNET;
+
+// ─── STRK20 privacy pool ────────────────────────────────────────────────────
+//
+// One pool serves every token, so unlike Tongo there is no per-token contract —
+// just the pool plus the two services. All of it is per-network because the app
+// switches chains at runtime. See .env.example.
+
+function pick(mainnet: string | undefined, sepolia: string | undefined) {
+  return (CHAIN_ID.isSepolia() ? sepolia : mainnet)?.trim() || undefined;
+}
+
+const PRIVACY_POOL = pick(
+  env.VITE_PRIVACY_POOL_MAINNET as string | undefined,
+  env.VITE_PRIVACY_POOL_SEPOLIA as string | undefined
+);
+const PRIVACY_PROVER = pick(
+  env.VITE_PRIVACY_PROVER_MAINNET as string | undefined,
+  env.VITE_PRIVACY_PROVER_SEPOLIA as string | undefined
+);
+const PRIVACY_DISCOVERY = pick(
+  env.VITE_PRIVACY_DISCOVERY_MAINNET as string | undefined,
+  env.VITE_PRIVACY_DISCOVERY_SEPOLIA as string | undefined
+);
+const PRIVACY_OHTTP_RELAY = (
+  env.VITE_PRIVACY_OHTTP_RELAY as string | undefined
+)?.trim();
+
+// OHTTP defaults to on: without it the viewing key reaches the prover and
+// discovery service in plaintext (inside TLS, but readable by the operator).
+const PRIVACY_OHTTP =
+  (env.VITE_PRIVACY_OHTTP as string | undefined)?.trim() !== "false";
+
+/**
+ * Config for `connectPrivacy` / `createPrivacy`, or `undefined` when this
+ * network has no privacy endpoints set — the STRK20 tab then explains what is
+ * missing instead of failing at call time.
+ */
+// How the pool fee is paid. `sponsored` is the sane default: the relayer fronts
+// the gas and the user pays only the pool fee the deployment sets. `default`
+// needs no API key, but its withdrawal is sized at the paymaster's suggested
+// maximum rather than its estimate, so it covers headroom that may go unused.
+// The amounts, and the gap between the modes, move with the network and with
+// gas — quote the paymaster rather than trust a figure written here. `default`
+// needs a gas token, `sponsored_private` a pool-fee token.
+// `||` rather than `??`, and trimmed first: .env.example ships the key with an
+// empty value, which `??` treats as set and passes straight through.
+const PRIVACY_FEE_MODE =
+  (env.VITE_PRIVACY_FEE_MODE as string | undefined)?.trim() || "sponsored";
+const PRIVACY_FEE_TOKEN = (
+  env.VITE_PRIVACY_FEE_TOKEN as string | undefined
+)?.trim();
+
+function privacyFee(): PrivacyFeeMode | undefined {
+  const disabled = (why: string) => {
+    console.warn(`[example] STRK20 disabled: ${why}`);
+    return undefined;
+  };
+  const token = () =>
+    PRIVACY_FEE_TOKEN ? fromAddress(PRIVACY_FEE_TOKEN) : undefined;
+
+  // Matched exhaustively. An unrecognised value used to fall through to
+  // `sponsored_private`, so a typo silently selected the one mode that needs an
+  // API key and lets the user choose the fee token.
+  switch (PRIVACY_FEE_MODE) {
+    case "sponsored":
+      return { mode: "sponsored" };
+    case "default": {
+      const gasToken = token();
+      return gasToken
+        ? { mode: "default", gasToken }
+        : disabled("`default` fee mode needs VITE_PRIVACY_FEE_TOKEN");
+    }
+    case "sponsored_private": {
+      const poolFeeToken = token();
+      return poolFeeToken
+        ? { mode: "sponsored_private", poolFeeToken }
+        : disabled("`sponsored_private` fee mode needs VITE_PRIVACY_FEE_TOKEN");
+    }
+    default:
+      return disabled(
+        `VITE_PRIVACY_FEE_MODE="${PRIVACY_FEE_MODE}" is not one of sponsored, sponsored_private, default`
+      );
+  }
+}
+
+const PRIVACY_FEE = privacyFee();
+
+// Both required by the SDK. The ceiling caps what a quote may withdraw from the
+// shielded balance, in base units of the fee token; size it for the fee mode
+// (the flat pool fee under sponsored modes, pool fee plus suggested-max gas
+// under `default`). The recipients are the forwarder addresses your paymaster
+// operator gave you, comma-separated; a quote naming any other is refused.
+const PRIVACY_MAX_FEE = pick(
+  env.VITE_PRIVACY_MAX_FEE_MAINNET as string | undefined,
+  env.VITE_PRIVACY_MAX_FEE_SEPOLIA as string | undefined
+);
+const PRIVACY_FEE_RECIPIENTS = pick(
+  env.VITE_PRIVACY_FEE_RECIPIENTS_MAINNET as string | undefined,
+  env.VITE_PRIVACY_FEE_RECIPIENTS_SEPOLIA as string | undefined
+)
+  ?.split(",")
+  .map((address) => fromAddress(address.trim()));
+
+/**
+ * Env keys the STRK20 config still needs for this network. Empty when the
+ * config is complete, so the tab can name exactly what is missing.
+ */
+export const PRIVACY_CONFIG_MISSING: readonly string[] = (() => {
+  const suffix = NETWORK === "mainnet" ? "MAINNET" : "SEPOLIA";
+  return [
+    [PRIVACY_POOL, `VITE_PRIVACY_POOL_${suffix}`],
+    [PRIVACY_PROVER, `VITE_PRIVACY_PROVER_${suffix}`],
+    [PRIVACY_DISCOVERY, `VITE_PRIVACY_DISCOVERY_${suffix}`],
+    [PAYMASTER_NODE_URL, `VITE_PAYMASTER_PROXY_URL_${suffix}`],
+    [PRIVACY_FEE, "VITE_PRIVACY_FEE_MODE (see its comment)"],
+    [PRIVACY_MAX_FEE, `VITE_PRIVACY_MAX_FEE_${suffix}`],
+    [PRIVACY_FEE_RECIPIENTS?.length, `VITE_PRIVACY_FEE_RECIPIENTS_${suffix}`],
+  ]
+    .filter(([value]) => !value)
+    .map(([, key]) => key as string);
+})();
+
+export const PRIVACY_CONFIG: PrivacyConfig | undefined =
+  PRIVACY_CONFIG_MISSING.length === 0 &&
+  PRIVACY_POOL &&
+  PRIVACY_PROVER &&
+  PRIVACY_DISCOVERY &&
+  PAYMASTER_NODE_URL &&
+  PRIVACY_FEE &&
+  PRIVACY_MAX_FEE &&
+  PRIVACY_FEE_RECIPIENTS?.length
+    ? {
+        poolContractAddress: PRIVACY_POOL,
+        prover: PRIVACY_PROVER,
+        discovery: PRIVACY_DISCOVERY,
+        // Privacy transactions are submitted by the paymaster's relayer, so the
+        // account never appears on-chain. Same proxy as the sponsored toggle:
+        // it forwards any method with the API key attached.
+        paymaster: {
+          url: PAYMASTER_NODE_URL,
+          fee: PRIVACY_FEE,
+          maxFee: BigInt(PRIVACY_MAX_FEE),
+          allowedFeeRecipients: PRIVACY_FEE_RECIPIENTS,
+        },
+        // Dev builds may use a plain-http proxy on the LAN; production must not.
+        allowInsecureHttp: Boolean(env.DEV),
+        ohttp: PRIVACY_OHTTP
+          ? PRIVACY_OHTTP_RELAY
+            ? { relayUrl: PRIVACY_OHTTP_RELAY }
+            : true
+          : false,
+      }
+    : undefined;
+
+// Switch network by reloading with the query param — mirrors the old behavior
+// (a fresh SDK + wallet per network is simpler than live-rebuilding).
+export function switchNetwork(next: AppNetwork): void {
+  if (next === NETWORK) return;
+  persistSelectedNetwork(next);
+  const url = new URL(location.href);
+  if (next === ENV_NETWORK) url.searchParams.delete(NETWORK_QUERY_PARAM);
+  else url.searchParams.set(NETWORK_QUERY_PARAM, next);
+  location.replace(url.toString());
+}

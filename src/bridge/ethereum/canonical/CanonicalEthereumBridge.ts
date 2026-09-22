@@ -1,24 +1,27 @@
-import { EthereumBridge } from "@/bridge/ethereum/EthereumBridge";
+import { ContractRoutedEthereumBridge } from "@/bridge/ethereum/ContractRoutedEthereumBridge";
 import type {
   BridgeDepositOptions,
   EthereumDepositFeeEstimation,
   EthereumInitiateWithdrawFeeEstimation,
-  EthereumTransactionDetails,
-  EthereumWalletConfig,
   InitiateBridgeWithdrawOptions,
 } from "@/bridge";
+import type {
+  EthereumTransactionDetails,
+  EthereumWalletConfig,
+} from "@/bridge/ethereum/ethers-interop";
 import { DUMMY_L1_ADDRESS, DUMMY_SN_ADDRESS } from "@/bridge/ethereum/types";
 import {
   type Address,
   Amount,
+  ContractRoutedEthereumBridgeToken,
   type EthereumAddress,
-  EthereumBridgeToken,
   type ExternalAddress,
   type ExternalTransactionResponse,
 } from "@/types";
 import { ethereumAddress } from "@/bridge/ethereum/EtherToken";
-import { type ContractTransaction, type InterfaceAbi } from "ethers";
-import { type Call, CallData, RPC, uint256 } from "starknet";
+import type { ContractTransaction, InterfaceAbi } from "ethers";
+import { type Call, CallData, uint256 } from "starknet";
+import type { L1Message } from "@starknet-io/starknet-types-0103";
 import { FeeErrorCause } from "@/types/errors";
 import type { WalletInterface } from "@/wallet";
 import {
@@ -29,11 +32,11 @@ import CANONICAL_BRIDGE_ABI from "@/abi/ethereum/canonicalBridge.json";
 import type { Tx } from "@/tx";
 import type { StarkZapLogger } from "@/logger";
 
-export class CanonicalEthereumBridge extends EthereumBridge {
+export class CanonicalEthereumBridge extends ContractRoutedEthereumBridge {
   private static readonly DEFAULT_ESTIMATED_DEPOSIT_GAS_REQUIREMENT = 154744n;
 
   constructor(
-    bridgeToken: EthereumBridgeToken,
+    bridgeToken: ContractRoutedEthereumBridgeToken,
     config: EthereumWalletConfig,
     starknetWallet: WalletInterface,
     private readonly autoWithdrawFeesHandler: AutoWithdrawFeesHandler,
@@ -243,7 +246,7 @@ export class CanonicalEthereumBridge extends EthereumBridge {
   ): Promise<{ fee: Amount; l2FeeError?: FeeErrorCause }> {
     try {
       const { low, high } = uint256.bnToUint256(amount.toBase());
-      const l1Message: RPC.RPCSPEC010.L1Message = {
+      const l1Message: L1Message = {
         from_address: await ethereumAddress(this.bridge),
         to_address: this.bridgeToken.starknetBridge.toString(),
         entry_point_selector: "handle_token_deposit",

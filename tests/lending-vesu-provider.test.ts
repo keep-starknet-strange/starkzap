@@ -58,6 +58,40 @@ describe("VesuLendingProvider", () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
+  it("treats a null body as no markets and no positions", async () => {
+    // A CDN edge case can return the literal JSON `null`; that is an empty
+    // result, not a TypeError on `.data`.
+    const fetcher = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => null,
+    });
+    const provider = new VesuLendingProvider({
+      fetcher: fetcher as unknown as typeof fetch,
+    });
+
+    await expect(provider.getMarkets(ChainId.MAINNET)).resolves.toEqual([]);
+    await expect(
+      provider.getPositions(createContext(vi.fn()), {})
+    ).resolves.toEqual([]);
+  });
+
+  it("treats a non-array data field as no markets and no positions", async () => {
+    // Same contract as the null body: a malformed success response yields an
+    // empty result rather than a TypeError from iterating `data`.
+    const fetcher = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ data: {} }),
+    });
+    const provider = new VesuLendingProvider({
+      fetcher: fetcher as unknown as typeof fetch,
+    });
+
+    await expect(provider.getMarkets(ChainId.MAINNET)).resolves.toEqual([]);
+    await expect(
+      provider.getPositions(createContext(vi.fn()), {})
+    ).resolves.toEqual([]);
+  });
+
   it("skips malformed position API items instead of failing the full response", async () => {
     const fetcher = vi.fn().mockResolvedValue({
       ok: true,
@@ -263,6 +297,35 @@ describe("VesuLendingProvider", () => {
     expect(prepared.calls[0]!.entrypoint).toBe("approve");
     expect(prepared.calls[1]!.contractAddress).toBe(fromAddress("0x1234"));
     expect(prepared.calls[1]!.entrypoint).toBe("deposit");
+  });
+
+  it("caps the vToken cache and evicts the oldest entry", async () => {
+    const callContract = vi.fn().mockResolvedValue([fromAddress("0x1234")]);
+    const provider = new VesuLendingProvider();
+    const context = createContext(callContract);
+    const tokenAt = (i: number) => ({
+      ...debtToken,
+      address: fromAddress(`0x${(0x1000 + i).toString(16)}`),
+    });
+    const deposit = (i: number) =>
+      provider.prepareDeposit(context, {
+        token: tokenAt(i),
+        amount: Amount.parse("1", debtToken),
+      });
+
+    for (let i = 0; i < 130; i++) await deposit(i);
+
+    const cache = (provider as unknown as { vTokenCache: Map<string, unknown> })
+      .vTokenCache;
+    expect(cache.size).toBe(128);
+    expect(callContract).toHaveBeenCalledTimes(130);
+
+    // The two oldest were evicted, so the first token is looked up again;
+    // the newest is still cached.
+    await deposit(0);
+    expect(callContract).toHaveBeenCalledTimes(131);
+    await deposit(129);
+    expect(callContract).toHaveBeenCalledTimes(131);
   });
 
   it("rejects delegated withdraw owner overrides", async () => {

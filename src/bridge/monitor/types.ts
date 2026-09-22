@@ -66,11 +66,16 @@ export interface HyperlaneWithdrawMonitorResult extends BaseWithdrawMonitorResul
   protocol: "hyperlane";
 }
 
+export interface LayerswapWithdrawMonitorResult extends BaseWithdrawMonitorResult {
+  protocol: "layerswap";
+}
+
 export type WithdrawMonitorResult =
   | CanonicalWithdrawMonitorResult
   | CctpWithdrawMonitorResult
   | OftWithdrawMonitorResult
-  | HyperlaneWithdrawMonitorResult;
+  | HyperlaneWithdrawMonitorResult
+  | LayerswapWithdrawMonitorResult;
 
 export enum WithdrawalState {
   /** Bridging is in progress — no user action required yet. */

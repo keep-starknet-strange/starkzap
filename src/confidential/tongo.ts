@@ -1,7 +1,10 @@
 import type { Call } from "starknet";
-import { Account as TongoAccount } from "@fatsolutions/tongo-sdk";
-import type { ConfidentialProvider } from "@/confidential/interface";
 import type { Amount } from "@/types/amount";
+import {
+  loadTongoSdk,
+  type TongoAccount,
+  type TongoSdkModule,
+} from "@/confidential/tongoRuntime";
 import type {
   ConfidentialConfig,
   ConfidentialFundDetails,
@@ -14,13 +17,41 @@ import type {
 } from "@/confidential/types";
 
 /**
- * Tongo implementation of the {@link ConfidentialProvider} interface.
+ * Confidential transfers backed by the Tongo protocol.
  *
  * Each instance is bound to a single Tongo private key and contract.
  *
- * In addition to the standard {@link ConfidentialProvider} methods,
- * this class exposes Tongo-specific operations: {@link ragequit},
- * {@link rollover}, and direct access to the underlying Tongo account.
+ * Every operation returns plain `Call`s, so one operation can share a
+ * transaction with other calls through {@link TxBuilder}. Do not put two
+ * operations for the same account in one transaction. The second one is proved
+ * against a stale balance and nonce, and the whole transaction reverts. Send
+ * them one after another.
+ *
+ * This is one of two independent privacy integrations and is not
+ * interchangeable with the STRK20 privacy pool: Tongo keeps an encrypted
+ * *balance* per account and proves locally, while the privacy pool spends
+ * *notes* and needs a remote prover whose output rides on the transaction
+ * rather than inside a call. Pick whichever protocol you are integrating —
+ * there is no shared interface to code against.
+ *
+ * ## Reaching the rest of the Tongo SDK
+ *
+ * This class wraps the operations that produce `Call`s, plus balance and unit
+ * conversion. Tongo's `Account` does more than that: transaction history and
+ * per-event reads, audit and ex-post proofs, raw encrypted state, and manual
+ * decryption. For any of those, construct the SDK's `Account` yourself with the
+ * same config you passed here:
+ *
+ * ```ts
+ * import { Account } from "@fatsolutions/tongo-sdk";
+ *
+ * const tongo = new Account(privateKey, contractAddress, provider);
+ * const history = await tongo.getTxHistory(fromBlock);
+ * ```
+ *
+ * A second instance is equivalent to the one inside this class rather than a
+ * rival to it — `Account` holds no chain state, and reads its nonce and balance
+ * fresh on every call, so the two cannot disagree.
  *
  * @example
  * ```ts
@@ -29,7 +60,7 @@ import type {
  * const sdk = new StarkZap({ network: "mainnet" });
  * const wallet = await sdk.connectWallet({ ... });
  *
- * const confidential = new TongoConfidential({
+ * const confidential = await TongoConfidential.create({
  *   privateKey: tongoPrivateKey,
  *   contractAddress: TONGO_CONTRACT,
  *   provider: wallet.getProvider(),
@@ -46,18 +77,35 @@ import type {
  * console.log(`Confidential balance: ${state.balance}`);
  * ```
  */
-export class TongoConfidential implements ConfidentialProvider {
+export class TongoConfidential {
   readonly id = "tongo";
+  private readonly sdk: TongoSdkModule;
   private readonly account: TongoAccount;
 
-  constructor(config: ConfidentialConfig) {
-    // Cast needed: starkzap uses starknet v9 while tongo-sdk uses v8.
+  private constructor(sdk: TongoSdkModule, account: TongoAccount) {
+    this.sdk = sdk;
+    this.account = account;
+  }
+
+  /**
+   * Create a Tongo confidential account.
+   *
+   * Async because `@fatsolutions/tongo-sdk` is an optional peer dependency
+   * loaded on first use; if it is not installed this rejects with an install
+   * hint rather than breaking the `starkzap` import.
+   */
+  static async create(config: ConfidentialConfig): Promise<TongoConfidential> {
+    const sdk = await loadTongoSdk();
+
+    // Cast needed: starkzap uses starknet v10 while tongo-sdk (1.5.0) uses v9.
     // The Provider types are runtime-compatible but differ in private fields.
-    this.account = new TongoAccount(
+    const account = new sdk.Account(
       config.privateKey,
       config.contractAddress,
       config.provider as never
     );
+
+    return new TongoConfidential(sdk, account);
   }
 
   /** The Tongo address (base58-encoded public key) for this account. */
@@ -68,6 +116,14 @@ export class TongoConfidential implements ConfidentialProvider {
   /** The public key used to receive confidential transfers to this account. */
   get recipientId(): ConfidentialRecipient {
     return this.account.publicKey;
+  }
+
+  /**
+   * Decode a Tongo address (base58-encoded public key, as returned by
+   * {@link address}) into the `{ x, y }` recipient used by {@link transfer}.
+   */
+  recipientFromAddress(address: string): ConfidentialRecipient {
+    return this.sdk.pubKeyBase58ToAffine(address.trim());
   }
 
   /**
@@ -111,7 +167,8 @@ export class TongoConfidential implements ConfidentialProvider {
    */
   async fund(details: ConfidentialFundDetails): Promise<Call[]> {
     const op = await this.account.fund({
-      amount: details.amount.toBase(),
+      // Tongo works in confidential units (32-bit), not ERC20 base units.
+      amount: await this.toConfidentialUnits(details.amount),
       sender: details.sender,
       ...(details.feeTo !== undefined && { fee_to_sender: details.feeTo }),
     });
@@ -125,7 +182,7 @@ export class TongoConfidential implements ConfidentialProvider {
    */
   async transfer(details: ConfidentialTransferDetails): Promise<Call[]> {
     const op = await this.account.transfer({
-      amount: details.amount.toBase(),
+      amount: await this.toConfidentialUnits(details.amount),
       to: details.to,
       sender: details.sender,
       ...(details.feeTo !== undefined && { fee_to_sender: details.feeTo }),
@@ -140,7 +197,7 @@ export class TongoConfidential implements ConfidentialProvider {
    */
   async withdraw(details: ConfidentialWithdrawDetails): Promise<Call[]> {
     const op = await this.account.withdraw({
-      amount: details.amount.toBase(),
+      amount: await this.toConfidentialUnits(details.amount),
       to: details.to,
       sender: details.sender,
       ...(details.feeTo !== undefined && { fee_to_sender: details.feeTo }),
@@ -174,15 +231,5 @@ export class TongoConfidential implements ConfidentialProvider {
       sender: details.sender,
     });
     return [op.toCalldata()];
-  }
-
-  /**
-   * Access the underlying Tongo Account for advanced operations.
-   *
-   * Use this for event reading, audit proofs, or other operations
-   * not covered by the convenience methods.
-   */
-  getTongoAccount(): TongoAccount {
-    return this.account;
   }
 }

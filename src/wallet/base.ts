@@ -53,14 +53,8 @@ import {
 import type { WalletOnrampInput } from "@/wallet/interface";
 import type { PaycrestConfig } from "@/types/config";
 import type { PreparedSwap, SwapInput, SwapProvider, SwapQuote } from "@/swap";
-import { AvnuSwapProvider } from "@/swap";
 import { resolveSwapInput } from "@/swap/utils";
-import {
-  AvnuDcaProvider,
-  DcaClient,
-  type DcaClientInterface,
-  type DcaProvider,
-} from "@/dca";
+import { DcaClient, type DcaClientInterface, type DcaProvider } from "@/dca";
 import {
   LendingClient,
   type LendingProvider,
@@ -157,11 +151,13 @@ export abstract class BaseWallet implements WalletInterface {
       options.bridgingConfig,
       this.logger
     );
-    this.swapRegistry = new ProviderRegistry("swap");
-    this.swapRegistry.register(
-      options.defaultSwapProvider ?? new AvnuSwapProvider(),
-      true
+    this.swapRegistry = new ProviderRegistry(
+      "swap",
+      'Register a swap provider before swapping, e.g. `wallet.registerSwapProvider(new AvnuSwapProvider())` (AVNU requires the optional peer dependency "@avnu/avnu-sdk": npm i @avnu/avnu-sdk).'
     );
+    if (options.defaultSwapProvider) {
+      this.swapRegistry.register(options.defaultSwapProvider, true);
+    }
     this.lendingClient = new LendingClient(
       {
         address: this.address,
@@ -181,7 +177,7 @@ export abstract class BaseWallet implements WalletInterface {
         getDefaultSwapProvider: () => this.getDefaultSwapProvider(),
         getSwapProvider: (providerId) => this.getSwapProvider(providerId),
       },
-      options.defaultDcaProvider ?? new AvnuDcaProvider()
+      options.defaultDcaProvider
     );
   }
 

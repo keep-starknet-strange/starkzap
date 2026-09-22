@@ -7,12 +7,17 @@ import type {
   SwapRequest,
 } from "@/swap/interface";
 import {
-  DEFAULT_AVNU_API_BASES,
+  type AvnuApiBases,
+  type AvnuSdkModule,
+  loadAvnuSdk,
   normalizeAvnuCalls,
+  resolveAvnuApiBases,
   supportsAvnuChain,
   withAvnuApiBaseFallback,
 } from "@/utils/avnu";
-import { getQuotes, quoteToCalls, type Quote } from "@avnu/avnu-sdk";
+import type { Quote } from "@avnu/avnu-sdk";
+
+const AVNU_SWAP_FEATURE = "AVNU swaps";
 
 const DEFAULT_QUOTES_PAGE_SIZE = 5;
 const DEFAULT_SLIPPAGE_BPS = 100n;
@@ -67,16 +72,12 @@ function toSwapQuote(params: {
 export class AvnuSwapProvider implements SwapProvider {
   readonly id = "avnu";
 
-  private readonly apiBases: Record<"SN_MAIN" | "SN_SEPOLIA", string[]>;
+  private readonly apiBaseOverrides: AvnuSwapProviderOptions["apiBases"];
   private readonly quotesPageSize: number;
+  private resolvedApiBases: AvnuApiBases | undefined;
 
   constructor(options: AvnuSwapProviderOptions = {}) {
-    this.apiBases = {
-      SN_MAIN: options.apiBases?.SN_MAIN ?? [...DEFAULT_AVNU_API_BASES.SN_MAIN],
-      SN_SEPOLIA: options.apiBases?.SN_SEPOLIA ?? [
-        ...DEFAULT_AVNU_API_BASES.SN_SEPOLIA,
-      ],
-    };
+    this.apiBaseOverrides = options.apiBases;
     this.quotesPageSize = validateQuotesPageSize(
       options.quotesPageSize ?? DEFAULT_QUOTES_PAGE_SIZE
     );
@@ -86,6 +87,19 @@ export class AvnuSwapProvider implements SwapProvider {
     return supportsAvnuChain(chainId);
   }
 
+  /**
+   * Load the avnu SDK (running the optional-peer-dependency check) and resolve
+   * the per-chain API bases from its URL constants on first use.
+   */
+  private async ready(): Promise<{
+    sdk: AvnuSdkModule;
+    apiBases: AvnuApiBases;
+  }> {
+    const sdk = await loadAvnuSdk(AVNU_SWAP_FEATURE);
+    this.resolvedApiBases ??= resolveAvnuApiBases(sdk, this.apiBaseOverrides);
+    return { sdk, apiBases: this.resolvedApiBases };
+  }
+
   async getQuote(request: SwapRequest): Promise<SwapQuote> {
     const { quote } = await this.fetchQuoteForRequest(request);
 
@@ -93,10 +107,11 @@ export class AvnuSwapProvider implements SwapProvider {
   }
 
   async prepareSwap(request: SwapRequest): Promise<PreparedSwap> {
+    const { sdk } = await this.ready();
     const { quote, apiBase } = await this.fetchQuoteForRequest(request);
 
     const slippage = bpsToPercent(request.slippageBps ?? DEFAULT_SLIPPAGE_BPS);
-    const quoteToCallsRequest: Parameters<typeof quoteToCalls>[0] = {
+    const quoteToCallsRequest: Parameters<AvnuSdkModule["quoteToCalls"]>[0] = {
       quoteId: quote.quoteId,
       slippage,
       executeApprove: true,
@@ -106,7 +121,7 @@ export class AvnuSwapProvider implements SwapProvider {
       quoteToCallsRequest.takerAddress = request.takerAddress;
     }
 
-    const result = await quoteToCalls(quoteToCallsRequest, {
+    const result = await sdk.quoteToCalls(quoteToCallsRequest, {
       baseUrl: apiBase,
     });
     const calls = normalizeAvnuCalls(
@@ -150,13 +165,14 @@ export class AvnuSwapProvider implements SwapProvider {
     amountInBase: bigint;
     takerAddress?: Address;
   }): Promise<{ quote: Quote; apiBase: string }> {
+    const { sdk, apiBases } = await this.ready();
     return withAvnuApiBaseFallback({
-      apiBasesByChain: this.apiBases,
+      apiBasesByChain: apiBases,
       chainId: params.chainId,
       feature: "quote",
       action: "quote",
       run: async (apiBase) => {
-        const quotesRequest: Parameters<typeof getQuotes>[0] = {
+        const quotesRequest: Parameters<AvnuSdkModule["getQuotes"]>[0] = {
           sellTokenAddress: params.tokenInAddress,
           buyTokenAddress: params.tokenOutAddress,
           sellAmount: params.amountInBase,
@@ -167,7 +183,7 @@ export class AvnuSwapProvider implements SwapProvider {
           quotesRequest.takerAddress = params.takerAddress;
         }
 
-        const quotes = await getQuotes(quotesRequest, { baseUrl: apiBase });
+        const quotes = await sdk.getQuotes(quotesRequest, { baseUrl: apiBase });
 
         if (!quotes.length) {
           throw new Error("AVNU quote returned no routes");

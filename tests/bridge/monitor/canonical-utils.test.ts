@@ -1,7 +1,14 @@
-import { describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it } from "vitest";
 import { AbiCoder, type TransactionReceipt } from "ethers";
 import { constants, hash } from "starknet";
 import { deriveStarknetDepositTxHash } from "@/bridge/monitor/canonical/utils";
+import { loadEthers } from "@/connect/ethersRuntime";
+
+// `deriveStarknetDepositTxHash` reads ethers from the lazy runtime cache
+// (ethers is an optional peer dependency); populate it as production does.
+beforeAll(async () => {
+  await loadEthers("canonical-utils tests");
+});
 
 /** Event topic0: `LogMessageToL2` (Starknet Core Contract). Must match `canonical/utils.ts`. */
 const L2_MSG_TOPIC =

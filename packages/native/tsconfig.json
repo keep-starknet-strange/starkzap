@@ -2,6 +2,8 @@
   "compilerOptions": {
     "rootDir": "src",
     "outDir": "dist",
+    // expo/tsconfig.base sets noEmit:true; the build must emit dist/, so override it.
+    "noEmit": false,
     "baseUrl": ".",
     "paths": {
       "@/*": ["src/*"],

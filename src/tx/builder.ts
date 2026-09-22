@@ -21,7 +21,7 @@ import type {
   Token,
 } from "@/types";
 import type {
-  ConfidentialProvider,
+  TongoConfidential,
   ConfidentialFundDetails,
   ConfidentialTransferDetails,
   ConfidentialWithdrawDetails,
@@ -35,6 +35,13 @@ import type {
  * atomicity — either every operation succeeds or none of them do.
  *
  * Create a builder via `wallet.tx()`, chain operations, then call `.send()`.
+ *
+ * Some operations prepare their calls asynchronously, such as a swap that needs
+ * a quote. An error from that preparation is held and thrown by the first of
+ * {@link calls}, {@link estimateFee}, {@link simulate} or {@link send}. A builder
+ * that is never sent or otherwise resolved never reports it. Holding the error
+ * rather than letting the promise reject is what keeps an abandoned builder
+ * from raising an unhandled rejection.
  *
  * @example
  * ```ts
@@ -536,7 +543,7 @@ export class TxBuilder {
    * The provider returns all necessary calls (including ERC20 approve
    * when required), so no manual approve step is needed.
    *
-   * @param confidential - A {@link ConfidentialProvider} instance
+   * @param confidential - A {@link TongoConfidential} instance
    * @param details - Fund parameters (amount, sender)
    * @returns this (for chaining)
    *
@@ -548,7 +555,7 @@ export class TxBuilder {
    * ```
    */
   confidentialFund(
-    confidential: ConfidentialProvider,
+    confidential: TongoConfidential,
     details: ConfidentialFundDetails
   ): this {
     this.queueAsyncCalls(confidential.fund(details));
@@ -560,7 +567,7 @@ export class TxBuilder {
    *
    * Generates ZK proofs for the confidential transfer.
    *
-   * @param confidential - A {@link ConfidentialProvider} instance
+   * @param confidential - A {@link TongoConfidential} instance
    * @param details - Transfer parameters (amount, recipient pubkey, sender)
    * @returns this (for chaining)
    *
@@ -576,7 +583,7 @@ export class TxBuilder {
    * ```
    */
   confidentialTransfer(
-    confidential: ConfidentialProvider,
+    confidential: TongoConfidential,
     details: ConfidentialTransferDetails
   ): this {
     this.queueAsyncCalls(confidential.transfer(details));
@@ -586,7 +593,7 @@ export class TxBuilder {
   /**
    * Withdraw from a confidential account to a public address.
    *
-   * @param confidential - A {@link ConfidentialProvider} instance
+   * @param confidential - A {@link TongoConfidential} instance
    * @param details - Withdraw parameters (amount, recipient, sender)
    * @returns this (for chaining)
    *
@@ -602,7 +609,7 @@ export class TxBuilder {
    * ```
    */
   confidentialWithdraw(
-    confidential: ConfidentialProvider,
+    confidential: TongoConfidential,
     details: ConfidentialWithdrawDetails
   ): this {
     this.queueAsyncCalls(confidential.withdraw(details));

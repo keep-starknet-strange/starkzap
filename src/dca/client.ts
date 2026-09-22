@@ -14,7 +14,6 @@ import type {
   PreparedDcaAction,
 } from "@/dca/interface";
 import { assertPreparedCalls } from "@/providers/assert";
-import { AvnuDcaProvider } from "@/dca/avnu";
 import {
   assertDcaContext,
   hydrateDcaCancelInput,
@@ -31,8 +30,13 @@ export class DcaClient implements DcaClientInterface {
 
   constructor(context: DcaExecutionContext, defaultProvider?: DcaProvider) {
     this.context = context;
-    this.registry = new ProviderRegistry("DCA");
-    this.registry.register(defaultProvider ?? new AvnuDcaProvider(), true);
+    this.registry = new ProviderRegistry(
+      "DCA",
+      'Register a DCA provider before using DCA, e.g. `registerProvider(new AvnuDcaProvider())` (via `wallet.dca()` or directly on a `DcaClient`). AVNU requires the optional peer dependency "@avnu/avnu-sdk": npm i @avnu/avnu-sdk.'
+    );
+    if (defaultProvider) {
+      this.registry.register(defaultProvider, true);
+    }
   }
 
   registerProvider(provider: DcaProvider, makeDefault = false): void {

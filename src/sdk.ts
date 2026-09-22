@@ -129,7 +129,9 @@ export class StarkZap {
         "StarkZap requires either 'network' or 'rpcUrl' to be specified"
       );
     }
-    const normalizedRpcUrl = assertSafeHttpUrl(rpcUrl, "rpcUrl").toString();
+    const normalizedRpcUrl = assertSafeHttpUrl(rpcUrl, "rpcUrl", {
+      allowInsecureHttp: config.allowInsecureHttp,
+    }).toString();
 
     // Resolve chainId (explicit > network preset)
     const chainId = config.chainId ?? networkPreset?.chainId;
@@ -148,10 +150,11 @@ export class StarkZap {
     if (explorer?.baseUrl) {
       explorer = {
         ...explorer,
-        baseUrl: assertSafeHttpUrl(
-          explorer.baseUrl,
-          "explorer.baseUrl"
-        ).toString(),
+        // A link the app renders, never a channel the SDK sends over, so
+        // plain http is a display choice rather than a data exposure.
+        baseUrl: assertSafeHttpUrl(explorer.baseUrl, "explorer.baseUrl", {
+          allowInsecureHttp: true,
+        }).toString(),
       };
     }
 
@@ -397,6 +400,7 @@ export class StarkZap {
         ...(privy.requestTimeoutMs && {
           requestTimeoutMs: privy.requestTimeoutMs,
         }),
+        ...(this.config.allowInsecureHttp && { allowInsecureHttp: true }),
       });
 
       const wallet = await this.connectWallet({
@@ -476,6 +480,7 @@ export class StarkZap {
         chainId: this.config.chainId,
         ...(explorer && { explorer }),
         ...(this.config.logging && { logging: this.config.logging }),
+        ...(this.config.allowInsecureHttp && { allowInsecureHttp: true }),
       },
       this.config.staking,
       this.config.bridging,
@@ -535,6 +540,9 @@ export class StarkZap {
    * Get bridgeable tokens for the SDK's configured Starknet network.
    *
    * @remarks
+   * Requires `bridging.layerswapApiKey` in the SDK configuration — Layerswap
+   * tokens are discovered from the Layerswap API, which needs the key.
+   *
    * The bridge token API environment is inferred from the configured chain:
    * - `SN_MAIN` -> `mainnet`
    * - `SN_SEPOLIA` -> `testnet`
@@ -555,8 +563,18 @@ export class StarkZap {
    */
   async getBridgingTokens(chain?: ExternalChain): Promise<BridgeToken[]> {
     if (!this.bridgeTokenRepository) {
+      const layerswapApiKey = this.config.bridging?.layerswapApiKey;
+      const layerswapBaseUrl = this.config.bridging?.layerswapBaseUrl;
       this.bridgeTokenRepository = new BridgeTokenRepository({
         logger: createLogger(this.config.logging),
+        ...(layerswapApiKey
+          ? {
+              layerswapOptions: {
+                apiKey: layerswapApiKey,
+                ...(layerswapBaseUrl ? { baseUrl: layerswapBaseUrl } : {}),
+              },
+            }
+          : {}),
       });
     }
 

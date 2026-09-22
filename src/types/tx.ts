@@ -36,7 +36,13 @@ export interface TxWatchOptions {
    * @default 600000 (10 minutes)
    */
   timeoutMs?: number;
-  /** Optional callback for recoverable polling errors or timeout. */
+  /**
+   * Optional callback for recoverable polling errors or timeout.
+   *
+   * A throw from this callback is logged with `console.error` and does not stop
+   * the watch. The poll runs detached, so letting it escape would be an unhandled
+   * rejection.
+   */
   onError?: (error: Error) => void;
 }
 

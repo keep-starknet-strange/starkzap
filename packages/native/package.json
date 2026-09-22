@@ -24,6 +24,12 @@
       "import": "./dist/index.js",
       "default": "./dist/index.js"
     },
+    "./privacy": {
+      "types": "./dist/privacy.d.ts",
+      "react-native": "./src/privacy.ts",
+      "import": "./dist/privacy.js",
+      "default": "./dist/privacy.js"
+    },
     "./metro": {
       "require": "./metro.cjs"
     }

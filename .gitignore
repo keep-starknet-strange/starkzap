@@ -36,4 +36,7 @@ coverage/
 *.pem
 wallets.json
 tasks/
-.claude/
+
+# Claude Code: shared skills/settings are versioned, per-machine settings are not
+**/.claude/settings.local.json
+examples/mobile/.claude/
