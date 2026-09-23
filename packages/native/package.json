@@ -1,6 +1,6 @@
 {
   "name": "starkzap-native",
-  "version": "3.0.0",
+  "version": "4.0.0",
   "description": "React Native companion package for Starkzap",
   "homepage": "https://github.com/keep-starknet-strange/starkzap/tree/main/packages/native#readme",
   "bugs": {
@@ -52,7 +52,7 @@
   },
   "dependencies": {
     "expo": "^55.0.8",
-    "starkzap": "^3.0.0"
+    "starkzap": "^4.0.0"
   },
   "peerDependencies": {
     "@ethersproject/shims": "^5.7.0",

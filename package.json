@@ -1,6 +1,6 @@
 {
   "name": "starkzap",
-  "version": "3.0.0",
+  "version": "4.0.0",
   "description": "Helper sdk for easy wallet integration",
   "workspaces": [
     "packages/*"
