@@ -4,6 +4,7 @@ import {
   ChainId,
   type ExplorerConfig,
   getChainId,
+  type PaycrestConfig,
   type SDKConfig,
   type StakingConfig,
 } from "@/types/config";
@@ -182,6 +183,7 @@ export class StarkZap {
     chainId: ChainId;
     explorer?: ExplorerConfig;
     logging?: LoggerConfig;
+    paycrest?: PaycrestConfig;
     rpcUrl: string;
     staking?: StakingConfig;
   }> {
@@ -481,7 +483,8 @@ export class StarkZap {
         ...(this.config.allowInsecureHttp && { allowInsecureHttp: true }),
       },
       this.config.staking,
-      this.config.bridging
+      this.config.bridging,
+      this.config.paycrest
     );
     return wallet as CartridgeWalletInterface;
   }

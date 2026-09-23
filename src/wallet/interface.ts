@@ -13,6 +13,14 @@ import type { Staking, EndurStaking, EndurStakingOptions } from "@/staking";
 import type { LendingClient } from "@/lending";
 import type { DcaClientInterface } from "@/dca";
 import type { Troves, TrovesOptions } from "@/troves";
+import type {
+  Paycrest,
+  PaycrestOptions,
+  OfframpInput,
+  OfframpResult,
+  OnrampInput,
+  OnrampResult,
+} from "@/paycrest";
 import type { PreparedSwap, SwapInput, SwapProvider, SwapQuote } from "@/swap";
 import type {
   Address,
@@ -353,4 +361,53 @@ export interface WalletInterface extends BridgeOperatorInterface {
    * (Troves is a mainnet-only service).
    */
   troves(options?: TrovesOptions): Troves;
+
+  // ============================================================
+  // Paycrest — fiat on/off-ramp
+  // ============================================================
+
+  /**
+   * Get a Paycrest client for fiat on/off-ramps.
+   *
+   * The same instance is returned across calls. **Options only apply on the
+   * first call** — subsequent calls ignore them and return the cached
+   * instance.
+   *
+   * Off-ramp methods (`offramp`, `populateOfframp`) take this wallet as
+   * their first argument; on-ramp (`onramp`) is wallet-independent. See
+   * `Paycrest` for the full API.
+   *
+   * Paycrest is mainnet-only.
+   */
+  paycrest(options?: PaycrestOptions): Paycrest;
+
+  /**
+   * Submit a fiat off-ramp order (stablecoin → bank/mobile money).
+   *
+   * Thin convenience wrapper over `wallet.paycrest().offramp(wallet,
+   * input)` so the API key flows from `SDKConfig.paycrest`. Use
+   * `paycrest()` directly for advanced use (custom options, populate-only
+   * builders).
+   */
+  offramp(
+    input: OfframpInput,
+    options?: ExecuteOptions
+  ): Promise<OfframpResult>;
+
+  /**
+   * Submit a fiat on-ramp order (bank/mobile money → stablecoin).
+   *
+   * Thin convenience wrapper over `wallet.paycrest().onramp(input)`.
+   * `to.recipient` defaults to this wallet's address when omitted.
+   */
+  onramp(input: WalletOnrampInput): Promise<OnrampResult>;
 }
+
+/**
+ * Input to {@link WalletInterface.onramp}. Identical to {@link OnrampInput}
+ * except `to.recipient` is optional — it defaults to the wallet's own
+ * address when omitted.
+ */
+export type WalletOnrampInput = Omit<OnrampInput, "to"> & {
+  to: Omit<OnrampInput["to"], "recipient"> & { recipient?: Address };
+};

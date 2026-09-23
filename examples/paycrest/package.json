@@ -1,0 +1,18 @@
+{
+  "name": "starkzap-example-paycrest",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "offramp:gateway": "node --import tsx offramp-gateway.ts",
+    "offramp:api": "node --import tsx offramp-api.ts",
+    "onramp": "node --import tsx onramp.ts",
+    "postinstall": "cd ../.. && npm run build"
+  },
+  "dependencies": {
+    "dotenv": "^17.2.3",
+    "starkzap": "file:../.."
+  },
+  "devDependencies": {
+    "tsx": "^4.19.2"
+  }
+}

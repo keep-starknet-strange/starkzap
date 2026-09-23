@@ -41,7 +41,8 @@
     "@hyperlane-xyz/utils": "^14.4.0",
     "@solana/web3.js": "^1.98.4",
     "@starkware-libs/starknet-privacy-sdk": "^0.14.3-rc.5",
-    "ethers": "^6.16.0"
+    "ethers": "^6.16.0",
+    "node-forge": "^1.3.1"
   },
   "peerDependenciesMeta": {
     "@avnu/avnu-sdk": {
@@ -75,6 +76,9 @@
       "optional": true
     },
     "fast-text-encoding": {
+      "optional": true
+    },
+    "node-forge": {
       "optional": true
     },
     "react-native-get-random-values": {
@@ -128,7 +132,9 @@
     "eslint": "^9.39.2",
     "eslint-config-prettier": "^10.1.8",
     "ethers": "^6.16.0",
+    "@types/node-forge": "^1.3.11",
     "husky": "^9.1.7",
+    "node-forge": "^1.3.1",
     "prettier": "3.8.1",
     "starknet-devnet": "^0.8.2",
     "tsc-alias": "^1.8.16",
