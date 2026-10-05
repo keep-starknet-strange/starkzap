@@ -19,6 +19,8 @@ import {
   AUTO_PRIVATE_KEY,
   AUTO_ACCOUNT_PRESET,
   PAYMASTER_NODE_URL,
+  PAYCREST_API_BASE,
+  PAYCREST_PLACEHOLDER_API_KEY,
 } from "./config";
 import { sdkLogger, log } from "./logger";
 import { feeOptions } from "./settings";
@@ -102,6 +104,12 @@ export const sdk = new StarkZap({
   ...(bridging ? { bridging } : {}),
   // Enables the "Sponsored" toggles. Absent when no proxy is set.
   ...(PAYMASTER_NODE_URL ? { paymaster: { nodeUrl: PAYMASTER_NODE_URL } } : {}),
+  // Used by wallet.offramp / wallet.onramp. Requests go through the dev-server
+  // proxy, which swaps in the real key (see config.ts).
+  paycrest: {
+    apiKey: PAYCREST_PLACEHOLDER_API_KEY,
+    apiBaseUrl: PAYCREST_API_BASE,
+  },
 });
 
 interface WalletState {

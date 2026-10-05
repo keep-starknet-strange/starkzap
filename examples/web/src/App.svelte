@@ -13,6 +13,7 @@
   import PrivacyScreen from "~/features/privacy/PrivacyScreen.svelte";
   import LendingScreen from "~/features/lending/LendingScreen.svelte";
   import BridgePanel from "~/features/bridge/BridgePanel.svelte";
+  import PaycrestPanel from "~/features/paycrest/PaycrestPanel.svelte";
 
   // Ordered tabs mirroring mobile.
   const TABS: { key: string; label: string; component: Component }[] = [
@@ -24,6 +25,7 @@
     { key: "privacy", label: "Privacy", component: PrivacyScreen },
     { key: "yield", label: "Yield", component: YieldPanel },
     { key: "bridge", label: "Bridge", component: BridgePanel },
+    { key: "fiat", label: "Fiat", component: PaycrestPanel },
   ];
 
   let active = $state("balances");

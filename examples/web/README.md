@@ -310,6 +310,16 @@ VITE_ALCHEMY_API_KEY=<key>   # Enables Ethereum/Solana RPC for gas estimation an
 VITE_OFT_PUBLIC_KEY=<key>    # LayerZero API key for OFT bridge support (mainnet only)
 ```
 
+### Fiat ramp (Paycrest)
+
+The **Fiat** tab on- and off-ramps through the Paycrest Sender API with the connected wallet. Paycrest is mainnet-only.
+
+```bash
+PAYCREST_API_KEY=<key>   # Sender API key from app.paycrest.io (no VITE_ prefix)
+```
+
+Paycrest's API sends no CORS headers, so `npm run dev` proxies it at `/paycrest-api` and the proxy attaches the key — it is never inlined into the browser bundle. Without the key, rates still load but orders are disabled. The proxy only exists under the dev server.
+
 ### Privy Server URL
 
 The Privy server URL defaults to `http://localhost:3001`. Change it in `main.ts` if your server runs elsewhere:

@@ -1,4 +1,4 @@
-import { defineConfig, type Plugin } from "vite";
+import { defineConfig, loadEnv, type Plugin } from "vite";
 import path from "path";
 import { createRequire } from "module";
 import { nodePolyfills } from "vite-plugin-node-polyfills";
@@ -18,51 +18,76 @@ function resolvePolyfillShims(): Plugin {
   };
 }
 
-export default defineConfig({
-  // Cartridge's keychain login uses WebAuthn/passkeys, which browsers refuse on
-  // any origin with a TLS certificate error. A self-signed cert (basicSsl) is
-  // NOT enough — WebAuthn needs a *trusted* cert. mkcert installs a local CA
-  // and issues a trusted localhost cert, so https://localhost has no cert error.
-  plugins: [mkcert(), svelte(), nodePolyfills(), resolvePolyfillShims()],
-  server: {
-    allowedHosts: ["localhost", ".trycloudflare.com"],
-    // Vite serves HTTPS over HTTP/2 (`http2.createSecureServer`, unconditional
-    // in v7). Browsers won't open a WebSocket over an h2 connection without
-    // RFC 8441 extended CONNECT, which node's http2 server doesn't enable, so
-    // HMR silently fails to connect while the page itself loads fine. Giving
-    // HMR its own port makes Vite spin up a standalone HTTP/1.1 TLS server for
-    // it (reusing the mkcert cert), where the WebSocket upgrade works.
-    hmr: { port: 24678 },
-  },
-  resolve: {
-    alias: {
-      // More specific first: Vite matches aliases in order.
-      "starkzap/privacy": path.resolve(__dirname, "../../src/privacy/index.ts"),
-      starkzap: path.resolve(__dirname, "../../src/index.ts"),
-      "@": path.resolve(__dirname, "../../src"),
-      "~": path.resolve(__dirname, "src"),
+export default defineConfig(({ mode }) => {
+  // Read without the VITE_ prefix so the key stays on the dev server and is
+  // never inlined into the browser bundle.
+  const paycrestApiKey = loadEnv(mode, __dirname, "").PAYCREST_API_KEY?.trim();
+
+  return {
+    // Cartridge's keychain login uses WebAuthn/passkeys, which browsers refuse on
+    // any origin with a TLS certificate error. A self-signed cert (basicSsl) is
+    // NOT enough — WebAuthn needs a *trusted* cert. mkcert installs a local CA
+    // and issues a trusted localhost cert, so https://localhost has no cert error.
+    plugins: [mkcert(), svelte(), nodePolyfills(), resolvePolyfillShims()],
+    server: {
+      allowedHosts: ["localhost", ".trycloudflare.com"],
+      // Vite serves HTTPS over HTTP/2 (`http2.createSecureServer`, unconditional
+      // in v7). Browsers won't open a WebSocket over an h2 connection without
+      // RFC 8441 extended CONNECT, which node's http2 server doesn't enable, so
+      // HMR silently fails to connect while the page itself loads fine. Giving
+      // HMR its own port makes Vite spin up a standalone HTTP/1.1 TLS server for
+      // it (reusing the mkcert cert), where the WebSocket upgrade works.
+      hmr: { port: 24678 },
+      // Paycrest's API is server-to-server and sends no CORS headers, so the
+      // browser can't call it directly. Proxy it same-origin and attach the API
+      // key here; the SDK's paycrest apiBaseUrl points at /paycrest-api (see
+      // src/lib/stores/config.ts). Lowercase so it replaces the browser's
+      // placeholder header rather than sitting beside it.
+      proxy: {
+        "/paycrest-api": {
+          target: "https://api.paycrest.io",
+          changeOrigin: true,
+          rewrite: (p: string) => p.replace(/^\/paycrest-api/, ""),
+          ...(paycrestApiKey && { headers: { "api-key": paycrestApiKey } }),
+        },
+      },
     },
-  },
-  optimizeDeps: {
-    exclude: ["starkzap"],
-    // The SDK reaches its optional peers through `await import(...)` inside
-    // lazy loaders. Vite's scanner only pre-bundles statically imported bare
-    // specifiers, so these are discovered at runtime instead — triggering a
-    // second optimize pass that changes the dep hashes, 504s every module
-    // request already in flight ("Outdated Optimize Dep") and force-reloads
-    // the page. Listing them here puts them in the first pass, so there is
-    // no second pass and no 504.
-    include: [
-      "@avnu/avnu-sdk",
-      "@cartridge/controller",
-      "@fatsolutions/tongo-sdk",
-      "@hyperlane-xyz/registry",
-      "@hyperlane-xyz/sdk",
-      "@hyperlane-xyz/utils",
-      "@solana/web3.js",
-      "@starkware-libs/starknet-privacy-sdk",
-      "ethers",
-    ],
-  },
-  envPrefix: "VITE_",
+    define: {
+      __PAYCREST_KEY_CONFIGURED__: JSON.stringify(Boolean(paycrestApiKey)),
+    },
+    resolve: {
+      alias: {
+        // More specific first: Vite matches aliases in order.
+        "starkzap/privacy": path.resolve(
+          __dirname,
+          "../../src/privacy/index.ts"
+        ),
+        starkzap: path.resolve(__dirname, "../../src/index.ts"),
+        "@": path.resolve(__dirname, "../../src"),
+        "~": path.resolve(__dirname, "src"),
+      },
+    },
+    optimizeDeps: {
+      exclude: ["starkzap"],
+      // The SDK reaches its optional peers through `await import(...)` inside
+      // lazy loaders. Vite's scanner only pre-bundles statically imported bare
+      // specifiers, so these are discovered at runtime instead — triggering a
+      // second optimize pass that changes the dep hashes, 504s every module
+      // request already in flight ("Outdated Optimize Dep") and force-reloads
+      // the page. Listing them here puts them in the first pass, so there is
+      // no second pass and no 504.
+      include: [
+        "@avnu/avnu-sdk",
+        "@cartridge/controller",
+        "@fatsolutions/tongo-sdk",
+        "@hyperlane-xyz/registry",
+        "@hyperlane-xyz/sdk",
+        "@hyperlane-xyz/utils",
+        "@solana/web3.js",
+        "@starkware-libs/starknet-privacy-sdk",
+        "ethers",
+      ],
+    },
+    envPrefix: "VITE_",
+  };
 });

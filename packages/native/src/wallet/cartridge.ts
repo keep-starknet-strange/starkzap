@@ -8,6 +8,7 @@ import type {
   ExplorerConfig,
   FeeMode,
   LoggerConfig,
+  PaycrestConfig,
   PreflightOptions,
   PreflightResult,
   StakingConfig,
@@ -271,6 +272,7 @@ export interface NativeCartridgeWalletOptions {
   feeMode?: SupportedNativeCartridgeFeeMode;
   timeBounds?: PaymasterTimeBounds;
   staking?: StakingConfig;
+  paycrest?: PaycrestConfig;
   logging?: LoggerConfig;
 }
 
@@ -292,6 +294,7 @@ export class NativeCartridgeWallet extends BaseWallet {
       address: fromAddress(options.session.account.address),
       ...(options.bridging && { bridgingConfig: options.bridging }),
       stakingConfig: staking,
+      ...(options.paycrest && { paycrestConfig: options.paycrest }),
       ...(options.logging && { logging: options.logging }),
     });
     this.session = options.session;

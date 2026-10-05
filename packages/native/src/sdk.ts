@@ -49,7 +49,7 @@ export class StarkZap extends CoreStarkZap {
     await this.ensureProviderChainMatchesConfig();
 
     const provider = this.getProvider();
-    const { bridging, chainId, explorer, rpcUrl, staking, logging } =
+    const { bridging, chainId, explorer, rpcUrl, staking, paycrest, logging } =
       this.getResolvedConfig();
     const walletExplorer = options.explorer ?? explorer;
 
@@ -81,6 +81,7 @@ export class StarkZap extends CoreStarkZap {
       }),
       ...(bridging && { bridging }),
       ...(staking && { staking }),
+      ...(paycrest && { paycrest }),
       ...(logging && { logging }),
     });
 

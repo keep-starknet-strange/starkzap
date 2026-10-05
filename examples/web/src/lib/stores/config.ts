@@ -117,6 +117,15 @@ export const PAYMASTER_NODE_URL =
     ? (env.VITE_PAYMASTER_PROXY_URL as string | undefined)?.trim()
     : undefined);
 
+// Paycrest fiat ramp (mainnet only). Paycrest's API sends no CORS headers, so
+// the dev server proxies it at /paycrest-api (see vite.config.ts) and adds the
+// API key there, read from PAYCREST_API_KEY without the VITE_ prefix so it never
+// ships in the bundle. The SDK still requires *a* key before it sends order
+// requests; the proxy overwrites this placeholder with the real one.
+export const PAYCREST_API_BASE = `${location.origin}/paycrest-api`;
+export const PAYCREST_PLACEHOLDER_API_KEY = "added-by-dev-proxy";
+export const PAYCREST_KEY_CONFIGURED = __PAYCREST_KEY_CONFIGURED__;
+
 // Reown/WalletConnect project id — enables the bridge's external wallet connect.
 export const REOWN_PROJECT_ID = env.VITE_REOWN_PROJECT_ID as string | undefined;
 
